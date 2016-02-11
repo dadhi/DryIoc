@@ -282,15 +282,24 @@ namespace DryIocAttributes
         /// <summary>Contract key of Decorated type, not for a decorator itself. Used to find the service to apply decorator to.</summary>
         public object ContractKey { get; set; }
 
-        /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
+        /// <summary>If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// - first registered are closer decoratee.</summary>
         public int Order { get; set; }
 
         /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
         public bool UseDecorateeReuse { get; set; }
 
         /// <summary>Creates attribute by providing its optional properties.</summary>
-        /// <param name="contractKey">(optional)</param> <param name="order">(optional)</param>
-        /// <param name="useDecorateeReuse">(optional)</param>
+        /// <param name="contractKey">(optional) Contract key of Decorated type, not for a decorator itself. 
+        /// Used to find the service to apply decorator to.</param> 
+        /// <param name="order">(optional)If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// - first registered are closer decoratee.</param>
+        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse. 
+        /// Decorated service may be decorator itself.</param>
         public AsDecoratorAttribute(object contractKey = null, int order = 0, bool useDecorateeReuse = false)
         {
             ContractKey = contractKey;

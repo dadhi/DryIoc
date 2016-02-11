@@ -813,78 +813,74 @@ namespace DryIoc
                 return null;
 
             var serviceType = request.ServiceType;
-            var parent = request.Parent;
-            var prevDecoratorID = parent.FactoryType == FactoryType.Decorator ? parent.FactoryID : -1;
-
             var container = request.Container;
-
+            
+            // Get decorators for the service type
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
 
-            // todo: test the ordering?
-            // append less specific open-generic decorators
+            // Append open-generic decorators
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
-                decorators = decorators.Append(container.GetDecoratorFactoriesOrDefault(openGenericServiceType));
+            {
+                var openeGenericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
+                if (!openeGenericDecorators.IsNullOrEmpty())
+                {
+                    var closeGenericDecorators = openeGenericDecorators
+                        .Select(d => d.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
+                        .Where(d => d != null)
+                        .ToArrayOrSelf();
+                    decorators = decorators.Append(closeGenericDecorators);
+                }
+            }
 
-            // append even lesser specific object decorators
-            var objectDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object))
-                .Where(d => d.CheckCondition(request))
-                .ToArrayOrSelf();
+            // Append arbitrary object decorators
+            var objectDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!objectDecorators.IsNullOrEmpty())
                 decorators = decorators.Append(objectDecorators);
 
+            // Return fast if no decorators found
             if (decorators.IsNullOrEmpty())
                 return null;
 
-            // Decorators are applied in a reverse order, so the first registered decorator will be closer to decorated service
-            // comparing to next registered one.
+            // There are already decorators in chain:
+            // - First is to exclude already applied decorators
             Factory decorator;
-            if (prevDecoratorID == -1)
+            var parent = request.Parent;
+            if (parent.FactoryType == FactoryType.Decorator)
             {
-                decorator = decorators[decorators.Length - 1];
+                var appliedDecoratorIDs = parent.Enumerate()
+                    .TakeWhile(p => p.FactoryType != FactoryType.Service)
+                    .Where(p => p.FactoryType == FactoryType.Decorator)
+                    .Select(d => d.FactoryID)
+                    .ToArray();
+
+                if (appliedDecoratorIDs.Length != 0)
+                    decorators = decorators
+                        .Where(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1)
+                        .ToArray();
+
+                // return earlier if all decorators are already applied
+                if (decorators.Length == 0)
+                    return null;
+            }
+
+            if (decorators.Length == 1)
+            {
+                decorator = decorators[0];
+                if (!decorator.CheckCondition(request))
+                    return null;
             }
             else
             {
-                var prevDecoratorIndex = IndexOfDecorator(decorators, prevDecoratorID, request);
-                // if decorator was removed, go further to the next parent decorator or use first if not found
-                if (prevDecoratorIndex == -1)
-                {
-                    for (var p = parent.Parent;
-                        !p.IsEmpty && p.FactoryType == FactoryType.Decorator && prevDecoratorIndex == -1;
-                        p = p.Parent)
-                        prevDecoratorIndex = IndexOfDecorator(decorators, p.FactoryID, request);
-                    if (prevDecoratorIndex == -1) // if no used decorators found then just use the first
-                        prevDecoratorIndex = decorators.Length;
-                }
-
-                if (prevDecoratorIndex - 1 < 0)
-                    return null;
-
-                decorator = decorators[prevDecoratorIndex - 1];
+                // - Within remaining decorators find one with maximum Order
+                // or if no Order for all decorators, then the last registered - with maximum FactoryID
+                decorator = decorators
+                    .OrderByDescending(d => ((Setup.DecoratorSetup)d.Setup).Order)
+                    .ThenByDescending(d => d.FactoryID)
+                    .FirstOrDefault(d => d.CheckCondition(request));
             }
-
-            var condition = decorator.Setup.Condition;
-            if (condition != null && !condition(request.ToRequestInfo()))
-                return null;
-
-            if (decorator.FactoryGenerator != null)
-                decorator = decorator.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
 
             return decorator == null ? null : decorator.GetExpressionOrDefault(request);
-        }
-
-        private static int IndexOfDecorator(Factory[] decorators, int decoratorID, Request request)
-        {
-            var i = decorators.Length - 1;
-            for (; i >= 0; i--)
-            {
-                var factory = decorators[i];
-                if (factory.FactoryGenerator != null)
-                    factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
-                if (factory != null && factory.FactoryID == decoratorID)
-                    break;
-            }
-            return i;
         }
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
@@ -1314,31 +1310,8 @@ namespace DryIoc
                 return factory.FactoryType == FactoryType.Service
                         ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, InsertDecorator))
+                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append))
                         : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
-            }
-
-            private static Factory[] InsertDecorator(Factory[] oldDecorators, Factory[] newDecorators)
-            {
-                var newDecorator = newDecorators[0]; // always a single decorator
-                var decorators = new Factory[oldDecorators.Length + 1];
-                var newDecoratorIndex = oldDecorators.Length;
-                var indexShift = 0;
-                for (var i = 0; i < oldDecorators.Length; i++)
-                {
-                    var oldDecorator = oldDecorators[i];
-                    if (indexShift == 0 &&
-                        ((Setup.DecoratorSetup)newDecorator.Setup).Order <
-                        ((Setup.DecoratorSetup)oldDecorator.Setup).Order)
-                    {
-                        newDecoratorIndex = i;
-                        indexShift = 1;
-                    }
-                    decorators[i + indexShift] = oldDecorator;
-                }
-
-                decorators[newDecoratorIndex] = newDecorator;
-                return decorators;
             }
 
             public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
@@ -5228,8 +5201,10 @@ namespace DryIoc
         /// <summary>Creates setup with optional condition.</summary>
         /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
         /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
-        /// Decorated service may be decorator itself.</param>
+        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// - first registered are closer decoratee.</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
         public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
         {
@@ -5362,7 +5337,10 @@ namespace DryIoc
             /// <summary>Returns Decorator factory type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
 
-            /// <summary>If provided specifies relative decorator position in decorators chain.</summary>
+            /// <summary>If provided specifies relative decorator position in decorators chain.
+            /// Greater number means further from decoratee - specify negative number to stay closer.
+            /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+            /// - first registered are closer decoratee.</summary>
             public readonly int Order;
 
             /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
@@ -5370,7 +5348,10 @@ namespace DryIoc
 
             /// <summary>Creates decorator setup with optional condition.</summary>
             /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
-            /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
+            /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.
+            /// Greater number means further from decoratee - specify negative number to stay closer.
+            /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+            /// - first registered are closer decoratee.</param>
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
             public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)

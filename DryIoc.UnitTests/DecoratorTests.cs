@@ -542,6 +542,26 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_register_custom_Disposer_just_with_Disposer_and_without_Factory()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton);
+
+            container.Register<FooDisposer>(
+                setup: Setup.With(useParentReuse: true));
+
+            container.Register(Made.Of(
+                r => ServiceInfo.Of<FooDisposer>(),
+                f => f.TrackForDispose(Arg.Of<Foo>())),
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var foo = container.Resolve<Foo>();
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+        }
+
+        [Test]
         public void Decorator_created_by_factory_should_be_compasable_with_other_decorator()
         {
             var container = new Container();
@@ -617,7 +637,7 @@ namespace DryIoc.UnitTests
             container.Register<S, SS>(setup: Setup.Decorator);
             container.Register<object>(made: Made.Of(r =>
                 GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
-                setup: Setup.DecoratorWith(order: 1));
+                setup: Setup.DecoratorWith(order: -1));
 
             var s = container.Resolve<S>();
             Assert.AreEqual("OkNot", s.Message);
@@ -717,9 +737,10 @@ namespace DryIoc.UnitTests
         {
             protected T Item;
 
-            public void TrackForDispose(T item)
+            public T TrackForDispose(T item)
             {
                 Item = item;
+                return item;
             }
 
             public abstract void Dispose();
