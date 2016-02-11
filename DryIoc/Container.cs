@@ -1670,11 +1670,13 @@ namespace DryIoc
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Made made = null)
         {
-            var facade = container.CreateFacade();
+            // Creates independent registry
+            var facade = container.WithRegistrationsCopy();
+
             var implType = facade.GetWrappedType(concreteType, null);
             facade.Register(implType, made: made);
 
-            // NOTE Facade is not disposed because if concreteType is Lazy<T> it need to hold on facade yet.
+            // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
             return facade.Resolve(concreteType);
         }
 

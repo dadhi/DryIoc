@@ -562,7 +562,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Foo>(Reuse.Singleton, serviceKey: "blah");
-            container.RegisterDisposer<Foo>(f => f.IsReleased = true, r => r.ServiceKey == "blah");
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true, r => "blah".Equals(r.ServiceKey));
 
             var foo = container.Resolve<Foo>("blah");
 
