@@ -35,11 +35,7 @@ namespace DryIocZero
 /* 
 Errors during resolution:
 -----------------------------
-SERVICE: String registered as factory {ID=127}
-ERROR: Runtime state is required to inject (or use) the value System.Func`2[DryIoc.IResolver,System.Object]. 
-The source of runtime state is RegisterDelegate, RegisterInstance, or registering with non-primitive service key, or metadata.
-To allow the value you can use container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_DELEGATE)).
-
+Generation went without errors.
 -----------------------------
 end of exception list
 */
@@ -49,40 +45,40 @@ end of exception list
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
         {
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan))
                 service = Create_0(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService))
                 service = Create_1(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService))
                 service = Create_2(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb))
                 service = Create_3(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService))
-                service = Create_7(this, scope);
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B))
+                service = Create_4(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb))
                 service = Create_8(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1))
                 service = Create_9(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan))
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2))
                 service = Create_10(this, scope);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb))
-                service = Create_11(this, scope);
+            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3))
+                service = Create_14(this, scope);
         }
 
         [ExcludeFromCodeCoverage]
@@ -92,30 +88,30 @@ end of exception list
             if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)) 
             {
                 if ("c".Equals(serviceKey))
-                    service = Create_4(this, scope);
-
-                else
-                if ("b".Equals(serviceKey))
                     service = Create_5(this, scope);
 
                 else
-                if ("a".Equals(serviceKey))
+                if ("b".Equals(serviceKey))
                     service = Create_6(this, scope);
+
+                else
+                if ("a".Equals(serviceKey))
+                    service = Create_7(this, scope);
             }
 
             else
             if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)) 
             {
                 if ("c".Equals(serviceKey))
-                    service = Create_12(this, scope);
+                    service = Create_11(this, scope);
 
                 else
                 if ("j".Equals(serviceKey))
-                    service = Create_13(this, scope);
+                    service = Create_12(this, scope);
 
                 else
                 if ("i".Equals(serviceKey))
-                    service = Create_14(this, scope);
+                    service = Create_13(this, scope);
             }
             if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)) 
             {
@@ -150,167 +146,167 @@ end of exception list
         [ExcludeFromCodeCoverage]
         private IEnumerable<KV> ResolveManyGenerated(Type serviceType)
         {
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_0);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_1);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_2);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_3);
 			}
 
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B))
+			{
+				yield return new KV(null, (FactoryDelegate)Create_4);
+			}
+
 			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported))
 			{
-				yield return new KV("c", (FactoryDelegate)Create_4);
-				yield return new KV("b", (FactoryDelegate)Create_5);
-				yield return new KV("a", (FactoryDelegate)Create_6);
+				yield return new KV("c", (FactoryDelegate)Create_5);
+				yield return new KV("b", (FactoryDelegate)Create_6);
+				yield return new KV("a", (FactoryDelegate)Create_7);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService))
-			{
-				yield return new KV(null, (FactoryDelegate)Create_7);
-			}
-
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_8);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_9);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan))
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2))
 			{
 				yield return new KV(null, (FactoryDelegate)Create_10);
 			}
 
-			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb))
-			{
-				yield return new KV(null, (FactoryDelegate)Create_11);
-			}
-
 			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported))
 			{
-				yield return new KV("c", (FactoryDelegate)Create_12);
-				yield return new KV("j", (FactoryDelegate)Create_13);
-				yield return new KV("i", (FactoryDelegate)Create_14);
+				yield return new KV("c", (FactoryDelegate)Create_11);
+				yield return new KV("j", (FactoryDelegate)Create_12);
+				yield return new KV("i", (FactoryDelegate)Create_13);
+			}
+
+			if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3))
+			{
+				yield return new KV(null, (FactoryDelegate)Create_14);
 			}
 
 		}
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan)
         internal static object Create_0(IResolverContext r, IScope scope)
         {
-            return new DryIoc.MefAttributedModel.UnitTests.CUT.B((DryIoc.MefAttributedModel.UnitTests.CUT.A)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A), null, false, default(System.Type), RequestInfo.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), 46, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), default(IReuse)), r.Scopes.GetOrCreateResolutionScope(ref scope, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), null)));
+            return r.Scopes.SingletonScope.GetOrAdd(1, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan());
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService)
         internal static object Create_1(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(1, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, false, default(System.Type), RequestInfo.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), 44, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), Reuse.Singleton), r.Scopes.GetOrCreateResolutionScope(ref scope, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), null))));
+            return ((object[])r.Scopes.SingletonScope.GetOrAdd(2, () => new object[] { new DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService() }))[0];
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService)
         internal static object Create_2(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(3, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, false, default(System.Type), RequestInfo.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), 42, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), Reuse.Singleton), r.Scopes.GetOrCreateResolutionScope(ref scope, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), null))));
+            return ((System.WeakReference)r.Scopes.SingletonScope.GetOrAdd(3, () => new System.WeakReference(new DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService()))).Target.ThrowNewErrorIfNull("Reused service wrapped in WeakReference is Garbage Collected and no longer available.");
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb)
         internal static object Create_3(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan());
+            return r.Scopes.SingletonScope.GetOrAdd(1, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan());
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B)
         internal static object Create_4(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+            return new DryIoc.MefAttributedModel.UnitTests.CUT.B((DryIoc.MefAttributedModel.UnitTests.CUT.A)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A), null, false, default(System.Type), RequestInfo.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), 46, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), default(IReuse)), r.Scopes.GetOrCreateResolutionScope(ref scope, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), null)));
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
         internal static object Create_5(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
         internal static object Create_6(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
         internal static object Create_7(IResolverContext r, IScope scope)
         {
-            return ((System.WeakReference)r.Scopes.SingletonScope.GetOrAdd(6, () => new System.WeakReference(new DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService()))).Target.ThrowNewErrorIfNull("Reused service wrapped in WeakReference is Garbage Collected and no longer available.");
+            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+        }
+
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb)
+        internal static object Create_8(IResolverContext r, IScope scope)
+        {
+            return r.Scopes.SingletonScope.GetOrAdd(1, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan());
+        }
+
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1)
+        internal static object Create_9(IResolverContext r, IScope scope)
+        {
+            return r.Scopes.SingletonScope.GetOrAdd(6, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, false, default(System.Type), RequestInfo.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), 42, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), Reuse.Singleton), r.Scopes.GetOrCreateResolutionScope(ref scope, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), null))));
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2)
-        internal static object Create_8(IResolverContext r, IScope scope)
+        internal static object Create_10(IResolverContext r, IScope scope)
         {
             return r.Scopes.SingletonScope.GetOrAdd(8, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2((DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject2)r.Scopes.SingletonScope.GetOrAdd(7, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject2())));
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService)
-        internal static object Create_9(IResolverContext r, IScope scope)
-        {
-            return ((object[])r.Scopes.SingletonScope.GetOrAdd(9, () => new object[] { new DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService() }))[0];
-        }
-
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan)
-        internal static object Create_10(IResolverContext r, IScope scope)
-        {
-            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan());
-        }
-
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
         internal static object Create_11(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan());
+            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
         internal static object Create_12(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
         internal static object Create_13(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+            return r.Scopes.SingletonScope.GetOrAdd(4, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
         }
 
-		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
+		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3)
         internal static object Create_14(IResolverContext r, IScope scope)
         {
-            return r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported());
+            return r.Scopes.SingletonScope.GetOrAdd(10, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.Resolver.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, false, default(System.Type), RequestInfo.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), 44, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), Reuse.Singleton), r.Scopes.GetOrCreateResolutionScope(ref scope, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), null))));
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)
         internal static object CreateDependency_0(IResolverContext r, IScope scope)
         {
-            return (DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject1)r.Scopes.SingletonScope.GetOrAdd(2, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject1());
+            return (DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject1)r.Scopes.SingletonScope.GetOrAdd(5, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject1());
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)
         internal static object CreateDependency_1(IResolverContext r, IScope scope)
         {
-            return (DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject3)r.Scopes.SingletonScope.GetOrAdd(0, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject3());
+            return (DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject3)r.Scopes.SingletonScope.GetOrAdd(9, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject3());
         }
 
 		// typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A)

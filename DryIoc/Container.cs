@@ -227,6 +227,28 @@ namespace DryIoc
         public static readonly ParameterExpression ResolutionScopeParamExpr =
             Expression.Parameter(typeof(IScope), "scope");
 
+        /// <summary>Creates state item access expression given item index.
+        /// State items actually are singleton items. So that methid knows about Singleton items structure.</summary>
+        /// <param name="itemIndex">Index of item.</param>
+        /// <returns>Expression.</returns>
+        public static Expression GetStateItemExpression(int itemIndex)
+        {
+            var bucketSize = SingletonScope.BucketSize;
+            if (itemIndex < bucketSize)
+                return Expression.ArrayIndex(StateParamExpr, Expression.Constant(itemIndex, typeof(int)));
+
+            //  Result: ((object[][])_singletonItems[0])[itemIndex/bucketSize][itemIndex%bucketSize];
+            var bucketsExpr = Expression.Convert(
+                Expression.ArrayIndex(StateParamExpr, Expression.Constant(0, typeof(int))),
+                typeof(object[][]));
+
+            var bucketExpr = Expression.ArrayIndex(bucketsExpr,
+                Expression.Constant(itemIndex / bucketSize - 1, typeof(int)));
+
+            return Expression.ArrayIndex(bucketExpr,
+                Expression.Constant(itemIndex % bucketSize, typeof(int)));
+        }
+
         internal static Expression GetResolutionScopeExpression(Request request)
         {
             if (request.Scope != null)
@@ -407,11 +429,8 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             var factoryDelegate = _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-
-            // todo: Replace _singletonScope.Items with _singletonItems after completed refactoring of singletonScope.
-
             return factoryDelegate != null
-                ? factoryDelegate(_singletonScope.Items, _containerWeakRef, null)
+                ? factoryDelegate(_singletonItems, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -439,7 +458,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
+                    return cachedFactoryDelegate(_singletonItems, _containerWeakRef, scope);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -451,7 +470,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
+            var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
 
             if (registryValue.Services.IsEmpty)
                 return service;
@@ -492,7 +511,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(_singletonScope.Items, _containerWeakRef, scope);
+            var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
 
             // Caching disabled only if:
             // - if caching is off by factory itself
@@ -995,7 +1014,7 @@ namespace DryIoc
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         public object[] ResolutionStateCache
         {
-            get { return _singletonScope.Items; }
+            get { return _singletonItems; }
         }
 
         /// <summary>Adds item if it is not already added to singleton state, returns added or existing item index.</summary>
@@ -1028,10 +1047,8 @@ namespace DryIoc
             Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired, Error.StateIsRequiredToUseItem, item);
 
             var itemIndex = GetOrAddStateItem(item);
-
-            var indexExpr = Expression.Constant(itemIndex, typeof(int));
-            var getItemByIndexExpr = Expression.ArrayIndex(StateParamExpr, indexExpr);
-            return Expression.Convert(getItemByIndexExpr, itemType);
+            var stateItemExpr = GetStateItemExpression(itemIndex);
+            return Expression.Convert(stateItemExpr, itemType);
         }
 
         private static Expression GetPrimitiveOrArrayExprOrDefault(object item, Type itemType)
@@ -1197,6 +1214,8 @@ namespace DryIoc
         private readonly Request _emptyRequest;
 
         private readonly SingletonScope _singletonScope;
+        private readonly object[] _singletonItems;
+
         private readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
@@ -1630,6 +1649,8 @@ namespace DryIoc
             _disposed = disposed;
 
             _singletonScope = singletonScope;
+            _singletonItems = singletonScope.Items;
+
             _scopeContext = scopeContext;
 
             if (openedScope != null)
@@ -2061,8 +2082,11 @@ namespace DryIoc
                 if (arrayIndexExpr.Left.NodeType == ExpressionType.Parameter)
                 {
                     var index = (int)((ConstantExpression)arrayIndexExpr.Right).Value;
-                    var value = container.ResolutionStateCache[index];
-                    return (state, context, scope) => value;
+                    if (index < container.ResolutionStateCache.Length)
+                    {
+                        var value = container.ResolutionStateCache[index];
+                        return (state, context, scope) => value;
+                    }
                 }
             }
 
@@ -5621,7 +5645,6 @@ namespace DryIoc
             }
 
             return serviceExpr;
-
         }
 
         private static IReuse GetTransientDisposableTrackingReuse(Request request)
@@ -5688,7 +5711,7 @@ namespace DryIoc
                 singletonScope.GetOrAdd(singletonId, () =>
                         factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
 
-                serviceExpr = Expression.ArrayIndex(Container.StateParamExpr, Expression.Constant(singletonId, typeof(int)));
+                serviceExpr = Container.GetStateItemExpression(singletonId);
             }
             else
             {
@@ -6888,63 +6911,24 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
-    /// Locking is used internally to ensure that object factory called only once.</summary>
+    /// <summary>Different from <see cref="Scope"/> so that uses single array of items for fast access.
+    /// The array structure is:
+    /// items[0] is reserved for storing object[][] buckets.
+    /// items[1-BucketSize] are used for storing actual singletons up to (BucketSize-1) index
+    /// Buckets structure is variable number of object[BucketSize] buckets used to storing items with index >= BucketSize.
+    /// The structure allows very fast access to up to <see cref="BucketSize"/> singletons - it just array access: items[itemIndex]
+    /// For further indexes it is a fast O(1) access: ((object[][])items[i])[i / BucketSize - 1][i % BucketSize]
+    /// </summary>
     public sealed class SingletonScope : IScope
     {
-        // todo:
-        // <WIP>
-
-        private object[] _lockers = 
-        {
-            new object(), new object(), new object(), new object(), 
-            new object(), new object(), new object(), new object() 
-        };
-
-        private const int BATCH_SIZE = 32;
-
-        // value at 0 index is reserved for [][] structure to accomodate more values
-        private object[] _values = new object[BATCH_SIZE];
-
-        private object GetOrAdd2(int id, CreateScopedValue createValue)
-        {
-            if (id < BATCH_SIZE)
-            {
-                var value = _values[id];
-                if (value != null)
-                    return value;
-
-                var locker = _lockers[id % _lockers.Length];
-                lock (locker)
-                {
-                    value = _values[id];
-                    if (value != null)
-                        _values[id] = value = createValue();
-                }
-
-                return value;
-            }
-            else
-            {
-                //var rest = _values[0] as object[][];
-                //if (rest == null)
-
-                return null;
-            }
-        }
-
-        // </WIP>
-
-        private static readonly int MaxItemArrayIncreaseStep = 32;
-
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public IScope Parent { get; private set; }
 
         /// <summary>Optional name object associated with scope.</summary>
         public object Name { get; private set; }
 
-        /// <summary>Exposes singleton items collection for faster read.</summary>
-        internal object[] Items;
+        /// <summary>Amount of items in item array.</summary>
+        public static readonly int BucketSize = 32;
 
         /// <summary>Creates scope.</summary>
         /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
@@ -6952,10 +6936,9 @@ namespace DryIoc
         {
             Parent = parent;
             Name = name;
-            Items = new object[0];
+            Items = new object[BucketSize];
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-            _lastItemIndex = -1;
-            _itemsLocker = new object();
+            _lastItemIndex = 0;
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
@@ -6970,21 +6953,11 @@ namespace DryIoc
             Ref.Swap(ref _factoryIdToIndexMap, map =>
             {
                 index = map.GetValueOrDefault(externalId);
-                if (index != null)
-                    return map;
-                index = GetNewIndex();
-                return map.AddOrUpdate(externalId, index);
+                return index != null ? map
+                    : map.AddOrUpdate(externalId, index = Interlocked.Increment(ref _lastItemIndex));
             });
 
             return (int)index;
-        }
-
-        private int GetNewIndex()
-        {
-            var newIndex = Interlocked.Increment(ref _lastItemIndex);
-            if (newIndex >= Items.Length)
-                ExtendItemsUpTo(newIndex);
-            return newIndex;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -6995,8 +6968,9 @@ namespace DryIoc
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            var items = Items;
-            return (id < items.Length ? items[id] : null) ?? TryGetOrAddToArray(id, createValue);
+            return id < BucketSize
+                ? (Items[id] ?? GetOrAddItem(Items, id, createValue))
+                : GetOrAddItem(id, createValue);
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -7004,8 +6978,14 @@ namespace DryIoc
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            lock (_itemsLocker)
+            if (id < BucketSize)
                 Items[id] = item;
+            else
+            {
+                var bucket = GetOrAddBucket(id);
+                var indexInBucket = id % BucketSize;
+                bucket[indexInBucket] = item;
+            }
         }
 
         /// <summary>Adds external non-service item into singleton collection. 
@@ -7014,20 +6994,12 @@ namespace DryIoc
         /// <returns>Index of added or already added item.</returns>
         internal int GetOrAdd(object item)
         {
-            var index = Array.IndexOf(Items, item);
-            if (index != -1)
-                return index;
-
-            lock (_itemsLocker)
+            var index = IndexOf(item);
+            if (index == -1)
             {
-                index = Array.IndexOf(Items, item);
-                if (index == -1)
-                {
-                    index = GetNewIndex();
-                    Items[index] = item;
-                }
+                index = Interlocked.Increment(ref _lastItemIndex);
+                SetOrAdd(index, item);
             }
-
             return index;
         }
 
@@ -7036,9 +7008,12 @@ namespace DryIoc
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-            var items = Items;
-            for (var i = 0; i < items.Length; i++)
-                Scope.DisposeItem(items[i]);
+
+            var factoryIdToIndexMap = _factoryIdToIndexMap;
+            if (!factoryIdToIndexMap.IsEmpty)
+                foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
+                    Scope.DisposeItem(GetItemOrDefault((int)idToIndex.Value));
+
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             Items = ArrayTools.Empty<object>();
         }
@@ -7046,43 +7021,121 @@ namespace DryIoc
         #region Implementation
 
         private ImTreeMapIntToObj _factoryIdToIndexMap;
-        private readonly object _itemsLocker;
         private int _lastItemIndex;
         private int _disposed;
-
-        private void ExtendItemsUpTo(int index)
+        private static readonly object[] _lockers =
         {
-            lock (_itemsLocker)
-            {
-                var size = Items.Length;
-                if (index >= size)
-                {
-                    var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
-                    var newItems = new object[newSize];
-                    Array.Copy(Items, 0, newItems, 0, size);
-                    Items = newItems;
-                }
-            }
+            new object(), new object(), new object(), new object(),
+            new object(), new object(), new object(), new object()
+        };
+
+        /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
+        internal object[] Items;
+
+        private object GetOrAddItem(int index, CreateScopedValue createValue)
+        {
+            var bucket = GetOrAddBucket(index);
+            index = index % BucketSize;
+            return GetOrAddItem(bucket, index, createValue);
         }
 
-        private object TryGetOrAddToArray(int index, CreateScopedValue createValue)
+        private static object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
         {
-            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
+            var value = bucket[index];
+            if (value != null)
+                return value;
 
-            if (index >= Items.Length)
-                ExtendItemsUpTo(index);
-
-            object item;
-            lock (_itemsLocker)
+            var locker = _lockers[index % _lockers.Length];
+            lock (locker)
             {
-                item = Items[index];
-                if (item != null)
-                    return item;
-                item = createValue();
-                Items[index] = item;
+                value = bucket[index];
+                if (value == null)
+                    bucket[index] = value = createValue();
             }
 
-            return item;
+            return value;
+        }
+
+        private object GetItemOrDefault(int index)
+        {
+            if (index < BucketSize)
+                return Items[index];
+
+            var bucketIndex = index / BucketSize - 1;
+            var buckets = Items[0] as object[][];
+            if (buckets != null && buckets.Length > bucketIndex)
+            {
+                var bucket = buckets[bucketIndex];
+                if (bucket != null)
+                    return bucket[index%BucketSize];
+            }
+
+            return null;
+        }
+
+        // find if bucket already created starting from 0
+        // if not - create new buckets array and copy old buckets into it
+        private object[] GetOrAddBucket(int index)
+        {
+            var bucketIndex = index / BucketSize - 1;
+            var buckets = Items[0] as object[][];
+            if (buckets == null ||
+                buckets.Length < bucketIndex + 1 ||
+                buckets[bucketIndex] == null)
+            {
+                Ref.Swap(ref Items[0], value =>
+                {
+                    if (value == null)
+                    {
+                        var newBuckets = new object[bucketIndex + 1][];
+                        newBuckets[bucketIndex] = new object[BucketSize];
+                        return newBuckets;
+                    }
+
+                    var oldBuckets = (object[][])value;
+                    if (oldBuckets.Length < bucketIndex + 1)
+                    {
+                        var newBuckets = new object[bucketIndex + 1][];
+                        Array.Copy(oldBuckets, 0, newBuckets, 0, oldBuckets.Length);
+                        newBuckets[bucketIndex] = new object[BucketSize];
+                        return newBuckets;
+                    }
+
+                    if (oldBuckets[bucketIndex] == null)
+                        oldBuckets[bucketIndex] = new object[BucketSize];
+
+                    return value;
+                });
+            }
+
+            var bucket = ((object[][])Items[0])[bucketIndex];
+            return bucket;
+        }
+
+        private int IndexOf(object item)
+        {
+            var index = Items.IndexOf(item);
+            if (index != -1)
+                return index;
+
+            // look in other buckets
+            var bucketsObj = Items[0];
+            if (bucketsObj != null)
+            {
+                var buckets = (object[][])bucketsObj;
+                for (var i = 0; i < buckets.Length; i++)
+                {
+                    var b = buckets[i];
+                    if (b != null)
+                    {
+                        index = b.IndexOf(item);
+                        if (index != -1)
+                            return (i + 1) * BucketSize + index;
+                    }
+                }
+            }
+
+            return -1;
         }
 
         #endregion
