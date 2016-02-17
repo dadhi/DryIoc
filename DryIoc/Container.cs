@@ -294,13 +294,14 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             ThrowIfInvalidRegistration(factory, serviceType, serviceKey, isStaticallyChecked);
 
-            // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
-            // if attempt fails then fallback to normal Swap with retry. 
             var registry = _registry.Value;
-            var current = registry;
+
             if (ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
-            if (!_registry.TrySwapIfStillCurrent(current, current.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
+
+            // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
+            // if attempt fails then fallback to normal Swap with retry. 
+            if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
         }
 
@@ -1329,8 +1330,10 @@ namespace DryIoc
                 return factory.FactoryType == FactoryType.Service
                         ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append))
-                        : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
+                        ? WithDecorators(
+                            Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append))
+                        : WithWrappers(
+                            Wrappers.AddOrUpdate(serviceType, factory));
             }
 
             public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
@@ -2552,6 +2555,26 @@ namespace DryIoc
             var newRules = (Rules)MemberwiseClone();
             newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Remove(rule);
             return newRules;
+        }
+
+        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
+        /// The resolution creates transient services.
+        /// </summary>
+        public static UnknownServiceResolver AutoResolveConcreteTypeRule()
+        {
+            return request =>
+                request.ServiceType.IsAbstract() ? null
+                : new ReflectionFactory(request.ServiceType, made: DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
+        }
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
+        /// The resolution creates transient services.
+        /// </summary>
+        /// <returns>New rules.</returns>
+        public Rules WithAutoConcreteTypeResolution()
+        {
+            return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule());
         }
 
         /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
@@ -3928,7 +3951,7 @@ namespace DryIoc
         /// <param name="registrator">Usually is <see cref="Container"/> object.</param>
         /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and 
         /// <see cref="IResolver"/> to resolve additional services required by initializer.</param>
-        /// <param name="condition">(optional) Condition to select required target.</param>
+        /// <param name="condition">(optional) Additional condition to select required target.</param>
         /// <example><code lang="cs"><![CDATA[
         ///     container.Register<EventAggregator>(Reuse.Singleton);
         ///     container.Register<ISubscriber, SomeSubscriber>();
@@ -3948,16 +3971,15 @@ namespace DryIoc
                 _ => new InitializerFactory<TTarget>(initialize),
                 serviceKey: factoryKey);
 
-            registrator.Register<object>(made: 
-                Made.Of(request => FactoryMethod.Of(
-                    typeof(InitializerFactory<TTarget>).GetSingleMethodOrNull("Decorate")
-                        .MakeGenericMethod(request.ServiceType),
-                    ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: factoryKey))),
+            Func<RequestInfo, bool> decoratorCondition = r => 
+                (r.ImplementationType ?? r.GetActualServiceType()).IsAssignableTo(typeof(TTarget))
+                && (condition == null || condition(r));
 
-                setup: Setup.DecoratorWith(
-                    r => (r.ImplementationType ?? r.GetActualServiceType()).IsAssignableTo(typeof(TTarget))
-                    && (condition == null || condition(r)), 
-                    useDecorateeReuse: true));
+            registrator.Register<object>(
+                made: Made.Of(request => FactoryMethod.Of(
+                    typeof(InitializerFactory<TTarget>).GetSingleMethodOrNull("Decorate").MakeGenericMethod(request.ServiceType),
+                    ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: factoryKey))),
+                setup: Setup.DecoratorWith(decoratorCondition, useDecorateeReuse: true));
         }
 
         internal sealed class InitializerFactory<TTarget>
@@ -3979,8 +4001,9 @@ namespace DryIoc
 
         /// <summary>Registers dispose action for reused target service.</summary>
         /// <typeparam name="TService">Target service type.</typeparam>
-        /// <param name="registrator">Registrator to use.</param> <param name="dispose"></param>
-        /// <param name="condition">Additional way to identify the service.</param>
+        /// <param name="registrator">Registrator to use.</param> 
+        /// <param name="dispose">Actual dispose action to be invoke when scope is disposed.</param>
+        /// <param name="condition">(optional) Additional way to identify the service.</param>
         public static void RegisterDisposer<TService>(this IRegistrator registrator, 
             Action<TService> dispose, Func<RequestInfo, bool> condition = null)
         {
@@ -3995,7 +4018,7 @@ namespace DryIoc
             registrator.Register(Made.Of(
                 r => ServiceInfo.Of<Disposer<TService>>(serviceKey: disposerKey),
                 f => f.TrackForDispose(Arg.Of<TService>())),
-                setup: Setup.DecoratorWith(condition: condition, useDecorateeReuse: true));
+                setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
         }
 
         internal sealed class Disposer<T> : IDisposable
@@ -4477,6 +4500,9 @@ namespace DryIoc
                 ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
                 return dependency;
 
+            if (serviceType == requiredServiceType)
+                requiredServiceType = null;
+
             return dependency.Create(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
         }
 
@@ -4498,7 +4524,7 @@ namespace DryIoc
         /// <summary>Creates info out of provided settings</summary>
         /// <param name="serviceType">Service type</param>
         /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
-        /// <param name="serviceKey">(optional) Service key.</param>
+        ///  <param name="serviceKey">(optional) Service key.</param>
         /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
         {
@@ -5655,7 +5681,7 @@ namespace DryIoc
                 return null;
 
             // If no resued parent, then track in current open scope if any
-            // NOTE: No tracking in singleton cause cause it is most likely a memory leak.
+            // NOTE: No tracking in singleton scope cause it is most likely a memory leak.
             var reuse = parent.Reuse;
             if (reuse == null)
             {
@@ -5709,7 +5735,7 @@ namespace DryIoc
                 var singletonScope = request.Scopes.SingletonScope;
                 var singletonId = singletonScope.GetScopedItemIdOrSelf(externalId);
                 singletonScope.GetOrAdd(singletonId, () =>
-                        factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
+                    factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
 
                 serviceExpr = Container.GetStateItemExpression(singletonId);
             }
@@ -8296,10 +8322,12 @@ namespace DryIoc
             GotNullFactoryWhenResolvingService = Of(
                 "Got null factory method when resolving {0}"),
             RegisteredDisposableTransientWontBeDisposedByContainer = Of(
-                "Registered Disposable Transient service {0} with key {1} and factory {2} won't be disposed by container." + Environment.NewLine +
-                "DryIoc does not hold reference to resolved transients, and therefore does not control their dispose." + Environment.NewLine +
-                "To silence this exception Register<YourService>(setup: Setup.With(allowDisposableTransient: true))" + Environment.NewLine +
-                "or set the rule per container with new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient()).");
+                "Registered Disposable Transient service {0} with key {1} and factory {2} won't be disposed by container." +
+                " DryIoc does not hold reference to resolved transients, and therefore does not control their dispose." +
+                " To silence this exception Register<YourService>(setup: Setup.With(allowDisposableTransient: true)) " +
+                " or set the rule Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient())." +
+                " To enable tracking use Register<YourService>(setup: Setup.With(trackDisposableTransient: true)) " +
+                " or set the rule Container(rules => rules.WithTrackingDisposableTransient())");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

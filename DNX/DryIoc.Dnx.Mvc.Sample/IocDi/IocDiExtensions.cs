@@ -16,16 +16,19 @@ namespace Web.IocDi
         public static IServiceProvider WithIocDiSimple(this IServiceCollection services, Action<IServiceCollection> configureServices)
         {
             configureServices(services);
-            var container = new Container(cfg => cfg.WithUnknownServiceResolvers(CreateFactoryForTypesMarkedWithResolveAs));
-            return container.GetDryIocServiceProvider(services);
+            var container = new Container(cfg => cfg
+                .WithUnknownServiceResolvers(CreateFactoryForTypesMarkedWithResolveAs))
+                .WithDependencyInjectionAdapter(services);
+            return container.Resolve<IServiceProvider>();
         }
 
         public static IServiceProvider WithIocDiFull(this IServiceCollection services, Action<IRegistrator> configureServices)
         {
-            var container = new Container(cfg => cfg.WithUnknownServiceResolvers(CreateFactoryForTypesMarkedWithResolveAs));
-            var serviceProvider = container.GetDryIocServiceProvider(services);
-            configureServices((IContainer)serviceProvider.GetService(typeof(IContainer)));
-            return serviceProvider;
+            var container = new Container(cfg => cfg
+                .WithUnknownServiceResolvers(CreateFactoryForTypesMarkedWithResolveAs))
+                .WithDependencyInjectionAdapter(services);
+            configureServices(container);
+            return container.Resolve<IServiceProvider>();
         }
 
         public static void UseIocDi(this IApplicationBuilder app, GetScopeInstancesDelegate getScopeInstancesDelegate)

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -603,9 +604,56 @@ namespace DryIoc.UnitTests
             container.Resolve<AResolutionScoped>());
         }
 
+        [Test]
+        public void Resolve_a_big_amount_of_singletons()
+        {
+            var container = new Container();
+
+            var count = SingletonScope.BucketSize * 2 + 1;
+            for (var i = 0; i < count; i++)
+            {
+                var serviceKey = new IntKey(i);
+                container.Register<AD>(Reuse.Singleton, serviceKey: serviceKey);
+                container.RegisterDisposer<AD>(ad => ad.IsDisposed = true);
+            }
+
+            var services = container.Resolve<KeyValuePair<IntKey, AD>[]>();
+            for (int i = 0; i < count; i++)
+            {
+                var pair = services[i];
+                Assert.IsNotNull(pair.Value);
+                Assert.AreEqual(i, pair.Key.Index);
+            }
+
+            container.Dispose();
+            for (int i = 0; i < count; ++i)
+                Assert.IsTrue(services[i].Value.IsDisposed);
+        }
+
+        public class IntKey
+        {
+            public readonly int Index;
+
+            public IntKey(int i)
+            {
+                Index = i;
+            }
+
+            public override bool Equals(object obj)
+            {
+                var intKey = obj as IntKey;
+                return intKey != null && Index.Equals(intKey.Index);
+            }
+
+            public override int GetHashCode()
+            {
+                return Index.GetHashCode();
+            }
+        }
+
         public class AD
         {
-            public bool IsDisposed { get; private set; }
+            public bool IsDisposed { get; set; }
 
             public void Dispose()
             {

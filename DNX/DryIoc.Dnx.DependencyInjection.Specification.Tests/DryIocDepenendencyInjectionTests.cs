@@ -8,7 +8,7 @@ namespace DryIoc.Dnx.DependencyInjection.Specification.Tests
     {
         protected override IServiceProvider CreateServiceProvider(IServiceCollection serviceCollection)
         {
-            return new Container().GetDryIocServiceProvider(serviceCollection);
+            return new Container().WithDependencyInjectionAdapter(serviceCollection).Resolve<IServiceProvider>();
         }
     }
 }

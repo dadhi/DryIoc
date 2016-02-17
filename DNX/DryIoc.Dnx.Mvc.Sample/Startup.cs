@@ -13,9 +13,9 @@ namespace Web
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
-            return false // choose Simple vs. FullControl
-                ? services.WithIocDiSimple(Bootstrap.ConfigureServices)
-                : services.WithIocDiFull(Bootstrap.ConfigureServices);
+            return //false // choose Simple vs. FullControl
+                //? services.WithIocDiSimple(Bootstrap.ConfigureServices)
+                services.WithIocDiFull(Bootstrap.ConfigureServices);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

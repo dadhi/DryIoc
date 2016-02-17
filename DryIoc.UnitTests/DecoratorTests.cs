@@ -570,6 +570,47 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(foo.IsReleased);
         }
 
+        [Test]
+        public void Can_register_2_custom_Disposers()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton);
+            var released = false;
+            container.RegisterDisposer<Foo>(f =>
+            {
+                if (f.IsReleased)
+                    released = true;
+                f.IsReleased = true;
+            });
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+
+            var foo = container.Resolve<Foo>();
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+            Assert.IsTrue(released);
+        }
+
+        [Test]
+        public void Can_register_2_custom_Disposers_for_keyed_service()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton, serviceKey: 1);
+            var released = false;
+            container.RegisterDisposer<Foo>(f =>
+            {
+                if (f.IsReleased)
+                    released = true;
+                f.IsReleased = true;
+            });
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+
+            var foo = container.Resolve<Foo>(1);
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+            Assert.IsTrue(released);
+        }
 
         [Test]
         public void Decorator_created_by_factory_should_be_compasable_with_other_decorator()
@@ -651,6 +692,18 @@ namespace DryIoc.UnitTests
 
             var s = container.Resolve<S>();
             Assert.AreEqual("OkNot", s.Message);
+        }
+
+        [Test]
+        public void I_can_register_decorator_with_key_to_identify_decoratee()
+        {
+            var container = new Container();
+
+            container.Register<S>(serviceKey: "a");
+            container.Register<S, SS>(setup: Setup.Decorator);
+
+            var s = container.Resolve<S>(serviceKey: "a");
+            Assert.AreEqual("Not", s.Message);
         }
 
         public class S

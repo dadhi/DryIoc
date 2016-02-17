@@ -55,7 +55,30 @@ namespace DryIoc.UnitTests
 
             Assert.IsNull(container.Resolve<NotRegisteredService>(IfUnresolved.ReturnDefault));
         }
-        
+
+        [Test]
+        public void I_can_add_rule_to_resolve_any_unknown_concrete_type()
+        {
+            IContainer container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<X>(x);
+            Assert.IsInstanceOf<Y>(x.Dep);
+        }
+
+        public class X
+        {
+            public Y Dep { get; private set; }
+
+            public X(Y dep)
+            {
+                Dep = dep;
+            }
+        }
+
+        public class Y {}
+
         [Test]
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {

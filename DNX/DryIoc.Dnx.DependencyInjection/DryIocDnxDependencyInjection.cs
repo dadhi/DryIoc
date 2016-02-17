@@ -31,29 +31,24 @@ namespace DryIoc.Dnx.DependencyInjection
     /// <summary>Provides populating of service collection.</summary>
     public static class DryIocDnxDependencyInjection
     {
-        /// <summary>Entry method with all DI adaptations applied which returns configured DryIoc container wrapped in <see cref="IServiceProvider"/>
-        /// populated from <paramref name="services"/>.</summary>
-        /// <param name="container">DryIoc container to adapt. Passed container will stay intact, instead the new adapted container instance will be
-        /// returned.</param>
-        /// <param name="services">Service collection to register into container.</param>
-        /// <returns>New adapted container instance.</returns>
-        public static IServiceProvider GetDryIocServiceProvider(this IContainer container, IServiceCollection services)
-        {
-            var adapter = container.WithDependencyInjectionAdapter();
-
-            adapter.Populate(services);
-
-            return adapter.Resolve<IServiceProvider>();
-        }
-
         /// <summary>Creates new container from the <paramref name="container"/> adapted to be used
         /// with Asp.Net 5 dependency injection:
         /// - First method sets the rules specific for Asp.Net DI.
         /// - Then registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
         /// </summary>
         /// <param name="container">Source container to adapt.</param>
-        /// <returns>New container with modified rules.</returns>
-        public static IContainer WithDependencyInjectionAdapter(this IContainer container)
+        /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
+        /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
+        /// <returns>New container adapted to AspNet DI conventions.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        ///     container = new Container().WithDependencyInjectionAdapter(services);
+        ///     serviceProvider = container.Resolve<IServiceProvider>();
+        /// ]]></code>
+        /// </example>
+        public static IContainer WithDependencyInjectionAdapter(this IContainer container,
+            IEnumerable<ServiceDescriptor> descriptors = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             if (container.ScopeContext != null)
                 throw new ArgumentException("Adapted container uses ambient scope context which is not supported by AspNet DI.");
@@ -69,6 +64,10 @@ namespace DryIoc.Dnx.DependencyInjection
             // Scope factory should be scoped itself to enable nested scopes creation
             adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.InCurrentScope);
 
+            // Register asp net abstractions specified by descriptors in container 
+            if (descriptors != null)
+                adapter.Populate(descriptors, registerDescriptor);
+
             return adapter;
         }
 
@@ -76,10 +75,27 @@ namespace DryIoc.Dnx.DependencyInjection
         /// different service collections.</summary>
         /// <param name="container">The container.</param>
         /// <param name="descriptors">The service descriptors.</param>
-        public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors)
+        /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
+        /// <example>
+        /// <code><![CDATA[
+        ///     // example of normal descriptor registration together with factory method registration for SomeService.
+        ///     container.Populate(services, (r, service) => {
+        ///         if (service.ServiceType == typeof(SomeService)) {
+        ///             r.Register<SomeService>(Made.Of(() => CreateCustomService()), Reuse.Singleton);
+        ///             return true;
+        ///         };
+        ///         return false; // fallback to normal registrations for the rest of the descriptors.
+        ///     });
+        /// ]]></code>
+        /// </example>
+        public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             foreach (var descriptor in descriptors)
-                container.RegisterDescriptor(descriptor);
+            {
+                if (registerDescriptor == null || !registerDescriptor(container, descriptor))
+                    container.RegisterDescriptor(descriptor);
+            }
         }
 
         /// <summary>Registers described service into container by mapping DI Lifetime to DryIoc Reuse, 

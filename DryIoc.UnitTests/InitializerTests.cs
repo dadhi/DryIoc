@@ -105,6 +105,21 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_register_initializer_for_object_For_example_to_log_all_resolutions_for_keyed_service()
+        {
+            var container = new Container();
+            container.Register<InitializableService>(serviceKey: "a");
+
+            var log = new List<string>();
+            container.RegisterInitializer<object>((x, r) => log.Add(x.GetType().Name));
+            container.RegisterInitializer<object>((x, r) => log.Add("two"));
+
+            container.Resolve<InitializableService>("a");
+
+            CollectionAssert.IsSubsetOf(new[] { "InitializableService", "two" }, log);
+        }
+
+        [Test]
         public void Can_track_disposable_transient_in_scope_via_initializer()
         {
             var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
