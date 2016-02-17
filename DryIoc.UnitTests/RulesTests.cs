@@ -67,6 +67,29 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<Y>(x.Dep);
         }
 
+        [Test]
+        public void I_can_Not_resolve_unknown_concrete_type_on_specific_condition()
+        {
+            IContainer container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<X>());
+        }
+
+        [Test]
+        public void I_can_resolve_unknown_concrete_type_on_specific_condition()
+        {
+            IContainer container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
+
+            container.Register<X>(Reuse.Singleton);
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<X>(x);
+            Assert.IsInstanceOf<Y>(x.Dep);
+        }
+
         public class X
         {
             public Y Dep { get; private set; }

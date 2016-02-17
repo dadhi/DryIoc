@@ -2461,7 +2461,7 @@ namespace DryIoc
         /// <summary>Dependency nesting level where to split object graph into separate Resolve call 
         /// to optimize performance of large object graph.</summary>
         /// <remarks>At the moment the value is predefined. Not sure if it should be user-defined.</remarks>
-        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 5;
+        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 6;
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -2559,29 +2559,29 @@ namespace DryIoc
 
         /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
-        /// The resolution creates transient services.
-        /// </summary>
-        public static UnknownServiceResolver AutoResolveConcreteTypeRule()
+        /// The resolution creates transient services.</summary>
+        /// <param name="condition">(optional) Selects resolution path to apply the rule.</param>
+        /// <returns>New rule.</returns>
+        public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null)
         {
-            return request =>
-                request.ServiceType.IsAbstract() ? null
+            return request => request.ServiceType.IsAbstract() || condition != null && !condition(request) ? null
                 : new ReflectionFactory(request.ServiceType, made: DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
         }
         /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
-        /// The resolution creates transient services.
-        /// </summary>
+        /// The resolution creates transient services.</summary>
+        /// <param name="condition">(optional) Selects resolution path to apply the rule.</param>
         /// <returns>New rules.</returns>
-        public Rules WithAutoConcreteTypeResolution()
+        public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
         {
-            return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule());
+            return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
         }
 
         /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
         /// <param name="implTypes">Assemblies to look for implementation types.</param>
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
-        /// <param name="condition">(optional) condition.</param>
-        /// <returns>Rule.</returns>
+        /// <param name="condition">(optional) Selects when to apply the rule.</param>
+        /// <returns>New rule.</returns>
         public static UnknownServiceResolver AutoRegisterUnknownServiceRule(
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
