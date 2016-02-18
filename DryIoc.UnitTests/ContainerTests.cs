@@ -442,6 +442,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Container_interfaces_can_be_resolved_as_normal_services_in_scope()
+        {
+            var container = new Container();
+            using (var scope = container.OpenScope())
+            {
+                Assert.AreSame(scope, scope.Resolve<IContainer>());
+                Assert.AreSame(scope, scope.Resolve<IRegistrator>());
+                Assert.AreSame(scope, scope.Resolve<IResolver>());
+            }
+        }
+
+        [Test]
         public void IRegistrator_will_be_injected_even_if_not_registered()
         {
             var container = new Container();

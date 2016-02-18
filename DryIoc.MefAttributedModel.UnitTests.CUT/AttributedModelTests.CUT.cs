@@ -483,4 +483,26 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             Items = items.ToArray();
         }
     }
+
+    public interface IAllOpts { }
+
+    [ExportEx(typeof(IAllOpts),
+        ContractKey = "a",
+        IfAlreadyExported = IfAlreadyExported.Keep)]
+    public class AllOpts : IAllOpts, IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [ExportEx(typeof(IAllOpts),
+        ContractKey = "a",
+        IfAlreadyExported = IfAlreadyExported.Keep)]
+    public class AllOpts2 : IAllOpts
+    {
+    }
 }

@@ -228,7 +228,7 @@ namespace DryIoc
             Expression.Parameter(typeof(IScope), "scope");
 
         /// <summary>Creates state item access expression given item index.
-        /// State items actually are singleton items. So that methid knows about Singleton items structure.</summary>
+        /// State items actually are singleton items. So that method knows about Singleton items structure.</summary>
         /// <param name="itemIndex">Index of item.</param>
         /// <returns>Expression.</returns>
         public static Expression GetStateItemExpression(int itemIndex)
@@ -2194,6 +2194,25 @@ namespace DryIoc
                 wrappers = wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.WrapperWith(i)));
 
+            wrappers = AddContainerInterfacesAndDisposableScope(wrappers);
+
+            return wrappers;
+        }
+
+        private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
+        {
+            wrappers = wrappers.AddOrUpdate(typeof(IResolver), 
+                new ExpressionFactory(_ => Container.ResolverExpr, setup: Setup.Wrapper));
+
+            var containerFactory = new ExpressionFactory(r => 
+                Expression.Convert(Container.ResolverExpr, r.ServiceType), setup: Setup.Wrapper);
+            wrappers = wrappers.AddOrUpdate(typeof(IRegistrator), containerFactory);
+            wrappers = wrappers.AddOrUpdate(typeof(IContainer), containerFactory);
+
+            wrappers = wrappers.AddOrUpdate(typeof(IDisposable), 
+                new ExpressionFactory(r => r.IsResolutionRoot ? null : Container.GetResolutionScopeExpression(r),
+                setup: Setup.Wrapper));
+
             return wrappers;
         }
 
@@ -2710,7 +2729,7 @@ namespace DryIoc
         /// to dispose it! That's is similar situation to creating service by new - you have full control.
         /// 
         /// If dependency wrapped in Func somewhere in parent chain then it also won't be tracked, because
-        /// Func supposedly means multiple object aquisition and for container it is not clear what to do, so container
+        /// Func supposedly means multiple object creation and for container it is not clear what to do, so container
         /// delegates that to user. Func here is the similar to Owned relationship type in Autofac library.
         /// </summary>
         /// <remarks>Turning this setting On automatically turns off <see cref="ThrowOnRegisteringDisposableTransient"/>.</remarks>
@@ -2966,11 +2985,6 @@ namespace DryIoc
             Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
-
-            var implicitParamExpr = ReflectionFactory.TryInjectImplicitlyAvailableDependency(parameterServiceInfo, request);
-            if (implicitParamExpr != null)
-                return true;
-
             var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
             var customValue = parameterServiceInfo.Details.CustomValue;
             if (customValue != null && customValue.GetType().IsAssignableTo(parameterRequest.ServiceType))
@@ -4105,7 +4119,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Portable aggressive inlining option for MethodImpl.</summary>
+    /// <summary>Portable aggressive in-lining option for MethodImpl.</summary>
     public static class MethodImplHints
     {
         /// <summary>Value of MethodImplOptions.AggressingInlining</summary>
@@ -4470,7 +4484,7 @@ namespace DryIoc
         public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, IServiceInfo owner,
             bool shouldInheritServiceKey = false)
         {
-            // Note: that an actual meaninge parameter should be renamed in next major version.
+            // Note: that an actual meaning parameter should be renamed in next major version.
             var isNonServiceOwner = shouldInheritServiceKey;
 
             var ownerDetails = owner.Details;
@@ -5574,7 +5588,7 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                    && Setup.FactoryType == FactoryType.Service
-                   // the settings below specify context based resolution so that expression will be diffrent on 
+                   // the settings below specify context based resolution so that expression will be different on 
                    // different resolution paths, which prevents its caching and reuse.
                    && Setup.Condition == null
                    && !Setup.AsResolutionCall 
@@ -5595,7 +5609,7 @@ namespace DryIoc
         }
 
         /// <summary><see cref="GetExpressionOrDefault(DryIoc.Request)"/>.</summary>
-        /// <param name="request">Request for service.</param> <param name="cacheable">Returns true if expression is cahcebale</param>
+        /// <param name="request">Request for service.</param> <param name="cacheable">Returns true if expression is cache-able</param>
         /// <returns>Service expression.</returns>
         public Expression GetExpressionOrDefault(Request request, out bool cacheable)
         {
@@ -5680,7 +5694,7 @@ namespace DryIoc
             if (parent.FactoryType == FactoryType.Wrapper)
                 return null;
 
-            // If no resued parent, then track in current open scope if any
+            // If no reused parent, then track in current open scope if any
             // NOTE: No tracking in singleton scope cause it is most likely a memory leak.
             var reuse = parent.Reuse;
             if (reuse == null)
@@ -6168,11 +6182,6 @@ namespace DryIoc
                         if (paramExpr == null)
                         {
                             var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
-
-                            paramExprs[i] = TryInjectImplicitlyAvailableDependency(paramInfo, request);
-                            if (paramExprs[i] != null)
-                                continue;
-
                             var paramRequest = request.Push(paramInfo);
 
                             var customValue = paramInfo.Details.CustomValue;
@@ -6466,28 +6475,6 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        internal static Expression TryInjectImplicitlyAvailableDependency(IServiceInfo serviceInfo, Request request)
-        {
-            // ignore non default registrations
-            if (serviceInfo.Details.ServiceKey != null ||
-                serviceInfo.Details.RequiredServiceType != null)
-                return null;
-        
-            var serviceType = serviceInfo.ServiceType;
-
-            if (serviceType == typeof(IResolver))
-                return Container.ResolverExpr;
-
-            if (serviceType == typeof(IRegistrator) ||
-                serviceType == typeof(IContainer))
-                return Expression.Convert(Container.ResolverExpr, serviceType);
-
-            if (serviceType == typeof(IDisposable))
-                return Container.GetResolutionScopeExpression(request);
-
-            return null;
-        }
-
         private FactoryMethod GetFactoryMethod(Request request)
         {
             var implType = _implementationType;
@@ -6524,23 +6511,20 @@ namespace DryIoc
             foreach (var member in members)
                 if (member != null)
                 {
-                    var memberExpr = TryInjectImplicitlyAvailableDependency(member, request);
-                    if (memberExpr == null)
+                    Expression memberExpr;
+                    var memberRequest = request.Push(member);
+                    var customValue = member.Details.CustomValue;
+                    if (customValue != null)
                     {
-                        var memberRequest = request.Push(member);
-                        var customValue = member.Details.CustomValue;
-                        if (customValue != null)
-                        {
-                            customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                            memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
-                        }
-                        else
-                        {
-                            var memberFactory = memberRequest.Container.ResolveFactory(memberRequest);
-                            memberExpr = memberFactory == null ? null : memberFactory.GetExpressionOrDefault(memberRequest);
-                            if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
-                                return null;
-                        }
+                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                    }
+                    else
+                    {
+                        var memberFactory = memberRequest.Container.ResolveFactory(memberRequest);
+                        memberExpr = memberFactory == null ? null : memberFactory.GetExpressionOrDefault(memberRequest);
+                        if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
+                            return null;
                     }
 
                     if (memberExpr != null)

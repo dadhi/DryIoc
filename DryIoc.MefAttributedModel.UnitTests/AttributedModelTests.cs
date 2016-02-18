@@ -161,7 +161,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<AttributedModelException>(() =>
-                container.RegisterExports(typeof(OneWithManyMeta)));
+                container.RegisterExports(typeof(ThrowsForMultipleMeta)));
             Assert.AreEqual(ex.Error, Error.UnsupportedMultipleMetadata);
 
         }
@@ -279,27 +279,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [ExportEx(typeof(DontThrows), IfAlreadyExported.Throw)]
         public class Throws : DontThrows { }
 
-        public interface IAllOpts { }
-
-        [ExportEx(typeof(IAllOpts), 
-            ContractKey = "a",
-            IfAlreadyExported = IfAlreadyExported.Keep)]
-        public class AllOpts : IAllOpts, IDisposable
-        {
-            public bool IsDisposed;
-
-            public void Dispose()
-            {
-                IsDisposed = true;
-            }
-        }
-
-        [ExportEx(typeof(IAllOpts),
-            ContractKey = "a",
-            IfAlreadyExported = IfAlreadyExported.Keep)]
-        public class AllOpts2 : IAllOpts
-        {
-        }
+        [ExportWithDisplayName("blah"), WithMetadata("hey")]
+        public class ThrowsForMultipleMeta { }
 
         #region Implementation
 
@@ -320,8 +301,4 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         #endregion
     }
-
-    [ExportWithDisplayName("blah"), WithMetadata("hey")]
-    public class OneWithManyMeta { }
 }
-

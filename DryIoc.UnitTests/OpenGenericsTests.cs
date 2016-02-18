@@ -273,12 +273,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_singleton_registered_Then_resolving_non_generic_service_as_Many_should_succeed()
+        public void Given_open_generic_singleton_registered_with_register_many_then_resolving_as_close_generic_should_fail()
         {
             var container = new Container();
             container.RegisterMany(new[] { typeof(IceCreamSource<>) }, Reuse.Singleton);
 
-            var disposable = container.Resolve<LazyEnumerable<IDisposable>>().ToArray();
+            var disposable = container.Resolve<LazyEnumerable<ISomeIface>>().ToArray();
 
             Assert.That(disposable.Length, Is.EqualTo(0));
         }
