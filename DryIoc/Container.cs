@@ -33,7 +33,7 @@ namespace DryIoc
     using System.Text;
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;
-    using System.Runtime.CompilerServices; // for MethodImpl attribute
+    using System.Runtime.CompilerServices; // for MethodImpl attribute todo: add nuspec reference
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -506,8 +506,7 @@ namespace DryIoc
             if (request.ServiceKey != null)
                 return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, null, scope);
 
-            var cacheable = true;
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request, out cacheable);
+            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
 
@@ -515,9 +514,8 @@ namespace DryIoc
             var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
 
             // Caching disabled only if:
-            // - if caching is off by factory itself
             // - if no services were registered, so the service probably empty collection wrapper or alike.
-            if (cacheable && !registryValue.Services.IsEmpty)
+            if (!registryValue.Services.IsEmpty)
             {
                 var cacheRef = registryValue.DefaultFactoryDelegateCache;
                 var cacheVal = cacheRef.Value;
@@ -5723,7 +5721,6 @@ namespace DryIoc
         protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, bool tracksTransientDisposable, Request request)
         {
             var serviceType = serviceExpr.Type;
-            var externalId = tracksTransientDisposable ? GetNextID() : FactoryID;
 
             // The singleton optimization: eagerly create singleton during the construction of object graph.
             if (reuse is SingletonReuse &&
@@ -5747,7 +5744,8 @@ namespace DryIoc
                 }
 
                 var singletonScope = request.Scopes.SingletonScope;
-                var singletonId = singletonScope.GetScopedItemIdOrSelf(externalId);
+
+                var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
                 singletonScope.GetOrAdd(singletonId, () =>
                     factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
 
@@ -5762,10 +5760,11 @@ namespace DryIoc
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
                 var scopeExpr = reuse.GetScopeExpression(request);
-                var scopedServiceId = reuse.GetScopedItemIdOrSelf(externalId, request);
 
+                // For transient disposable we does not care to bind to specific ID, because it should be created each time.
+                var scopedId = tracksTransientDisposable ? -1 : reuse.GetScopedItemIdOrSelf(FactoryID, request);
                 serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                    Expression.Constant(scopedServiceId),
+                    Expression.Constant(scopedId),
                     Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
             }
 
@@ -5806,15 +5805,6 @@ namespace DryIoc
             if (parentWithLongerLifespan != null)
                 Throw.It(Error.DependencyHasShorterReuseLifespan,
                     request.PrintCurrent(), reuse, parentWithLongerLifespan);
-        }
-
-        /// <summary><see cref="GetDelegateOrDefault(DryIoc.Request)"/></summary>
-        /// <param name="request">Service request.</param><param name="cacheable">returns true if result delegate is cacheable</param>
-        /// <returns>Factory delegate created from service expression.</returns>
-        public FactoryDelegate GetDelegateOrDefault(Request request, out bool cacheable)
-        {
-            var expression = GetExpressionOrDefault(request, out cacheable);
-            return expression == null ? null : expression.CompileToDelegate(request.Container);
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.
@@ -6119,9 +6109,14 @@ namespace DryIoc
         {
             return base.IsFactoryExpressionCacheable(request)
                  && (Made == Made.Default
-                // No caching for context dependent Made which is:
-                // - We don't know the result returned by factory method - it depends on request
-                // - or even if we do know the result type, some dependency is using custom value which depends on request
+                 // Property injection.
+                 || (Made.FactoryMethod == null
+                    && Made.Parameters == null
+                    && (Made.PropertiesAndFields == PropertiesAndFields.Auto ||
+                        Made.PropertiesAndFields == PropertiesAndFields.Of))
+                 // No caching for context dependent Made which is:
+                 // - We don't know the result returned by factory method - it depends on request
+                 // - or even if we do know the result type, some dependency is using custom value which depends on request
                  || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
         }
 
@@ -6686,19 +6681,19 @@ namespace DryIoc
         /// <param name="request">Context</param> <returns>Expression throwing exception.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            return Expression.Constant(null); // todo: Review 
+            return Expression.Constant(_instance); 
         }
 
         /// <summary>Puts instance directly to available scope.</summary>
-        protected override Expression ApplyReuse(Expression ignored, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
+        protected override Expression ApplyReuse(Expression _, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
         {
             var scope = Reuse.GetScopeOrDefault(request).ThrowIfNull(Error.NoCurrentScope);
-            var externalId = scope.GetScopedItemIdOrSelf(FactoryID);
-            scope.GetOrAdd(externalId, () => _instance);
-            var scopeExpr = Reuse.GetScopeExpression(request);
+            var scopedInstanceId = scope.GetScopedItemIdOrSelf(FactoryID);
+            scope.GetOrAdd(scopedInstanceId, () => _instance);
 
+            var scopeExpr = Reuse.GetScopeExpression(request);
             Expression serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                Expression.Constant(externalId),
+                Expression.Constant(scopedInstanceId),
                 Expression.Lambda<CreateScopedValue>(Expression.Constant(null), ArrayTools.Empty<ParameterExpression>()));
 
             // Unwrap WeakReference and/or array preventing disposal
@@ -6843,8 +6838,15 @@ namespace DryIoc
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
 
+            if (id == -1) // disposable transient
+            {
+                var dt = createValue();
+                Ref.Swap(ref _disposableTransients, dts => dts.AppendOrUpdate(dt));
+                return dt;
+            }
+
             object item;
-            lock (_itemCreationLocker)
+            lock (_locker)
             {
                 item = _items.GetValueOrDefault(id);
                 if (item != null)
@@ -6869,18 +6871,31 @@ namespace DryIoc
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside, 
+        /// so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
             var items = _items;
             if (!items.IsEmpty)
-                foreach (var item in items.Enumerate().OrderByDescending(it => it.Key))
-                    DisposeItem(item.Value);
+            {
+                // dispose in backward registration order
+                var itemList = items.Enumerate().ToArray();
+                for (var i = itemList.Length - 1; i >= 0; --i)
+                    DisposeItem(itemList[i].Value);
+            }
             _items = ImTreeMapIntToObj.Empty;
+
+            var disposableTransients = _disposableTransients;
+            if (!disposableTransients.IsNullOrEmpty())
+                for (var i = 0; i < disposableTransients.Length; i++)
+                    DisposeItem(_disposableTransients[i]);
+            _disposableTransients = null;
         }
 
-        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
+        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> 
+        /// <returns>String representation.</returns>
         public override string ToString()
         {
             return "{" +
@@ -6892,10 +6907,11 @@ namespace DryIoc
         #region Implementation
 
         private ImTreeMapIntToObj _items;
+        private object[] _disposableTransients;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _itemCreationLocker = new object();
+        private readonly object _locker = new object();
 
         internal static void DisposeItem(object item)
         {
@@ -6978,7 +6994,7 @@ namespace DryIoc
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            return id < BucketSize
+            return id < BucketSize && id >= 0 // it could be -1 for disposable transients
                 ? (Items[id] ?? GetOrAddItem(Items, id, createValue))
                 : GetOrAddItem(id, createValue);
         }
@@ -7017,33 +7033,53 @@ namespace DryIoc
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
 
             var factoryIdToIndexMap = _factoryIdToIndexMap;
             if (!factoryIdToIndexMap.IsEmpty)
-                foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
-                    Scope.DisposeItem(GetItemOrDefault((int)idToIndex.Value));
-
+            {
+                var ids = factoryIdToIndexMap.Enumerate().ToArray();
+                for (var i = ids.Length - 1; i >= 0; --i)
+                    Scope.DisposeItem(GetItemOrDefault((int)ids[i].Value));
+            }
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
+
+            var disposableTransients = _disposableTransients;
+            if (!disposableTransients.IsNullOrEmpty())
+                for (var i = 0; i < disposableTransients.Length; i++)
+                    Scope.DisposeItem(_disposableTransients[i]);
+            _disposableTransients = null;
+
             Items = ArrayTools.Empty<object>();
         }
 
         #region Implementation
 
-        private ImTreeMapIntToObj _factoryIdToIndexMap;
-        private int _lastItemIndex;
-        private int _disposed;
         private static readonly object[] _lockers =
         {
             new object(), new object(), new object(), new object(),
             new object(), new object(), new object(), new object()
         };
 
+        private ImTreeMapIntToObj _factoryIdToIndexMap;
+        private int _lastItemIndex;
+        private int _disposed;
+
         /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
         internal object[] Items;
 
+        private object[] _disposableTransients;
+
         private object GetOrAddItem(int index, CreateScopedValue createValue)
         {
+            if (index == -1) // disposable transient
+            {
+                var item = createValue();
+                Ref.Swap(ref _disposableTransients, items => items.AppendOrUpdate(item));
+                return item;
+            }
+
             var bucket = GetOrAddBucket(index);
             index = index % BucketSize;
             return GetOrAddItem(bucket, index, createValue);
