@@ -1044,6 +1044,13 @@ namespace DryIocZero
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
 
+            if (id == -1) // disposable transient
+            {
+                var dt = createValue();
+                Ref.Swap(ref _disposableTransients, dts => dts.AppendOrUpdate(dt));
+                return dt;
+            }
+
             object item;
             lock (_locker)
             {
@@ -1053,7 +1060,11 @@ namespace DryIocZero
                 item = createValue();
             }
 
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            var items = _items;
+            var newItems = items.AddOrUpdate(id, item);
+            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
+            if (Interlocked.CompareExchange(ref _items, newItems, items) != items)
+                Ref.Swap(ref _items, _ => _.AddOrUpdate(id, item));
             return item;
         }
 
@@ -1066,18 +1077,31 @@ namespace DryIocZero
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside, 
+        /// so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
             var items = _items;
             if (!items.IsEmpty)
-                foreach (var item in items.Enumerate().OrderByDescending(it => it.Key))
-                    DisposeItem(item.Value);
+            {
+                // dispose in backward registration order
+                var itemList = items.Enumerate().ToArray();
+                for (var i = itemList.Length - 1; i >= 0; --i)
+                    DisposeItem(itemList[i].Value);
+            }
             _items = ImTreeMapIntToObj.Empty;
+
+            var disposableTransients = _disposableTransients;
+            if (!disposableTransients.IsNullOrEmpty())
+                for (var i = 0; i < disposableTransients.Length; i++)
+                    DisposeItem(_disposableTransients[i]);
+            _disposableTransients = null;
         }
 
-        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
+        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> 
+        /// <returns>String representation.</returns>
         public override string ToString()
         {
             return "{" +
@@ -1089,6 +1113,7 @@ namespace DryIocZero
         #region Implementation
 
         private ImTreeMapIntToObj _items;
+        private object[] _disposableTransients;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
@@ -1106,11 +1131,13 @@ namespace DryIocZero
             }
 
             if (disposable != null)
+            {
                 try { disposable.Dispose(); }
                 catch (Exception)
                 {
                     // NOTE Ignoring disposing exception, they not so important for program to proceed.
                 }
+            }
         }
 
         #endregion
@@ -1173,7 +1200,7 @@ namespace DryIocZero
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            return id < BucketSize
+            return id < BucketSize && id >= 0 // it could be -1 for disposable transients
                 ? (Items[id] ?? GetOrAddItem(Items, id, createValue))
                 : GetOrAddItem(id, createValue);
         }
@@ -1212,33 +1239,53 @@ namespace DryIocZero
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
 
             var factoryIdToIndexMap = _factoryIdToIndexMap;
             if (!factoryIdToIndexMap.IsEmpty)
-                foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
-                    Scope.DisposeItem(GetItemOrDefault((int)idToIndex.Value));
-
+            {
+                var ids = factoryIdToIndexMap.Enumerate().ToArray();
+                for (var i = ids.Length - 1; i >= 0; --i)
+                    Scope.DisposeItem(GetItemOrDefault((int)ids[i].Value));
+            }
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
+
+            var disposableTransients = _disposableTransients;
+            if (!disposableTransients.IsNullOrEmpty())
+                for (var i = 0; i < disposableTransients.Length; i++)
+                    Scope.DisposeItem(_disposableTransients[i]);
+            _disposableTransients = null;
+
             Items = ArrayTools.Empty<object>();
         }
 
         #region Implementation
 
-        private ImTreeMapIntToObj _factoryIdToIndexMap;
-        private int _lastItemIndex;
-        private int _disposed;
         private static readonly object[] _lockers =
         {
             new object(), new object(), new object(), new object(),
             new object(), new object(), new object(), new object()
         };
 
+        private ImTreeMapIntToObj _factoryIdToIndexMap;
+        private int _lastItemIndex;
+        private int _disposed;
+
         /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
         internal object[] Items;
 
+        private object[] _disposableTransients;
+
         private object GetOrAddItem(int index, CreateScopedValue createValue)
         {
+            if (index == -1) // disposable transient
+            {
+                var item = createValue();
+                Ref.Swap(ref _disposableTransients, items => items.AppendOrUpdate(item));
+                return item;
+            }
+
             var bucket = GetOrAddBucket(index);
             index = index % BucketSize;
             return GetOrAddItem(bucket, index, createValue);

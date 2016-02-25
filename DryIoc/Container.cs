@@ -33,7 +33,7 @@ namespace DryIoc
     using System.Text;
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;
-    using System.Runtime.CompilerServices; // for MethodImpl attribute todo: add nuspec reference
+    using System.Runtime.CompilerServices;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -3976,12 +3976,12 @@ namespace DryIoc
         {
             initialize.ThrowIfNull();
 
-            // unique key to binds decorator factory and decorator registrations
-            var factoryKey = new object();
+            // unique key to bind decorator factory and decorator registrations
+            var decoratorFactoryKey = new object();
 
             registrator.RegisterDelegate(
                 _ => new InitializerFactory<TTarget>(initialize),
-                serviceKey: factoryKey);
+                serviceKey: decoratorFactoryKey);
 
             Func<RequestInfo, bool> decoratorCondition = r => 
                 (r.ImplementationType ?? r.GetActualServiceType()).IsAssignableTo(typeof(TTarget))
@@ -3990,7 +3990,7 @@ namespace DryIoc
             registrator.Register<object>(
                 made: Made.Of(request => FactoryMethod.Of(
                     typeof(InitializerFactory<TTarget>).GetSingleMethodOrNull("Decorate").MakeGenericMethod(request.ServiceType),
-                    ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: factoryKey))),
+                    ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: decoratorFactoryKey))),
                 setup: Setup.DecoratorWith(decoratorCondition, useDecorateeReuse: true));
         }
 
@@ -5643,9 +5643,9 @@ namespace DryIoc
                 // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account 
                 var reuse = request.Reuse;
 
-                // Track transient disposable in parent scope (if any), or singleton
+                // Track transient disposable in parent scope (if any), or open scope (if any)
                 var tracksTransientDisposable = false;
-                if (reuse == null &&
+                if (reuse == null && !Setup.PreventDisposal &&
                     (Setup.TrackDisposableTransient || container.Rules.TrackingDisposableTransients) &&
                     IsDisposableService(request))
                 {
@@ -6688,12 +6688,12 @@ namespace DryIoc
         protected override Expression ApplyReuse(Expression _, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
         {
             var scope = Reuse.GetScopeOrDefault(request).ThrowIfNull(Error.NoCurrentScope);
-            var scopedInstanceId = scope.GetScopedItemIdOrSelf(FactoryID);
-            scope.GetOrAdd(scopedInstanceId, () => _instance);
+            var scopedId = scope.GetScopedItemIdOrSelf(FactoryID);
+            scope.GetOrAdd(scopedId, () => _instance);
 
             var scopeExpr = Reuse.GetScopeExpression(request);
             Expression serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                Expression.Constant(scopedInstanceId),
+                Expression.Constant(scopedId),
                 Expression.Lambda<CreateScopedValue>(Expression.Constant(null), ArrayTools.Empty<ParameterExpression>()));
 
             // Unwrap WeakReference and/or array preventing disposal

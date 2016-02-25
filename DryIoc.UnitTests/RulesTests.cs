@@ -454,6 +454,20 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_prevent_tracking_for_registration_with_prevent_disposal_option()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope().WithTrackingDisposableTransients());
+            container.Register<AD>(setup: Setup.With(preventDisposal: true));
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsFalse(ad.IsDisposed);
+        }
+
+
+        [Test]
         public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
         {
             var container = new Container();

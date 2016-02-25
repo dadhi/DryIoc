@@ -706,6 +706,47 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("Not", s.Message);
         }
 
+        [Test]
+        public void Can_register_decorator_of_T()
+        {
+            var container = new Container();
+
+            container.Register<X>();
+            container.Register<object>(
+                made: Made.Of(r => typeof(DecoratorFactory)
+                    .GetSingleMethodOrNull("Decorate")
+                    .MakeGenericMethod(r.ServiceType)), 
+                setup: Setup.Decorator);
+
+            var x = container.Resolve<X>();
+            Assert.IsTrue(x.IsStarted);
+        }
+
+        public interface IStartable
+        {
+            void Start();
+        }
+
+        public class X : IStartable
+        {
+            public bool IsStarted { get; private set; }
+
+            public void Start()
+            {
+                IsStarted = true;
+            }
+        }
+
+        public static class DecoratorFactory
+        {
+            public static T Decorate<T>(T service) where T : IStartable
+            {
+                service.Start();
+                return service;
+            }
+        }
+
+
         public class S
         {
             public string Message = "";

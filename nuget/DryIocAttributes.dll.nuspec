@@ -14,10 +14,7 @@
         <releaseNotes>
           v2.2.0
           - added: UseParentReuseAttribute to support DryIoc Setup.UseParentReuse
-          v2.1.0
-          - added: #185: Support for IfAlreadyRegistered option in MefAttributedModel
-          v2.0.0
-          - Supports all DryIoc V2 features.
+          - added: UseDecorateeReuse option in AsDecoratorAttribute
         </releaseNotes>
       <dependencies>
         <group targetFramework="dotnet">

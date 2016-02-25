@@ -65,12 +65,14 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Register with resolution condition.
 * Register with associated metadata object of arbitrary type.
 * Resolve and ResolveMany. 
-* Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
+* Unknown service resolution via `Rules.WithUnknownServiceResolvers()`:
+    * Optional automatic concrete types resolution
 * Instance lifetime control or *Reuse* in DryIoc terms:
     * Nested disposable scopes, ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
+    * `useParentReuse` option for injected dependencies
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
-* Open-generics without special syntax.
+* Extensive Open-generics support without special syntax: supported constaints, variance, complex nested generic definitions
 * Constructor, property and field injection.
 * Static or instance factory methods in addition to constructor. Factory methods support parameter injection the same way as constructors.
 * Injecting properties and fields into existing object.
@@ -80,8 +82,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
     * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
-* Resolve [Composites](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
-* Specify [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
+* [Composite pattern](https://bitbucket.org/dadhi/dryioc/wiki/Wrappers#markdown-header-composite-pattern-support): Composite itself is excluded from result collection.
+* [Decorator pattern](https://bitbucket.org/dadhi/dryioc/wiki/Decorators). 
 
 
 ## Companions
