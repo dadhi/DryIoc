@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -519,14 +519,22 @@ namespace DryIoc.MefAttributedModel
                 var factoryServiceInfo = member.IsStatic() ? null :
                     ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
 
-                var factory = registrationInfo.CreateFactory(Made.Of(member, factoryServiceInfo));
+                // Special support for decorator of T to be registered as Object
+                var decoratorOfT = registrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo 
+                    && member.GetReturnTypeOrDefault().IsGenericParameter;
+                var made = !decoratorOfT 
+                    ? Made.Of(member, factoryServiceInfo) 
+                    : Made.Of(r => ((MethodInfo)member).MakeGenericMethod(r.ServiceType), factoryServiceInfo);
+
+                var factory = registrationInfo.CreateFactory(made);
 
                 var serviceExports = registrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(factory,
-                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
+                    var serviceType = decoratorOfT ? typeof(object) : export.ServiceType;
+                    registrator.Register(factory, serviceType, 
+                        export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
         }

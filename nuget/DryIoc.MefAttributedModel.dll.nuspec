@@ -5,7 +5,7 @@
         <!-- just a placeholder for "nuget pack -Version" flag -->
         <version>0.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -13,14 +13,9 @@
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
           v2.2.0
-          - added: Support for UseParentReuseAttribute to support DryIoc Setup.UseParentReuse
-          v2.1.1
-          - fixed: Package depends on correct version of DryIocAttributes
-          v2.1.0
-          - added: #185: Support for IfAlreadyRegistered option in MefAttributedModel
-          v2.0.0
-          - Supports all DryIoc V2 features.
-          - Attributes are moved to separate DryIocAttributes package
+          - added: #141: Support Decorators with open-generic factory methods of T
+          - added: Support UseParentReuseAttribute to support DryIoc Setup.UseParentReuse
+          - added: Support for UseDecorateeReuse option in AsDecoratorAttribute
         </releaseNotes>
         <dependencies>
             <group>

@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -5602,16 +5602,6 @@ namespace DryIoc
         /// <param name="request">Request for service.</param> <returns>Service expression.</returns>
         public virtual Expression GetExpressionOrDefault(Request request)
         {
-            bool ignoreCacheability;
-            return GetExpressionOrDefault(request, out ignoreCacheability);
-        }
-
-        /// <summary><see cref="GetExpressionOrDefault(DryIoc.Request)"/>.</summary>
-        /// <param name="request">Request for service.</param> <param name="cacheable">Returns true if expression is cache-able</param>
-        /// <returns>Service expression.</returns>
-        public Expression GetExpressionOrDefault(Request request, out bool cacheable)
-        {
-            cacheable = false;
             request = request.WithResolvedFactory(this);
 
             var container = request.Container;
@@ -5629,7 +5619,7 @@ namespace DryIoc
                     : null;
 
             var isDecorated = decoratorExpr != null;
-            cacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
+            var cacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
             if (cacheable)
             {
                 var cachedServiceExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);

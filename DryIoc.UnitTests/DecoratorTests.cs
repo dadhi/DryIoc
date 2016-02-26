@@ -746,7 +746,6 @@ namespace DryIoc.UnitTests
             }
         }
 
-
         public class S
         {
             public string Message = "";
