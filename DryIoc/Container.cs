@@ -5661,13 +5661,14 @@ namespace DryIoc
                 if (request.IfUnresolved == IfUnresolved.Throw)
                     Container.ThrowUnableToResolve(request);
 
-                // Throw in case of collection wrapper with unresolved current service dependency
+                // Throw in case of collection wrapper with unresolved current service dependency,
+                // But if collection resolved as IfUnresolved.ReturnDefault it won't throw.
                 if (FactoryType == FactoryType.Service)
                 {
-                    var wrapper = request.Ancestor(r => r.FactoryType == FactoryType.Wrapper);
-                    if (!wrapper.IsEmpty && wrapper.Enumerate()
-                        .TakeWhile(r => r.FactoryType == FactoryType.Wrapper)
-                        .Any(r => r.GetActualServiceType().IsSupportedCollectionType()))
+                    var collectionParent = request.RawParent.Enumerate()
+                        .FirstOrDefault(r => r.FactoryType == FactoryType.Wrapper 
+                            && r.GetActualServiceType().IsSupportedCollectionType());
+                    if (collectionParent != null && collectionParent.IfUnresolved == IfUnresolved.Throw)
                         Container.ThrowUnableToResolve(request);
                 }
             }

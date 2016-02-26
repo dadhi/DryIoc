@@ -220,7 +220,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(2, items.Length);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Skip_resolution_on_missing_dependency()
         {
             var container = new Container();
