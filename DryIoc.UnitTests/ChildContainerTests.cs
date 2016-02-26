@@ -84,6 +84,24 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_use_registration_copy_instead_of_facade()
+        {
+            var container = new Container();
+            container.Register<FruitJuice>();
+            container.Register<IFruit, Melon>();
+
+            var childContainer = container.WithRegistrationsCopy()
+                .With(rules => rules.WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Replace));
+
+            childContainer.Register<IFruit, Orange>();
+
+            Assert.IsInstanceOf<Melon>(container.Resolve<FruitJuice>().Fruit);
+            Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
+            GC.KeepAlive(container);
+        }
+
+
+        [Test]
         public void Child_may_throw_if_parent_is_disposed()
         {
             var container = new Container();
