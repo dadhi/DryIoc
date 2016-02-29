@@ -60,7 +60,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 * Register interface/type mapping, additionally supported: registering service once, registration update, removing registration. 
 * Register user-defined delegate factory and register existing instance.
-* Register from assembly(ies) implementation types with automatically determined service types.
+* Register implementation types from provided assemblies with automatically determined service types.
 * Register with service key of arbitrary type, or register multiple non-keyed services.
 * Register with resolution condition.
 * Register with associated metadata object of arbitrary type.
@@ -72,7 +72,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
     * `useParentReuse` option for injected dependencies
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
-* Extensive Open-generics support without special syntax: supported constaints, variance, complex nested generic definitions
+* Extensive Open-generics support without special syntax: supported constraints, variance, complex nested generic definitions
 * Constructor, property and field injection.
 * Static or instance factory methods in addition to constructor. Factory methods support parameter injection the same way as constructors.
 * Injecting properties and fields into existing object.
