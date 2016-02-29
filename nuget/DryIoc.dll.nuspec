@@ -4,48 +4,27 @@
         <id>DryIoc.dll</id>
         <version>0.0.0</version><!-- overridden by "NuGet pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.1.2
-          - fixed: #222: Resolving as IEnumerable silence the dependency resolution errors and just skips the unresolved item
-          - fixed: #218: Apply decorators registered for service type when resolving with required service type
-          v2.1.1
-          - fixed: #213: Lazy Singletons should be resolved after container is disposed
-          - fixed: #212: ResolveMany of object with generic required service type is failing with ArgumentException
-          v2.1.0
-          - added: #205: Add customizable IfAlreadyRegistered default value per container
-          - added: #204: Add ResolveMany of objects wout need to specify ResolveMany{Object}
-          - fixed: #203: RegisterMany should exclude ValueType and general purpose service types IEquatable, IComparable
-          v2.0.2
-          - fixed: #201: Mutithreading issue when RegisterInstance() is used within OpenScope()
-          v2.0.1
-          - fixed: #200 Multiple instances for Singleton created when Container is shared among multiple threads
-          v2.0.0
-          - Support for PCL 328 and 259 profiles, and .NET Core via dotnet moniker.
-          - More consistent and complete API surface.
-          - Diagnostics of potential resolution problems with `container.VerifyResolutions()`.
-          - Improved registration and first resolution time.
-          - Support of really large object graphs.
-          - Possibility of compile-time factory delegate generation. Utilized by DryIocZero.
-          - Ambient current scope and `Reuse.InWebRequest` for ASP.NET integration.
-          - Support for static and instance factory methods in addition to constructor, including support for method parameters injection.
-          - Powerful open-generics support including variance, constraints, open-generic factory methods in open-generic classes.
-          - Service key of arbitrary type. The only requirement for key type is to implement `GetHashCode` and `Equals`.
-          - Resolve as `KeyValuePair` to get service key with service object.
-          - Register with condition for resolution.
-          - Required service type support: e.g. `var serviceObjects = c.Resolve{object[]}(typeof(Service));`.
-          - Optional parameters support.
-          - Fine-grained control over injection of parameters, properties, and fields.
-          - Injection of primitive values.
-          - Control how reused service is stored and disposed via `weaklyReferenced` and `preventDisposal` setups.
-          - Resolve service collection as `IList{T}`, `ICollection{T}`, `IReadOnlyList{T}`, `IReadOnlyCollection{T}`.
-          - Register once, existing registration update, unregister.
-          - removed: Compilation to DynamicAssembly. DryIoc is fast enough without its complexity.
+          v2.2.0
+          - added: #141: Support Decorators with open-generic factory methods of T
+          - added: #206: Track IDisposable Transients in scoped consumer's Scope
+          - added: #215: Option to specify Release action for reused services to implement pooling etc
+          - added: #227: Missing Arg.Of overload to specify default value for unresolved dependency
+          - added: #228: Make IContainer implicitly available for injection wout need for registration
+          - added: #229: Container rule to use Singleton scope as implicitly Open current scope for scoped registrations
+          - added: #239: Decorator setting to use Decoratee Reuse
+          - added: #241: Registration option to useParentReuse for dependency
+          - added: #242: Container rule for automatic concrete types resolution
+          - fixed: #94: Support for creating concrete type without storing it in Container
+          - fixed: #220: Minimize locking and therefore chances for deadlock in Singleton Scope
+          - fixed: #230: Custom initializer attached to lazily resolved dependency is called once per resolution, not once per construction
+          - fixed: #240: ConstructorWithAllResolvableArguments ignores implicitly injected dependencies and custom values
         </releaseNotes>
         <dependencies>
           <group targetFramework="dotnet">

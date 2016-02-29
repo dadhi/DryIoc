@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.Samples.CUT")]
-[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2016 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

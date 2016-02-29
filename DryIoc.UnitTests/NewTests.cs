@@ -90,6 +90,41 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.ResolvingOpenGenericServiceTypeIsNotPossible, ex.Error);
         }
 
+        [Test]
+        public void New_can_inject_singleton_dependency()
+        {
+            var container = new Container();
+
+            container.Register<ISingleton, SingletonImpl>(Reuse.Singleton);
+
+            var testconcreate1 = container.New<ConcreteService>();
+            var testconcreate2 = container.New<ConcreteService>();
+
+            Assert.AreSame(testconcreate1.Singleton, testconcreate2.Singleton);
+        }
+
+        public interface ISingleton
+        {
+            void Foo();
+        }
+
+        public class SingletonImpl : ISingleton
+        {
+            public SingletonImpl() { }
+
+            public void Foo() { }
+        }
+
+        public class ConcreteService
+        {
+            public ISingleton Singleton { get; private set; }
+
+            public ConcreteService(ISingleton singleton)
+            {
+                Singleton = singleton;
+            }
+        }
+
         internal class Wheels
         {
             public string Paint;            

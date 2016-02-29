@@ -4,19 +4,21 @@
         <id>DryIoc.SignalR</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Source code of DryIoc extension for ASP.NET SignalR</description>
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
-          Initial release
+          v2.0.0-rc2: fixed: Added missing dependency on Castle.DynamicProxy used for Hub interception.
+          v2.0.0-rc1: Initial release
         </releaseNotes>
         <dependencies>
           <group>
             <dependency id="DryIoc" version="[2.1.2,3.0.0)" />
             <dependency id="Microsoft.AspNet.SignalR.Core" version="[2.2,3.0)" />
+            <dependency id="Castle.DynamicProxy" version="[2.2,3.0)" />
           </group>
         </dependencies>
     </metadata>

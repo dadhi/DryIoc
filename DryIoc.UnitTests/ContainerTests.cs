@@ -431,6 +431,55 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void IContainer_will_be_injected_even_if_not_registered()
+        {
+            var container = new Container();
+            container.Register<Beh>(made: PropertiesAndFields.Auto);
+
+            var c = container.Resolve<Beh>().C;
+
+            Assert.AreSame(container, c);
+        }
+
+        [Test]
+        public void Container_interfaces_can_be_resolved_as_normal_services_in_scope()
+        {
+            var container = new Container();
+            using (var scope = container.OpenScope())
+            {
+                Assert.AreSame(scope, scope.Resolve<IContainer>());
+                Assert.AreSame(scope, scope.Resolve<IRegistrator>());
+                Assert.AreSame(scope, scope.Resolve<IResolver>());
+            }
+        }
+
+        [Test]
+        public void IRegistrator_will_be_injected_even_if_not_registered()
+        {
+            var container = new Container();
+            container.Register<Beh>(made: PropertiesAndFields.Auto);
+
+            var reg = container.Resolve<Beh>().Reg;
+
+            Assert.AreSame(container, reg);
+        }
+
+        [Test]
+        public void Given_open_scope_the_scoped_IContainer_will_be_injected_even_if_not_registered()
+        {
+            var container = new Container();
+            container.Register<Beh>(made: PropertiesAndFields.Auto);
+
+            using (var scoped = container.OpenScope())
+            {
+                var c = scoped.Resolve<Beh>().C;
+                Assert.AreSame(scoped, c);
+            }
+
+            Assert.AreSame(container, container.Resolve<Beh>().C);
+        }
+
+        [Test]
         public void Should_Throw_if_implementation_is_not_assignable_to_service_type()
         {
             var container = new Container();
@@ -444,6 +493,10 @@ namespace DryIoc.UnitTests
         public class Beh
         {
             public IResolver R { get; set; }
+
+            public IContainer C { get; set; }
+
+            public IContainer Reg { get; set; }
         }
 
         [Test]

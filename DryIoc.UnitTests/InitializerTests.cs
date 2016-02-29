@@ -12,11 +12,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<InitializableService>();
-            container.RegisterDelegate<Func<InitializableService, InitializableService>>(r => x =>
+            container.RegisterDelegateDecorator<InitializableService>(r => (x =>
             {
                 x.Initialize("blah");
                 return x;
-            }, setup: Setup.Decorator);
+            }));
 
             var service = container.Resolve<InitializableService>();
 
@@ -28,9 +28,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IInitializable<InitializableService>, InitializableService>();
-            container.RegisterDelegate<Func<IInitializable<InitializableService>, IInitializable<InitializableService>>>(
-                r => x => x.Initialize("blah"), 
-                setup: Setup.Decorator);
+            container.RegisterDelegateDecorator<IInitializable<InitializableService>>(
+                r => x => x.Initialize("blah"));
 
             var service = (InitializableService)container.Resolve<IInitializable<InitializableService>>();
 
@@ -98,11 +97,110 @@ namespace DryIoc.UnitTests
             container.Register<InitializableService>();
 
             var log = new List<string>();
-            container.RegisterInitializer<object>((x, _) => log.Add(x.GetType().Name));
+            container.RegisterInitializer<object>((x, r) => log.Add(x.GetType().Name));
 
             container.Resolve<InitializableService>();
 
             CollectionAssert.AreEqual(new[] { "InitializableService" }, log);
+        }
+
+        [Test]
+        public void Can_register_initializer_for_object_For_example_to_log_all_resolutions_for_keyed_service()
+        {
+            var container = new Container();
+            container.Register<InitializableService>(serviceKey: "a");
+
+            var log = new List<string>();
+            container.RegisterInitializer<object>((x, r) => log.Add(x.GetType().Name));
+            container.RegisterInitializer<object>((x, r) => log.Add("two"));
+
+            container.Resolve<InitializableService>("a");
+
+            CollectionAssert.IsSubsetOf(new[] { "InitializableService", "two" }, log);
+        }
+
+        [Test]
+        public void Can_track_disposable_transient_in_scope_via_initializer()
+        {
+            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+            RegisterTransientDisposablesTracker(container);
+
+            container.Register<ADisp>(Reuse.Transient);
+
+            var scope = container.OpenScope();
+            var a = scope.Resolve<ADisp>();
+            scope.Dispose();
+
+            Assert.IsTrue(a.IsDisposed);
+        }
+
+        [Test]
+        public void Can_track_injected_disposable_transient_in_scope_via_initializer()
+        {
+            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+            RegisterTransientDisposablesTracker(container);
+
+            container.Register<ADisp>();
+            container.Register<B>();
+
+            var scope = container.OpenScope();
+            var b = scope.Resolve<B>();
+            scope.Dispose();
+
+            Assert.AreNotSame(b.A1, b.A2);
+            Assert.IsTrue(b.A1.IsDisposed);
+            Assert.IsTrue(b.A2.IsDisposed);
+        }
+
+        public class B
+        {
+            public ADisp A1 { get; private set; }
+
+            public ADisp A2 { get; private set; }
+
+            public B(ADisp a1, ADisp a2)
+            {
+                A1 = a1;
+                A2 = a2;
+            }
+        }
+
+        public class ADisp : IDisposable
+        {
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        private static void RegisterTransientDisposablesTracker(IRegistrator registrator)
+        {
+            registrator.Register<TransientDisposablesTracker>(Reuse.InCurrentScope);
+
+            registrator.RegisterInitializer<object>(
+                (service, r) => r.Resolve<TransientDisposablesTracker>().Track((IDisposable)service),
+                request => request.ReuseLifespan == 0
+                    && (request.ImplementationType ?? request.GetActualServiceType()).IsAssignableTo(typeof(IDisposable)));
+        }
+
+        public class TransientDisposablesTracker : IDisposable
+        {
+            private readonly Ref<IDisposable[]> _items = Ref.Of(ArrayTools.Empty<IDisposable>());
+
+            public void Track(IDisposable disposable)
+            {
+                _items.Swap(i => i.AppendOrUpdate(disposable));
+            }
+
+            public void Dispose()
+            {
+                var items = _items.Value;
+                for (var i = 0; i < items.Length; i++)
+                    items[i].Dispose();
+                _items.Swap(_ => ArrayTools.Empty<IDisposable>());
+            }
         }
 
         public interface IInitializable<T>

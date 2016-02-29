@@ -235,7 +235,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportMany, AsResolutionRoot]
+    [ExportMany, AsResolutionRootAttibute]
     public class DbMan : ISomeDb, IAnotherDb
     {
     }
@@ -322,7 +322,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [ForImportCondition3Parent, AsResolutionCall]
     public class ExportConditionalObject3 : IExportConditionInterface { }
 
-    [Export, AsResolutionRoot]
+    [Export, AsResolutionRootAttibute]
     public class ImportConditionObject1
     {
         public IExportConditionInterface ExportConditionInterface { get; set; }
@@ -332,7 +332,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsResolutionRoot]
+    [Export, AsResolutionRootAttibute]
     public class ImportConditionObject2
     {
         public IExportConditionInterface ExportConditionInterface { get; set; }
@@ -342,7 +342,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsResolutionRoot]
+    [Export, AsResolutionRootAttibute]
     public class ImportConditionObject3
     {
         public IExportConditionInterface ExportConditionInterface { get; set; }
@@ -355,7 +355,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export, AsResolutionCall, TransientReuse]
     public class A {}
 
-    [Export, AsResolutionRoot, TransientReuse]
+    [Export, AsResolutionRootAttibute, TransientReuse]
     public class B
     {
         public readonly A A;
@@ -396,10 +396,10 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export, CurrentScopeReuse("ScopeA")]
     public class WithNamedCurrentScope { }
 
-    [Export, WeaklyReferenced, AsResolutionRoot]
+    [Export, WeaklyReferenced, AsResolutionRootAttibute]
     public class WeaklyReferencedService { }
 
-    [Export, PreventDisposal, AsResolutionRoot]
+    [Export, PreventDisposal, AsResolutionRootAttibute]
     public class PreventDisposalService : IDisposable
     {
         public bool IsDisposed;
@@ -409,8 +409,40 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AllowsDisposableTransient]
-    public sealed class Abc { }
+    [Export, SingletonReuse]
+    public sealed class DTUser
+    {
+        public readonly DT Dt;
+        public readonly DT2 Dt2;
+
+        public DTUser(DT dt, DT2 dt2)
+        {
+            Dt = dt;
+            Dt2 = dt2;
+        }
+    }
+
+    [Export, TransientReuse, AllowDisposableTransient]
+    public sealed class DT : IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export, TransientReuse, TrackDisposableTransient]
+    public sealed class DT2 : IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
 
     public class Daah
     {
@@ -450,5 +482,27 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         {
             Items = items.ToArray();
         }
+    }
+
+    public interface IAllOpts { }
+
+    [ExportEx(typeof(IAllOpts),
+        ContractKey = "a",
+        IfAlreadyExported = IfAlreadyExported.Keep)]
+    public class AllOpts : IAllOpts, IDisposable
+    {
+        public bool IsDisposed;
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [ExportEx(typeof(IAllOpts),
+        ContractKey = "a",
+        IfAlreadyExported = IfAlreadyExported.Keep)]
+    public class AllOpts2 : IAllOpts
+    {
     }
 }

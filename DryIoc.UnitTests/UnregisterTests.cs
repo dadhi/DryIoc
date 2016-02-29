@@ -381,9 +381,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Unregister_singleton_resolution_root()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container();
             container.Register<A>(Reuse.Singleton);
-            container.Register<B>();
+            container.Register<B>(setup: Setup.With(allowDisposableTransient: true));
 
             var a = container.Resolve<A>();
 
@@ -405,10 +405,10 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Unregister_singleton_injected_redendency()
+        public void Unregister_singleton_injected_dependency()
         {
-            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
-            container.Register<A>();
+            var container = new Container();
+            container.Register<A>(setup: Setup.With(allowDisposableTransient: true));
             container.Register<B>(Reuse.Singleton, setup: Setup.With(asResolutionCall: true));
 
             var a = container.Resolve<A>();

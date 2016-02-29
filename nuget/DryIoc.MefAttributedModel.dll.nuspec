@@ -5,27 +5,26 @@
         <!-- just a placeholder for "nuget pack -Version" flag -->
         <version>0.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.1.0
-          - added: #185: Support for IfAlreadyRegistered option in MefAttributedModel
-          v2.0.0
-          - Supports all DryIoc V2 features.
-          - Attributes are moved to separate DryIocAttributes package
+          v2.2.0
+          - added: #141: Support Decorators with open-generic factory methods of T
+          - added: Support UseParentReuseAttribute to support DryIoc Setup.UseParentReuse
+          - added: Support for UseDecorateeReuse option in AsDecoratorAttribute
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc.dll" version="[2.1.1,3.0.0)" />
-                <dependency id="DryIocAttributes.dll" version="(1.5,3.0.0)" />
+                <dependency id="DryIoc.dll" version="[2.2.0,3.0.0)" />
+                <dependency id="DryIocAttributes.dll" version="[2.2.0,3.0.0)" />
             </group>
             <group targetFramework="dotnet">
-                <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
-                <dependency id="DryIocAttributes.dll" version="(1.5,3.0.0)" />
+                <dependency id="DryIoc.dll" version="[2.2.0,3.0.0)" />
+                <dependency id="DryIocAttributes.dll" version="[2.2.0,3.0.0)" />
 
                 <dependency id="System.Collections" version="4.0.0" />
                 <dependency id="System.Linq" version="4.0.0" />

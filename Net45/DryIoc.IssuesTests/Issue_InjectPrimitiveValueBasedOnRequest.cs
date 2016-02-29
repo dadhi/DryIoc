@@ -55,11 +55,9 @@ namespace DryIoc.IssuesTests
             // setup
             _container.Register<Target>();
             _container.Register<ILog, Log>(
-                made: Made.Of(request =>
-                {
-                    var targetType = request.Parent.Enumerate().First(p => p.ServiceType != typeof(ILog)).ImplementationType;
-                    return FactoryMethod.Of(typeof(LoggerFactory).GetMethodOrNull("GetLog").MakeGenericMethod(targetType));
-                }));
+                made: Made.Of(request => typeof(LoggerFactory).GetMethodOrNull("GetLog")
+                    .MakeGenericMethod(request.Parent.Enumerate()
+                            .First(p => p.ServiceType != typeof(ILog)).ImplementationType)));
 
             // exercise
             var resolved = _container.Resolve<Target>();

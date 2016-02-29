@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2014 Maksim Volkau
+Copyright (c) 2015 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,17 +31,71 @@ namespace DryIoc.Dnx.DependencyInjection
     /// <summary>Provides populating of service collection.</summary>
     public static class DryIocDnxDependencyInjection
     {
-        /// <summary>Registers descriptors services into container. </summary>
-        /// Plus registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
+        /// <summary>Creates new container from the <paramref name="container"/> adapted to be used
+        /// with Asp.Net 5 dependency injection:
+        /// - First method sets the rules specific for Asp.Net DI.
+        /// - Then registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
+        /// </summary>
+        /// <param name="container">Source container to adapt.</param>
+        /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
+        /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
+        /// <returns>New container adapted to AspNet DI conventions.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        ///     container = new Container().WithDependencyInjectionAdapter(services);
+        ///     serviceProvider = container.Resolve<IServiceProvider>();
+        /// ]]></code>
+        /// </example>
+        public static IContainer WithDependencyInjectionAdapter(this IContainer container,
+            IEnumerable<ServiceDescriptor> descriptors = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+        {
+            if (container.ScopeContext != null)
+                throw new ArgumentException("Adapted container uses ambient scope context which is not supported by AspNet DI.");
+
+            var adapter = container.With(rules => rules
+                .With(FactoryMethod.ConstructorWithResolvableArguments)
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                .WithTrackingDisposableTransients()
+                .WithImplicitRootOpenScope());
+
+            adapter.Register<IServiceProvider, DryIocServiceProvider>(Reuse.InCurrentScope);
+
+            // Scope factory should be scoped itself to enable nested scopes creation
+            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.InCurrentScope);
+
+            // Register asp net abstractions specified by descriptors in container 
+            if (descriptors != null)
+                adapter.Populate(descriptors, registerDescriptor);
+
+            return adapter;
+        }
+
+        /// <summary>Registers descriptors services into container and that's all. May be called multiple times with
+        /// different service collections.</summary>
         /// <param name="container">The container.</param>
         /// <param name="descriptors">The service descriptors.</param>
-        public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors)
+        /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
+        /// <example>
+        /// <code><![CDATA[
+        ///     // example of normal descriptor registration together with factory method registration for SomeService.
+        ///     container.Populate(services, (r, service) => {
+        ///         if (service.ServiceType == typeof(SomeService)) {
+        ///             r.Register<SomeService>(Made.Of(() => CreateCustomService()), Reuse.Singleton);
+        ///             return true;
+        ///         };
+        ///         return false; // fallback to normal registrations for the rest of the descriptors.
+        ///     });
+        /// ]]></code>
+        /// </example>
+        public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
-            container.Register<IServiceProvider, DryIocServiceProvider>(Reuse.Singleton);
-            container.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.Singleton);
-
             foreach (var descriptor in descriptors)
-                container.RegisterDescriptor(descriptor);
+            {
+                if (registerDescriptor == null || !registerDescriptor(container, descriptor))
+                    container.RegisterDescriptor(descriptor);
+            }
         }
 
         /// <summary>Registers described service into container by mapping DI Lifetime to DryIoc Reuse, 
@@ -50,7 +104,7 @@ namespace DryIoc.Dnx.DependencyInjection
         /// <param name="descriptor">Service descriptor.</param>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
         {
-            var reuse = MapLifetimeToReuse(descriptor.Lifetime);
+            var reuse = ConvertLifetimeToReuse(descriptor.Lifetime);
 
             if (descriptor.ImplementationType != null)
             {
@@ -68,7 +122,7 @@ namespace DryIoc.Dnx.DependencyInjection
             }
         }
 
-        private static IReuse MapLifetimeToReuse(ServiceLifetime lifetime)
+        private static IReuse ConvertLifetimeToReuse(ServiceLifetime lifetime)
         {
             switch (lifetime)
             {
@@ -79,57 +133,71 @@ namespace DryIoc.Dnx.DependencyInjection
                 case ServiceLifetime.Transient:
                     return Reuse.Transient;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, 
-                        "Not supported lifetime");
+                    throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "Not supported lifetime");
             }
         }
     }
 
-    public sealed class DryIocServiceProvider : IServiceProvider
+    /// <summary>Delegates service resolution to wrapped DryIoc scoped container.</summary>
+    /// <remarks>When disposed, disposed scoped container: that means the singletons registered directly to DryIoc container won't
+    /// be disposed. You should take care for them yourself outside of DI.</remarks>
+    public sealed class DryIocServiceProvider : IServiceProvider, IDisposable
     {
-        private readonly IResolver _resolver;
+        private readonly IContainer _scopedContainer;
 
-        public DryIocServiceProvider(IResolver resolver)
+        /// <summary>Wraps passed container.</summary> <param name="scopedContainer">subj.</param>
+        public DryIocServiceProvider(IContainer scopedContainer)
         {
-            _resolver = resolver;
+            _scopedContainer = scopedContainer;
         }
 
+        /// <summary>Delegates resolution to scoped container. Uses <see cref="IfUnresolved.ReturnDefault"/> policy to return
+        /// default value in case of resolution errors.</summary>
+        /// <param name="serviceType">Registered type to resolve.</param>
+        /// <returns>Resolved service object.</returns>
         public object GetService(Type serviceType)
         {
-            return _resolver.Resolve(serviceType, ifUnresolvedReturnDefault: true);
+            return _scopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault: true);
+        }
+
+        /// <summary>Disposes scoped container: which in order disposes open scope.</summary>
+        public void Dispose()
+        {
+            _scopedContainer.Dispose();
         }
     }
 
+    /// <summary>The goal of the factory is create/open new scope.
+    /// Factory by itself is scoped (not a singleton): that means you need resolve factory from outer scope to create nested scope.</summary>
     public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
     {
-        private readonly IContainer _container;
+        private readonly IContainer _scopedContainer;
 
-        public DryIocServiceScopeFactory(IContainer container)
+        /// <summary>Creates factory and stores injected scoped container to use it for opening scopes.</summary>
+        /// <param name="scopedContainer">Outer scoped container to be used to create nested scopes.</param>
+        public DryIocServiceScopeFactory(IContainer scopedContainer)
         {
-            _container = container;
+            _scopedContainer = scopedContainer;
         }
 
+        /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
+        /// <returns>DI wrapper of opened scope.</returns>
         public IServiceScope CreateScope()
         {
-            return new DryIocServiceScope(_container.OpenScope());
+            var scope = _scopedContainer.OpenScope();
+            return new DryIocServiceScope(scope.Resolve<IServiceProvider>());
         }
 
         private sealed class DryIocServiceScope : IServiceScope
         {
-            private readonly IContainer _scopedContainer;
+            public IServiceProvider ServiceProvider { get; }
 
-            public IServiceProvider ServiceProvider { get; private set; }
-
-            public DryIocServiceScope(IContainer scopedContainer)
+            public DryIocServiceScope(IServiceProvider serviceProvider)
             {
-                _scopedContainer = scopedContainer;
-                ServiceProvider = scopedContainer.Resolve<IServiceProvider>();
+                ServiceProvider = serviceProvider;
             }
 
-            public void Dispose()
-            {
-                _scopedContainer.Dispose();
-            }
+            public void Dispose() => (ServiceProvider as IDisposable)?.Dispose();
         }
     }
 }

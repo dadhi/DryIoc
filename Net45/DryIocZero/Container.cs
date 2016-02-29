@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1044,6 +1044,13 @@ namespace DryIocZero
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
 
+            if (id == -1) // disposable transient
+            {
+                var dt = createValue();
+                Ref.Swap(ref _disposableTransients, dts => dts.AppendOrUpdate(dt));
+                return dt;
+            }
+
             object item;
             lock (_locker)
             {
@@ -1053,7 +1060,11 @@ namespace DryIocZero
                 item = createValue();
             }
 
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            var items = _items;
+            var newItems = items.AddOrUpdate(id, item);
+            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
+            if (Interlocked.CompareExchange(ref _items, newItems, items) != items)
+                Ref.Swap(ref _items, _ => _.AddOrUpdate(id, item));
             return item;
         }
 
@@ -1066,18 +1077,31 @@ namespace DryIocZero
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside, 
+        /// so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
             var items = _items;
             if (!items.IsEmpty)
-                foreach (var item in items.Enumerate().OrderByDescending(it => it.Key))
-                    DisposeItem(item.Value);
+            {
+                // dispose in backward registration order
+                var itemList = items.Enumerate().ToArray();
+                for (var i = itemList.Length - 1; i >= 0; --i)
+                    DisposeItem(itemList[i].Value);
+            }
             _items = ImTreeMapIntToObj.Empty;
+
+            var disposableTransients = _disposableTransients;
+            if (!disposableTransients.IsNullOrEmpty())
+                for (var i = 0; i < disposableTransients.Length; i++)
+                    DisposeItem(_disposableTransients[i]);
+            _disposableTransients = null;
         }
 
-        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> <returns>String representation.</returns>
+        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> 
+        /// <returns>String representation.</returns>
         public override string ToString()
         {
             return "{" +
@@ -1089,6 +1113,7 @@ namespace DryIocZero
         #region Implementation
 
         private ImTreeMapIntToObj _items;
+        private object[] _disposableTransients;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
@@ -1106,35 +1131,46 @@ namespace DryIocZero
             }
 
             if (disposable != null)
+            {
                 try { disposable.Dispose(); }
                 catch (Exception)
                 {
                     // NOTE Ignoring disposing exception, they not so important for program to proceed.
                 }
+            }
         }
 
         #endregion
     }
 
-    /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
-    /// Locking is used internally to ensure that object factory called only once.</summary>
+    /// <summary>Different from <see cref="Scope"/> so that uses single array of items for fast access.
+    /// The array structure is:
+    /// items[0] is reserved for storing object[][] buckets.
+    /// items[1-BucketSize] are used for storing actual singletons up to (BucketSize-1) index
+    /// Buckets structure is variable number of object[BucketSize] buckets used to storing items with index >= BucketSize.
+    /// The structure allows very fast access to up to <see cref="BucketSize"/> singletons - it just array access: items[itemIndex]
+    /// For further indexes it is a fast O(1) access: ((object[][])items[i])[i / BucketSize - 1][i % BucketSize]
+    /// </summary>
     public sealed class SingletonScope : IScope
     {
-        private static readonly int MaxItemArrayIncreaseStep = 32;
-
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public IScope Parent { get { return null; } }
+        public IScope Parent { get; private set; }
 
         /// <summary>Optional name object associated with scope.</summary>
-        public object Name { get { return null; } }
+        public object Name { get; private set; }
+
+        /// <summary>Amount of items in item array.</summary>
+        public static readonly int BucketSize = 32;
 
         /// <summary>Creates scope.</summary>
-        public SingletonScope()
+        /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
+        public SingletonScope(IScope parent = null, object name = null)
         {
-            _items = new object[0];
+            Parent = parent;
+            Name = name;
+            Items = new object[BucketSize];
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-            _lastItemIndex = -1;
-            _itemsLocker = new object();
+            _lastItemIndex = 0;
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
@@ -1149,21 +1185,11 @@ namespace DryIocZero
             Ref.Swap(ref _factoryIdToIndexMap, map =>
             {
                 index = map.GetValueOrDefault(externalId);
-                if (index != null)
-                    return map;
-                index = GetNewIndex();
-                return map.AddOrUpdate(externalId, index);
+                return index != null ? map
+                    : map.AddOrUpdate(externalId, index = Interlocked.Increment(ref _lastItemIndex));
             });
 
             return (int)index;
-        }
-
-        private int GetNewIndex()
-        {
-            var newIndex = Interlocked.Increment(ref _lastItemIndex);
-            if (newIndex >= _items.Length)
-                ExtendItemsUpTo(newIndex);
-            return newIndex;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -1174,8 +1200,9 @@ namespace DryIocZero
         /// <exception cref="ContainerException">if scope is disposed.</exception>
         public object GetOrAdd(int id, CreateScopedValue createValue)
         {
-            // ReSharper disable once InconsistentlySynchronizedField
-            return (id < _items.Length ? _items[id] : null) ?? TryGetOrAddToArray(id, createValue);
+            return id < BucketSize && id >= 0 // it could be -1 for disposable transients
+                ? (Items[id] ?? GetOrAddItem(Items, id, createValue))
+                : GetOrAddItem(id, createValue);
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -1183,26 +1210,28 @@ namespace DryIocZero
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            lock (_itemsLocker)
-                _items[id] = item;
+            if (id < BucketSize)
+                Items[id] = item;
+            else
+            {
+                var bucket = GetOrAddBucket(id);
+                var indexInBucket = id % BucketSize;
+                bucket[indexInBucket] = item;
+            }
         }
 
+        /// <summary>Adds external non-service item into singleton collection. 
+        /// The item may not have corresponding external item ID.</summary>
+        /// <param name="item">External item to add, this may be metadata, service key, etc.</param>
+        /// <returns>Index of added or already added item.</returns>
         internal int GetOrAdd(object item)
         {
-            var index = Array.IndexOf(_items, item);
-            if (index != -1)
-                return index;
-
-            lock (_itemsLocker)
+            var index = IndexOf(item);
+            if (index == -1)
             {
-                index = Array.IndexOf(_items, item);
-                if (index == -1)
-                {
-                    index = GetNewIndex();
-                    _items[index] = item;
-                }
+                index = Interlocked.Increment(ref _lastItemIndex);
+                SetOrAdd(index, item);
             }
-
             return index;
         }
 
@@ -1210,56 +1239,155 @@ namespace DryIocZero
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
+
             var factoryIdToIndexMap = _factoryIdToIndexMap;
             if (!factoryIdToIndexMap.IsEmpty)
-                foreach (var idToIndex in factoryIdToIndexMap.Enumerate().OrderByDescending(it => it.Key))
-                    Scope.DisposeItem(_items[(int)idToIndex.Value]);
+            {
+                var ids = factoryIdToIndexMap.Enumerate().ToArray();
+                for (var i = ids.Length - 1; i >= 0; --i)
+                    Scope.DisposeItem(GetItemOrDefault((int)ids[i].Value));
+            }
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-            _items = ArrayTools.Empty<object>();
+
+            var disposableTransients = _disposableTransients;
+            if (!disposableTransients.IsNullOrEmpty())
+                for (var i = 0; i < disposableTransients.Length; i++)
+                    Scope.DisposeItem(_disposableTransients[i]);
+            _disposableTransients = null;
+
+            Items = ArrayTools.Empty<object>();
         }
 
         #region Implementation
 
+        private static readonly object[] _lockers =
+        {
+            new object(), new object(), new object(), new object(),
+            new object(), new object(), new object(), new object()
+        };
+
         private ImTreeMapIntToObj _factoryIdToIndexMap;
-        private object[] _items;
-        private readonly object _itemsLocker;
         private int _lastItemIndex;
         private int _disposed;
 
-        private void ExtendItemsUpTo(int index)
+        /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
+        internal object[] Items;
+
+        private object[] _disposableTransients;
+
+        private object GetOrAddItem(int index, CreateScopedValue createValue)
         {
-            lock (_itemsLocker)
+            if (index == -1) // disposable transient
             {
-                var size = _items.Length;
-                if (index >= size)
-                {
-                    var newSize = Math.Max(index + 1, size + MaxItemArrayIncreaseStep);
-                    var newItems = new object[newSize];
-                    Array.Copy(_items, 0, newItems, 0, size);
-                    _items = newItems;
-                }
+                var item = createValue();
+                Ref.Swap(ref _disposableTransients, items => items.AppendOrUpdate(item));
+                return item;
             }
+
+            var bucket = GetOrAddBucket(index);
+            index = index % BucketSize;
+            return GetOrAddItem(bucket, index, createValue);
         }
 
-        private object TryGetOrAddToArray(int index, CreateScopedValue createValue)
+        private static object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
         {
-            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
+            var value = bucket[index];
+            if (value != null)
+                return value;
 
-            if (index >= _items.Length)
-                ExtendItemsUpTo(index);
-
-            object item;
-            lock (_itemsLocker)
+            var locker = _lockers[index % _lockers.Length];
+            lock (locker)
             {
-                item = _items[index];
-                if (item != null)
-                    return item;
-                item = createValue();
-                _items[index] = item;
+                value = bucket[index];
+                if (value == null)
+                    bucket[index] = value = createValue();
             }
 
-            return item;
+            return value;
+        }
+
+        private object GetItemOrDefault(int index)
+        {
+            if (index < BucketSize)
+                return Items[index];
+
+            var bucketIndex = index / BucketSize - 1;
+            var buckets = Items[0] as object[][];
+            if (buckets != null && buckets.Length > bucketIndex)
+            {
+                var bucket = buckets[bucketIndex];
+                if (bucket != null)
+                    return bucket[index % BucketSize];
+            }
+
+            return null;
+        }
+
+        // find if bucket already created starting from 0
+        // if not - create new buckets array and copy old buckets into it
+        private object[] GetOrAddBucket(int index)
+        {
+            var bucketIndex = index / BucketSize - 1;
+            var buckets = Items[0] as object[][];
+            if (buckets == null ||
+                buckets.Length < bucketIndex + 1 ||
+                buckets[bucketIndex] == null)
+            {
+                Ref.Swap(ref Items[0], value =>
+                {
+                    if (value == null)
+                    {
+                        var newBuckets = new object[bucketIndex + 1][];
+                        newBuckets[bucketIndex] = new object[BucketSize];
+                        return newBuckets;
+                    }
+
+                    var oldBuckets = (object[][])value;
+                    if (oldBuckets.Length < bucketIndex + 1)
+                    {
+                        var newBuckets = new object[bucketIndex + 1][];
+                        Array.Copy(oldBuckets, 0, newBuckets, 0, oldBuckets.Length);
+                        newBuckets[bucketIndex] = new object[BucketSize];
+                        return newBuckets;
+                    }
+
+                    if (oldBuckets[bucketIndex] == null)
+                        oldBuckets[bucketIndex] = new object[BucketSize];
+
+                    return value;
+                });
+            }
+
+            var bucket = ((object[][])Items[0])[bucketIndex];
+            return bucket;
+        }
+
+        private int IndexOf(object item)
+        {
+            var index = Items.IndexOf(item);
+            if (index != -1)
+                return index;
+
+            // look in other buckets
+            var bucketsObj = Items[0];
+            if (bucketsObj != null)
+            {
+                var buckets = (object[][])bucketsObj;
+                for (var i = 0; i < buckets.Length; i++)
+                {
+                    var b = buckets[i];
+                    if (b != null)
+                    {
+                        index = b.IndexOf(item);
+                        if (index != -1)
+                            return (i + 1) * BucketSize + index;
+                    }
+                }
+            }
+
+            return -1;
         }
 
         #endregion
@@ -1502,13 +1630,110 @@ namespace DryIocZero
         Decorator,
         /// <summary>Defines wrapper factory.</summary>
         Wrapper
-    };
+    }
+
+    /// <summary>Reuse goal is to locate or create scope where reused objects will be stored.</summary>
+    /// <remarks><see cref="IReuse"/> implementors supposed to be stateless, and provide scope location behavior only.
+    /// The reused service instances should be stored in scope(s).</remarks>
+    public interface IReuse
+    {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        int Lifespan { get; }
+    }
+
+    /// <summary>Specifies pre-defined reuse behaviors supported by container: 
+    /// used when registering services into container with <see cref="Registrator"/> methods.</summary>
+    public static class Reuse
+    {
+        /// <summary>Specifies to store single service instance per <see cref="Container"/>.</summary>
+        public static readonly IReuse Singleton = new SingletonReuse();
+
+        /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
+        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+
+        /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
+        public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
+
+        /// <summary>Returns current scope reuse with specific name to match with scope.
+        /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
+        /// <param name="name">(optional) Name to match with scope.</param>
+        /// <returns>Created current scope reuse.</returns>
+        public static IReuse InCurrentNamedScope(object name = null)
+        {
+            return name == null ? InCurrentScope : new CurrentScopeReuse(name);
+        }
+
+        /// <summary>Creates reuse to search for <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/>
+        /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="InResolutionScope"/> will be returned.</summary>
+        /// <param name="assignableFromServiceType">(optional) To search for scope with service type assignable to type specified in parameter.</param>
+        /// <param name="serviceKey">(optional) Search for specified key.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
+        /// <returns>New reuse with specified parameters or <see cref="InResolutionScope"/> if nothing specified.</returns>
+        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
+        {
+            return assignableFromServiceType == null && serviceKey == null ? InResolutionScope
+                : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, outermost);
+        }
+    }
+
+    /// <summary>Returns container bound scope for storing singleton objects.</summary>
+    public sealed class SingletonReuse : IReuse
+    {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 1000; } }
+    }
+
+    /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
+    /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
+    public sealed class CurrentScopeReuse : IReuse
+    {
+        /// <summary>Name to find current scope or parent with equal name.</summary>
+        public readonly object Name;
+
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 100; } }
+
+        /// <summary>Creates reuse optionally specifying its name.</summary> 
+        /// <param name="name">(optional) Used to find matching current scope or parent.</param>
+        public CurrentScopeReuse(object name = null)
+        {
+            Name = name;
+        }
+    }
+
+    /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
+    /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
+    public sealed class ResolutionScopeReuse : IReuse
+    {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan { get { return 0; } }
+
+        /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>
+        public readonly Type AssignableFromServiceType;
+
+        /// <summary>Indicates service key of the consumer that defines resolution scope.</summary>
+        public readonly object ServiceKey;
+
+        /// <summary>When set indicates to find the outermost matching consumer with resolution scope,
+        /// otherwise nearest consumer scope will be used.</summary>
+        public readonly bool Outermost;
+
+        /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
+        /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="outermost">(optional)</param>
+        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
+        {
+            AssignableFromServiceType = assignableFromServiceType;
+            ServiceKey = serviceKey;
+            Outermost = outermost;
+        }
+    }
 
     /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, 0, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, null, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
@@ -1558,31 +1783,34 @@ namespace DryIocZero
         public readonly Type ImplementationType;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
-        public readonly int ReuseLifespan;
+        public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
+
+        /// <summary>Service reuse.</summary>
+        public readonly IReuse Reuse;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
         /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, int reuseLifespan)
+        /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
         {
-            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuseLifespan);
+            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuse);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
         /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
         {
             return new RequestInfo(serviceType, requiredServiceType, serviceKey,
-                factoryID, factoryType, implementationType, reuseLifespan, this);
+                factoryID, factoryType, implementationType, reuse, this);
         }
 
         private RequestInfo(
             Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
             RequestInfo parentOrWrapper)
         {
             ParentOrWrapper = parentOrWrapper;
@@ -1596,7 +1824,7 @@ namespace DryIocZero
             FactoryID = factoryID;
             FactoryType = factoryType;
             ImplementationType = implementationType;
-            ReuseLifespan = reuseLifespan;
+            Reuse = reuse;
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>

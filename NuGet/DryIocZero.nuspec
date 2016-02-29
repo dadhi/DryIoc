@@ -4,27 +4,20 @@
         <id>DryIocZero</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
-          v2.0.1
-          - fixed: #200 Multiple instances for Singleton created when Container is shared among multiple threads
-
-          v2.0.0
-          - Ensures "zero" application bootstrapping time associated with IoC registrations.
-          - Does not depend on DryIoc at run-time.
-          - Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
-          - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
-          - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
-          - Allows run-time registrations too. You may register instances and factories at run-time.
+          v2.1.0
+          - fixed: #238: DryIocZero generation should notify about runtime state used: RegisterDelegate and RegisterInstance
+          - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate
         </releaseNotes>
         <dependencies>
-            <dependency id="DryIoc.dll" version="2.0.0" />
-            <dependency id="DryIoc.MefAttributedModel.dll" version="2.0.0" />
+            <dependency id="DryIoc.dll" version="2.2.0" />
+            <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.0" />
             <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
         <frameworkAssemblies>

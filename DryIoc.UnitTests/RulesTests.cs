@@ -55,7 +55,53 @@ namespace DryIoc.UnitTests
 
             Assert.IsNull(container.Resolve<NotRegisteredService>(IfUnresolved.ReturnDefault));
         }
-        
+
+        [Test]
+        public void I_can_add_rule_to_resolve_any_unknown_concrete_type()
+        {
+            IContainer container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<X>(x);
+            Assert.IsInstanceOf<Y>(x.Dep);
+        }
+
+        [Test]
+        public void I_can_Not_resolve_unknown_concrete_type_on_specific_condition()
+        {
+            IContainer container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<X>());
+        }
+
+        [Test]
+        public void I_can_resolve_unknown_concrete_type_on_specific_condition()
+        {
+            IContainer container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
+
+            container.Register<X>(Reuse.Singleton);
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<X>(x);
+            Assert.IsInstanceOf<Y>(x.Dep);
+        }
+
+        public class X
+        {
+            public Y Dep { get; private set; }
+
+            public X(Y dep)
+            {
+                Dep = dep;
+            }
+        }
+
+        public class Y {}
+
         [Test]
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
         {
@@ -199,7 +245,7 @@ namespace DryIoc.UnitTests
         internal class RedMe { public RedMe(IMe me) { } }
 
         [Test]
-        public void I_can_support_for_specific_primitive_value_injection_via_container_rule()
+        public void Exist_support_for_non_primitive_value_injection_via_container_rule()
         {
             var container = new Container(rules => rules.WithItemToExpressionConverter(
                 (item, type) => type == typeof(ConnectionString)
@@ -214,6 +260,22 @@ namespace DryIoc.UnitTests
             Assert.AreEqual("aaa", user.S.Value);
         }
 
+        [Test]
+        public void Container_rule_for_serializing_custom_value_to_expression_should_throw_proper_exception_for_not_supported_type()
+        {
+            var container = new Container(rules => rules.WithItemToExpressionConverter(
+                (item, type) => type == typeof(ConnectionString)
+                ? Expression.New(type.GetSingleConstructorOrNull(),
+                    Expression.Constant(((ConnectionString)item).Value))
+                : null));
+
+            var s = new ConnectionStringImpl("aaa");
+            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));
+
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<ConStrUser>());
+            Assert.AreEqual(Error.StateIsRequiredToUseItem, ex.Error);
+        }
+
         public class ConnectionString
         {
             public string Value;
@@ -221,6 +283,10 @@ namespace DryIoc.UnitTests
             {
                 Value = value;
             }
+        }
+
+        public class ConnectionStringImpl : ConnectionString {
+            public ConnectionStringImpl(string value) : base(value) {}
         }
 
         public class ConStrUser 
@@ -261,6 +327,172 @@ namespace DryIoc.UnitTests
             container.Register<AD>());
         }
 
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_singleton_scope()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>();
+            container.Register<ADConsumer>(Reuse.Singleton);
+            var singleton = container.Resolve<ADConsumer>();
+
+            container.Dispose();
+
+            Assert.IsTrue(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_not_track_func_of_transient_disposable_dependency_in_singleton_scope()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>();
+            container.Register<ADFuncConsumer>(Reuse.Singleton);
+            var singleton = container.Resolve<ADFuncConsumer>();
+
+            container.Dispose();
+
+            Assert.IsFalse(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_lazy_of_transient_disposable_dependency_in_singleton_scope()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>();
+            container.Register<ADLazyConsumer>(Reuse.Singleton);
+            var singleton = container.Resolve<ADLazyConsumer>();
+
+            container.Dispose();
+
+            Assert.IsTrue(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_current_scope()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>();
+            container.Register<ADConsumer>(Reuse.InCurrentScope);
+
+            ADConsumer scoped;
+            using (var scope = container.OpenScope())
+            {
+                scoped = scope.Resolve<ADConsumer>();
+            }
+
+            Assert.IsTrue(scoped.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_disposable_dependency_in_resolution_scope()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>(setup: Setup.With(asResolutionCall: true));
+            container.Register<ADConsumer>(Reuse.InResolutionScopeOf<AResolutionScoped>(), setup: Setup.With(asResolutionCall: true));
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+
+            var scoped = container.Resolve<AResolutionScoped>();
+            scoped.Dependencies.Dispose();
+
+            Assert.IsTrue(scoped.Consumer.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_service_in_open_scope_if_present()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+        [Test]
+        public void Tracked_disposables_should_be_different()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            using (var scope = container.OpenScope())
+            {
+                var ad = scope.Resolve<AD>();
+                Assert.AreNotSame(ad, scope.Resolve<AD>());
+            }
+        }
+
+        [Test]
+        public void Should_track_transient_service_in_implicit_open_scope()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope());
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            var ad = container.Resolve<AD>();
+
+            container.Dispose();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+        [Test]
+        public void Should_track_transient_service_in_nested_open_scope_if_present()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope().WithTrackingDisposableTransients());
+            container.Register<AD>();
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+        [Test]
+        public void Can_prevent_tracking_for_registration_with_prevent_disposal_option()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope().WithTrackingDisposableTransients());
+            container.Register<AD>(setup: Setup.With(preventDisposal: true));
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsFalse(ad.IsDisposed);
+        }
+
+
+        [Test]
+        public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            AD ad;
+            using (var scope = container.OpenScope("hey"))
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+        }
+
+
+        [Test]
+        public void Should_NOT_track_transient_service_in_singleton_scope_if_no_open_scope_because_it_is_most_definitely_a_leak()
+        {
+            var container = new Container();
+            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
+
+            var ad = container.Resolve<AD>();
+
+            container.Dispose();
+            Assert.IsFalse(ad.IsDisposed);
+        }
+
         public class AD : IDisposable
         {
             public bool IsDisposed { get; private set; }
@@ -275,9 +507,58 @@ namespace DryIoc.UnitTests
         {
             public AD Ad { get; private set; }
 
-            public ADConsumer(AD ad)
+            public AD Ad2 { get; private set; }
+
+            public ADConsumer(AD ad, AD ad2)
             {
                 Ad = ad;
+                Ad2 = ad2;
+            }
+        }
+
+        public class AResolutionScoped
+        {
+            public ADConsumer Consumer { get; private set; }
+
+            public IDisposable Dependencies { get; private set; }
+
+            public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
+            {
+                Consumer = consumer;
+                Dependencies = dependencies;
+            }
+        }
+
+        public class AResolutionScopedConsumer
+        {
+            public AResolutionScoped AScoped { get; private set; }
+
+            public IDisposable Dependencies { get; private set; }
+
+            public AResolutionScopedConsumer(AResolutionScoped aScoped, IDisposable dependencies)
+            {
+                AScoped = aScoped;
+                Dependencies = dependencies;
+            }
+        }
+
+        public class ADFuncConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public ADFuncConsumer(Func<AD> ad)
+            {
+                Ad = ad();
+            }
+        }
+
+        public class ADLazyConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public ADLazyConsumer(Lazy<AD> ad)
+            {
+                Ad = ad.Value;
             }
         }
 

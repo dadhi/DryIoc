@@ -18,33 +18,37 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 
 * Designed for low-ceremony use, performance, and extensibility.
-* Supports .NET 3.5+; PCL Profiles 259 and 328, [.NET Core](https://oren.codes/2015/07/29/targeting-net-core) and [DNX](https://github.com/aspnet/dnx)
+* Supports .NET 3.5+; PCL Profiles 259, 328, [dotnet](https://oren.codes/2015/07/29/targeting-net-core); [DNX/.NET Core](https://github.com/aspnet/dnx)
 * [Documented][WikiHome] and [open for contributions](CONTRIBUTING.md)
 * Available at NuGet as [DryIoc.dll] or as code [DryIoc] (_in NuGet < 3.0_) 
     * `PM> Install-Package DryIoc.dll`
     * get code `PM> Install-Package DryIoc`
     * for DNX `PM> Install-Package DryIoc.Dnx`
-* __DryIoc v2.1.2__ is the latest stable version
+* __DryIoc v2.2.0__ is the latest stable version
     * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
 
 ## Benchmarks
+
 * [Performance](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
 * [Features](http://featuretests.apphb.com/DependencyInjection.html)
 
 
 ## Performance
+
 * General use-cases optimized for max speed.
 * Memory footprint preserved as small as possible.
 
 
 ## Code/Library
+
 * No dependencies on the other libraries.
 * Public API is fully documented.
 
 
 ## Reliability
+
 * Unit-test suit with ~700 tests.
 * Thread-safe and lock-free: registrations and resolutions could be made in parallel without corrupting container state. 
 * Detects recursive dependencies aka cycles in object graph.
@@ -56,17 +60,19 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 * Register interface/type mapping, additionally supported: registering service once, registration update, removing registration. 
 * Register user-defined delegate factory and register existing instance.
-* Register from assembly(ies) implementation types with automatically determined service types.
+* Register implementation types from provided assemblies with automatically determined service types.
 * Register with service key of arbitrary type, or register multiple non-keyed services.
 * Register with resolution condition.
 * Register with associated metadata object of arbitrary type.
 * Resolve and ResolveMany. 
-* Unknown service resolution with `Rules.WithUnknownServiceResolvers()`. 
+* Unknown service resolution via `Rules.WithUnknownServiceResolvers()`:
+    * Optional automatic concrete types resolution
 * Instance lifetime control or *Reuse* in DryIoc terms:
     * Nested disposable scopes, ambient scope context.
     * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
+    * `useParentReuse` option for injected dependencies
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
-* Open-generics without special syntax.
+* Extensive Open-generics support without special syntax: supported constraints, variance, complex nested generic definitions
 * Constructor, property and field injection.
 * Static or instance factory methods in addition to constructor. Factory methods support parameter injection the same way as constructors.
 * Injecting properties and fields into existing object.
@@ -76,8 +82,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
     * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
-* Resolve [Composites](http://en.wikipedia.org/wiki/Composite_pattern): Composite itself is excluded from result collection.
-* Specify [Decorators](http://en.wikipedia.org/wiki/Decorator_pattern). 
+* [Composite pattern](https://bitbucket.org/dadhi/dryioc/wiki/Wrappers#markdown-header-composite-pattern-support): Composite itself is excluded from result collection.
+* [Decorator pattern](https://bitbucket.org/dadhi/dryioc/wiki/Decorators). 
 
 
 ## Companions

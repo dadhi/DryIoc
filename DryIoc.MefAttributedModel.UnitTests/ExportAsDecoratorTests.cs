@@ -122,6 +122,44 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(3, svc.GetResult(), "Verify that both decorators were found.");
         }
 
+        [Test]
+        public void Can_register_decorator_of_T()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(typeof(X), typeof(DecoratorFactory));
+
+            var x = container.Resolve<X>();
+            Assert.IsTrue(x.IsStarted);
+        }
+
+        public interface IStartable
+        {
+            void Start();
+        }
+
+        [Export]
+        public class X : IStartable
+        {
+            public bool IsStarted { get; private set; }
+
+            public void Start()
+            {
+                IsStarted = true;
+            }
+        }
+
+        [Export, AsFactory]
+        public static class DecoratorFactory
+        {
+            [Export, AsDecorator]
+            public static T Decorate<T>(T service) where T : IStartable
+            {
+                service.Start();
+                return service;
+            }
+        }
+
         internal interface IBug { }
         
         [Export(typeof(IBug))]

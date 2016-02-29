@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -278,8 +279,6 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
-
             container.RegisterDelegateDecorator<IOperation>(_ => op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
@@ -328,23 +327,58 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registering_one_decorator_as_delegate_and_another_as_service_Then_delegate_will_be_applied_last()
+        public void When_mixing_Type_and_Delegate_decorators_the_registration_order_is_preserved()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
             container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
             container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
-            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.IsInstanceOf<AsyncOperationDecorator>(operation);
+
+            var decorated1 = ((AsyncOperationDecorator)operation).Decorated();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(decorated1);
+
+            var decorated2 = ((MeasureExecutionTimeOperationDecorator)decorated1).Decorated;
+            Assert.IsInstanceOf<RetryOperationDecorator>(decorated2);
+        }
+
+        [Test]
+        public void I_can_ensure_Decorator_order_with_Order_option()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>();
+            container.Register<IOperation, RetryOperationDecorator>(setup: Setup.DecoratorWith(order: 3));
+            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.DecoratorWith(order: 1));
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.IsInstanceOf<RetryOperationDecorator>(operation);
+
+            var decorated1 = ((RetryOperationDecorator)operation).Decorated;
+            Assert.IsInstanceOf<AsyncOperationDecorator>(decorated1);
+
+            var decorated2 = ((AsyncOperationDecorator)decorated1).Decorated();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(decorated2);
+        }
+
+
+        [Test]
+        public void Delegate_decorator_will_use_decoratee_reuse()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.RegisterDelegateDecorator<IOperation>(r => 
+                op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
 
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
-
-            var decorated1 = ((MeasureExecutionTimeOperationDecorator)operation).Decorated;
-            Assert.IsInstanceOf<RetryOperationDecorator>(decorated1);
-
-            var decorated2 = ((RetryOperationDecorator)decorated1).Decorated;
-            Assert.IsInstanceOf<AsyncOperationDecorator>(decorated2);
+            Assert.AreSame(operation, container.Resolve<IOperation>());
         }
 
         [Test]
@@ -487,6 +521,335 @@ namespace DryIoc.UnitTests
             var bird = container.Resolve<IBird>(typeof(Duck));
 
             Assert.IsInstanceOf<TalkingBirdDecorator>(bird);
+        }
+
+        [Test]
+        public void Can_register_custom_Disposer_as_decorator()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton);
+
+            container.RegisterDelegate(
+                _ => new Disposer<Foo>(f => f.IsReleased = true),
+                setup: Setup.With(useParentReuse: true));
+
+            container.Register(Made.Of(
+                r => ServiceInfo.Of<Disposer<Foo>>(),
+                f => f.TrackForDispose(Arg.Of<Foo>())),
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var foo = container.Resolve<Foo>();
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+        }
+
+        [Test]
+        public void Can_register_custom_Disposer_via_specific_register_method()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton);
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+
+            var foo = container.Resolve<Foo>();
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+        }
+
+        [Test]
+        public void Can_register_custom_Disposer_via_specific_register_method_with_condition()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton, serviceKey: "blah");
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true, r => "blah".Equals(r.ServiceKey));
+
+            var foo = container.Resolve<Foo>("blah");
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+        }
+
+        [Test]
+        public void Can_register_2_custom_Disposers()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton);
+            var released = false;
+            container.RegisterDisposer<Foo>(f =>
+            {
+                if (f.IsReleased)
+                    released = true;
+                f.IsReleased = true;
+            });
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+
+            var foo = container.Resolve<Foo>();
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+            Assert.IsTrue(released);
+        }
+
+        [Test]
+        public void Can_register_2_custom_Disposers_for_keyed_service()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton, serviceKey: 1);
+            var released = false;
+            container.RegisterDisposer<Foo>(f =>
+            {
+                if (f.IsReleased)
+                    released = true;
+                f.IsReleased = true;
+            });
+            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+
+            var foo = container.Resolve<Foo>(1);
+
+            container.Dispose();
+            Assert.IsTrue(foo.IsReleased);
+            Assert.IsTrue(released);
+        }
+
+        [Test]
+        public void Decorator_created_by_factory_should_be_compasable_with_other_decorator()
+        {
+            var container = new Container();
+            container.Register<A>();
+
+            container.Register<FB>();
+            container.Register(
+                Made.Of(r => ServiceInfo.Of<FB>(),
+                f => f.Decorate(Arg.Of<A>())),
+                setup: Setup.Decorator);
+
+            container.Register<A, C>(setup: Setup.Decorator);
+
+            var a = container.Resolve<A>();
+            Assert.IsInstanceOf<C>(a);
+
+            var c = (C)a;
+            Assert.IsInstanceOf<B>(c.A);
+        }
+
+        [Test]
+        public void Can_register_decorator_of_any_T_As_object()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+            container.Register<object>(made: Made.Of(r => 
+                GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.Decorator);
+
+            var s = container.Resolve<S>();
+            Assert.AreEqual("Ok", s.Message);
+        }
+
+        [Test]
+        public void If_decorator_of_any_T_has_not_compatible_decoratee_type_It_should_throw()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+
+            container.Register<object>(made: Made.Of(r =>
+                GetType().GetSingleMethodOrNull("PutMessage2").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.Decorator);
+
+            Assert.Throws<ArgumentException>(() =>
+            container.Resolve<S>());
+        }
+
+        [Test]
+        public void If_decorator_of_any_T_returns_unexpected_decorator_type_It_should_throw()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+
+            container.Register<object>(made: Made.Of(r =>
+                GetType().GetSingleMethodOrNull("PutMessage3").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.Decorator);
+
+            var ex = Assert.Throws<ContainerException>(() =>
+            container.Resolve<S>());
+
+            Assert.AreEqual(Error.ServiceIsNotAssignableFromFactoryMethod, ex.Error);
+        }
+
+        [Test]
+        public void Can_register_decorator_of_any_T_As_object_and_specified_order_of_application()
+        {
+            var container = new Container();
+
+            container.Register<S>();
+            container.Register<S, SS>(setup: Setup.Decorator);
+            container.Register<object>(made: Made.Of(r =>
+                GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
+                setup: Setup.DecoratorWith(order: -1));
+
+            var s = container.Resolve<S>();
+            Assert.AreEqual("OkNot", s.Message);
+        }
+
+        [Test]
+        public void I_can_register_decorator_with_key_to_identify_decoratee()
+        {
+            var container = new Container();
+
+            container.Register<S>(serviceKey: "a");
+            container.Register<S, SS>(setup: Setup.Decorator);
+
+            var s = container.Resolve<S>(serviceKey: "a");
+            Assert.AreEqual("Not", s.Message);
+        }
+
+        [Test]
+        public void Can_register_decorator_of_T()
+        {
+            var container = new Container();
+
+            container.Register<X>();
+            container.Register<object>(
+                made: Made.Of(r => typeof(DecoratorFactory)
+                    .GetSingleMethodOrNull("Decorate")
+                    .MakeGenericMethod(r.ServiceType)), 
+                setup: Setup.Decorator);
+
+            var x = container.Resolve<X>();
+            Assert.IsTrue(x.IsStarted);
+        }
+
+        public interface IStartable
+        {
+            void Start();
+        }
+
+        public class X : IStartable
+        {
+            public bool IsStarted { get; private set; }
+
+            public void Start()
+            {
+                IsStarted = true;
+            }
+        }
+
+        public static class DecoratorFactory
+        {
+            public static T Decorate<T>(T service) where T : IStartable
+            {
+                service.Start();
+                return service;
+            }
+        }
+
+        public class S
+        {
+            public string Message = "";
+        }
+
+        public class SS : S
+        {
+            public SS(S s)
+            {
+                Message = s.Message + "Not";
+            }
+        }
+
+        public static T PutMessage<T>(T t)
+        {
+            var s = t as S;
+            if (s != null)
+                s.Message += "Ok";
+            return t;
+        }
+
+        public static T PutMessage2<T>(T t) where T : IDisposable
+        {
+            var s = t as S;
+            if (s != null)
+                s.Message = "Ok";
+            return t;
+        }
+
+        public static string PutMessage3<T>(T t) 
+        {
+            var s = t as S;
+            if (s != null)
+                s.Message = "Ok";
+            return "nope";
+        }
+
+        public class A { }
+
+        public class FB : A
+        {
+            public A Decorate(A a)
+            {
+                return new B(a);
+            }     
+        }
+
+        class B : A
+        {
+            public A A { get; private set; }
+
+            public B(A a)
+            {
+                A = a;
+            }
+        }
+
+        class C : A
+        {
+            public A A { get; private set; }
+
+            public C(A a)
+            {
+                A = a;
+            }
+        }
+
+
+        public class Foo
+        {
+            public bool IsReleased { get; set; }
+        }
+
+        public sealed class Disposer<T> : IDisposable
+        {
+            private readonly Action<T> _dispose;
+            private int _state;
+            private const int Tracked = 1, Disposed = 2;
+            private T _item;
+
+            public Disposer(Action<T> dispose)
+            {
+                _dispose = dispose.ThrowIfNull();
+            }
+
+            public T TrackForDispose(T item)
+            {
+                if (Interlocked.CompareExchange(ref _state, Tracked, 0) != 0)
+                    Throw.It(Error.Of("Something is {0} already."), _state == Tracked ? " tracked" : "disposed");
+                _item = item;
+                return item;
+            }
+
+            public void Dispose()
+            {
+                if (Interlocked.CompareExchange(ref _state, Disposed, Tracked) != Tracked)
+                    return;    
+                var item = _item;
+                if (item != null)
+                {
+                    _dispose(item);
+                    _item = default(T);
+                }
+            }
         }
 
         public interface IBird {}

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -564,7 +565,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_sepcify_default_reuse_per_Container_different_from_Transient()
+        public void Can_specify_default_reuse_per_Container_different_from_Transient()
         {
             var container = new Container(r => r.WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
             container.Register<Abc>();
@@ -573,6 +574,116 @@ namespace DryIoc.UnitTests
             {
                 var abc = scope.Resolve<Abc>();
                 Assert.AreSame(abc, scope.Resolve<Abc>());
+            }
+        }
+
+        [Test]
+        public void Resolution_scope_should_be_propagated_through_resolution_call_intermediate_dependencies()
+        {
+            var container = new Container();
+
+            container.Register<AD>(Reuse.InResolutionScopeOf<AResolutionScoped>());
+            container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+
+            var scoped = container.Resolve<AResolutionScoped>();
+            Assert.IsNotNull(scoped);
+            Assert.AreSame(scoped.Consumer.Ad, scoped.Consumer.Ad2);
+        }
+
+        [Test]
+        public void Resolution_call_should_not_create_resolution_scope()
+        {
+            var container = new Container();
+
+            container.Register<AD>(Reuse.InResolutionScopeOf<ADConsumer>());
+            container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
+            container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
+
+            Assert.Throws<ContainerException>(() => 
+            container.Resolve<AResolutionScoped>());
+        }
+
+        [Test]
+        public void Resolve_a_big_amount_of_singletons()
+        {
+            var container = new Container();
+
+            var count = SingletonScope.BucketSize * 2 + 1;
+            for (var i = 0; i < count; i++)
+            {
+                var serviceKey = new IntKey(i);
+                container.Register<AD>(Reuse.Singleton, serviceKey: serviceKey);
+                container.RegisterDisposer<AD>(ad => ad.IsDisposed = true);
+            }
+
+            var services = container.Resolve<KeyValuePair<IntKey, AD>[]>();
+            for (int i = 0; i < count; i++)
+            {
+                var pair = services[i];
+                Assert.IsNotNull(pair.Value);
+                Assert.AreEqual(i, pair.Key.Index);
+            }
+
+            container.Dispose();
+            for (int i = 0; i < count; ++i)
+                Assert.IsTrue(services[i].Value.IsDisposed);
+        }
+
+        public class IntKey
+        {
+            public readonly int Index;
+
+            public IntKey(int i)
+            {
+                Index = i;
+            }
+
+            public override bool Equals(object obj)
+            {
+                var intKey = obj as IntKey;
+                return intKey != null && Index.Equals(intKey.Index);
+            }
+
+            public override int GetHashCode()
+            {
+                return Index.GetHashCode();
+            }
+        }
+
+        public class AD
+        {
+            public bool IsDisposed { get; set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        public class ADConsumer
+        {
+            public AD Ad { get; private set; }
+
+            public AD Ad2 { get; private set; }
+
+            public ADConsumer(AD ad, AD ad2)
+            {
+                Ad = ad;
+                Ad2 = ad2;
+            }
+        }
+
+        public class AResolutionScoped
+        {
+            public ADConsumer Consumer { get; private set; }
+
+            public IDisposable Dependencies { get; private set; }
+
+            public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
+            {
+                Consumer = consumer;
+                Dependencies = dependencies;
             }
         }
 

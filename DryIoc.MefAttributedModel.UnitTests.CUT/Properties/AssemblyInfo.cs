@@ -9,7 +9,7 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.MefAttributedModel.UnitTests.CUT")]
-[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2016 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

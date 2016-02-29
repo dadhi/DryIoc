@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -178,7 +178,10 @@ namespace DryIocAttributes
     public class PreventDisposalAttribute : Attribute { }
 
     /// <summary>Allows disposable transient to be exported.</summary>
-    public class AllowsDisposableTransientAttribute : Attribute { }
+    public class AllowDisposableTransientAttribute : Attribute { }
+
+    /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
+    public class TrackDisposableTransientAttribute : Attribute { }
 
     /// <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
     //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
@@ -279,23 +282,39 @@ namespace DryIocAttributes
         /// <summary>Contract key of Decorated type, not for a decorator itself. Used to find the service to apply decorator to.</summary>
         public object ContractKey { get; set; }
 
-        /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
+        /// <summary>If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// - first registered are closer decoratee.</summary>
         public int Order { get; set; }
 
+        /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
+        public bool UseDecorateeReuse { get; set; }
+
         /// <summary>Creates attribute by providing its optional properties.</summary>
-        /// <param name="contractKey">(optional)</param> <param name="order">(optional)</param>
-        public AsDecoratorAttribute(object contractKey = null, int order = 0)
+        /// <param name="contractKey">(optional) Contract key of Decorated type, not for a decorator itself. 
+        /// Used to find the service to apply decorator to.</param> 
+        /// <param name="order">(optional)If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// - first registered are closer decoratee.</param>
+        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse. 
+        /// Decorated service may be decorator itself.</param>
+        public AsDecoratorAttribute(object contractKey = null, int order = 0, bool useDecorateeReuse = false)
         {
             ContractKey = contractKey;
             Order = order;
+            UseDecorateeReuse = useDecorateeReuse;
         }
 
         /// <summary>Creates attributes with <see cref="ContractName"/> and optional order.</summary>
         /// <param name="contractName"></param> <param name="order">(optional)</param>
-        public AsDecoratorAttribute(string contractName, int order = 0)
+        /// <param name="useDecorateeReuse">(optional)</param>
+        public AsDecoratorAttribute(string contractName, int order = 0, bool useDecorateeReuse = false)
         {
             ContractName = contractName;
             Order = order;
+            UseDecorateeReuse = useDecorateeReuse;
         }
 }
 
@@ -627,7 +646,7 @@ public enum FactoryType
         | AttributeTargets.Method
         | AttributeTargets.Property
         | AttributeTargets.Field)]
-    public class AsResolutionCall : Attribute { }
+    public class AsResolutionCallAttribute : Attribute { }
 
     /// <summary>Marker for resolution root exports.</summary>
     [AttributeUsage(AttributeTargets.Class
@@ -635,6 +654,13 @@ public enum FactoryType
         | AttributeTargets.Method
         | AttributeTargets.Property
         | AttributeTargets.Field)]
-    public class AsResolutionRoot : Attribute { }
+    public class AsResolutionRootAttibute : Attribute { }
 
+    /// <summary>Marker for resolution root exports.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class UseParentReuseAttribute : Attribute { }
 }

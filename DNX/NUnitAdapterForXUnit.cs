@@ -195,5 +195,11 @@ namespace NUnit.Framework
             foreach (var b in bb)
                 Assert.IsTrue(aa.Contains(b));
         }
+
+        public static void IsSubsetOf<T>(IEnumerable<T> subset, IEnumerable<T> superset)
+        {
+            foreach (var a in subset)
+                Assert.IsTrue(superset.Contains(a));
+        }
     }
 }

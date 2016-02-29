@@ -220,6 +220,24 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(2, items.Length);
         }
 
+        [Test]
+        public void Skip_resolution_on_missing_dependency()
+        {
+            var container = new Container();
+            container.Register<A>();
+
+            var items = container.Resolve<A[]>(IfUnresolved.ReturnDefault);
+
+            Assert.AreEqual(0, items.Length);
+        }
+
+        public class B { }
+
+        public class A
+        {
+            public A(B b) { }
+        }
+
         public interface ICmd { }
         public class X : ICmd { }
         public class Y : ICmd { }

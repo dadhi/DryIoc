@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -317,11 +317,11 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.OpenResolutionScope = true;
                 }
-                else if (attribute is AsResolutionCall)
+                else if (attribute is AsResolutionCallAttribute)
                 {
                     info.AsResolutionCall = true;
                 }
-                else if (attribute is AsResolutionRoot)
+                else if (attribute is AsResolutionRootAttibute)
                 {
                     info.AsResolutionRoot = true;
                 }
@@ -333,9 +333,17 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.PreventDisposal = true;
                 }
-                else if (attribute is AllowsDisposableTransientAttribute)
+                else if (attribute is AllowDisposableTransientAttribute)
                 {
-                    info.AllowsDisposableTransient = true;
+                    info.AllowDisposableTransient = true;
+                }
+                else if (attribute is TrackDisposableTransientAttribute)
+                {
+                    info.TrackDisposableTransient = true;
+                }
+                else if (attribute is UseParentReuseAttribute)
+                {
+                    info.UseParentReuse = true;
                 }
                 else if (attribute is AsWrapperAttribute)
                 {
@@ -459,7 +467,12 @@ namespace DryIoc.MefAttributedModel
             Throw.If(resultInfo.FactoryType != DryIoc.FactoryType.Service, Error.UnsupportedMultipleFactoryTypes, implementationType);
             resultInfo.FactoryType = DryIoc.FactoryType.Decorator;
             var decoratedServiceKeyInfo = ServiceKeyInfo.Of(attribute.ContractName ?? attribute.ContractKey);
-            resultInfo.Decorator = new DecoratorInfo { DecoratedServiceKeyInfo = decoratedServiceKeyInfo, Order = attribute.Order };
+            resultInfo.Decorator = new DecoratorInfo
+            {
+                DecoratedServiceKeyInfo = decoratedServiceKeyInfo,
+                Order = attribute.Order,
+                UseDecorateeReuse = attribute.UseDecorateeReuse
+            };
         }
 
         private static Attribute[] GetAllExportRelatedAttributes(Type type)
@@ -506,14 +519,22 @@ namespace DryIoc.MefAttributedModel
                 var factoryServiceInfo = member.IsStatic() ? null :
                     ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
 
-                var factory = registrationInfo.CreateFactory(Made.Of(member, factoryServiceInfo));
+                // Special support for decorator of T to be registered as Object
+                var decoratorOfT = registrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo 
+                    && member.GetReturnTypeOrDefault().IsGenericParameter;
+                var made = !decoratorOfT 
+                    ? Made.Of(member, factoryServiceInfo) 
+                    : Made.Of(r => ((MethodInfo)member).MakeGenericMethod(r.ServiceType), factoryServiceInfo);
+
+                var factory = registrationInfo.CreateFactory(made);
 
                 var serviceExports = registrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
-                    registrator.Register(factory,
-                        export.ServiceType, export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
+                    var serviceType = decoratorOfT ? typeof(object) : export.ServiceType;
+                    registrator.Register(factory, serviceType, 
+                        export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
         }
@@ -700,8 +721,14 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Specifies to store reused instance as WeakReference.</summary>
         public bool WeaklyReferenced;
 
-        /// <summary>Allows disposable transient to be registered.</summary>
-        public bool AllowsDisposableTransient;
+        /// <summary>Allows registering transient disposable. But the disposal is up to you.</summary>
+        public bool AllowDisposableTransient;
+
+        /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
+        public bool TrackDisposableTransient;
+
+        /// <summary>Instructs to use parent reuse. Applied only if Reuse is not specified.</summary>
+        public bool UseParentReuse;
 
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
@@ -750,7 +777,9 @@ namespace DryIoc.MefAttributedModel
 
             return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot, 
-                PreventDisposal, WeaklyReferenced, AllowsDisposableTransient);
+                PreventDisposal, WeaklyReferenced, 
+                AllowDisposableTransient, TrackDisposableTransient,
+                UseParentReuse);
         }
 
         private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo source)
@@ -924,21 +953,26 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Decorated service key info. Info wrapper is required for serialization.</summary>
         public ServiceKeyInfo DecoratedServiceKeyInfo;
+
         /// <summary>Controls the order that decorators are registered in the container when multiple decorators are used for a single type.</summary>
         public int Order;
 
+        /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
+        public bool UseDecorateeReuse;
+
         /// <summary>Converts info to corresponding decorator setup.</summary>
         /// <param name="condition">(optional) <see cref="Setup.Condition"/>.</param>
-        /// <returns>Setup.</returns>
+        /// <returns>Decorator setup.</returns>
         public Setup GetSetup(Func<DryIoc.RequestInfo, bool> condition = null)
         {
-            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && condition == null && Order == 0)
+            if (DecoratedServiceKeyInfo == ServiceKeyInfo.Default && 
+                condition == null && Order == 0 && !UseDecorateeReuse)
                 return Setup.Decorator;
 
             return Setup.DecoratorWith(r =>
                 (DecoratedServiceKeyInfo.Key == null || Equals(DecoratedServiceKeyInfo.Key, r.ServiceKey)) &&
                 (condition == null || condition(r)),
-                Order);
+                Order, UseDecorateeReuse);
         }
 
         /// <summary>Compares this info to other info for equality.</summary> <param name="obj">Other info to compare.</param>
