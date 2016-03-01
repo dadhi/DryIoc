@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.Composition;
 using System.Linq;
+using DryIoc.Experimental;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using DryIocAttributes;
 using NUnit.Framework;
@@ -103,7 +104,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_export_decorator_of_T()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(Bee), typeof(D));
+            container.RegisterExports(typeof(Bee), typeof(Dd));
 
             container.Resolve<IBug>();
         }
@@ -133,10 +134,23 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(x.IsStarted);
         }
 
+        [Test]
+        public void Can_register_decorator_of_T_without_breaking_other_exports()
+        {
+            var di = D.I.WithMefAttributedModel();
+
+            di.RegisterExports(typeof(Y), typeof(X), typeof(DecoratorFactory));
+
+            di.Resolve<Y>();
+        }
+
         public interface IStartable
         {
             void Start();
         }
+
+        [Export]
+        public class Y { }
 
         [Export]
         public class X : IStartable
@@ -168,7 +182,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Export, AsFactory]
-        internal static class D
+        internal static class Dd
         {
             [Export(typeof(IBug)), AsDecorator]
             public static TBug Decorate<TBug>(TBug bug) where TBug : IBug

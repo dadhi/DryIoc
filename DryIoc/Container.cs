@@ -39,7 +39,7 @@ namespace DryIoc
     public sealed partial class Container : IContainer, IScopeAccess
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
-        public Container() : this(Rules.Default, Ref.Of(Registry.Default), new SingletonScope())
+        public Container(): this(Rules.Default, Ref.Of(Registry.Default), new SingletonScope())
         { }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
@@ -186,12 +186,13 @@ namespace DryIoc
                 _singletonScope.Dispose();
 
                 _registry.Swap(Registry.Empty);
+                _defaultFactoryDelegateCache = Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty);
 
                 Rules = Rules.Default;
             }
         }
 
-        // note: in V3: move to IContainer.
+        // todo-v3: move to IContainer.
         /// <summary>Disposes current scope and sets the scope parent (if any) back to ambient context (if any).</summary>
         /// <remarks>May be called safely multiple times.</remarks>
         public void CloseCurrentScope()
@@ -294,15 +295,16 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             ThrowIfInvalidRegistration(factory, serviceType, serviceKey, isStaticallyChecked);
 
-            var registry = _registry.Value;
-
             if (ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
             // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
             // if attempt fails then fallback to normal Swap with retry. 
+            var registry = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
+
+            _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache;
         }
 
         private void ThrowIfInvalidRegistration(Factory factory, Type serviceType, object serviceKey, bool isStaticallyChecked)
@@ -420,6 +422,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
+            _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache;
         }
 
         #endregion
@@ -429,7 +432,7 @@ namespace DryIoc
         [MethodImpl(MethodImplHints.AggressingInlining)]
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
-            var factoryDelegate = _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
                 ? factoryDelegate(_singletonItems, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
@@ -1208,6 +1211,7 @@ namespace DryIoc
         private int _disposed;
 
         private readonly Ref<Registry> _registry;
+        private Ref<ImTreeMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
 
         private readonly ContainerWeakRef _containerWeakRef;
         private readonly Request _emptyRequest;
@@ -1644,10 +1648,12 @@ namespace DryIoc
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope, 
             IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0)
         {
+            _disposed = disposed;
+
             Rules = rules;
 
             _registry = registry;
-            _disposed = disposed;
+            _defaultFactoryDelegateCache = registry.Value.DefaultFactoryDelegateCache;
 
             _singletonScope = singletonScope;
             _singletonItems = singletonScope.Items;
@@ -8578,7 +8584,8 @@ namespace DryIoc
                 t.DeclaredFields.Cast<MemberInfo>())));
         }
 
-        /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters from <paramref name="genericParameters"/>.</summary>
+        /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters 
+        /// from <paramref name="genericParameters"/>.</summary>
         /// <param name="openGenericType">Expected to be open-generic type.</param>
         /// <param name="genericParameters">Generic parameters.</param>
         /// <returns>Returns true if contains and false otherwise.</returns>
@@ -9764,5 +9771,26 @@ namespace DryIoc
         }
 
         private T _value;
+    }
+}
+
+namespace DryIoc.Experimental
+{
+    /// <summary>Shortcut access to container.</summary>
+    public static class D
+    {
+        /// <summary>Default configured container instance.</summary>
+        public static readonly IContainer I = Ioc();
+
+        /// <summary>Creates new default configured container</summary>
+        /// <returns>New configured container.</returns>
+        public static IContainer Ioc()
+        {
+            return new Container(Rules.Default
+                .With(FactoryMethod.ConstructorWithResolvableArguments)
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                .WithTrackingDisposableTransients()
+                .WithAutoConcreteTypeResolution());
+        }
     }
 }

@@ -21,12 +21,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_service_wrapper_from_parent_container()
+        public void Can_resolve_service_wrapper_with_dependency_from_parent_container()
         {
             var parent = new Container();
             parent.Register(typeof(IFruit), typeof(Orange));
 
-            var child = parent.CreateFacade();
+            var child = parent.WithRegistrationsCopy();
             child.Register(typeof(IJuice), typeof(FruitJuice));
 
             var juice = child.Resolve<Func<IJuice>>();
