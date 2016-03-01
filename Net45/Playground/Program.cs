@@ -5,8 +5,8 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
-using BenchmarkDotNet;
-using BenchmarkDotNet.Tasks;
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Running;
 
 namespace Playground
 {
@@ -14,13 +14,31 @@ namespace Playground
     {
         static void Main()
         {
-            new BenchmarkRunner().RunCompetition(new ArrayAccessVsGetOrAddItem());
-
+            BenchmarkRunner.Run<IfVsTernaryOperator>();
+            //BenchmarkRunner.Run<ArrayAccessVsGetOrAddItem>();
             //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
             //new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
+        }
+
+        public class IfVsTernaryOperator
+        {
+            private object x = "a";
+
+            [Benchmark]
+            public string If()
+            {
+                if (x is string) return (string)x;
+                return string.Empty;
+            }
+
+            [Benchmark]
+            public string TernaryOperator()
+            {
+                return x is string ? (string)x : string.Empty;
+            }
         }
 
         public class ExpressionCompileVsEmit
@@ -82,7 +100,7 @@ namespace Playground
         /// <summary>Result delegate to be created by <see cref="CreateExpression"/></summary>
         public object CreateA(object[] state)
         {
-            return new A(new B(), (string)state[11], new ID[2] { new D1(), new D2() }) { Prop = new P(new B()), Bop = new B() };
+            return new A(new B(), (string)state[11], new ID[] { new D1(), new D2() }) { Prop = new P(new B()), Bop = new B() };
         }
 
         private static object ExpressionVsEmit()

@@ -433,9 +433,9 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return factoryDelegate != null
-                ? factoryDelegate(_singletonItems, _containerWeakRef, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
+            if (factoryDelegate != null)
+                return factoryDelegate(_singletonItems, _containerWeakRef, null);
+            return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, IScope scope)
@@ -6588,7 +6588,9 @@ namespace DryIoc
         }
 
         private static bool MatchServiceWithImplementedTypeParams(
-            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs, int resultCount = 0)
+            Type[] resultImplArgs, Type[] implParams, 
+            Type[] serviceParams, Type[] serviceArgs, 
+            int resultCount = 0)
         {
             for (var i = 0; i < serviceParams.Length; i++)
             {
