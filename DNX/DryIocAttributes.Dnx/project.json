@@ -1,5 +1,5 @@
 ﻿{
-    "version": "2.0.0-rc1",
+    "version": "2.2.0-rc1",
     "title": "DryIocAttributes.Dnx",
     "description": "Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.",
     "authors": [ "Maksim Volkau" ],
@@ -9,7 +9,7 @@
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
     "requireLicenseAcceptance": false,
-    "releaseNotes": "Supports all DryIoc V2 features.",
+    "releaseNotes": "Compatible with DryIoc 2.2",
 
     "compilationOptions": {
         "warningsAsErrors": true

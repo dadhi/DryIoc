@@ -1,8 +1,9 @@
-﻿using Web.IocDi;
+﻿using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace Web.Models.Home
 {
-    [ResolveAsSelf]
+    [Export, CurrentScopeReuse]
     public sealed class IndexModel
     {
         public string Title { get { return "Static title"; } }

@@ -3,7 +3,7 @@
     "description": "DryIoc.Dnx.DependencyInjection.Specification.Tests Class Library",
     "authors": [ "Maksim Volkau" ],
     "owners": [ "Maksim Volkau" ],
-    "copyright": "Copyright © 2015 Maksim Volkau",
+    "copyright": "Copyright © 2016 Maksim Volkau",
     "tags": [ "DryIoc", "DNX", "Dependency Injection", "DI", "IoC", "Asp", "vNext" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",

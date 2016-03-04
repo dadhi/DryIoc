@@ -112,13 +112,16 @@ namespace DryIoc
             return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
         }
 
-        /// <summary>Returns scope context associated with container.</summary>
+        /// <summary>Returns ambient scope context associated with container.</summary>
         public IScopeContext ScopeContext { get { return _scopeContext; } }
 
-        /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
-        /// <param name="scopeName">(optional) Name for opened scope to allow reuse to identify the scope.</param>
+        /// <summary>Creates new container with new opened scope, with shared registrations, singletons and resolutions cache.
+        /// If container uses ambient scope context, then this method sets new opened scope as current scope in the context.
+        /// In case of previous open scope, new open scope references old one as a parent.
+        /// </summary>
+        /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
-        /// <returns>New container with different current scope and optionally Rules.</returns>
+        /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
         /// {
@@ -126,18 +129,16 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        /// <remarks>Be sure to Dispose returned scope, because if not - ambient context will keep scope with it's items
-        /// introducing memory leaks and likely preventing to open other scopes.</remarks>
-        public IContainer OpenScope(object scopeName = null, Func<Rules, Rules> configure = null)
+        public IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null)
         {
             ThrowIfContainerDisposed();
 
-            if (scopeName == null)
-                scopeName = _openedScope != null ? null
+            if (name == null)
+                name = _openedScope != null ? null
                     : _scopeContext != null ? _scopeContext.RootScopeName
                     : NonAmbientRootScopeName;
 
-            var nestedOpenedScope = new Scope(_openedScope, scopeName);
+            var nestedOpenedScope = new Scope(_openedScope, name);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             if (_scopeContext != null)
@@ -148,8 +149,8 @@ namespace DryIoc
             return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed);
         }
 
-        /// <summary>Provides root scope name when context is absent.</summary>
-        public static readonly object NonAmbientRootScopeName = typeof(IContainer).FullName;
+        /// <summary>The default name of root scope without ambient context.</summary>
+        public static readonly object NonAmbientRootScopeName = "NonAmbientRootScope";
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade is the new empty container, with the same rules and scope context as current container. 
@@ -163,7 +164,7 @@ namespace DryIoc
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
 
-        /// <summary>Disposes container current scope and that means container itself.</summary>
+        /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
             // for container created with OpenScope
@@ -172,7 +173,7 @@ namespace DryIoc
             {
                 CloseCurrentScope();
             }
-            else // for Container created with constructor.
+            else // whole Container with singletons.
             {
                 if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                     return;
@@ -3056,7 +3057,9 @@ namespace DryIoc
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New injection rules or <see cref="Default"/>.</returns>
-        public static Made Of(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null,
+        public static Made Of(
+            FactoryMethodSelector factoryMethod = null, 
+            ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return factoryMethod == null && parameters == null && propertiesAndFields == null
@@ -6287,134 +6290,8 @@ namespace DryIoc
                 return closedGenericFactory;
             }
 
-            private static FactoryMethod GetClosedFactoryMethodOrDefault(
-                FactoryMethod factoryMethod, Type[] serviceTypeArgs, Request request)
-            {
-                var factoryMember = factoryMethod.ConstructorOrMethodOrMember;
-                var factoryInfo = factoryMethod.FactoryServiceInfo;
-
-                var factoryResultType = factoryMember.GetReturnTypeOrDefault();
-                var implTypeParams = factoryResultType.GetGenericParamsAndArgs();
-
-                // Get method declaring type, and if its open-generic,
-                // then close it first. It is required to get actual method.
-                var factoryImplType = factoryMember.DeclaringType.ThrowIfNull();
-                if (factoryImplType.IsOpenGeneric())
-                {
-                    var factoryImplTypeParams = factoryImplType.GetGenericParamsAndArgs();
-                    var resultFactoryImplTypeArgs = new Type[factoryImplTypeParams.Length];
-
-                    var isFactoryImplTypeClosed = MatchServiceWithImplementedTypeParams(
-                        resultFactoryImplTypeArgs, factoryImplTypeParams,
-                        implTypeParams, serviceTypeArgs);
-
-                    if (!isFactoryImplTypeClosed)
-                        return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                            : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs,
-                                factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
-
-                    // For instance factory match its service type from the implementation factory type.
-                    if (factoryInfo != null)
-                    {
-                        // Open-generic service type is always normalized as generic type definition
-                        var factoryServiceType = factoryInfo.ServiceType;
-
-                        // Look for service type equivalent within factory implementation type base classes and interfaces,
-                        // because we need identical type arguments to match.
-                        if (factoryServiceType != factoryImplType)
-                            factoryServiceType = factoryImplType.GetImplementedTypes()
-                                .First(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType);
-
-                        var factoryServiceTypeParams = factoryServiceType.GetGenericParamsAndArgs();
-                        var resultFactoryServiceTypeArgs = new Type[factoryServiceTypeParams.Length];
-
-                        var isFactoryServiceTypeClosed = MatchServiceWithImplementedTypeParams(
-                            resultFactoryServiceTypeArgs, factoryServiceTypeParams,
-                            factoryImplTypeParams, resultFactoryImplTypeArgs);
-
-                        // Replace factory info with close factory service type
-                        if (isFactoryServiceTypeClosed)
-                        {
-                            factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
-                            var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
-                                () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
-                                request.IfUnresolved == IfUnresolved.Throw,
-                                Error.NoMatchedGenericParamConstraints, factoryServiceType, request);
-
-                            // Copy factory info with closed factory type
-                            factoryInfo = ServiceInfo.Of(closedFactoryServiceType)
-                                .WithDetails(factoryInfo.Details, request);
-                        }
-                    }
-
-                    // Close the factory type implementation 
-                    // and get factory member to use from it.
-                    var closedFactoryImplType = Throw.IfThrows<ArgumentException, Type>(
-                        () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
-                        request.IfUnresolved == IfUnresolved.Throw,
-                        Error.NoMatchedGenericParamConstraints, factoryImplType, request);
-
-                    // Find corresponding member again, now from closed type
-                    var factoryMethodBase = factoryMember as MethodBase;
-                    if (factoryMethodBase != null)
-                    {
-                        var factoryMethodParameters = factoryMethodBase.GetParameters();
-                        var targetMethods = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredMethods)
-                            .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
-                            .ToArray();
-
-                        if (targetMethods.Length == 1)
-                            factoryMember = targetMethods[0];
-                        else // Fallback to  MethodHandle only if methods have similar signatures
-                        {
-                            var methodHandleProperty = typeof(MethodBase).GetPropertyOrNull("MethodHandle")
-                                .ThrowIfNull(Error.OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform,
-                                    factoryImplType, closedFactoryImplType, factoryMethodBase.Name);
-                            factoryMember = MethodBase.GetMethodFromHandle(
-                                (RuntimeMethodHandle)methodHandleProperty.GetValue(factoryMethodBase, ArrayTools.Empty<object>()),
-                                closedFactoryImplType.TypeHandle);
-                        }
-                    }
-                    else if (factoryMember is FieldInfo)
-                    {
-                        factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredFields)
-                            .Single(f => f.Name == factoryMember.Name);
-                    }
-                    else if (factoryMember is PropertyInfo)
-                    {
-                        factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredProperties)
-                            .Single(f => f.Name == factoryMember.Name);
-                    }
-                }
-
-                // If factory method is actual method and still open-generic after closing its declaring type, 
-                // then match remaining method type parameters and make closed method
-                var openFactoryMethod = factoryMember as MethodInfo;
-                if (openFactoryMethod != null && openFactoryMethod.ContainsGenericParameters)
-                {
-                    var methodTypeParams = openFactoryMethod.GetGenericArguments();
-                    var resultMethodTypeArgs = new Type[methodTypeParams.Length];
-
-                    var isMethodClosed = MatchServiceWithImplementedTypeParams(
-                        resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
-
-                    if (!isMethodClosed)
-                        return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                            : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodWithServiceTypeArgs,
-                                openFactoryMethod, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "),
-                                request);
-
-                    factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
-                        () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
-                        request.IfUnresolved == IfUnresolved.Throw,
-                        Error.NoMatchedGenericParamConstraints, factoryImplType, request);
-                }
-
-                return FactoryMethod.Of(factoryMember, factoryInfo);
-            }
-
             private readonly ReflectionFactory _openGenericFactory;
-            private readonly Ref<ImTreeMap<KV<Type, object>, ReflectionFactory>>
+            private readonly Ref<ImTreeMap<KV<Type, object>, ReflectionFactory>> 
                 _generatedFactories = Ref.Of(ImTreeMap<KV<Type, object>, ReflectionFactory>.Empty);
         }
 
@@ -6553,7 +6430,19 @@ namespace DryIoc
                     : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
                         openImplType, implementedTypes, request);
 
-            // check constraints
+            MatchOpenGenericConstraints(implTypeParams, implTypeArgs);
+
+            var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
+            if (notMatchedIndex != -1)
+                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                    : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
+                        openImplType, implTypeParams[notMatchedIndex], request);
+
+            return implTypeArgs;
+        }
+
+        private static void MatchOpenGenericConstraints(Type[] implTypeParams, Type[] implTypeArgs)
+        {
             for (var i = 0; i < implTypeParams.Length; i++)
             {
                 var implTypeArg = implTypeArgs[i];
@@ -6567,29 +6456,24 @@ namespace DryIoc
                 for (var j = 0; !constraintMatchFound && j < implTypeParamConstraints.Length; ++j)
                 {
                     var implTypeParamConstraint = implTypeParamConstraints[j];
-                    if (implTypeParamConstraint != implTypeArg &&
-                        implTypeParamConstraint.IsOpenGeneric() && implTypeArg.IsGeneric())
+                    if (implTypeParamConstraint != implTypeArg && 
+                        implTypeParamConstraint.IsOpenGeneric())
                     {
+                        // match type parameters inside constraint
+                        var implTypeArgArgs = implTypeArg.IsGeneric()
+                            ? implTypeArg.GetGenericParamsAndArgs()
+                            : new[] { implTypeArg };
+
+                        var implTypeParamConstraintParams = implTypeParamConstraint.GetGenericParamsAndArgs();
                         constraintMatchFound = MatchServiceWithImplementedTypeParams(
-                            implTypeArgs, implTypeParams,
-                            implTypeParamConstraint.GetGenericParamsAndArgs(),
-                            implTypeArg.GetGenericParamsAndArgs());
+                            implTypeArgs, implTypeParams, implTypeParamConstraintParams, implTypeArgArgs);
                     }
                 }
             }
-
-            var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
-            if (notMatchedIndex != -1)
-                return request.IfUnresolved == IfUnresolved.ReturnDefault ? null
-                    : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
-                        openImplType, implTypeParams[notMatchedIndex], request);
-
-            return implTypeArgs;
         }
 
         private static bool MatchServiceWithImplementedTypeParams(
-            Type[] resultImplArgs, Type[] implParams, 
-            Type[] serviceParams, Type[] serviceArgs, 
+            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs, 
             int resultCount = 0)
         {
             for (var i = 0; i < serviceParams.Length; i++)
@@ -6627,6 +6511,158 @@ namespace DryIoc
         }
 
         #endregion
+
+        /// <summary>
+        /// todo:
+        /// </summary>
+        /// <param name="factoryMethod"></param>
+        /// <param name="serviceTypeArgs"></param>
+        /// <param name="request"></param>
+        /// <param name="shouldReturnOnError"></param>
+        /// <returns></returns>
+        public static FactoryMethod GetClosedFactoryMethodOrDefault(
+            FactoryMethod factoryMethod, Type[] serviceTypeArgs, Request request,
+            bool shouldReturnOnError = false)
+        {
+            var factoryMember = factoryMethod.ConstructorOrMethodOrMember;
+            var factoryInfo = factoryMethod.FactoryServiceInfo;
+
+            var factoryResultType = factoryMember.GetReturnTypeOrDefault();
+            var implTypeParams = factoryResultType.IsGenericParameter 
+                ? new[] { factoryResultType } 
+                : factoryResultType.GetGenericParamsAndArgs();
+
+            // Get method declaring type, and if its open-generic,
+            // then close it first. It is required to get actual method.
+            var factoryImplType = factoryMember.DeclaringType.ThrowIfNull();
+            if (factoryImplType.IsOpenGeneric())
+            {
+                var factoryImplTypeParams = factoryImplType.GetGenericParamsAndArgs();
+                var resultFactoryImplTypeArgs = new Type[factoryImplTypeParams.Length];
+
+                var isFactoryImplTypeClosed = MatchServiceWithImplementedTypeParams(
+                    resultFactoryImplTypeArgs, factoryImplTypeParams,
+                    implTypeParams, serviceTypeArgs);
+
+                if (!isFactoryImplTypeClosed)
+                    return shouldReturnOnError || request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                        : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs,
+                            factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
+
+                // For instance factory match its service type from the implementation factory type.
+                if (factoryInfo != null)
+                {
+                    // Open-generic service type is always normalized as generic type definition
+                    var factoryServiceType = factoryInfo.ServiceType;
+
+                    // Look for service type equivalent within factory implementation type base classes and interfaces,
+                    // because we need identical type arguments to match.
+                    if (factoryServiceType != factoryImplType)
+                        factoryServiceType = factoryImplType.GetImplementedTypes()
+                            .First(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType);
+
+                    var factoryServiceTypeParams = factoryServiceType.GetGenericParamsAndArgs();
+                    var resultFactoryServiceTypeArgs = new Type[factoryServiceTypeParams.Length];
+
+                    var isFactoryServiceTypeClosed = MatchServiceWithImplementedTypeParams(
+                        resultFactoryServiceTypeArgs, factoryServiceTypeParams,
+                        factoryImplTypeParams, resultFactoryImplTypeArgs);
+
+                    // Replace factory info with close factory service type
+                    if (isFactoryServiceTypeClosed)
+                    {
+                        MatchOpenGenericConstraints(factoryImplTypeParams, resultFactoryImplTypeArgs);
+
+                        factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
+                        var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
+                            () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
+                            !shouldReturnOnError && request.IfUnresolved == IfUnresolved.Throw,
+                            Error.NoMatchedGenericParamConstraints, factoryServiceType, request);
+
+                        if (closedFactoryServiceType == null)
+                            return null;
+
+                        // Copy factory info with closed factory type
+                        factoryInfo = ServiceInfo.Of(closedFactoryServiceType)
+                            .WithDetails(factoryInfo.Details, request);
+                    }
+                }
+
+                MatchOpenGenericConstraints(factoryImplTypeParams, resultFactoryImplTypeArgs);
+
+                // Close the factory type implementation 
+                // and get factory member to use from it.
+                var closedFactoryImplType = Throw.IfThrows<ArgumentException, Type>(
+                    () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
+                    !shouldReturnOnError && request.IfUnresolved == IfUnresolved.Throw,
+                    Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+
+                if (closedFactoryImplType == null)
+                    return null;
+
+                // Find corresponding member again, now from closed type
+                var factoryMethodBase = factoryMember as MethodBase;
+                if (factoryMethodBase != null)
+                {
+                    var factoryMethodParameters = factoryMethodBase.GetParameters();
+                    var targetMethods = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredMethods)
+                        .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
+                        .ToArray();
+
+                    if (targetMethods.Length == 1)
+                        factoryMember = targetMethods[0];
+                    else // Fallback to MethodHandle only if methods have similar signatures
+                    {
+                        var methodHandleProperty = typeof(MethodBase).GetPropertyOrNull("MethodHandle")
+                            .ThrowIfNull(Error.OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform,
+                                factoryImplType, closedFactoryImplType, factoryMethodBase.Name);
+                        factoryMember = MethodBase.GetMethodFromHandle(
+                            (RuntimeMethodHandle)methodHandleProperty.GetValue(factoryMethodBase, ArrayTools.Empty<object>()),
+                            closedFactoryImplType.TypeHandle);
+                    }
+                }
+                else if (factoryMember is FieldInfo)
+                {
+                    factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredFields)
+                        .Single(f => f.Name == factoryMember.Name);
+                }
+                else if (factoryMember is PropertyInfo)
+                {
+                    factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredProperties)
+                        .Single(f => f.Name == factoryMember.Name);
+                }
+            }
+
+            // If factory method is actual method and still open-generic after closing its declaring type, 
+            // then match remaining method type parameters and make closed method
+            var openFactoryMethod = factoryMember as MethodInfo;
+            if (openFactoryMethod != null && openFactoryMethod.ContainsGenericParameters)
+            {
+                var methodTypeParams = openFactoryMethod.GetGenericArguments();
+                var resultMethodTypeArgs = new Type[methodTypeParams.Length];
+
+                var isMethodClosed = MatchServiceWithImplementedTypeParams(
+                    resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
+
+                if (!isMethodClosed)
+                    return shouldReturnOnError || request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                        : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodWithServiceTypeArgs,
+                            openFactoryMethod, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "),
+                            request);
+
+                MatchOpenGenericConstraints(methodTypeParams, resultMethodTypeArgs);
+
+                factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
+                    () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
+                    !shouldReturnOnError && request.IfUnresolved == IfUnresolved.Throw,
+                    Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+
+                if (factoryMember == null)
+                    return null;
+            }
+
+            return FactoryMethod.Of(factoryMember, factoryInfo);
+        }
     }
 
     /// <summary>Creates service expression using client provided expression factory delegate.</summary>
@@ -6897,9 +6933,8 @@ namespace DryIoc
         /// <returns>String representation.</returns>
         public override string ToString()
         {
-            return "{" +
-                (Name != null ? "Name=" + Name + ", " : string.Empty) +
-                (Parent == null ? "Parent=null" : "Parent=" + Parent)
+            return "{Name=" + (Name == null ? "{empty}" : Name) 
+                + (Parent == null ? string.Empty : ", Parent=" + Parent)
                 + "}";
         }
 
@@ -7973,7 +8008,10 @@ namespace DryIoc
         /// <summary>Returns scope context associated with container.</summary>
         IScopeContext ScopeContext { get; }
 
-        /// <summary>Creates new container with new opened scope and set this scope as current in ambient scope context.</summary>
+        /// <summary>Creates new container with new opened scope, with shared registrations, singletons and resolutions cache.
+        /// If container uses ambient scope context, then this method sets new opened scope as current scope in the context.
+        /// In case of previous open scope, new open scope references old one as a parent.
+        /// </summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
         /// <returns>New container with different current scope.</returns>
