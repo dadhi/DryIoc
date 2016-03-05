@@ -109,19 +109,20 @@ namespace DryIoc.MefAttributedModel
         /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
-            if (!info.ImplementationType.IsStatic())
+            if (info.IsFactory)
             {
-                var factory = info.CreateFactory();
-                for (var i = 0; i < info.Exports.Length; i++)
-                {
-                    var export = info.Exports[i];
-                    registrator.Register(factory,
-                        export.ServiceType, export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, false);
-                }
+                var factoryExportRequired = RegisterFactoryMethodsAndCheckFactoryExportRequired(registrator, info);
+                if (!factoryExportRequired)
+                    return;
             }
 
-            if (info.IsFactory)
-                RegisterFactoryMethods(registrator, info);
+            var factory = info.CreateFactory();
+            for (var i = 0; i < info.Exports.Length; i++)
+            {
+                var export = info.Exports[i];
+                registrator.Register(factory,
+                    export.ServiceType, export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, false);
+            }
         }
 
         /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>
@@ -503,8 +504,11 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static void RegisterFactoryMethods(IRegistrator registrator, ExportedRegistrationInfo factoryInfo)
+        private static bool RegisterFactoryMethodsAndCheckFactoryExportRequired(IRegistrator registrator, 
+            ExportedRegistrationInfo factoryInfo)
         {
+            var factoryExportRequired = false;
+            var hasExportedMethods = false;
             var members = factoryInfo.ImplementationType.GetAllMembers();
             foreach (var member in members)
             {
@@ -512,12 +516,17 @@ namespace DryIoc.MefAttributedModel
                 if (!IsExportDefined(attributes))
                     continue;
 
+                hasExportedMethods = true;
+
                 var memberReturnType = member.GetReturnTypeOrDefault();
                 var registrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
 
                 var factoryExport = factoryInfo.Exports[0];
-                var factoryServiceInfo = member.IsStatic() ? null :
-                    ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key);
+
+                factoryExportRequired = !member.IsStatic();
+                var factoryServiceInfo = factoryExportRequired 
+                    ? ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key) 
+                    : null;
 
                 // Special support for decorator of T to be registered as Object
                 var decoratorOfT = registrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo 
@@ -537,6 +546,11 @@ namespace DryIoc.MefAttributedModel
                         export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
                 }
             }
+
+            if (!hasExportedMethods)
+                Throw.It(Error.ExportedFactoryDoesNotContainFactoryMethods, factoryInfo.ImplementationType);
+
+            return factoryExportRequired;
         }
 
         #endregion
@@ -569,7 +583,11 @@ namespace DryIoc.MefAttributedModel
             UnsupportedReuseType = Of(
                 "Attributed model does not support reuse type {0}."),
             UnsupportedReuseWrapperType = Of(
-                "Attributed model does not support reuse wrapper type {0}.");
+                "Attributed model does not support reuse wrapper type {0}."),
+            ExportedFactoryDoesNotContainFactoryMethods = Of(
+                "Type exported AsFactory {0} does not contain any members marked with Export, " +
+                "which is probably a error.");
+
 #pragma warning restore 1591
 
         /// <summary>Returns message by provided error code.</summary>

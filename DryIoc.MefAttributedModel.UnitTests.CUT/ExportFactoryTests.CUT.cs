@@ -5,15 +5,6 @@ using DryIocAttributes;
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
     [Export, AsFactory]
-    public class AppleFactory
-    {
-        public Apple Create()
-        {
-            return new Apple();
-        }
-    }
-
-    [Export, AsFactory]
     public class OrangeFactory
     {
         [Export]
