@@ -12,6 +12,9 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.2.1
+      - fixed: #245: Automatically add condition to check T constraints in Decorator of T
+      - changed: Minor Resolve speedup
       v2.2.0
       - added: #141: Support Decorators with open-generic factory methods of T
       - added: #206: Track IDisposable Transients in scoped consumer's Scope

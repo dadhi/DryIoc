@@ -21,7 +21,7 @@ namespace Web.Controllers
         )
         {
             _singleton1 = singleton1;
-            _singleton2 = singleton1;
+            _singleton2 = singleton2;
             _perRequest1 = perRequest1;
             _perRequest2 = perRequest2;
             _transinet1 = transinet1;

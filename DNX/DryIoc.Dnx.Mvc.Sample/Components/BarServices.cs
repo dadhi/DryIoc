@@ -8,7 +8,8 @@ namespace Web.Components
     public sealed class BarSingletonService : ServiceBase, ISingletonService
     {
         private BarSingletonService() { }
-        public static BarSingletonService FactoryMethod() { return new BarSingletonService(); }
+
+        public static ISingletonService FactoryMethod() { return new BarSingletonService(); }
     }
 
     public sealed class BarPerRequestService : ServiceBase, IPerRequestService
@@ -18,7 +19,7 @@ namespace Web.Components
             SingletonService = singletonService;
         }
 
-        public static BarPerRequestService FactoryMethod(ISingletonService singletonService)
+        public static IPerRequestService FactoryMethod(ISingletonService singletonService)
         {
             return new BarPerRequestService(singletonService);
         }
@@ -33,7 +34,7 @@ namespace Web.Components
             PerRequestService = perRequestService;
         }
 
-        public static BarTransientService FactoryMethod(IPerRequestService perRequestService)
+        public static ITransientService FactoryMethod(IPerRequestService perRequestService)
         {
             return new BarTransientService(perRequestService);
         }
@@ -55,6 +56,7 @@ namespace Web.Components
         }
 
         public HttpContext HttpContext { get; private set; }
+
         public ISingletonService SingletonService { get; private set; }
     }
 }

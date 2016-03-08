@@ -1,7 +1,9 @@
 ﻿using System;
+using System.ComponentModel.Composition;
 using System.Linq.Expressions;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
@@ -81,15 +83,21 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void You_should_attribute_Create_with_Export_to_register_Otherwise_only_factory_itself_will_be_registered()
+        public void If_no_factory_members_Exported_then_the_factory_is_invalid_and_it_registration_throws()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(AppleFactory));
 
-            container.Resolve<AppleFactory>();
+            Assert.Throws<AttributedModelException>(() =>
+                container.RegisterExports(typeof(AppleFactory)));
+        }
 
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<Apple>());
+        [Export, AsFactory]
+        public class AppleFactory
+        {
+            public Apple Create()
+            {
+                return new Apple();
+            }
         }
 
         [Test]
@@ -101,6 +109,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var duck = container.Resolve<Duck>();
 
             Assert.IsInstanceOf<Duck>(duck);
+        }
+
+        [Test]
+        public void When_exporting_static_factory_method_the_class_itself_should_not_be_exported()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(BirdFactory));
+
+            Assert.Throws<ContainerException>(() => 
+                container.Resolve<BirdFactory>());
         }
 
         [Test]

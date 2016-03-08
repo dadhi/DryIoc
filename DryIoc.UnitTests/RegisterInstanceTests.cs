@@ -40,8 +40,10 @@ namespace DryIoc.UnitTests
                 Assert.AreEqual("bbbb", scope.Resolve<string>());
             }
 
-            var ex = Assert.Throws<ContainerException>(() => container.Resolve<string>());
-            Assert.AreEqual(ex.Error, Error.NoCurrentScope);
+            var ex = Assert.Throws<ContainerException>(
+                () => container.Resolve<string>());
+
+            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
         }
 
         [Test]

@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2015 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,22 +28,25 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Dnx.DependencyInjection
 {
-    /// <summary>Provides populating of service collection.</summary>
+    /// <summary>DI adapter for DryIoc. Basically it is a DryIoc implementation of <see cref="IServiceProvider"/>.</summary>
     public static class DryIocDnxDependencyInjection
     {
         /// <summary>Creates new container from the <paramref name="container"/> adapted to be used
-        /// with Asp.Net 5 dependency injection:
-        /// - First method sets the rules specific for Asp.Net DI.
+        /// with AspNetCore Dependency Injection:
+        /// - First configures container with DI conventions.
         /// - Then registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>.
         /// </summary>
         /// <param name="container">Source container to adapt.</param>
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
-        /// <returns>New container adapted to AspNet DI conventions.</returns>
+        /// <returns>New container adapted to AspNetCore DI conventions.</returns>
         /// <example>
         /// <code><![CDATA[
         ///     container = new Container().WithDependencyInjectionAdapter(services);
         ///     serviceProvider = container.Resolve<IServiceProvider>();
+        ///     
+        ///     // To register your service to be reused in Request use Reuse.InCurrentScope
+        ///     container.Register<IMyService, MyService>(Reuse.InCurrentScope)
         /// ]]></code>
         /// </example>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
@@ -71,8 +74,7 @@ namespace DryIoc.Dnx.DependencyInjection
             return adapter;
         }
 
-        /// <summary>Registers descriptors services into container and that's all. May be called multiple times with
-        /// different service collections.</summary>
+        /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
         /// <param name="container">The container.</param>
         /// <param name="descriptors">The service descriptors.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
@@ -98,7 +100,8 @@ namespace DryIoc.Dnx.DependencyInjection
             }
         }
 
-        /// <summary>Registers described service into container by mapping DI Lifetime to DryIoc Reuse, 
+        /// <summary>Uses passed descriptor to register service in container: 
+        /// maps DI Lifetime to DryIoc Reuse,
         /// and DI registration type to corresponding DryIoc Register, RegisterDelegate or RegisterInstance.</summary>
         /// <param name="container">The container.</param>
         /// <param name="descriptor">Service descriptor.</param>
@@ -138,43 +141,44 @@ namespace DryIoc.Dnx.DependencyInjection
         }
     }
 
-    /// <summary>Delegates service resolution to wrapped DryIoc scoped container.</summary>
-    /// <remarks>When disposed, disposed scoped container: that means the singletons registered directly to DryIoc container won't
-    /// be disposed. You should take care for them yourself outside of DI.</remarks>
+    /// <summary>Delegates service resolution to wrapped DryIoc scoped container.
+    /// When disposed, disposes the scoped container.</summary>
     public sealed class DryIocServiceProvider : IServiceProvider, IDisposable
     {
         private readonly IContainer _scopedContainer;
 
-        /// <summary>Wraps passed container.</summary> <param name="scopedContainer">subj.</param>
+        /// <summary>Uses passed container for scoped resolutions.</summary> 
+        /// <param name="scopedContainer">subj.</param>
         public DryIocServiceProvider(IContainer scopedContainer)
         {
             _scopedContainer = scopedContainer;
         }
 
-        /// <summary>Delegates resolution to scoped container. Uses <see cref="IfUnresolved.ReturnDefault"/> policy to return
-        /// default value in case of resolution errors.</summary>
-        /// <param name="serviceType">Registered type to resolve.</param>
+        /// <summary>Delegates resolution to scoped container. 
+        /// Uses <see cref="IfUnresolved.ReturnDefault"/> policy to return default value in case of resolution error.</summary>
+        /// <param name="serviceType">Service type to resolve.</param>
         /// <returns>Resolved service object.</returns>
         public object GetService(Type serviceType)
         {
             return _scopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault: true);
         }
 
-        /// <summary>Disposes scoped container: which in order disposes open scope.</summary>
+        /// <summary>Disposes scoped container and scope.</summary>
         public void Dispose()
         {
             _scopedContainer.Dispose();
         }
     }
 
-    /// <summary>The goal of the factory is create/open new scope.
-    /// Factory by itself is scoped (not a singleton): that means you need resolve factory from outer scope to create nested scope.</summary>
+    /// <summary>The goal of the factory is create / open new scope.
+    /// The factory itself is scoped (not a singleton). 
+    /// That means you need to resolve factory from outer scope to create nested scope.</summary>
     public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
     {
         private readonly IContainer _scopedContainer;
 
-        /// <summary>Creates factory and stores injected scoped container to use it for opening scopes.</summary>
-        /// <param name="scopedContainer">Outer scoped container to be used to create nested scopes.</param>
+        /// <summary>Stores passed scoped container to open nested scope.</summary>
+        /// <param name="scopedContainer">Scoped container to be used to create nested scope.</param>
         public DryIocServiceScopeFactory(IContainer scopedContainer)
         {
             _scopedContainer = scopedContainer;

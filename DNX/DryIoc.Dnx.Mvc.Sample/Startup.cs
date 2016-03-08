@@ -13,16 +13,15 @@ namespace Web
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
-            return //false // choose Simple vs. FullControl
-                //? services.WithIocDiSimple(Bootstrap.ConfigureServices)
-                services.WithIocDiFull(Bootstrap.ConfigureServices);
+            var serviceProvider = services.WithIocDiFull(Bootstrap.RegisterServices);
+            return serviceProvider;
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app)
         {
             app.UseDeveloperExceptionPage();
-            app.UseIocDi(Bootstrap.GetScopeInstances);
+            app.UseIocDi();
             app.UseMvcWithDefaultRoute();
         }
 

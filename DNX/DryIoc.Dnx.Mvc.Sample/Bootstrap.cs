@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using DryIoc;
+﻿using DryIoc;
 using Microsoft.AspNet.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Web.Components;
@@ -12,7 +10,7 @@ namespace Web
         /***
          ** IoC container setup in case features offered by ServiceDescriptor are sufficient
          ***/
-        public static void ConfigureServices(IServiceCollection services)
+        public static void RegisterServices(IServiceCollection services)
         {
             services.AddSingleton<ISingletonService, FooSingletonService>();
             services.AddScoped<IPerRequestService, FooPerRequestService>();
@@ -22,22 +20,16 @@ namespace Web
         /***
          ** IoC container setup in case features offered by ServiceDescriptor are not sufficient
          ***/
-        public static void ConfigureServices(IRegistrator registrator)
+        public static void RegisterServices(IRegistrator registrator)
         {
-            registrator.Register<ISingletonService>(reuse: Reuse.Singleton, made: Made.Of(() => BarSingletonService.FactoryMethod()));
-            registrator.Register<IPerRequestService>(reuse: Reuse.InCurrentScope, made: Made.Of(() => BarPerRequestService.FactoryMethod(Arg.Of<ISingletonService>())));
-            registrator.Register<ITransientService>(reuse: Reuse.Transient, made: Made.Of(() => BarTransientService.FactoryMethod(Arg.Of<IPerRequestService>())));
+            registrator.Register<ISingletonService>(Reuse.Singleton, Made.Of(() => BarSingletonService.FactoryMethod()));
+            registrator.Register<IPerRequestService>(Reuse.InCurrentScope, Made.Of(() => BarPerRequestService.FactoryMethod(Arg.Of<ISingletonService>())));
+            registrator.Register<ITransientService>(Reuse.Transient, Made.Of(() => BarTransientService.FactoryMethod(Arg.Of<IPerRequestService>())));
+
+            registrator.Register<FooServiceHttpContext>(Reuse.InCurrentScope);
+            registrator.Register<BarServiceHttpContext>(Made.Of(
+                () => BarServiceHttpContext.FactoryMethod(Arg.Of<HttpContext>(), Arg.Of<ISingletonService>())), 
+                Reuse.InCurrentScope);
         }
-
-        public static IEnumerable<Tuple<Type, object>> GetScopeInstances(HttpContext httpContext)
-        {
-            IServiceProvider serviceProvider = httpContext.RequestServices ?? httpContext.ApplicationServices;
-
-            yield return CreateTuple(new FooServiceHttpContext(httpContext));
-            yield return CreateTuple(BarServiceHttpContext.FactoryMethod(httpContext, (ISingletonService)serviceProvider.GetService(typeof(ISingletonService))));
-        }
-
-        private static Tuple<Type, object> CreateTuple<TInstance>(TInstance instance)
-        { return Tuple.Create(typeof(TInstance), (object)instance); }
     }
 }

@@ -35,7 +35,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registring_external_instance_and_disposing_container_Then_instance_should_be_disposed()
+        public void When_registering_external_instance_and_disposing_container_Then_instance_should_be_disposed()
         {
             var container = new Container();
             var service = new DisposableService();
@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_registring_external_instance_with_prevent_disposal_parameter_Then_instance_should_Not_be_disposed()
+        public void When_registering_external_instance_with_prevent_disposal_parameter_Then_instance_should_Not_be_disposed()
         {
             var container = new Container();
             container.RegisterInstance<IService>(new DisposableService(), preventDisposal: true);
@@ -57,7 +57,6 @@ namespace DryIoc.UnitTests
 
             Assert.IsFalse(((DisposableService)service).IsDisposed);
         }
-
 
         [Test]
         public void Registering_instance_as_weak_reference_does_not_prevent_it_from_dispose()
@@ -200,6 +199,44 @@ namespace DryIoc.UnitTests
             var presenter = container.Resolve<ViewModel1Presenter>();
 
             Assert.AreSame(presenter.VM1.Log, presenter.VM1.VM2.Log);
+        }
+
+        [Test]
+        public void Resolution_scope_can_be_automatically_tracked_in_open_scope_and_removed()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<K>(Reuse.InResolutionScope);
+            container.Register<L>(setup: Setup.With(openResolutionScope: true));
+
+            K k; 
+            using (var scope = container.OpenScope())
+            {
+                var l = scope.Resolve<L>();
+                k = l.K;
+            }
+
+            Assert.IsTrue(k.IsDisposed);
+        }
+
+        public class K : IDisposable
+        {
+            public bool IsDisposed { get; private set; }
+
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
+
+        public class L
+        {
+            public K K { get; private set; }
+
+            public L(K k, IDisposable scope)
+            {
+                K = k;
+            }
         }
 
         internal class ViewModel1Presenter
@@ -522,13 +559,15 @@ namespace DryIoc.UnitTests
             public void Dispose() { IsDisposed = true; }
         }
 
-        internal class A : IDisposable {
+        internal class A : IDisposable
+        {
             public void Dispose()
             {
                 throw new DivideByZeroException();
             }
         }
-        internal class B : IDisposable {
+        internal class B : IDisposable
+        {
             public bool IsDisposed;
             public void Dispose()
             {
