@@ -434,9 +434,9 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            if (factoryDelegate != null)
-                return factoryDelegate(_singletonItems, _containerWeakRef, null);
-            return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
+            return factoryDelegate != null
+                ? factoryDelegate(_singletonItems, _containerWeakRef, null)
+                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, IScope scope)
