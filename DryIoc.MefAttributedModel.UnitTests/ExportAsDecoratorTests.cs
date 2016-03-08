@@ -134,7 +134,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(x.IsStarted);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_register_decorator_of_T_without_breaking_other_exports()
         {
             var di = D.I.WithMefAttributedModel();

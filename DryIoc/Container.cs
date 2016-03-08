@@ -858,7 +858,14 @@ namespace DryIoc
             // Append arbitrary object decorators
             var objectDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!objectDecorators.IsNullOrEmpty())
-                decorators = decorators.Append(objectDecorators);
+            {
+                var matchingClosedDecorators = objectDecorators.Select(
+                    factory => factory.FactoryGenerator == null ? factory
+                        : factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
+                    .Where(f => f != null)
+                    .ToArray();
+                decorators = decorators.Append(matchingClosedDecorators);
+            }
 
             // Return fast if no decorators found
             if (decorators.IsNullOrEmpty())
@@ -6096,11 +6103,14 @@ namespace DryIoc
             : base(reuse, setup)
         {
             Made = made ?? Made.Default;
+            _implementationType = GetValidImplementationTypeOrDefault(implementationType);
 
-            if (implementationType != null && implementationType.IsGenericDefinition())
+            // Create closed type generator for open-generic implementation type
+            var maybeGenericImplType = _implementationType ?? implementationType;
+            if (maybeGenericImplType != null && (
+                maybeGenericImplType.IsGenericDefinition() ||
+                maybeGenericImplType.IsGenericParameter))
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
-
-            _implementationType = ValidateAndNormalizeImplementationType(implementationType);
         }
 
         /// <summary>Add to base rules: do not cache if Made is context based.</summary>
@@ -6249,9 +6259,12 @@ namespace DryIoc
 
                 var implementationType = _openGenericFactory._implementationType;
 
-                var closedTypeArgs = implementationType == null ||
-                    implementationType == serviceType.GetGenericDefinitionOrNull() ? serviceType.GetGenericParamsAndArgs()
-                    : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
+                var closedTypeArgs = 
+                    implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
+                        ? serviceType.GetGenericParamsAndArgs()
+                    : implementationType.IsGenericParameter
+                        ? new [] { serviceType }
+                        : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
 
                 if (closedTypeArgs == null)
                     return null;
@@ -6262,8 +6275,12 @@ namespace DryIoc
                     var factoryMethod = closedMade.FactoryMethod(request)
                         .ThrowIfNull(Error.GotNullFactoryWhenResolvingService, request);
 
-                    var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request);
-                    if (closedFactoryMethod == null) // may be null only for IfUnresolved.ReturnDefault
+                    var checkMatchingType = implementationType != null && implementationType.IsGenericParameter;
+                    var closedFactoryMethod = GetClosedFactoryMethodOrDefault(
+                        factoryMethod, closedTypeArgs, request, checkMatchingType);
+
+                    // may be null only for IfUnresolved.ReturnDefault or check for matching type is failed
+                    if (closedFactoryMethod == null) 
                         return null;
 
                     closedMade = Made.Of(_ => closedFactoryMethod, closedMade.Parameters, closedMade.PropertiesAndFields);
@@ -6272,10 +6289,13 @@ namespace DryIoc
                 Type closedImplementationType = null;
                 if (implementationType != null)
                 {
-                    closedImplementationType = Throw.IfThrows<ArgumentException, Type>(
-                        () => implementationType.MakeGenericType(closedTypeArgs),
-                        request.IfUnresolved == IfUnresolved.Throw,
-                        Error.NoMatchedGenericParamConstraints, implementationType, request);
+                    if (implementationType.IsGenericParameter)
+                        closedImplementationType = closedTypeArgs[0];
+                    else
+                        closedImplementationType = Throw.IfThrows<ArgumentException, Type>(
+                            () => implementationType.MakeGenericType(closedTypeArgs),
+                            request.IfUnresolved == IfUnresolved.Throw,
+                            Error.NoMatchedGenericParamConstraints, implementationType, request);
 
                     if (closedImplementationType == null)
                         return null;
@@ -6295,10 +6315,12 @@ namespace DryIoc
                 _generatedFactories = Ref.Of(ImTreeMap<KV<Type, object>, ReflectionFactory>.Empty);
         }
 
-        private Type ValidateAndNormalizeImplementationType(Type implementationType)
+        private Type GetValidImplementationTypeOrDefault(Type implementationType)
         {
             var factoryMethodResultType = Made.FactoryMethodKnownResultType;
-            if (implementationType == null || implementationType.IsAbstract())
+            if (implementationType == null || 
+                implementationType == typeof(object) ||
+                implementationType.IsAbstract())
             {
                 Throw.If(Made.FactoryMethod == null && implementationType == null,
                     Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
@@ -6512,15 +6534,7 @@ namespace DryIoc
 
         #endregion
 
-        /// <summary>
-        /// todo:
-        /// </summary>
-        /// <param name="factoryMethod"></param>
-        /// <param name="serviceTypeArgs"></param>
-        /// <param name="request"></param>
-        /// <param name="shouldReturnOnError"></param>
-        /// <returns></returns>
-        public static FactoryMethod GetClosedFactoryMethodOrDefault(
+        private static FactoryMethod GetClosedFactoryMethodOrDefault(
             FactoryMethod factoryMethod, Type[] serviceTypeArgs, Request request,
             bool shouldReturnOnError = false)
         {

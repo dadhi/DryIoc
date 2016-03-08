@@ -531,11 +531,8 @@ namespace DryIoc.MefAttributedModel
                 // Special support for decorator of T to be registered as Object
                 var decoratorOfT = registrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo 
                     && member.GetReturnTypeOrDefault().IsGenericParameter;
-                var made = !decoratorOfT 
-                    ? Made.Of(member, factoryServiceInfo) 
-                    : Made.Of(r => ((MethodInfo)member).MakeGenericMethod(r.ServiceType), factoryServiceInfo);
 
-                var factory = registrationInfo.CreateFactory(made);
+                var factory = registrationInfo.CreateFactory(Made.Of(member, factoryServiceInfo));
 
                 var serviceExports = registrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)

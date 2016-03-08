@@ -686,8 +686,8 @@ namespace DryIoc.UnitTests
 
             container.Register<S>();
             container.Register<S, SS>(setup: Setup.Decorator);
-            container.Register<object>(made: Made.Of(r =>
-                GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
+            container.Register<object>(
+                made: Made.Of(GetType().GetSingleMethodOrNull("PutMessage")),
                 setup: Setup.DecoratorWith(order: -1));
 
             var s = container.Resolve<S>();
