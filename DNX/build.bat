@@ -6,7 +6,7 @@ rem call dnu restore
 
 dnx -p "DryIoc.Dnx.UnitTests" test
 dnx -p "DryIoc.MefAttributedModel.Dnx.UnitTests" test
-dnx -p "DryIoc.Dnx.DependencyInjection.Specification.Tests" test
+rem dnx -p "DryIoc.Dnx.DependencyInjection.Specification.Tests" test
 
 echo:BUILD AND PACKAGE:
 call dnu pack DryIoc.Dnx --configuration Release

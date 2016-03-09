@@ -24,8 +24,6 @@ Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.MefAttributedModel.D
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.MefAttributedModel.Dnx.UnitTests.CUT", "DryIoc.MefAttributedModel.Dnx.UnitTests.CUT\DryIoc.MefAttributedModel.Dnx.UnitTests.CUT.xproj", "{AF2AEE9C-80E3-404A-A683-DC62286F0B7B}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.Dnx.DependencyInjection.Specification.Tests", "DryIoc.Dnx.DependencyInjection.Specification.Tests\DryIoc.Dnx.DependencyInjection.Specification.Tests.xproj", "{3F7E63BD-6BB0-4B3A-BFC2-25F6398E6A7D}"
-EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Web", "DryIoc.Dnx.Mvc.Sample\Web.xproj", "{535C4252-C478-440A-AA2D-F4E5E5F136EB}"
 EndProject
 Global
@@ -62,10 +60,6 @@ Global
 		{AF2AEE9C-80E3-404A-A683-DC62286F0B7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AF2AEE9C-80E3-404A-A683-DC62286F0B7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AF2AEE9C-80E3-404A-A683-DC62286F0B7B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3F7E63BD-6BB0-4B3A-BFC2-25F6398E6A7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3F7E63BD-6BB0-4B3A-BFC2-25F6398E6A7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3F7E63BD-6BB0-4B3A-BFC2-25F6398E6A7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3F7E63BD-6BB0-4B3A-BFC2-25F6398E6A7D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{535C4252-C478-440A-AA2D-F4E5E5F136EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{535C4252-C478-440A-AA2D-F4E5E5F136EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{535C4252-C478-440A-AA2D-F4E5E5F136EB}.Release|Any CPU.ActiveCfg = Release|Any CPU

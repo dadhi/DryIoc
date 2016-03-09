@@ -22,9 +22,12 @@ namespace Web
          ***/
         public static void RegisterServices(IRegistrator registrator)
         {
-            registrator.Register<ISingletonService>(Reuse.Singleton, Made.Of(() => BarSingletonService.FactoryMethod()));
-            registrator.Register<IPerRequestService>(Reuse.InCurrentScope, Made.Of(() => BarPerRequestService.FactoryMethod(Arg.Of<ISingletonService>())));
-            registrator.Register<ITransientService>(Reuse.Transient, Made.Of(() => BarTransientService.FactoryMethod(Arg.Of<IPerRequestService>())));
+            registrator.Register<ISingletonService>(Reuse.Singleton, 
+                Made.Of(() => BarSingletonService.FactoryMethod()));
+            registrator.Register<IPerRequestService>(Reuse.InCurrentScope,
+                Made.Of(() => BarPerRequestService.FactoryMethod(Arg.Of<ISingletonService>())));
+            registrator.Register<ITransientService>(Reuse.Transient, 
+                Made.Of(() => BarTransientService.FactoryMethod(Arg.Of<IPerRequestService>())));
 
             registrator.Register<FooServiceHttpContext>(Reuse.InCurrentScope);
             registrator.Register<BarServiceHttpContext>(Made.Of(
