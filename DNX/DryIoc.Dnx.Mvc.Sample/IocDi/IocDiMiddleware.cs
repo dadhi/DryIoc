@@ -17,9 +17,8 @@ namespace Web.IocDi
             _next = next;
         }
 
-        public async Task Invoke(HttpContext context)
+        public async Task Invoke(HttpContext context, IContainer scopedContainer)
         {
-            var scopedContainer = context.RequestServices.GetRequiredService<IContainer>();
             scopedContainer.RegisterInstance(context, Reuse.InCurrentScope, IfAlreadyRegistered.Replace, preventDisposal: true);
             await _next(context);
         }

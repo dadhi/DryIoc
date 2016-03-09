@@ -1,5 +1,5 @@
 ﻿{
-    "version": "2.2.0-rc1",
+    "version": "2.2.1-rc1",
     "title": "DryIoc.Dnx",
     "description": "DryIoc targeting DNX (Asp.NET 5 / CoreFX)",
     "authors": [ "Maksim Volkau" ],
