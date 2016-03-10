@@ -550,6 +550,16 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
         }
 
+        [Test]
+        public void Container_ToString_should_output_scope_info_for_open_scope()
+        {
+            var container = new Container();
+            StringAssert.Contains("container", container.ToString());
+
+            using (var scope = container.OpenScope("a-a-a"))
+                StringAssert.Contains("a-a-a", scope.ToString());
+        }
+
         class MyService
         {
             public MyService(RequiredDependency d) {}

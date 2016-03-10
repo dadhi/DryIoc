@@ -99,4 +99,15 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [Export]
         public static Chicken Chicken { get { return new Chicken(); } }
     }
+
+    [Export("hey"), AsFactory]
+    public class KeyedFactoryWithString
+    {
+        [Export]
+        public string GetValue()
+        {
+            return "blah!";
+        }
+    }
+
 }

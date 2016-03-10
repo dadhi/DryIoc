@@ -529,7 +529,8 @@ namespace DryIoc.MefAttributedModel
 
                 factoryExportRequired = !member.IsStatic();
                 var factoryServiceInfo = factoryExportRequired 
-                    ? ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key) 
+                    ? ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, 
+                        factoryExport.ServiceKeyInfo.Key) 
                     : null;
 
                 // Special support for decorator of T to be registered as Object

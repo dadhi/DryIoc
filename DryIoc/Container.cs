@@ -57,6 +57,15 @@ namespace DryIoc
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext)
         { }
 
+        /// <summary>Outputs scope info for open scope.</summary> <returns>Info about scoped container</returns>
+        public override string ToString()
+        {
+            var scope = ((IScopeAccess)this).GetCurrentScope();
+            if (scope != null)
+                return "container with open scope: " + scope;
+            return "container";
+        }
+
         /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
         /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>

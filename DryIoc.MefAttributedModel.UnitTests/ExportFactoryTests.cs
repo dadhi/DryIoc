@@ -154,5 +154,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.IsInstanceOf<Duck>(duck);
         }
+
+        [Test]
+        public void Can_export_and_use_factory_with_key()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(typeof(KeyedFactoryWithString));
+
+            var s = container.Resolve<string>();
+        }
     }
 }
