@@ -34,7 +34,7 @@ namespace Web.Controllers
 
         public IActionResult Index()
         {
-            return base.View(
+            return View(
                 new IndexModel
                 {
                     Singleton1Id = _singleton1.InstanceId,
