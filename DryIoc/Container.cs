@@ -733,20 +733,20 @@ namespace DryIoc
         Factory IContainer.ResolveFactory(Request request)
         {
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
+            if (factory == null)
+            {
+                factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
+
+                if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
+                    factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
+
+                if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
+                    for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
+                        factory = Rules.UnknownServiceResolvers[i](request);
+            }
+
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
-
-            if (factory != null)
-                return factory;
-
-            factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
-
-            if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
-                factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
-
-            if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
-                for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
-                    factory = Rules.UnknownServiceResolvers[i](request);
 
             if (factory == null && request.IfUnresolved == IfUnresolved.Throw)
                 ThrowUnableToResolve(request);
@@ -1785,7 +1785,7 @@ namespace DryIoc
             Func<Request, bool> condition = null)
         {
             var types = implTypeAssemblies.ThrowIfNull()
-                .SelectMany(a => a.GetLoadedTypes())
+                .SelectMany(assembly => assembly.GetLoadedTypes())
                 .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated())
                 .ToArray();
             return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
@@ -2631,8 +2631,12 @@ namespace DryIoc
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
 
+                var requestedServiceType = request.GetActualServiceType();
                 request.Container.RegisterMany(implTypes, reuse,
-                    serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
+                    serviceTypeCondition: serviceType =>
+                        serviceType.IsOpenGeneric() && requestedServiceType.IsClosedGeneric()
+                            ? serviceType == requestedServiceType.GetGenericTypeDefinition()
+                            : serviceType == requestedServiceType);
 
                 return request.Container.GetServiceFactoryOrDefault(request);
             };

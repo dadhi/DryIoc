@@ -54,7 +54,7 @@ namespace DryIoc.Dnx.DependencyInjection
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             if (container.ScopeContext != null)
-                throw new ArgumentException("Adapted container uses ambient scope context which is not supported by AspNet DI.");
+                throw new ArgumentException("Adapted container uses ambient scope context which is not supported by AspNetCore DI.");
 
             var adapter = container.With(rules => rules
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
