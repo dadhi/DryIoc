@@ -53,7 +53,10 @@ namespace DryIoc.MefAttributedModel
         public static Rules WithMefAttributedModel(this Rules rules)
         {
             // hello, Max!!! we are Martians.
-            return rules.With(GetImportingConstructor, GetImportedParameter, _getImportedPropertiesAndFields);
+            return rules.With(
+                request => GetImportingConstructor(request, rules.FactoryMethod), 
+                GetImportedParameter, 
+                _getImportedPropertiesAndFields);
         }
 
         /// <summary>Appends attributed model rules to passed container.</summary>
@@ -170,13 +173,14 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(Request request)
+        private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector)
         {
             var implType = request.ImplementationType;
             var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
             var ctor = ctors.Length == 1 ? ctors[0]
-                : ctors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any())
-                    .ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType);
+                : ctors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+            if (ctor == null)
+                return fallbackSelector.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType).Invoke(request);
             return FactoryMethod.Of(ctor);
         }
 
@@ -525,7 +529,8 @@ namespace DryIoc.MefAttributedModel
 
                 factoryExportRequired = !member.IsStatic();
                 var factoryServiceInfo = factoryExportRequired 
-                    ? ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, factoryExport.ServiceKeyInfo.Key) 
+                    ? ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, 
+                        factoryExport.ServiceKeyInfo.Key) 
                     : null;
 
                 // Special support for decorator of T to be registered as Object

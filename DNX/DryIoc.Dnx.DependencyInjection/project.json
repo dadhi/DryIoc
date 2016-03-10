@@ -5,7 +5,7 @@
     "authors": [ "Maksim Volkau" ],
     "owners": [ "Maksim Volkau" ],
     "copyright": "Copyright © 2016 Maksim Volkau",
-    "tags": [ "DryIoc", "DNX", "Dependency Injection", "DI", "IoC", "Asp", "vNext" ],
+    "tags": [ "DryIoc", "DNX", "Dependency Injection", "DI", "IoC", "Asp", "vNext", "AspNetCore", "NetCore" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
     "requireLicenseAcceptance": false,
@@ -16,7 +16,7 @@
     },
 
     "dependencies": {
-        "DryIoc.Dnx": "2.2.1-*",
+        "DryIoc.Dnx": "2.2.2-*",
         "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0-rc1-final"
     },
 

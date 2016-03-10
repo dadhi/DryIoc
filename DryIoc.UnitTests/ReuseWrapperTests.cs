@@ -124,6 +124,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<IService>();
 
             Assert.IsInstanceOf<DisposableService>(service);
+            GC.KeepAlive(service);
         }
 
         [Test]

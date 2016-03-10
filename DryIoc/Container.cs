@@ -57,6 +57,15 @@ namespace DryIoc
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext)
         { }
 
+        /// <summary>Outputs scope info for open scope.</summary> <returns>Info about scoped container</returns>
+        public override string ToString()
+        {
+            var scope = ((IScopeAccess)this).GetCurrentScope();
+            if (scope != null)
+                return "container with open scope: " + scope;
+            return "container";
+        }
+
         /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
         /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
@@ -733,20 +742,20 @@ namespace DryIoc
         Factory IContainer.ResolveFactory(Request request)
         {
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
+            if (factory == null)
+            {
+                factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
+
+                if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
+                    factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
+
+                if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
+                    for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
+                        factory = Rules.UnknownServiceResolvers[i](request);
+            }
+
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
-
-            if (factory != null)
-                return factory;
-
-            factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
-
-            if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
-                factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
-
-            if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
-                for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
-                    factory = Rules.UnknownServiceResolvers[i](request);
 
             if (factory == null && request.IfUnresolved == IfUnresolved.Throw)
                 ThrowUnableToResolve(request);
@@ -1785,7 +1794,7 @@ namespace DryIoc
             Func<Request, bool> condition = null)
         {
             var types = implTypeAssemblies.ThrowIfNull()
-                .SelectMany(a => a.GetLoadedTypes())
+                .SelectMany(assembly => assembly.GetLoadedTypes())
                 .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated())
                 .ToArray();
             return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
@@ -2631,8 +2640,12 @@ namespace DryIoc
                 if (changeDefaultReuse != null)
                     reuse = changeDefaultReuse(reuse, request);
 
+                var requestedServiceType = request.GetActualServiceType();
                 request.Container.RegisterMany(implTypes, reuse,
-                    serviceTypeCondition: type => type.IsAssignableTo(request.ServiceType));
+                    serviceTypeCondition: serviceType =>
+                        serviceType.IsOpenGeneric() && requestedServiceType.IsClosedGeneric()
+                            ? serviceType == requestedServiceType.GetGenericTypeDefinition()
+                            : serviceType == requestedServiceType);
 
                 return request.Container.GetServiceFactoryOrDefault(request);
             };

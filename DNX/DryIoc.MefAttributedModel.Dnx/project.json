@@ -1,5 +1,5 @@
 ﻿{
-    "version": "2.2.1-rc1",
+    "version": "2.2.2-rc1",
     "title": "DryIoc.MefAttributedModel.Dnx",
     "description": "DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container",
     "authors": [ "Maksim Volkau" ],
@@ -9,7 +9,7 @@
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
     "requireLicenseAcceptance": false,
-    "releaseNotes": "Compatible with DryIoc 2.2.1",
+    "releaseNotes": "Compatible with DryIoc 2.2.2",
 
     "compilationOptions": {
         "warningsAsErrors": true
@@ -21,7 +21,7 @@
     ],
 
     "dependencies": {
-        "DryIoc.Dnx": "2.2.1-*",
+        "DryIoc.Dnx": "2.2.2-*",
         "DryIocAttributes.Dnx": "2.2-*"
     },
 

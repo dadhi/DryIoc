@@ -270,6 +270,20 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(DryIoc.Error.UnableToRegisterDuplicateDefault, ex.Error);
         }
 
+        [Test]
+        public void Works_together_with_ConstructorWithResolvableArguments()
+        {
+            var c = new Container(rules => rules
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithMefAttributedModel();
+
+            c.RegisterExports(typeof(MultiCtorSample), typeof(MultiCtorDep));
+
+            var s = c.Resolve<MultiCtorSample>();
+
+            Assert.IsNotNull(s.Dep);
+        }
+
         public interface I { }
 
         [ExportEx(IfAlreadyExported.Throw)]
