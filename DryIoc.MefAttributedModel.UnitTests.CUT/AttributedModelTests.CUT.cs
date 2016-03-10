@@ -505,4 +505,20 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public class AllOpts2 : IAllOpts
     {
     }
+
+    [Export]
+    public class MultiCtorDep { }
+
+    [Export]
+    public class MultiCtorSample
+    {
+        public MultiCtorDep Dep { get; private set; }
+
+        public MultiCtorSample() { }
+
+        public MultiCtorSample(Func<MultiCtorDep> getDep)
+        {
+            Dep = getDep();
+        }
+    }
 }
