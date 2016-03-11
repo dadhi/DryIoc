@@ -16,8 +16,8 @@
           - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate
         </releaseNotes>
         <dependencies>
-            <dependency id="DryIoc.dll" version="2.2.0" />
-            <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.0" />
+            <dependency id="DryIoc.dll" version="2.2.2" />
+            <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.2" />
             <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
         <frameworkAssemblies>
