@@ -1735,6 +1735,17 @@ namespace DryIoc
             return (T)container.New(typeof(T), made);
         }
 
+        /// <summary>Creates service given strongly-typed creation expression. 
+        /// Can be used to invoke arbitrary method returning some value with injecting its parameters from container.</summary>
+        /// <typeparam name="T">Method or constructor result type.</typeparam> 
+        /// <param name="container">Container to use for injecting dependencies.</param>
+        /// <param name="made">Creation expression.</param>
+        /// <returns>Created result.</returns>
+        public static T New<T>(this IContainer container, Made.TypedMade<T> made)
+        {
+            return (T)container.New(typeof(T), made);
+        }
+
         /// <summary>Registers new service type with factory for registered service type. 
         /// Throw if no such registered service type in container.</summary>
         /// <param name="container">Container</param> <param name="serviceType">New service type.</param>
