@@ -15,24 +15,35 @@ namespace DryIoc.Playground
         }
     }
 
-    public struct Opt<T>
+    /// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>
+    /// <typeparam name="T">Type of parameter</typeparam>
+    public struct ArgOpt<T>
     {
-        public static implicit operator Opt<T>(T value)
+        /// <summary>Allows to transparently convert parameter argument to opt structure.</summary>
+        /// <param name="value">Argument value to wrap, may be null.</param>
+        public static implicit operator ArgOpt<T>(T value)
         {
-            return new Opt<T>(value);
+            return new ArgOpt<T>(value);
         }
-        
+
+        /// <summary>Argument value.</summary>
         public readonly T Value;
 
+        /// <summary>Indicates that value is passed.</summary>
         public readonly bool HasValue;
 
-        public Opt(T value)
+        /// <summary>Wraps passed value in structure. Sets the flag that value is present.</summary>
+        /// <param name="value"></param>
+        public ArgOpt(T value)
         {
             HasValue = true;
             Value = value;
         }
 
-        public T ValueOrDefault(T defaultValue = default(T))
+        /// <summary>Helper to get value or default value if value is not present.</summary>
+        /// <param name="defaultValue">(optional) Default value.</param>
+        /// <returns>Value or default.</returns>
+        public T OrDefault(T defaultValue = default(T))
         {
             return HasValue ? Value : defaultValue;
         }
@@ -53,13 +64,13 @@ namespace DryIoc.Playground
 
         private DataObject() {}
 
-        public DataObject With(Opt<int> id = default(Opt<int>), Opt<string> value = default(Opt<string>), Opt<DataObject2> obj = default(Opt<DataObject2>))
+        public DataObject With(ArgOpt<int> id = default(ArgOpt<int>), ArgOpt<string> value = default(ArgOpt<string>), ArgOpt<DataObject2> obj = default(ArgOpt<DataObject2>))
         {
             return new DataObject
             {
-                Id = id.ValueOrDefault(Id),
-                Value = value.ValueOrDefault(Value),
-                Object = obj.ValueOrDefault(Object)
+                Id = id.OrDefault(Id),
+                Value = value.OrDefault(Value),
+                Object = obj.OrDefault(Object)
             };
         }
     }
@@ -79,12 +90,12 @@ namespace DryIoc.Playground
         {
         }
 
-        public DataObject2 With(Opt<decimal> price = default(Opt<decimal>), Opt<string> priceType = default(Opt<string>))
+        public DataObject2 With(ArgOpt<decimal> price = default(ArgOpt<decimal>), ArgOpt<string> priceType = default(ArgOpt<string>))
         {
             return new DataObject2
             {
-                Price = price.ValueOrDefault(Price),
-                PriceType = priceType.ValueOrDefault(PriceType)
+                Price = price.OrDefault(Price),
+                PriceType = priceType.OrDefault(PriceType)
             };
         }
     }

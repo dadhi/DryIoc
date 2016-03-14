@@ -32,7 +32,7 @@ using System.Threading;
 
 namespace DryIocZero
 {
-    /// <summary>Minimal container which allow to register service factory delegates and then resolve service from them.</summary>
+    /// <summary>Minimal container to register service factory delegates and then resolve service from them.</summary>
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly", Justification = "Does not contain any unmanaged resources.")]
     public sealed partial class Container : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
     {

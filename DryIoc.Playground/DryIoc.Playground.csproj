@@ -63,7 +63,7 @@
     <Compile Include="IntNTree.cs" />
     <Compile Include="IntNTreeTests.cs" />
     <Compile Include="IntTreeTests.cs" />
-    <Compile Include="Opt.cs" />
+    <Compile Include="ArgOpt.cs" />
     <Compile Include="Performance\ClosureFieldsAccessSpeed.cs" />
     <Compile Include="Performance\CompareTryGetVsGetOrNull.cs" />
     <Compile Include="Performance\IlEmitDynamicMethodVsExpressionCompile.cs" />
