@@ -180,7 +180,13 @@ namespace DryIoc
             if (_openedScope != null && 
                 !(Rules.ImplicitOpenedRootScope && _openedScope.Parent == null && _scopeContext == null))
             {
-                CloseCurrentScope();
+                if (_openedScope == null)
+                    return;
+
+                _openedScope.Dispose();
+
+                if (_scopeContext != null)
+                    _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
             }
             else // whole Container with singletons.
             {
@@ -200,20 +206,6 @@ namespace DryIoc
 
                 Rules = Rules.Default;
             }
-        }
-
-        // todo-v3: move to IContainer.
-        /// <summary>Disposes current scope and sets the scope parent (if any) back to ambient context (if any).</summary>
-        /// <remarks>May be called safely multiple times.</remarks>
-        public void CloseCurrentScope()
-        {
-            if (_openedScope == null)
-                return;
-
-            _openedScope.Dispose();
-
-            if (_scopeContext != null)
-                _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
         }
 
         #region Static state
@@ -9854,21 +9846,32 @@ namespace DryIoc
 
 namespace DryIoc.Experimental
 {
-    /// <summary>Shortcut access to container.</summary>
-    public static class D
-    {
-        /// <summary>Default configured container instance.</summary>
-        public static readonly IContainer I = Ioc();
+    using System.Reflection;
 
+    /// <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
+    public static class DI
+    {
         /// <summary>Creates new default configured container</summary>
         /// <returns>New configured container.</returns>
-        public static IContainer Ioc()
+        public static IContainer New()
         {
             return new Container(Rules.Default
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .WithTrackingDisposableTransients()
                 .WithAutoConcreteTypeResolution());
+        }
+
+        /// <summary>Auto-wired resolution of T from the <see cref="New"/> container.</summary>
+        /// <typeparam name="T">Type of service to resolve.</typeparam>
+        /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
+        /// <returns>Resolved service or throws.</returns>
+        public static T Get<T>(params Assembly[] assemblies)
+        {
+            if (assemblies.IsNullOrEmpty())
+                assemblies = new[] { typeof(T).GetAssembly() };
+            var di = New().WithAutoFallbackResolution(assemblies);
+            return di.Resolve<T>();
         }
     }
 }
