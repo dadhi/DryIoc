@@ -100,15 +100,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Can_track_disposable_transient()
+        public void Can_track_disposable_transient_but_export_option_still_override_the_container_option()
         {
-            var container = new Container(rules => rules.WithTrackingDisposableTransients()).WithMefAttributedModel();
+            var container = new Container(rules => rules
+                .WithTrackingDisposableTransients())
+                .WithMefAttributedModel();
+
             container.RegisterExports(typeof(DT), typeof(DT2), typeof(DTUser));
 
             var user = container.Resolve<DTUser>();
 
             container.Dispose();
-            Assert.IsTrue(user.Dt.IsDisposed);
+            Assert.IsFalse(user.Dt.IsDisposed);
             Assert.IsTrue(user.Dt2.IsDisposed);
         }
 

@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
             var juice = child.Resolve<IJuice>();
 
             Assert.IsInstanceOf<FruitJuice>(juice);
-            GC.KeepAlive(juice);
+            GC.KeepAlive(parent);
         }
 
         [Test]

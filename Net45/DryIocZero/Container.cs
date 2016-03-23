@@ -291,12 +291,13 @@ namespace DryIocZero
         public IScopeContext ScopeContext { get; private set; }
 
         /// <summary>Creates new container with new current ambient scope.</summary>
+        /// <param name="name">(optional) Scope name.</param>
         /// <returns>New container.</returns>
-        public Container OpenScope()
+        public Container OpenScope(object name = null)
         {
             ThrowIfContainerDisposed();
 
-            var nestedOpenedScope = new Scope(_openedScope);
+            var nestedOpenedScope = new Scope(_openedScope, name);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             if (ScopeContext != null)
@@ -306,8 +307,8 @@ namespace DryIocZero
                     return nestedOpenedScope;
                 });
 
-            return new Container(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext,
-                nestedOpenedScope, _disposed);
+            return new Container(_defaultFactories, _keyedFactories, 
+                SingletonScope, ScopeContext, nestedOpenedScope, _disposed);
         }
 
         private readonly IScope _openedScope;
@@ -588,24 +589,6 @@ namespace DryIocZero
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
     }
 
-    /// <summary>Provides scope context by convention.</summary>
-    public static partial class ScopeContext
-    {
-        /// <summary>Default scope context.</summary>
-        public static IScopeContext Default
-        {
-            get
-            {
-                if (_default == null)
-                    GetDefaultScopeContext(ref _default);
-                return _default;
-            }
-        }
-        static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
-
-        private static IScopeContext _default;
-    }
-    
     /// <summary>Convenience extensions for registrations on top of delegate registrator.</summary>
     public static class Registrator
     {
@@ -648,11 +631,17 @@ namespace DryIocZero
     {
         /// <summary>Resolves non-keyed service of <typeparamref name="TService"/> type.</summary>
         /// <typeparam name="TService">Type of service to resolve.</typeparam> <param name="resolver"></param>
+        /// <param name="requiredServiceType">(optional) Required service type.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
         /// <returns>Service object or throws exception.</returns>
-        public static TService Resolve<TService>(this IResolver resolver, bool ifUnresolvedReturnDefault = false)
+        public static TService Resolve<TService>(this IResolver resolver, 
+            Type requiredServiceType = null, bool ifUnresolvedReturnDefault = false, object serviceKey = null)
         {
-            return (TService)resolver.Resolve(typeof(TService), ifUnresolvedReturnDefault);
+            return (TService)(requiredServiceType == null && serviceKey == null
+                ? resolver.Resolve(typeof(TService), ifUnresolvedReturnDefault)
+                : resolver.Resolve(typeof(TService), serviceKey, ifUnresolvedReturnDefault, requiredServiceType, 
+                    RequestInfo.Empty, null));
         }
     }
 
@@ -1433,7 +1422,7 @@ namespace DryIocZero
         }
     }
 
-    /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
+    /// <summary>Simple immutable AVL tree with object keys and object values.</summary>
     public sealed class ImTreeMap
     {
         /// <summary>Represents Empty tree.</summary>
@@ -1521,6 +1510,7 @@ namespace DryIocZero
         #region Implementation
 
         private readonly ImTreeMapIntToObj _tree;
+
         private ImTreeMap(ImTreeMapIntToObj tree)
         {
             _tree = tree;
@@ -1570,7 +1560,7 @@ namespace DryIocZero
     /// <summary>Zero container exception.</summary>
     [SuppressMessage("Microsoft.Usage",
         "CA2237:MarkISerializableTypesWithSerializable",
-        Justification = "Not available in PCL.")]
+        Justification = "Not available in PCL")]
     public class ContainerException : InvalidOperationException
     {
         /// <summary>Error code.</summary>

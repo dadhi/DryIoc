@@ -326,7 +326,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.AsResolutionCall = true;
                 }
-                else if (attribute is AsResolutionRootAttibute)
+                else if (attribute is AsResolutionRootAttribute)
                 {
                     info.AsResolutionRoot = true;
                 }

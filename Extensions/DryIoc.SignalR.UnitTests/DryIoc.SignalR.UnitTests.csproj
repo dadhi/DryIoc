@@ -44,7 +44,6 @@
   <ItemGroup>
     <Compile Include="DryIocSignalRTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ScopeTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">

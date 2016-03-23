@@ -27,8 +27,8 @@ namespace DryIoc.SignalR
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Threading.Tasks;
     using System.Diagnostics.CodeAnalysis;
+    using System.Reflection;
     using Microsoft.AspNet.SignalR;
     using Microsoft.AspNet.SignalR.Hubs;
 
@@ -37,47 +37,80 @@ namespace DryIoc.SignalR
     /// </summary>
     public static class DryIocSignalR
     {
-        /// <summary>Adapts container for use with SignalR implicit convention:
-        ///   1) Turns on Transient Disposable tracking; 
-        ///   2) Sets reuse ambient context to <see cref="AsyncExecutionFlowScopeContext"/>.
-        /// Registers <see cref="DryIocDependencyResolver"/> as <see cref="IDependencyResolver"/>
-        /// and registers <see cref="DryIocHubActivator"/> as <see cref="IHubActivator"/>.
-        /// You can resolve the abstractions from returned container.
-        /// Related discussion and more info may be found here: https://stackoverflow.com/questions/10555791/using-simple-injector-with-signalr
+        /// <summary>The method does: 
+        ///  - registers <see cref="DryIocHubActivator"/> as <see cref="IHubActivator"/>,
+        ///  - registers <see cref="DryIocDependencyResolver"/> as <see cref="IDependencyResolver"/>,
+        ///  - optionally registers Hubs from given assemblies,
+        ///  - sets GlobalHost.DependencyResolver to <see cref="DryIocDependencyResolver"/>.
         /// </summary>
-        /// <param name="container">Container to adapt for SignalR.</param>
-        /// <param name="scopeContext">(optional) Ambient scope context alternative to <see cref="AsyncExecutionFlowScopeContext"/>.
-        /// Generally the ambient scope context is required for <see cref="DryIocHubActivator"/> to produce scope bound hubs.</param>
-        /// <returns>Adapted container. It will be different from passed container.</returns>
+        /// <param name="container">Container to use.</param>
+        /// <param name="hubAssemblies">(optional) Assemblies with hubs.</param>
+        /// <returns>Container for fluent API.</returns>
+        /// <remarks>
+        /// Related discussion: https://stackoverflow.com/questions/10555791/using-simple-injector-with-signalr
+        /// </remarks>
         /// <example> <code lang="cs"><![CDATA[
-        ///
-        ///     // - Approach 1: with DryIocDependecyResolver
-        ///     container = new Container().WithSignalR();
-        ///     RouteTable.Routes.MapHubs(); // should go before setting the resolver, check SO link above for reasoning
-        ///     GlobalHost.DependencyResolver = container.Resolve<IDependencyResolver>();
-        ///
-        ///     // Possible way to register Hubs:
-        ///     container.RegisterMany(new[] { Assembly.GetExecutingAssembly() }, 
-        ///         serviceTypeCondition: type => type.BaseType == typeof(Hub));
-        ///
-        ///     
-        ///     // - Approach 2: Just use DryIocHubActivator with default DependencyResolver 
-        ///     container = new Container().WithSignalR();
-        ///     GlobalHost.DependencyResolver.Register(typeof(IHubActivator), () => new DryIocHubActivator(container));
-        ///     RouteTable.Routes.MapHubs();
-        ///
-        ///  ]]></code></example>
-        public static IContainer WithSignalR(this IContainer container, IScopeContext scopeContext = null)
+        /// 
+        ///      var hubAssemblies = new[] { Assembly.GetExecutingAssembly() };
+        /// 
+        ///      // - Approach 1: Full integration with HubActivator and setting-up the Resolver
+        ///      container = new Container().WithSignalR(hubAssemblies);
+        ///      RouteTable.Routes.MapHubs(); // should go before setting the resolver, check SO link above for reasoning
+        /// 
+        ///      // - Approach 2: Selective integration with DryIocHubActivator and default DependencyResolver 
+        ///      container = new Container();
+        ///      container.RegisterHubs(hubAssemblies);
+        ///      GlobalHost.DependencyResolver.Register(typeof(IHubActivator), () => new DryIocHubActivator(container));
+        ///      RouteTable.Routes.MapHubs();
+        /// 
+        ///   ]]></code></example>
+        public static IContainer WithSignalR(this IContainer container, params Assembly[] hubAssemblies)
         {
-            if (container.ScopeContext == null)
-                container = container.With(rules => rules
-                    .WithTrackingDisposableTransients(),
-                    scopeContext ?? new AsyncExecutionFlowScopeContext());
-
             container.Register<IHubActivator, DryIocHubActivator>();
             container.Register<IDependencyResolver, DryIocDependencyResolver>(Reuse.Singleton);
-
+            RegisterHubs(container, hubAssemblies);
+            GlobalHost.DependencyResolver = container.Resolve<IDependencyResolver>();
             return container;
+        }
+
+        /// <summary>Helper method to register transient hubs from provided assemblies.</summary>
+        /// <param name="container">Container to use for registration.</param>
+        /// <param name="hubAssemblies">Array of hub types assemblies.</param>
+        /// <remarks><see cref="Hub"/> implements <see cref="IDisposable"/> but supposed to be disposed
+        /// outside of container by SignalR infrastructure, therefore the hubs registered with 
+        /// <see cref="Setup.AllowDisposableTransient"/> and are not tracked by container. 
+        /// This prevents possible memory leak when container will hold reference to disposable hub.
+        /// In addition the hub will be registered once using <see cref="IfAlreadyRegistered.Keep"/> policy.</remarks>
+        public static void RegisterHubs(this IContainer container, params Assembly[] hubAssemblies)
+        {
+            if (!hubAssemblies.IsNullOrEmpty())
+                container.RegisterMany(hubAssemblies, IsHubType,
+                    setup: Setup.With(allowDisposableTransient: true), 
+                    ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+        }
+
+        /// <summary>Helper method to register transient hubs from provided types.</summary>
+        /// <param name="container">Container to use for registration.</param>
+        /// <param name="hubTypes">Array of hub types.</param>
+        /// <remarks><see cref="Hub"/> implements <see cref="IDisposable"/> but supposed to be disposed
+        /// outside of container by SignalR infrastructure, therefore the hubs registered with 
+        /// <see cref="Setup.AllowDisposableTransient"/> and are not tracked by container. 
+        /// This prevents possible memory leak when container will hold reference to disposable hub.</remarks>
+        public static void RegisterHubs(this IContainer container, params Type[] hubTypes)
+        {
+            if (!hubTypes.IsNullOrEmpty())
+                container.RegisterMany(hubTypes, serviceTypeCondition: IsHubType, 
+                    setup: Setup.With(allowDisposableTransient: true));
+        }
+
+        /// <summary>Helper method to found if the passed type is hub type:
+        /// concrete type which implements <see cref="Hub"/> or <see cref="IHub"/>.</summary>
+        /// <param name="type">Type to check.</param> <returns><c>True if hub type.</c></returns>
+        public static bool IsHubType(Type type)
+        {
+            return !type.IsAbstract() && (
+                type.BaseType == typeof(Hub) ||
+                type.IsAssignableTo(typeof(IHub)));
         }
     }
 
@@ -142,69 +175,13 @@ namespace DryIoc.SignalR
             _container = container;
         }
 
-        /// <summary>Opens scope via <see cref="IContainer.OpenScope"/> to start unit-of-work:
-        /// so that <see cref="Reuse.InWebRequest"/> and <see cref="Reuse.InCurrentScope"/> hub dependencies are supported.
-        /// Then creates hub by using <paramref name="descriptor"/> info. 
-        /// Wraps the hub in <see cref="HubProxy"/> decorator, to hook disposing of open scope on disposing of hub.
-        /// Returns the hub decorator.
-        /// </summary>
+        /// <summary>Creates hub by using <paramref name="descriptor"/> info.</summary>
+        /// <returns>Created hub.</returns>
         public IHub Create(HubDescriptor descriptor)
         {
-            var scope = _container.OpenScope(Reuse.WebRequestScopeName);
-            return new HubProxy(_container.Resolve<IHub>(descriptor.HubType), scope);
+            return _container.Resolve<IHub>(descriptor.HubType);
         }
 
         private readonly IContainer _container;
-
-        internal sealed class HubProxy : IHub
-        {
-            public HubCallerContext Context
-            {
-                get { return _hub.Context; }
-                set { _hub.Context = value; }
-            }
-
-            public IHubCallerConnectionContext<dynamic> Clients
-            {
-                get { return _hub.Clients; }
-                set { _hub.Clients = value; }
-            }
-
-            public IGroupManager Groups
-            {
-                get { return _hub.Groups; }
-                set { _hub.Groups = value; }
-            }
-
-            public HubProxy(IHub hub, IContainer scopedContainer)
-            {
-                _hub = hub;
-                _scopedContainer = scopedContainer;
-            }
-
-            public void Dispose()
-            {
-                _scopedContainer.Dispose();
-                _hub.Dispose();
-            }
-
-            public Task OnConnected()
-            {
-                return _hub.OnConnected();
-            }
-
-            public Task OnReconnected()
-            {
-                return _hub.OnReconnected();
-            }
-
-            public Task OnDisconnected(bool stopCalled)
-            {
-                return _hub.OnDisconnected(stopCalled);
-            }
-
-            private readonly IHub _hub;
-            private readonly IContainer _scopedContainer;
-        }
     }
 }

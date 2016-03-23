@@ -11,13 +11,10 @@
         <description>DryIoc extension for ASP.NET SignalR</description>
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
-          v2.0.0-rc3: 
-            - fixed: Open scope disposing when the Hub is disposed, via custom HubDecorator.
-            - fixed: XML-doc commented all public API. Add Example of usage to WithSignalR docs.
-            - changed: Removed HubConfiguration from setup. The setup may be done outside.
-            - removed: Dependency to Castle.DynamicProxy.
-          v2.0.0-rc2: fixed: Added missing dependency on Castle.DynamicProxy used for Hub interception.
-          v2.0.0-rc1: Initial release
+          v2.0.0-rc4:
+          - changed: WithSignalR to not modify container and just register HubActivator, Hubs, and set GlobalHost.Resolver
+          - changed: HubActivator to just resolving the Hub without opening the scope
+          - add: Helper methods to RegisterHubs
         </releaseNotes>
         <dependencies>
           <group>

@@ -654,7 +654,7 @@ public enum FactoryType
         | AttributeTargets.Method
         | AttributeTargets.Property
         | AttributeTargets.Field)]
-    public class AsResolutionRootAttibute : Attribute { }
+    public class AsResolutionRootAttribute : Attribute { }
 
     /// <summary>Marker for resolution root exports.</summary>
     [AttributeUsage(AttributeTargets.Class

@@ -232,7 +232,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Factory_should_return_different_service_when_called_in_different_scopes()
         {
-            var container = new Container(scopeContext: ScopeContext.Default);
+            var container = new Container(scopeContext: new ThreadScopeContext());
 
             container.Register<IService, IndependentService>(Reuse.InCurrentScope);
             container.Register<ServiceWithFuncConstructorDependency>(Reuse.Singleton);

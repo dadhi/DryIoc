@@ -2770,7 +2770,6 @@ namespace DryIoc
             return newRules;
         }
 
-
         /// <summary><see cref="WithoutEagerCachingSingletonForFasterAccess"/>.</summary>
         public bool EagerCachingSingletonForFasterAccess
         {
@@ -5667,8 +5666,9 @@ namespace DryIoc
 
                 // Track transient disposable in parent scope (if any), or open scope (if any)
                 var tracksTransientDisposable = false;
-                if (reuse == null && !Setup.PreventDisposal &&
-                    (Setup.TrackDisposableTransient || container.Rules.TrackingDisposableTransients) &&
+                if (reuse == null && !Setup.PreventDisposal && 
+                    (Setup.TrackDisposableTransient || 
+                    !Setup.AllowDisposableTransient && container.Rules.TrackingDisposableTransients) &&
                     IsDisposableService(request))
                 {
                     reuse = GetTransientDisposableTrackingReuse(request);
@@ -6963,7 +6963,7 @@ namespace DryIoc
         /// <returns>String representation.</returns>
         public override string ToString()
         {
-            return "{Name=" + (Name == null ? "{empty}" : Name) 
+            return "{Name=" + (Name ?? "{empty}")
                 + (Parent == null ? string.Empty : ", Parent=" + Parent)
                 + "}";
         }
@@ -7274,28 +7274,6 @@ namespace DryIoc
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
-    }
-
-    /// <summary>Provides scope context by convention.</summary>
-    public static partial class ScopeContext
-    {
-        /// <summary>Default scope context.</summary>
-        public static IScopeContext Default
-        {
-            get { return _default ?? (_default = GetDefaultScopeContext()); }
-        }
-
-        static partial void GetDefaultScopeContext(ref IScopeContext resultContext);
-
-        private static IScopeContext GetDefaultScopeContext()
-        {
-            IScopeContext context = null;
-            GetDefaultScopeContext(ref context);
-            // ReSharper disable once ConstantNullCoalescingCondition
-            return context ?? new ThreadScopeContext();
-        }
-
-        private static IScopeContext _default;
     }
 
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -9864,14 +9842,24 @@ namespace DryIoc.Experimental
 
         /// <summary>Auto-wired resolution of T from the <see cref="New"/> container.</summary>
         /// <typeparam name="T">Type of service to resolve.</typeparam>
+        /// <param name="container">(optional) Container </param>
+        /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
+        /// <returns>Resolved service or throws.</returns>
+        public static T Get<T>(this IContainer container, params Assembly[] assemblies)
+        {
+            if (assemblies.IsNullOrEmpty())
+                assemblies = new[] { typeof(T).GetAssembly() };
+            return container.WithAutoFallbackResolution(assemblies).Resolve<T>();
+        }
+
+
+        /// <summary>Auto-wired resolution of T from the <see cref="New"/> container.</summary>
+        /// <typeparam name="T">Type of service to resolve.</typeparam>
         /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
         /// <returns>Resolved service or throws.</returns>
         public static T Get<T>(params Assembly[] assemblies)
         {
-            if (assemblies.IsNullOrEmpty())
-                assemblies = new[] { typeof(T).GetAssembly() };
-            var di = New().WithAutoFallbackResolution(assemblies);
-            return di.Resolve<T>();
+            return New().Get<T>();
         }
     }
 }
