@@ -14,4 +14,4 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyFileVersion("2.1.0")]
 [assembly: AssemblyInformationalVersion("2.1.0")]
 
-//[assembly: InternalsVisibleTo("DryIoc.WebApi.UnitTests")]
+[assembly: InternalsVisibleTo("DryIoc.WebApi.UnitTests")]

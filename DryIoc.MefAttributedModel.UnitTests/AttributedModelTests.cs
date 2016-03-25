@@ -3,7 +3,7 @@
     using System;
     using System.Linq;
     using System.Linq.Expressions;
-    using DryIoc.MefAttributedModel.UnitTests.CUT;
+    using CUT;
     using NUnit.Framework;
 
     [TestFixture]
