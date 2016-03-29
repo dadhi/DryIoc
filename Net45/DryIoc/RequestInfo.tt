@@ -1,7 +1,0 @@
-﻿<#@ template debug="false" hostspecific="false" language="C#" #>
-<#@ assembly name="System.Core" #>
-<#@ output extension=".cs" #>
-namespace DryIoc.Test
-{
-<#@ include File="..\..\shared\RequestInfo.shared.cs" #>
-}

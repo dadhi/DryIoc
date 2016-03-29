@@ -44,6 +44,9 @@
     <Compile Include="..\..\DryIoc\FactoryCompiler.cs">
       <Link>FactoryCompiler.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc\ImTools.cs">
+      <Link>ImTools.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc\Ported-net45.cs">
       <Link>Ported-net45.cs</Link>
     </Compile>

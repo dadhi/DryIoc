@@ -22,16 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading;
-
 namespace DryIocZero
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
+    using System.Linq;
+    using System.Reflection;
+    using System.Text;
+    using System.Threading;
+
+    using DryIoc;
+
     /// <summary>Minimal container to register service factory delegates and then resolve service from them.</summary>
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly", Justification = "Does not contain any unmanaged resources.")]
     public sealed partial class Container : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
@@ -39,7 +41,9 @@ namespace DryIocZero
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Ambient scope context.</param>
         public Container(IScopeContext scopeContext = null)
-            : this(Ref.Of(ImTreeMap.Empty), Ref.Of(ImTreeMap.Empty), new SingletonScope(), scopeContext, null, 0) { }
+            : this(Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty), 
+                  Ref.Of(ImTreeMap<Type, ImTreeMap<object, FactoryDelegate>>.Empty), 
+                  new SingletonScope(), scopeContext, null, 0) { }
 
         /// <summary>Full constructor - all state included.</summary>
         /// <param name="defaultFactories"></param>
@@ -48,7 +52,8 @@ namespace DryIocZero
         /// <param name="scopeContext">Ambient scope context.</param>
         /// <param name="openedScope">Container bound opened scope.</param>
         /// <param name="disposed"></param>
-        public Container(Ref<ImTreeMap> defaultFactories, Ref<ImTreeMap> keyedFactories, 
+        public Container(Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactories, 
+            Ref<ImTreeMap<Type, ImTreeMap<object, FactoryDelegate>>> keyedFactories, 
             IScope singletonScope, IScopeContext scopeContext, IScope openedScope, 
             int disposed)
         {
@@ -165,30 +170,29 @@ namespace DryIocZero
             if (serviceKey == null)
                 return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, scope);
 
-            var keyedFactories = _keyedFactories.Value.GetValueOrDefault(serviceType);
-            if (keyedFactories != null)
+            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType);
+            if (factories != null)
             {
-                var factories = (ImTreeMap)keyedFactories;
                 var factory = factories.GetValueOrDefault(serviceKey);
                 if (factory != null)
-                    return ((FactoryDelegate)factory)(this, scope);
+                    return factory(this, scope);
             }
 
             // If not resolved from runtime registration then try resolve generated
             object service = null;
             ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
-                Error.UnableToResolveKeyedService, serviceType, serviceKey, keyedFactories == null ? string.Empty : "non-");
+                Error.UnableToResolveKeyedService, serviceType, serviceKey, factories == null ? string.Empty : "non-");
         }
 
-        partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType);
+        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType);
 
         /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
         /// <param name="serviceType">Service type.</param>
         /// <returns>Collection of service key - service pairs.</returns>
-        public IEnumerable<KV> ResolveManyGeneratedOrGetEmpty(Type serviceType)
+        public IEnumerable<KV<object, FactoryDelegate>> ResolveManyGeneratedOrGetEmpty(Type serviceType)
         {
-            var manyGenerated = Enumerable.Empty<KV>();
+            var manyGenerated = Enumerable.Empty<KV<object, FactoryDelegate>>();
             ResolveManyGenerated(ref manyGenerated, serviceType);
             return manyGenerated;
         }
@@ -210,7 +214,7 @@ namespace DryIocZero
         {
             serviceType = requiredServiceType ?? serviceType;
 
-            var manyGeneratedFactories = Enumerable.Empty<KV>();
+            var manyGeneratedFactories = Enumerable.Empty<KV<object, FactoryDelegate>>();
             ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
             if (compositeParentKey != null)
                 manyGeneratedFactories = manyGeneratedFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
@@ -218,12 +222,12 @@ namespace DryIocZero
             foreach (var generated in manyGeneratedFactories)
                 yield return ((FactoryDelegate)generated.Value)(this, scope);
 
-            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType) as ImTreeMap;
+            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType);
             if (factories != null)
             {
                 if (serviceKey != null)
                 {
-                    var factoryDelegate = factories.GetValueOrDefault(serviceKey) as FactoryDelegate;
+                    var factoryDelegate = factories.GetValueOrDefault(serviceKey);
                     if (factoryDelegate != null)
                         yield return factoryDelegate(this, scope);
                 }
@@ -266,13 +270,13 @@ namespace DryIocZero
             ThrowIfContainerDisposed();
             _keyedFactories.Swap(_ =>
             {
-                var entry = _.GetValueOrDefault(serviceType) as ImTreeMap ?? ImTreeMap.Empty;
+                var entry = _.GetValueOrDefault(serviceType) ?? ImTreeMap<object, FactoryDelegate>.Empty;
                 return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
             });
         }
 
-        private Ref<ImTreeMap> _defaultFactories;  // <Type -> FactoryDelegate>
-        private Ref<ImTreeMap> _keyedFactories;    // <Type -> <Key -> FactoryDelegate>>
+        private Ref<ImTreeMap<Type, FactoryDelegate>> _defaultFactories;
+        private Ref<ImTreeMap<Type, ImTreeMap<object, FactoryDelegate>>> _keyedFactories;
 
         #endregion
 
@@ -346,7 +350,7 @@ namespace DryIocZero
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         public IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
-            return scope ?? (scope = new Scope(null, new KV(serviceType, serviceKey)));
+            return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
         }
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
@@ -362,8 +366,8 @@ namespace DryIocZero
             bool outermost, bool throwIfNotFound)
         {
             var matchingScope = GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost);
-            return matchingScope
-                   ?? (IScope)Throw.If(throwIfNotFound, Error.NoMatchedScopeFound,new KV(assignableFromServiceType, serviceKey));
+            return matchingScope ?? (IScope)Throw.If(throwIfNotFound, 
+                    Error.NoMatchedScopeFound,new KV<Type, object>(assignableFromServiceType, serviceKey));
         }
 
         private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey,
@@ -375,10 +379,10 @@ namespace DryIocZero
             IScope matchedScope = null;
             while (scope != null)
             {
-                var name = scope.Name as KV;
+                var name = scope.Name as KV<Type, object>;
                 if (name != null &&
                     (assignableFromServiceType == null
-                    || name.Key != null && assignableFromServiceType.GetTypeInfo().IsAssignableFrom(name.Key.GetType().GetTypeInfo())) 
+                    || name.Key != null && assignableFromServiceType.GetTypeInfo().IsAssignableFrom(name.Key.GetTypeInfo())) 
                     && (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
                     matchedScope = scope;
@@ -409,8 +413,8 @@ namespace DryIocZero
             else
             {
                 if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1) return;
-                _defaultFactories = Ref.Of(ImTreeMap.Empty);
-                _keyedFactories = Ref.Of(ImTreeMap.Empty);
+                _defaultFactories = Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty);
+                _keyedFactories = Ref.Of(ImTreeMap<Type, ImTreeMap<object, FactoryDelegate>>.Empty);
                 SingletonScope.Dispose();
                 if (ScopeContext != null)
                     ScopeContext.Dispose();
@@ -642,353 +646,6 @@ namespace DryIocZero
                 ? resolver.Resolve(typeof(TService), ifUnresolvedReturnDefault)
                 : resolver.Resolve(typeof(TService), serviceKey, ifUnresolvedReturnDefault, requiredServiceType, 
                     RequestInfo.Empty, null));
-        }
-    }
-
-    /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
-    /// <typeparam name="T">Type of object to wrap.</typeparam>
-    public sealed class Ref<T> where T : class
-    {
-        /// <summary>Gets the wrapped value.</summary>
-        public T Value { get { return _value; } }
-
-        /// <summary>Creates ref to object, optionally with initial value provided.</summary>
-        /// <param name="initialValue">Initial object value.</param>
-        public Ref(T initialValue = default(T))
-        {
-            _value = initialValue;
-        }
-
-        /// <summary>Exchanges currently hold object with <paramref name="getNewValue"/> result: see <see cref="Ref.Swap{T}"/> for details.</summary>
-        /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
-        /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
-        /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public T Swap(Func<T, T> getNewValue)
-        {
-            return Ref.Swap(ref _value, getNewValue);
-        }
-
-        private T _value;
-    }
-
-    /// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
-    public static class Ref
-    {
-        /// <summary>Factory for <see cref="Ref{T}"/> with type of value inference.</summary>
-        /// <typeparam name="T">Type of value to wrap.</typeparam>
-        /// <param name="value">Initial value to wrap.</param>
-        /// <returns>New ref.</returns>
-        public static Ref<T> Of<T>(T value) where T : class
-        {
-            return new Ref<T>(value);
-        }
-
-        /// <summary>Creates new ref to original ref value.</summary> <typeparam name="T">Type of ref value.</typeparam>
-        /// <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
-        public static Ref<T> NewRef<T>(this Ref<T> original) where T : class
-        {
-            return Of(original.Value);
-        }
-
-        /// <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
-        /// Second, it checks that original value is not changed. 
-        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getNewValue"/>).</summary>
-        /// <typeparam name="T">Type of value to swap.</typeparam>
-        /// <param name="value">Reference to change to new value</param>
-        /// <param name="getNewValue">Delegate to get value from old one.</param>
-        /// <returns>Old/original value. By analogy with <see cref="Interlocked.Exchange(ref int,int)"/>.</returns>
-        /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public static T Swap<T>(ref T value, Func<T, T> getNewValue) where T : class
-        {
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(_errorRetryCountExceeded);
-            }
-        }
-
-        private const int RETRY_COUNT_UNTIL_THROW = 50;
-        private static readonly string _errorRetryCountExceeded =
-            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
-    }
-
-    /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
-    public sealed class ImTreeMapIntToObj
-    {
-        /// <summary>Empty tree to start with. The <see cref="Height"/> of the empty tree is 0.</summary>
-        public static readonly ImTreeMapIntToObj Empty = new ImTreeMapIntToObj();
-
-        /// <summary>Key.</summary>
-        public readonly int Key;
-
-        /// <summary>Value.</summary>
-        public readonly object Value;
-
-        /// <summary>Left sub-tree/branch, or empty.</summary>
-        public readonly ImTreeMapIntToObj Left;
-
-        /// <summary>Right sub-tree/branch, or empty.</summary>
-        public readonly ImTreeMapIntToObj Right;
-
-        /// <summary>Height of longest sub-tree/branch. It is 0 for empty tree, and 1 for single node tree.</summary>
-        public readonly int Height;
-
-        /// <summary>Returns true is tree is empty.</summary>
-        public bool IsEmpty { get { return Height == 0; } }
-
-        /// <summary>Returns new tree with added or updated value for specified key.</summary>
-        /// <param name="key"></param> <param name="value"></param>
-        /// <returns>New tree.</returns>
-        public ImTreeMapIntToObj AddOrUpdate(int key, object value)
-        {
-            return AddOrUpdate(key, value, false, null);
-        }
-
-        /// <summary>Delegate to get updated value based on its old and new value.</summary>
-        /// <param name="oldValue">Old</param> <param name="newValue">New</param> <returns>Update result</returns>
-        public delegate object UpdateValue(object oldValue, object newValue);
-
-        /// <summary>Returns new tree with added or updated value for specified key.</summary>
-        /// <param name="key"></param> <param name="value"></param>
-        /// <param name="updateValue">Delegate to get updated value based on its old and new value.</param>
-        /// <returns>New tree.</returns>
-        public ImTreeMapIntToObj AddOrUpdate(int key, object value, UpdateValue updateValue)
-        {
-            return AddOrUpdate(key, value, false, updateValue);
-        }
-
-        /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
-        /// <param name="key"></param> <param name="value"></param>
-        /// <returns>New tree if key is found, or the same tree otherwise.</returns>
-        public ImTreeMapIntToObj Update(int key, object value)
-        {
-            return AddOrUpdate(key, value, true, null);
-        }
-
-        /// <summary>Get value for found key or null otherwise.</summary>
-        /// <param name="key"></param> <returns>Found value or null.</returns>
-        public object GetValueOrDefault(int key)
-        {
-            var tree = this;
-            while (tree.Height != 0 && tree.Key != key)
-                tree = key < tree.Key ? tree.Left : tree.Right;
-            return tree.Height != 0 ? tree.Value : null;
-        }
-
-        /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
-        /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
-        public IEnumerable<ImTreeMapIntToObj> Enumerate()
-        {
-            if (Height == 0)
-                yield break;
-
-            var parents = new ImTreeMapIntToObj[Height];
-
-            var tree = this;
-            var parentCount = -1;
-            while (tree.Height != 0 || parentCount != -1)
-            {
-                if (tree.Height != 0)
-                {
-                    parents[++parentCount] = tree;
-                    tree = tree.Left;
-                }
-                else
-                {
-                    tree = parents[parentCount--];
-                    yield return tree;
-                    tree = tree.Right;
-                }
-            }
-        }
-
-        #region Implementation
-
-        private ImTreeMapIntToObj() { }
-
-        private ImTreeMapIntToObj(int key, object value, ImTreeMapIntToObj left, ImTreeMapIntToObj right)
-        {
-            Key = key;
-            Value = value;
-            Left = left;
-            Right = right;
-            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
-        }
-
-        // If keys is not found and updateOnly is true, it should return current tree without changes.
-        private ImTreeMapIntToObj AddOrUpdate(int key, object value, bool updateOnly, UpdateValue update)
-        {
-            return Height == 0 ? // tree is empty
-                    (updateOnly ? this : new ImTreeMapIntToObj(key, value, Empty, Empty))
-                : (key == Key ? // actual update
-                    new ImTreeMapIntToObj(key, update == null ? value : update(Value, value), Left, Right)
-                : (key < Key    // try update on left or right sub-tree
-                    ? With(Left.AddOrUpdate(key, value, updateOnly, update), Right)
-                    : With(Left, Right.AddOrUpdate(key, value, updateOnly, update))).KeepBalanced());
-        }
-
-        private ImTreeMapIntToObj KeepBalanced()
-        {
-            var delta = Left.Height - Right.Height;
-            return delta >= 2 ? With(Left.Right.Height - Left.Left.Height == 1 ? Left.RotateLeft() : Left, Right).RotateRight()
-                : (delta <= -2 ? With(Left, Right.Left.Height - Right.Right.Height == 1 ? Right.RotateRight() : Right).RotateLeft()
-                : this);
-        }
-
-        private ImTreeMapIntToObj RotateRight()
-        {
-            return Left.With(Left.Left, With(Left.Right, Right));
-        }
-
-        private ImTreeMapIntToObj RotateLeft()
-        {
-            return Right.With(With(Left, Right.Left), Right.Right);
-        }
-
-        private ImTreeMapIntToObj With(ImTreeMapIntToObj left, ImTreeMapIntToObj right)
-        {
-            return left == Left && right == Right ? this : new ImTreeMapIntToObj(Key, Value, left, right);
-        }
-
-        #endregion
-    }
-
-    /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
-    public static class ArrayTools
-    {
-        /// <summary>Returns true if array is null or have no items.</summary> <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Source array to check.</param> <returns>True if null or has no items, false otherwise.</returns>
-        public static bool IsNullOrEmpty<T>(this T[] source)
-        {
-            return source == null || source.Length == 0;
-        }
-
-        /// <summary>Returns source enumerable if it is array, otherwise converts source to array.</summary>
-        /// <typeparam name="T">Array item type.</typeparam>
-        /// <param name="source">Source enumerable.</param>
-        /// <returns>Source enumerable or its array copy.</returns>
-        public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source)
-        {
-            return source is T[] ? (T[])source : source.ToArray();
-        }
-
-        /// <summary>Returns new array consisting from all items from source array then all items from added array.
-        /// If source is null or empty, then added array will be returned.
-        /// If added is null or empty, then source will be returned.</summary>
-        /// <typeparam name="T">Array item type.</typeparam>
-        /// <param name="source">Array with leading items.</param>
-        /// <param name="added">Array with following items.</param>
-        /// <returns>New array with items of source and added arrays.</returns>
-        public static T[] Append<T>(this T[] source, params T[] added)
-        {
-            if (added == null || added.Length == 0)
-                return source;
-            if (source == null || source.Length == 0)
-                return added;
-            var result = new T[source.Length + added.Length];
-            Array.Copy(source, 0, result, 0, source.Length);
-            if (added.Length == 1)
-                result[source.Length] = added[0];
-            else
-                Array.Copy(added, 0, result, source.Length, added.Length);
-            return result;
-        }
-
-        /// <summary>Returns new array with <paramref name="value"/> appended, 
-        /// or <paramref name="value"/> at <paramref name="index"/>, if specified.
-        /// If source array could be null or empty, then single value item array will be created despite any index.</summary>
-        /// <typeparam name="T">Array item type.</typeparam>
-        /// <param name="source">Array to append value to.</param>
-        /// <param name="value">Value to append.</param>
-        /// <param name="index">(optional) Index of value to update.</param>
-        /// <returns>New array with appended or updated value.</returns>
-        public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
-        {
-            if (source == null || source.Length == 0)
-                return new[] { value };
-            var sourceLength = source.Length;
-            index = index < 0 ? sourceLength : index;
-            var result = new T[index < sourceLength ? sourceLength : sourceLength + 1];
-            Array.Copy(source, result, sourceLength);
-            result[index] = value;
-            return result;
-        }
-
-        /// <summary>Calls predicate on each item in <paramref name="source"/> array until predicate returns true,
-        /// then method will return this item index, or if predicate returns false for each item, method will return -1.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array: if null or empty, then method will return -1.</param>
-        /// <param name="predicate">Delegate to evaluate on each array item until delegate returns true.</param>
-        /// <returns>Index of item for which predicate returns true, or -1 otherwise.</returns>
-        public static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
-        {
-            if (source != null && source.Length != 0)
-                for (var i = 0; i < source.Length; ++i)
-                    if (predicate(source[i]))
-                        return i;
-            return -1;
-        }
-
-        /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array: if null or empty, then method will return -1.</param>
-        /// <param name="value">Value to look up.</param>
-        /// <returns>Index of item equal to value, or -1 item is not found.</returns>
-        public static int IndexOf<T>(this T[] source, T value)
-        {
-            if (source != null && source.Length != 0)
-                for (var i = 0; i < source.Length; ++i)
-                {
-                    var item = source[i];
-                    if (ReferenceEquals(item, value) || Equals(item, value))
-                        return i;
-                }
-            return -1;
-        }
-
-        /// <summary>Produces new array without item at specified <paramref name="index"/>. 
-        /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
-        /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="index">Index if item to remove.</param>
-        /// <returns>New array with removed item at index, or input source array if index is not in array.</returns>
-        public static T[] RemoveAt<T>(this T[] source, int index)
-        {
-            if (source == null || source.Length == 0 || index < 0 || index >= source.Length)
-                return source;
-            if (index == 0 && source.Length == 1)
-                return new T[0];
-            var result = new T[source.Length - 1];
-            if (index != 0)
-                Array.Copy(source, 0, result, 0, index);
-            if (index != result.Length)
-                Array.Copy(source, index + 1, result, index, result.Length - index);
-            return result;
-        }
-
-        /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
-        /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="value">Value to find and remove.</param>
-        /// <returns>New array with value removed or original array if value is not found.</returns>
-        public static T[] Remove<T>(this T[] source, T value)
-        {
-            return source.RemoveAt(source.IndexOf(value));
-        }
-
-        /// <summary>Returns singleton empty array of provided type.</summary> 
-        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
-        public static T[] Empty<T>()
-        {
-            return EmptyArray<T>.Value;
-        }
-
-        private static class EmptyArray<T>
-        {
-            public static readonly T[] Value = new T[0];
         }
     }
 
@@ -1377,144 +1034,6 @@ namespace DryIocZero
             }
 
             return -1;
-        }
-
-        #endregion
-    }
-
-    /// <summary>Key Value objects pair.</summary>
-    public class KV
-    {
-        /// <summary>Key object.</summary>
-        public readonly object Key;
-
-        /// <summary>Value object.</summary>
-        public readonly object Value;
-
-        /// <summary>Creates pair.</summary> <param name="key"></param> <param name="value"></param>
-        public KV(object key, object value) { Key = key; Value = value; }
-
-        /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
-        /// <param name="obj">Object to check equality with.</param> <returns>True if equal.</returns>
-        public override bool Equals(object obj)
-        {
-            var other = obj as KV;
-            return other != null
-                && (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key))
-                && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
-        }
-
-        /// <summary>Combines key and value hash code. R# generated default implementation.</summary>
-        /// <returns>Combined hash code for key-value.</returns>
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (Key == null ? 0 : Key.GetHashCode() * 397)
-                     ^ (Value == null ? 0 : Value.GetHashCode());
-            }
-        }
-
-        /// <summary>Creates nice string view for Key and Value.</summary><returns>String representation.</returns>
-        public override string ToString()
-        {
-            return "[" + (Key ?? "null") + ", " + (Value ?? "null") + "]";
-        }
-    }
-
-    /// <summary>Simple immutable AVL tree with object keys and object values.</summary>
-    public sealed class ImTreeMap
-    {
-        /// <summary>Represents Empty tree.</summary>
-        public static readonly ImTreeMap Empty = new ImTreeMap(ImTreeMapIntToObj.Empty);
-
-        /// <summary>Returns true if tree is empty.</summary>
-        public readonly bool IsEmpty;
-
-        private sealed class KVWithConflicts : KV
-        {
-            public readonly KV[] Conflicts;
-            public KVWithConflicts(KV kv, KV[] conflicts) : base(kv.Key, kv.Value) { Conflicts = conflicts; }
-        }
-
-        /// <summary>Creates new tree with added or updated value for corresponding key.</summary>
-        /// <param name="key">Key.</param> <param name="value">Value.</param> <returns>New tree.</returns>
-        public ImTreeMap AddOrUpdate(object key, object value)
-        {
-            return new ImTreeMap(_tree.AddOrUpdate(key.GetHashCode(), new KV(key, value), UpdateConflictingKeyValue));
-        }
-
-        private static object UpdateConflictingKeyValue(object entryOld, object entryNew)
-        {
-            var kvOld = (KV)entryOld;
-            var kvNew = (KV)entryNew;
-
-            var conflicts = kvOld is KVWithConflicts ? ((KVWithConflicts)kvOld).Conflicts : null;
-
-            // if equal just replace with keeping conflicts intact.
-            if (ReferenceEquals(kvOld.Key, kvNew.Key) || kvOld.Key.Equals(kvNew.Key))
-                return conflicts == null ? kvNew : new KVWithConflicts(kvNew, conflicts);
-
-            // if keys are not equal but hash is the same:
-            // - if no previous conflicts then add new value to conflict with old one. 
-            if (conflicts == null)
-                return new KVWithConflicts(kvOld, new[] { kvNew });
-
-            // - if some conflicts exist find key in conflict.
-            var i = conflicts.Length - 1;
-            while (i >= 0 && !Equals(conflicts[i].Key, kvNew.Key)) --i;
-
-            var newConflicts = new KV[i != -1 ? conflicts.Length : conflicts.Length + 1];
-            Array.Copy(conflicts, 0, newConflicts, 0, conflicts.Length);
-            newConflicts[i != -1 ? i : conflicts.Length] = kvNew;
-
-            return new KVWithConflicts(kvOld, newConflicts);
-        }
-
-        /// <summary>Looks for value added with key or will return null if key is not found.</summary>
-        /// <param name="key">Key</param> <returns>Found value or null if not found.</returns>
-        public object GetValueOrDefault(object key)
-        {
-            var kv = _tree.GetValueOrDefault(key.GetHashCode()) as KV;
-            return kv != null && (ReferenceEquals(key, kv.Key) || key.Equals(kv.Key))
-                ? kv.Value : GetConflictedValueOrDefault(kv, key);
-        }
-
-        private static object GetConflictedValueOrDefault(KV kv, object key)
-        {
-            var conflicts = kv is KVWithConflicts ? ((KVWithConflicts)kv).Conflicts : null;
-            if (conflicts != null)
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (Equals(conflicts[i].Key, key))
-                        return conflicts[i].Value;
-            return null;
-        }
-
-        /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
-        /// <returns>Enumerated pairs.</returns>
-        public IEnumerable<KV> Enumerate()
-        {
-            if (!_tree.IsEmpty)
-                foreach (var t in _tree.Enumerate())
-                {
-                    yield return (KV)t.Value;
-                    if (t.Value is KVWithConflicts)
-                    {
-                        var conflicts = ((KVWithConflicts)t.Value).Conflicts;
-                        for (var i = 0; i < conflicts.Length; ++i)
-                            yield return conflicts[i];
-                    }
-                }
-        }
-
-        #region Implementation
-
-        private readonly ImTreeMapIntToObj _tree;
-
-        private ImTreeMap(ImTreeMapIntToObj tree)
-        {
-            _tree = tree;
-            IsEmpty = tree.IsEmpty;
         }
 
         #endregion

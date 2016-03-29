@@ -70,6 +70,8 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 
+using DryIoc; // for ImTools, not for Container
+
 namespace DryIocZero
 {
 /* 
@@ -172,13 +174,13 @@ end of exception list
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveManyGenerated(ref IEnumerable<KV> services, Type serviceType) 
+        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
         [ExcludeFromCodeCoverage]
-        private IEnumerable<KV> ResolveManyGenerated(Type serviceType)
+        private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
         {
 <#
 		if (!roots.Any())
@@ -198,7 +200,7 @@ end of exception list
 				foreach (var factory in rootGroup)
 				{
 #>
-				yield return new KV(<#= factory.ServiceKey #>, (FactoryDelegate)Create_<#= factory.Index #>);
+				yield return new KV<object, FactoryDelegate>(<#= factory.ServiceKey #>, (FactoryDelegate)Create_<#= factory.Index #>);
 <#
 				}
 #>
