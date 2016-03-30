@@ -1,7 +1,7 @@
 ﻿{
-    "version": "2.2.2-rc1",
+    "version": "2.3.0-rc1",
     "title": "DryIoc.Dnx",
-    "description": "DryIoc targeting DNX (Asp.NET 5 / CoreFX)",
+    "description": "DryIoc targeting .Net Core and Asp.Net Core",
     "authors": [ "Maksim Volkau" ],
     "owners": [ "Maksim Volkau" ],
     "copyright": "Copyright © 2016 Maksim Volkau",
@@ -9,7 +9,7 @@
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
     "requireLicenseAcceptance": false,
-    "releaseNotes": "Based on dotnet/corefx rc1-final \r\n https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version",
+    "releaseNotes": "Based on dotnet/corefx rc1-final and latest DryIoc https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version",
 
     "compilationOptions": {
         "warningsAsErrors": true
@@ -17,6 +17,7 @@
 
     "compileFiles": [
         "..\\..\\DryIoc\\Container.cs",
+        "..\\..\\DryIoc\\ImTools.cs",
         "..\\..\\DryIoc\\Properties\\AssemblyInfo.cs",
         "..\\..\\Net45\\DryIoc\\AsyncExecutionFlowScopeContext.cs"
     ],

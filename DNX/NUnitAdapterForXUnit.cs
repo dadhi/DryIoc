@@ -7,6 +7,10 @@ namespace NUnit.Framework
 {
     public class TestFixtureAttribute : Attribute {}
 
+    public class SetUpAttribute : Attribute {}
+
+    public class TearDownAttribute : Attribute {}
+
     public class TestAttribute : Xunit.FactAttribute {}
 
     public class ExplicitAttribute : Xunit.FactAttribute
