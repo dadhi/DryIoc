@@ -265,9 +265,25 @@ namespace DryIoc
             var registeredServiceType = container.GetWrappedType(parent.ServiceType, parent.RequiredServiceType);
             var parentServiceTypeExpr = Expression.Constant(registeredServiceType, typeof(Type));
             var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
-            return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope", ArrayTools.Empty<Type>(),
-                ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
+            if (_assignMethod != null)
+            {
+                var getOrNewScopeExpr = Expression.Call(ScopesExpr, "GetOrNewResolutionScope", 
+                    ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
+                var assignExpr = (Expression)_assignMethod.Invoke(null, new object[]
+                {
+                    ResolutionScopeParamExpr,
+                    getOrNewScopeExpr
+                });
+                return assignExpr;
+            }
+
+            return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope", 
+                ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
+
+        private static readonly MethodInfo _assignMethod = 
+            typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression));
+
 
         #endregion
 
@@ -655,6 +671,7 @@ namespace DryIoc
             return scope;
         }
 
+        // note: The method required for .NET 3.5 which  does not have Expression.Assign, so the need for "ref" parameter (BTW "ref" is not supported in XAMARIN)
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
         /// <param name="scope">May be null scope.</param>
         /// <param name="serviceType">Marking scope with resolved service type.</param> 
@@ -663,6 +680,16 @@ namespace DryIoc
         IScope IScopeAccess.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
             return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
+        }
+
+        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+        /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
+        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        public IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey)
+        {
+            return scope ?? new Scope(null, new KV<Type, object>(serviceType, serviceKey));
         }
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
@@ -3641,16 +3668,16 @@ namespace DryIoc
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
         {
+            "System.IDisposable",
             "System.ValueType",
-            "System.Runtime.Serialization.ISerializable",
             "System.ICloneable",
             "System.IEquatable",
+            "System.IComparable",
+            "System.Runtime.Serialization.ISerializable",
             "System.Collections.IStructuralEquatable",
-            typeof(IComparable).FullName,
-            typeof(IDisposable).FullName,
-            typeof(IList).FullName,
-            typeof(ICollection).FullName,
-            typeof(IEnumerable).FullName
+            "System.Collections.IEnumerable",
+            "System.Collections.IList",
+            "System.Collections.ICollection",
         };
 
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
@@ -7958,6 +7985,13 @@ namespace DryIoc
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey);
+
+        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+        /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
+        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey);
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
         /// then returns input <paramref name="scope"/>.
