@@ -10,7 +10,7 @@
     public class DryIocWebApiOwinTests
     {
         [Test]
-        public void UseAutofacWebApiAddsDelegatingHandler()
+        public void Ensure_that_we_added_delegating_handler()
         {
             var app = new AppBuilder();
             var config = new HttpConfiguration();
@@ -21,7 +21,7 @@
         }
 
         [Test]
-        public void UseAutofacWebApiWillOnlyAddDelegatingHandlerOnce()
+        public void Ensure_that_we_added_delegating_handler_once()
         {
             var app = new AppBuilder();
             var config = new HttpConfiguration();

@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Wheels>();
-            var car = container.New<Car>(Made.Of(() => CarFactory.Create(default(Wheels))));
+            var car = container.New(Made.Of(() => CarFactory.Create(default(Wheels))));
 
             Assert.That(car.Wheels, Is.Not.Null);
             Assert.That(container.IsRegistered<Car>(), Is.False);

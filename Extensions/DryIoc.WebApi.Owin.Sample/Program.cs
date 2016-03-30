@@ -24,7 +24,7 @@ namespace DryIoc.WebApi.Owin.Sample
 
     public class Startup
     {
-        public void Configuration(IAppBuilder app_)
+        public void Configuration(IAppBuilder app)
         {
             var config = new HttpConfiguration();
             config.MapHttpAttributeRoutes();
@@ -34,15 +34,15 @@ namespace DryIoc.WebApi.Owin.Sample
                 routeTemplate: "{controller}"
                );
 
-            var di = new DryIoc.Container();
+            var di = new Container();
 
             // NOTE: Registers ISession provider to work with injected Request
             di.Register<ISession>(Made.Of(() => GetSession(Arg.Of<HttpRequestMessage>())));
 
             di.WithWebApi(config);
 
-            app_.UseWebApi(config);
-            app_.UseErrorPage(ErrorPageOptions.ShowAll);
+            app.UseWebApi(config);
+            app.UseErrorPage(ErrorPageOptions.ShowAll);
         }
 
         public static ISession GetSession(HttpRequestMessage request)

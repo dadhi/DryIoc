@@ -41,6 +41,9 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\DryIoc\ImTools.cs">
+      <Link>ImTools.cs</Link>
+    </Compile>
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
     <Compile Include="Container.Generated.cs">
       <DependentUpon>Container.Generated.tt</DependentUpon>

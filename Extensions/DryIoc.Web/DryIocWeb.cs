@@ -100,7 +100,7 @@ namespace DryIoc.Web
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
         /// <param name="setCurrentScope">Delegate to get new scope.</param>
-        /// <returns>Return new current scope.</returns>
+        /// <returns>New current scope.</returns>
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
             var newCurrentScope = setCurrentScope.ThrowIfNull()(GetCurrentOrDefault());

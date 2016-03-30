@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
@@ -29,7 +28,7 @@ namespace DryIoc.WebApi.UnitTests
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config);
 
-            container.Register<Blah>(DryIoc.Reuse.Singleton);
+            container.Register<Blah>(Reuse.Singleton);
             container.Register<Fooh>(serviceKey: 1);
             container.Register<Fooh>(serviceKey: 2);
 
@@ -94,7 +93,56 @@ namespace DryIoc.WebApi.UnitTests
             }
         }
 
+        [Test]
+        public void Can_verify_if_no_controlles_were_registered()
+        {
+            var config = new HttpConfiguration();
+            var container = new Container().WithWebApi(config, new[] { Assembly.GetExecutingAssembly() });
+            var errors = container.VerifyResolutions();
+
+            Assert.AreEqual(
+                typeof(MissingDependencyController).GetImplementedServiceTypes().Length, 
+                errors.Length);
+        }
+
+        [Test]
+        public void Can_specify_to_throw_on_unresolved_controller()
+        {
+            var config = new HttpConfiguration();
+            new Container().WithWebApi(config, throwIfUnresolved: type => type.IsController());
+
+            using (var scope = config.DependencyResolver.BeginScope())
+            {
+                var ex = Assert.Throws<ContainerException>(() => 
+                    scope.GetService(typeof(MissingDependencyController)));
+
+                Assert.AreEqual(DryIoc.Error.UnableToResolveUnknownService, ex.Error);
+            }
+        }
+
+        [Test]
+        public void IsController_will_not_recognize_type_without_controller_suffix()
+        {
+            Assert.IsFalse(typeof(ControllerWithWrongName).IsController());
+        }
+
         public class MyController : ApiController
+        {
+        }
+
+        public interface ISomeDep { }
+
+        public class MissingDependencyController : ApiController
+        {
+            public ISomeDep Dep { get; private set; }
+
+            public MissingDependencyController(ISomeDep dep)
+            {
+                Dep = dep;
+            }
+        }
+
+        public class ControllerWithWrongName : ApiController
         {
         }
 
@@ -191,5 +239,4 @@ namespace DryIoc.WebApi.UnitTests
             }
         }
     }
-
 }

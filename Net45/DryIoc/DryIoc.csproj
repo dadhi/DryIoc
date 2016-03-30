@@ -43,21 +43,13 @@
     <Compile Include="..\..\DryIoc\FactoryCompiler.cs">
       <Link>FactoryCompiler.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc\ImTools.cs">
+      <Link>ImTools.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
-    <Compile Include="RequestInfo.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>RequestInfo.tt</DependentUpon>
-    </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="RequestInfo.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>RequestInfo.cs</LastGenOutput>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />

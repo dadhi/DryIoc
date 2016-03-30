@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2015 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,65 +28,118 @@ namespace DryIoc.SignalR
     using System.Collections.Generic;
     using System.Linq;
     using System.Diagnostics.CodeAnalysis;
-    using Castle.Core.Interceptor;
-    using Castle.DynamicProxy;
+    using System.Reflection;
     using Microsoft.AspNet.SignalR;
     using Microsoft.AspNet.SignalR.Hubs;
 
-    /// <summary>DryIoc extension to support SignalR.</summary>
+    /// <summary>DryIoc extension to support SignalR.
+    /// Provides DryIoc implementations of <see cref="IHubActivator"/> and <see cref="IDependencyResolver"/>.
+    /// </summary>
     public static class DryIocSignalR
     {
-        /// <summary>
+        /// <summary>The method does: 
+        ///  - registers <see cref="DryIocHubActivator"/> as <see cref="IHubActivator"/>,
+        ///  - registers <see cref="DryIocDependencyResolver"/> as <see cref="IDependencyResolver"/>,
+        ///  - optionally registers Hubs from given assemblies,
+        ///  - sets GlobalHost.DependencyResolver to <see cref="DryIocDependencyResolver"/>.
         /// </summary>
-        public static IContainer WithSignalR(this IContainer container, 
-            HubConfiguration hubConfiguration = null,
-            IScopeContext scopeContext = null)
+        /// <param name="container">Container to use.</param>
+        /// <param name="hubAssemblies">(optional) Assemblies with hubs.</param>
+        /// <returns>Container for fluent API.</returns>
+        /// <remarks>
+        /// Related discussion: https://stackoverflow.com/questions/10555791/using-simple-injector-with-signalr
+        /// </remarks>
+        /// <example> <code lang="cs"><![CDATA[
+        /// 
+        ///      var hubAssemblies = new[] { Assembly.GetExecutingAssembly() };
+        /// 
+        ///      // - Approach 1: Full integration with HubActivator and setting-up the Resolver
+        ///      container = new Container().WithSignalR(hubAssemblies);
+        ///      RouteTable.Routes.MapHubs(); // should go before setting the resolver, check SO link above for reasoning
+        /// 
+        ///      // - Approach 2: Selective integration with DryIocHubActivator and default DependencyResolver 
+        ///      container = new Container();
+        ///      container.RegisterHubs(hubAssemblies);
+        ///      GlobalHost.DependencyResolver.Register(typeof(IHubActivator), () => new DryIocHubActivator(container));
+        ///      RouteTable.Routes.MapHubs();
+        /// 
+        ///   ]]></code></example>
+        public static IContainer WithSignalR(this IContainer container, params Assembly[] hubAssemblies)
         {
-            if (container.ScopeContext == null)
-                container = container.With(
-                    rules => rules.WithoutThrowOnRegisteringDisposableTransient(),
-                    scopeContext ?? new AsyncExecutionFlowScopeContext());
-
-            container.RegisterInstance<IHubActivator>(new DryIocHubActivator(container));
-
-            container.RegisterInstance(new HubToCloseScopeOnDisposeInterceptor(container));
-            container.RegisterInterfaceInterceptor<IHub, HubToCloseScopeOnDisposeInterceptor>();
-
+            container.Register<IHubActivator, DryIocHubActivator>();
             container.Register<IDependencyResolver, DryIocDependencyResolver>(Reuse.Singleton);
-
-            hubConfiguration = hubConfiguration ?? new HubConfiguration();
-            hubConfiguration.Resolver = container.Resolve<IDependencyResolver>();
-
+            RegisterHubs(container, hubAssemblies);
+            GlobalHost.DependencyResolver = container.Resolve<IDependencyResolver>();
             return container;
+        }
+
+        /// <summary>Helper method to register transient hubs from provided assemblies.</summary>
+        /// <param name="container">Container to use for registration.</param>
+        /// <param name="hubAssemblies">Array of hub types assemblies.</param>
+        /// <remarks><see cref="Hub"/> implements <see cref="IDisposable"/> but supposed to be disposed
+        /// outside of container by SignalR infrastructure, therefore the hubs registered with 
+        /// <see cref="Setup.AllowDisposableTransient"/> and are not tracked by container. 
+        /// This prevents possible memory leak when container will hold reference to disposable hub.
+        /// In addition the hub will be registered once using <see cref="IfAlreadyRegistered.Keep"/> policy.</remarks>
+        public static void RegisterHubs(this IContainer container, params Assembly[] hubAssemblies)
+        {
+            if (!hubAssemblies.IsNullOrEmpty())
+                container.RegisterMany(hubAssemblies, IsHubType,
+                    setup: Setup.With(allowDisposableTransient: true), 
+                    ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+        }
+
+        /// <summary>Helper method to register transient hubs from provided types.</summary>
+        /// <param name="container">Container to use for registration.</param>
+        /// <param name="hubTypes">Array of hub types.</param>
+        /// <remarks><see cref="Hub"/> implements <see cref="IDisposable"/> but supposed to be disposed
+        /// outside of container by SignalR infrastructure, therefore the hubs registered with 
+        /// <see cref="Setup.AllowDisposableTransient"/> and are not tracked by container. 
+        /// This prevents possible memory leak when container will hold reference to disposable hub.</remarks>
+        public static void RegisterHubs(this IContainer container, params Type[] hubTypes)
+        {
+            if (!hubTypes.IsNullOrEmpty())
+                container.RegisterMany(hubTypes, serviceTypeCondition: IsHubType, 
+                    setup: Setup.With(allowDisposableTransient: true));
+        }
+
+        /// <summary>Helper method to found if the passed type is hub type:
+        /// concrete type which implements <see cref="Hub"/> or <see cref="IHub"/>.</summary>
+        /// <param name="type">Type to check.</param> <returns><c>True if hub type.</c></returns>
+        public static bool IsHubType(Type type)
+        {
+            return !type.IsAbstract() && (
+                type.BaseType == typeof(Hub) ||
+                type.IsAssignableTo(typeof(IHub)));
         }
     }
 
-    /// <summary>
-    /// </summary>
+    /// <summary>DryIoc implementation of <see cref="IDependencyResolver"/>.
+    /// It uses <see cref="DefaultDependencyResolver"/> and combines directly registered services and
+    /// default services on resolution.</summary>
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
         Justification = "Not available in PCL.")]
     public sealed class DryIocDependencyResolver : DefaultDependencyResolver
     {
-        /// <summary>
-        /// </summary>
+        /// <summary>Created resolver given DryIoc resolver.</summary>
         public DryIocDependencyResolver(IResolver resolver)
         {
-            _containerResolver = resolver;
+            _resolver = resolver;
         }
 
-        /// <summary>
-        /// </summary>
+        /// <summary>Try to resolve service suing DryIoc container, 
+        /// and if not resolved fallbacks to base <see cref="DefaultDependencyResolver"/>.</summary>
         public override object GetService(Type serviceType)
         {
-            return _containerResolver.Resolve(serviceType, IfUnresolved.ReturnDefault)
+            return _resolver.Resolve(serviceType, IfUnresolved.ReturnDefault)
                 ?? base.GetService(serviceType);
         }
 
-        /// <summary>
-        /// </summary>
+        /// <summary>Combines services from DryIoc container and base <see cref="DependencyResolverExtensions"/>
+        /// and returns in a single collection.</summary>
         public override IEnumerable<object> GetServices(Type serviceType)
         {
-            var services = _containerResolver.Resolve<object[]>(serviceType);
+            var services = _resolver.Resolve<object[]>(serviceType);
             var baseServices = base.GetServices(serviceType);
 
             return baseServices != null
@@ -95,100 +148,38 @@ namespace DryIoc.SignalR
                 : null;
         }
 
-        /// <summary>
-        /// </summary>
+        /// <summary>Disposes DryIoc container at the end.</summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                var disposable = _containerResolver as IDisposable;
+                var disposable = _resolver as IDisposable;
                 if (disposable != null)
                     disposable.Dispose();
             }
             base.Dispose(disposing);
         }
 
-        private readonly IResolver _containerResolver;
+        private readonly IResolver _resolver;
     }
 
-    /// <summary>
-    /// </summary>
+    /// <summary>Implements <see cref="IHubActivator"/>, 
+    /// additionally before returning hub opens the scope to start Unit-of-Work,
+    /// and disposes the scope together on the Hub dispose.</summary>
     public sealed class DryIocHubActivator : IHubActivator
     {
-        private readonly IContainer _container;
-
-        /// <summary>
-        /// </summary>
+        /// <summary>Creates activator sing provided container.</summary> 
+        /// <param name="container">Container to resolve hubs and open scope.</param>
         public DryIocHubActivator(IContainer container)
         {
             _container = container;
         }
 
-        /// <summary>
-        /// </summary>
+        /// <summary>Creates hub by using <paramref name="descriptor"/> info.</summary>
+        /// <returns>Created hub.</returns>
         public IHub Create(HubDescriptor descriptor)
         {
-            _container.OpenScope();
             return _container.Resolve<IHub>(descriptor.HubType);
-        }
-    }
-
-    /// <summary>
-    /// </summary>
-    public static class DryIocInterceptionTools
-    {
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <typeparam name="TService"></typeparam>
-        /// <typeparam name="TInterceptor"></typeparam>
-        /// <param name="registrator"></param>
-        public static void RegisterInterfaceInterceptor<TService, TInterceptor>(this IRegistrator registrator)
-            where TInterceptor : class, IInterceptor
-        {
-            var serviceType = typeof(TService);
-            if (!serviceType.IsInterface)
-                throw new ArgumentException(string.Format("Intercepted service type {0} is not an interface", serviceType));
-
-            var proxyType = ProxyBuilder.Value.CreateInterfaceProxyTypeWithTargetInterface(
-                serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
-
-            registrator.Register(serviceType, proxyType,
-                made: Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[])),
-                setup: Setup.Decorator);
-        }
-
-        private static readonly Lazy<DefaultProxyBuilder> ProxyBuilder = new Lazy<DefaultProxyBuilder>(() => new DefaultProxyBuilder());
-    }
-
-    /// <summary>
-    /// </summary>
-    public sealed class HubToCloseScopeOnDisposeInterceptor : IInterceptor
-    {
-        /// <summary>
-        /// </summary>
-        public HubToCloseScopeOnDisposeInterceptor(IContainer container)
-        {
-            _container = container;
-        }
-
-        /// <summary>
-        /// </summary>
-        /// <param name="invocation"></param>
-        public void Intercept(IInvocation invocation)
-        {
-            var method = invocation.Method;
-            if (method.Name == "Dispose" && method.GetParameters().Length == 0)
-            {
-                _container.ScopeContext.SetCurrent(scope =>
-                {
-                    if (scope == null)
-                        return null;
-                    scope.Dispose();
-                    return scope.Parent;
-                });
-            }
-            invocation.Proceed();
         }
 
         private readonly IContainer _container;

@@ -12,47 +12,43 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v2.2.2
-      - fixed: #251: Auto register types from different namespace and different assmblies
-      - fixed: #253 Add Container.ToString method to at least indicate scope for scoped container
-      v2.2.1
-      - fixed: #245: Automatically add condition to check T constraints in Decorator of T
-      - changed: Minor Resolve speedup
-      v2.2.0
-      - added: #141: Support Decorators with open-generic factory methods of T
-      - added: #206: Track IDisposable Transients in scoped consumer's Scope
-      - added: #215: Option to specify Release action for reused services to implement pooling etc
-      - added: #227: Missing Arg.Of overload to specify default value for unresolved dependency
-      - added: #228: Make IContainer implicitly available for injection wout need for registration
-      - added: #229: Container rule to use Singleton scope as implicitly Open current scope for scoped registrations
-      - added: #239: Decorator setting to use Decoratee Reuse
-      - added: #241: Registration option to useParentReuse for dependency
-      - added: #242: Container rule for automatic concrete types resolution
-      - fixed: #94: Support for creating concrete type without storing it in Container
-      - fixed: #220: Minimize locking and therefore chances for deadlock in Singleton Scope
-      - fixed: #230: Custom initializer attached to lazily resolved dependency is called once per resolution, not once per construction
-      - fixed: #240: ConstructorWithAllResolvableArguments ignores implicitly injected dependencies and custom values
+      v2.3.0
+      - fixed: #260: Cannot interpret GetOrCreateResolutionScope expression on iOS
+      - fixed: #258: Setup.AllowDisposableTransient is overridden by container.WithTrackingDisposableTransient
+      - changed: In source code DryIoc package split immutable data structures and tool to separate ImTools.cs
+      - removed: CloseCurrentScope from Container as it was added recently but not used anywhere.
+      - added: method New overload with strongly type Made.Of
     </releaseNotes>
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
+
     <!--net35-->
     <file src="..\DryIoc\Container.cs" target="content\net35\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\net35\DryIoc" />
     <file src="..\DryIoc\FactoryCompiler.cs" target="content\net35\DryIoc" />
     <file src="..\DryIoc\Ported-net40.cs" target="content\net35\DryIoc" />
     <file src="..\DryIoc\Ported-net45.cs" target="content\net35\DryIoc" />
+
     <!--net40-->
     <file src="..\DryIoc\Container.cs" target="content\net40\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\net40\DryIoc" />
     <file src="..\DryIoc\FactoryCompiler.cs" target="content\net40\DryIoc" />
     <file src="..\DryIoc\Ported-net45.cs" target="content\net40\DryIoc" />
+
     <!--net45-->
     <file src="..\DryIoc\Container.cs" target="content\net45\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\net45\DryIoc" />
     <file src="..\DryIoc\FactoryCompiler.cs" target="content\net45\DryIoc" />
     <file src="..\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIoc" />
+
     <!-- PCL: Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
     <file src="..\DryIoc\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+
     <!-- PCL: Profile259 .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
     <file src="..\DryIoc\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
   </files>
 </package>

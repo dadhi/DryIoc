@@ -60,6 +60,7 @@ namespace DryIoc.IssuesTests
             }
 
             Assert.IsFalse(a.IsDisposed);
+            GC.KeepAlive(a);
         }
 
         public interface IA { }

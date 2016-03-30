@@ -1,17 +1,19 @@
-﻿using Microsoft.AspNet.Http;
+﻿using System.ComponentModel.Composition;
+using DryIocAttributes;
+using Microsoft.AspNet.Http;
 
-/***
- ** Set of services created by static factory method
- ***/
 namespace Web.Components
 {
+    [Export, AsFactory]
     public sealed class BarSingletonService : ServiceBase, ISingletonService
     {
         private BarSingletonService() { }
 
+        [Export]
         public static ISingletonService FactoryMethod() { return new BarSingletonService(); }
     }
 
+    [Export, AsFactory]
     public sealed class BarPerRequestService : ServiceBase, IPerRequestService
     {
         private BarPerRequestService(ISingletonService singletonService)
@@ -19,6 +21,7 @@ namespace Web.Components
             SingletonService = singletonService;
         }
 
+        [Export, WebRequestReuse]
         public static IPerRequestService FactoryMethod(ISingletonService singletonService)
         {
             return new BarPerRequestService(singletonService);
@@ -27,6 +30,7 @@ namespace Web.Components
         public ISingletonService SingletonService { get; private set; }
     }
 
+    [Export, AsFactory]
     public sealed class BarTransientService : ServiceBase, ITransientService
     {
         private BarTransientService(IPerRequestService perRequestService)
@@ -34,6 +38,7 @@ namespace Web.Components
             PerRequestService = perRequestService;
         }
 
+        [Export, TransientReuse]
         public static ITransientService FactoryMethod(IPerRequestService perRequestService)
         {
             return new BarTransientService(perRequestService);
@@ -42,6 +47,7 @@ namespace Web.Components
         public IPerRequestService PerRequestService { get; private set; }
     }
 
+    [Export, AsFactory]
     public sealed class BarServiceHttpContext : ServiceBase
     {
         private BarServiceHttpContext(HttpContext httpContext, ISingletonService singletonService)
@@ -50,9 +56,10 @@ namespace Web.Components
             SingletonService = singletonService;
         }
 
-        public static BarServiceHttpContext FactoryMethod(HttpContext httpContext, ISingletonService singletonService)
+        [Export, WebRequestReuse]
+        public static BarServiceHttpContext FactoryMethod(IHttpContextAccessor httpContextAccessor, ISingletonService singletonService)
         {
-            return new BarServiceHttpContext(httpContext, singletonService);
+            return new BarServiceHttpContext(httpContextAccessor.HttpContext, singletonService);
         }
 
         public HttpContext HttpContext { get; private set; }

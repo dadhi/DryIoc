@@ -24,7 +24,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * `PM> Install-Package DryIoc.dll`
     * get code `PM> Install-Package DryIoc`
     * for DNX `PM> Install-Package DryIoc.Dnx`
-* __DryIoc v2.2.2__ is the latest stable version
+* __DryIoc v2.3.0__ is the latest stable version
     * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
@@ -111,8 +111,22 @@ Slim IoC Container based on service factory delegates __generated at compile-tim
 
 ## Extensions
 
-- [MefAttributedModel](https://bitbucket.org/dadhi/dryioc/wiki/Extensions/MefAttributedModel) for [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx). Enables automatic types discovery and wiring.
-- [Common Service Locator](https://commonservicelocator.codeplex.com/)
-- ASP.NET: [DryIoc.Web](), [DryIoc.Mvc](), [DryIoc.WepApi]() 
-- ASP.NET 5 (vNext) DI adapter: [DryIoc.Dnx.DependencyInjection]()
-- OWIN: [DryIoc.Owin](), [DryIoc.Mvc.Owin](), [DryIoc.WebApi.Owin]()
+- [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) 
+for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx)
+
+- ASP.NET: 
+
+    - [DryIoc.Web](https://www.nuget.org/packages/DryIoc.Web/) 
+    - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
+    - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
+    - [DryIoc.SignalR-RC](Extensions\SignalR)
+    - [DryIoc.Dnx.DependencyInjection-RC](https://www.nuget.org/packages/DryIoc.dnx.dependencyinjection) 
+for AspNetCore (vNext / DNX) 
+
+- OWIN:
+
+    - [DryIoc.Owin](https://www.nuget.org/packages/DryIoc.Owin.dll/)
+    - [DryIoc.WebApi.Owin](https://www.nuget.org/packages/DryIoc.WebApi.Owin.dll/)
+
+- [Nancy.Bootstrappers.DryIoc](https://www.nuget.org/packages/Nancy.Bootstrappers.DryIoc/) for [NanxyFX](http://nancyfx.org/)
+- [Common Service Locator](https://www.nuget.org/packages/DryIoc.CommonServiceLocator.dll/)

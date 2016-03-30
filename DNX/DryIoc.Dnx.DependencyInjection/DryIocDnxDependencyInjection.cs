@@ -45,8 +45,11 @@ namespace DryIoc.Dnx.DependencyInjection
         ///     container = new Container().WithDependencyInjectionAdapter(services);
         ///     serviceProvider = container.Resolve<IServiceProvider>();
         ///     
-        ///     // To register your service to be reused in Request use Reuse.InCurrentScope
-        ///     container.Register<IMyService, MyService>(Reuse.InCurrentScope)
+        ///     // To register service per Request use Reuse.WebRequest or Reuse.InCurrenScope,
+        ///     // both will work
+        ///     container.Register<IMyService, MyService>(Reuse.InWebRequest)
+        ///     // or
+        ///     container.Register<IMyService, MyService>(Reuse.InCurrenScope)
         /// ]]></code>
         /// </example>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
@@ -175,6 +178,10 @@ namespace DryIoc.Dnx.DependencyInjection
     /// That means you need to resolve factory from outer scope to create nested scope.</summary>
     public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
     {
+        /// <summary>Using <see cref="Reuse.WebRequestScopeName"/> allows registration with both
+        /// <see cref="Reuse.InCurrentScope"/> and <see cref="Reuse.InWebRequest"/>.</summary>
+        public static readonly string DefaultScopeName = Reuse.WebRequestScopeName;
+
         private readonly IContainer _scopedContainer;
 
         /// <summary>Stores passed scoped container to open nested scope.</summary>
@@ -186,9 +193,10 @@ namespace DryIoc.Dnx.DependencyInjection
 
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
+        /// <remarks>The scope name is defaulted to <see cref="Reuse.WebRequestScopeName"/>.</remarks>
         public IServiceScope CreateScope()
         {
-            var scope = _scopedContainer.OpenScope();
+            var scope = _scopedContainer.OpenScope(DefaultScopeName);
             return new DryIocServiceScope(scope.Resolve<IServiceProvider>());
         }
 

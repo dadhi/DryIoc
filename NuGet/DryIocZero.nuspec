@@ -11,13 +11,16 @@
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
+          v3.0.0:
+          - added: Optional Name parameter into OpenScope
+          - changed: Switched to use DryIoc ImTools.cs
           v2.1.0
           - fixed: #238: DryIocZero generation should notify about runtime state used: RegisterDelegate and RegisterInstance
           - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate
         </releaseNotes>
         <dependencies>
-            <dependency id="DryIoc.dll" version="2.2.0" />
-            <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.0" />
+            <dependency id="DryIoc.dll" version="2.2.2" />
+            <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.2" />
             <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
         <frameworkAssemblies>
@@ -32,17 +35,20 @@
 
         <!--net45-->
         <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />
+        <file src="..\DryIoc\ImTools.cs" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\YourServiceRegistrations.tt.include" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIocZero" />
 
         <!-- PCL: Profile259 .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\Net45\DryIocZero\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+        <file src="..\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\YourServiceRegistrations.tt.include" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
 
         <!-- PCL: Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\Net45\DryIocZero\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
+        <file src="..\DryIoc\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\YourServiceRegistrations.tt.include" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\PCL\DryIocZero\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />

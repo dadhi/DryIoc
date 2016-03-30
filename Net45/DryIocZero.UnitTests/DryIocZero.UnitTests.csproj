@@ -45,6 +45,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\DryIoc.UnitTests\HashTreeTests.cs">
+      <Link>HashTreeTests.cs</Link>
+    </Compile>
+    <Compile Include="AttributedModelTests.cs" />
+    <Compile Include="AttributedModelTestsBase.cs" />
     <Compile Include="GeneratedResolutionsTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ZeroContainerTests.cs" />

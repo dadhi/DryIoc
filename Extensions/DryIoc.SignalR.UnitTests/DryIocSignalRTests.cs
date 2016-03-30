@@ -13,7 +13,7 @@ namespace DryIoc.SignalR.UnitTests
         [SetUp]
         public void Init()
         {
-            _container = new Container().WithSignalR();
+            _container = new Container().WithSignalR(typeof(AHub).Assembly);
         }
 
         [TearDown]
@@ -31,31 +31,33 @@ namespace DryIoc.SignalR.UnitTests
         }
 
         [Test]
-        public void Creating_hub_opens_scope()
+        public void Registered_hubs_wont_be_disposed_container()
         {
-            _container.Register<AHub>(Reuse.InCurrentScope);
+            var container = new Container();
+            container.RegisterHubs(typeof(AHub));
 
-            var hubDescriptor = new HubDescriptor { HubType = typeof(AHub) };
-            var hubActivator = new DryIocHubActivator(_container);
-
-            using (hubActivator.Create(hubDescriptor))
-                Assert.IsNotNull(_container.ScopeContext.GetCurrentOrDefault());
+            container.RegisterMany<Test>();
+            var hub = container.Resolve<IHub>(typeof(AHub));
+            container.Dispose();
+            
+            Assert.IsFalse(((AHub)hub).IsDisposed);
+            hub.Dispose();
+            Assert.IsTrue(((AHub)hub).IsDisposed);
         }
 
         [Test]
-        public void Disposing_hub_closes_scope()
+        public void Disposing_hub_does_not_throws_error()
         {
-            _container.Register<AHub>(Reuse.InCurrentScope);
-
             var hubDescriptor = new HubDescriptor { HubType = typeof(AHub) };
-            var hubActivator = new DryIocHubActivator(_container);
-            var hub = hubActivator.Create(hubDescriptor);
+            _container.Register<Test>(Reuse.InCurrentScope);
 
-            hub.Dispose();
-
-            Assert.IsNull(_container.ScopeContext.GetCurrentOrDefault());
+            using (var scope = _container.OpenScope())
+            {
+                var hubActivator = new DryIocHubActivator(scope);
+                var hub = hubActivator.Create(hubDescriptor);
+                hub.Dispose();
+            }
         }
-
 
         [Test]
         public void Ensure_that_dependency_resolver_is_registered_in_container()
@@ -140,8 +142,25 @@ namespace DryIoc.SignalR.UnitTests
             Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
         }
 
+        public class AHub : Hub
+        {
+            public readonly Test Test;
 
-        public class AHub : Hub { }
+            public bool IsDisposed { get; private set; }
+
+            public AHub(Test test)
+            {
+                Test = test;
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                IsDisposed = true;
+                base.Dispose(disposing);
+            }
+        }
+
+        public class Test {}
 
         public interface IBuggy {}
 
