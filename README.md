@@ -119,7 +119,7 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
     - [DryIoc.Web](https://www.nuget.org/packages/DryIoc.Web/) 
     - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
-    - [DryIoc.SignalR-RC](Extensions\SignalR)
+    - [DryIoc.SignalR](Extensions\SignalR)
     - [DryIoc.Dnx.DependencyInjection-RC](https://www.nuget.org/packages/DryIoc.dnx.dependencyinjection) 
 for AspNetCore (vNext / DNX) 
 
