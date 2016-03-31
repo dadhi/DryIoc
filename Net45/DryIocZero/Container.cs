@@ -353,6 +353,16 @@ namespace DryIocZero
             return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
         }
 
+        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+        /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
+        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        public IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey)
+        {
+            return scope ?? new Scope(null, new KV<Type, object>(serviceType, serviceKey));
+        }
+
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
         /// then returns input <paramref name="scope"/>.
         /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
@@ -526,6 +536,13 @@ namespace DryIocZero
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey);
+
+        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+        /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
+        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey);
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
         /// then returns input <paramref name="scope"/>.

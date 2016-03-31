@@ -9246,20 +9246,23 @@ namespace DryIoc.Experimental
     using System.Reflection;
 
     /// <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
-    public static class DI
+    public static class D
     {
         /// <summary>Creates new default configured container</summary>
-        /// <returns>New configured container.</returns>
-        public static IContainer New()
+        /// <value>New configured container.</value>
+        public static IContainer I
         {
-            return new Container(Rules.Default
-                .With(FactoryMethod.ConstructorWithResolvableArguments)
-                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithTrackingDisposableTransients()
-                .WithAutoConcreteTypeResolution());
+            get
+            {
+                return new Container(Rules.Default
+                    .With(FactoryMethod.ConstructorWithResolvableArguments)
+                    .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                    .WithTrackingDisposableTransients()
+                    .WithAutoConcreteTypeResolution());
+            }
         }
 
-        /// <summary>Auto-wired resolution of T from the <see cref="New"/> container.</summary>
+        /// <summary>Auto-wired resolution of T from the container.</summary>
         /// <typeparam name="T">Type of service to resolve.</typeparam>
         /// <param name="container">(optional) Container </param>
         /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
@@ -9269,16 +9272,6 @@ namespace DryIoc.Experimental
             if (assemblies.IsNullOrEmpty())
                 assemblies = new[] { typeof(T).GetAssembly() };
             return container.WithAutoFallbackResolution(assemblies).Resolve<T>();
-        }
-
-
-        /// <summary>Auto-wired resolution of T from the <see cref="New"/> container.</summary>
-        /// <typeparam name="T">Type of service to resolve.</typeparam>
-        /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
-        /// <returns>Resolved service or throws.</returns>
-        public static T Get<T>(params Assembly[] assemblies)
-        {
-            return New().Get<T>();
         }
     }
 }
