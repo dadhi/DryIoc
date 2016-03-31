@@ -1,9 +1,13 @@
 {
-  "projects": [ 
-  	"DryIoc.Dnx", 
-  	"DryIoc.Dnx.UnitTests",
-  	"DryIoc.Dnx.DependencyInjection"
+  "projects": [
+    "DryIoc.Dnx",
+    "DryIoc.Dnx.UnitTests",
+    "DryIoc.Dnx.DependencyInjection",
+    "DryIocAttributes.Dnx",
+    "DryIoc.MefAttributedModel.Dnx",
+    "DryIoc.MefAttributedModel.Dnx.UnitTests",
+    "DryIoc.MefAttributedModel.Dnx.UnitTests.CUT"
   ],
 
-  "sdk": { "version": "1.0.0-rc1-final" }
+  "sdk": { "version": "1.0.0-rc1-update1" }
 }
