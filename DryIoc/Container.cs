@@ -8349,7 +8349,7 @@ namespace DryIoc
             ServiceIsNotAssignableFromOpenGenericRequiredServiceType = Of(
                 "Service of {0} is not assignable from open-generic required service type {1} when resolving: {2}."),
             FactoryObjIsNullInFactoryMethod = Of(
-                "Unable to use null factory object with factory method {0} when resolving: {1}."),
+                "Unable to use null factory object with *instance* factory method {0} when resolving: {1}."),
             FactoryObjProvidedButMethodIsStatic = Of(
                 "Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
             GotNullConstructorFromFactoryMethod = Of(
