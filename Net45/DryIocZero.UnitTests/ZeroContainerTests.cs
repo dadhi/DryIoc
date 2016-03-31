@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using DryIoc;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 
@@ -114,6 +115,67 @@ namespace DryIocZero.UnitTests
 
             Assert.AreEqual(1, handlers.Length);
         }
+
+        [Test]
+        public void Can_resolve_generated_only_service()
+        {
+            var container = new Container();
+            var b = container.ResolveGeneratedOrGetDefault(typeof(B));
+            Assert.IsNotNull(b);
+
+            var nr = container.ResolveGeneratedOrGetDefault(typeof(NotRegistered));
+            Assert.IsNull(nr);
+        }
+
+        [Test]
+        public void Can_resolve_generated_only_keyed_service()
+        {
+            var container = new Container();
+            var m = container.ResolveGeneratedOrGetDefault(typeof(MultiExported), "b");
+            Assert.IsNotNull(m);
+
+            var b = container.ResolveGeneratedOrGetDefault(typeof(B), "b");
+            Assert.IsNull(b);
+        }
+
+        [Test]
+        public void Can_resolve_generated_only_many_services()
+        {
+            var container = new Container();
+            var ms = container.ResolveManyGeneratedOrGetEmpty(typeof(IMultiExported));
+            Assert.IsTrue(ms.Any());
+
+            var ns = container.ResolveManyGeneratedOrGetEmpty(typeof(NotRegistered));
+            Assert.IsTrue(!ns.Any());
+        }
+
+        [Test]
+        public void Can_resolve_many_of_both_generated_and_runtime_default_and_keyed_services()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IMultiExported), (context, scope) => new AnotherMulti());
+            container.Register(typeof(IMultiExported), "another", (context, scope) => new AnotherMulti());
+
+            var ms = container.ResolveMany(typeof(IMultiExported)).Cast<IMultiExported>().ToArray();
+            Assert.AreEqual(2, ms.Count(m => m.GetType() == typeof(AnotherMulti)));
+            Assert.Greater(ms.Length, 2);
+        }
+
+        [Test]
+        public void Can_resolve_many_of_both_generated_and_runtime_keyed_service_with_specified_key()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IMultiExported), "c", (context, scope) => new AnotherMulti());
+
+            var ms = container.ResolveMany(typeof(IMultiExported), "c").Cast<IMultiExported>().ToArray();
+            Assert.AreEqual(1, ms.Count(m => m.GetType() == typeof(AnotherMulti)));
+            Assert.AreEqual(2, ms.Length);
+        }
+
+
+        internal class AnotherMulti : IMultiExported { }
 
         internal class NotRegistered {}
     }

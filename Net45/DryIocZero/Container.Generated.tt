@@ -93,9 +93,9 @@ ERROR: <#=e.Value.Message#>
 end of exception list
 */
 
+    [ExcludeFromCodeCoverage]
     partial class Container
     {
-        [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
         {
 <#
@@ -112,7 +112,6 @@ end of exception list
 #>
         }
 
-        [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, 
             Type requiredServiceType, RequestInfo preRequestParent, IScope scope)
         {
@@ -173,13 +172,11 @@ end of exception list
 #>
         }
 
-        [ExcludeFromCodeCoverage]
         partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
-        [ExcludeFromCodeCoverage]
         private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
         {
 <#

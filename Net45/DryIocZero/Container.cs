@@ -216,33 +216,36 @@ namespace DryIocZero
 
             var manyGeneratedFactories = Enumerable.Empty<KV<object, FactoryDelegate>>();
             ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
+            if (serviceKey != null)
+                manyGeneratedFactories = manyGeneratedFactories.Where(kv => serviceKey.Equals(kv.Key));
             if (compositeParentKey != null)
                 manyGeneratedFactories = manyGeneratedFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
 
             foreach (var generated in manyGeneratedFactories)
-                yield return ((FactoryDelegate)generated.Value)(this, scope);
+                yield return generated.Value(this, scope);
 
-            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType);
-            if (factories != null)
+            if (serviceKey == null)
+            {
+                var defaultFactory = _defaultFactories.Value.GetValueOrDefault(serviceType);
+                if (defaultFactory != null)
+                    yield return defaultFactory(this, scope);
+            }
+
+            var keyedFactories = _keyedFactories.Value.GetValueOrDefault(serviceType);
+            if (keyedFactories != null)
             {
                 if (serviceKey != null)
                 {
-                    var factoryDelegate = factories.GetValueOrDefault(serviceKey);
+                    var factoryDelegate = keyedFactories.GetValueOrDefault(serviceKey);
                     if (factoryDelegate != null)
                         yield return factoryDelegate(this, scope);
                 }
                 else
                 {
-                    foreach (var resolution in factories.Enumerate())
+                    foreach (var resolution in keyedFactories.Enumerate())
                         if (compositeParentKey == null || !compositeParentKey.Equals(resolution.Key))
-                            yield return ((FactoryDelegate)resolution.Value)(this, scope);
+                            yield return resolution.Value(this, scope);
                 }
-            }
-            else
-            {
-                var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as FactoryDelegate;
-                if (factoryDelegate != null)
-                    yield return factoryDelegate(this, scope);
             }
         }
 
@@ -268,10 +271,10 @@ namespace DryIocZero
                 return;
             }
             ThrowIfContainerDisposed();
-            _keyedFactories.Swap(_ =>
+            _keyedFactories.Swap(factories =>
             {
-                var entry = _.GetValueOrDefault(serviceType) ?? ImTreeMap<object, FactoryDelegate>.Empty;
-                return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
+                var entry = factories.GetValueOrDefault(serviceType) ?? ImTreeMap<object, FactoryDelegate>.Empty;
+                return factories.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
             });
         }
 
