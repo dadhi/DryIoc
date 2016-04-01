@@ -149,6 +149,7 @@ namespace DryIocZero
             RequestInfo preResolveParent = null, IScope scope = null)
         {
             object service = null;
+            // no runtime registrations - fast resolve from generated delegates
             if (_keyedFactories.Value.IsEmpty)
             {
                 if (serviceKey == null && requiredServiceType == null && preResolveParent == null)
@@ -156,6 +157,8 @@ namespace DryIocZero
                 else
                     ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
             }
+
+            // if not resolved from generated fallback to check runtime registrations first
             return service ?? ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, preResolveParent, scope);
         }
 
