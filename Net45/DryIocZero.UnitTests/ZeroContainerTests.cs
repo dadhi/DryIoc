@@ -31,6 +31,28 @@ namespace DryIocZero.UnitTests
         }
 
         [Test]
+        public void Should_throw_if_null_keyed_service_is_nor_registered_nor_generated()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve(typeof(Potato), null));
+
+            Assert.AreEqual(Error.UnableToResolveDefaultService, ex.Error);
+        }
+
+        [Test]
+        public void Should_throw_if_non_null_keyed_service_is_nor_registered_nor_generated()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve(typeof(Potato), "x"));
+
+            Assert.AreEqual(Error.UnableToResolveKeyedService, ex.Error);
+        }
+
+        [Test]
         public void Can_Register_Instance()
         {
             var container = new Container();
@@ -174,6 +196,14 @@ namespace DryIocZero.UnitTests
             Assert.AreEqual(2, ms.Length);
         }
 
+        [Test]
+        public void Should_exclude_composite_key_from_many()
+        {
+            var container = new Container();
+
+            var ms = container.ResolveMany(typeof(IMultiExported), compositeParentKey: "c").Cast<IMultiExported>().ToArray();
+            Assert.AreEqual(2, ms.Length);
+        }
 
         internal class AnotherMulti : IMultiExported { }
 
