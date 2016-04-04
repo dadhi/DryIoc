@@ -510,6 +510,11 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
+    [Export, CurrentScopeReuse(scopeName: "a"), AsResolutionRoot]
+    public class NamedScopeService
+    {
+    }
+
     [Export]
     public class MultiCtorDep { }
 

@@ -171,5 +171,15 @@
 
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
         }
+
+        [Test, Ignore]
+        public void Can_change_default_part_creation_policy_to_Transient()
+        {
+            var container = _container.With(rules => rules
+                .WithDefaultReuseInsteadOfTransient(Reuse.Transient));
+
+            var service = container.Resolve<Service>();
+            Assert.AreNotSame(service, container.Resolve<Service>());
+        }
     }
 }

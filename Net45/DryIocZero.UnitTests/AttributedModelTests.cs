@@ -66,9 +66,12 @@
         [Test]
         public void Export_condition_should_be_evaluated()
         {
-            Assert.IsInstanceOf<ExportConditionalObject1>(_container.Resolve<ImportConditionObject1>().ExportConditionInterface);
-            Assert.IsInstanceOf<ExportConditionalObject2>(_container.Resolve<ImportConditionObject2>().ExportConditionInterface);
-            Assert.IsInstanceOf<ExportConditionalObject3>(_container.Resolve<ImportConditionObject3>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject1>(
+                _container.Resolve<ImportConditionObject1>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject2>(
+                _container.Resolve<ImportConditionObject2>().ExportConditionInterface);
+            Assert.IsInstanceOf<ExportConditionalObject3>(
+                _container.Resolve<ImportConditionObject3>().ExportConditionInterface);
         }
 
         [Test]
@@ -95,6 +98,36 @@
 
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
             container.Dispose();
+        }
+
+        [Test]
+        public void I_can_check_existinse_of_open_scope()
+        {
+            using (var s = _container.OpenScope("a"))
+            {
+                Assert.IsNotNull(s.GetCurrentScope());
+            }
+        }
+
+        [Test]
+        public void Should_throw_if_no_open_scope()
+        {
+            var ex = Assert.Throws<ContainerException>(() =>
+                _container.Resolve<NamedScopeService>());
+
+            Assert.AreEqual(Error.NoCurrentScope, ex.Error);
+        }
+
+        [Test]
+        public void Should_throw_if_matching_scope_is_not_found()
+        {
+            using (var s = _container.OpenScope())
+            {
+                var ex = Assert.Throws<ContainerException>(() => 
+                    s.Resolve<NamedScopeService>());
+
+                Assert.AreEqual(Error.NoMatchedScopeFound, ex.Error);
+            }
         }
     }
 }
