@@ -7219,23 +7219,6 @@ namespace DryIoc
             return value;
         }
 
-        private object GetItemOrDefault(int index)
-        {
-            if (index < BucketSize)
-                return Items[index];
-
-            var bucketIndex = index / BucketSize - 1;
-            var buckets = Items[0] as object[][];
-            if (buckets != null && buckets.Length > bucketIndex)
-            {
-                var bucket = buckets[bucketIndex];
-                if (bucket != null)
-                    return bucket[index%BucketSize];
-            }
-
-            return null;
-        }
-
         // find if bucket already created starting from 0
         // if not - create new buckets array and copy old buckets into it
         private object[] GetOrAddBucket(int index)
