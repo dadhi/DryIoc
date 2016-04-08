@@ -325,6 +325,7 @@ namespace DryIoc
     /// <returns>Changed value.</returns>
     public delegate V Update<V>(V oldValue, V newValue);
 
+    // todo: V3: Rename to ImTree
     /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
     public sealed class ImTreeMapIntToObj
     {

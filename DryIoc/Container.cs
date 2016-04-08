@@ -6932,9 +6932,9 @@ namespace DryIoc
 
             if (id == -1) // disposable transient
             {
-                var dt = createValue();
-                Ref.Swap(ref _disposableTransients, dts => dts.AppendOrUpdate(dt));
-                return dt;
+                var transient = createValue();
+                TrackDisposable(transient);
+                return transient;
             }
 
             object item;
@@ -6943,7 +6943,9 @@ namespace DryIoc
                 item = _items.GetValueOrDefault(id);
                 if (item != null)
                     return item;
+
                 item = createValue();
+                TrackDisposable(item);
             }
 
             var items = _items;
@@ -6969,21 +6971,14 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
-            var items = _items;
-            if (!items.IsEmpty)
-            {
-                // dispose in backward registration order
-                var itemList = items.Enumerate().ToArray();
-                for (var i = itemList.Length - 1; i >= 0; --i)
-                    DisposeItem(itemList[i].Value);
-            }
-            _items = ImTreeMapIntToObj.Empty;
 
-            var disposableTransients = _disposableTransients;
-            if (!disposableTransients.IsNullOrEmpty())
-                for (var i = 0; i < disposableTransients.Length; i++)
-                    DisposeItem(_disposableTransients[i]);
-            _disposableTransients = null;
+            var disposables = _disposables;
+            if (!disposables.IsEmpty)
+                foreach (var disposable in disposables.Enumerate())
+                    ScopedDisposableHandling.DisposeItem(disposable.Value);
+
+            _disposables = ImTreeMapIntToObj.Empty;
+            _items = ImTreeMapIntToObj.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> 
@@ -6998,34 +6993,55 @@ namespace DryIoc
         #region Implementation
 
         private ImTreeMapIntToObj _items;
-        private object[] _disposableTransients;
+        private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
+        private int _nextDisposablelID = int.MaxValue;
         private int _disposed;
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
 
-        internal static void DisposeItem(object item)
+        private void TrackDisposable(object item)
+        {
+            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
+            {
+                // Decrement here is because dispose should happen in reverse resolution order
+                // By adding items with decreasing IDs we get rid off ordering on Dispose.
+                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
+                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
+            }
+        }
+
+        #endregion
+    }
+
+    internal static class ScopedDisposableHandling
+    {
+        public static IDisposable TryUnwrapDisposable(object item)
         {
             var disposable = item as IDisposable;
-            if (disposable == null)
-            {
-                // Unwrap WeakReference if item wrapped in it.
-                var weakRefItem = item as WeakReference;
-                if (weakRefItem != null)
-                    disposable = weakRefItem.Target as IDisposable;
-            }
+            if (disposable != null)
+                return disposable;
 
+            // Unwrap WeakReference if item wrapped in it.
+            var weakRefItem = item as WeakReference;
+            if (weakRefItem != null)
+                return weakRefItem.Target as IDisposable;
+
+            return null;
+        }
+
+        public static void DisposeItem(object item)
+        {
+            var disposable = TryUnwrapDisposable(item);
             if (disposable != null)
             {
                 try { disposable.Dispose(); }
                 catch (Exception)
                 {
-                    // NOTE Ignoring disposing exception, they not so important for program to proceed.
+                    // NOTE: Ignoring disposing exception, they not so important for program to proceed.
                 }
             }
         }
-
-        #endregion
     }
 
     /// <summary>Different from <see cref="Scope"/> so that uses single array of items for fast access.
@@ -7103,6 +7119,8 @@ namespace DryIoc
                 var indexInBucket = id % BucketSize;
                 bucket[indexInBucket] = item;
             }
+
+            TrackDisposable(item);
         }
 
         /// <summary>Adds external non-service item into singleton collection. 
@@ -7127,21 +7145,13 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            var factoryIdToIndexMap = _factoryIdToIndexMap;
-            if (!factoryIdToIndexMap.IsEmpty)
-            {
-                var ids = factoryIdToIndexMap.Enumerate().ToArray();
-                for (var i = ids.Length - 1; i >= 0; --i)
-                    Scope.DisposeItem(GetItemOrDefault((int)ids[i].Value));
-            }
+            var disposables = _disposables;
+            if (!disposables.IsEmpty)
+                foreach (var disposable in disposables.Enumerate())
+                    ScopedDisposableHandling.DisposeItem(disposable.Value);
+
+            _disposables = ImTreeMapIntToObj.Empty;
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-
-            var disposableTransients = _disposableTransients;
-            if (!disposableTransients.IsNullOrEmpty())
-                for (var i = 0; i < disposableTransients.Length; i++)
-                    Scope.DisposeItem(_disposableTransients[i]);
-            _disposableTransients = null;
-
             Items = ArrayTools.Empty<object>();
         }
 
@@ -7160,15 +7170,27 @@ namespace DryIoc
         /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
         internal object[] Items;
 
-        private object[] _disposableTransients;
+        private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
+        private int _nextDisposablelID = int.MaxValue;
+
+        private void TrackDisposable(object item)
+        {
+            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
+            {
+                // Decrement here is because dispose should happen in reverse resolution order
+                // By adding items with decreasing IDs we get rid off ordering on Dispose.
+                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
+                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
+            }
+        }
 
         private object GetOrAddItem(int index, CreateScopedValue createValue)
         {
             if (index == -1) // disposable transient
             {
-                var item = createValue();
-                Ref.Swap(ref _disposableTransients, items => items.AppendOrUpdate(item));
-                return item;
+                var transient = createValue();
+                TrackDisposable(transient);
+                return transient;
             }
 
             var bucket = GetOrAddBucket(index);
@@ -7176,7 +7198,7 @@ namespace DryIoc
             return GetOrAddItem(bucket, index, createValue);
         }
 
-        private static object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
+        private object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
         {
             var value = bucket[index];
             if (value != null)
@@ -7187,7 +7209,11 @@ namespace DryIoc
             {
                 value = bucket[index];
                 if (value == null)
-                    bucket[index] = value = createValue();
+                {
+                    value = createValue();
+                    TrackDisposable(value);
+                    bucket[index] = value;
+                }
             }
 
             return value;

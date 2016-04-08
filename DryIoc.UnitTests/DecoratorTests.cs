@@ -582,7 +582,12 @@ namespace DryIoc.UnitTests
                     released = true;
                 f.IsReleased = true;
             });
-            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+            container.RegisterDisposer<Foo>(f =>
+            {
+                if (f.IsReleased)
+                    released = true;
+                f.IsReleased = true;
+            });
 
             var foo = container.Resolve<Foo>();
 
@@ -603,7 +608,12 @@ namespace DryIoc.UnitTests
                     released = true;
                 f.IsReleased = true;
             });
-            container.RegisterDisposer<Foo>(f => f.IsReleased = true);
+            container.RegisterDisposer<Foo>(f =>
+            {
+                if (f.IsReleased)
+                    released = true;
+                f.IsReleased = true;
+            });
 
             var foo = container.Resolve<Foo>(1);
 

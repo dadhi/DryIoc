@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System;
+using NUnit.Framework;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -71,6 +72,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var service = container.Resolve<WeaklyReferencedService>();
 
             Assert.That(service, Is.InstanceOf<WeaklyReferencedService>());
+            GC.KeepAlive(service);
         }
 
         [Test]
