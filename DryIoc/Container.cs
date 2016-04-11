@@ -4707,7 +4707,7 @@ namespace DryIoc
         }
 
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
-        public virtual Type ServiceType { get { return _parameter.ParameterType; } }
+        public virtual Type ServiceType { get { return Parameter.ParameterType; } }
 
         /// <summary>Optional service details.</summary>
         public virtual ServiceDetails Details { get { return ServiceDetails.Default; } }
@@ -4717,21 +4717,22 @@ namespace DryIoc
         public IServiceInfo Create(Type serviceType, ServiceDetails details)
         {
             return serviceType == ServiceType
-                ? new WithDetails(_parameter, details)
-                : new TypeWithDetails(_parameter, serviceType, details);
+                ? new WithDetails(Parameter, details)
+                : new TypeWithDetails(Parameter, serviceType, details);
         }
+
+        /// <summary>Parameter info.</summary>
+        public readonly ParameterInfo Parameter;
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return new StringBuilder().Print(this).Append(" as parameter ").Print(_parameter.Name, "\"").ToString();
+            return new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name, "\"").ToString();
         }
 
         #region Implementation
 
-        private readonly ParameterInfo _parameter;
-
-        private ParameterServiceInfo(ParameterInfo parameter) { _parameter = parameter; }
+        private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
 
         private class WithDetails : ParameterServiceInfo
         {
@@ -5206,6 +5207,45 @@ namespace DryIoc
                 return parent.Push(ServiceType, RequiredServiceType, ServiceKey, -1, FactoryType.Service, null, null);
             return parent.Push(ServiceType, RequiredServiceType, ServiceKey,
                     factory.FactoryID, factory.FactoryType, factory.ImplementationType, Reuse);
+        }
+
+        /// <summary>If request corresponds to dependency injected into parameter, 
+        /// then method calls <paramref name="parameter"/> handling and returns its result.
+        /// If request corresponds to property or field, then method calls respective handler.
+        /// If request does not correspond to dependency, then calls <paramref name="root"/> handler.</summary>
+        /// <typeparam name="TResult"></typeparam>
+        /// <param name="root">(optional) handler for resolution call or root.</param>
+        /// <param name="parameter">(optional) handler for parameter dependency</param>
+        /// <param name="property">(optional) handler for property dependency</param>
+        /// <param name="field">(optional) handler for field dependency</param>
+        /// <returns>Result of applied handler or default <typeparamref name="TResult"/>.</returns>
+        public TResult Is<TResult>(
+            Func<TResult> root = null,
+            Func<ParameterInfo, TResult> parameter = null,
+            Func<PropertyInfo, TResult> property = null,
+            Func<FieldInfo, TResult> field = null)
+        {
+            if (_serviceInfo is ParameterServiceInfo)
+            {
+                if (parameter != null)
+                    return parameter(((ParameterServiceInfo)_serviceInfo).Parameter);
+            }
+            else if (_serviceInfo is PropertyOrFieldServiceInfo)
+            {
+                var propertyOrFieldServiceInfo = (PropertyOrFieldServiceInfo)_serviceInfo;
+                var propertyInfo = propertyOrFieldServiceInfo.Member as PropertyInfo;
+                if (propertyInfo != null)
+                {
+                    if (property != null)
+                        return property(propertyInfo);
+                }
+                else if (field != null)
+                        return field((FieldInfo)propertyOrFieldServiceInfo.Member);
+            }
+            else if (root != null)
+                return root();
+
+            return default(TResult);
         }
 
         /// <summary>Enumerates all request stack parents. 
