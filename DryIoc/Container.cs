@@ -1418,15 +1418,17 @@ namespace DryIoc
                 ImTreeMap<Type, object> services;
                 if (serviceKey == null)
                 {
-                    services = Services.AddOrUpdate(serviceType, factory, (oldEntry, newFactory) =>
+                    services = Services.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
                     {
                         if (oldEntry == null)
-                            return newFactory;
+                            return newEntry;
+
+                        var newFactory = (Factory)newEntry;
 
                         var oldFactories = oldEntry as FactoriesEntry;
                         if (oldFactories != null && oldFactories.LastDefaultKey == null) // no default registered yet
                             return new FactoriesEntry(DefaultKey.Value,
-                                oldFactories.Factories.AddOrUpdate(DefaultKey.Value, (Factory)newFactory));
+                                oldFactories.Factories.AddOrUpdate(DefaultKey.Value, newFactory));
 
                         var oldFactory = oldFactories == null ? (Factory)oldEntry : null;
                         switch (ifAlreadyRegistered)
@@ -1440,20 +1442,22 @@ namespace DryIoc
 
                             case IfAlreadyRegistered.Replace:
                                 replacedFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
-                                return oldFactories == null ? newFactory
+                                return oldFactories == null ? newEntry
                                     : new FactoriesEntry(oldFactories.LastDefaultKey,
-                                        oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, (Factory)newFactory));
+                                        oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, newFactory));
+
+                            case IfAlreadyRegistered.AppendNewImplementation:
+                                var implementationType = newFactory.ImplementationType;
+                                if (implementationType == null ||
+                                    oldFactory != null && oldFactory.ImplementationType != implementationType ||
+                                    oldFactories != null && oldFactories.Factories.Enumerate()
+                                        .All(f => f.Value.ImplementationType != implementationType))
+                                    return AppendNonKeyed(oldFactories, oldFactory, newFactory);
+
+                                return oldEntry;
 
                             default:
-                                if (oldFactories == null)
-                                    return new FactoriesEntry(DefaultKey.Value.Next(),
-                                        ImTreeMap<object, Factory>.Empty
-                                            .AddOrUpdate(DefaultKey.Value, (Factory)oldEntry)
-                                            .AddOrUpdate(DefaultKey.Value.Next(), (Factory)newFactory));
-
-                                var nextKey = oldFactories.LastDefaultKey.Next();
-                                return new FactoriesEntry(nextKey,
-                                    oldFactories.Factories.AddOrUpdate(nextKey, (Factory)newFactory));
+                                return AppendNonKeyed(oldFactories, oldFactory, newFactory);
                         }
                     });
                 }
@@ -1485,8 +1489,8 @@ namespace DryIoc
                                         replacedFactory = oldFactory;
                                         return newFactory;
 
-                                    //case IfAlreadyRegistered.Throw:
-                                    //case IfAlreadyRegistered.AppendNonKeyed:
+                                    case IfAlreadyRegistered.Throw:
+                                    case IfAlreadyRegistered.AppendNewImplementation:
                                     default:
                                         return Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, serviceType, newFactory, serviceKey, oldFactory);
                                 }
@@ -1515,6 +1519,18 @@ namespace DryIoc
                 }
 
                 return registry;
+            }
+
+            private static object AppendNonKeyed(FactoriesEntry oldFactories, Factory oldEntry, Factory newFactory)
+            {
+                if (oldFactories == null)
+                    return new FactoriesEntry(DefaultKey.Value.Next(),
+                        ImTreeMap<object, Factory>.Empty
+                            .AddOrUpdate(DefaultKey.Value, oldEntry)
+                            .AddOrUpdate(DefaultKey.Value.Next(), newFactory));
+
+                var nextKey = oldFactories.LastDefaultKey.Next();
+                return new FactoriesEntry(nextKey, oldFactories.Factories.AddOrUpdate(nextKey, newFactory));
             }
 
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
@@ -7892,7 +7908,10 @@ namespace DryIoc
         /// <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
         Keep,
         /// <summary>Replaces old registration with new one.</summary>
-        Replace
+        Replace,
+        /// <summary>Adds new implementation or null (Made.Of), 
+        /// skips registration if the implementation is already registered.</summary>
+        AppendNewImplementation
     }
 
     /// <summary>Define registered service structure.</summary>

@@ -17,13 +17,15 @@ namespace DryIoc.UnitTests
             var services = container.Resolve<I[]>();
 
             CollectionAssert.AreEqual(
-                new[] {typeof(X), typeof(Y) }, 
+                new[] {typeof(X), typeof(Y)},
                 services.Select(s => s.GetType()).ToArray());
         }
 
-        public interface I { }
-        public class X : I { }
-        public class Y : I { }
+        public interface I {}
+
+        public class X : I {}
+
+        public class Y : I {}
 
         [Test]
         public void I_can_say_to_Throw_on_new_default_registration()
@@ -32,7 +34,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             var ex = Assert.Throws<ContainerException>(() =>
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
+                container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
 
             Assert.AreEqual(ex.Error, Error.UnableToRegisterDuplicateDefault);
         }
@@ -46,7 +48,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>(serviceKey: 2, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             var ex = Assert.Throws<ContainerException>(() =>
-            container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
+                container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw));
 
             Assert.AreEqual(ex.Error, Error.UnableToRegisterDuplicateDefault);
         }
@@ -68,7 +70,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(serviceKey: EnumKey.Some);
-            container.Register<IService, AnotherService>(serviceKey: EnumKey.Some, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.Register<IService, AnotherService>(serviceKey: EnumKey.Some,
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var service = container.Resolve<IService>(EnumKey.Some);
 
@@ -86,8 +89,21 @@ namespace DryIoc.UnitTests
             var services = container.Resolve<IService[]>();
 
             CollectionAssert.AreEqual(
-                new[] { typeof(Service), typeof(AnotherService) },
+                new[] {typeof(Service), typeof(AnotherService)},
                 services.Select(service => service.GetType()).ToArray());
+        }
+
+        [Test]
+        public void Can_register_distinct_implementations()
+        {
+            var container = new Container();
+            container.Register<I, X>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.Register<I, Y>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.Register<I, Y>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+
+            var ies = container.Resolve<I[]>();
+
+            Assert.AreEqual(2, ies.Length);
         }
     }
 }

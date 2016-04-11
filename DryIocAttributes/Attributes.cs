@@ -53,7 +53,10 @@ namespace DryIocAttributes
         /// <summary>Keeps old default or keyed registration ignoring new registration: ensures Register-Once semantics.</summary>
         Keep,
         /// <summary>Replaces old registration with new one.</summary>
-        Replace
+        Replace,
+        /// <summary>Adds new implementation or null (Made.Of), 
+        /// skips registration if the implementation is already registered.</summary>
+        AppendNewImplementation
     }
 
     /// <summary>Provides whole set of possible/supported export options.</summary>
