@@ -172,11 +172,12 @@
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
         }
 
-        [Test, Ignore]
+        [Test, Ignore("Requires ability to change default reuse")]
         public void Can_change_default_part_creation_policy_to_Transient()
         {
-            var container = _container.With(rules => rules
-                .WithDefaultReuseInsteadOfTransient(Reuse.Transient));
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(typeof(Service));
 
             var service = container.Resolve<Service>();
             Assert.AreNotSame(service, container.Resolve<Service>());
