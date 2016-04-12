@@ -419,6 +419,7 @@ namespace DryIoc.MefAttributedModel
                 case IfAlreadyExported.Throw: return IfAlreadyRegistered.Throw;
                 case IfAlreadyExported.Keep: return IfAlreadyRegistered.Keep;
                 case IfAlreadyExported.Replace: return IfAlreadyRegistered.Replace;
+                case IfAlreadyExported.AppendNewImplementation: return IfAlreadyRegistered.AppendNewImplementation;
                 default: return IfAlreadyRegistered.AppendNotKeyed;
             }
         }

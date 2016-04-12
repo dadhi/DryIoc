@@ -205,8 +205,59 @@ namespace DryIocZero.UnitTests
             Assert.AreEqual(2, ms.Length);
         }
 
+        [Test]
+        public void Can_register_into_resolution_scope_at_runtime()
+        {
+            var container = new Container();
+            var yID = container.GetNextFactoryID();
+            container.Register(typeof(X), (context, scope) => new X(
+                    (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), null)
+                        .GetOrAdd(yID, () => new Y()),
+                    (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), null)
+                        .GetOrAdd(yID, () => new Y())));
+
+            var x = container.Resolve<X>();
+            Assert.IsNotNull(x.Y1);
+            Assert.AreSame(x.Y1, x.Y2);
+        }
+
+        [Test]
+        public void Can_register_into_matching_resolution_scope_at_runtime()
+        {
+            var container = new Container();
+            var yID = container.GetNextFactoryID();
+            container.Register(typeof(X), "a", (context, scope) => new X(
+                    (Y)context.Scopes.GetMatchingResolutionScope(
+                        context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), "a"),
+                        typeof(X), "a", false, true)
+                        .GetOrAdd(yID, () => new Y()),
+                    (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), "a")
+                        .GetOrAdd(yID, () => new Y())));
+
+            var x = container.Resolve<X>(serviceKey: "a");
+            Assert.IsNotNull(x.Y1);
+            Assert.AreSame(x.Y1, x.Y2);
+        }
+
         internal class AnotherMulti : IMultiExported { }
 
         internal class NotRegistered {}
+
+        internal class X
+        {
+            public Y Y1 { get; private set; }
+
+            public Y Y2 { get; private set; }
+
+            public X(Y y1, Y y2)
+            {
+                Y1 = y1;
+                Y2 = y2;
+            }
+        }
+
+        internal class Y
+        {
+        }
     }
 }

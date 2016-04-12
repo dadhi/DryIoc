@@ -173,13 +173,10 @@ namespace DryIocZero
             if (serviceKey == null)
                 return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, scope);
 
+            FactoryDelegate factory;
             var factories = _keyedFactories.Value.GetValueOrDefault(serviceType);
-            if (factories != null)
-            {
-                var factory = factories.GetValueOrDefault(serviceKey);
-                if (factory != null)
-                    return factory(this, scope);
-            }
+            if (factories != null && (factory = factories.GetValueOrDefault(serviceKey)) != null)
+                return factory(this, scope);
 
             // If not resolved from runtime registration then try resolve generated
             object service = null;
