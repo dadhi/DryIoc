@@ -105,10 +105,11 @@ namespace DryIoc.Mvc
         {
             filterProviders = filterProviders ?? FilterProviders.Providers;
 
-            var filterAttributeFilterProviders = filterProviders.OfType<FilterAttributeFilterProvider>().ToArray();
-            for (var i = filterAttributeFilterProviders.Length - 1; i >= 0; --i)
-                filterProviders.RemoveAt(i);
-
+            foreach (var filterAttributeFilterProvider in filterProviders.OfType<FilterAttributeFilterProvider>().ToArray())
+            {
+                filterProviders.Remove(filterAttributeFilterProvider);
+            }
+   
             var filterProvider = new DryIocFilterAttributeFilterProvider(container);
             filterProviders.Add(filterProvider);
 
