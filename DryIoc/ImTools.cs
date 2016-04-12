@@ -649,4 +649,65 @@ namespace DryIoc
 
         #endregion
     }
+
+    // todo: make public or remove
+    internal abstract class Either<A, B>
+    {
+        public static implicit operator Either<A, B>(A a)
+        {
+            return Of(a);
+        }
+
+        public static implicit operator Either<A, B>(B b)
+        {
+            return Of(b);
+        }
+
+        public static Either<A, B> Of(A a)
+        {
+            return new CaseA(a);
+        }
+
+        public static Either<A, B> Of(B b)
+        {
+            return new CaseB(b);
+        }
+
+        public abstract T Is<T>(Func<A, T> a = null, Func<B, T> b = null);
+
+        public abstract void Is(Action<A> a = null, Action<B> b = null);
+
+        private sealed class CaseA : Either<A, B>
+        {
+            private readonly A _item;
+            public CaseA(A item) { _item = item; }
+
+            public override T Is<T>(Func<A, T> a = null, Func<B, T> b = null)
+            {
+                return a == null ? default(T) : a(_item);
+            }
+
+            public override void Is(Action<A> a = null, Action<B> b = null)
+            {
+                if (a != null) a(_item);
+            }
+        }
+
+        private sealed class CaseB : Either<A, B>
+        {
+            private readonly B _item;
+
+            public CaseB(B item) { _item = item; }
+
+            public override T Is<T>(Func<A, T> a = null, Func<B, T> b = null)
+            {
+                return b == null ? default(T) : b(_item);
+            }
+
+            public override void Is(Action<A> a = null, Action<B> b = null)
+            {
+                if (b != null) b(_item);
+            }
+        }
+    }
 }

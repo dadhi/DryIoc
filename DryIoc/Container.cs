@@ -1414,7 +1414,7 @@ namespace DryIoc
 
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
             {
-                Factory replacedFactory = null;
+                Either<Factory, ImTreeMap<object, Factory>> replacedFactories = null;
                 ImTreeMap<Type, object> services;
                 if (serviceKey == null)
                 {
@@ -1425,39 +1425,57 @@ namespace DryIoc
 
                         var newFactory = (Factory)newEntry;
 
-                        var oldFactories = oldEntry as FactoriesEntry;
-                        if (oldFactories != null && oldFactories.LastDefaultKey == null) // no default registered yet
+                        var oldFactoriesEntry = oldEntry as FactoriesEntry;
+                        if (oldFactoriesEntry != null && oldFactoriesEntry.LastDefaultKey == null) // no default registered yet
                             return new FactoriesEntry(DefaultKey.Value,
-                                oldFactories.Factories.AddOrUpdate(DefaultKey.Value, newFactory));
+                                oldFactoriesEntry.Factories.AddOrUpdate(DefaultKey.Value, newFactory));
 
-                        var oldFactory = oldFactories == null ? (Factory)oldEntry : null;
+                        var oldFactory = oldFactoriesEntry == null ? (Factory)oldEntry : null;
                         switch (ifAlreadyRegistered)
                         {
                             case IfAlreadyRegistered.Throw:
-                                oldFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
+                                oldFactory = oldFactory ?? oldFactoriesEntry.Factories.GetValueOrDefault(oldFactoriesEntry.LastDefaultKey);
                                 return Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, oldFactory);
 
                             case IfAlreadyRegistered.Keep:
                                 return oldEntry;
 
                             case IfAlreadyRegistered.Replace:
-                                replacedFactory = oldFactory ?? oldFactories.Factories.GetValueOrDefault(oldFactories.LastDefaultKey);
-                                return oldFactories == null ? newEntry
-                                    : new FactoriesEntry(oldFactories.LastDefaultKey,
-                                        oldFactories.Factories.AddOrUpdate(oldFactories.LastDefaultKey, newFactory));
+                                if (oldFactoriesEntry != null)
+                                {
+                                    var newFactories = oldFactoriesEntry.Factories;
+                                    if (oldFactoriesEntry.LastDefaultKey != null)
+                                    {
+                                        newFactories = ImTreeMap<object, Factory>.Empty;
+                                        var removedFactories = ImTreeMap<object, Factory>.Empty;
+                                        foreach (var f in newFactories.Enumerate())
+                                            if (f.Key is DefaultKey)
+                                                removedFactories = removedFactories.AddOrUpdate(f.Key, f.Value);
+                                            else
+                                                newFactories = newFactories.AddOrUpdate(f.Key, f.Value);
+
+                                        replacedFactories = removedFactories;
+                                    }
+
+                                    return new FactoriesEntry(DefaultKey.Value,
+                                        newFactories.AddOrUpdate(DefaultKey.Value, newFactory));
+                                }
+
+                                replacedFactories = oldFactory;
+                                return newEntry;
 
                             case IfAlreadyRegistered.AppendNewImplementation:
                                 var implementationType = newFactory.ImplementationType;
                                 if (implementationType == null ||
                                     oldFactory != null && oldFactory.ImplementationType != implementationType ||
-                                    oldFactories != null && oldFactories.Factories.Enumerate()
+                                    oldFactoriesEntry != null && oldFactoriesEntry.Factories.Enumerate()
                                         .All(f => f.Value.ImplementationType != implementationType))
-                                    return AppendNonKeyed(oldFactories, oldFactory, newFactory);
+                                    return AppendNonKeyed(oldFactoriesEntry, oldFactory, newFactory);
 
                                 return oldEntry;
 
                             default:
-                                return AppendNonKeyed(oldFactories, oldFactory, newFactory);
+                                return AppendNonKeyed(oldFactoriesEntry, oldFactory, newFactory);
                         }
                     });
                 }
@@ -1486,7 +1504,7 @@ namespace DryIoc
                                         return oldFactory;
 
                                     case IfAlreadyRegistered.Replace:
-                                        replacedFactory = oldFactory;
+                                        replacedFactories = oldFactory;
                                         return newFactory;
 
                                     case IfAlreadyRegistered.Throw:
@@ -1500,12 +1518,23 @@ namespace DryIoc
 
                 // Note: We are reusing replaced factory (with same setup and reuse) cache by inheriting its ID.
                 // It is possible because cache depends only on ID.
-                var canReuseReplacedInstanceFactory = 
-                        replacedFactory is InstanceFactory && factory is InstanceFactory &&
-                        replacedFactory.Reuse == factory.Reuse && replacedFactory.Setup == factory.Setup;
+                var canReuseReplacedInstanceFactory = false;
+                if (replacedFactories != null)
+                    replacedFactories.Is(f =>
+                    {
+                        var replacedInstanceFactory = f as InstanceFactory;
+                        canReuseReplacedInstanceFactory = 
+                            replacedInstanceFactory != null && factory is InstanceFactory &&
+                            replacedInstanceFactory.Reuse == factory.Reuse &&
+                            replacedInstanceFactory.Setup == factory.Setup;
 
-                if (canReuseReplacedInstanceFactory)
-                    ((InstanceFactory)factory).FactoryID = replacedFactory.FactoryID;
+                        if (replacedInstanceFactory != null && canReuseReplacedInstanceFactory)
+                            ((InstanceFactory)factory).FactoryID = replacedInstanceFactory.FactoryID;
+                    },
+                    fs =>
+                    {
+                        // todo: handle multiple factories
+                    });
 
                 var registry = this;
                 if (registry.Services != services)
@@ -1514,8 +1543,15 @@ namespace DryIoc
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
                         FactoryExpressionCache.NewRef(), _isChangePermitted);
 
-                    if (replacedFactory != null && !canReuseReplacedInstanceFactory)
-                        registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
+                    if (replacedFactories != null && !canReuseReplacedInstanceFactory)
+                        registry = replacedFactories.Is(
+                            f => WithoutFactoryCache(registry, f, serviceType, serviceKey),
+                            fs =>
+                            {
+                                foreach (var f in fs.Enumerate())
+                                    registry = WithoutFactoryCache(registry, f.Value, serviceType, serviceKey);
+                                return registry;
+                            });
                 }
 
                 return registry;

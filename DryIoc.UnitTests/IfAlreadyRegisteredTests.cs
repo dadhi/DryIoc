@@ -79,7 +79,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_update_latest_registered_default()
+        public void The_replace_will_replace_all_previous_service_registrations()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -88,9 +88,8 @@ namespace DryIoc.UnitTests
 
             var services = container.Resolve<IService[]>();
 
-            CollectionAssert.AreEqual(
-                new[] {typeof(Service), typeof(AnotherService)},
-                services.Select(service => service.GetType()).ToArray());
+            Assert.AreEqual(1, services.Length);
+            Assert.IsInstanceOf<AnotherService>(services[0]);
         }
 
         [Test]
@@ -105,5 +104,53 @@ namespace DryIoc.UnitTests
 
             Assert.AreEqual(2, ies.Length);
         }
+
+        [Test]
+        public void RegisterMany_services_of_single_implementation_with_AppendNewImplementation_option()
+        {
+            var container = new Container();
+            container.RegisterMany<M>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+
+            Assert.IsNotNull(container.Resolve<IM>());
+            Assert.IsNotNull(container.Resolve<IN>());
+        }
+
+        [Test]
+        public void RegisterMany_services_of_single_implementation_with_Replace_option()
+        {
+            var container = new Container();
+            container.RegisterMany<M>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            Assert.IsNotNull(container.Resolve<IM>());
+            Assert.IsNotNull(container.Resolve<IN>());
+        }
+
+        [Test]
+        public void RegisterMany_for_each_of_many_implementations_with_Replace_option()
+        {
+            var container = new Container();
+            container.RegisterMany<M>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.RegisterMany<N>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            Assert.IsInstanceOf<N>(container.Resolve<IM>());
+            Assert.IsInstanceOf<N>(container.Resolve<IN>());
+        }
+
+        [Test]
+        public void RegisterMany_many_implementations_with_Replace_option()
+        {
+            var container = new Container();
+            container.RegisterMany(new[] { typeof(M), typeof(N) }, 
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            Assert.IsInstanceOf<N>(container.Resolve<IM>());
+            Assert.IsInstanceOf<N>(container.Resolve<IN>());
+        }
+
+        public interface IM {}
+        public interface IN {}
+
+        public class M : IM, IN {}
+        public class N : IM, IN {}
     }
 }

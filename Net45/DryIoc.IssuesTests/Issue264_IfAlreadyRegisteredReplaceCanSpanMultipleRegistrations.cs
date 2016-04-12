@@ -19,11 +19,10 @@ namespace DryIoc.IssuesTests
 
             container.RegisterMany<B>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
-            var ma = container.Resolve<IX[]>();
+            var ix = container.Resolve<IX[]>();
 
-            if (ma.Count() != 2) throw new Exception("Expected 2");
-            if (!(ma.Last() is B)) throw new Exception("Expected last added IX to be last on resolve");
-            if (!(ma.First() is CX)) throw new Exception("Expected CX to not get overwritten");
+            Assert.AreEqual(1, ix.Length);
+            Assert.IsInstanceOf<B>(ix[0]);
         }
 
         [Test]
