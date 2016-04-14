@@ -13,6 +13,7 @@
         <releaseNotes>
           v2.4.0
           - added: #263: Add IfAlreadyRegistered.AppendNewImplementation option for better collection handling
+          - fixed: #264: IfAlreadyRegistered.Replace can span multiple registrations
           - fixed: #262: Using attributes to inject primitive variables
           - fixed: #261: Make Disposal work in reverse resolution order
           v2.3.0
