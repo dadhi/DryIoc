@@ -25,10 +25,10 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.2.2\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.3.0\lib\net45\DryIoc.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
-<#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
+<#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
@@ -69,6 +69,7 @@ var deps = resolutionCallDependencies.Select((r, i) =>
 using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
+using System.Threading;
 
 using DryIoc; // for ImTools, not for Container
 
@@ -95,6 +96,15 @@ end of exception list
 
     partial class Container
     {
+		private int _lastFactoryID = <#= Factory.GetNextID()  #>; // generated, equals to last used Factory.FactoryID 
+
+		/// <summary>The unique factory ID, which may be used for runtime scoped registrations.</summary>
+		/// <returns>New factory ID.</returns>
+		public int GetNextFactoryID() 
+		{
+			return Interlocked.Increment(ref _lastFactoryID);
+		}
+
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
         {

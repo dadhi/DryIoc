@@ -58,7 +58,7 @@ namespace DryIoc.Mvc
         /// sets <see cref="DryIocFilterAttributeFilterProvider"/> as filter provider,
         /// and at last sets container as <see cref="DependencyResolver"/>.</summary>
         /// <param name="container">Original container.</param>
-        /// <param name="controllerAssemblies">(optional) By default uses <see cref="GetReferencedAssemblies"/>.</param>
+        /// <param name="controllerAssemblies">(optional) By default uses <see cref="BuildManager.GetReferencedAssemblies"/>.</param>
         /// <param name="scopeContext">(optional) Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/> 
         /// (if container does not have its own context specified).</param>
         /// <returns>New container with applied Web context.</returns>
@@ -79,8 +79,8 @@ namespace DryIoc.Mvc
             return container;
         }
 
-        /// <summary>Returns all app specific referenced assemblies (except from GAC and Dynamic).</summary>
-        /// <returns>Assemblies.</returns>
+        /// <summary>Returns all application specific referenced assemblies (except from GAC and Dynamic).</summary>
+        /// <returns>The assemblies.</returns>
         public static IEnumerable<Assembly> GetReferencedAssemblies()
         {
             return BuildManager.GetReferencedAssemblies().OfType<Assembly>()
@@ -89,7 +89,7 @@ namespace DryIoc.Mvc
 
         /// <summary>Registers controllers types in container with InWebRequest reuse.</summary>
         /// <param name="container">Container to register controllers to.</param>
-        /// <param name="controllerAssemblies">(optional) Uses <see cref="GetReferencedAssemblies"/> by default.</param>
+        /// <param name="controllerAssemblies">(optional) Uses <see cref="BuildManager.GetReferencedAssemblies"/> by default.</param>
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
@@ -104,10 +104,9 @@ namespace DryIoc.Mvc
         public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)
         {
             filterProviders = filterProviders ?? FilterProviders.Providers;
-
-            var filterAttributeFilterProviders = filterProviders.OfType<FilterAttributeFilterProvider>().ToArray();
-            for (var i = filterAttributeFilterProviders.Length - 1; i >= 0; --i)
-                filterProviders.RemoveAt(i);
+            var filterProvidersSnapshot = filterProviders.OfType<FilterAttributeFilterProvider>().ToArray();
+            foreach (var provider in filterProvidersSnapshot)
+                filterProviders.Remove(provider);
 
             var filterProvider = new DryIocFilterAttributeFilterProvider(container);
             filterProviders.Add(filterProvider);

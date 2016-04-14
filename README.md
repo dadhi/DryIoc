@@ -24,7 +24,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * `PM> Install-Package DryIoc.dll`
     * get code `PM> Install-Package DryIoc`
     * for DNX `PM> Install-Package DryIoc.Dnx`
-* __DryIoc v2.3.0__ is the latest stable version
+* __DryIoc v2.4.0__ is the latest stable version
     * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
@@ -119,7 +119,7 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
     - [DryIoc.Web](https://www.nuget.org/packages/DryIoc.Web/) 
     - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
-    - [DryIoc.SignalR-RC](Extensions\SignalR)
+    - [DryIoc.SignalR](Extensions\SignalR)
     - [DryIoc.Dnx.DependencyInjection-RC](https://www.nuget.org/packages/DryIoc.dnx.dependencyinjection) 
 for AspNetCore (vNext / DNX) 
 

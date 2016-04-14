@@ -12,6 +12,11 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.4.0
+      - added: #263: Add IfAlreadyRegistered.AppendNewImplementation option for better collection handling
+      - fixed: #264: IfAlreadyRegistered.Replace can span multiple registrations
+      - fixed: #262: Using attributes to inject primitive variables
+      - fixed: #261: Make Disposal work in reverse resolution order
       v2.3.0
       - fixed: #260: Cannot interpret GetOrCreateResolutionScope expression on iOS
       - fixed: #258: Setup.AllowDisposableTransient is overridden by container.WithTrackingDisposableTransient

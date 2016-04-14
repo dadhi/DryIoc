@@ -92,6 +92,46 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void AutofacDisposalOrder()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<Y>().SingleInstance();
+            builder.RegisterType<X>().SingleInstance();
+            var container = builder.Build();
+
+            var x = container.Resolve<X>();
+            var y = container.Resolve<Y>();
+
+            var order = string.Empty;
+            x.Disposed = () => order += "x";
+            y.Disposed = () => order += "y";
+
+            container.Dispose();
+
+            Assert.AreEqual("yx", order);
+        }
+
+        public class X : IDisposable
+        {
+            public Action Disposed;
+
+            public void Dispose()
+            {
+                Disposed();
+            }
+        }
+
+        public class Y : IDisposable
+        {
+            public Action Disposed;
+
+            public void Dispose()
+            {
+                Disposed();
+            }
+        }
+
+        [Test]
         public void Can_register_many_services_produced_by_factory()
         {
             var builder = new Container();

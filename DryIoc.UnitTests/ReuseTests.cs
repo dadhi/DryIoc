@@ -516,40 +516,40 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Dispose_should_happen_in_reverse_order_to_registration()
+        public void Dispose_should_happen_in_reverse_resolution_order()
         {
             var container = new Container();
-            container.Register<Fst>(Reuse.Singleton);
-            container.Register<Snd>(Reuse.Singleton);
+            container.Register<F>(Reuse.Singleton);
+            container.Register<S>(Reuse.Singleton);
             
-            var fst = container.Resolve<Fst>();
+            var fst = container.Resolve<F>();
             container.Dispose();
 
-            Assert.AreEqual(2, fst.Snd.Order);
+            Assert.AreEqual("fs", fst.S.Order);
         }
 
-        class Fst : IDisposable
+        class F : IDisposable
         {
-            public readonly Snd Snd;
+            public readonly S S;
 
-            public Fst(Snd snd)
+            public F(S s)
             {
-                Snd = snd;
+                S = s;
             }
 
             public void Dispose()
             {
-                Snd.Order = 2;
+                S.Order += "f";
             }
         }
 
-        class Snd : IDisposable
+        class S : IDisposable
         {
-            public int Order;
+            public string Order = String.Empty;
 
             public void Dispose()
             {
-                Order = 1;
+                Order += "s";
             }
         }
 

@@ -10,8 +10,12 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{70D96533-11DF-4025-BE33-433679EA8745}"
 	ProjectSection(SolutionItems) = preProject
 		build.bat = build.bat
+		global.json = global.json
 		NuGet.config = NuGet.config
 		NUnitAdapterForXUnit.cs = NUnitAdapterForXUnit.cs
+	EndProjectSection
+	ProjectSection(FolderGlobals) = preProject
+		__JSONSchema = http://json.schemastore.org/htmlhint
 	EndProjectSection
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.Dnx.DependencyInjection", "DryIoc.Dnx.DependencyInjection\DryIoc.Dnx.DependencyInjection.xproj", "{AADBE94F-040E-4FAA-9FC7-F2C41135A682}"

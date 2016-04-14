@@ -78,7 +78,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_store_as_disposable_as_WeakReference_and_dispose_it_if_alive()
+        public void Can_store_disposable_as_WeakReference_and_dispose_it_if_alive()
         {
             var container = new Container();
             container.Register<DisposableService>(Reuse.InCurrentScope, setup: Setup.With(weaklyReferenced: true));

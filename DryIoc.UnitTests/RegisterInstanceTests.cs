@@ -167,6 +167,17 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_register_instance_with_keep_option_without_prev_registration()
+        {
+            var container = new Container();
+
+            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var s = container.Resolve<string>();
+            Assert.AreEqual("x", s);
+        }
+
+        [Test]
         public void Given_multiple_already_registered_services_When_registering_with_keep_option_Then_no_exception_should_be_thrown()
         {
             var container = new Container();
@@ -179,18 +190,29 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_multiple_already_registered_services_When_registering_with_Replace_option_Then_no_exception_should_be_thrown()
+        public void For_multiple_registered_instances_Then_Replace_should_replace_them_all()
         {
             var container = new Container();
 
             container.RegisterInstance("a");
             container.RegisterInstance("b");
 
-            Assert.DoesNotThrow(() =>
-            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Replace));
+            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
-            var strings = container.Resolve<string[]>();
-            CollectionAssert.AreEqual(new[] { "a", "x" }, strings);
+            var x = container.Resolve<string>();
+            Assert.AreEqual("x", x);
+        }
+
+        [Test]
+        public void Replace_keyed_instance_registration()
+        {
+            var container = new Container();
+
+            container.RegisterInstance("a", serviceKey: "x");
+            Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
+
+            container.RegisterInstance("b", serviceKey: "x", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
         }
     }
 }

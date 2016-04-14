@@ -85,10 +85,6 @@
         <member name="M:DryIoc.Container.Dispose">
             <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         </member>
-        <member name="M:DryIoc.Container.CloseCurrentScope">
-            <summary>Disposes current scope and sets the scope parent (if any) back to ambient context (if any).</summary>
-            <remarks>May be called safely multiple times.</remarks>
-        </member>
         <member name="F:DryIoc.Container.StateParamExpr">
             <summary>State parameter expression in FactoryDelegate.</summary>
         </member>
@@ -159,6 +155,13 @@
             <exception cref="T:DryIoc.ContainerException"> with code <see cref="F:DryIoc.Error.NoMatchedScopeFound"/>.</exception>
         </member>
         <member name="M:DryIoc.Container.DryIoc#IScopeAccess#GetOrCreateResolutionScope(DryIoc.IScope@,System.Type,System.Object)">
+            <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+            <param name="scope">May be null scope.</param>
+            <param name="serviceType">Marking scope with resolved service type.</param> 
+            <param name="serviceKey">Marking scope with resolved service key.</param>
+            <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        </member>
+        <member name="M:DryIoc.Container.GetOrNewResolutionScope(DryIoc.IScope,System.Type,System.Object)">
             <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
             <param name="scope">May be null scope.</param>
             <param name="serviceType">Marking scope with resolved service type.</param> 
@@ -249,6 +252,14 @@
             <param name="container">Container to use for type creation and injecting its dependencies.</param>
             <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
             <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        </member>
+        <member name="M:DryIoc.ContainerTools.New``1(DryIoc.IContainer,DryIoc.Made.TypedMade{``0})">
+            <summary>Creates service given strongly-typed creation expression. 
+            Can be used to invoke arbitrary method returning some value with injecting its parameters from container.</summary>
+            <typeparam name="T">Method or constructor result type.</typeparam> 
+            <param name="container">Container to use for injecting dependencies.</param>
+            <param name="made">Creation expression.</param>
+            <returns>Created result.</returns>
         </member>
         <member name="M:DryIoc.ContainerTools.RegisterMapping(DryIoc.IContainer,System.Type,System.Type,System.Object,System.Object)">
             <summary>Registers new service type with factory for registered service type. 
@@ -2199,12 +2210,6 @@
             Make it predictable by removing any side effects.</remarks>
             <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
         </member>
-        <member name="T:DryIoc.ScopeContext">
-            <summary>Provides scope context by convention.</summary>
-        </member>
-        <member name="P:DryIoc.ScopeContext.Default">
-            <summary>Default scope context.</summary>
-        </member>
         <member name="T:DryIoc.ThreadScopeContext">
             <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
             if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
@@ -2628,6 +2633,13 @@
             <param name="throwIfNotFound">Says to throw if no scope found.</param>
         </member>
         <member name="M:DryIoc.IScopeAccess.GetOrCreateResolutionScope(DryIoc.IScope@,System.Type,System.Object)">
+            <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+            <param name="scope">May be null scope.</param>
+            <param name="serviceType">Marking scope with resolved service type.</param> 
+            <param name="serviceKey">Marking scope with resolved service key.</param>
+            <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        </member>
+        <member name="M:DryIoc.IScopeAccess.GetOrNewResolutionScope(DryIoc.IScope,System.Type,System.Object)">
             <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
             <param name="scope">May be null scope.</param>
             <param name="serviceType">Marking scope with resolved service type.</param> 
@@ -3182,6 +3194,89 @@
             <typeparam name="T">Type of expression result.</typeparam> <param name="func">Delegate to convert.</param>
             <returns>Delegate expression.</returns>
         </member>
+        <member name="T:DryIoc.PrintTools">
+            <summary>Provides pretty printing/debug view for number of types.</summary>
+        </member>
+        <member name="F:DryIoc.PrintTools.DefaultItemSeparator">
+            <summary>Default separator used for printing enumerable.</summary>
+        </member>
+        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Object,System.String,System.String,System.Func{System.Type,System.String})">
+            <summary>Prints input object by using corresponding Print methods for know types.</summary>
+            <param name="s">Builder to append output to.</param>
+            <param name="x">Object to print.</param>
+            <param name="quote">(optional) Quote to use for quoting string object.</param>
+            <param name="itemSeparator">(optional) Separator for enumerable.</param>
+            <param name="getTypeName">(optional) Custom type printing policy.</param>
+            <returns>String builder with appended output.</returns>
+        </member>
+        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.String,System.String)">
+            <summary>Appends string to string builder quoting with <paramref name="quote"/> if provided.</summary>
+            <param name="s">String builder to append string to.</param>
+            <param name="str">String to print.</param>
+            <param name="quote">(optional) Quote to add before and after string.</param>
+            <returns>String builder with appended string.</returns>
+        </member>
+        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Collections.IEnumerable,System.String,System.Action{System.Text.StringBuilder,System.Object})">
+            <summary>Prints enumerable by using corresponding Print method for known item type.</summary>
+            <param name="s">String builder to append output to.</param>
+            <param name="items">Items to print.</param>
+            <param name="separator">(optional) Custom separator if provided.</param>
+            <param name="printItem">(optional) Custom item printer if provided.</param>
+            <returns>String builder with appended output.</returns>
+        </member>
+        <member name="F:DryIoc.PrintTools.GetTypeNameDefault">
+            <summary>Default delegate to print Type details: by default prints Type FullName and
+            skips namespace if it start with "System."</summary>
+        </member>
+        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Type,System.Func{System.Type,System.String})">
+            <summary>Appends type details to string builder.</summary>
+            <param name="s">String builder to append output to.</param>
+            <param name="type">Input type to print.</param>
+            <param name="getTypeName">(optional) Delegate to provide custom type details.</param>
+            <returns>String builder with appended output.</returns>
+        </member>
+        <member name="T:DryIoc.Portable">
+            <summary>Ports some methods from .Net 4.0/4.5</summary>
+        </member>
+        <member name="F:DryIoc.Portable.GetAssemblyTypes">
+            <summary>Portable version of Assembly.GetTypes or Assembly.DefinedTypes.</summary>
+        </member>
+        <member name="M:DryIoc.Portable.GetGetMethodOrNull(System.Reflection.PropertyInfo,System.Boolean)">
+            <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
+            <param name="p">Target property info</param>
+            <param name="includeNonPublic">(optional) If set then consider non-public getter</param>
+            <returns>Setter method info if it is defined for property.</returns>
+        </member>
+        <member name="M:DryIoc.Portable.GetSetMethodOrNull(System.Reflection.PropertyInfo,System.Boolean)">
+            <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
+            <param name="p">Target property info</param>
+            <param name="includeNonPublic">(optional) If set then consider non-public setter</param>
+            <returns>Setter method info if it is defined for property.</returns>
+        </member>
+        <member name="M:DryIoc.Portable.GetCurrentManagedThreadID">
+            <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>
+            <returns>Managed Thread ID.</returns>
+        </member>
+        <member name="T:DryIoc.Experimental.DI">
+            <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
+        </member>
+        <member name="M:DryIoc.Experimental.DI.New">
+            <summary>Creates new default configured container</summary>
+            <returns>New configured container.</returns>
+        </member>
+        <member name="M:DryIoc.Experimental.DI.Get``1(DryIoc.IContainer,System.Reflection.Assembly[])">
+            <summary>Auto-wired resolution of T from the <see cref="M:DryIoc.Experimental.DI.New"/> container.</summary>
+            <typeparam name="T">Type of service to resolve.</typeparam>
+            <param name="container">(optional) Container </param>
+            <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
+            <returns>Resolved service or throws.</returns>
+        </member>
+        <member name="M:DryIoc.Experimental.DI.Get``1(System.Reflection.Assembly[])">
+            <summary>Auto-wired resolution of T from the <see cref="M:DryIoc.Experimental.DI.New"/> container.</summary>
+            <typeparam name="T">Type of service to resolve.</typeparam>
+            <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
+            <returns>Resolved service or throws.</returns>
+        </member>
         <member name="T:DryIoc.ArrayTools">
             <summary>Methods to work with immutable arrays, and general array sugar.</summary>
         </member>
@@ -3250,68 +3345,59 @@
             <summary>Returns singleton empty array of provided type.</summary> 
             <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
         </member>
-        <member name="T:DryIoc.PrintTools">
-            <summary>Provides pretty printing/debug view for number of types.</summary>
+        <member name="T:DryIoc.Ref`1">
+            <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/>.</summary>
+            <typeparam name="T">Type of object to wrap.</typeparam>
         </member>
-        <member name="F:DryIoc.PrintTools.DefaultItemSeparator">
-            <summary>Default separator used for printing enumerable.</summary>
+        <member name="P:DryIoc.Ref`1.Value">
+            <summary>Gets the wrapped value.</summary>
         </member>
-        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Object,System.String,System.String,System.Func{System.Type,System.String})">
-            <summary>Prints input object by using corresponding Print methods for know types.</summary>
-            <param name="s">Builder to append output to.</param>
-            <param name="x">Object to print.</param>
-            <param name="quote">(optional) Quote to use for quoting string object.</param>
-            <param name="itemSeparator">(optional) Separator for enumerable.</param>
-            <param name="getTypeName">(optional) Custom type printing policy.</param>
-            <returns>String builder with appended output.</returns>
+        <member name="M:DryIoc.Ref`1.#ctor(`0)">
+            <summary>Creates ref to object, optionally with initial value provided.</summary>
+            <param name="initialValue">(optional) Initial value.</param>
         </member>
-        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.String,System.String)">
-            <summary>Appends string to string builder quoting with <paramref name="quote"/> if provided.</summary>
-            <param name="s">String builder to append string to.</param>
-            <param name="str">String to print.</param>
-            <param name="quote">(optional) Quote to add before and after string.</param>
-            <returns>String builder with appended string.</returns>
+        <member name="M:DryIoc.Ref`1.Swap(System.Func{`0,`0})">
+            <summary>Exchanges currently hold object with <paramref name="getNewValue"/> - see <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> for details.</summary>
+            <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
+            <returns>Returns old object value the same way as <see cref="M:System.Threading.Interlocked.Exchange(System.Int32@,System.Int32)"/></returns>
+            <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
         </member>
-        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Collections.IEnumerable,System.String,System.Action{System.Text.StringBuilder,System.Object})">
-            <summary>Prints enumerable by using corresponding Print method for known item type.</summary>
-            <param name="s">String builder to append output to.</param>
-            <param name="items">Items to print.</param>
-            <param name="separator">(optional) Custom separator if provided.</param>
-            <param name="printItem">(optional) Custom item printer if provided.</param>
-            <returns>String builder with appended output.</returns>
+        <member name="M:DryIoc.Ref`1.Swap(`0)">
+            <summary>Just sets new value ignoring any intermingled changes.</summary>
+            <param name="newValue"></param> <returns>old value</returns>
         </member>
-        <member name="F:DryIoc.PrintTools.GetTypeNameDefault">
-            <summary>Default delegate to print Type details: by default prints Type FullName and
-            skips namespace if it start with "System."</summary>
+        <member name="M:DryIoc.Ref`1.TrySwapIfStillCurrent(`0,`0)">
+            <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
+            <param name="currentValue"></param> <param name="newValue"></param>
+            <returns>True if current value was replaced with new value, and false if current value is outdated (already changed by other party).</returns>
+            <example><c>[!CDATA[
+            var value = SomeRef.Value;
+            if (!SomeRef.TrySwapIfStillCurrent(value, Update(value))
+                SomeRef.Swap(v => Update(v)); // fallback to normal Swap with delegate allocation
+            ]]</c></example>
         </member>
-        <member name="M:DryIoc.PrintTools.Print(System.Text.StringBuilder,System.Type,System.Func{System.Type,System.String})">
-            <summary>Appends type details to string builder.</summary>
-            <param name="s">String builder to append output to.</param>
-            <param name="type">Input type to print.</param>
-            <param name="getTypeName">(optional) Delegate to provide custom type details.</param>
-            <returns>String builder with appended output.</returns>
+        <member name="T:DryIoc.Ref">
+            <summary>Provides optimistic-concurrency consistent <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> operation.</summary>
         </member>
-        <member name="T:DryIoc.Portable">
-            <summary>Ports some methods from .Net 4.0/4.5</summary>
+        <member name="M:DryIoc.Ref.Of``1(``0)">
+            <summary>Factory for <see cref="T:DryIoc.Ref`1"/> with type of value inference.</summary>
+            <typeparam name="T">Type of value to wrap.</typeparam>
+            <param name="value">Initial value to wrap.</param>
+            <returns>New ref.</returns>
         </member>
-        <member name="F:DryIoc.Portable.GetAssemblyTypes">
-            <summary>Portable version of Assembly.GetTypes or Assembly.DefinedTypes.</summary>
+        <member name="M:DryIoc.Ref.NewRef``1(DryIoc.Ref{``0})">
+            <summary>Creates new ref to the value of original ref.</summary> <typeparam name="T">Ref value type.</typeparam>
+            <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
         </member>
-        <member name="M:DryIoc.Portable.GetGetMethodOrNull(System.Reflection.PropertyInfo,System.Boolean)">
-            <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
-            <param name="p">Target property info</param>
-            <param name="includeNonPublic">(optional) If set then consider non-public getter</param>
-            <returns>Setter method info if it is defined for property.</returns>
-        </member>
-        <member name="M:DryIoc.Portable.GetSetMethodOrNull(System.Reflection.PropertyInfo,System.Boolean)">
-            <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
-            <param name="p">Target property info</param>
-            <param name="includeNonPublic">(optional) If set then consider non-public setter</param>
-            <returns>Setter method info if it is defined for property.</returns>
-        </member>
-        <member name="M:DryIoc.Portable.GetCurrentManagedThreadID">
-            <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>
-            <returns>Managed Thread ID.</returns>
+        <member name="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})">
+            <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
+            Second, it checks that original value is not changed. 
+            If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getNewValue"/>).</summary>
+            <typeparam name="T">Type of value to swap.</typeparam>
+            <param name="value">Reference to change to new value</param>
+            <param name="getNewValue">Delegate to get value from old one.</param>
+            <returns>Old/original value. By analogy with <see cref="M:System.Threading.Interlocked.Exchange(System.Int32@,System.Int32)"/>.</returns>
+            <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
         </member>
         <member name="T:DryIoc.KV`2">
             <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
@@ -3456,70 +3542,6 @@
             The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
             <returns>Sequence of enumerated key value pairs.</returns>
         </member>
-        <member name="T:DryIoc.Ref">
-            <summary>Provides optimistic-concurrency consistent <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> operation.</summary>
-        </member>
-        <member name="M:DryIoc.Ref.Of``1(``0)">
-            <summary>Factory for <see cref="T:DryIoc.Ref`1"/> with type of value inference.</summary>
-            <typeparam name="T">Type of value to wrap.</typeparam>
-            <param name="value">Initial value to wrap.</param>
-            <returns>New ref.</returns>
-        </member>
-        <member name="M:DryIoc.Ref.NewRef``1(DryIoc.Ref{``0})">
-            <summary>Creates new ref to the value of original ref.</summary> <typeparam name="T">Ref value type.</typeparam>
-            <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
-        </member>
-        <member name="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})">
-            <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
-            Second, it checks that original value is not changed. 
-            If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getNewValue"/>).</summary>
-            <typeparam name="T">Type of value to swap.</typeparam>
-            <param name="value">Reference to change to new value</param>
-            <param name="getNewValue">Delegate to get value from old one.</param>
-            <returns>Old/original value. By analogy with <see cref="M:System.Threading.Interlocked.Exchange(System.Int32@,System.Int32)"/>.</returns>
-            <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        </member>
-        <member name="T:DryIoc.Ref`1">
-            <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/>.</summary>
-            <typeparam name="T">Type of object to wrap.</typeparam>
-        </member>
-        <member name="P:DryIoc.Ref`1.Value">
-            <summary>Gets the wrapped value.</summary>
-        </member>
-        <member name="M:DryIoc.Ref`1.#ctor(`0)">
-            <summary>Creates ref to object, optionally with initial value provided.</summary>
-            <param name="initialValue">(optional) Initial value.</param>
-        </member>
-        <member name="M:DryIoc.Ref`1.Swap(System.Func{`0,`0})">
-            <summary>Exchanges currently hold object with <paramref name="getNewValue"/> - see <see cref="M:DryIoc.Ref.Swap``1(``0@,System.Func{``0,``0})"/> for details.</summary>
-            <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
-            <returns>Returns old object value the same way as <see cref="M:System.Threading.Interlocked.Exchange(System.Int32@,System.Int32)"/></returns>
-            <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        </member>
-        <member name="M:DryIoc.Ref`1.Swap(`0)">
-            <summary>Just sets new value ignoring any intermingled changes.</summary>
-            <param name="newValue"></param> <returns>old value</returns>
-        </member>
-        <member name="M:DryIoc.Ref`1.TrySwapIfStillCurrent(`0,`0)">
-            <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
-            <param name="currentValue"></param> <param name="newValue"></param>
-            <returns>True if current value was replaced with new value, and false if current value is outdated (already changed by other party).</returns>
-            <example><c>[!CDATA[
-            var value = SomeRef.Value;
-            if (!SomeRef.TrySwapIfStillCurrent(value, Update(value))
-                SomeRef.Swap(v => Update(v)); // fallback to normal Swap with delegate allocation
-            ]]</c></example>
-        </member>
-        <member name="T:DryIoc.Experimental.D">
-            <summary>Shortcut access to container.</summary>
-        </member>
-        <member name="F:DryIoc.Experimental.D.I">
-            <summary>Default configured container instance.</summary>
-        </member>
-        <member name="M:DryIoc.Experimental.D.Ioc">
-            <summary>Creates new default configured container</summary>
-            <returns>New configured container.</returns>
-        </member>
         <member name="T:DryIoc.AsyncExecutionFlowScopeContext">
             <summary>Stores scopes propagating through async-await boundaries.</summary>
         </member>
@@ -3542,11 +3564,6 @@
         </member>
         <member name="M:DryIoc.AsyncExecutionFlowScopeContext.Dispose">
             <summary>Nothing to dispose.</summary>
-        </member>
-        <member name="T:DryIoc.Test.Abddddd">
-            <summary>
-            
-            </summary>
         </member>
     </members>
 </doc>

@@ -149,6 +149,7 @@ namespace DryIocZero
             RequestInfo preResolveParent = null, IScope scope = null)
         {
             object service = null;
+            // no runtime registrations - fast resolve from generated delegates
             if (_keyedFactories.Value.IsEmpty)
             {
                 if (serviceKey == null && requiredServiceType == null && preResolveParent == null)
@@ -156,6 +157,8 @@ namespace DryIocZero
                 else
                     ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
             }
+
+            // if not resolved from generated fallback to check runtime registrations first
             return service ?? ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, preResolveParent, scope);
         }
 
@@ -170,13 +173,10 @@ namespace DryIocZero
             if (serviceKey == null)
                 return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault, scope);
 
+            FactoryDelegate factory;
             var factories = _keyedFactories.Value.GetValueOrDefault(serviceType);
-            if (factories != null)
-            {
-                var factory = factories.GetValueOrDefault(serviceKey);
-                if (factory != null)
-                    return factory(this, scope);
-            }
+            if (factories != null && (factory = factories.GetValueOrDefault(serviceKey)) != null)
+                return factory(this, scope);
 
             // If not resolved from runtime registration then try resolve generated
             object service = null;
@@ -216,33 +216,36 @@ namespace DryIocZero
 
             var manyGeneratedFactories = Enumerable.Empty<KV<object, FactoryDelegate>>();
             ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
+            if (serviceKey != null)
+                manyGeneratedFactories = manyGeneratedFactories.Where(kv => serviceKey.Equals(kv.Key));
             if (compositeParentKey != null)
                 manyGeneratedFactories = manyGeneratedFactories.Where(kv => !compositeParentKey.Equals(kv.Key));
 
             foreach (var generated in manyGeneratedFactories)
-                yield return ((FactoryDelegate)generated.Value)(this, scope);
+                yield return generated.Value(this, scope);
 
-            var factories = _keyedFactories.Value.GetValueOrDefault(serviceType);
-            if (factories != null)
+            if (serviceKey == null)
+            {
+                var defaultFactory = _defaultFactories.Value.GetValueOrDefault(serviceType);
+                if (defaultFactory != null)
+                    yield return defaultFactory(this, scope);
+            }
+
+            var keyedFactories = _keyedFactories.Value.GetValueOrDefault(serviceType);
+            if (keyedFactories != null)
             {
                 if (serviceKey != null)
                 {
-                    var factoryDelegate = factories.GetValueOrDefault(serviceKey);
+                    var factoryDelegate = keyedFactories.GetValueOrDefault(serviceKey);
                     if (factoryDelegate != null)
                         yield return factoryDelegate(this, scope);
                 }
                 else
                 {
-                    foreach (var resolution in factories.Enumerate())
+                    foreach (var resolution in keyedFactories.Enumerate())
                         if (compositeParentKey == null || !compositeParentKey.Equals(resolution.Key))
-                            yield return ((FactoryDelegate)resolution.Value)(this, scope);
+                            yield return resolution.Value(this, scope);
                 }
-            }
-            else
-            {
-                var factoryDelegate = _defaultFactories.Value.GetValueOrDefault(serviceType) as FactoryDelegate;
-                if (factoryDelegate != null)
-                    yield return factoryDelegate(this, scope);
             }
         }
 
@@ -268,10 +271,10 @@ namespace DryIocZero
                 return;
             }
             ThrowIfContainerDisposed();
-            _keyedFactories.Swap(_ =>
+            _keyedFactories.Swap(factories =>
             {
-                var entry = _.GetValueOrDefault(serviceType) ?? ImTreeMap<object, FactoryDelegate>.Empty;
-                return _.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
+                var entry = factories.GetValueOrDefault(serviceType) ?? ImTreeMap<object, FactoryDelegate>.Empty;
+                return factories.AddOrUpdate(serviceType, entry.AddOrUpdate(serviceKey, factoryDelegate));
             });
         }
 
@@ -351,6 +354,16 @@ namespace DryIocZero
         public IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
         {
             return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
+        }
+
+        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+        /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
+        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        public IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey)
+        {
+            return scope ?? new Scope(null, new KV<Type, object>(serviceType, serviceKey));
         }
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
@@ -526,6 +539,13 @@ namespace DryIocZero
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey);
+
+        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
+        /// <param name="scope">May be null scope.</param>
+        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceKey">Marking scope with resolved service key.</param>
+        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
+        IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey);
 
         /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
         /// then returns input <paramref name="scope"/>.

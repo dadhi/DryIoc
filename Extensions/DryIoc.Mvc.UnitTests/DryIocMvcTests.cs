@@ -56,6 +56,19 @@ namespace DryIoc.Mvc.UnitTests
             Assert.IsInstanceOf<AsyncExecutionFlowScopeContext>(container.ScopeContext);
         }
 
+        [Test]
+        public void Correct_filter_provider_substitution()
+        {
+            FilterProviders.Providers.Add(new FilterAttributeFilterProvider());
+            Assert.IsNotEmpty(FilterProviders.Providers.OfType<FilterAttributeFilterProvider>());
+
+            new Container().WithMvc(new[] {typeof(DryIocMvcTests).Assembly});
+
+            Assert.IsEmpty(FilterProviders.Providers.OfType<FilterAttributeFilterProvider>()
+                .Except(FilterProviders.Providers.OfType<DryIocFilterAttributeFilterProvider>()));
+            Assert.AreEqual(1, FilterProviders.Providers.OfType<DryIocFilterAttributeFilterProvider>().Count());
+        }
+
         public class Blah { }
         public class Fooh { }
     }

@@ -47,6 +47,7 @@
     <Compile Include="CommonReflectionUtil.cs" />
     <Compile Include="CreateEnumerableWithExpressionTests.cs" />
     <Compile Include="DirectVsIndirectArrayAccessSpeedTests.cs" />
+    <Compile Include="Either.cs" />
     <Compile Include="Experiments.cs" />
     <Compile Include="ExpressionTreeTests.cs" />
     <Compile Include="FasterAppendStore.cs" />

@@ -8,17 +8,17 @@
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc extension for ASP.NET SignalR</description>
+        <description>DryIoc integration with ASP.NET SignalR</description>
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
-          v2.0.0-rc4:
+          v2.0.0:
           - changed: WithSignalR to not modify container and just register HubActivator, Hubs, and set GlobalHost.Resolver
           - changed: HubActivator to just resolving the Hub without opening the scope
           - add: Helper methods to RegisterHubs
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.2.2,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.3.0,3.0.0)" />
             <dependency id="Microsoft.AspNet.SignalR.Core" version="[2.2,3.0)" />
           </group>
         </dependencies>

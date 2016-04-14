@@ -37,7 +37,7 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         ///<summary>Default reuse policy is Singleton, as in MEF.</summary>
-        public static ReuseType DefaultReuse = ReuseType.Singleton;
+        public static readonly ReuseType DefaultReuse = ReuseType.Singleton;
 
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/> 
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
@@ -134,7 +134,9 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Lazy collection of registration info DTOs.</returns>
         public static IEnumerable<ExportedRegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
         {
-            return assemblies.SelectMany(Portable.GetAssemblyTypes)
+            return assemblies
+                .Distinct()
+                .SelectMany(Portable.GetAssemblyTypes)
                 .Select(GetRegistrationInfoOrDefault).Where(info => info != null);
         }
 
@@ -417,6 +419,7 @@ namespace DryIoc.MefAttributedModel
                 case IfAlreadyExported.Throw: return IfAlreadyRegistered.Throw;
                 case IfAlreadyExported.Keep: return IfAlreadyRegistered.Keep;
                 case IfAlreadyExported.Replace: return IfAlreadyRegistered.Replace;
+                case IfAlreadyExported.AppendNewImplementation: return IfAlreadyRegistered.AppendNewImplementation;
                 default: return IfAlreadyRegistered.AppendNotKeyed;
             }
         }

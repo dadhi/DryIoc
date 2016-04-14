@@ -12,6 +12,8 @@
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.3.0
+          - added: #263: Add IfAlreadyRegistered.AppendNewImplementation option for better collection handling
           v2.2.2
           - fixed: #252: Make work together MefAttributedModel constructor selection and ConstructorWithResolvableArguments rule
           v2.2.1
@@ -24,13 +26,13 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc.dll" version="[2.2.2,3.0.0)" />
-                <dependency id="DryIocAttributes.dll" version="[2.2.0,3.0.0)" />
+                <dependency id="DryIoc.dll" version="[2.4,3.0.0)" />
+                <dependency id="DryIocAttributes.dll" version="[2.3,3.0.0)" />
             </group>
             <group targetFramework="dotnet">
               
-                <dependency id="DryIoc.dll" version="[2.2.2,3.0.0)" />
-                <dependency id="DryIocAttributes.dll" version="[2.2.0,3.0.0)" />
+                <dependency id="DryIoc.dll" version="[2.4,3.0.0)" />
+                <dependency id="DryIocAttributes.dll" version="[2.3,3.0.0)" />
 
                 <dependency id="System.Collections" version="4.0.0" />
                 <dependency id="System.Linq" version="4.0.0" />

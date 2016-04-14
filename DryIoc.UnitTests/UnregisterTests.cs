@@ -429,5 +429,30 @@ namespace DryIoc.UnitTests
             var a1 = container.Resolve<A>();
             Assert.AreNotSame(a, a1);
         }
+
+        [Test]
+        public void Can_UnregisterMany()
+        {
+            var c = new Container();
+            c.RegisterMany<M>();
+            c.RegisterMany<N>();
+
+            c.Resolve<IM[]>();
+            c.Resolve<IN[]>();
+
+            var types = typeof(M).GetImplementedServiceTypes();
+            foreach (var type in types)
+                c.Unregister(type, condition: f => f.ImplementationType == typeof(M));
+
+            Assert.IsInstanceOf<N>(c.Resolve<IM>());
+            Assert.IsInstanceOf<N>(c.Resolve<IN>());
+        }
+
+        public interface IM { }
+        public interface IN { }
+
+        public class M : IM, IN { }
+        public class N : IM, IN { }
+
     }
 }
