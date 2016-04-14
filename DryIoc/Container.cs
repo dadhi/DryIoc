@@ -1544,7 +1544,7 @@ namespace DryIoc
                     {
                         if (replacedFactory != null)
                             registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
-                        else
+                        else if (replacedFactories != null)
                             foreach (var f in replacedFactories.Enumerate())
                                 registry = WithoutFactoryCache(registry, f.Value, serviceType, serviceKey);
                     }
