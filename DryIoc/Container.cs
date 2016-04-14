@@ -1414,7 +1414,8 @@ namespace DryIoc
 
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
             {
-                Either<Factory, ImTreeMap<object, Factory>> replacedFactories = null;
+                Factory replacedFactory = null;
+                ImTreeMap<object, Factory> replacedFactories = null;
                 ImTreeMap<Type, object> services;
                 if (serviceKey == null)
                 {
@@ -1461,7 +1462,7 @@ namespace DryIoc
                                         newFactories.AddOrUpdate(DefaultKey.Value, newFactory));
                                 }
 
-                                replacedFactories = oldFactory;
+                                replacedFactory = oldFactory;
                                 return newEntry;
 
                             case IfAlreadyRegistered.AppendNewImplementation:
@@ -1504,7 +1505,7 @@ namespace DryIoc
                                         return oldFactory;
 
                                     case IfAlreadyRegistered.Replace:
-                                        replacedFactories = oldFactory;
+                                        replacedFactory = oldFactory;
                                         return newFactory;
 
                                     case IfAlreadyRegistered.Throw:
@@ -1518,23 +1519,18 @@ namespace DryIoc
 
                 // Note: We are reusing replaced factory (with same setup and reuse) cache by inheriting its ID.
                 // It is possible because cache depends only on ID.
-                var canReuseReplacedInstanceFactory = false;
-                if (replacedFactories != null)
-                    replacedFactories.Is(f =>
-                    {
-                        var replacedInstanceFactory = f as InstanceFactory;
-                        canReuseReplacedInstanceFactory = 
-                            replacedInstanceFactory != null && factory is InstanceFactory &&
-                            replacedInstanceFactory.Reuse == factory.Reuse &&
-                            replacedInstanceFactory.Setup == factory.Setup;
+                var reuseReplacedInstanceFactory = false;
+                if (replacedFactory != null)
+                {
+                    var replacedInstanceFactory = replacedFactory as InstanceFactory;
+                    reuseReplacedInstanceFactory =
+                        replacedInstanceFactory != null && factory is InstanceFactory &&
+                        replacedInstanceFactory.Reuse == factory.Reuse &&
+                        replacedInstanceFactory.Setup == factory.Setup;
 
-                        if (replacedInstanceFactory != null && canReuseReplacedInstanceFactory)
-                            ((InstanceFactory)factory).FactoryID = replacedInstanceFactory.FactoryID;
-                    },
-                    fs =>
-                    {
-                        // todo: handle multiple factories
-                    });
+                    if (reuseReplacedInstanceFactory)
+                        ((InstanceFactory)factory).FactoryID = replacedInstanceFactory.FactoryID;
+                }
 
                 var registry = this;
                 if (registry.Services != services)
@@ -1543,15 +1539,15 @@ namespace DryIoc
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
                         FactoryExpressionCache.NewRef(), _isChangePermitted);
 
-                    if (replacedFactories != null && !canReuseReplacedInstanceFactory)
-                        registry = replacedFactories.Is(
-                            f => WithoutFactoryCache(registry, f, serviceType, serviceKey),
-                            fs =>
-                            {
-                                foreach (var f in fs.Enumerate())
-                                    registry = WithoutFactoryCache(registry, f.Value, serviceType, serviceKey);
-                                return registry;
-                            });
+                    if ((replacedFactories != null || replacedFactory != null) &&
+                        !reuseReplacedInstanceFactory)
+                    {
+                        if (replacedFactory != null)
+                            registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
+                        else
+                            foreach (var f in replacedFactories.Enumerate())
+                                registry = WithoutFactoryCache(registry, f.Value, serviceType, serviceKey);
+                    }
                 }
 
                 return registry;
@@ -4012,22 +4008,17 @@ namespace DryIoc
                 if (serviceKey != null)
                     factories = factories.Where(f => serviceKey.Equals(f.Key));
 
-                // Replace the last factory
+                // Replace the single factory
                 var factoriesList = factories.ToArray();
-                if (factoriesList.Length != 0)
-                    factory = factoriesList[factoriesList.Length - 1].Value as InstanceFactory;
+                if (factoriesList.Length == 1)
+                    factory = factoriesList[0].Value as InstanceFactory;
 
-                // Check Keep option here on the higher level: 
-                // if no registered factory is found, then we assume that we can register new factory, and to ensure that (and ignore low level check)
-                // we replace Keep option with Replace.
-                if (ifAlreadyRegistered == IfAlreadyRegistered.Keep)
-                {
-                    if (factoriesList.Length != 0) return;
-                    ifAlreadyRegistered = IfAlreadyRegistered.Replace;
-                }
+                if (ifAlreadyRegistered == IfAlreadyRegistered.Keep && factoriesList.Length != 0)
+                    return;
             }
 
-            var canReuseAlreadyRegisteredFactory = factory != null && factory.Reuse == reuse && factory.Setup == setup;
+            var canReuseAlreadyRegisteredFactory = 
+                factory != null && factory.Reuse == reuse && factory.Setup == setup;
             if (canReuseAlreadyRegisteredFactory)
                 factory.ReplaceInstance(instance);
             else

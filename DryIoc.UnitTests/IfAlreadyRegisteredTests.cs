@@ -78,8 +78,23 @@ namespace DryIoc.UnitTests
             Assert.That(service, Is.InstanceOf<AnotherService>());
         }
 
+
         [Test]
-        public void The_replace_will_replace_all_previous_service_registrations()
+        public void Can_update_registered_named_with_new_named_preserving_defaults()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(serviceKey: EnumKey.Some);
+            container.Register<IService, Service>();
+            container.Register<IService, AnotherService>(serviceKey: EnumKey.Some,
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            Assert.IsInstanceOf<AnotherService>(container.Resolve<IService>(EnumKey.Some));
+            Assert.IsInstanceOf<Service>(container.Resolve<IService>());
+        }
+
+
+        [Test]
+        public void Replace_option_will_replace_all_previous_service_registrations()
         {
             var container = new Container();
             container.Register<IService, Service>();
