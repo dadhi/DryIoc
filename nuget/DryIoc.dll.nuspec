@@ -11,6 +11,8 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.4.1
+          - fixed: #267: False alarm about recursive dependency when using decorator
           v2.4.0
           - added: #263: Add IfAlreadyRegistered.AppendNewImplementation option for better collection handling
           - fixed: #264: IfAlreadyRegistered.Replace can span multiple registrations
