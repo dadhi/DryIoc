@@ -864,7 +864,7 @@ namespace DryIoc
 
             var serviceType = request.ServiceType;
             var container = request.Container;
-            
+
             // Get decorators for the service type
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
 
@@ -888,7 +888,8 @@ namespace DryIoc
             if (!objectDecorators.IsNullOrEmpty())
             {
                 var matchingClosedDecorators = objectDecorators.Select(
-                    factory => factory.FactoryGenerator == null ? factory
+                    factory => factory.FactoryGenerator == null
+                        ? factory
                         : factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
                     .Where(f => f != null)
                     .ToArray();
@@ -899,28 +900,27 @@ namespace DryIoc
             if (decorators.IsNullOrEmpty())
                 return null;
 
-            // There are already decorators in chain:
-            // - First is to exclude already applied decorators
-            Factory decorator;
+            // Find applied decorators and exclude them from the list
             var parent = request.Parent;
-            if (parent.FactoryType == FactoryType.Decorator)
+            if (!parent.IsEmpty)
             {
                 var appliedDecoratorIDs = parent.Enumerate()
-                    .TakeWhile(p => p.FactoryType != FactoryType.Service)
                     .Where(p => p.FactoryType == FactoryType.Decorator)
                     .Select(d => d.FactoryID)
                     .ToArray();
 
                 if (appliedDecoratorIDs.Length != 0)
+                {
                     decorators = decorators
                         .Where(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1)
                         .ToArray();
 
-                // return earlier if all decorators are already applied
-                if (decorators.Length == 0)
-                    return null;
+                    if (decorators.Length == 0)
+                        return null;
+                }
             }
 
+            Factory decorator;
             if (decorators.Length == 1)
             {
                 decorator = decorators[0];
