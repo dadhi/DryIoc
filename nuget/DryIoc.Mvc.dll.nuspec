@@ -11,13 +11,15 @@
         <description>DryIoc extension for ASP.NET MVC</description>
         <tags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.0.2
+          - fixed: #273: NuGet - DryIoc.Mvc.dll has non-dll dependencies
           v2.0.1
           - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="[2.4,3.0.0)" />
-            <dependency id="DryIoc.Web" version="[2.0,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.4.1,3.0.0)" />
+            <dependency id="DryIoc.Web.dll" version="[2.0,3.0.0)" />
           </group>
         </dependencies>
         <frameworkAssemblies>
