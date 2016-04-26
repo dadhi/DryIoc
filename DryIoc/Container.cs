@@ -265,23 +265,21 @@ namespace DryIoc
             var registeredServiceType = container.GetWrappedType(parent.ServiceType, parent.RequiredServiceType);
             var parentServiceTypeExpr = Expression.Constant(registeredServiceType, typeof(Type));
             var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
-            if (_assignMethod != null)
+
+            // if assign in expression is supported then use it.
+            if (_expressionAssignMethod != null)
             {
                 var getOrNewScopeExpr = Expression.Call(ScopesExpr, "GetOrNewResolutionScope", 
                     ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
-                var assignExpr = (Expression)_assignMethod.Invoke(null, new object[]
-                {
-                    ResolutionScopeParamExpr,
-                    getOrNewScopeExpr
-                });
-                return assignExpr;
+                var parameters = new object[] { ResolutionScopeParamExpr, getOrNewScopeExpr };
+                return (Expression)_expressionAssignMethod.Invoke(null, parameters);
             }
 
             return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope", 
                 ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
-        private static readonly MethodInfo _assignMethod = 
+        private static readonly MethodInfo _expressionAssignMethod = 
             typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression));
 
 
@@ -2465,10 +2463,12 @@ namespace DryIoc
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
-            // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
+
+            // Note: the conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
             if (serviceExpr.Type != serviceType)
                 serviceExpr = Expression.Convert(serviceExpr, serviceType);
+
             var factoryExpr = Expression.Lambda(serviceExpr, null);
             var serviceFuncType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = lazyType.GetConstructorOrNull(args: serviceFuncType);
@@ -5732,6 +5732,7 @@ namespace DryIoc
                    && Setup.Condition == null
                    && !Setup.AsResolutionCall 
                    && !Setup.UseParentReuse
+                   && !(request.Reuse is ResolutionScopeReuse)
                    // tracking disposable transient
                    && !(request.Reuse == null 
                     && (Setup.TrackDisposableTransient || request.Container.Rules.TrackingDisposableTransients) 
