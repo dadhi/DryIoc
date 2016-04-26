@@ -11,6 +11,8 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.4.2
+          - fixed: #274: Lazy resolution of dependency registered with Reuse.InResolutionScope breaks subsequent resolutions without wrappers
           v2.4.1
           - fixed: #267: False alarm about recursive dependency when using decorator
           v2.4.0
