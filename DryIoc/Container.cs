@@ -2979,15 +2979,15 @@ namespace DryIoc
         [Flags]
         private enum Settings
         {
-            ThrowIfDependencyHasShorterReuseLifespan = 1,
-            ThrowOnRegisteringDisposableTransient = 2,
-            TrackingDisposableTransients = 4,
-            ImplicitCheckForReuseMatchingScope = 8,
-            VariantGenericTypesInResolvedCollection = 16,
-            ResolveIEnumerableAsLazyEnumerable = 32,
-            EagerCachingSingletonForFasterAccess = 64,
-            ImplicitRootOpenScope = 128,
-            ThrowIfRuntimeStateRequired = 256
+            ThrowIfDependencyHasShorterReuseLifespan =  1 << 1,
+            ThrowOnRegisteringDisposableTransient =     1 << 2,
+            TrackingDisposableTransients =              1 << 3,
+            ImplicitCheckForReuseMatchingScope =        1 << 4,
+            VariantGenericTypesInResolvedCollection =   1 << 5,
+            ResolveIEnumerableAsLazyEnumerable =        1 << 6,
+            EagerCachingSingletonForFasterAccess =      1 << 7,
+            ImplicitRootOpenScope =                     1 << 8,
+            ThrowIfRuntimeStateRequired =               1 << 9
         }
 
         private const Settings DEFAULT_SETTINGS =
@@ -5535,14 +5535,14 @@ namespace DryIoc
             [Flags]
             private enum Settings
             {
-                AsResolutionCall = 1,
-                OpenResolutionScope = 2,
-                PreventDisposal = 4,
-                WeaklyReferenced = 8,
-                AllowDisposableTransient = 16,
-                TrackDisposableTransient = 32,
-                AsResolutionRoot = 64,
-                UseParentReuse = 128
+                AsResolutionCall =          1 << 1,
+                OpenResolutionScope =       1 << 2,
+                PreventDisposal =           1 << 3,
+                WeaklyReferenced =          1 << 4,
+                AllowDisposableTransient =  1 << 5,
+                TrackDisposableTransient =  1 << 6,
+                AsResolutionRoot =          1 << 7,
+                UseParentReuse =            1 << 8
             }
 
             private readonly Settings _settings;
