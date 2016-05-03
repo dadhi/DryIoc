@@ -386,6 +386,29 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<B>(bb.B);
         }
 
+        [Test]
+        public void Single_implementation_multiple_interfaces_dont_share_lifetime()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterType<AB>().As<IA>().SingleInstance();
+            builder.RegisterType<AB>().As<IB>().SingleInstance();
+
+            var c = builder.Build();
+
+            var a = c.Resolve<IA>();
+            var b = c.Resolve<IB>();
+
+            Assert.AreNotSame(a, b);
+        }
+
+        public interface IA {}
+        public interface IB {}
+
+        public class AB : IA, IB
+        {
+        }
+
         public class AutofacModule : Module
         {
             protected override void Load(ContainerBuilder builder)
