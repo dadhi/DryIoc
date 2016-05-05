@@ -96,7 +96,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.RegisterInstance("parameter");
-            container.Register(Made.Of(r => ServiceInfo.Of<ServiceFactory>(), f => f.Create(default(string))));
+            container.Register(Made.Of(r => ServiceInfo.Of<ServiceFactory>(), f => f.Create(Arg.Of<string>())));
 
             var service = container.Resolve<IService>();
 
@@ -113,7 +113,7 @@ namespace DryIoc.UnitTests
 
             container.Register(Made.Of(
                 r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
-                f => f.Create(default(string))));
+                f => f.Create(Arg.Of<string>())));
 
             var service = container.Resolve<IService>();
 

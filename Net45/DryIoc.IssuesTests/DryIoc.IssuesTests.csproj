@@ -57,6 +57,14 @@
       <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Serilog, Version=1.5.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Serilog.1.5.14\lib\net45\Serilog.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Serilog.FullNetFx, Version=1.5.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Serilog.1.5.14\lib\net45\Serilog.FullNetFx.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
@@ -113,6 +121,7 @@
     <Compile Include="Issue264_IfAlreadyRegisteredReplaceCanSpanMultipleRegistrations.cs" />
     <Compile Include="Issue267_False_alarm_about_recursive_dependency_when_using_decorator.cs" />
     <Compile Include="Issue274_Lazy_resolution_of_dependency_registered_with_ReuseInResolutionScope_breaks_subsequent_resolutions_without_wrappers.cs" />
+    <Compile Include="Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -125,7 +134,9 @@
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
+    <Compile Include="Issue_InjectingSerilogLogger.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
+    <Compile Include="Issue_ResolveBooleanWithKey.cs" />
     <Compile Include="Issue_SupportForDynamicKeyword.cs" />
     <Compile Include="Issue_UsingAsyncMethodAsMadeOf.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
