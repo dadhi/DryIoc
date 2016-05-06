@@ -22,7 +22,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Wheels>();
-            var car = container.New(Made.Of(() => CarFactory.Create(default(Wheels))));
+            var car = container.New(
+                Made.Of(() => CarFactory.Create(Arg.Of<Wheels>())));
 
             Assert.That(car.Wheels, Is.Not.Null);
             Assert.That(container.IsRegistered<Car>(), Is.False);
@@ -33,7 +34,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Wheels>();
-            container.Register(Made.Of(() => CarFactory.DecorateWheels(default(Wheels))), setup: Setup.Decorator);
+            container.Register(Made.Of(() => CarFactory.DecorateWheels(Arg.Of<Wheels>())), setup: Setup.Decorator);
 
             var car = container.New<Car>();
 

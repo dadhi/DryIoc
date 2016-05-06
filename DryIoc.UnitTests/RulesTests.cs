@@ -263,13 +263,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Container_rule_for_serializing_custom_value_to_expression_should_throw_proper_exception_for_not_supported_type()
         {
-            var container = new Container(rules => rules.WithItemToExpressionConverter(
-                (item, type) => type == typeof(ConnectionString)
-                ? Expression.New(type.GetSingleConstructorOrNull(),
-                    Expression.Constant(((ConnectionString)item).Value))
-                : null));
+            var container = new Container();
 
-            var s = new ConnectionStringImpl("aaa");
+            var s = new ConnectionString("aaa");
             container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<ConStrUser>());
@@ -283,10 +279,6 @@ namespace DryIoc.UnitTests
             {
                 Value = value;
             }
-        }
-
-        public class ConnectionStringImpl : ConnectionString {
-            public ConnectionStringImpl(string value) : base(value) {}
         }
 
         public class ConStrUser 

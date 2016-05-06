@@ -33,7 +33,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(Made.Of(() => new Burger(default(ICheese))));
+            container.Register(Made.Of(() => new Burger(Arg.Of<ICheese>())));
             container.Register<ICheese, BlueCheese>();
 
             var burger = container.Resolve<Burger>();

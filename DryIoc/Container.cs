@@ -1090,7 +1090,9 @@ namespace DryIoc
         private static Expression GetPrimitiveOrArrayExprOrDefault(object item, Type itemType)
         {
             if (item == null)
-                return Expression.Constant(null, itemType);
+                return itemType != null 
+                    ? Expression.Constant(null, itemType)
+                    : Expression.Constant(null);
 
             itemType = itemType ?? item.GetType();
 
@@ -3088,9 +3090,13 @@ namespace DryIoc
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
             var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
-            var customValue = parameterServiceInfo.Details.CustomValue;
-            if (customValue != null && customValue.GetType().IsAssignableTo(parameterRequest.ServiceType))
-                return true;
+
+            if (parameterServiceInfo.Details.HasCustomValue)
+            {
+                var customValue = parameterServiceInfo.Details.CustomValue;
+                return customValue == null 
+                    || customValue.GetType().IsAssignableTo(parameterRequest.ServiceType);
+            }
 
             var parameterFactory = request.Container.ResolveFactory(parameterRequest);
             return parameterFactory != null && parameterFactory.GetExpressionOrDefault(parameterRequest) != null;
@@ -3365,7 +3371,6 @@ namespace DryIoc
                     var argConstantExpr = GetArgConstantExpressionOrDefault(argExprs[i])
                         .ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, argExprs[i]);
 
-                    // if constant is not null use it directly as a custom value
                     var customValue = argConstantExpr.Value;
                     parameters = parameters.Details((r, p) => p.Equals(parameter) ? ServiceDetails.Of(customValue) : null);
                 }
@@ -4473,7 +4478,7 @@ namespace DryIoc
             if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
                 ifUnresolved = IfUnresolved.ReturnDefault;
 
-            return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue);
+            return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue, hasCustomValue: false);
         }
 
         /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
@@ -4481,7 +4486,7 @@ namespace DryIoc
         public static ServiceDetails Of(object value)
         {
             // Using default value with invalid ifUnresolved state to indicate custom value.
-            return new ServiceDetails(null, IfUnresolved.Throw, null, value);
+            return new ServiceDetails(null, IfUnresolved.Throw, null, value, hasCustomValue: true);
         }
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
@@ -4492,6 +4497,9 @@ namespace DryIoc
 
         /// <summary>Policy to deal with unresolved request.</summary>
         public readonly IfUnresolved IfUnresolved;
+
+        /// <summary>Indicates that the custom value is specified.</summary>
+        public readonly bool HasCustomValue;
 
         /// <summary>Either default or custom value depending on <see cref="IfUnresolved"/> setting.</summary>
         private readonly object _value;
@@ -4507,8 +4515,8 @@ namespace DryIoc
         {
             var s = new StringBuilder();
 
-            if (CustomValue != null)
-                return s.Append("{CustomValue=").Print(CustomValue, "\"").Append("}").ToString();
+            if (HasCustomValue)
+                return s.Append("{CustomValue=").Print(CustomValue ?? "null", "\"").Append("}").ToString();
 
             if (RequiredServiceType != null)
                 s.Append("{RequiredServiceType=").Print(RequiredServiceType);
@@ -4519,12 +4527,14 @@ namespace DryIoc
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
-        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, object serviceKey, object defaultValue)
+        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, object serviceKey, 
+            object value, bool hasCustomValue)
         {
             RequiredServiceType = requiredServiceType;
             IfUnresolved = ifUnresolved;
             ServiceKey = serviceKey;
-            _value = defaultValue;
+            _value = value;
+            HasCustomValue = hasCustomValue;
         }
     }
 
@@ -6316,11 +6326,13 @@ namespace DryIoc
                             var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
                             var paramRequest = request.Push(paramInfo);
 
-                            var customValue = paramInfo.Details.CustomValue;
-                            if (customValue != null)
+                            if (paramInfo.Details.HasCustomValue)
                             {
-                                customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
-                                paramExpr = paramRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                                var customValue = paramInfo.Details.CustomValue;
+                                if (customValue != null)
+                                    customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+                                paramExpr = paramRequest.Container
+                                    .GetOrAddStateItemExpression(customValue, paramRequest.ServiceType, throwIfStateRequired: true);
                             }
                             else
                             {
@@ -6531,11 +6543,12 @@ namespace DryIoc
                 {
                     Expression memberExpr;
                     var memberRequest = request.Push(member);
-                    var customValue = member.Details.CustomValue;
-                    if (customValue != null)
+                    if (member.Details.HasCustomValue)
                     {
-                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                        var customValue = member.Details.CustomValue;
+                        if (customValue != null)
+                            customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, memberRequest.ServiceType, throwIfStateRequired: true);
                     }
                     else
                     {
