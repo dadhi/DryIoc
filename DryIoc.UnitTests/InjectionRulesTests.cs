@@ -83,7 +83,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
-            container.RegisterMany(Made.Of(() => new ClientWithPropsAndFields { PInternal = default(IService) }));
+            container.RegisterMany(Made.Of(() => new ClientWithPropsAndFields { PInternal = Arg.Of<IService>() }));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 

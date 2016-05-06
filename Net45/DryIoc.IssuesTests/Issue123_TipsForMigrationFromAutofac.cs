@@ -402,11 +402,39 @@ namespace DryIoc.IssuesTests
             Assert.AreNotSame(a, b);
         }
 
-        public interface IA {}
-        public interface IB {}
+        public interface IA { }
+        public interface IB { }
+        public class AB : IA, IB { }
+        public class AA : IA { }
 
-        public class AB : IA, IB
+        [Test]
+        public void Resolve_all_services_implementing_the_interface()
         {
+            var container = new Container();
+            container.Register<IB, AB>();
+            container.Register<AA>();
+
+            var aas = container.GetServiceRegistrations()
+                .Where(r => typeof(IA).IsAssignableFrom(r.Factory.ImplementationType ?? r.ServiceType))
+                .Select(r => (IA)container.Resolve(r.ServiceType))
+                .ToList();
+
+            Assert.AreEqual(2, aas.Count);
+        }
+
+        [Test]
+        public void Resolve_all_registered_interface_services()
+        {
+            var container = new Container();
+
+            // changed to RegisterMany to register implemented interfaces as services
+            container.RegisterMany<AB>();
+            container.RegisterMany<AA>();
+
+            // simple resolve
+            var aas = container.Resolve<IList<IA>>();
+
+            Assert.AreEqual(2, aas.Count);
         }
 
         public class AutofacModule : Module

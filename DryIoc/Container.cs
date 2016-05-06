@@ -3368,10 +3368,7 @@ namespace DryIoc
                 }
                 else
                 {
-                    var argConstantExpr = GetArgConstantExpressionOrDefault(argExprs[i])
-                        .ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, argExprs[i]);
-
-                    var customValue = argConstantExpr.Value;
+                    var customValue = GetArgExpressionValueOrThrow(argExprs[i]);
                     parameters = parameters.Details((r, p) => p.Equals(parameter) ? ServiceDetails.Of(customValue) : null);
                 }
             }
@@ -3390,8 +3387,7 @@ namespace DryIoc
                 var methodCallExpr = memberAssignment.Expression as MethodCallExpression;
                 if (methodCallExpr == null)
                 {
-                    var memberDefaultExpr = GetArgConstantExpressionOrDefault(memberAssignment.Expression);
-                    memberDefaultExpr.ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, memberAssignment.Expression);
+                    GetArgExpressionValueOrThrow(memberAssignment.Expression);
                     propertiesAndFields = propertiesAndFields.And(r => new[]
                     {
                         PropertyOrFieldServiceInfo.Of(member)
@@ -3431,8 +3427,7 @@ namespace DryIoc
             Throw.If(argValues.IsNullOrEmpty(), Error.ArgOfValueIsProvidedButNoArgValues);
 
             var argIndexExpr = methodCallExpr.Arguments[0];
-            var argIndexValueExpr = GetArgConstantExpressionOrDefault(argIndexExpr);
-            var argIndex = (int)argIndexValueExpr.Value;
+            var argIndex = (int)GetArgExpressionValueOrThrow(argIndexExpr);
 
             Throw.If(argIndex < 0 || argIndex >= argValues.Length,
                 Error.ArgOfValueIndesIsOutOfProvidedArgValues, argIndex, argValues);
@@ -3456,12 +3451,12 @@ namespace DryIoc
             var argExpr = methodCallExpr.Arguments;
             for (var j = 0; j < argExpr.Count; j++)
             {
-                var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
-                if (argValueExpr != null)
+                var argValue = GetArgExpressionValueOrThrow(argExpr[j]);
+                if (argValue != null)
                 {
-                    if (argValueExpr.Type == typeof(IfUnresolved))
+                    if (argValue is IfUnresolved)
                     {
-                        ifUnresolved = (IfUnresolved)argValueExpr.Value;
+                        ifUnresolved = (IfUnresolved)argValue;
                         if (hasPrevArg) // the only possible argument is default value.
                         {
                             defaultValue = serviceKey;
@@ -3470,7 +3465,7 @@ namespace DryIoc
                     }
                     else
                     {
-                        serviceKey = argValueExpr.Value;
+                        serviceKey = argValue;
                         hasPrevArg = true;
                     }
                 }
@@ -3479,15 +3474,29 @@ namespace DryIoc
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        private static ConstantExpression GetArgConstantExpressionOrDefault(Expression arg)
+        private static object GetArgExpressionValueOrThrow(Expression arg)
         {
             var valueExpr = arg as ConstantExpression;
             if (valueExpr != null)
-                return valueExpr;
+                return valueExpr.Value;
+
             var convert = arg as UnaryExpression; // e.g. (object)SomeEnum.Value
             if (convert != null && convert.NodeType == ExpressionType.Convert)
-                valueExpr = convert.Operand as ConstantExpression;
-            return valueExpr;
+                return GetArgExpressionValueOrThrow(convert.Operand as ConstantExpression);
+
+            var member = arg as MemberExpression;
+            if (member != null)
+            {
+                var memberOwner = member.Expression as ConstantExpression;
+                if (memberOwner != null && memberOwner.Type.IsClosureType())
+                {
+                    var memberField = member.Member as FieldInfo;
+                    if (memberField != null)
+                        return memberField.GetValue(memberOwner.Value);
+                }
+            }
+            
+            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstant, arg);
         }
 
         #endregion
@@ -9089,6 +9098,13 @@ namespace DryIoc
         public static bool IsIndexer(this PropertyInfo property)
         {
             return property.GetIndexParameters().Length != 0;
+        }
+
+        /// <summary>Returns true if type is generated type of hoisted closure.</summary>
+        /// <param name="type">Source type.</param> <returns>Check result.</returns>
+        public static bool IsClosureType(this Type type)
+        {
+            return type.Name.Contains("<>c__DisplayClass");
         }
 
         /// <summary>Returns attributes defined for the member/method.</summary>

@@ -9,21 +9,19 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var c = new Container();
+            
+            c.RegisterInstance(false, serviceKey: "skipAuthz");
 
-            bool hasAccess = true;
-            c.RegisterInstance(hasAccess, serviceKey: "hasAccess");
-            c.Register(Made.Of(() => new A(Arg.Of<bool>("hasAccess"))));
+            var accessAll = new object();
+            c.RegisterInstance(true, serviceKey: accessAll);
+            c.Register(Made.Of(() => new A(Arg.Of<bool>(accessAll))));
 
-            c.Resolve<A>();
-
+            Assert.DoesNotThrow(() => c.Resolve<A>());
         }
 
         public class A
         {
-            public A(bool hasAccess)
-            {
-                
-            }
+            public A(bool hasAccess) {}
         }
     }
 }
