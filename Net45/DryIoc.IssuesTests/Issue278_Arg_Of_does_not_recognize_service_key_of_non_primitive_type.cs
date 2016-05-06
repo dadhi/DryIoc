@@ -3,7 +3,7 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue_ResolveBooleanWithKey
+    public class Issue278_Arg_Of_does_not_recognize_service_key_of_non_primitive_type
     {
         [Test]
         public void Test()
