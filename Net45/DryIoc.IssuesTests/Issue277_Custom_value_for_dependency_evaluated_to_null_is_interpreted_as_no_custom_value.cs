@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.IssuesTests;
 using NUnit.Framework;
 
 namespace DryIoc
@@ -11,11 +12,11 @@ namespace DryIoc
         {
             var c = new Container();
 
-            c.Register(Made.Of(() => Serilog.Log.ForContext(Arg.Index<Type>(0)),
+            c.Register(Made.Of(() => Issue_InjectingSerilogLogger.Log.ForContext(Arg.Index<Type>(0)),
                 r => r.Parent.ImplementationType));
 
             // When ImplementationType is null fails trying to resolve the Type parameter
-            c.Resolve<Serilog.ILogger>();
+            c.Resolve<Issue_InjectingSerilogLogger.ILogger>();
         }
     }
 }
