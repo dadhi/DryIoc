@@ -93,15 +93,28 @@ namespace DryIoc.UnitTests
         public void Can_specify_properties_and_fields_together_with_constructor()
         {
             var container = new Container();
-            container.Register(Made.Of(() => new Burger { Name = "", Cheese = Arg.Of<BlueCheese>() }));
+            container.Register(Made.Of(() => 
+                new Burger { Name = "x", Cheese = Arg.Of<BlueCheese>() }));
 
-            container.RegisterInstance("King");
             container.Register<BlueCheese>();
 
             var burger = container.Resolve<Burger>();
 
-            Assert.AreEqual("King", burger.Name);
+            Assert.AreEqual("x", burger.Name);
             Assert.IsInstanceOf<BlueCheese>(burger.Cheese);
+        }
+
+        [Test]
+        public void Can_specify_custom_value_via_variable_for_a_property()
+        {
+            var container = new Container();
+
+            var x = "King";
+            container.Register(Made.Of(() => new Burger { Name = x }));
+
+            var burger = container.Resolve<Burger>();
+
+            Assert.AreEqual("King", burger.Name);
         }
 
         [Test]
@@ -113,7 +126,6 @@ namespace DryIoc.UnitTests
 
             var burger = container.Resolve<IBurger>();
 
-            Assert.AreEqual(3, burger.Size);
         }
 
         [Test]

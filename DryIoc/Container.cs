@@ -3385,12 +3385,13 @@ namespace DryIoc
                 var member = memberAssignment.Member;
 
                 var methodCallExpr = memberAssignment.Expression as MethodCallExpression;
-                if (methodCallExpr == null)
+                if (methodCallExpr == null) // not an Arg.Of: e.g. constant or variable
                 {
-                    GetArgExpressionValueOrThrow(memberAssignment.Expression);
+                    var customValue = GetArgExpressionValueOrThrow(memberAssignment.Expression);
                     propertiesAndFields = propertiesAndFields.And(r => new[]
                     {
-                        PropertyOrFieldServiceInfo.Of(member)
+                        PropertyOrFieldServiceInfo.Of(member).WithDetails(
+                                ServiceDetails.Of(customValue), r)
                     });
                 }
                 else
