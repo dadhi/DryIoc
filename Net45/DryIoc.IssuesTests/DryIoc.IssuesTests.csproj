@@ -113,6 +113,7 @@
     <Compile Include="Issue264_IfAlreadyRegisteredReplaceCanSpanMultipleRegistrations.cs" />
     <Compile Include="Issue267_False_alarm_about_recursive_dependency_when_using_decorator.cs" />
     <Compile Include="Issue274_Lazy_resolution_of_dependency_registered_with_ReuseInResolutionScope_breaks_subsequent_resolutions_without_wrappers.cs" />
+    <Compile Include="Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -125,7 +126,9 @@
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
+    <Compile Include="Issue_InjectingSerilogLogger.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
+    <Compile Include="Issue278_Arg_Of_does_not_recognize_service_key_of_non_primitive_type.cs" />
     <Compile Include="Issue_SupportForDynamicKeyword.cs" />
     <Compile Include="Issue_UsingAsyncMethodAsMadeOf.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

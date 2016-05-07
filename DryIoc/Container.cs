@@ -1090,7 +1090,9 @@ namespace DryIoc
         private static Expression GetPrimitiveOrArrayExprOrDefault(object item, Type itemType)
         {
             if (item == null)
-                return Expression.Constant(null, itemType);
+                return itemType != null 
+                    ? Expression.Constant(null, itemType)
+                    : Expression.Constant(null);
 
             itemType = itemType ?? item.GetType();
 
@@ -2979,15 +2981,15 @@ namespace DryIoc
         [Flags]
         private enum Settings
         {
-            ThrowIfDependencyHasShorterReuseLifespan = 1,
-            ThrowOnRegisteringDisposableTransient = 2,
-            TrackingDisposableTransients = 4,
-            ImplicitCheckForReuseMatchingScope = 8,
-            VariantGenericTypesInResolvedCollection = 16,
-            ResolveIEnumerableAsLazyEnumerable = 32,
-            EagerCachingSingletonForFasterAccess = 64,
-            ImplicitRootOpenScope = 128,
-            ThrowIfRuntimeStateRequired = 256
+            ThrowIfDependencyHasShorterReuseLifespan =  1 << 1,
+            ThrowOnRegisteringDisposableTransient =     1 << 2,
+            TrackingDisposableTransients =              1 << 3,
+            ImplicitCheckForReuseMatchingScope =        1 << 4,
+            VariantGenericTypesInResolvedCollection =   1 << 5,
+            ResolveIEnumerableAsLazyEnumerable =        1 << 6,
+            EagerCachingSingletonForFasterAccess =      1 << 7,
+            ImplicitRootOpenScope =                     1 << 8,
+            ThrowIfRuntimeStateRequired =               1 << 9
         }
 
         private const Settings DEFAULT_SETTINGS =
@@ -3088,9 +3090,13 @@ namespace DryIoc
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
             var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request));
-            var customValue = parameterServiceInfo.Details.CustomValue;
-            if (customValue != null && customValue.GetType().IsAssignableTo(parameterRequest.ServiceType))
-                return true;
+
+            if (parameterServiceInfo.Details.HasCustomValue)
+            {
+                var customValue = parameterServiceInfo.Details.CustomValue;
+                return customValue == null 
+                    || customValue.GetType().IsAssignableTo(parameterRequest.ServiceType);
+            }
 
             var parameterFactory = request.Container.ResolveFactory(parameterRequest);
             return parameterFactory != null && parameterFactory.GetExpressionOrDefault(parameterRequest) != null;
@@ -3362,11 +3368,7 @@ namespace DryIoc
                 }
                 else
                 {
-                    var argConstantExpr = GetArgConstantExpressionOrDefault(argExprs[i])
-                        .ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, argExprs[i]);
-
-                    // if constant is not null use it directly as a custom value
-                    var customValue = argConstantExpr.Value;
+                    var customValue = GetArgExpressionValueOrThrow(argExprs[i]);
                     parameters = parameters.Details((r, p) => p.Equals(parameter) ? ServiceDetails.Of(customValue) : null);
                 }
             }
@@ -3383,13 +3385,13 @@ namespace DryIoc
                 var member = memberAssignment.Member;
 
                 var methodCallExpr = memberAssignment.Expression as MethodCallExpression;
-                if (methodCallExpr == null)
+                if (methodCallExpr == null) // not an Arg.Of: e.g. constant or variable
                 {
-                    var memberDefaultExpr = GetArgConstantExpressionOrDefault(memberAssignment.Expression);
-                    memberDefaultExpr.ThrowIfNull(Error.UnexpectedExpressionInsteadOfConstant, memberAssignment.Expression);
+                    var customValue = GetArgExpressionValueOrThrow(memberAssignment.Expression);
                     propertiesAndFields = propertiesAndFields.And(r => new[]
                     {
-                        PropertyOrFieldServiceInfo.Of(member)
+                        PropertyOrFieldServiceInfo.Of(member).WithDetails(
+                                ServiceDetails.Of(customValue), r)
                     });
                 }
                 else
@@ -3426,8 +3428,7 @@ namespace DryIoc
             Throw.If(argValues.IsNullOrEmpty(), Error.ArgOfValueIsProvidedButNoArgValues);
 
             var argIndexExpr = methodCallExpr.Arguments[0];
-            var argIndexValueExpr = GetArgConstantExpressionOrDefault(argIndexExpr);
-            var argIndex = (int)argIndexValueExpr.Value;
+            var argIndex = (int)GetArgExpressionValueOrThrow(argIndexExpr);
 
             Throw.If(argIndex < 0 || argIndex >= argValues.Length,
                 Error.ArgOfValueIndesIsOutOfProvidedArgValues, argIndex, argValues);
@@ -3451,12 +3452,12 @@ namespace DryIoc
             var argExpr = methodCallExpr.Arguments;
             for (var j = 0; j < argExpr.Count; j++)
             {
-                var argValueExpr = GetArgConstantExpressionOrDefault(argExpr[j]);
-                if (argValueExpr != null)
+                var argValue = GetArgExpressionValueOrThrow(argExpr[j]);
+                if (argValue != null)
                 {
-                    if (argValueExpr.Type == typeof(IfUnresolved))
+                    if (argValue is IfUnresolved)
                     {
-                        ifUnresolved = (IfUnresolved)argValueExpr.Value;
+                        ifUnresolved = (IfUnresolved)argValue;
                         if (hasPrevArg) // the only possible argument is default value.
                         {
                             defaultValue = serviceKey;
@@ -3465,7 +3466,7 @@ namespace DryIoc
                     }
                     else
                     {
-                        serviceKey = argValueExpr.Value;
+                        serviceKey = argValue;
                         hasPrevArg = true;
                     }
                 }
@@ -3474,15 +3475,29 @@ namespace DryIoc
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue);
         }
 
-        private static ConstantExpression GetArgConstantExpressionOrDefault(Expression arg)
+        private static object GetArgExpressionValueOrThrow(Expression arg)
         {
             var valueExpr = arg as ConstantExpression;
             if (valueExpr != null)
-                return valueExpr;
+                return valueExpr.Value;
+
             var convert = arg as UnaryExpression; // e.g. (object)SomeEnum.Value
             if (convert != null && convert.NodeType == ExpressionType.Convert)
-                valueExpr = convert.Operand as ConstantExpression;
-            return valueExpr;
+                return GetArgExpressionValueOrThrow(convert.Operand as ConstantExpression);
+
+            var member = arg as MemberExpression;
+            if (member != null)
+            {
+                var memberOwner = member.Expression as ConstantExpression;
+                if (memberOwner != null && memberOwner.Type.IsClosureType())
+                {
+                    var memberField = member.Member as FieldInfo;
+                    if (memberField != null)
+                        return memberField.GetValue(memberOwner.Value);
+                }
+            }
+            
+            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstant, arg);
         }
 
         #endregion
@@ -4473,7 +4488,7 @@ namespace DryIoc
             if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
                 ifUnresolved = IfUnresolved.ReturnDefault;
 
-            return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue);
+            return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue, hasCustomValue: false);
         }
 
         /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
@@ -4481,7 +4496,7 @@ namespace DryIoc
         public static ServiceDetails Of(object value)
         {
             // Using default value with invalid ifUnresolved state to indicate custom value.
-            return new ServiceDetails(null, IfUnresolved.Throw, null, value);
+            return new ServiceDetails(null, IfUnresolved.Throw, null, value, hasCustomValue: true);
         }
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
@@ -4492,6 +4507,9 @@ namespace DryIoc
 
         /// <summary>Policy to deal with unresolved request.</summary>
         public readonly IfUnresolved IfUnresolved;
+
+        /// <summary>Indicates that the custom value is specified.</summary>
+        public readonly bool HasCustomValue;
 
         /// <summary>Either default or custom value depending on <see cref="IfUnresolved"/> setting.</summary>
         private readonly object _value;
@@ -4507,8 +4525,8 @@ namespace DryIoc
         {
             var s = new StringBuilder();
 
-            if (CustomValue != null)
-                return s.Append("{CustomValue=").Print(CustomValue, "\"").Append("}").ToString();
+            if (HasCustomValue)
+                return s.Append("{CustomValue=").Print(CustomValue ?? "null", "\"").Append("}").ToString();
 
             if (RequiredServiceType != null)
                 s.Append("{RequiredServiceType=").Print(RequiredServiceType);
@@ -4519,12 +4537,14 @@ namespace DryIoc
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
-        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, object serviceKey, object defaultValue)
+        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, object serviceKey, 
+            object value, bool hasCustomValue)
         {
             RequiredServiceType = requiredServiceType;
             IfUnresolved = ifUnresolved;
             ServiceKey = serviceKey;
-            _value = defaultValue;
+            _value = value;
+            HasCustomValue = hasCustomValue;
         }
     }
 
@@ -5535,14 +5555,14 @@ namespace DryIoc
             [Flags]
             private enum Settings
             {
-                AsResolutionCall = 1,
-                OpenResolutionScope = 2,
-                PreventDisposal = 4,
-                WeaklyReferenced = 8,
-                AllowDisposableTransient = 16,
-                TrackDisposableTransient = 32,
-                AsResolutionRoot = 64,
-                UseParentReuse = 128
+                AsResolutionCall =          1 << 1,
+                OpenResolutionScope =       1 << 2,
+                PreventDisposal =           1 << 3,
+                WeaklyReferenced =          1 << 4,
+                AllowDisposableTransient =  1 << 5,
+                TrackDisposableTransient =  1 << 6,
+                AsResolutionRoot =          1 << 7,
+                UseParentReuse =            1 << 8
             }
 
             private readonly Settings _settings;
@@ -6316,11 +6336,13 @@ namespace DryIoc
                             var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
                             var paramRequest = request.Push(paramInfo);
 
-                            var customValue = paramInfo.Details.CustomValue;
-                            if (customValue != null)
+                            if (paramInfo.Details.HasCustomValue)
                             {
-                                customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
-                                paramExpr = paramRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                                var customValue = paramInfo.Details.CustomValue;
+                                if (customValue != null)
+                                    customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+                                paramExpr = paramRequest.Container
+                                    .GetOrAddStateItemExpression(customValue, paramRequest.ServiceType, throwIfStateRequired: true);
                             }
                             else
                             {
@@ -6531,11 +6553,12 @@ namespace DryIoc
                 {
                     Expression memberExpr;
                     var memberRequest = request.Push(member);
-                    var customValue = member.Details.CustomValue;
-                    if (customValue != null)
+                    if (member.Details.HasCustomValue)
                     {
-                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, throwIfStateRequired: true);
+                        var customValue = member.Details.CustomValue;
+                        if (customValue != null)
+                            customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, memberRequest.ServiceType, throwIfStateRequired: true);
                     }
                     else
                     {
@@ -9076,6 +9099,13 @@ namespace DryIoc
         public static bool IsIndexer(this PropertyInfo property)
         {
             return property.GetIndexParameters().Length != 0;
+        }
+
+        /// <summary>Returns true if type is generated type of hoisted closure.</summary>
+        /// <param name="type">Source type.</param> <returns>Check result.</returns>
+        public static bool IsClosureType(this Type type)
+        {
+            return type.Name.Contains("<>c__DisplayClass");
         }
 
         /// <summary>Returns attributes defined for the member/method.</summary>

@@ -12,6 +12,9 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.4.3
+      - fixed: #277 Custom value for dependency evaluated to null is interpreted as no custom value and tries to resolve the dependency
+      - fixed: #278 Arg.Of does not recognize service key of non-primitive type
       v2.4.2
       - fixed: #274: Lazy resolution of dependency registered with Reuse.InResolutionScope breaks subsequent resolutions without wrappers
       v2.4.1
