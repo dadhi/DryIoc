@@ -221,7 +221,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Skip_resolution_on_missing_dependency()
+        public void Skip_resolution_on_missing_dependency_when_resolved_with_ReturnDefault()
         {
             var container = new Container();
             container.Register<A>();
@@ -230,6 +230,20 @@ namespace DryIoc.UnitTests
 
             Assert.AreEqual(0, items.Length);
         }
+
+        [Test, Ignore]
+        public void Lazy_enumerable_should_throw_on_missing_dependency()
+        {
+            var container = new Container(rules => 
+                rules.WithResolveIEnumerableAsLazyEnumerable());
+            container.Register<A>();
+
+            var items = container.Resolve<IEnumerable<A>>();
+
+            Assert.Throws<ContainerException>(
+                () => items.Count());
+        }
+
 
         public class B { }
 
