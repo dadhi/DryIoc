@@ -231,7 +231,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(0, items.Length);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Lazy_enumerable_should_throw_on_missing_dependency()
         {
             var container = new Container(rules => 
@@ -240,16 +240,110 @@ namespace DryIoc.UnitTests
 
             var items = container.Resolve<IEnumerable<A>>();
 
-            Assert.Throws<ContainerException>(
+            
+            var ex = Assert.Throws<ContainerException>(
                 () => items.Count());
+
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), Error.NameOf(ex.Error));
         }
 
+        [Test]
+        public void Lazy_enumerable_should_Not_throw_on_missing_dependency_when_resolved_as_ResolveDefault()
+        {
+            var container = new Container(rules =>
+                rules.WithResolveIEnumerableAsLazyEnumerable());
+            container.Register<A>();
+
+            var items = container.Resolve<IEnumerable<A>>(IfUnresolved.ReturnDefault);
+
+            Assert.AreEqual(0, items.Count());
+        }
+
+        [Test]
+        public void Lazy_enumerable_of_enumerable_should_throw_for_nested_enumarable_of_ResolveThrow()
+        {
+            var container = new Container(rules =>
+                rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.Register<A>();
+            container.Register(Made.Of(() => new AA(Arg.Of<IEnumerable<A>>(IfUnresolved.Throw))));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<IEnumerable<AA>>().ToArray());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToResolveUnknownService), 
+                Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void Lazy_enumerable_of_enumerable_of_meta_dep_should_throw_for_nested_enumarable_of_ResolveThrow()
+        {
+            var container = new Container(rules =>
+                rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.Register<D>();
+            container.Register(Made.Of(() => new AD(Arg.Of<IEnumerable<D>>(IfUnresolved.Throw))));
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<IEnumerable<AD>>().ToArray());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToResolveUnknownService),
+                Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void Lazy_enumerable_of_enumerable_of_array_dep_should_throw_for_nested_enumarable_of_ResolveThrow()
+        {
+            var container = new Container(rules =>
+                rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.Register<E>();
+            container.Register(Made.Of(() => new AE(Arg.Of<IEnumerable<E>>(IfUnresolved.Throw))));
+
+            var aes = container.Resolve<IEnumerable<AD>>().ToArray();
+        }
 
         public class B { }
 
         public class A
         {
             public A(B b) { }
+        }
+
+        public class AA
+        {
+            public AA(IEnumerable<A> aas)
+            {
+                aas.ToArray();
+            }
+        }
+
+        public class D
+        {
+            public D(Meta<B, string> b) { }
+        }
+
+        public class AD
+        {
+            public AD (IEnumerable<D> dds)
+            {
+                dds.ToArray();
+            }
+        }
+
+        public class E
+        {
+            public E(B[] b) { }
+        }
+
+        public class AE
+        {
+            public AE(IEnumerable<E> dds)
+            {
+                dds.ToArray();
+            }
         }
 
         public interface ICmd { }
