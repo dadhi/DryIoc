@@ -122,6 +122,7 @@
     <Compile Include="Issue267_False_alarm_about_recursive_dependency_when_using_decorator.cs" />
     <Compile Include="Issue274_Lazy_resolution_of_dependency_registered_with_ReuseInResolutionScope_breaks_subsequent_resolutions_without_wrappers.cs" />
     <Compile Include="Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value.cs" />
+    <Compile Include="Issue281_MakeAutofacMigrationEasier.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

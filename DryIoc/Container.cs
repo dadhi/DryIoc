@@ -3273,14 +3273,14 @@ namespace DryIoc
             }
             else if (callExpr.NodeType == ExpressionType.Call)
             {
-                var methodCallExpr = ((MethodCallExpression)callExpr);
+                var methodCallExpr = (MethodCallExpression)callExpr;
                 ctorOrMethodOrMember = methodCallExpr.Method;
                 parameters = methodCallExpr.Method.GetParameters();
                 argExprs = methodCallExpr.Arguments;
             }
             else if (callExpr.NodeType == ExpressionType.Invoke)
             {
-                var invokeExpr = ((InvocationExpression)callExpr);
+                var invokeExpr = (InvocationExpression)callExpr;
                 var invokedDelegateExpr = invokeExpr.Expression;
                 var invokeMethod = invokedDelegateExpr.Type.GetSingleMethodOrNull("Invoke");
                 ctorOrMethodOrMember = invokeMethod;
