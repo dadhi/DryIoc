@@ -27,6 +27,75 @@ using System.Text;
 
 namespace System
 {
+    /// <summary>Func with 5 input parameters.</summary>
+    /// <typeparam name="T1"></typeparam>
+    /// <typeparam name="T2"></typeparam>
+    /// <typeparam name="T3"></typeparam>
+    /// <typeparam name="T4"></typeparam>
+    /// <typeparam name="T5"></typeparam>
+    /// <typeparam name="TResult"></typeparam>
+    /// <param name="arg1"></param>
+    /// <param name="arg2"></param>
+    /// <param name="arg3"></param>
+    /// <param name="arg4"></param>
+    /// <param name="arg5"></param>
+    /// <returns></returns>
+    public delegate TResult Func<T1, T2, T3, T4, T5, TResult>(
+        T1 arg1,
+        T2 arg2,
+        T3 arg3,
+        T4 arg4,
+        T5 arg5);
+
+    /// <summary>Func with 6 input parameters.</summary>
+    /// <typeparam name="T1"></typeparam>
+    /// <typeparam name="T2"></typeparam>
+    /// <typeparam name="T3"></typeparam>
+    /// <typeparam name="T4"></typeparam>
+    /// <typeparam name="T5"></typeparam>
+    /// <typeparam name="T6"></typeparam>
+    /// <typeparam name="TResult"></typeparam>
+    /// <param name="arg1"></param>
+    /// <param name="arg2"></param>
+    /// <param name="arg3"></param>
+    /// <param name="arg4"></param>
+    /// <param name="arg5"></param>
+    /// <param name="arg6"></param>
+    /// <returns></returns>
+    public delegate TResult Func<T1, T2, T3, T4, T5, T6, TResult>(
+        T1 arg1,
+        T2 arg2,
+        T3 arg3,
+        T4 arg4,
+        T5 arg5,
+        T6 arg6);
+
+    /// <summary>Func with 7 input parameters.</summary>
+    /// <typeparam name="T1"></typeparam>
+    /// <typeparam name="T2"></typeparam>
+    /// <typeparam name="T3"></typeparam>
+    /// <typeparam name="T4"></typeparam>
+    /// <typeparam name="T5"></typeparam>
+    /// <typeparam name="T6"></typeparam>
+    /// <typeparam name="T7"></typeparam>
+    /// <typeparam name="TResult"></typeparam>
+    /// <param name="arg1"></param>
+    /// <param name="arg2"></param>
+    /// <param name="arg3"></param>
+    /// <param name="arg4"></param>
+    /// <param name="arg5"></param>
+    /// <param name="arg6"></param>
+    /// <param name="arg7"></param>
+    /// <returns></returns>
+    public delegate TResult Func<T1, T2, T3, T4, T5, T6, T7, TResult>(
+        T1 arg1,
+        T2 arg2,
+        T3 arg3,
+        T4 arg4,
+        T5 arg5,
+        T6 arg6,
+        T7 arg7);
+
     /// <summary>Wrapper for value computation required on-demand. Since computed the same value will be returned over and over again.</summary>
     /// <typeparam name="T">Type of value.</typeparam>
     public sealed class Lazy<T>

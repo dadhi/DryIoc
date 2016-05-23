@@ -2244,7 +2244,11 @@ namespace DryIoc
     public static class WrappersSupport
     {
         /// <summary>Supported Func types up to 4 input parameters.</summary>
-        public static readonly Type[] FuncTypes = { typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>) };
+        public static readonly Type[] FuncTypes =
+        {
+            typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>),
+            typeof(Func<,,,,,>), typeof(Func<,,,,,,>), typeof(Func<,,,,,,,>)
+        };
 
         /// <summary>Supported open-generic collection types.</summary>
         public static readonly IEnumerable<Type> ArrayInterfaces = 
