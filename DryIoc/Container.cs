@@ -4978,7 +4978,7 @@ namespace DryIoc
         public static Request CreateEmpty(ContainerWeakRef container)
         {
             var resolverContext = new ResolverContext(container, container, null, RequestInfo.Empty);
-            return new Request(resolverContext, parent: null, requestInfo: null, made: null, funcArgs: null);
+            return new Request(resolverContext, parent: null, requestInfo: RequestInfo.Empty, made: null, funcArgs: null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="_requestInfo"/> in such a request.</summary>
@@ -5071,9 +5071,6 @@ namespace DryIoc
         /// <summary>(optional) Made spec used for resolving request.</summary>
         public readonly Made Made;
 
-        /// <summary>Service reuse.</summary>
-        public IReuse Reuse { get { return _requestInfo.Reuse; } }
-
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
         /// <remarks>Mutable: tracks used parameters</remarks>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
@@ -5082,26 +5079,30 @@ namespace DryIoc
         public readonly int Level;
 
         /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
-        public Type ServiceType { get { return _requestInfo == null ? null : _requestInfo.ServiceType; } }
+        public Type ServiceType { get { return _requestInfo.ServiceType; } }
 
         /// <summary>Shortcut access to <see cref="ServiceDetails.ServiceKey"/>.</summary>
-        public object ServiceKey { get { return _requestInfo.ThrowIfNull().ServiceKey; } }
+        public object ServiceKey { get { return _requestInfo.ServiceKey; } }
 
         /// <summary>Shortcut access to <see cref="ServiceDetails.IfUnresolved"/>.</summary>
         public IfUnresolved IfUnresolved { get { return _requestInfo.ThrowIfNull().IfUnresolved; } }
 
         /// <summary>Shortcut access to <see cref="ServiceDetails.RequiredServiceType"/>.</summary>
-        public Type RequiredServiceType { get { return _requestInfo.ThrowIfNull().RequiredServiceType; } }
-
-        /// <summary>Implementation type of factory, if request was <see cref="WithResolvedFactory"/> factory, or null otherwise.</summary>
-        public Type ImplementationType { get { return _requestInfo == null ? null : _requestInfo.ImplementationType; } }
+        public Type RequiredServiceType { get { return _requestInfo.RequiredServiceType; } }
 
         /// <summary>Shortcut to FactoryID.</summary>
         /// <remarks>The default unassigned value od ID is 0.</remarks>
         public int FactoryID { get { return _requestInfo.FactoryID; } }
 
         /// <summary>Shortcut to FactoryType.</summary>
-        public FactoryType FactoryType { get { return _requestInfo == null ? FactoryType.Service : _requestInfo.FactoryType; } }
+        public FactoryType FactoryType { get { return _requestInfo.FactoryType; } }
+
+        /// <summary>Implementation type of factory, 
+        /// if request was <see cref="WithResolvedFactory"/> factory, or null otherwise.</summary>
+        public Type ImplementationType { get { return _requestInfo.ImplementationType; } }
+
+        /// <summary>Service reuse.</summary>
+        public IReuse Reuse { get { return _requestInfo.Reuse; } }
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
@@ -5110,7 +5111,7 @@ namespace DryIoc
         /// <returns>The type to be used for lookup in registry.</returns>
         public Type GetActualServiceType()
         {
-            return _requestInfo.ThrowIfNull().GetActualServiceType();
+            return _requestInfo.GetActualServiceType();
         }
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
@@ -5352,19 +5353,10 @@ namespace DryIoc
         public StringBuilder PrintCurrent(StringBuilder s = null)
         {
             s = s ?? new StringBuilder();
-            if (IsEmpty)
-                return s.Append("{{empty}}");
-
-            if (FactoryType != FactoryType.Service)
-                s.Append(FactoryType.ToString().ToLower()).Append(' ');
-
+            s = _requestInfo.PrintCurrent(s);
             if (FuncArgs != null)
-                s.AppendFormat("with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
-
-            if (ImplementationType != null && ImplementationType != ServiceType)
-                s.Print(ImplementationType).Append(": ");
-
-            return s.Append(_requestInfo.ServiceInfo);
+                s.AppendFormat(" with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
+            return s;
         }
 
         /// <summary>Prints full stack of requests starting from current one using <see cref="PrintCurrent"/>.</summary>
@@ -7954,7 +7946,7 @@ namespace DryIoc
             if (ImplementationType != null && ImplementationType != ServiceType)
                 s.Print(ImplementationType).Append(": ");
 
-            s.Print(ServiceInfo);
+            s.Append(ServiceInfo);
             return s;
         }
 
