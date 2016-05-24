@@ -2010,6 +2010,17 @@ namespace DryIoc
         }
 
         private static readonly Expression _emptyRequestInfoExpr = ReflectionTools.ToExpression(() => RequestInfo.Empty);
+
+        // todo: v3: replace with more direct access
+        /// <summary>Returns the current scope, or null if not opened and <paramref name="throwIfNotFound"/> is not set.</summary>
+        /// <param name="container">Container with scope to check.</param>
+        /// <param name="name">(optional) Name of scpoe to search in current scope or its parents.</param>
+        /// <param name="throwIfNotFound">(optional) Dictates to throw exception if scope if not found.</param>
+        /// <returns>Scope if found, or null otherwise (if <paramref name="throwIfNotFound"/> is not set).</returns>
+        public static IScope GetCurrentScope(this IContainer container, object name = null, bool throwIfNotFound = false)
+        {
+            return container.ContainerWeakRef.Scopes.GetCurrentNamedScope(name, throwIfNotFound);
+        }
     }
 
     /// <summary>Converter of given reuse to its code representation as expression tree.</summary>
