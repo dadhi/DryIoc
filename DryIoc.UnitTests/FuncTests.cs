@@ -380,6 +380,69 @@ namespace DryIoc.UnitTests
             Assert.IsNull(getX);
         }
 
+        [Test]
+        public void Reuse_func_arguments_in_nested_dependencies()
+        {
+            var container = new Container();
+
+            container.Register<AA>();
+            container.Register<BB>();
+
+            var getAA = container.Resolve<Func<ILogger, AA>>();
+
+            var logger = new SomeLogger();
+            var aa = getAA(logger);
+            Assert.AreSame(logger, aa.Logger);
+            Assert.AreSame(aa.Bb.Logger, aa.Logger);
+        }
+
+        [Test]
+        public void Should_not_reuse_func_arguments_in_the_same_service()
+        {
+            var container = new Container();
+
+            container.Register<AA>();
+            container.Register<BB, BBB>(Made.Of(() => new BBB(Arg.Of<ILogger>(), Arg.Of<ILogger>(IfUnresolved.ReturnDefault))));
+
+            var getAA = container.Resolve<Func<ILogger, AA>>();
+
+            var logger = new SomeLogger();
+            var aa = getAA(logger);
+            Assert.IsNull(((BBB)aa.Bb).OtherLogger);
+            Assert.AreSame(logger, aa.Logger);
+            Assert.AreSame(aa.Bb.Logger, aa.Logger);
+        }
+
+        public class BB {
+            public ILogger Logger { get; set; }
+            public BB(ILogger logger)
+            {
+                Logger = logger;
+            }
+        }
+
+        public class BBB : BB
+        {
+            public ILogger OtherLogger { get; set; }
+
+            public BBB(ILogger logger, ILogger otherLogger) : base(logger)
+            {
+                OtherLogger = otherLogger;
+            }
+        }
+
+        public class AA {
+            public BB Bb { get; set; }
+            public ILogger Logger { get; set; }
+            public AA(BB bb, ILogger logger)
+            {
+                Bb = bb;
+                Logger = logger;
+            }
+        }
+
+        public class SomeLogger : ILogger { }
+
         internal class X
         {
             public A A { get; private set; }

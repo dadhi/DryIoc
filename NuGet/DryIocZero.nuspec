@@ -23,12 +23,6 @@
             <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.2" />
             <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
-        <frameworkAssemblies>
-            <frameworkAssembly assemblyName="System.ComponentModel.Composition" />
-        </frameworkAssemblies>
-        <references>
-            <!-- No references should be added to the project, the dependencies are used only by Container.Generated.tt at compile-time -->
-        </references>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
@@ -40,13 +34,13 @@
         <file src="..\Net45\DryIocZero\YourServiceRegistrations.tt.include" target="content\net45\DryIocZero" />
         <file src="..\Net45\DryIocZero\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIocZero" />
 
-        <!-- PCL: Profile259 .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\Net45\DryIocZero\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\YourServiceRegistrations.tt.include" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
 
-        <!-- PCL: Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\Net45\DryIocZero\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\DryIoc\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />
         <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocZero" />

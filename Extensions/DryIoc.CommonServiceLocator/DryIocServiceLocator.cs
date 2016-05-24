@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -35,11 +35,11 @@ namespace DryIoc.CommonServiceLocator
     public class DryIocServiceLocator : ServiceLocatorImplBase
     {
         /// <summary>Exposes underlying Container for direct operation.</summary>
-        public readonly Container Container;
+        public readonly IContainer Container;
 
         /// <summary>Creates new locator as adapter for provided container.</summary>
         /// <param name="container">Container to use/adapt.</param>
-        public DryIocServiceLocator(Container container)
+        public DryIocServiceLocator(IContainer container)
         {
             if (container == null) throw new ArgumentNullException("container");
             Container = container;
