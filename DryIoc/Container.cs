@@ -4584,6 +4584,12 @@ namespace DryIoc
         public static T WithDetails<T>(this T serviceInfo, ServiceDetails details, Request request)
             where T : IServiceInfo
         {
+            return WithRequiredServiceType(serviceInfo, details, request);
+        }
+
+        internal static T WithRequiredServiceType<T>(T serviceInfo, ServiceDetails details, Request request)
+            where T : IServiceInfo
+        {
             var serviceType = serviceInfo.ServiceType;
             var requiredServiceType = details == null ? null : details.RequiredServiceType;
             if (requiredServiceType != null)
@@ -4609,13 +4615,14 @@ namespace DryIoc
                     if (wrappedType != null)
                     {
                         var wrappedRequiredType = container.GetWrappedType(requiredServiceType, null);
-                        wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType, request);
+                        wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType,
+                            request);
                     }
                 }
             }
 
             return serviceType == serviceInfo.ServiceType
-                && (details == null || details == serviceInfo.Details)
+                   && (details == null || details == serviceInfo.Details)
                 ? serviceInfo // if service type unchanged and details absent, or details are the same return original info.
                 : (T)serviceInfo.Create(serviceType, details); // otherwise: create new.
         }
@@ -5072,33 +5079,32 @@ namespace DryIoc
         public readonly Made Made;
 
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
-        /// <remarks>Mutable: tracks used parameters</remarks>
+        /// <remarks>Mutable: tracks used arguments</remarks>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
 
         /// <summary>Counting nested levels. May be used to split object graph if level is too deep.</summary>
         public readonly int Level;
 
-        /// <summary>Shortcut access to <see cref="IServiceInfo.ServiceType"/>.</summary>
+        /// <summary>Requested service type.</summary>
         public Type ServiceType { get { return _requestInfo.ServiceType; } }
 
-        /// <summary>Shortcut access to <see cref="ServiceDetails.ServiceKey"/>.</summary>
+        /// <summary>Optional service key to identify service of the same type.</summary>
         public object ServiceKey { get { return _requestInfo.ServiceKey; } }
 
-        /// <summary>Shortcut access to <see cref="ServiceDetails.IfUnresolved"/>.</summary>
-        public IfUnresolved IfUnresolved { get { return _requestInfo.ThrowIfNull().IfUnresolved; } }
+        /// <summary>Policy to deal with unresolved service.</summary>
+        public IfUnresolved IfUnresolved { get { return _requestInfo.IfUnresolved; } }
 
-        /// <summary>Shortcut access to <see cref="ServiceDetails.RequiredServiceType"/>.</summary>
+        /// <summary>Required service type if specified.</summary>
         public Type RequiredServiceType { get { return _requestInfo.RequiredServiceType; } }
 
-        /// <summary>Shortcut to FactoryID.</summary>
-        /// <remarks>The default unassigned value od ID is 0.</remarks>
+        /// <summary>Implementation FactoryID.</summary>
+        /// <remarks>The default unassigned value of ID is 0.</remarks>
         public int FactoryID { get { return _requestInfo.FactoryID; } }
 
-        /// <summary>Shortcut to FactoryType.</summary>
+        /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public FactoryType FactoryType { get { return _requestInfo.FactoryType; } }
 
-        /// <summary>Implementation type of factory, 
-        /// if request was <see cref="WithResolvedFactory"/> factory, or null otherwise.</summary>
+        /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType { get { return _requestInfo.ImplementationType; } }
 
         /// <summary>Service reuse.</summary>
@@ -5314,7 +5320,7 @@ namespace DryIoc
             Func<PropertyInfo, TResult> property = null,
             Func<FieldInfo, TResult> field = null)
         {
-            var serviceInfo = _requestInfo.ThrowIfNull().ServiceInfo;
+            var serviceInfo = _requestInfo.ServiceInfo;
             if (serviceInfo is ParameterServiceInfo)
             {
                 if (parameter != null)
@@ -7817,7 +7823,7 @@ namespace DryIoc
             return r;
         }
 
-        /// <summary>Asked service type.</summary>
+        /// <summary>Requested service type.</summary>
         public Type ServiceType { get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; } }
 
         /// <summary>Required service type if specified.</summary>
@@ -7842,7 +7848,7 @@ namespace DryIoc
             get { return ServiceInfo == null ? IfUnresolved.Throw : ServiceInfo.Details.IfUnresolved; }
         }
 
-        /// <summary>Optional service key.</summary>
+        /// <summary>Optional service key to identify service of the same type.</summary>
         public object ServiceKey
         {
             get { return ServiceInfo == null ? null : ServiceInfo.Details.ServiceKey; }
@@ -7851,10 +7857,10 @@ namespace DryIoc
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
         public readonly int FactoryID;
 
-        /// <summary>False for Decorators and Wrappers.</summary>
+        /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public readonly FactoryType FactoryType;
 
-        /// <summary>Implementation type.</summary>
+        /// <summary>Service implementation type if known.</summary>
         public readonly Type ImplementationType;
 
         /// <summary>Service reuse.</summary>
