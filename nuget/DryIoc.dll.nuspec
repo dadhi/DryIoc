@@ -11,24 +11,16 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.4.3
-          - fixed: #277 Custom value for dependency evaluated to null is interpreted as no custom value and tries to resolve the dependency
-          - fixed: #278 Arg.Of does not recognize service key of non-primitive type
-          v2.4.2
-          - fixed: #274: Lazy resolution of dependency registered with Reuse.InResolutionScope breaks subsequent resolutions without wrappers
-          v2.4.1
-          - fixed: #267: False alarm about recursive dependency when using decorator
-          v2.4.0
-          - added: #263: Add IfAlreadyRegistered.AppendNewImplementation option for better collection handling
-          - fixed: #264: IfAlreadyRegistered.Replace can span multiple registrations
-          - fixed: #262: Using attributes to inject primitive variables
-          - fixed: #261: Make Disposal work in reverse resolution order
-          v2.3.0
-          - fixed: #260: Cannot interpret GetOrCreateResolutionScope expression on iOS
-          - fixed: #258: Setup.AllowDisposableTransient is overridden by container.WithTrackingDisposableTransient
-          - changed: In source code DryIoc package split immutable data structures and tool to separate ImTools.cs
-          - removed: CloseCurrentScope from Container as it was added recently but not used anywhere.
-          - added: method New overload with strongly type Made.Of
+          v2.5.0
+          - fixed: #280: LazyEnumerable dependency silences missing dependency error - but works (throws) for fixed array
+          - fixed: #279: IfUnresolved.ReturnDefault propagates down the dependency chain
+          - fixed: #285: Recursive dependency in the case of using Composite Pattern
+          - fixed: #219: Minimize memory allocations in Request and RequestInfo
+          - added: #282: Enable to resolve func with more than 4 parameters (up to 7)
+          - added: #255: Make GetCurrentScope available on IContainer via extension method
+          - added: #172: Reuse passed Func argument in nested dependencies, but not in the same service
+          - added: #257: Support for contentFiles to enable source packages in NuGet3.3
+          - added: Uap (Universal Windows Platform) content source code DryIoc package
         </releaseNotes>
         <dependencies>
           <group targetFramework="dotnet">
