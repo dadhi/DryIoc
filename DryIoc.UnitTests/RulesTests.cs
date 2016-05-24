@@ -128,6 +128,7 @@ namespace DryIoc.UnitTests
             var service = container.Resolve<FooConsumer>();
 
             Assert.That(service.Foo.Value, Is.InstanceOf<FooBlah>());
+            GC.KeepAlive(container);
         }
 
         [Test]

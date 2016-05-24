@@ -28,7 +28,9 @@ namespace DryIoc.IssuesTests
             container.Register(typeof(IGenericService<>), typeof(GenericService<>));
             container.Register(typeof(IGenericService<>), typeof(GenericServiceWithIService2Constraint<>));
 
-            var resolved = container.ResolveMany<object>(typeof(IGenericService<IndependentService>), ResolveManyBehavior.AsFixedArray).ToArray();
+            var resolved = container.ResolveMany<object>(
+                typeof(IGenericService<IndependentService>), 
+                ResolveManyBehavior.AsFixedArray).ToArray();
 
             Assert.AreEqual(1, resolved.Length);
             Assert.IsInstanceOf<GenericService<IndependentService>>(resolved[0]);

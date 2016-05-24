@@ -1,6 +1,5 @@
 ﻿using System;
 using NUnit.Framework;
-using Serilog;
 
 namespace DryIoc.IssuesTests
 {
@@ -12,12 +11,12 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
-            c.Register(Made.Of(() => Serilog.Log.Logger), 
+            c.Register(Made.Of(() => Log.Logger), 
                 setup: Setup.With(condition: r => r.Parent.ImplementationType == null));
-            c.Register(Made.Of(() => Serilog.Log.ForContext(Arg.Index<Type>(0)), r => r.Parent.ImplementationType),
+            c.Register(Made.Of(() => Log.ForContext(Arg.Index<Type>(0)), r => r.Parent.ImplementationType),
                 setup: Setup.With(condition: r => r.Parent.ImplementationType != null));
 
-            c.Resolve<Serilog.ILogger>();
+            c.Resolve<ILogger>();
 
             c.Register<LogSubject>();
             c.Resolve<LogSubject>();
@@ -26,9 +25,38 @@ namespace DryIoc.IssuesTests
         public class LogSubject
         {
             public ILogger Logger { get; private set; }
-            public LogSubject(Serilog.ILogger logger)
+            public LogSubject(ILogger logger)
             {
                 Logger = logger;
+            }
+        }
+
+        public interface ILogger
+        {
+            Type Type { get; }
+        }
+
+        public static class Log
+        {
+            public static readonly ILogger Logger = new DefaultLogger();
+
+            public class DefaultLogger : ILogger {
+                public Type Type { get { return null; } }
+            }
+
+            public static ILogger ForContext(Type context)
+            {
+                return new ContextualLogger(context);
+            }
+
+            public class ContextualLogger : ILogger
+            {
+                public Type Type { get; set; }
+
+                public ContextualLogger(Type type)
+                {
+                    Type = type;
+                }
             }
         }
     }

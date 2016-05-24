@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<Tuple<ServiceWithDependencyAndWithMetadata, Metadata>[]>());
 
-            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), Error.NameOf(ex.Error));
         }
 
         [Test]
