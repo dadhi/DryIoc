@@ -88,6 +88,76 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(3, shapes.Count());
         }
 
+        [Test]
+        public void No_recursion_with_required_type()
+        {
+            var container = new Container();
+            container.Register<IOperation, OperationOne>(serviceKey: nameof(OperationOne));
+            container.Register<IOperation, OperationTwo>(serviceKey: nameof(OperationTwo));
+
+            container.RegisterMany(
+                new[] {typeof(IOperation), typeof(IAction)},
+                typeof(CompositeOpertaion));
+            container.Register<Service>(made: Parameters.Of.Type<IAction>(typeof(IOperation)));
+
+            var service = container.Resolve<Service>();
+            Assert.IsNotNull(service);
+            Assert.IsInstanceOf<CompositeOpertaion>(service.Action);
+        }
+
+        [Test]
+        public void No_recursion_with_required_type_in_lazy_enumerable()
+        {
+            var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+            container.Register<IOperation, OperationOne>(serviceKey: nameof(OperationOne));
+            container.Register<IOperation, OperationTwo>(serviceKey: nameof(OperationTwo));
+
+            container.RegisterMany(
+                new[] { typeof(IOperation), typeof(IAction) },
+                typeof(CompositeOpertaion));
+            container.Register<Service>(made: Parameters.Of.Type<IAction>(typeof(IOperation)));
+
+            var service = container.Resolve<Service>();
+            Assert.IsNotNull(service);
+            Assert.IsInstanceOf<CompositeOpertaion>(service.Action);
+        }
+
+        public interface IAction
+        {
+        }
+
+        public interface IOperation : IAction
+        {
+        }
+
+        public class OperationOne : IOperation
+        {
+        }
+
+        public class OperationTwo : IOperation
+        {
+        }
+
+        public class CompositeOpertaion : IOperation
+        {
+            public readonly IEnumerable<IOperation> Operations;
+
+            public CompositeOpertaion(IEnumerable<IOperation> operations)
+            {
+                Operations = operations.ToArray();
+            }
+        }
+
+        public class Service
+        {
+            public readonly IAction Action;
+
+            public Service(IAction action)
+            {
+                Action = action;
+            }
+        }
+
         #region Composite pattern CUT
 
         public interface IShape

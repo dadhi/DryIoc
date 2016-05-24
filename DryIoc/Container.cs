@@ -545,6 +545,7 @@ namespace DryIoc
             return service;
         }
 
+        // todo: v3: remove unused composite key and required type parameters
         IEnumerable<object> IResolver.ResolveMany(
             Type serviceType, object serviceKey, Type requiredServiceType, 
             object compositeParentKey, Type compositeParentRequiredType, 
@@ -586,7 +587,7 @@ namespace DryIoc
             // exclude composite parent from items
             var parent = preResolveParent.FactoryType != FactoryType.Wrapper 
                 ? preResolveParent : preResolveParent.Parent;
-            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
+            if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
             {
                 items = items.Where(x => x.Value.FactoryID != parent.FactoryID);
 
@@ -2404,10 +2405,10 @@ namespace DryIoc
                 items = items.Append(variantGenericItems);
             }
 
-            // Composite pattern support: filter out composite root from available keys.
+            // Composite pattern support: filter out composite root in available keys
             var parent = request.Parent;
             if (!parent.IsEmpty && 
-                parent.ServiceType == requiredItemType) // check fast for the parent of the same type
+                parent.GetActualServiceType() == requiredItemType) // check fast for the parent of the same type
             {
                 items = items.Where(x => x.Factory.FactoryID != parent.FactoryID &&
                     (x.Factory.FactoryGenerator == null || !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().Any(f =>
@@ -2459,7 +2460,7 @@ namespace DryIoc
             object compositeParentKey = null;
             Type compositeParentRequiredType = null;
             var parent = request.Parent;
-            if (!parent.IsEmpty && parent.ServiceType == requiredItemType)
+            if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
             {
                 compositeParentKey = parent.ServiceKey ?? DefaultKey.Value;
                 compositeParentRequiredType = parent.RequiredServiceType;
