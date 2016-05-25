@@ -5,6 +5,6 @@ using System.Reflection;
 [assembly: AssemblyProduct("DryIocAttributes")]
 [assembly: AssemblyCopyright("Copyright © 2016 Maksim Volkau")]
 
-[assembly: AssemblyVersion("2.3.0")]
-[assembly: AssemblyFileVersion("2.3.0")]
-[assembly: AssemblyInformationalVersion("2.3.0")]
+[assembly: AssemblyVersion("2.4.0")]
+[assembly: AssemblyFileVersion("2.4.0")]
+[assembly: AssemblyInformationalVersion("2.4.0")]
