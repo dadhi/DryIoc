@@ -34,6 +34,10 @@
         <member name="F:DryIocAttributes.IfAlreadyExported.Replace">
             <summary>Replaces old registration with new one.</summary>
         </member>
+        <member name="F:DryIocAttributes.IfAlreadyExported.AppendNewImplementation">
+            <summary>Adds new implementation or null (Made.Of), 
+            skips registration if the implementation is already registered.</summary>
+        </member>
         <member name="T:DryIocAttributes.ExportExAttribute">
             <summary>Provides whole set of possible/supported export options.</summary>
         </member>
@@ -223,6 +227,15 @@
         <member name="F:DryIocAttributes.FactoryType.Wrapper">
             <summary>Defines wrapper factory.</summary>
         </member>
+        <member name="T:DryIocAttributes.IfUnresolved">
+            <summary>Policy to handle unresolved service.</summary>
+        </member>
+        <member name="F:DryIocAttributes.IfUnresolved.Throw">
+            <summary>Specifies to throw exception if no service found.</summary>
+        </member>
+        <member name="F:DryIocAttributes.IfUnresolved.ReturnDefault">
+            <summary>Specifies to return default value instead of throwing error.</summary>
+        </member>
         <member name="T:DryIocAttributes.RequestInfo">
             <summary>Dependency request path information.</summary>
         </member>
@@ -255,6 +268,9 @@
         <member name="F:DryIocAttributes.RequestInfo.ServiceKey">
             <summary>Optional service key.</summary>
         </member>
+        <member name="F:DryIocAttributes.RequestInfo.IfUnresolved">
+            <summary>Policy to deal with unresolved request.</summary>
+        </member>
         <member name="F:DryIocAttributes.RequestInfo.FactoryID">
             <summary>Resolved factory ID, used to identify applied decorator.</summary>
         </member>
@@ -267,15 +283,11 @@
         <member name="F:DryIocAttributes.RequestInfo.ReuseLifespan">
             <summary>Relative number representing reuse lifespan.</summary>
         </member>
-        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Int32,System.Type,System.Int32)">
-            <summary>Simplified version of Push with most common properties.</summary>
-            <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
-            <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        </member>
-        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Type,System.Object,System.Int32,DryIocAttributes.FactoryType,System.Type,System.Int32)">
+        <member name="M:DryIocAttributes.RequestInfo.Push(System.Type,System.Type,System.Object,DryIocAttributes.IfUnresolved,System.Int32,DryIocAttributes.FactoryType,System.Type,System.Int32)">
             <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
             <param name="serviceType"></param> <param name="requiredServiceType"></param>
-            <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
+            <param name="serviceKey"></param> <param name="ifUnresolved"></param>
+             <param name="factoryID"></param><param name="factoryType"></param>
             <param name="implementationType"></param> <param name="reuseLifespan"></param>
             <returns>Created info chain to current (parent) info.</returns>
         </member>
@@ -365,7 +377,7 @@
         <member name="T:DryIocAttributes.AsResolutionCallAttribute">
             <summary>Marker for resolution root exports.</summary>
         </member>
-        <member name="T:DryIocAttributes.AsResolutionRootAttibute">
+        <member name="T:DryIocAttributes.AsResolutionRootAttribute">
             <summary>Marker for resolution root exports.</summary>
         </member>
         <member name="T:DryIocAttributes.UseParentReuseAttribute">
