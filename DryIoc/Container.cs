@@ -7788,7 +7788,7 @@ namespace DryIoc
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
     }
 
-    /// <summary>Specifies what to return when <see cref="IResolver"/> unable to resolve service.</summary>
+    /// <summary>Policy to handle unresolved service.</summary>
     public enum IfUnresolved
     {
         /// <summary>Specifies to throw exception if no service found.</summary>
@@ -8027,6 +8027,9 @@ namespace DryIoc
 
                 if (i.ServiceKey != null)
                     currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
+
+                if (i.IfUnresolved != IfUnresolved.Throw)
+                    currentHash = CombineHashCodes(currentHash, i.IfUnresolved.GetHashCode());
 
                 if (i.FactoryType != FactoryType.Service)
                     currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());

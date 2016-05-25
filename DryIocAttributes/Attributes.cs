@@ -321,8 +321,8 @@ namespace DryIocAttributes
         }
 }
 
-/// <summary>Type of services supported by Container.</summary>
-public enum FactoryType
+    /// <summary>Type of services supported by Container.</summary>
+    public enum FactoryType
     {
         /// <summary>(default) Defines normal service factory</summary>
         Service,
@@ -332,11 +332,21 @@ public enum FactoryType
         Wrapper
     };
 
+    /// <summary>Policy to handle unresolved service.</summary>
+    public enum IfUnresolved
+    {
+        /// <summary>Specifies to throw exception if no service found.</summary>
+        Throw,
+        /// <summary>Specifies to return default value instead of throwing error.</summary>
+        ReturnDefault
+    }
+
     /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, DryIocAttributes.FactoryType.Service, null, 0, null);
+        public static readonly RequestInfo Empty = 
+            new RequestInfo(null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
@@ -376,6 +386,9 @@ public enum FactoryType
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
 
+        /// <summary>Policy to deal with unresolved request.</summary>
+        public readonly IfUnresolved IfUnresolved;
+
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
         public readonly int FactoryID;
 
@@ -388,28 +401,22 @@ public enum FactoryType
         /// <summary>Relative number representing reuse lifespan.</summary>
         public readonly int ReuseLifespan;
 
-        /// <summary>Simplified version of Push with most common properties.</summary>
-        /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
-        /// <param name="reuseLifespan"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, int reuseLifespan)
-        {
-            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuseLifespan);
-        }
-
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
+        /// <param name="serviceKey"></param> <param name="ifUnresolved"></param>
+        ///  <param name="factoryID"></param><param name="factoryType"></param>
         /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
+        public RequestInfo Push(
+            Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey,
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, ifUnresolved,
                 factoryID, factoryType, implementationType, reuseLifespan, this);
         }
 
         private RequestInfo(
-            Type serviceType, Type requiredServiceType, object serviceKey,
+            Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
             RequestInfo parentOrWrapper)
         {
@@ -419,6 +426,7 @@ public enum FactoryType
             ServiceType = serviceType;
             RequiredServiceType = requiredServiceType;
             ServiceKey = serviceKey;
+            IfUnresolved = ifUnresolved;
 
             // Implementation info:
             FactoryID = factoryID;
@@ -443,11 +451,9 @@ public enum FactoryType
 
             var s = new StringBuilder();
 
-            if (FactoryID != 0)
-                s.Append('#').Append(FactoryID).Append(' ');
-
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');
+
             if (ImplementationType != null && ImplementationType != ServiceType)
                 s.Append(ImplementationType).Append(": ");
 
@@ -458,6 +464,9 @@ public enum FactoryType
 
             if (ServiceKey != null)
                 s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
+
+            if (IfUnresolved != IfUnresolved.Throw)
+                s.Append(" if unresolved ").Append(Enum.GetName(typeof(IfUnresolved), IfUnresolved));
 
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
@@ -490,6 +499,7 @@ public enum FactoryType
         {
             return other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
+                && other.IfUnresolved == IfUnresolved
                 && other.ServiceKey == ServiceKey
 
                 && other.FactoryType == FactoryType
@@ -510,6 +520,9 @@ public enum FactoryType
 
                 if (i.ServiceKey != null)
                     currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
+
+                if (i.IfUnresolved != IfUnresolved.Throw)
+                    currentHash = CombineHashCodes(currentHash, i.IfUnresolved.GetHashCode());
 
                 if (i.FactoryType != FactoryType.Service)
                     currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());

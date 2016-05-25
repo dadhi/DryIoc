@@ -223,8 +223,7 @@ namespace DryIoc.MefAttributedModel
                 ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null)
                 ?? GetServiceKeyWithMetadataAttribute(reflectedType, attributes, request);
 
-            var ifUnresolved = import.AllowDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
-
+            var ifUnresolved = import.AllowDefault ? DryIoc.IfUnresolved.ReturnDefault : DryIoc.IfUnresolved.Throw;
             return ServiceDetails.Of(import.ContractType, serviceKey, ifUnresolved);
         }
 
@@ -532,7 +531,7 @@ namespace DryIoc.MefAttributedModel
 
                 factoryExportRequired = !member.IsStatic();
                 var factoryServiceInfo = factoryExportRequired 
-                    ? ServiceInfo.Of(factoryExport.ServiceType, IfUnresolved.ReturnDefault, 
+                    ? ServiceInfo.Of(factoryExport.ServiceType, DryIoc.IfUnresolved.ReturnDefault, 
                         factoryExport.ServiceKeyInfo.Key) 
                     : null;
 
@@ -810,17 +809,21 @@ namespace DryIoc.MefAttributedModel
             if (source.IsEmpty)
                 return RequestInfo.Empty;
 
-            var registrationType = 
+            var factoryType = 
                 source.FactoryType == DryIoc.FactoryType.Decorator ? DryIocAttributes.FactoryType.Decorator : 
                 source.FactoryType == DryIoc.FactoryType.Wrapper ? DryIocAttributes.FactoryType.Wrapper :
                 DryIocAttributes.FactoryType.Service;
+
+            var ifUnresolved =
+                source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
 
             return ConvertRequestInfo(source.ParentOrWrapper).Push(
                 source.ServiceType,
                 source.RequiredServiceType,
                 source.ServiceKey,
+                ifUnresolved,
                 source.FactoryID,
-                registrationType,
+                factoryType,
                 source.ImplementationType,
                 source.ReuseLifespan);
         }
@@ -857,7 +860,7 @@ namespace DryIoc.MefAttributedModel
     FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType);
             if (Wrapper != null) code.Append(@",
     Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
-                .Append(Wrapper.WrappedServiceTypeArgIndex).Append(@" }");
+                .Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
             if (Decorator != null)
             {
                 code.Append(@",
@@ -928,10 +931,10 @@ namespace DryIoc.MefAttributedModel
         public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
-                .Append(@"new ExportInfo(").AppendType(ServiceType).Append(@", ")
-                .AppendCode(ServiceKeyInfo.Key).Append(@", ")
+                .Append("new ExportInfo(").AppendType(ServiceType).Append(", ")
+                .AppendCode(ServiceKeyInfo.Key).Append(", ")
                 .AppendEnum(typeof(IfAlreadyRegistered), IfAlreadyRegistered)
-                .Append(@")");
+                .Append(")");
         }
     }
 
@@ -965,7 +968,7 @@ namespace DryIoc.MefAttributedModel
         public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
-                .Append(@"Wrapper = new WrapperInfo(")
+                .Append("Wrapper = new WrapperInfo(")
                 .AppendCode(WrappedServiceTypeArgIndex).Append(", ")
                 .AppendCode(AlwaysWrapsRequiredServiceType).Append(")");
         }
@@ -1011,7 +1014,7 @@ namespace DryIoc.MefAttributedModel
         public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
-                .Append(@"Decorator = new DecoratorInfo(").AppendCode(DecoratedServiceKeyInfo.Key).Append(")");
+                .Append("Decorator = new DecoratorInfo(").AppendCode(DecoratedServiceKeyInfo.Key).Append(")");
         }
     }
 

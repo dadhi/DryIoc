@@ -9,8 +9,8 @@
 // implementation below is just an EXAMPLE!
 //===========================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.2.0\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.2.2\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.4.0\lib\net45\DryIocAttributes.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.4.0\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 
 <#/* EXAMPLE: I am referencing assembly and namespace with my services to register. Replace it with yours! */#>

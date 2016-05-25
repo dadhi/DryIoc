@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+
 namespace DryIocZero
 {
     using System;
@@ -31,7 +32,6 @@ namespace DryIocZero
     using System.Reflection;
     using System.Text;
     using System.Threading;
-
     using DryIoc;
 
     /// <summary>Minimal container to register service factory delegates and then resolve service from them.</summary>
@@ -1150,17 +1150,6 @@ namespace DryIocZero
         }
     }
 
-    /// <summary>Type of services supported by Container.</summary>
-    public enum FactoryType
-    {
-        /// <summary>(default) Defines normal service factory</summary>
-        Service,
-        /// <summary>Defines decorator factory</summary>
-        Decorator,
-        /// <summary>Defines wrapper factory.</summary>
-        Wrapper
-    }
-
     /// <summary>Reuse goal is to locate or create scope where reused objects will be stored.</summary>
     /// <remarks><see cref="IReuse"/> implementors supposed to be stateless, and provide scope location behavior only.
     /// The reused service instances should be stored in scope(s).</remarks>
@@ -1258,11 +1247,32 @@ namespace DryIocZero
         }
     }
 
+    /// <summary>Type of services supported by Container.</summary>
+    public enum FactoryType
+    {
+        /// <summary>(default) Defines normal service factory</summary>
+        Service,
+        /// <summary>Defines decorator factory</summary>
+        Decorator,
+        /// <summary>Defines wrapper factory.</summary>
+        Wrapper
+    }
+
+    /// <summary>Policy to handle unresolved service.</summary>
+    public enum IfUnresolved
+    {
+        /// <summary>Specifies to throw exception if no service found.</summary>
+        Throw,
+        /// <summary>Specifies to return default value instead of throwing error.</summary>
+        ReturnDefault
+    }
+
     /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, null, null, -1, FactoryType.Service, null, null, null);
+        public static readonly RequestInfo Empty =
+            new RequestInfo(null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, null, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
@@ -1302,6 +1312,9 @@ namespace DryIocZero
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
 
+        /// <summary>Policy to deal with unresolved request.</summary>
+        public readonly IfUnresolved IfUnresolved;
+
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
         public readonly int FactoryID;
 
@@ -1333,12 +1346,25 @@ namespace DryIocZero
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey,
+            return Push(serviceType, requiredServiceType, serviceKey, IfUnresolved.Throw,
+                factoryID, factoryType, implementationType, reuse);
+        }
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param> <param name="ifUnresolved"></param>
+        /// <param name="factoryType"></param> <param name="factoryID"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param>
+        /// <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
+        {
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, ifUnresolved,
                 factoryID, factoryType, implementationType, reuse, this);
         }
 
         private RequestInfo(
-            Type serviceType, Type requiredServiceType, object serviceKey,
+            Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
             RequestInfo parentOrWrapper)
         {
@@ -1348,6 +1374,7 @@ namespace DryIocZero
             ServiceType = serviceType;
             RequiredServiceType = requiredServiceType;
             ServiceKey = serviceKey;
+            IfUnresolved = ifUnresolved;
 
             // Implementation info:
             FactoryID = factoryID;
@@ -1372,11 +1399,9 @@ namespace DryIocZero
 
             var s = new StringBuilder();
 
-            if (FactoryID != 0)
-                s.Append('#').Append(FactoryID).Append(' ');
-
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');
+
             if (ImplementationType != null && ImplementationType != ServiceType)
                 s.Append(ImplementationType).Append(": ");
 
@@ -1387,6 +1412,9 @@ namespace DryIocZero
 
             if (ServiceKey != null)
                 s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
+
+            if (IfUnresolved != IfUnresolved.Throw)
+                s.Append(" if unresolved ").Append(Enum.GetName(typeof(IfUnresolved), IfUnresolved));
 
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
@@ -1409,16 +1437,18 @@ namespace DryIocZero
         public bool Equals(RequestInfo other)
         {
             return other != null && EqualsWithoutParent(other)
-                && (ParentOrWrapper == null && other.ParentOrWrapper == null
-                || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
+                   && (ParentOrWrapper == null && other.ParentOrWrapper == null
+                   || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
         }
 
-        /// <summary>Compares with other info taking into account the properties but not the parents and their properties.</summary>
+        /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
+        /// <remarks>Ignores the FactoryID.</remarks>
         public bool EqualsWithoutParent(RequestInfo other)
         {
             return other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
+                && other.IfUnresolved == IfUnresolved
                 && other.ServiceKey == ServiceKey
 
                 && other.FactoryType == FactoryType
@@ -1434,11 +1464,15 @@ namespace DryIocZero
             for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
             {
                 var currentHash = i.ServiceType.GetHashCode();
+
                 if (i.RequiredServiceType != null)
                     currentHash = CombineHashCodes(currentHash, i.RequiredServiceType.GetHashCode());
 
                 if (i.ServiceKey != null)
                     currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
+
+                if (i.IfUnresolved != IfUnresolved.Throw)
+                    currentHash = CombineHashCodes(currentHash, i.IfUnresolved.GetHashCode());
 
                 if (i.FactoryType != FactoryType.Service)
                     currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());

@@ -11,9 +11,10 @@
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
-          v3.0.0:
-          - added: Optional Name parameter into OpenScope
+          v2.5.0:
+          - changed: Compatible with DryIoc 2.5
           - changed: Switched to use DryIoc ImTools.cs
+          - added: Optional Name parameter into OpenScope
           v2.1.0
           - fixed: #238: DryIocZero generation should notify about runtime state used: RegisterDelegate and RegisterInstance
           - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate

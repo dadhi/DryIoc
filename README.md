@@ -17,16 +17,19 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 
-* Designed for low-ceremony use, performance, and extensibility.
-* Supports .NET 3.5+; PCL Profiles 259, 328, [dotnet](https://oren.codes/2015/07/29/targeting-net-core); [DNX/.NET Core](https://github.com/aspnet/dnx)
-* [Documented][WikiHome] and [open for contributions](CONTRIBUTING.md)
-* Available at NuGet as [DryIoc.dll] or as code [DryIoc] (_in NuGet < 3.0_) 
-    * `PM> Install-Package DryIoc.dll`
-    * get code `PM> Install-Package DryIoc`
-    * for DNX `PM> Install-Package DryIoc.Dnx`
-* __DryIoc v2.5.0__ is the latest stable version
-    * [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
-    * [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
+- Designed for low-ceremony use, performance, and extensibility.
+- Supported platforms: 
+    - .NET 3.5+ 
+    - PCL Profiles 259, 328, [dotnet](https://oren.codes/2015/07/29/targeting-net-core) 
+    - [DNX/.NET Core](https://github.com/aspnet/dnx)
+- NuGet packages: 
+    - [DryIoc.dll] - `PM> Install-Package DryIoc.dll`
+    - _source code_ [DryIoc] - `PM> Install-Package DryIoc`
+- Latest stable version is __DryIoc v2.5.0__: 
+    - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
+    - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
+- [Documentation][WikiHome]
+- [How to contribute](CONTRIBUTING.md)
 
 
 ## Benchmarks

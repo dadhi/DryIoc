@@ -326,6 +326,13 @@
             <param name="request">Request info to convert to expression.</param>
             <returns>Returns result expression.</returns>
         </member>
+        <member name="M:DryIoc.ContainerTools.GetCurrentScope(DryIoc.IContainer,System.Object,System.Boolean)">
+            <summary>Returns the current scope, or null if not opened and <paramref name="throwIfNotFound"/> is not set.</summary>
+            <param name="container">Container with scope to check.</param>
+            <param name="name">(optional) Name of scpoe to search in current scope or its parents.</param>
+            <param name="throwIfNotFound">(optional) Dictates to throw exception if scope if not found.</param>
+            <returns>Scope if found, or null otherwise (if <paramref name="throwIfNotFound"/> is not set).</returns>
+        </member>
         <member name="T:DryIoc.ReuseToExpressionConverter">
             <summary>Converter of given reuse to its code representation as expression tree.</summary>
         </member>
@@ -1319,6 +1326,9 @@
         <member name="F:DryIoc.ServiceDetails.IfUnresolved">
             <summary>Policy to deal with unresolved request.</summary>
         </member>
+        <member name="F:DryIoc.ServiceDetails.HasCustomValue">
+            <summary>Indicates that the custom value is specified.</summary>
+        </member>
         <member name="F:DryIoc.ServiceDetails._value">
             <summary>Either default or custom value depending on <see cref="F:DryIoc.ServiceDetails.IfUnresolved"/> setting.</summary>
         </member>
@@ -1360,6 +1370,14 @@
         <member name="M:DryIoc.ServiceInfo.Of(System.Type,DryIoc.IfUnresolved,System.Object)">
             <summary>Creates info out of provided settings</summary>
             <param name="serviceType">Service type</param>
+            <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
+             <param name="serviceKey">(optional) Service key.</param>
+            <returns>Created info.</returns>
+        </member>
+        <member name="M:DryIoc.ServiceInfo.Of(System.Type,System.Type,DryIoc.IfUnresolved,System.Object)">
+            <summary>Creates info out of provided settings</summary>
+            <param name="serviceType">Service type</param>
+            <param name="requiredServiceType">Registered service type to search for.</param>
             <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
              <param name="serviceKey">(optional) Service key.</param>
             <returns>Created info.</returns>
@@ -1410,6 +1428,9 @@
             <summary>Creates info from service type and details.</summary>
             <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
         </member>
+        <member name="F:DryIoc.ParameterServiceInfo.Parameter">
+            <summary>Parameter info.</summary>
+        </member>
         <member name="M:DryIoc.ParameterServiceInfo.ToString">
             <summary>Prints info to string using <see cref="M:DryIoc.ServiceInfoTools.Print(System.Text.StringBuilder,DryIoc.IServiceInfo)"/>.</summary> <returns>Printed string.</returns>
         </member>
@@ -1448,11 +1469,11 @@
             <param name="container">Reference to container issued the request. Could be changed later with <see cref="M:DryIoc.Request.WithNewContainer(DryIoc.ContainerWeakRef)"/> method.</param>
             <returns>New empty request.</returns>
         </member>
+        <member name="P:DryIoc.Request.IsEmpty">
+            <summary>Indicates that request is empty initial request: there is no <see cref="F:DryIoc.Request._requestInfo"/> in such a request.</summary>
+        </member>
         <member name="F:DryIoc.Request.RawParent">
             <summary>Request parent with all runtime info available.</summary>
-        </member>
-        <member name="P:DryIoc.Request.IsEmpty">
-            <summary>Indicates that request is empty initial request: there is no <see cref="T:DryIoc.RequestInfo"/> in such a request.</summary>
         </member>
         <member name="P:DryIoc.Request.IsResolutionCall">
             <summary>Returns true if request is First in Resolve call.</summary>
@@ -1501,43 +1522,46 @@
         <member name="P:DryIoc.Request.Scope">
             <summary>Optionally associated resolution scope.</summary>
         </member>
-        <member name="F:DryIoc.Request.ResolvedFactory">
-            <summary>Factory found in container to resolve this request.</summary>
-        </member>
-        <member name="F:DryIoc.Request.Reuse">
-            <summary>Service reuse.</summary>
+        <member name="F:DryIoc.Request.Made">
+            <summary>(optional) Made spec used for resolving request.</summary>
         </member>
         <member name="F:DryIoc.Request.FuncArgs">
             <summary>User provided arguments: key tracks what args are still unused.</summary>
-            <remarks>Mutable: tracks used parameters</remarks>
+            <remarks>Mutable: tracks used arguments</remarks>
         </member>
         <member name="F:DryIoc.Request.Level">
             <summary>Counting nested levels. May be used to split object graph if level is too deep.</summary>
         </member>
         <member name="P:DryIoc.Request.ServiceType">
-            <summary>Shortcut access to <see cref="P:DryIoc.IServiceInfo.ServiceType"/>.</summary>
+            <summary>Requested service type.</summary>
         </member>
         <member name="P:DryIoc.Request.ServiceKey">
-            <summary>Shortcut access to <see cref="F:DryIoc.ServiceDetails.ServiceKey"/>.</summary>
+            <summary>Optional service key to identify service of the same type.</summary>
         </member>
         <member name="P:DryIoc.Request.IfUnresolved">
-            <summary>Shortcut access to <see cref="F:DryIoc.ServiceDetails.IfUnresolved"/>.</summary>
+            <summary>Policy to deal with unresolved service.</summary>
         </member>
         <member name="P:DryIoc.Request.RequiredServiceType">
-            <summary>Shortcut access to <see cref="F:DryIoc.ServiceDetails.RequiredServiceType"/>.</summary>
+            <summary>Required service type if specified.</summary>
         </member>
-        <member name="P:DryIoc.Request.ImplementationType">
-            <summary>Implementation type of factory, if request was <see cref="M:DryIoc.Request.WithResolvedFactory(DryIoc.Factory)"/> factory, or null otherwise.</summary>
+        <member name="P:DryIoc.Request.FactoryID">
+            <summary>Implementation FactoryID.</summary>
+            <remarks>The default unassigned value of ID is 0.</remarks>
         </member>
         <member name="P:DryIoc.Request.FactoryType">
-            <summary>Shortcut to FactoryType.</summary>
+            <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
+        </member>
+        <member name="P:DryIoc.Request.ImplementationType">
+            <summary>Service implementation type if known.</summary>
+        </member>
+        <member name="P:DryIoc.Request.Reuse">
+            <summary>Service reuse.</summary>
         </member>
         <member name="P:DryIoc.Request.ReuseLifespan">
             <summary>Relative number representing reuse lifespan.</summary>
         </member>
         <member name="M:DryIoc.Request.GetActualServiceType">
-            <summary>Returns <see cref="P:DryIoc.Request.RequiredServiceType"/> if it is specified and assignable to <see cref="P:DryIoc.Request.ServiceType"/>,
-            otherwise returns <see cref="P:DryIoc.Request.ServiceType"/>.</summary>
+            <summary>Returns result of <see cref="M:DryIoc.RequestInfo.GetActualServiceType"/>>.</summary>
             <returns>The type to be used for lookup in registry.</returns>
         </member>
         <member name="M:DryIoc.Request.Push(DryIoc.IServiceInfo,DryIoc.IScope,DryIoc.RequestInfo)">
@@ -1554,13 +1578,13 @@
             <param name="ifUnresolved">(optional) Instructs how to handle unresolved service.</param>
             <param name="requiredServiceType">(optional) Registered/unwrapped service type to find.</param>
             <param name="scope">(optional) Resolution scope.</param>
-            <param name="preResolveParent">(optional) Request info beyond/preceding Resolve call.</param>
+            <param name="preResolveParent">(optional) Request info preceding Resolve call.</param>
             <returns>New request with provided info.</returns>
         </member>
         <member name="M:DryIoc.Request.WithChangedServiceInfo(System.Func{DryIoc.IServiceInfo,DryIoc.IServiceInfo})">
             <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
             <param name="getInfo">Gets new info to switch to.</param>
-            <returns>New request with new info but the rest intact: e.g. <see cref="F:DryIoc.Request.ResolvedFactory"/>.</returns>
+            <returns>New request with new service info but the same implementation and context.</returns>
         </member>
         <member name="M:DryIoc.Request.ChangeServiceKey(System.Object)">
             <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -1581,18 +1605,30 @@
             <returns>Request with replaced container.</returns>
         </member>
         <member name="M:DryIoc.Request.WithResolvedFactory(DryIoc.Factory)">
-            <summary>Returns new request with set <see cref="F:DryIoc.Request.ResolvedFactory"/>.</summary>
+            <summary>Returns new request with set implementation details.</summary>
             <param name="factory">Factory to which request is resolved.</param>
             <returns>New request with set factory.</returns>
         </member>
         <member name="M:DryIoc.Request.GetParentOrFuncOrEmpty(System.Boolean)">
             <summary>Returns non-wrapper parent of Func wrapper if any.</summary>
             <param name="firstNonTransientParent">(optional) When set specifies to search for first not transient parent.</param>
-            <returns>Found parent or Func parent or <see cref="F:DryIoc.RequestInfo.Empty"/>.</returns>
+            <returns>Found parent or Func parent or empty.</returns>
         </member>
         <member name="M:DryIoc.Request.ToRequestInfo">
-            <summary>Converts input request into its slim version of <see cref="T:DryIoc.RequestInfo"/> </summary>
+            <summary>Converts input request into its serializable version stripped from run-time info.</summary>
             <returns>Mirrored request info.</returns>
+        </member>
+        <member name="M:DryIoc.Request.Is``1(System.Func{``0},System.Func{System.Reflection.ParameterInfo,``0},System.Func{System.Reflection.PropertyInfo,``0},System.Func{System.Reflection.FieldInfo,``0})">
+            <summary>If request corresponds to dependency injected into parameter, 
+            then method calls <paramref name="parameter"/> handling and returns its result.
+            If request corresponds to property or field, then method calls respective handler.
+            If request does not correspond to dependency, then calls <paramref name="root"/> handler.</summary>
+            <typeparam name="TResult"></typeparam>
+            <param name="root">(optional) handler for resolution call or root.</param>
+            <param name="parameter">(optional) handler for parameter dependency</param>
+            <param name="property">(optional) handler for property dependency</param>
+            <param name="field">(optional) handler for field dependency</param>
+            <returns>Result of applied handler or default <typeparamref name="TResult"/>.</returns>
         </member>
         <member name="M:DryIoc.Request.Enumerate">
             <summary>Enumerates all request stack parents. 
@@ -2418,7 +2454,10 @@
             <summary>Dependency request path information.</summary>
         </member>
         <member name="F:DryIoc.RequestInfo.Empty">
-            <summary>Represents empty info (indicated by null <see cref="F:DryIoc.RequestInfo.ServiceType"/>).</summary>
+            <summary>Represents empty info (indicated by null <see cref="P:DryIoc.RequestInfo.ServiceType"/>).</summary>
+        </member>
+        <member name="F:DryIoc.RequestInfo.ServiceInfo">
+            <summary>Wraps the resolved service lookup details.</summary>
         </member>
         <member name="P:DryIoc.RequestInfo.IsEmpty">
             <summary>Returns true for an empty request.</summary>
@@ -2437,34 +2476,37 @@
             <param name="condition">Condition to stop on. Should not be null.</param>
             <returns>Request info of found parent.</returns>
         </member>
-        <member name="F:DryIoc.RequestInfo.ServiceType">
-            <summary>Asked service type.</summary>
+        <member name="P:DryIoc.RequestInfo.ServiceType">
+            <summary>Requested service type.</summary>
         </member>
-        <member name="F:DryIoc.RequestInfo.RequiredServiceType">
+        <member name="P:DryIoc.RequestInfo.RequiredServiceType">
             <summary>Required service type if specified.</summary>
         </member>
         <member name="M:DryIoc.RequestInfo.GetActualServiceType">
-            <summary>Returns <see cref="F:DryIoc.RequestInfo.RequiredServiceType"/> if it is specified and assignable to <see cref="F:DryIoc.RequestInfo.ServiceType"/>,
-            otherwise returns <see cref="F:DryIoc.RequestInfo.ServiceType"/>.</summary>
+            <summary>Returns <see cref="P:DryIoc.RequestInfo.RequiredServiceType"/> if it is specified and assignable to <see cref="P:DryIoc.RequestInfo.ServiceType"/>,
+            otherwise returns <see cref="P:DryIoc.RequestInfo.ServiceType"/>.</summary>
             <returns>The type to be used for lookup in registry.</returns>
         </member>
-        <member name="F:DryIoc.RequestInfo.ServiceKey">
-            <summary>Optional service key.</summary>
+        <member name="P:DryIoc.RequestInfo.IfUnresolved">
+            <summary>Policy to deal with unresolved request.</summary>
+        </member>
+        <member name="P:DryIoc.RequestInfo.ServiceKey">
+            <summary>Optional service key to identify service of the same type.</summary>
         </member>
         <member name="F:DryIoc.RequestInfo.FactoryID">
             <summary>Resolved factory ID, used to identify applied decorator.</summary>
         </member>
         <member name="F:DryIoc.RequestInfo.FactoryType">
-            <summary>False for Decorators and Wrappers.</summary>
+            <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         </member>
         <member name="F:DryIoc.RequestInfo.ImplementationType">
-            <summary>Implementation type.</summary>
-        </member>
-        <member name="P:DryIoc.RequestInfo.ReuseLifespan">
-            <summary>Relative number representing reuse lifespan.</summary>
+            <summary>Service implementation type if known.</summary>
         </member>
         <member name="F:DryIoc.RequestInfo.Reuse">
             <summary>Service reuse.</summary>
+        </member>
+        <member name="P:DryIoc.RequestInfo.ReuseLifespan">
+            <summary>Relative number representing reuse lifespan.</summary>
         </member>
         <member name="M:DryIoc.RequestInfo.Push(System.Type,System.Int32,System.Type,DryIoc.IReuse)">
             <summary>Simplified version of Push with most common properties.</summary>
@@ -2478,12 +2520,41 @@
             <param name="implementationType"></param> <param name="reuse"></param>
             <returns>Created info chain to current (parent) info.</returns>
         </member>
+        <member name="M:DryIoc.RequestInfo.Push(System.Type,System.Type,System.Object,DryIoc.IfUnresolved,System.Int32,DryIoc.FactoryType,System.Type,DryIoc.IReuse)">
+            <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+            <param name="serviceType"></param> <param name="requiredServiceType"></param>
+            <param name="serviceKey"></param> <param name="ifUnresolved"></param>
+            <param name="factoryType"></param> <param name="factoryID"></param>
+            <param name="implementationType"></param> <param name="reuse"></param>
+            <returns>Created info chain to current (parent) info.</returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.Push(DryIoc.IServiceInfo,System.Int32,DryIoc.FactoryType,System.Type,DryIoc.IReuse)">
+            <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+            <param name="serviceInfo"></param>
+            <param name="factoryType">(optional)</param> <param name="factoryID">(optional)</param>
+            <param name="implementationType">(optional)</param> <param name="reuse">(optional)</param>
+            <returns>Created info chain to current (parent) info.</returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.With(System.Func{DryIoc.IServiceInfo,DryIoc.IServiceInfo})">
+            <summary>Produces new request info with specified service info.</summary>
+            <param name="getServiceInfo">Gets new service info from the old one.</param> <returns>New request info.</returns>
+        </member>
+        <member name="M:DryIoc.RequestInfo.With(System.Int32,DryIoc.FactoryType,System.Type,DryIoc.IReuse)">
+            <summary>Produces new info adding the implementation (factory) details to the current info.</summary>
+            <param name="factoryType"></param> <param name="factoryID"></param>
+            <param name="implementationType"></param> <param name="reuse"></param>
+            <returns>New request info.</returns>
+        </member>
         <member name="M:DryIoc.RequestInfo.Enumerate">
             <summary>Returns all request until the root - parent is null.</summary>
             <returns>Requests from the last to first.</returns>
         </member>
+        <member name="M:DryIoc.RequestInfo.PrintCurrent(System.Text.StringBuilder)">
+            <summary>Prints request without parents.</summary>
+            <param name="s">Where to print.</param><returns><paramref name="s"/> with appended info.</returns>
+        </member>
         <member name="M:DryIoc.RequestInfo.Print(System.Text.StringBuilder)">
-            <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
+            <summary>Prints request with all its parents.</summary>
             <param name="s">Where to print.</param><returns><paramref name="s"/> with appended info.</returns>
         </member>
         <member name="M:DryIoc.RequestInfo.ToString">
@@ -2558,6 +2629,10 @@
         </member>
         <member name="F:DryIoc.IfAlreadyRegistered.Replace">
             <summary>Replaces old registration with new one.</summary>
+        </member>
+        <member name="F:DryIoc.IfAlreadyRegistered.AppendNewImplementation">
+            <summary>Adds new implementation or null (Made.Of), 
+            skips registration if the implementation is already registered.</summary>
         </member>
         <member name="T:DryIoc.ServiceRegistrationInfo">
             <summary>Define registered service structure.</summary>
@@ -2864,6 +2939,10 @@
             <summary>Stores new error message and returns error code for it.</summary>
             <param name="message">Error message to store.</param> <returns>Error code for message.</returns>
         </member>
+        <member name="M:DryIoc.Error.NameOf(System.Int32)">
+            <summary>Returns the name for the provided error code.</summary>
+            <param name="error">error code.</param> <returns>name of error, unique in scope of this <see cref="T:DryIoc.Error"/> class.</returns>
+        </member>
         <member name="T:DryIoc.ErrorCheck">
             <summary>Checked error condition, possible error sources.</summary>
         </member>
@@ -3167,6 +3246,10 @@
             <summary>Returns true if property is indexer: aka this[].</summary>
             <param name="property">Property to check</param><returns>True if indexer.</returns>
         </member>
+        <member name="M:DryIoc.ReflectionTools.IsClosureType(System.Type)">
+            <summary>Returns true if type is generated type of hoisted closure.</summary>
+            <param name="type">Source type.</param> <returns>Check result.</returns>
+        </member>
         <member name="M:DryIoc.ReflectionTools.GetAttributes(System.Reflection.MemberInfo,System.Type,System.Boolean)">
             <summary>Returns attributes defined for the member/method.</summary>
             <param name="member">Member to check.</param> <param name="attributeType">(optional) Specific attribute type to return, any attribute otherwise.</param>
@@ -3257,23 +3340,17 @@
             <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>
             <returns>Managed Thread ID.</returns>
         </member>
-        <member name="T:DryIoc.Experimental.DI">
+        <member name="T:DryIoc.Experimental.D">
             <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
         </member>
-        <member name="M:DryIoc.Experimental.DI.New">
+        <member name="P:DryIoc.Experimental.D.I">
             <summary>Creates new default configured container</summary>
-            <returns>New configured container.</returns>
+            <value>New configured container.</value>
         </member>
-        <member name="M:DryIoc.Experimental.DI.Get``1(DryIoc.IContainer,System.Reflection.Assembly[])">
-            <summary>Auto-wired resolution of T from the <see cref="M:DryIoc.Experimental.DI.New"/> container.</summary>
+        <member name="M:DryIoc.Experimental.D.Get``1(DryIoc.IContainer,System.Reflection.Assembly[])">
+            <summary>Auto-wired resolution of T from the container.</summary>
             <typeparam name="T">Type of service to resolve.</typeparam>
             <param name="container">(optional) Container </param>
-            <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
-            <returns>Resolved service or throws.</returns>
-        </member>
-        <member name="M:DryIoc.Experimental.DI.Get``1(System.Reflection.Assembly[])">
-            <summary>Auto-wired resolution of T from the <see cref="M:DryIoc.Experimental.DI.New"/> container.</summary>
-            <typeparam name="T">Type of service to resolve.</typeparam>
             <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
             <returns>Resolved service or throws.</returns>
         </member>
