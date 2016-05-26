@@ -11,7 +11,9 @@
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
-          v2.5.0:
+          v2.5.1
+          - fixed: Package dependency to correct version of DryIoc and DryIoc.MefAttributedModel
+          v2.5.0
           - changed: Compatible with DryIoc 2.5
           - changed: Switched to use DryIoc ImTools.cs
           - added: Optional Name parameter into OpenScope
@@ -20,8 +22,8 @@
           - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate
         </releaseNotes>
         <dependencies>
-            <dependency id="DryIoc.dll" version="2.2.2" />
-            <dependency id="DryIoc.MefAttributedModel.dll" version="2.2.2" />
+            <dependency id="DryIoc.dll" version="2.5.0" />
+            <dependency id="DryIoc.MefAttributedModel.dll" version="2.4.0" />
             <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
     </metadata>
