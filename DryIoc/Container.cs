@@ -628,6 +628,20 @@ namespace DryIoc
                     if (service != null) // skip unresolved items
                         yield return service;
                 }
+
+            var fallbackContainers = container.Rules.FallbackContainers;
+            if (!fallbackContainers.IsNullOrEmpty())
+            {
+                for (var i = 0; i < fallbackContainers.Length; i++)
+                {
+                    var fallbackContainer = fallbackContainers[i];
+                    var fallbackServices = fallbackContainer.Resolver.ResolveMany(serviceType,
+                        serviceKey, requiredServiceType, compositeParentKey, compositeParentRequiredType,
+                        preResolveParent, scope);
+                    foreach (var fallbackService in fallbackServices)
+                        yield return fallbackService;
+                }
+            }
         }
 
         private void ThrowIfContainerDisposed()
@@ -2449,6 +2463,23 @@ namespace DryIoc
                         if (itemExpr != null)
                             itemExprList.Add(itemExpr);
                     }
+                }
+            }
+
+            // add items from fallback containers if any
+            var fallbackContainers = container.Rules.FallbackContainers;
+            if (!fallbackContainers.IsNullOrEmpty())
+            {
+                for (var i = 0; i < fallbackContainers.Length; i++)
+                {
+                    var fallbackContainer = fallbackContainers[i];
+                    var fallbackRequest = request.WithNewContainer(fallbackContainer);
+                    var itemsExpr = (NewArrayExpression)GetArrayExpression(fallbackRequest);
+                    if (itemsExpr.Expressions.Count != 0)
+                        if (itemExprList != null)
+                            itemExprList.AddRange(itemsExpr.Expressions);
+                        else
+                            itemExprList = new List<Expression>(itemsExpr.Expressions);
                 }
             }
 

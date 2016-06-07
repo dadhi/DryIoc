@@ -108,6 +108,7 @@
     <Compile Include="Issue213_LazySingletonsShouldBeResolvedAfterContainerIsDisposed.cs" />
     <Compile Include="Issue224_EnumerableWrappedInFuncLosesTheInformationAboutFuncWrapperCausingIncorrectScopeLifetimeValidation.cs" />
     <Compile Include="Issue230_CustomInitializerAttachedToLazilyResolvedDependencyIsCalledOncePerResolution.cs" />
+    <Compile Include="Issue247_Collection_wrapper_resolved_from_Facade_does_not_count_parent_container_registrations.cs" />
     <Compile Include="Issue251_AutoRegisterTypesFromDifferentNamespaceAndAssemblies.cs" />
     <Compile Include="Issue262_Using_attributes_to_inject_primitive_variables.cs" />
     <Compile Include="Issue264_IfAlreadyRegisteredReplaceCanSpanMultipleRegistrations.cs" />
