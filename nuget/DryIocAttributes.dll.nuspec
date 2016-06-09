@@ -12,6 +12,8 @@
         <description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.5.0
+          - added: Package for NetStandard1.0
           v2.4.0
           - added: Compatibility with DryIoc 2.5
           v2.3.0
@@ -23,11 +25,10 @@
           - added: UseDecorateeReuse option in AsDecoratorAttribute
         </releaseNotes>
       <dependencies>
-        <group targetFramework="dotnet">
-          <dependency id="System.Diagnostics.Debug" version="4.0.0" />
-          <dependency id="System.Runtime" version="4.0.0" />
-          <dependency id="System.Runtime.Extensions" version="4.0.0" />
-          <dependency id="System.ComponentModel.Composition" version="4.0.0" />
+        <group targetFramework="netstandard1.0">
+          <dependency id="System.Diagnostics.Debug" version="4.0.11" />
+          <dependency id="System.Runtime" version="4.1.0" />
+          <dependency id="System.Runtime.Extensions" version="4.1.0" />
         </group>
       </dependencies>
       <frameworkAssemblies>
@@ -52,20 +53,20 @@
         <file src="..\Net45\bin\Release\DryIocAttributes.pdb" target="lib\net45" />
         <file src="..\Net45\bin\Release\DryIocAttributes.xml" target="lib\net45" />
 
-        <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL\bin\Release\DryIocAttributes.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL\bin\Release\DryIocAttributes.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL\bin\Release\DryIocAttributes.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- PCL: Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile259 .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- Core CLR dotnet (PCL Profile259) https://oren.codes/2015/07/29/targeting-net-core -->
-        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.dll" target="lib\dotnet" />
-        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.pdb" target="lib\dotnet" />
-        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.xml" target="lib\dotnet" />
+        <!-- NetStandard1.0 created from PCL Profile259 -->
+        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.dll" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.pdb" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIocAttributes.xml" target="lib\netstandard1.0" />
 
         <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />

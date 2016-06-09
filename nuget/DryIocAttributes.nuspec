@@ -11,6 +11,8 @@
         <description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.5.0
+          - added: Source code (contentFiles) package for UWP (uap10.0)
           v2.4.0
           - added: Compatibility with DryIoc 2.5
           v2.3.0
@@ -21,10 +23,12 @@
           - added: UseParentReuseAttribute to support DryIoc Setup.UseParentReuse
           - added: UseDecorateeReuse option in AsDecoratorAttribute
         </releaseNotes>
-        <dependencies></dependencies>
         <frameworkAssemblies>
             <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
         </frameworkAssemblies>
+        <contentFiles>
+          <files include="cs/any/*.*" buildAction="Compile" />
+        </contentFiles>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
@@ -39,12 +43,16 @@
         <!-- net45 -->
         <file src="..\DryIocAttributes\Attributes.cs" target="content\net45\DryIocAttributes" />
 
-        <!-- PCL: Profile328	.NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIocAttributes\Attributes.cs"   target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
         <file src="..\DryIocAttributes\Ported-net40.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
 
-        <!-- PCL: Profile259	.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <!-- PCL Profile259:.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIocAttributes\Attributes.cs"   target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
         <file src="..\DryIocAttributes\Ported-net40.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
+
+        <!--uap10.0: Universal Windows Platform-->
+        <file src="..\DryIocAttributes\Attributes.cs" target="contentFiles\cs\any" />
+        <file src="..\DryIocAttributes\Ported-net40.cs" target="contentFiles\cs\any" />
     </files>
 </package>

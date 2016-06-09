@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.6.0
+      - increasing version for adding NnetStandard1.0 support to dll package
       v2.5.1
       - fixed: #247: Collection wrapper resolved from Facade does not count parent container registrations
       v2.5.0
@@ -31,10 +33,6 @@
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
-    
-    <!--uap10.0: Universal Windows Platform-->
-    <file src="..\DryIoc\Container.cs" target="contentFiles\cs\any" />
-    <file src="..\DryIoc\ImTools.cs" target="contentFiles\cs\any" />
 
     <!--net35-->
     <file src="..\DryIoc\Container.cs" target="content\net35\DryIoc" />
@@ -63,5 +61,9 @@
     <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
     <file src="..\DryIoc\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+
+    <!--uap10.0: Universal Windows Platform-->
+    <file src="..\DryIoc\Container.cs" target="contentFiles\cs\any" />
+    <file src="..\DryIoc\ImTools.cs" target="contentFiles\cs\any" />
   </files>
 </package>

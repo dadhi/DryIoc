@@ -11,6 +11,8 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.6.0
+          - added: Package for NetStandard1.0
           v2.5.1
           - fixed: #247: Collection wrapper resolved from Facade does not count parent container registrations
           v2.5.0
@@ -25,17 +27,17 @@
           - added Uap (Universal Windows Platform) content source code DryIoc package
         </releaseNotes>
         <dependencies>
-          <group targetFramework="dotnet">
-            <dependency id="System.Collections" version="4.0.0" />
-            <dependency id="System.Diagnostics.Debug" version="4.0.0" />
-            <dependency id="System.Diagnostics.Tools" version="4.0.0" />
-            <dependency id="System.Linq" version="4.0.0" />
-            <dependency id="System.Linq.Expressions" version="4.0.0" />
-            <dependency id="System.Reflection" version="4.0.0" />
-            <dependency id="System.Reflection.Extensions" version="4.0.0" />
-            <dependency id="System.Runtime" version="4.0.0" />
-            <dependency id="System.Runtime.Extensions" version="4.0.0" />
-            <dependency id="System.Threading" version="4.0.0" />
+          <group targetFramework="netstandard1.0">
+            <dependency id="System.Collections" version="4.0.11" />
+            <dependency id="System.Diagnostics.Debug" version="4.0.11" />
+            <dependency id="System.Diagnostics.Tools" version="4.0.1" />
+            <dependency id="System.Linq" version="4.1.0" />
+            <dependency id="System.Linq.Expressions" version="4.0.11" />
+            <dependency id="System.Reflection" version="4.1.0" />
+            <dependency id="System.Reflection.Extensions" version="4.0.1" />
+            <dependency id="System.Runtime" version="4.1.0" />
+            <dependency id="System.Runtime.Extensions" version="4.1.0" />
+            <dependency id="System.Threading" version="4.0.11" />
           </group>
         </dependencies>
     </metadata>
@@ -67,12 +69,12 @@
         <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- dotnet (PCL Profile259) https://oren.codes/2015/07/29/targeting-net-core -->
-        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\dotnet" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\dotnet" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\dotnet" />
+        <!-- NetStandard1.0 created from PCL Profile259 -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.0" />
 
-      <!-- tools -->
+        <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />
         <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
