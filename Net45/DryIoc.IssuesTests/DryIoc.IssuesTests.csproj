@@ -75,6 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DotnetWeekBlogExample.cs" />
+    <Compile Include="DryIocAdapterSpecificationTests.cs" />
     <Compile Include="InjectListOfDepsWithStringDeps.cs" />
     <Compile Include="Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize.cs" />
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
