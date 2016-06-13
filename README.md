@@ -21,7 +21,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 - Supported platforms: 
     - .NET 3.5+ 
     - PCL Profiles 259, 328
-    - .NET Core/DNX [Netstandard1.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
+    - .NET Core/DNX [netstandard1.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
 
 - NuGet packages 
     - [DryIoc.dll]: `PM> Install-Package DryIoc.dll`
