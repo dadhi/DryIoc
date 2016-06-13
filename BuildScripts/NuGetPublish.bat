@@ -1,27 +1,47 @@
 @echo off
-
 pushd ".."
 
 set NUGET=".nuget\NuGet.exe"
 set PACKAGEDIR="bin\NuGetPackages"
+set /p APIKEY=<ApiKey.txt
 
-echo:
-echo:Publishing NuGet packages . . .
-echo:-------------------------------
-if not "%1"=="-nopause" pause
+rem DryIoc
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.2.6.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.2-netcore-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
-set /p APIKEY=<NuGet\apikey-staging.txt
+rem DryIoc.AspNetCore.DependencyInjection
+%NUGET% push "%PACKAGEDIR%\DryIoc.AspNetCore.DependencyInjection.1.0.0-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
-for %%P in ("%PACKAGEDIR%\*.nupkg") do (
-	rem For all packages Not containing "symbols.nupkg" ...
-	for /f %%N in ('echo:%%P ^| find /v "symbols.nupkg"') do (
-		%NUGET% push "%%N" -Source https://staging.nuget.org -ApiKey %APIKEY%  
-	) 
-)
+rem DryIocZero
+rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+rem DryIocAttributes
+rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+rem DryIoc.MefAttributedModel
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+rem DryIoc.SignalR
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.2.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.dll.2.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+rem DryIoc.SignalR
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.dll.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+rem DryIoc.Mvc
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.0.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.0.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+rem DryIoc.Mvc
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.dll.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+
+popd
+pause
 
 echo: 
-echo:Publishing succeeded.
-popd
-
-if not "%1"=="-nopause" pause 
-goto:eof
+echo:Packaging succeeded.
