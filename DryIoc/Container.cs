@@ -5955,7 +5955,7 @@ namespace DryIoc
             {
                 var currentScope = request.Scopes.GetCurrentScope();
                 if (currentScope != null)
-                    reuse = DryIoc.Reuse.InCurrentNamedScope(currentScope.Name);
+                    reuse = DryIoc.Reuse.InCurrentScope;
             }
 
             return reuse;

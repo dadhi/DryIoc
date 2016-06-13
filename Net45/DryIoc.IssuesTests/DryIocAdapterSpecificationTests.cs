@@ -6,10 +6,12 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class DryIocAdapterSpecificationTests
     {
-        [Test, Ignore]
+        [Test]
         public void DisposingScopeDisposesService()
         {
-            var adapter = new Container(rules => rules.WithTrackingDisposableTransients());
+            var adapter = new Container(rules => rules
+                .WithImplicitRootOpenScope()
+                .WithTrackingDisposableTransients());
 
             adapter.Register<IFakeSingletonService, FakeService>(Reuse.Singleton);
             adapter.Register<IFakeScopedService, FakeService>(Reuse.InCurrentScope);
