@@ -1,5 +1,5 @@
 ﻿{
-  "version": "1.0-rc2-final",
+  "version": "1.0.0-rc2",
 
   "description": "DryIoc adapter for AspNetCore Microsoft.Extensions.DependencyInjection",
   "authors": [ "Maksim Volkau" ],

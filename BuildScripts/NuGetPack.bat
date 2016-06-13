@@ -16,7 +16,7 @@ echo:DryIoc v%VER%
 echo:================
 %NUGET% pack "NuGet\DryIoc.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 %NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive -Symbols
-%NUGET% pack "NuGet\DryIoc.NetCore.dll.nuspec" -Version %VER%-netcore-rc2 -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack "NuGet\DryIoc.NetCore.dll.nuspec" -Version %VER%-netcore-rc2 -OutputDirectory %PACKAGEDIR% -NonInteractive -Symbols
 
 echo:
 call :ParseVersion "DryIocAttributes\Properties\AssemblyInfo.cs"
