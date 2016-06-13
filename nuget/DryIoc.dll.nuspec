@@ -11,33 +11,9 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.5.1
-          - fixed: #247: Collection wrapper resolved from Facade does not count parent container registrations
-          v2.5.0
-          - fixed #280: LazyEnumerable dependency silences missing dependency error - but works (throws) for fixed array
-          - fixed #279: IfUnresolved.ReturnDefault propagates down the dependency chain
-          - fixed #285: Recursive dependency in the case of using Composite Pattern
-          - fixed #219: Minimize memory allocations in Request and RequestInfo
-          - added #282: Enable to resolve func with more than 4 parameters (up to 7)
-          - added #255: Make GetCurrentScope available on IContainer via extension method
-          - added #172: Reuse passed Func argument in nested dependencies, but not in the same service
-          - added #257: Support for contentFiles to enable source packages in NuGet3.3
-          - added Uap (Universal Windows Platform) content source code DryIoc package
+          v2.6.2
+          - fixed: #290 Disposable Transient without reused parent should be tracked in nearest open scope
         </releaseNotes>
-        <dependencies>
-          <group targetFramework="dotnet">
-            <dependency id="System.Collections" version="4.0.0" />
-            <dependency id="System.Diagnostics.Debug" version="4.0.0" />
-            <dependency id="System.Diagnostics.Tools" version="4.0.0" />
-            <dependency id="System.Linq" version="4.0.0" />
-            <dependency id="System.Linq.Expressions" version="4.0.0" />
-            <dependency id="System.Reflection" version="4.0.0" />
-            <dependency id="System.Reflection.Extensions" version="4.0.0" />
-            <dependency id="System.Runtime" version="4.0.0" />
-            <dependency id="System.Runtime.Extensions" version="4.0.0" />
-            <dependency id="System.Threading" version="4.0.0" />
-          </group>
-        </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
@@ -67,12 +43,7 @@
         <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- dotnet (PCL Profile259) https://oren.codes/2015/07/29/targeting-net-core -->
-        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\dotnet" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\dotnet" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\dotnet" />
-
-      <!-- tools -->
+        <!-- tools -->
         <file src="..\NuGet\DryIoc.snk" target="tools" />
         <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>

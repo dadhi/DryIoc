@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp", "DryIoc.SpeedTestApp\DryIoc.SpeedTestApp.csproj", "{A9C4E2CC-3CA9-4F04-8544-A2837B045643}"
 EndProject
@@ -35,6 +35,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 		NuGet\DryIoc.MefAttributedModel.nuspec = NuGet\DryIoc.MefAttributedModel.nuspec
 		nuget\DryIoc.Mvc.dll.nuspec = nuget\DryIoc.Mvc.dll.nuspec
 		nuget\DryIoc.Mvc.nuspec = nuget\DryIoc.Mvc.nuspec
+		NuGet\DryIoc.NetCore.dll.nuspec = NuGet\DryIoc.NetCore.dll.nuspec
 		nuget\DryIoc.nuspec = nuget\DryIoc.nuspec
 		nuget\DryIoc.Owin.dll.nuspec = nuget\DryIoc.Owin.dll.nuspec
 		nuget\DryIoc.Owin.nuspec = nuget\DryIoc.Owin.nuspec
