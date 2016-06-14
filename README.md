@@ -26,7 +26,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 - NuGet packages 
     - [DryIoc.dll]: `PM> Install-Package DryIoc.dll`
     - [DryIoc] source code: `PM> Install-Package DryIoc`
-    - __.Net Core RC2__: `PM> Install-Package -Pre DryIoc.dll`
+    - __.Net Core RC2__: `PM> Install-Package DryIoc.dll -Pre`
 
 - Latest stable DryIoc version is __v2.6.2__ / __2.6.2-netcore-rc2__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
