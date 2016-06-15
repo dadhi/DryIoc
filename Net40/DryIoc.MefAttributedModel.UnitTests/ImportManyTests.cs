@@ -24,7 +24,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        private void ImportMany_works_with_importing_constructor_in_Mef1()
+        public void ImportMany_works_with_importing_constructor_in_Mef1()
         {
             var pw = Mef.GetExport<PasswordVerifier1>();
 
@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        private void ImportMany_works_with_importing_constructor_in_Mef2()
+        public void ImportMany_works_with_importing_constructor_in_Mef2()
         {
             var pw = Mef.GetExport<PasswordVerifier2>();
 
@@ -46,7 +46,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        private void ImportMany_works_with_property_injection_in_Mef3()
+        public void ImportMany_works_with_property_injection_in_Mef3()
         {
             var pw = Mef.GetExport<PasswordVerifier3>();
 
@@ -57,7 +57,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        private void ImportMany_works_with_property_injection_in_Mef4()
+        public void ImportMany_works_with_property_injection_in_Mef4()
         {
             var pw = Mef.GetExport<PasswordVerifier4>();
 
@@ -65,6 +65,46 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.NotNull(pw.Value);
             Assert.AreEqual(3, pw.Value.Hashers.Count());
             Assert.IsTrue(pw.Value.ImportsSatisfied);
+        }
+
+        [Test]
+        public void ImportMany_works_with_importing_constructor_in_DryIoc1()
+        {
+            var pw = Container.Resolve<PasswordVerifier1>();
+
+            Assert.NotNull(pw);
+            Assert.AreEqual(3, pw.Hashers.Count());
+            Assert.IsTrue(pw.ImportsSatisfied);
+        }
+
+        [Test]
+        public void ImportMany_works_with_importing_constructor_in_DryIoc2()
+        {
+            var pw = Container.Resolve<PasswordVerifier2>();
+
+            Assert.NotNull(pw);
+            Assert.AreEqual(3, pw.Hashers.Count());
+            Assert.IsTrue(pw.ImportsSatisfied);
+        }
+
+        [Test]
+        public void ImportMany_works_with_property_injection_in_DryIoc3()
+        {
+            var pw = Container.Resolve<PasswordVerifier3>();
+
+            Assert.NotNull(pw);
+            Assert.AreEqual(3, pw.Hashers.Count());
+            Assert.IsTrue(pw.ImportsSatisfied);
+        }
+
+        [Test]
+        public void ImportMany_works_with_property_injection_in_DryIoc4()
+        {
+            var pw = Container.Resolve<PasswordVerifier4>();
+
+            Assert.NotNull(pw);
+            Assert.AreEqual(3, pw.Hashers.Count());
+            Assert.IsTrue(pw.ImportsSatisfied);
         }
     }
 }
