@@ -24,9 +24,9 @@ THE SOFTWARE.
 
 namespace System.ComponentModel.Composition
 {
-    /// <summary>Specifies to register annotated type in container. 
+    /// <summary>Specifies to register annotated type in container.
     /// Or you could annotate Method with this attribute, and the method will be used as Factory Method for registration.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
         AllowMultiple = true, Inherited = false)]
     public class ExportAttribute : Attribute
     {
@@ -60,12 +60,12 @@ namespace System.ComponentModel.Composition
         }
     }
 
-    /// <summary>Specifies that all types inherited from annotated type should be exported (see <see cref="ExportAttribute"/>) 
+    /// <summary>Specifies that all types inherited from annotated type should be exported (see <see cref="ExportAttribute"/>)
     /// with these settings.</summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true)]
     public class InheritedExportAttribute : ExportAttribute
     {
-        /// <summary>Create default attribute without <see cref="ExportAttribute.ContractName"/> 
+        /// <summary>Create default attribute without <see cref="ExportAttribute.ContractName"/>
         /// and with annotated type as <see cref="ExportAttribute.ContractType"/>.</summary>
         public InheritedExportAttribute() { }
 
@@ -90,7 +90,7 @@ namespace System.ComponentModel.Composition
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public sealed class PartNotDiscoverableAttribute : Attribute { }
 
-    /// <summary>Specifies that exported type instance should be NonShared (created in each Import - aka Transient) 
+    /// <summary>Specifies that exported type instance should be NonShared (created in each Import - aka Transient)
     /// or Shared (created once and then reused in each Import - aka Singleton).</summary>
     public enum CreationPolicy
     {
@@ -134,7 +134,7 @@ namespace System.ComponentModel.Composition
         /// The specified type should be assignable to annotated parameter, property or field type.</summary>
         public Type ContractType { get; set; }
 
-        /// <summary>Allow default value for the member if corresponding Exported service was found. 
+        /// <summary>Allow default value for the member if corresponding Exported service was found.
         /// If not specified, then instead of default value Exception will be thrown.</summary>
         public bool AllowDefault { get; set; }
 
@@ -164,7 +164,7 @@ namespace System.ComponentModel.Composition
         }
     }
 
-    /// <summary>Specifies that a property, field, or parameter should be populated with all 
+    /// <summary>Specifies that a property, field, or parameter should be populated with all
     /// matching exports by the <see cref="T:System.ComponentModel.Composition.Hosting.CompositionContainer" /> object.</summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
     public class ImportManyAttribute : Attribute
@@ -207,10 +207,16 @@ namespace System.ComponentModel.Composition
         }
     }
 
-
     /// <summary>Specifies that annotated attribute should be used as metadata object associated with Export.
     /// You can create your won custom Export attribute with metadata by deriving from <see cref="ExportAttribute"/> and
     /// annotating new attribute with <see cref="MetadataAttributeAttribute"/>.</summary>
     [AttributeUsage(AttributeTargets.Class)]
     public class MetadataAttributeAttribute : Attribute { }
+
+    /// <summary>Notifies a part when its imports have been satisfied.</summary>
+    public interface IPartImportsSatisfiedNotification
+    {
+        /// <summary>Called when a part's imports have been satisfied and it is safe to use.</summary>
+        void OnImportsSatisfied();
+    }
 }
