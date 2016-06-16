@@ -232,8 +232,18 @@ namespace DryIoc.MefAttributedModel
             }
             else
             {
-                serviceKey = import.ContractName ??
-                    (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
+                serviceKey = import.ContractName;
+                if (serviceKey == null)
+                {
+                    var importEx = import as ImportExAttribute;
+                    if (importEx != null)
+                        serviceKey = importEx.ContractKey;
+                    else
+#pragma warning disable 618 // ImportWithKeyAttribute is Obsolete.
+                        serviceKey = import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null;
+#pragma warning restore 618
+                }
+
                 requiredServiceType = import.ContractType;
                 if (import.AllowDefault)
                     ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;

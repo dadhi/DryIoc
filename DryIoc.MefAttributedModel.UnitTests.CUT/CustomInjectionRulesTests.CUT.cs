@@ -9,7 +9,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public IService Service { get; private set; }
         public string Message { get; private set; }
 
-        public ClientWithPrimitiveParameter([ImportWithKey(ServiceKey.One)]IService service, string message)
+        public ClientWithPrimitiveParameter([ImportEx(ServiceKey.One)]IService service, string message)
         {
             Service = service;
             Message = message;
@@ -19,7 +19,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export]
     public class ClientWithServiceAndPrimitiveProperty
     {
-        [ImportWithKey(ServiceKey.One)]
+        [ImportEx(ServiceKey.One)]
         public IService Service { get; set; }
 
         public string Message { get; set; }

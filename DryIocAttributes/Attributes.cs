@@ -561,7 +561,8 @@ namespace DryIocAttributes
         public abstract bool Evaluate(RequestInfo request);
     }
 
-    /// <summary>Imports service Only with equal <see cref="ContractKey"/>.</summary>
+    /// <summary>OBSOLETE: Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
+    //[Obsolete("Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.")]
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible", 
         Justification = "Not available in PCL.")] 
     [AttributeUsage(AttributeTargets.Parameter 
@@ -589,6 +590,34 @@ namespace DryIocAttributes
         }
     }
 
+    /// <summary>Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
+        Justification = "Not available in PCL.")]
+    [AttributeUsage(AttributeTargets.Parameter
+        | AttributeTargets.Field
+        | AttributeTargets.Property)]
+    public class ImportExAttribute : ImportAttribute
+    {
+        /// <summary>Arbitrary object to match with service key.</summary>
+        public object ContractKey { get; set; }
+
+        /// <summary>Creates attribute object service key.</summary> <param name="contractKey"></param>
+        /// <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
+        public ImportExAttribute(object contractKey, Type contractType = null)
+            : base(contractType)
+        {
+            ContractKey = contractKey;
+        }
+
+        /// <summary>Creates attribute with string service name.</summary> <param name="contractKey"></param>
+        /// <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
+        public ImportExAttribute(string contractKey, Type contractType = null)
+            : base(contractKey, contractType)
+        {
+            ContractKey = contractKey;
+        }
+    }
+
     /// <summary>Exports service with associated metadata object.</summary>
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class 
@@ -609,8 +638,9 @@ namespace DryIocAttributes
         }
     }
 
-    /// <summary>Indicate to import service and in case it is not registered, register it using provided
-    /// implementation info. Useful for ad-hoc/quick-prototyping registration of types from not controlled libraries.</summary>
+    /// <summary>Imports the service. 
+    /// But in case the service is not registered, attribute will exports the service in-place for registration.
+    /// Useful for ad-hoc registration of types from not controlled libraries.</summary>
     [AttributeUsage(AttributeTargets.Parameter 
         | AttributeTargets.Field 
         | AttributeTargets.Property)]

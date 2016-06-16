@@ -74,7 +74,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public readonly ExternalTool Tool;
 
-        public OtherDependsOnExternalTool([ImportWithKey(13)]ExternalTool tool)
+        public OtherDependsOnExternalTool([ImportEx(13)]ExternalTool tool)
         {
             Tool = tool;
         }

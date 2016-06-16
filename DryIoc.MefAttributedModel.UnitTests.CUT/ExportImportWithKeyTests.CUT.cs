@@ -8,7 +8,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public IService Service { get; set; }
 
-        public KeyClient([ImportWithKey(ServiceKey.One)]IService service)
+        public KeyClient([ImportEx(ServiceKey.One)]IService service)
         {
             Service = service;
         }
