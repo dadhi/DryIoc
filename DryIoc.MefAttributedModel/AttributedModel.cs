@@ -210,24 +210,42 @@ namespace DryIoc.MefAttributedModel
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
-            return GetImportDetails(type, attributes, request) ?? GetImportExternalDetails(type, attributes, request);
+            return GetImportDetails(type, attributes, request) 
+                ?? GetImportExternalDetails(type, attributes, request);
         }
 
         private static ServiceDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
         {
+            object serviceKey;
+            Type requiredServiceType;
+            var ifUnresolved = DryIoc.IfUnresolved.Throw;
+
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             if (import == null)
-                return null;
+            {
+                var importMany = GetSingleAttributeOrDefault<ImportManyAttribute>(attributes);
+                if (importMany == null)
+                    return null;
 
-            var serviceKey = import.ContractName
-                ?? (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null)
-                ?? GetServiceKeyWithMetadataAttribute(reflectedType, attributes, request);
+                serviceKey = importMany.ContractName;
+                requiredServiceType = importMany.ContractType;
+            }
+            else
+            {
+                serviceKey = import.ContractName ??
+                    (import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null);
+                requiredServiceType = import.ContractType;
+                if (import.AllowDefault)
+                    ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;
+            }
 
-            var ifUnresolved = import.AllowDefault ? DryIoc.IfUnresolved.ReturnDefault : DryIoc.IfUnresolved.Throw;
-            return ServiceDetails.Of(import.ContractType, serviceKey, ifUnresolved);
+            if (serviceKey == null)
+                serviceKey = TryGetServiceKeyWithMetadataAttribute(reflectedType, attributes, request);
+
+            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
         }
 
-        private static object GetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
+        private static object TryGetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
         {
             var meta = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
             if (meta == null)

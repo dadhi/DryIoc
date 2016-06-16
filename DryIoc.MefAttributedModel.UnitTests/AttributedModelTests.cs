@@ -5,6 +5,9 @@
     using System.Linq.Expressions;
     using CUT;
     using NUnit.Framework;
+    using System.Collections.Generic;
+    using System.ComponentModel.Composition;
+    using DryIocAttributes;
 
     [TestFixture]
     public class AttributedModelTests : AttributedModelTestsBase
@@ -170,6 +173,86 @@
             }
 
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
+        }
+
+        [Test]
+        public void ImportMany_with_required_service_type_should_work()
+        {
+            var container = new Container(Rules.Default.WithMefAttributedModel());
+
+            container.RegisterExports(typeof(RequiresManyOfType), typeof(SomeDep));
+
+            var r = container.Resolve<RequiresManyOfType>();
+            Assert.IsTrue(r.Deps.Any());
+        }
+
+        [Test]
+        public void ImportMany_with_service_key_should_work()
+        {
+            var container = new Container(Rules.Default.WithMefAttributedModel());
+
+            container.RegisterExports(typeof(RequiresManyOfName), typeof(BlahDep), typeof(HuhDep));
+
+            var r = container.Resolve<RequiresManyOfName>();
+            Assert.IsInstanceOf<BlahDep>(r.Deps.Single());
+        }
+
+        [Test, Ignore("#195 Composable Metadata as a IDictionary of string - object")]
+        public void ImportMany_with_metadata_should_work()
+        {
+            var container = new Container(Rules.Default.WithMefAttributedModel());
+
+            container.RegisterExports(typeof(RequiresManyOfMeta), typeof(SomeDep), typeof(BlahDep), typeof(HuhDep));
+
+            var r = container.Resolve<RequiresManyOfMeta>();
+            Assert.AreEqual(2, r.Deps.Count());
+        }
+
+        public interface IDep { }
+        
+        [Export(typeof(IDep))]
+        [WithMetadata("---")]
+        internal class SomeDep : IDep { }
+
+        [Export]
+        internal class RequiresManyOfType
+        {
+            public IEnumerable<IDep> Deps { get; private set; }
+
+            public RequiresManyOfType([ImportMany(typeof(IDep))]IEnumerable<IDep> deps)
+            {
+                Deps = deps;
+            }
+        }
+
+        [Export("blah", typeof(IDep))]
+        [WithMetadata("dep")]
+        internal class BlahDep : IDep { }
+
+        [Export("huh", typeof(IDep))]
+        [WithMetadata("dep")]
+        internal class HuhDep : IDep { }
+
+        [Export]
+        internal class RequiresManyOfName
+        {
+            public IEnumerable<IDep> Deps { get; private set; }
+
+            public RequiresManyOfName([ImportMany("blah")]IEnumerable<IDep> deps)
+            {
+                Deps = deps;
+            }
+        }
+
+        [Export]
+        internal class RequiresManyOfMeta
+        {
+            public IEnumerable<IDep> Deps { get; private set; }
+
+            public RequiresManyOfMeta([ImportMany][WithMetadata("dep")]IEnumerable<IDep> deps)
+            {
+                Deps = deps;
+            }
         }
     }
 }
