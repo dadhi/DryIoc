@@ -10,11 +10,16 @@
   },
 
   "packOptions": {
+    "releaseNotes": "Initial release for RC2, all specification tests are passing",
+
     "owners": [ "Maksim Volkau" ],
     "copyright": "Copyright © 2016 Maksim Volkau",
+
     "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "vNext", "AspNetCore", "NetCore", "DNX" ],
+
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
-    "licenseUrl": "http://opensource.org/licenses/MIT"
+    "licenseUrl": "http://opensource.org/licenses/MIT",
+    "requireLicenseAcceptance": false
   },
 
   "dependencies": {
