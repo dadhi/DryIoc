@@ -21,9 +21,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             Assert.AreSame(BazookaA, BazookaB);
         }
-    }
 
-    [Export("a")]
-    [Export("b")]
-    public class Bazooka {}
+        [Export("a")]
+        [Export("b")]
+        public class Bazooka { }
+    }
 }
