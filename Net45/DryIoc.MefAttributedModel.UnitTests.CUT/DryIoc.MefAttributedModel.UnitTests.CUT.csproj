@@ -62,6 +62,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportExternalTests.CUT.cs">
       <Link>ImportExternalTests.CUT.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportManyTests.CUT.cs">
+      <Link>ImportManyTests.CUT.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
       <Link>ImportWithMetadataTests.CUT.cs</Link>
     </Compile>
