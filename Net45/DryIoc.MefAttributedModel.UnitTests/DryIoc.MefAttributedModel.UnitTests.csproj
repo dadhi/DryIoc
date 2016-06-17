@@ -78,7 +78,7 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportExternalTests.cs">
       <Link>ImportExternalTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\ImportManyTests.cs">
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportManyTests.cs">
       <Link>ImportManyTests.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportWithMetadataTests.cs">
@@ -86,6 +86,9 @@
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
       <Link>InheritedExportTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefImportManyTests.cs">
+      <Link>MefImportManyTests.cs</Link>
     </Compile>
     <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefMultiExportTests.cs">
       <Link>MefMultiExportTests.cs</Link>

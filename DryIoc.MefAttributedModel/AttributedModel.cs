@@ -47,6 +47,7 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
 
+        // todo: V3: Rename to WithImports and make the original method an obsolete.
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
         /// <returns>New rules with attributed model rules.</returns>
@@ -64,10 +65,41 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Returns new container with new rules.</returns>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
-            container = container.With(rules => rules.WithMefAttributedModel());
-            container.RegisterInitializer<IPartImportsSatisfiedNotification>((s, r) => s.OnImportsSatisfied());
+            return container
+                .With(rules => rules.WithMefAttributedModel())
+                .WithImportsSatisfiedNotification();
+        }
+
+        /// <summary>Registers <see cref="IPartImportsSatisfiedNotification"/> calling decorator into container.
+        /// It is not directly related to MEF Exports and Imports, and may be used for notifying the injection
+        /// is completed for normal DryIoc registrations.</summary>
+        /// <param name="container">Container to support.</param>
+        /// <returns>The container with made registration.</returns>
+        public static IContainer WithImportsSatisfiedNotification(this IContainer container)
+        {
+            container.Register<object>(
+                made: _importsSatisfiedNotificationFactoryMethod, 
+                setup: _importsSatisfiedNotificationDecoratorSetup);
             return container;
         }
+
+        #region IPartImportsSatisfiedNotification support
+
+        internal static TService NotifyImportsSatisfied<TService>(TService service)
+            where TService : IPartImportsSatisfiedNotification
+        {
+            service.OnImportsSatisfied();
+            return service;
+        }
+
+        private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
+
+        private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
+            request => (request.ImplementationType ?? request.GetActualServiceType())
+                .IsAssignableTo(typeof(IPartImportsSatisfiedNotification)));
+
+        #endregion
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
         /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.</summary>

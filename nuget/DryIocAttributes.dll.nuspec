@@ -14,6 +14,7 @@
         <releaseNotes>
           v2.6.0
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
+          - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
           - added: ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
           v2.5.0
           - added: Package for NetStandard1.0
