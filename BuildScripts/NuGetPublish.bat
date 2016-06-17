@@ -11,18 +11,18 @@ rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.2.nupkg" -Source https://nuget.org
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.2-netcore-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.AspNetCore.DependencyInjection
-%NUGET% push "%PACKAGEDIR%\DryIoc.AspNetCore.DependencyInjection.1.0.0-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.AspNetCore.DependencyInjection.1.0.0-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
 rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocAttributes
-rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocAttributes.2.6.0-pre-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocAttributes.dll.2.6.0-pre-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.MefAttributedModel
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.2.6.0-pre-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.2.6.0-pre-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.SignalR
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.2.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
