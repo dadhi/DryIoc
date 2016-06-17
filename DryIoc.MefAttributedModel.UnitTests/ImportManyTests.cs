@@ -59,5 +59,27 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(3, pw.Hashers.Count());
             Assert.IsTrue(pw.ImportsSatisfied);
         }
+
+        [Test]
+        public void ImportMany_with_required_service_type_should_work()
+        {
+            var container = new Container(Rules.Default.WithMefAttributedModel());
+
+            container.RegisterExports(typeof(RequiresManyOfType), typeof(SomeDep));
+
+            var r = container.Resolve<RequiresManyOfType>();
+            Assert.IsTrue(r.Deps.Any());
+        }
+
+        [Test]
+        public void ImportMany_with_service_key_should_work()
+        {
+            var container = new Container(Rules.Default.WithMefAttributedModel());
+
+            container.RegisterExports(typeof(RequiresManyOfName), typeof(BlahDep), typeof(HuhDep));
+
+            var r = container.Resolve<RequiresManyOfName>();
+            Assert.IsInstanceOf<BlahDep>(r.Deps.Single());
+        }
     }
 }
