@@ -88,6 +88,7 @@
       <Link>ReuseAttributeTests.cs</Link>
     </Compile>
     <Compile Include="MefComposablePartCatalogSupportTests.cs" />
+    <Compile Include="MefCustomCatalogTests.cs" />
     <Compile Include="MefImportManyTests.cs" />
     <Compile Include="MefMultiExportTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
