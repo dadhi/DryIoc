@@ -13,9 +13,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{51CD64D5-4E22-4FCA-8110-2EEED5C79C4B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}"
-	ProjectSection(SolutionItems) = preProject
-		test\NUnitAdapterForXUnit.cs = test\NUnitAdapterForXUnit.cs
-	EndProjectSection
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.AspNetCore.DependencyInjection", "src\DryIoc.AspNetCore.DependencyInjection\DryIoc.AspNetCore.DependencyInjection.xproj", "{A6A43508-BAC9-4A3A-B044-52490B6BE1F5}"
 EndProject

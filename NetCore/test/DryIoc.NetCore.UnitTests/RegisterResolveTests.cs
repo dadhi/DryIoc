@@ -1,10 +1,11 @@
-﻿using Xunit;
+﻿using NUnit.Framework;
 
 namespace DryIoc.NetCore.UnitTests
 {
+    [TestFixture]
     public class RegisterResolveTests
     { 
-        [Fact]
+        [Test]
         public void Register_and_Resolve_should_work()
         {
             var container = new Container(Rules.Default.WithAutoConcreteTypeResolution());
