@@ -7,7 +7,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
     [TestFixture]
     public class ImportManyTests
     {
-
         private IContainer Container
         {
             get { return CreateContainer(); }

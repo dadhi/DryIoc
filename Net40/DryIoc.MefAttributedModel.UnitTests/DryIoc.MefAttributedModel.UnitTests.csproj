@@ -87,6 +87,7 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ReuseAttributeTests.cs">
       <Link>ReuseAttributeTests.cs</Link>
     </Compile>
+    <Compile Include="MefAdvancedCasesTests.cs" />
     <Compile Include="MefComposablePartCatalogSupportTests.cs" />
     <Compile Include="MefCustomCatalogTests.cs" />
     <Compile Include="MefImportManyTests.cs" />
