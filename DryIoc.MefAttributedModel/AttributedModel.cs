@@ -573,11 +573,11 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static bool RegisterFactoryMethodsAndCheckFactoryExportRequired(IRegistrator registrator,
-            ExportedRegistrationInfo factoryInfo)
+            ExportedRegistrationInfo registrationInfo)
         {
             var factoryExportRequired = false;
             var hasExportedMethods = false;
-            var members = factoryInfo.ImplementationType.GetAllMembers();
+            var members = registrationInfo.ImplementationType.GetAllMembers();
             foreach (var member in members)
             {
                 var attributes = member.GetAttributes().ToArrayOrSelf();
@@ -587,9 +587,9 @@ namespace DryIoc.MefAttributedModel
                 hasExportedMethods = true;
 
                 var memberReturnType = member.GetReturnTypeOrDefault();
-                var registrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
+                var factoryRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
 
-                var factoryExport = factoryInfo.Exports[0];
+                var factoryExport = registrationInfo.Exports[0];
 
                 factoryExportRequired = !member.IsStatic();
                 var factoryServiceInfo = factoryExportRequired
@@ -597,13 +597,13 @@ namespace DryIoc.MefAttributedModel
                         factoryExport.ServiceKeyInfo.Key)
                     : null;
 
-                // Special support for decorator of T to be registered as Object
-                var decoratorOfT = registrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo
+                // Special support for decorator of T to register it as Object
+                var decoratorOfT = factoryRegistrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo
                     && member.GetReturnTypeOrDefault().IsGenericParameter;
 
-                var factory = registrationInfo.CreateFactory(Made.Of(member, factoryServiceInfo));
+                var factory = factoryRegistrationInfo.CreateFactory(Made.Of(member, factoryServiceInfo));
 
-                var serviceExports = registrationInfo.Exports;
+                var serviceExports = factoryRegistrationInfo.Exports;
                 for (var i = 0; i < serviceExports.Length; i++)
                 {
                     var export = serviceExports[i];
@@ -614,7 +614,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             if (!hasExportedMethods)
-                Throw.It(Error.ExportedFactoryDoesNotContainFactoryMethods, factoryInfo.ImplementationType);
+                Throw.It(Error.ExportedFactoryDoesNotContainFactoryMethods, registrationInfo.ImplementationType);
 
             return factoryExportRequired;
         }
@@ -667,11 +667,10 @@ namespace DryIoc.MefAttributedModel
 
         static Error()
         {
-            var original = Throw.GetMatchedException;
             Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) =>
                 0 <= error - FirstErrorCode && error - FirstErrorCode < Messages.Count
                     ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
-                    : original(check, error, arg0, arg1, arg2, arg3, inner);
+                    : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
         }
 
         private static int Of(string message)
@@ -687,7 +686,7 @@ namespace DryIoc.MefAttributedModel
     public class AttributedModelException : ContainerException
     {
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and with message corresponding to code.</summary>
-        /// <param name="errorCheck">Type of check was done.</param> <param name="errorCode">Error code to wrap, <see cref="Error"/> for codes defined.</param>
+        /// <param name="errorCheck">Type of check.</param> <param name="errorCode">Error code to wrap, <see cref="Error"/> for codes defined.</param>
         /// <param name="arg0">(optional) Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
         /// <param name="inner">(optional) Inner exception to wrap.</param>
         /// <returns>Create exception object.</returns>

@@ -8478,16 +8478,22 @@ namespace DryIoc
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception innerException = null)
         {
-            var message = string.Format(DryIoc.Error.Messages[errorCode], Print(arg0), Print(arg1), Print(arg2), Print(arg3));
+            var messageFormat = GetMessage(errorCheck, errorCode);
+            var message = string.Format(messageFormat, Print(arg0), Print(arg1), Print(arg2), Print(arg3));
             return new ContainerException(errorCode, message, innerException);
         }
 
-        /// <summary>Creates exception with message describing cause and context of error.</summary>
-        /// <param name="error">Error code.</param> <param name="message">Error message.</param>
-        protected ContainerException(int error, string message)
-            : base(message)
+        /// <summary>Gets error message based on provided args.</summary> <param name="errorCheck"></param> <param name="errorCode"></param>
+        /// <returns>message format.</returns>
+        protected static string GetMessage(ErrorCheck errorCheck, int errorCode)
         {
-            Error = error;
+            return errorCode == -1 ? Throw.GetDefaultMessage(errorCheck) : DryIoc.Error.Messages[errorCode];
+        }
+
+        /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
+        protected static string Print(object arg)
+        {
+            return arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
         }
 
         /// <summary>Creates exception with message describing cause and context of error,
@@ -8500,11 +8506,10 @@ namespace DryIoc
             Error = error;
         }
 
-        /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
-        protected static string Print(object arg)
-        {
-            return new StringBuilder().Print(arg).ToString();
-        }
+        /// <summary>Creates exception with message describing cause and context of error.</summary>
+        /// <param name="error">Error code.</param> <param name="message">Error message.</param>
+        protected ContainerException(int error, string message)
+            : this(error, message, null) { }
     }
 
     /// <summary>Defines error codes and error messages for all DryIoc exceptions (DryIoc extensions may define their own.)</summary>
@@ -8518,11 +8523,6 @@ namespace DryIoc
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            InvalidCondition = Of("Argument {0} of type {1} has invalid condition."),
-            IsNull = Of("Argument of type {0} is null."),
-            IsNotOfType = Of("Argument {0} is not of type {1}."),
-            TypeIsNotOfType = Of("Type argument {0} is not assignable from type {1}."),
-
             UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}." + Environment.NewLine +
                 "Where no service registrations found" + Environment.NewLine +
@@ -8723,8 +8723,14 @@ namespace DryIoc
                 .FirstOrDefault();
             return field != null ? field.Name : null;
         }
+
+        static Error()
+        {
+            Throw.GetMatchedException = ContainerException.Of;
+        }
     }
 
+    // todo: V3: move into Throw as a nested enum
     /// <summary>Checked error condition, possible error sources.</summary>
     public enum ErrorCheck
     {
@@ -8738,18 +8744,39 @@ namespace DryIoc
         IsNotOfType,
         /// <summary>Checked type is not assignable to expected type</summary>
         TypeIsNotOfType,
-        /// <summary>Invoked operation throw, it is source of inner exception.</summary>
+        /// <summary>Invoked operation throws, it is source of inner exception.</summary>
         OperationThrows,
     }
 
     /// <summary>Enables more clean error message formatting and a bit of code contracts.</summary>
     public static class Throw
     {
+        private static string[] CreateDefaultMessages()
+        {
+            var messages = new string[(int)ErrorCheck.OperationThrows + 1];
+            messages[(int)ErrorCheck.Unspecified] = "The error reason is unspecified, which is bad thing.";
+            messages[(int)ErrorCheck.InvalidCondition] = "Argument {0} of type {1} has invalid condition.";
+            messages[(int)ErrorCheck.IsNull] = "Argument of type {0} is null.";
+            messages[(int)ErrorCheck.IsNotOfType] = "Argument {0} is not of type {1}.";
+            messages[(int)ErrorCheck.TypeIsNotOfType] = "Type argument {0} is not assignable from type {1}.";
+            messages[(int)ErrorCheck.OperationThrows] = "Invoked operation throws the inner exception {0}.";
+            return messages;
+        }
+
+        private static readonly string[] _defaultMessages = CreateDefaultMessages();
+
+        /// <summary>Returns the default message specified for <see cref="ErrorCheck"/> code.</summary>
+        /// <param name="error">Error code to get message for.</param> <returns>String format message.</returns>
+        public static string GetDefaultMessage(ErrorCheck error)
+        {
+            return _defaultMessages[(int)error];
+        }
+
         /// <summary>Declares mapping between <see cref="ErrorCheck"/> type and <paramref name="error"/> code to specific <see cref="Exception"/>.</summary>
         /// <returns>Returns mapped exception.</returns>
         public delegate Exception GetMatchedExceptionHandler(ErrorCheck errorCheck, int error, object arg0, object arg1, object arg2, object arg3, Exception inner);
 
-        /// <summary>Returns matched exception (to check type and error code). By default return <see cref="ContainerException"/>.</summary>
+        /// <summary>Returns matched exception for error check and error code.</summary>
         public static GetMatchedExceptionHandler GetMatchedException = ContainerException.Of;
 
         /// <summary>Throws matched exception if throw condition is true.</summary>
@@ -9132,6 +9159,26 @@ namespace DryIoc
                 .ToArrayOrSelf();
         }
 
+        /// <summary>Recursive method to enumerate all input type and its base types for specific details.
+        /// Details are returned by <paramref name="getMembers"/> delegate.</summary>
+        /// <typeparam name="TMember">Details type: properties, fields, methods, etc.</typeparam>
+        /// <param name="type">Input type.</param> <param name="getMembers">Get declared type details.</param>
+        /// <param name="includeBase">(optional) When set looks into base members.</param>
+        /// <returns>Enumerated details info objects.</returns>
+        public static IEnumerable<TMember> GetMembers<TMember>(this Type type, 
+            Func<TypeInfo, IEnumerable<TMember>> getMembers, 
+            bool includeBase = false)
+        {
+            var typeInfo = type.GetTypeInfo();
+            var members = getMembers(typeInfo);
+            if (!includeBase)
+                return members;
+            var baseType = typeInfo.BaseType;
+            return baseType == null || baseType == typeof(object) ? members
+                : members.Concat(baseType.GetMembers(getMembers));
+        }
+
+        // todo: V3: Obsolete: Replace with GetMembers.
         /// <summary>Recursive method to enumerate all input type and its base types for specific details.
         /// Details are returned by <paramref name="getDeclared"/> delegate.</summary>
         /// <typeparam name="T">Details type: properties, fields, methods, etc.</typeparam>
