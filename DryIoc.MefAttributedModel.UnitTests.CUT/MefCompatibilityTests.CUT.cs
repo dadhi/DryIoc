@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -9,7 +10,8 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     // no Export attribute here
-    public class LogTableManager : ILogTableManager
+    // [Export, AsFactory] fixes the test
+    public class LogTableManager: ILogTableManager
     {
         public const string FactoryMethodExportName = "LogTableManagerFactory";
 
@@ -65,6 +67,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     // no Export attribute here
+    //[Export, AsFactory]
     public class Constants
     {
         public const string SettingExportKey = "ExportedSetting";

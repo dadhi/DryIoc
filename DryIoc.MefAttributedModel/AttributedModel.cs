@@ -783,6 +783,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Full name of exported type. Enables type lazy-loading scenario.</summary>
         public string ImplementationTypeFullName;
 
+        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        public bool IsLazy { get { return ImplementationTypeFullName != null; } }
+
         /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public ReuseType Reuse;
 
@@ -830,6 +833,20 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
         public Type ConditionType;
+
+        /// <summary>Returns new info with type representation as type full name string, instead of
+        /// actual type.</summary> <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
+        public ExportedRegistrationInfo MakeLazy()
+        {
+            if (IsLazy) return this;
+            var newInfo = (ExportedRegistrationInfo)MemberwiseClone();
+            newInfo.ImplementationTypeFullName = ImplementationType.FullName;
+            newInfo.ImplementationType = null;
+            var exports = newInfo.Exports;
+            for (var i = 0; i < exports.Length; i++)
+                exports[i] = exports[i].MakeLazy();
+            return newInfo;
+        }
 
         /// <summary>Creates factory out of registration info.</summary>
         /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
@@ -960,6 +977,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>If already registered option to pass to container registration.</summary>
         public IfAlreadyRegistered IfAlreadyRegistered;
 
+        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        public bool IsLazy { get { return ServiceTypeFullName != null; } }
+
         /// <summary>Default constructor is usually required by deserializer.</summary>
         public ExportInfo() { }
 
@@ -971,6 +991,18 @@ namespace DryIoc.MefAttributedModel
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
         {
             ServiceType = serviceType;
+            ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
+            IfAlreadyRegistered = ifAlreadyRegistered;
+        }
+
+        /// <summary>Creates exported info out of type and optional key.</summary>
+        /// <param name="serviceTypeFullName">Contract type name to store.</param>
+        /// <param name="serviceKey">(optional) ContractName string or service key.</param>
+        /// <param name="ifAlreadyRegistered">(optional) Handles the case when the same export is already registered.</param>
+        public ExportInfo(string serviceTypeFullName, object serviceKey = null,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed)
+        {
+            ServiceTypeFullName = serviceTypeFullName;
             ServiceKeyInfo = ServiceKeyInfo.Of(serviceKey);
             IfAlreadyRegistered = ifAlreadyRegistered;
         }
@@ -996,6 +1028,17 @@ namespace DryIoc.MefAttributedModel
                 .AppendCode(ServiceKeyInfo.Key).Append(", ")
                 .AppendEnum(typeof(IfAlreadyRegistered), IfAlreadyRegistered)
                 .Append(")");
+        }
+
+        /// <summary>Returns new export info with type representation as type full name string, instead of
+        /// actual type.</summary> <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
+        public ExportInfo MakeLazy()
+        {
+            if (IsLazy) return this;
+            var info = (ExportInfo)MemberwiseClone();
+            info.ServiceTypeFullName = ServiceType.FullName;
+            info.ServiceType = null;
+            return info;
         }
     }
 
@@ -1094,6 +1137,8 @@ namespace DryIoc.MefAttributedModel
         {
             return key == null ? Default : new ServiceKeyInfo { Key = key };
         }
+
+
     }
 
 #pragma warning restore 659
