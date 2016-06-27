@@ -82,16 +82,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(factory("hey"));
         }
 
-        [Test]
-        public void If_no_factory_members_Exported_then_the_factory_is_invalid_and_it_registration_throws()
-        {
-            var container = new Container().WithMefAttributedModel();
-
-            Assert.Throws<AttributedModelException>(() =>
-                container.RegisterExports(typeof(AppleFactory)));
-        }
-
-        [Export, AsFactory]
+        [Export]
         public class AppleFactory
         {
             public Apple Create()
@@ -109,16 +100,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var duck = container.Resolve<Duck>();
 
             Assert.IsInstanceOf<Duck>(duck);
-        }
-
-        [Test]
-        public void When_exporting_static_factory_method_the_class_itself_should_not_be_exported()
-        {
-            var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(BirdFactory));
-
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<BirdFactory>());
         }
 
         [Test]

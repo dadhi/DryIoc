@@ -163,7 +163,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             }
         }
 
-        [Export, AsFactory]
         public static class DecoratorFactory
         {
             [Export, AsDecorator]
@@ -181,7 +180,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
         }
 
-        [Export, AsFactory]
         internal static class Dd
         {
             [Export(typeof(IBug)), AsDecorator]

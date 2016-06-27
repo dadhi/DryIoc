@@ -18,7 +18,7 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Can_get_registration_info_with_implementation_type_replaced_by_its_full_name()
         {
-            var registrationInfo = AttributedModel.GetRegistrationInfoOrDefault(typeof(Frog)).MakeLazy();
+            var registrationInfo = AttributedModel.GetRegistrationInfos(typeof(Frog)).Single().MakeLazy();
 
             Assert.IsNotNull(registrationInfo.ImplementationTypeFullName);
             Assert.IsNotNull(registrationInfo.Exports[0].ServiceTypeFullName);

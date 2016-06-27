@@ -5,9 +5,6 @@
     using System.Linq.Expressions;
     using CUT;
     using NUnit.Framework;
-    using System.Collections.Generic;
-    using System.ComponentModel.Composition;
-    using DryIocAttributes;
 
     [TestFixture]
     public class AttributedModelTests : AttributedModelTestsBase

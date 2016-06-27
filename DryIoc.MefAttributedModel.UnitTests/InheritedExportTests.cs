@@ -1,5 +1,4 @@
-﻿using System;
-using System.ComponentModel.Composition;
+﻿using System.ComponentModel.Composition;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;

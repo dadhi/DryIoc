@@ -452,7 +452,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             public Fooh(A a) {}
         }
 
-        [Export, AsFactory]
+        [Export]
         public class FoohFactory<A>
         {
             [Export("b")]

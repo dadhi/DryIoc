@@ -107,7 +107,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="types">Provides types to peek exported implementation types from.</param>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types)
         {
-            registrator.RegisterExports(types.ThrowIfNull().Select(GetRegistrationInfoOrDefault).Where(regInfo => regInfo != null));
+            registrator.RegisterExports(types.ThrowIfNull().SelectMany(GetExportedRegistrations));
         }
 
         /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
@@ -146,19 +146,15 @@ namespace DryIoc.MefAttributedModel
         /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
-            if (info.IsFactory)
-            {
-                var factoryExportRequired = RegisterFactoryMethodsAndCheckFactoryExportRequired(registrator, info);
-                if (!factoryExportRequired)
-                    return;
-            }
-
             var factory = info.CreateFactory();
-            for (var i = 0; i < info.Exports.Length; i++)
+
+            var exports = info.Exports;
+            for (var i = 0; i < exports.Length; i++)
             {
-                var export = info.Exports[i];
-                registrator.Register(factory,
-                    export.ServiceType, export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, false);
+                var export = exports[i];
+                registrator.Register(factory, export.ServiceType, 
+                    export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, 
+                    isStaticallyChecked: false); // todo: it may be set to true, cause we reflecting from the compiled code
             }
         }
 
@@ -171,22 +167,91 @@ namespace DryIoc.MefAttributedModel
             return assemblies
                 .Distinct()
                 .SelectMany(Portable.GetAssemblyTypes)
-                .Select(GetRegistrationInfoOrDefault).Where(info => info != null);
+                .SelectMany(GetExportedRegistrations);
         }
 
-        /// <summary>Creates registration info DTO for provided type. To find this info checks type attributes:
-        /// <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
-        /// If type is not concrete or is value type, then return null.</summary>
-        /// <param name="implementationType">Type to convert into registration info.</param>
-        /// <returns>Created DTO.</returns>
-        public static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type implementationType)
+        // todo: v3: remove
+        /// <remarks>Obsolete: use <see cref="GetExportedRegistrations"/> instead.</remarks>
+        public static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type)
         {
-            if (implementationType.IsValueType() ||
-                implementationType.IsAbstract() && !implementationType.IsStatic() ||
-                implementationType.IsCompilerGenerated())
+            if (!CanBeExported(type))
                 return null;
-            var attributes = GetAllExportRelatedAttributes(implementationType);
-            return !IsExportDefined(attributes) ? null : GetRegistrationInfoOrDefault(implementationType, attributes);
+
+            var attributes = GetAllExportAttributes(type);
+            return !IsExportDefined(attributes) ? null 
+                : GetRegistrationInfoOrDefault(type, attributes);
+        }
+
+        /// <summary>Creates registration info DTOs for provided type and/or for exported members. 
+        /// Method checks type attributes <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
+        /// If type is not concrete or is value type, then return null.</summary>
+        /// <param name="type">Type to convert into registration infos.</param>
+        /// <returns>Created DTOs.</returns>
+        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type)
+        {
+            if (!CanBeExported(type))
+                yield break;
+
+            ExportedRegistrationInfo typeRegistrationInfo = null;
+
+            // Exports does not make sense for static or abstract type, 
+            // because the instance of such type can't be created (resolved).
+            if (!type.IsStatic() && !type.IsAbstract())
+            {
+                var typeAttributes = GetAllExportAttributes(type);
+                if (IsExportDefined(typeAttributes))
+                {
+                    typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes);
+                    if (typeRegistrationInfo != null)
+                        yield return typeRegistrationInfo;
+                }
+            }
+            
+            var members = type.GetAllMembers(includeBase: true);
+            foreach (var member in members)
+            {
+                var memberAttributes = member.GetAttributes().ToArrayOrSelf();
+                if (!IsExportDefined(memberAttributes))
+                    continue;
+
+                var memberReturnType = member.GetReturnTypeOrDefault();
+                var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes)
+                    .ThrowIfNull();
+
+                var factoryMethod = new FactoryMethodInfo
+                {
+                    InstanceFactoryInfo = member.IsStatic() ? null : typeRegistrationInfo,
+                    MemberDeclaringType = type,
+                    MemberName = member.Name
+                };
+
+                var method = member as MethodInfo;
+                if (method != null)
+                {
+                    var parameters = method.GetParameters();
+                    factoryMethod.MethodSignature = parameters.Length == 0 
+                        ? ArrayTools.Empty<Type>() 
+                        : parameters.Select(p => p.ParameterType).ToArray();
+
+                    if (memberReturnType.IsGenericParameter &&
+                        memberRegistrationInfo.FactoryType == DryIoc.FactoryType.Decorator)
+                    {
+                        // note: the only possiblity for now for registering completely generic T service,
+                        // is registering it as object.
+                        var exports = memberRegistrationInfo.Exports;
+                        for (var i = 0; i < exports.Length; ++i)
+                            exports[i].ServiceType = typeof(object);
+                    }
+                }
+
+                memberRegistrationInfo.FactoryMethodInfo = factoryMethod;
+                yield return memberRegistrationInfo;
+            }
+        }
+
+        private static bool CanBeExported(Type type)
+        {
+            return !(type.IsValueType() || type.IsInterface() || type.IsCompilerGenerated());
         }
 
         #region Tools
@@ -346,27 +411,27 @@ namespace DryIoc.MefAttributedModel
 
         #region Implementation
 
-        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type implementationType, Attribute[] attributes)
+        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type, Attribute[] attributes)
         {
-            if (implementationType.IsOpenGeneric())
-                implementationType = implementationType.GetGenericTypeDefinition();
+            if (type.IsOpenGeneric())
+                type = type.GetGenericTypeDefinition();
 
-            var info = new ExportedRegistrationInfo { ImplementationType = implementationType, Reuse = DefaultReuse };
+            var info = new ExportedRegistrationInfo { ImplementationType = type, Reuse = DefaultReuse };
 
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
                 var attribute = attributes[attrIndex];
                 if (attribute is ExportExAttribute)
                 {
-                    info.Exports = GetExportsFromExportExAttribute((ExportExAttribute)attribute, info, implementationType);
+                    info.Exports = GetExportsFromExportExAttribute((ExportExAttribute)attribute, info, type);
                 }
                 else if (attribute is ExportManyAttribute)
                 {
-                    info.Exports = GetExportsFromExportManyAttribute((ExportManyAttribute)attribute, info, implementationType);
+                    info.Exports = GetExportsFromExportManyAttribute((ExportManyAttribute)attribute, info, type);
                 }
                 else if (attribute is ExportAttribute)
                 {
-                    info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, implementationType);
+                    info.Exports = GetExportsFromExportAttribute((ExportAttribute)attribute, info, type);
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
@@ -415,29 +480,26 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is AsWrapperAttribute)
                 {
-                    PopulateWrapperInfoFromAttribute(info, (AsWrapperAttribute)attribute, implementationType);
+                    PopulateWrapperInfoFromAttribute(info, (AsWrapperAttribute)attribute, type);
                 }
                 else if (attribute is AsDecoratorAttribute)
                 {
-                    PopulateDecoratorInfoFromAttribute(info, (AsDecoratorAttribute)attribute, implementationType);
+                    PopulateDecoratorInfoFromAttribute(info, (AsDecoratorAttribute)attribute, type);
                 }
                 else if (attribute is ExportConditionAttribute)
                 {
                     info.ConditionType = attribute.GetType();
                 }
-                else if (attribute is AsFactoryAttribute)
-                {
-                    info.IsFactory = true;
-                }
 
                 if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    Throw.If(info.HasMetadataAttribute, Error.UnsupportedMultipleMetadata, implementationType);
+                    if (info.HasMetadataAttribute)
+                        Throw.It(Error.UnsupportedMultipleMetadata, type);
                     info.HasMetadataAttribute = true;
                 }
             }
 
-            info.Exports.ThrowIfNull(Error.NoExport, implementationType);
+            info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
         }
 
@@ -544,7 +606,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static Attribute[] GetAllExportRelatedAttributes(Type type)
+        private static Attribute[] GetAllExportAttributes(Type type)
         {
             var attributes = type.GetAttributes();
 
@@ -572,53 +634,6 @@ namespace DryIoc.MefAttributedModel
             return exports;
         }
 
-        private static bool RegisterFactoryMethodsAndCheckFactoryExportRequired(IRegistrator registrator,
-            ExportedRegistrationInfo registrationInfo)
-        {
-            var factoryExportRequired = false;
-            var hasExportedMethods = false;
-            var members = registrationInfo.ImplementationType.GetAllMembers();
-            foreach (var member in members)
-            {
-                var attributes = member.GetAttributes().ToArrayOrSelf();
-                if (!IsExportDefined(attributes))
-                    continue;
-
-                hasExportedMethods = true;
-
-                var memberReturnType = member.GetReturnTypeOrDefault();
-                var factoryRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, attributes).ThrowIfNull();
-
-                var factoryExport = registrationInfo.Exports[0];
-
-                factoryExportRequired = !member.IsStatic();
-                var factoryServiceInfo = factoryExportRequired
-                    ? ServiceInfo.Of(factoryExport.ServiceType, DryIoc.IfUnresolved.ReturnDefault,
-                        factoryExport.ServiceKeyInfo.Key)
-                    : null;
-
-                // Special support for decorator of T to register it as Object
-                var decoratorOfT = factoryRegistrationInfo.FactoryType == DryIoc.FactoryType.Decorator && member is MethodInfo
-                    && member.GetReturnTypeOrDefault().IsGenericParameter;
-
-                var factory = factoryRegistrationInfo.CreateFactory(Made.Of(member, factoryServiceInfo));
-
-                var serviceExports = factoryRegistrationInfo.Exports;
-                for (var i = 0; i < serviceExports.Length; i++)
-                {
-                    var export = serviceExports[i];
-                    var serviceType = decoratorOfT ? typeof(object) : export.ServiceType;
-                    registrator.Register(factory, serviceType,
-                        export.ServiceKeyInfo.Key, IfAlreadyRegistered.AppendNotKeyed, false);
-                }
-            }
-
-            if (!hasExportedMethods)
-                Throw.It(Error.ExportedFactoryDoesNotContainFactoryMethods, registrationInfo.ImplementationType);
-
-            return factoryExportRequired;
-        }
-
         #endregion
     }
 
@@ -629,7 +644,7 @@ namespace DryIoc.MefAttributedModel
         public readonly static IList<string> Messages = new List<string>(20);
 
         /// <summary>Codes are starting from this value.</summary>
-        public readonly static int FirstErrorCode = 100;
+        public readonly static int FirstErrorCode = DryIoc.Error.FirstErrorCode + DryIoc.Error.Messages.Count;
 
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
@@ -649,10 +664,7 @@ namespace DryIoc.MefAttributedModel
             UnsupportedReuseType = Of(
                 "Attributed model does not support reuse type {0}."),
             UnsupportedReuseWrapperType = Of(
-                "Attributed model does not support reuse wrapper type {0}."),
-            ExportedFactoryDoesNotContainFactoryMethods = Of(
-                "Type exported AsFactory {0} does not contain any members marked with Export, " +
-                "which is probably a error.");
+                "Attributed model does not support reuse wrapper type {0}.");
 
 #pragma warning restore 1591
 
@@ -667,10 +679,14 @@ namespace DryIoc.MefAttributedModel
 
         static Error()
         {
-            Throw.GetMatchedException = (check, error, arg0, arg1, arg2, arg3, inner) =>
-                0 <= error - FirstErrorCode && error - FirstErrorCode < Messages.Count
-                    ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
-                    : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
+            Throw.GetMatchedException = GetAttributedModelOrContainerException;
+        }
+
+        private static Exception GetAttributedModelOrContainerException(ErrorCheck check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner)
+        {
+            return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count 
+                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner) 
+                : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
         }
 
         private static int Of(string message)
@@ -828,8 +844,15 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Not null if exported with <see cref="AsWrapperAttribute"/>, contains info about wrapper.</summary>
         public WrapperInfo Wrapper;
 
-        /// <summary>True if exported with <see cref="AsFactoryAttribute"/>.</summary>
+        // todo: v3: remove
+        /// <summary>Obsolete: Does not required.</summary>
         public bool IsFactory;
+
+        /// <summary>Not null for exported members.</summary>
+        public FactoryMethodInfo FactoryMethodInfo;
+
+        /// <summary>Member defining the Expory, corresponds to Factory Method in DryIoc.</summary>
+        public string MemberName;
 
         /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
         public Type ConditionType;
@@ -848,11 +871,32 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
-        /// <summary>Creates factory out of registration info.</summary>
-        /// <param name="made">(optional) Injection rules. Used if registration <see cref="IsFactory"/> to specify factory methods.</param>
-        /// <returns>Created factory.</returns>
-        public ReflectionFactory CreateFactory(Made made = null)
+        /// <summary>Creates factory out of registration info.</summary> <returns>Created factory.</returns>
+        public ReflectionFactory CreateFactory()
         {
+            Made made = null;
+            if (FactoryMethodInfo != null)
+            {
+                var factoryMethod = FactoryMethodInfo;
+                var member = factoryMethod.MemberDeclaringType
+                    .GetAllMembers(includeBase: true)
+                    .FirstOrDefault(m => m.Name == FactoryMethodInfo.MemberName && (!(m is MethodInfo) ||
+                        factoryMethod.MethodSignature.SequenceEqual(((MethodInfo)m).GetParameters().Select(p => p.ParameterType))))
+                    .ThrowIfNull();
+
+                ServiceInfo factoryServiceInfo = null;
+                if (factoryMethod.InstanceFactoryInfo != null)
+                {
+                    // note: The first export only is used for instance factory
+                    var export = factoryMethod.InstanceFactoryInfo.Exports[0]; 
+                    factoryServiceInfo = ServiceInfo.Of(
+                        export.ServiceType, DryIoc.IfUnresolved.ReturnDefault, 
+                        export.ServiceKeyInfo.Key);
+                }
+
+                made = Made.Of(member, factoryServiceInfo);
+            }
+
             var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
             return new ReflectionFactory(ImplementationType, reuse, made, GetSetup());
         }
@@ -959,6 +1003,22 @@ namespace DryIoc.MefAttributedModel
                 ? ((WithMetadataAttribute)metadataAttr).Metadata
                 : metadataAttr;
         }
+    }
+
+    /// <summary>Serializable info about exported member, aka factory method in DryIoc.</summary>
+    public sealed class FactoryMethodInfo
+    {
+        /// <summary>Not null for exported instance members. Null - for static members.</summary>
+        public ExportedRegistrationInfo InstanceFactoryInfo;
+
+        /// <summary>Member defining the Export.</summary>
+        public string MemberName;
+
+        /// <summary>For method member the parameter types to identify the method overload.</summary>
+        public Type[] MethodSignature;
+
+        /// <summary>The type declaring the member.</summary>
+        public Type MemberDeclaringType;
     }
 
     /// <summary>Defines DTO for exported service type and key.</summary>

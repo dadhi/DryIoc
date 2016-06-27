@@ -888,10 +888,10 @@ namespace DryIoc
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
             {
-                var openeGenericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
-                if (!openeGenericDecorators.IsNullOrEmpty())
+                var openGenericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
+                if (!openGenericDecorators.IsNullOrEmpty())
                 {
-                    var closeGenericDecorators = openeGenericDecorators
+                    var closeGenericDecorators = openGenericDecorators
                         .Select(d => d.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
                         .Where(d => d != null)
                         .ToArrayOrSelf();
@@ -4679,7 +4679,7 @@ namespace DryIoc
         public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, IServiceInfo owner,
             bool shouldInheritServiceKey = false)
         {
-            // todo: that an actual meaning parameter should be renamed in next major version.
+            // todo: v3: that an actual meaning parameter should be renamed in next major version.
             var isNonServiceOwner = shouldInheritServiceKey;
 
             var ownerDetails = owner.Details;
@@ -6573,10 +6573,13 @@ namespace DryIoc
                 implementationType == typeof(object) ||
                 implementationType.IsAbstract())
             {
-                Throw.If(Made.FactoryMethod == null && implementationType == null,
-                    Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
-                Throw.If(Made.FactoryMethod == null && implementationType.IsAbstract(),
-                    Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implementationType);
+                if (Made.FactoryMethod == null)
+                {
+                    if (implementationType == null)
+                        Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
+                    if (implementationType.IsAbstract())
+                        Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implementationType);
+                }
 
                 implementationType = null; // Ensure that we do not have abstract implementation type
 
@@ -8970,13 +8973,16 @@ namespace DryIoc
         }
 
         /// <summary>Gets all declared and base members.</summary>
-        /// <param name="type">Type to get members from.</param> <returns>All members.</returns>
-        public static IEnumerable<MemberInfo> GetAllMembers(this Type type)
+        /// <param name="type">Type to get members from.</param> 
+        /// <param name="includeBase">(optional) When set looks into base members.</param>
+        /// <returns>All members.</returns>
+        public static IEnumerable<MemberInfo> GetAllMembers(this Type type, bool includeBase = false)
         {
-            return type.GetDeclaredAndBase(t =>
+            return type.GetMembers(t =>
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
-                t.DeclaredFields.Cast<MemberInfo>())));
+                t.DeclaredFields.Cast<MemberInfo>())),
+                includeBase);
         }
 
         /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters 
@@ -9093,6 +9099,13 @@ namespace DryIoc
         public static bool IsValueType(this Type type)
         {
             return type.GetTypeInfo().IsValueType;
+        }
+
+        /// <summary>Returns true if type is interface.</summary>
+        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
+        public static bool IsInterface(this Type type)
+        {
+            return type.GetTypeInfo().IsInterface;
         }
 
         /// <summary>Returns true if type if abstract or interface.</summary>

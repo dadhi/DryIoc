@@ -4,7 +4,7 @@ using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
-    [Export, AsFactory]
+    [Export]
     public class OrangeFactory
     {
         [Export]
@@ -14,7 +14,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [ExportMany, AsFactory]
+    [ExportMany]
     public class FruitFactory
     {
         [Export]
@@ -30,7 +30,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsFactory]
+    [Export]
     public class NamedFruitFactory
     {
         [Export("orange")]
@@ -46,7 +46,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsFactory]
+    [Export]
     public class TransientOrangeFactory
     {
         [Export, TransientReuse]
@@ -56,7 +56,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export, AsFactory]
+    [Export]
     public class FuncFactory
     {
         [Export]
@@ -77,7 +77,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public class Duck {}
     public class Chicken {}
 
-    [Export, AsFactory]
+    [Export]
     public class BirdFactory
     {
         [Export]
@@ -90,7 +90,6 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public static Chicken Chicken { get { return new Chicken(); } }
     }
 
-    [Export, AsFactory]
     public static class StaticBirdFactory
     {
         [Export]
@@ -100,7 +99,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public static Chicken Chicken { get { return new Chicken(); } }
     }
 
-    [Export("hey"), AsFactory]
+    [Export("hey")]
     public class KeyedFactoryWithString
     {
         [Export]

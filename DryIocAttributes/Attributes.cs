@@ -239,7 +239,8 @@ namespace DryIocAttributes
         public IfAlreadyExported IfAlreadyExported { get; set; }
     }
 
-    /// <summary>Specifies that class exporting static or instance method factories</summary>
+    // todo: V3: remove
+    /// <summary>Obsolete: Is not required anymore, you can just put Export on member without marking the containing type with AsFactory.</summary>
     [AttributeUsage(AttributeTargets.Class 
         | AttributeTargets.Method 
         | AttributeTargets.Property 
