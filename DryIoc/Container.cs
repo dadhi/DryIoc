@@ -1916,7 +1916,10 @@ namespace DryIoc
                 .WithoutImplicitCheckForReuseMatchingScope()
                 .WithDependencyResolutionCallExpressions());
 
-            var registrations = generatingContainer.GetServiceRegistrations();
+            var registrations = generatingContainer.GetServiceRegistrations()
+                // ignore open-generic registrations because their may be resolved only when closed.
+                .Where(r => !r.ServiceType.IsOpenGeneric());
+
             if (whatRegistrations != null)
                 registrations = registrations.Where(whatRegistrations);
 
