@@ -183,8 +183,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members. 
-        /// Method checks type attributes <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
-        /// If type is not concrete or is value type, then return null.</summary>
+        /// If no exports found, the method returns empty enumerable.</summary>
         /// <param name="type">Type to convert into registration infos.</param>
         /// <returns>Created DTOs.</returns>
         public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type)
@@ -220,16 +219,19 @@ namespace DryIoc.MefAttributedModel
 
                 var factoryMethod = new FactoryMethodInfo
                 {
-                    InstanceFactoryInfo = member.IsStatic() ? null : typeRegistrationInfo,
-                    MemberDeclaringType = type,
+                    DeclaringType = type,
                     MemberName = member.Name
                 };
+
+                // note: The first export only is used for instance factory
+                if (typeRegistrationInfo != null && !member.IsStatic())
+                    factoryMethod.InstanceFactory = typeRegistrationInfo.Exports[0];
 
                 var method = member as MethodInfo;
                 if (method != null)
                 {
                     var parameters = method.GetParameters();
-                    factoryMethod.MethodSignature = parameters.Length == 0 
+                    factoryMethod.MethodParameterTypes = parameters.Length == 0 
                         ? ArrayTools.Empty<Type>() 
                         : parameters.Select(p => p.ParameterType).ToArray();
 
@@ -754,11 +756,24 @@ namespace DryIoc.MefAttributedModel
         {
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
         }
+        /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
+        /// <param name="code">Code to print to.</param>
+        /// <param name="items">Items to print.</param> <returns>Code with appended items.</returns>
+        public static StringBuilder AppendArray<T>(this StringBuilder code, IEnumerable<T> items)
+        {
+            code.Append("new ").Print(typeof(T)).Print("[] {").AppendLine();
+
+            foreach (var item in items)
+                code.AppendCode(item);
+
+            code.AppendLine().Append("}");
+            return code;
+        }
 
         /// <summary>Prints valid c# literal depending of <paramref name="x"/> type.</summary>
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param>
         /// <param name="ifNotRecognized">(optional) Delegate to print unrecognized value.</param>
-        /// <returns>Code with appended literal.</returns>
+        /// <returns>Code with appended item.</returns>
         public static StringBuilder AppendCode(this StringBuilder code, object x, Action<StringBuilder, object> ifNotRecognized = null)
         {
             if (x == null)
@@ -786,6 +801,7 @@ namespace DryIoc.MefAttributedModel
     #region Registration Info DTOs
 #pragma warning disable 659
 
+    // todo: v3: combine the bool fields into one with bit flags
     /// <summary>Serializable DTO of all registration information.</summary>
     public sealed class ExportedRegistrationInfo
     {
@@ -838,24 +854,21 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
 
+        // todo: v3: remove
+        /// <summary>Obsolete: Does not required.</summary>
+        public bool IsFactory;
+
+        /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
+        public Type ConditionType;
+
         /// <summary>Not null if exported with <see cref="AsDecoratorAttribute"/>, contains info about decorator.</summary>
         public DecoratorInfo Decorator;
 
         /// <summary>Not null if exported with <see cref="AsWrapperAttribute"/>, contains info about wrapper.</summary>
         public WrapperInfo Wrapper;
 
-        // todo: v3: remove
-        /// <summary>Obsolete: Does not required.</summary>
-        public bool IsFactory;
-
         /// <summary>Not null for exported members.</summary>
         public FactoryMethodInfo FactoryMethodInfo;
-
-        /// <summary>Member defining the Expory, corresponds to Factory Method in DryIoc.</summary>
-        public string MemberName;
-
-        /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
-        public Type ConditionType;
 
         /// <summary>Returns new info with type representation as type full name string, instead of
         /// actual type.</summary> <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
@@ -878,21 +891,18 @@ namespace DryIoc.MefAttributedModel
             if (FactoryMethodInfo != null)
             {
                 var factoryMethod = FactoryMethodInfo;
-                var member = factoryMethod.MemberDeclaringType
+                var member = factoryMethod.DeclaringType
                     .GetAllMembers(includeBase: true)
                     .FirstOrDefault(m => m.Name == FactoryMethodInfo.MemberName && (!(m is MethodInfo) ||
-                        factoryMethod.MethodSignature.SequenceEqual(((MethodInfo)m).GetParameters().Select(p => p.ParameterType))))
+                        factoryMethod.MethodParameterTypes.SequenceEqual(((MethodInfo)m).GetParameters().Select(p => p.ParameterType))))
                     .ThrowIfNull();
 
                 ServiceInfo factoryServiceInfo = null;
-                if (factoryMethod.InstanceFactoryInfo != null)
-                {
-                    // note: The first export only is used for instance factory
-                    var export = factoryMethod.InstanceFactoryInfo.Exports[0]; 
+                var export = factoryMethod.InstanceFactory;
+                if (export != null)
                     factoryServiceInfo = ServiceInfo.Of(
-                        export.ServiceType, DryIoc.IfUnresolved.ReturnDefault, 
+                        export.ServiceType, DryIoc.IfUnresolved.ReturnDefault,
                         export.ServiceKeyInfo.Key);
-                }
 
                 made = Made.Of(member, factoryServiceInfo);
             }
@@ -970,26 +980,35 @@ namespace DryIoc.MefAttributedModel
         public StringBuilder ToCode(StringBuilder code = null)
         {
             code = code ?? new StringBuilder();
-            code.Append(
-@"new RegistrationInfo {
-    ImplementationType = ").AppendType(ImplementationType).Append(@",
-    Exports = new[] {
-        "); for (var i = 0; i < Exports.Length; i++)
-                code = Exports[i].ToCode(code).Append(@",
-        "); code.Append(@"},
-    Reuse = ").AppendEnum(typeof(ReuseType), Reuse).Append(@",
-    HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
-    FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType);
+            code.Append(@"
+    new ExportedRegistrationInfo {
+        ImplementationType = ").AppendType(ImplementationType).Append(@",
+        Exports = new[] {
+            "); for (var i = 0; i < Exports.Length; i++)
+                    code = Exports[i].ToCode(code).Append(@",
+            "); code.Append(@"},
+        Reuse = ").AppendEnum(typeof(ReuseType), Reuse).Append(@",
+        ReuseName = ").AppendString(ReuseName).Append(@",
+        OpenResolutionScope = ").AppendBool(OpenResolutionScope).Append(@",
+        AsResolutionCall = ").AppendBool(AsResolutionCall).Append(@",
+        AsResolutionRoot = ").AppendBool(AsResolutionRoot).Append(@",
+        PreventDisposal = ").AppendBool(PreventDisposal).Append(@",
+        WeaklyReferenced = ").AppendBool(WeaklyReferenced).Append(@",
+        AllowDisposableTransient = ").AppendBool(AllowDisposableTransient).Append(@",
+        TrackDisposableTransient = ").AppendBool(TrackDisposableTransient).Append(@",
+        UseParentReuse = ").AppendBool(UseParentReuse).Append(@",
+        HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
+        FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType).Append(@",
+        ConditionType = ").AppendType(ConditionType);
             if (Wrapper != null) code.Append(@",
-    Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
+        Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
                 .Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
             if (Decorator != null)
-            {
-                code.Append(@",
-"); Decorator.ToCode(code);
-            }
+                Decorator.ToCode(code.AppendLine(","));
+            if (FactoryMethodInfo != null)
+                FactoryMethodInfo.ToCode(code.AppendLine(","));
             code.Append(@"
-}");
+    }");
             return code;
         }
 
@@ -1008,17 +1027,48 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Serializable info about exported member, aka factory method in DryIoc.</summary>
     public sealed class FactoryMethodInfo
     {
-        /// <summary>Not null for exported instance members. Null - for static members.</summary>
-        public ExportedRegistrationInfo InstanceFactoryInfo;
+        /// <summary>The type declaring the member.</summary>
+        public Type DeclaringType;
 
         /// <summary>Member defining the Export.</summary>
         public string MemberName;
 
         /// <summary>For method member the parameter types to identify the method overload.</summary>
-        public Type[] MethodSignature;
+        public Type[] MethodParameterTypes;
 
-        /// <summary>The type declaring the member.</summary>
-        public Type MemberDeclaringType;
+        /// <summary>Not null for exported instance member which requires factory object, null for static members.</summary>
+        public ExportInfo InstanceFactory;
+
+        /// <summary>Determines whether the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />.</summary>
+        /// <returns>true if the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />; otherwise, false.</returns>
+        /// <param name="obj">The <see cref="T:System.Object" /> to compare with the current <see cref="T:System.Object" />.</param>
+        public override bool Equals(object obj)
+        {
+            var other = obj as FactoryMethodInfo;
+            return other != null
+                && other.DeclaringType == DeclaringType
+                && other.MemberName == MemberName
+                && (other.MethodParameterTypes == null && MethodParameterTypes == null ||
+                    other.MethodParameterTypes != null && MethodParameterTypes != null &&
+                    other.MethodParameterTypes.SequenceEqual(MethodParameterTypes))
+                && Equals(other.InstanceFactory, InstanceFactory);
+        }
+
+        /// <summary>Generates valid c# code to re-create the info.</summary>
+        /// <param name="code">Code to append generated code to.</param>
+        /// <returns>Code with appended generated info.</returns>
+        public StringBuilder ToCode(StringBuilder code = null)
+        {
+            code = code ?? new StringBuilder();
+            code.Append("new FactoryMethodInfo { ");
+            code.Append("DeclaringType = ").AppendType(DeclaringType).AppendLine(",");
+            code.Append("MemberName = ").AppendString(MemberName);
+            if (MethodParameterTypes != null)
+                code.AppendArray(MethodParameterTypes);
+            if (InstanceFactory != null)
+                InstanceFactory.ToCode(code.Append(",").AppendLine());
+            return code.AppendLine().Append("}");
+        }
     }
 
     /// <summary>Defines DTO for exported service type and key.</summary>
@@ -1078,7 +1128,7 @@ namespace DryIoc.MefAttributedModel
                 && other.IfAlreadyRegistered == IfAlreadyRegistered;
         }
 
-        /// <summary>Generates valid c# code to "new <see cref="ExportInfo"/>() { ... };" from its state.</summary>
+        /// <summary>Generates valid c# code to re-create the info.</summary>
         /// <param name="code">Code to append generated code to.</param>
         /// <returns>Code with appended generated info.</returns>
         public StringBuilder ToCode(StringBuilder code = null)

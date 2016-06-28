@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         }
 
         [Test]
-        //[Ignore]
+        [Ignore]
         public void Given_scnanned_assembly_When_serialize_data_Then_deserialize_will_return_the_same_data()
         {
             // Given
@@ -59,7 +59,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             Assert.That(services, Is.EqualTo(infos));
         }
 
-        [Test]
+        [Test, Ignore]
         public void Given_deserialized_data_When_registering_scanned_data_into_container_Then_metadata_should_correctly_registered_too()
         {
             // Given
@@ -90,11 +90,15 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         private static RuntimeTypeModel CreateModel()
         {
             var model = TypeModel.Create();
-            model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
+
             model.Add<ExportedRegistrationInfo>();
             model.Add<ExportInfo>();
             model.Add<WrapperInfo>();
             model.Add<DecoratorInfo>();
+            model.Add<FactoryMethodInfo>();
+
+            model.Add(typeof(ServiceKeyInfo), false).SetSurrogate(typeof(ServiceKeyInfoSurrogate));
+
             return model;
         }
     }

@@ -65,7 +65,6 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     // no Export attribute here
-    //[Export, AsFactory]
     public class Constants
     {
         public const string SettingExportKey = "ExportedSetting";
