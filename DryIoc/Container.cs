@@ -1153,7 +1153,6 @@ namespace DryIoc
             if (entry == null) // no entry - no factories: return earlier
                 return null;
 
-            var serviceKey = request.ServiceKey;
             var singleFactory = entry as Factory;
             if (factorySelector != null)
             {
@@ -1168,9 +1167,12 @@ namespace DryIoc
                 return factorySelector(request, allFactories);
             }
 
+            var serviceKey = request.ServiceKey;
             if (singleFactory != null)
+            {
                 return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
                     && singleFactory.CheckCondition(request) ? singleFactory : null;
+            }
 
             var factories = ((FactoriesEntry)entry).Factories;
             if (serviceKey != null)
@@ -1179,7 +1181,14 @@ namespace DryIoc
                 return singleFactory != null && singleFactory.CheckCondition(request) ? singleFactory : null;
             }
 
-            var defaultFactories = factories.Enumerate()
+            var matchedFactories = factories.Enumerate();
+
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+            if (metadataKey != null || metadata != null)
+                matchedFactories = matchedFactories.Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
+
+            var defaultFactories = matchedFactories
                 .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
                 .ToArray();
 
@@ -2443,8 +2452,14 @@ namespace DryIoc
             }
 
             // Return collection of single matched item if key is specified.
-            if (request.ServiceKey != null)
-                items = items.Where(x => request.ServiceKey.Equals(x.OptionalServiceKey)).ToArray();
+            var serviceKey = request.ServiceKey;
+            if (serviceKey != null)
+                items = items.Where(it => serviceKey.Equals(it.OptionalServiceKey)).ToArray();
+
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+            if (metadataKey != null || metadata != null)
+                items = items.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata)).ToArray();
 
             List<Expression> itemExprList = null;
             if (!items.IsNullOrEmpty())
@@ -2514,7 +2529,7 @@ namespace DryIoc
                 Expression.Constant(requiredItemType),
                 container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                container.RequestInfoToExpression(request.ToRequestInfo()),
+                container.RequestInfoToExpression(request.RequestInfo),
                 Container.GetResolutionScopeExpression(request));
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
@@ -3513,34 +3528,46 @@ namespace DryIoc
                 requiredServiceType = null;
 
             var serviceKey = default(object);
+            var metadataKey = default(string);
+            var metadata = default(object);
             var ifUnresolved = defaultIfUnresolved;
 
             var hasPrevArg = false;
 
-            var argExpr = methodCallExpr.Arguments;
-            for (var j = 0; j < argExpr.Count; j++)
+            var argExprs = methodCallExpr.Arguments;
+            if (argExprs.Count == 2 && 
+                argExprs[0].Type == typeof(string) &&
+                argExprs[1].Type != typeof(IfUnresolved)) // matches the Of overload for metadata
             {
-                var argValue = GetArgExpressionValueOrThrow(argExpr[j]);
-                if (argValue != null)
+                metadataKey = (string)GetArgExpressionValueOrThrow(argExprs[0]);
+                metadata = GetArgExpressionValueOrThrow(argExprs[1]);
+            }
+            else
+            {
+                for (var a = 0; a < argExprs.Count; a++)
                 {
-                    if (argValue is IfUnresolved)
+                    var argValue = GetArgExpressionValueOrThrow(argExprs[a]);
+                    if (argValue != null)
                     {
-                        ifUnresolved = (IfUnresolved)argValue;
-                        if (hasPrevArg) // the only possible argument is default value.
+                        if (argValue is IfUnresolved)
                         {
-                            defaultValue = serviceKey;
-                            serviceKey = null;
+                            ifUnresolved = (IfUnresolved)argValue;
+                            if (hasPrevArg) // the only possible argument is default value.
+                            {
+                                defaultValue = serviceKey;
+                                serviceKey = null;
+                            }
                         }
-                    }
-                    else
-                    {
-                        serviceKey = argValue;
-                        hasPrevArg = true;
+                        else
+                        {
+                            serviceKey = argValue;
+                            hasPrevArg = true;
+                        }
                     }
                 }
             }
 
-            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue);
+            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata);
         }
 
         private static object GetArgExpressionValueOrThrow(Expression arg)
@@ -3609,6 +3636,18 @@ namespace DryIoc
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Ignored default of Service type.</returns>
         public static TService Of<TService, TRequired>(object serviceKey) { return default(TService); }
+
+        /// <summary>Specifies required service type of parameter or member. Plus specifies service key.</summary>
+        /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
+        /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or value.</param>
+        /// <returns>Returns some (ignored) value.</returns>
+        public static TRequired Of<TRequired>(string metadataKey, object metadata) { return default(TRequired); }
+
+        /// <summary>Specifies both service and required service types.</summary>
+        /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
+        /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or value.</param>
+        /// <returns>Ignored default of Service type.</returns>
+        public static TService Of<TService, TRequired>(string metadataKey, object metadata) { return default(TService); }
 
         /// <summary>Specifies required service type of parameter or member. Plus specifies if-unresolved policy. Plus specifies service key.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
@@ -4548,15 +4587,18 @@ namespace DryIoc
         /// <param name="requiredServiceType">Registered service type to search for.</param>
         /// <param name="serviceKey">Service key.</param> <param name="ifUnresolved">If unresolved policy.</param>
         /// <param name="defaultValue">Custom default value, if specified it will automatically set <paramref name="ifUnresolved"/> to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</param>
+        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or the value if key passed.</param>
         /// <returns>Created details DTO.</returns>
         public static ServiceDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
-            object defaultValue = null)
+            object defaultValue = null, string metadataKey = null, object metadata = null)
         {
             if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
                 ifUnresolved = IfUnresolved.ReturnDefault;
 
-            return new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, defaultValue, hasCustomValue: false);
+            return new ServiceDetails(requiredServiceType, ifUnresolved, 
+                serviceKey, metadataKey, metadata,
+                defaultValue, hasCustomValue: false);
         }
 
         /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
@@ -4564,7 +4606,7 @@ namespace DryIoc
         public static ServiceDetails Of(object value)
         {
             // Using default value with invalid ifUnresolved state to indicate custom value.
-            return new ServiceDetails(null, IfUnresolved.Throw, null, value, hasCustomValue: true);
+            return new ServiceDetails(null, IfUnresolved.Throw, null, null, null, value, hasCustomValue: true);
         }
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
@@ -4572,6 +4614,12 @@ namespace DryIoc
 
         /// <summary>Service key provided with registration.</summary>
         public readonly object ServiceKey;
+
+        /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
+        public readonly string MetadataKey;
+
+        /// <summary>Metadata value to find in resolved service.</summary>
+        public readonly object Metadata;
 
         /// <summary>Policy to deal with unresolved request.</summary>
         public readonly IfUnresolved IfUnresolved;
@@ -4605,12 +4653,15 @@ namespace DryIoc
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
-        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, object serviceKey, 
+        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved, 
+            object serviceKey, string metadataKey, object metadata,
             object value, bool hasCustomValue)
         {
             RequiredServiceType = requiredServiceType;
             IfUnresolved = ifUnresolved;
             ServiceKey = serviceKey;
+            MetadataKey = metadataKey;
+            Metadata = metadata;
             _value = value;
             HasCustomValue = hasCustomValue;
         }
@@ -4692,10 +4743,19 @@ namespace DryIoc
                 ? dependencyDetails.IfUnresolved
                 : ownerDetails.IfUnresolved;
 
-            // Use dependency key if it's non default, otherwise and if owner is not service, the
-            var serviceKey = dependencyDetails.ServiceKey == null && isNonServiceOwner
-                ? ownerDetails.ServiceKey
-                : dependencyDetails.ServiceKey;
+            var serviceKey = dependencyDetails.ServiceKey;
+            var metadataKey = dependencyDetails.MetadataKey;
+            var metadata = dependencyDetails.Metadata;
+            if (isNonServiceOwner) // e.g. wrapper, then propagate key and meta to the actual service 
+            {
+                if (serviceKey == null)
+                    serviceKey = ownerDetails.ServiceKey;
+                if (metadataKey == null && metadata == null)
+                {
+                    metadataKey = ownerDetails.MetadataKey;
+                    metadata = ownerDetails.Metadata;
+                }
+            }
 
             var serviceType = dependency.ServiceType;
             var requiredServiceType = dependencyDetails.RequiredServiceType;
@@ -4706,13 +4766,18 @@ namespace DryIoc
                 requiredServiceType = ownerRequiredServiceType;
 
             if (serviceType == dependency.ServiceType && serviceKey == dependencyDetails.ServiceKey &&
+                metadataKey == dependencyDetails.MetadataKey && metadata == dependencyDetails.Metadata &&
                 ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
                 return dependency;
 
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            return dependency.Create(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+            var serviceDetails = ServiceDetails.Of(requiredServiceType, 
+                serviceKey, ifUnresolved, dependencyDetails.DefaultValue, 
+                metadataKey, metadata);
+
+            return dependency.Create(serviceType, serviceDetails);
         }
 
         /// <summary>Appends info string representation into provided builder.</summary>
@@ -5031,7 +5096,7 @@ namespace DryIoc
             return new Request(resolverContext, parent: null, requestInfo: RequestInfo.Empty, made: null, funcArgs: null);
         }
 
-        /// <summary>Indicates that request is empty initial request: there is no <see cref="_requestInfo"/> in such a request.</summary>
+        /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
         public bool IsEmpty { get { return RawParent == null; } }
 
         /// <summary>Request parent with all runtime info available.</summary>
@@ -5129,29 +5194,41 @@ namespace DryIoc
         public readonly int Level;
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType { get { return _requestInfo.ServiceType; } }
+        public Type ServiceType { get { return RequestInfo.ServiceType; } }
 
         /// <summary>Optional service key to identify service of the same type.</summary>
-        public object ServiceKey { get { return _requestInfo.ServiceKey; } }
+        public object ServiceKey { get { return RequestInfo.ServiceKey; } }
+
+        /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
+        public string MetadataKey
+        {
+            get { return RequestInfo == null ? null : RequestInfo.MetadataKey; }
+        }
+
+        /// <summary>Metadata or the value (if key specified) to find in resolved service.</summary>
+        public object Metadata
+        {
+            get { return RequestInfo == null ? null : RequestInfo.Metadata; }
+        }
 
         /// <summary>Policy to deal with unresolved service.</summary>
-        public IfUnresolved IfUnresolved { get { return _requestInfo.IfUnresolved; } }
+        public IfUnresolved IfUnresolved { get { return RequestInfo.IfUnresolved; } }
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType { get { return _requestInfo.RequiredServiceType; } }
+        public Type RequiredServiceType { get { return RequestInfo.RequiredServiceType; } }
 
         /// <summary>Implementation FactoryID.</summary>
         /// <remarks>The default unassigned value of ID is 0.</remarks>
-        public int FactoryID { get { return _requestInfo.FactoryID; } }
+        public int FactoryID { get { return RequestInfo.FactoryID; } }
 
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
-        public FactoryType FactoryType { get { return _requestInfo.FactoryType; } }
+        public FactoryType FactoryType { get { return RequestInfo.FactoryType; } }
 
         /// <summary>Service implementation type if known.</summary>
-        public Type ImplementationType { get { return _requestInfo.ImplementationType; } }
+        public Type ImplementationType { get { return RequestInfo.ImplementationType; } }
 
         /// <summary>Service reuse.</summary>
-        public IReuse Reuse { get { return _requestInfo.Reuse; } }
+        public IReuse Reuse { get { return RequestInfo.Reuse; } }
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
@@ -5160,7 +5237,7 @@ namespace DryIoc
         /// <returns>The type to be used for lookup in registry.</returns>
         public Type GetActualServiceType()
         {
-            return _requestInfo.GetActualServiceType();
+            return RequestInfo.GetActualServiceType();
         }
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
@@ -5182,9 +5259,9 @@ namespace DryIoc
                 return new Request(resolverContext, this, requestInfo, made: null, funcArgs: null, level: 1);
             }
 
-            Throw.If(_requestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
+            Throw.If(RequestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
 
-            var inheritedRequestInfo = Push(_requestInfo, info);
+            var inheritedRequestInfo = Push(RequestInfo, info);
 
             return new Request(_resolverContext, this, inheritedRequestInfo, null, FuncArgs, Level + 1);
         }
@@ -5239,7 +5316,7 @@ namespace DryIoc
         /// <returns>New request with new service info but the same implementation and context.</returns>
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
-            var newRequestInfo = _requestInfo.With(getInfo);
+            var newRequestInfo = RequestInfo.With(getInfo);
             return new Request(_resolverContext, RawParent, newRequestInfo, Made, FuncArgs, Level);
         }
 
@@ -5248,7 +5325,7 @@ namespace DryIoc
         /// <param name="serviceKey">Key to set.</param>
         public void ChangeServiceKey(object serviceKey) // NOTE: May be removed in future versions. 
         {
-            _requestInfo = _requestInfo.With(i =>
+            RequestInfo = RequestInfo.With(i =>
             {
                 var details = i.Details;
                 var newDetails = ServiceDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue);
@@ -5275,7 +5352,7 @@ namespace DryIoc
 
             var funcArgsUsage = new bool[funcArgExprs.Length];
             var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(_resolverContext, RawParent, _requestInfo, Made, funcArgsUsageAndExpr, Level);
+            return new Request(_resolverContext, RawParent, RequestInfo, Made, funcArgsUsageAndExpr, Level);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container, 
@@ -5285,7 +5362,7 @@ namespace DryIoc
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
             var newContext = _resolverContext.With(newContainer);
-            return new Request(newContext, RawParent, _requestInfo, Made, FuncArgs, Level);
+            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs, Level);
         }
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -5309,7 +5386,7 @@ namespace DryIoc
                     ? Reuse
                     : null);
 
-            var newInfo = _requestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
+            var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
             var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
             return new Request(_resolverContext, RawParent, newInfo, made, FuncArgs, Level);
         }
@@ -5340,11 +5417,15 @@ namespace DryIoc
             return RequestInfo.Empty;
         }
 
-        /// <summary>Converts input request into its serializable version stripped from run-time info.</summary>
+        /// <summary>Serializable request info stripped from run-time info.</summary>
+        public RequestInfo RequestInfo { get; private set; } // note: mutable to change key in place
+
+        // todo: v3: remove
+        /// <summary>Obsolete: use <see cref="RequestInfo"/> instead.</summary>
         /// <returns>Mirrored request info.</returns>
         public RequestInfo ToRequestInfo()
         {
-            return _requestInfo;
+            return RequestInfo;
         }
 
         /// <summary>If request corresponds to dependency injected into parameter, 
@@ -5363,7 +5444,7 @@ namespace DryIoc
             Func<PropertyInfo, TResult> property = null,
             Func<FieldInfo, TResult> field = null)
         {
-            var serviceInfo = _requestInfo.ServiceInfo;
+            var serviceInfo = RequestInfo.ServiceInfo;
             if (serviceInfo is ParameterServiceInfo)
             {
                 if (parameter != null)
@@ -5402,7 +5483,7 @@ namespace DryIoc
         public StringBuilder PrintCurrent(StringBuilder s = null)
         {
             s = s ?? new StringBuilder();
-            s = _requestInfo.PrintCurrent(s);
+            s = RequestInfo.PrintCurrent(s);
             if (FuncArgs != null)
                 s.AppendFormat(" with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
             return s;
@@ -5447,14 +5528,13 @@ namespace DryIoc
         {
             _resolverContext = resolverContext;
             RawParent = parent;
-            _requestInfo = requestInfo;
+            RequestInfo = requestInfo;
             Made = made;
             FuncArgs = funcArgs;
             Level = level;
         }
 
         private readonly ResolverContext _resolverContext;
-        private RequestInfo _requestInfo; // note: mutable to change key in place
 
         internal sealed class ResolverContext
         {
@@ -5541,6 +5621,21 @@ namespace DryIoc
 
         /// <summary>Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</summary>
         public virtual bool UseParentReuse { get { return false; } }
+
+        /// <summary>Returns true if passed meta key and value match the setup metadata.</summary>
+        /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or the value if key passed.</param>
+        /// <returns>Check result.</returns>
+        public bool MatchesMetadata(string metadataKey, object metadata)
+        {
+            if (metadataKey == null)
+                return Equals(metadata, Metadata);
+
+            object metaValue;
+            var metaDict = Metadata as IDictionary<string, object>;
+            return metaDict != null
+                && metaDict.TryGetValue(metadataKey, out metaValue)
+                && Equals(metadata, metaValue);
+        }
 
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
@@ -6085,7 +6180,7 @@ namespace DryIoc
             if (Setup.FactoryType != Setup.Default.FactoryType)
                 s.Append(", FactoryType=").Append(Setup.FactoryType);
             if (Setup.Metadata != null)
-                s.Append(", Metadata=").Append(Setup.Metadata);
+                s.Append(", Metadata=").Print(Setup.Metadata);
             if (Setup.Condition != null)
                 s.Append(", HasCondition");
             if (Setup.OpenResolutionScope)
@@ -6153,12 +6248,15 @@ namespace DryIoc
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
         /// <returns>New parameters rules.</returns>
         public static ParameterSelector Name(this ParameterSelector source, string name,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
+            Type requiredServiceType = null, object serviceKey = null, 
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
+            string metadataKey = null, object metadata = null)
         {
             return source.Details((r, p) => !p.Name.Equals(name) ? null
-                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
         }
 
         /// <summary>Specify parameter by name and set custom value to it.</summary>
@@ -6175,12 +6273,15 @@ namespace DryIoc
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
         /// <returns>Combined selector.</returns>
         public static ParameterSelector Type<T>(this ParameterSelector source,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null)
+            Type requiredServiceType = null, object serviceKey = null, 
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
+            string metadataKey = null, object metadata = null)
         {
             return source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
-                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
         }
 
         /// <summary>Specify parameter by type and set custom value to it.</summary>
@@ -6291,11 +6392,16 @@ namespace DryIoc
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="ifUnresolved">(optional) By default returns default value if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
+        /// 
         /// <returns>Combined selector.</returns>
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
-            Type requiredServiceType = null, object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null)
+            Type requiredServiceType = null, object serviceKey = null, 
+            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null,
+            string metadataKey = null, object metadata = null)
         {
-            return source.Details(name, r => ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue));
+            return source.Details(name, r => ServiceDetails.Of(
+                requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
         }
 
         /// <summary>Specifies custom value for property/field with specific name.</summary>
@@ -7895,6 +8001,18 @@ namespace DryIoc
         public object ServiceKey
         {
             get { return ServiceInfo == null ? null : ServiceInfo.Details.ServiceKey; }
+        }
+
+        /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
+        public string MetadataKey
+        {
+            get { return ServiceInfo == null ? null : ServiceInfo.Details.MetadataKey; }
+        }
+
+        /// <summary>Metadata or the value (if key specified) to find in resolved service.</summary>
+        public object Metadata
+        {
+            get { return ServiceInfo == null ? null : ServiceInfo.Details.Metadata; }
         }
 
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>

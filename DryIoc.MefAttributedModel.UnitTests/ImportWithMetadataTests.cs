@@ -18,7 +18,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(ex.Error, Error.NotFindDependencyWithMetadata);
         }
 
-        [Test, Ignore("#195 Composable Metadata as a IDictionary of string - object")]
+        [Test, Ignore]
         public void ImportMany_with_metadata_should_work()
         {
             var container = new Container(Rules.Default.WithMefAttributedModel());
