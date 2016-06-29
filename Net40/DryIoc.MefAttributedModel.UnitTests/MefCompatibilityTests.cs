@@ -7,7 +7,7 @@ using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
-    [TestFixture]
+    [TestFixture, Ignore]
     public class MefCompatibilityTests
     {
         private CompositionContainer Mef => new CompositionContainer(new AssemblyCatalog(typeof(ILogTableManager).Assembly));
