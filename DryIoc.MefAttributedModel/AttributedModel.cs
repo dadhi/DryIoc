@@ -223,9 +223,19 @@ namespace DryIoc.MefAttributedModel
                     MemberName = member.Name
                 };
 
-                // note: The first export only is used for instance factory
-                if (typeRegistrationInfo != null && !member.IsStatic())
+                if (!member.IsStatic())
+                {
+                    // if no export for instance factory, then add one
+                    if (typeRegistrationInfo == null)
+                    {
+                        var typeAttributes = new Attribute[] { new ExportAttribute(SpecialNames.InstanceFactory) };
+                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes).ThrowIfNull();
+                        yield return typeRegistrationInfo;
+                    }
+
+                    // note: The first export only is used for instance factory
                     factoryMethod.InstanceFactory = typeRegistrationInfo.Exports[0];
+                }
 
                 var method = member as MethodInfo;
                 if (method != null)
@@ -637,6 +647,14 @@ namespace DryIoc.MefAttributedModel
         }
 
         #endregion
+    }
+
+    /// <summary>Names used by Attributed Model to mark the special exports.</summary>
+    public static class SpecialNames
+    {
+        /// <summary>Marks the Export generated for type which export its instance members, 
+        /// but should not be resolved as-self by default.</summary>
+        public static readonly string InstanceFactory = "SN.InstanceFactory";
     }
 
     /// <summary>Defines error codes and messages for <see cref="AttributedModelException"/>.</summary>

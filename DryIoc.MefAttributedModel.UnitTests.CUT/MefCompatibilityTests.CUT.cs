@@ -73,6 +73,15 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         private string ExportedValue => "Constants.ExportedValue";
     }
 
+    public class Abc { }
+
+    public class Provider
+    {
+        [Export]
+        private Abc ExportedValue => new Abc();
+    }
+
+
     [Export]
     public class SettingImportHelper
     {
