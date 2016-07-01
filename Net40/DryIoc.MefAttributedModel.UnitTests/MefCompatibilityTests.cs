@@ -61,6 +61,22 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Mef_supports_multiple_contract_names_on_same_service_type()
+        {
+            var importer = Mef.GetExport<ImportAllProtocolVersions>();
+
+            Assert.IsNotNull(importer);
+            Assert.IsNotNull(importer.Value);
+            Assert.IsNotNull(importer.Value.Protocols);
+            Assert.AreEqual(4, importer.Value.Protocols.Length);
+
+            Assert.IsTrue(importer.Value.Protocols.Any(v => v.Version == "1.0"));
+            Assert.IsTrue(importer.Value.Protocols.Any(v => v.Version == "2.0"));
+            Assert.IsTrue(importer.Value.Protocols.Any(v => v.Version == "3.0"));
+            Assert.IsTrue(importer.Value.Protocols.Any(v => v.Version == "4.0"));
+        }
+
+        [Test] // fails
         public void DryIoc_supports_importing_static_factory_method()
         {
             // LogTableManagerConsumer creates ILogTableManager via unnamed factory method with parameters
@@ -108,6 +124,21 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(importer.ImportedValues.Contains("SettingProvider1.ExportedValue"));
             Assert.IsTrue(importer.ImportedValues.Contains("SettingProvider2.ExportedValue"));
             Assert.IsTrue(importer.ImportedValues.Contains("SettingProvider3.ExportedValue"));
+        }
+
+        [Test] // fails
+        public void DryIoc_supports_multiple_contract_names_on_same_service_type()
+        {
+            var importer = Container.Resolve<ImportAllProtocolVersions>();
+
+            Assert.IsNotNull(importer);
+            Assert.IsNotNull(importer.Protocols);
+            Assert.AreEqual(4, importer.Protocols.Length);
+
+            Assert.IsTrue(importer.Protocols.Any(v => v.Version == "1.0"));
+            Assert.IsTrue(importer.Protocols.Any(v => v.Version == "2.0"));
+            Assert.IsTrue(importer.Protocols.Any(v => v.Version == "3.0"));
+            Assert.IsTrue(importer.Protocols.Any(v => v.Version == "4.0"));
         }
     }
 }
