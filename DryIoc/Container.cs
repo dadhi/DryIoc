@@ -2103,7 +2103,7 @@ namespace DryIoc
         /// <param name="registrationOrder"></param> <returns>New default key.</returns>
         public static DefaultKey Of(int registrationOrder)
         {
-            return new DefaultKey(registrationOrder);
+            return registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
         }
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
