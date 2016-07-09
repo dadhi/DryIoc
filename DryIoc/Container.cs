@@ -2103,13 +2103,7 @@ namespace DryIoc
         /// <param name="registrationOrder"></param> <returns>New default key.</returns>
         public static DefaultKey Of(int registrationOrder)
         {
-            if (registrationOrder < _keyPool.Length)
-                return _keyPool[registrationOrder];
-
-            var nextKey = new DefaultKey(registrationOrder);
-            if (registrationOrder == _keyPool.Length)
-                _keyPool = _keyPool.AppendOrUpdate(nextKey);
-            return nextKey;
+            return new DefaultKey(registrationOrder);
         }
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
@@ -2140,16 +2134,10 @@ namespace DryIoc
             return "DefaultKey.Of(" + RegistrationOrder + ")";
         }
 
-        #region Implementation
-
-        private static DefaultKey[] _keyPool = { Value };
-
         private DefaultKey(int registrationOrder)
         {
             RegistrationOrder = registrationOrder;
         }
-
-        #endregion
     }
 
     /// <summary>Returns reference to actual resolver implementation. 
