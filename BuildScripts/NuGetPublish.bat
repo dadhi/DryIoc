@@ -6,12 +6,12 @@ set PACKAGEDIR="bin\NuGetPackages"
 set /p APIKEY=<ApiKey.txt
 
 rem DryIoc
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.2.6.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.2-netcore-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.2.6.3.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.3.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.3-netcore-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.AspNetCore.DependencyInjection
-%NUGET% push "%PACKAGEDIR%\DryIoc.AspNetCore.DependencyInjection.1.0.0-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.AspNetCore.DependencyInjection.1.0.0-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
 rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
