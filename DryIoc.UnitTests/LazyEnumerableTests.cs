@@ -190,10 +190,12 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<Func<bool, LazyEnumerable<IServiceWithParameterAndDependency>>>());
 
-            StringAssert.Contains("with 1 arg(s)", ex.Message);
+            Assert.AreEqual(
+                Error.NameOf(Error.NotPossibleToResolveLazyEnumerableInsideFuncWithArgs),
+                Error.NameOf(ex.Error));
         }
 
-	    [Test]
+        [Test]
 	    public void Can_inject_Enumerable_as_LazyEnumerable_with_required_service_type()
 	    {
 	        var container = new Container();
