@@ -15,7 +15,7 @@
     "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "vNext", "AspNetCore", "NetCore", "DNX" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
-    "releaseNotes": "AspNetCore RTM support"
+    "releaseNotes": "- Package is renamed to DryIoc.Microsoft.DependencyInjection to align to Microsoft guidelines; - AspNetCore RTM support"
   },
 
   "dependencies": {

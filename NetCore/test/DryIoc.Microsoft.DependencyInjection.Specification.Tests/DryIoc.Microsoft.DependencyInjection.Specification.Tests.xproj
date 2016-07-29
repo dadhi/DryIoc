@@ -8,7 +8,7 @@
   <Import Project="$(VSToolsPath)\DotNet\Microsoft.DotNet.Props" Condition="'$(VSToolsPath)' != ''" />
   <PropertyGroup Label="Globals">
     <ProjectGuid>55030596-4ba0-4ba5-8be8-8b4bb568df19</ProjectGuid>
-    <RootNamespace>DryIoc.AspNetCore.DependencyInjection.Specification.Tests</RootNamespace>
+    <RootNamespace>DryIoc.Microsoft.DependencyInjection.Specification.Tests</RootNamespace>
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">.\obj</BaseIntermediateOutputPath>
     <OutputPath Condition="'$(OutputPath)'=='' ">.\bin\</OutputPath>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>

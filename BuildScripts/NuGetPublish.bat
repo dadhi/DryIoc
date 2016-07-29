@@ -6,11 +6,11 @@ set PACKAGEDIR="bin\NuGetPackages"
 set /p APIKEY=<ApiKey.txt
 
 rem DryIoc
-%NUGET% push "%PACKAGEDIR%\DryIoc.2.6.4.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.4.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.2.6.4.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.6.4.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
-rem DryIoc.AspNetCore.DependencyInjection
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.AspNetCore.DependencyInjection.1.0.0-rc2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem DryIoc.Microsoft.DependencyInjection
+%NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
 rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
@@ -24,8 +24,8 @@ rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.2.5.0.nupkg" -Source ht
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Owin
-%NUGET% push "%PACKAGEDIR%\DryIoc.Owin.2.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Owin.dll.2.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.2.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.dll.2.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%

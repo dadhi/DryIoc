@@ -26,7 +26,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DryIoc.AspNetCore.DependencyInjection
+namespace DryIoc.Microsoft.DependencyInjection
 {
     /// <summary>DryIoc. 
     /// Basically it is a DryIoc implementation of <see cref="IServiceProvider"/>.</summary>

@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Specification;
 
-namespace DryIoc.AspNetCore.DependencyInjection.Specification.Tests
+namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     public class DryIocAdapterSpecificationTests : DependencyInjectionSpecificationTests
     {

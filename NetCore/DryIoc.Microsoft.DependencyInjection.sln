@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AC570BFB-20F4-4395-A7B8-D33A151A2FE1}"
 	ProjectSection(SolutionItems) = preProject
@@ -14,9 +14,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{51CD64D5-4E2
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.AspNetCore.DependencyInjection", "src\DryIoc.AspNetCore.DependencyInjection\DryIoc.AspNetCore.DependencyInjection.xproj", "{A6A43508-BAC9-4A3A-B044-52490B6BE1F5}"
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.Microsoft.DependencyInjection", "src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.xproj", "{A6A43508-BAC9-4A3A-B044-52490B6BE1F5}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.AspNetCore.DependencyInjection.Specification.Tests", "test\DryIoc.AspNetCore.DependencyInjection.Specification.Tests\DryIoc.AspNetCore.DependencyInjection.Specification.Tests.xproj", "{55030596-4BA0-4BA5-8BE8-8B4BB568DF19}"
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.xproj", "{55030596-4BA0-4BA5-8BE8-8B4BB568DF19}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
