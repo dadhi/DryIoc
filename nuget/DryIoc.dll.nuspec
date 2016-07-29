@@ -18,9 +18,28 @@
           v2.6.2
           - fixed: #290 Disposable Transient without reused parent should be tracked in nearest open scope
         </releaseNotes>
+        <dependencies>
+          <group targetFramework="netstandard1.0">
+            <dependency id="System.Collections" version="4.0.11" />
+            <dependency id="System.Diagnostics.Debug" version="4.0.11" />
+            <dependency id="System.Diagnostics.Tools" version="4.0.1" />
+            <dependency id="System.Linq" version="4.1.0" />
+            <dependency id="System.Linq.Expressions" version="4.1.0" />
+            <dependency id="System.Reflection" version="4.1.0" />
+            <dependency id="System.Reflection.Extensions" version="4.0.1" />
+            <dependency id="System.Runtime" version="4.1.0" />
+            <dependency id="System.Runtime.Extensions" version="4.1.0" />
+            <dependency id="System.Threading" version="4.0.11" />
+          </group>
+        </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+
+        <!-- netstandard1.0 (based on PCL 259) -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.0" />
 
         <!-- net35 -->
         <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
