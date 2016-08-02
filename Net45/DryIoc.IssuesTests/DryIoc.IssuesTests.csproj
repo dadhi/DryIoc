@@ -118,6 +118,7 @@
     <Compile Include="Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value.cs" />
     <Compile Include="Issue281_MakeAutofacMigrationEasier.cs" />
     <Compile Include="Issue300_Exception_when_reusing_objects.cs" />
+    <Compile Include="Issue311_Resolve_does_not_work_with_InThread_registration.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
