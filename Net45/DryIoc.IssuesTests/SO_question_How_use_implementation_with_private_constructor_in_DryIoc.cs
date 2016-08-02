@@ -8,17 +8,20 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class SO_question_How_use_implementation_with_private_constructor_in_DryIoc
     {
+        public class A { internal A() { } }
+        public class B { internal B(A a) { } }
+
         [Test]
         public void Test()
         {
             var c = new Container();
             c.RegisterMany(new[] {typeof(A), typeof(B)},
-                made: Made.Of(SelectMostResolvablePrivateConstructor(includeNonPublic: true)));
+                made: Made.Of(SelectMostResolvableConstructor(includeNonPublic: true)));
 
             c.Resolve<B>();
         }
 
-        private FactoryMethodSelector SelectMostResolvablePrivateConstructor(bool includeNonPublic = false)
+        private FactoryMethodSelector SelectMostResolvableConstructor(bool includeNonPublic = false)
         {
             return request =>
             {
@@ -61,9 +64,5 @@ namespace DryIoc.IssuesTests
             var parameterFactory = request.Container.ResolveFactory(parameterRequest);
             return parameterFactory != null && parameterFactory.GetExpressionOrDefault(parameterRequest) != null;
         }
-
-        public class A { internal A() {} }
-
-        public class B { internal B(A a) {} }
     }
 }
