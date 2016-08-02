@@ -10,16 +10,15 @@
   },
 
   "dependencies": {
-    "DryIoc.dll": "2.6.2-netcore-rc2",
-    "NUnit": "3.2.1",
-    "dotnet-test-nunit": "3.4.0-alpha-2"
+    "DryIoc": { "target": "project" },
+    "NUnit": "3.4.0",
+    "dotnet-test-nunit": "3.4.0-beta-1"
   },
   "testRunner": "nunit",
 
   "frameworks": {
     "netcoreapp1.0": {
       "imports": [
-        "dnxcore50",
         "netcoreapp1.0",
         "portable-net45+win8"
       ],
@@ -29,6 +28,7 @@
           "type": "platform"
         }
       }
-    }
+    },
+    "net451": {}
   }
 }
