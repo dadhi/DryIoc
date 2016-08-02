@@ -2115,13 +2115,7 @@ namespace DryIoc
         /// <param name="registrationOrder"></param> <returns>New default key.</returns>
         public static DefaultKey Of(int registrationOrder)
         {
-            if (registrationOrder < _keyPool.Length)
-                return _keyPool[registrationOrder];
-
-            var nextKey = new DefaultKey(registrationOrder);
-            if (registrationOrder == _keyPool.Length)
-                _keyPool = _keyPool.AppendOrUpdate(nextKey);
-            return nextKey;
+            return registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
         }
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
@@ -2152,16 +2146,10 @@ namespace DryIoc
             return "DefaultKey.Of(" + RegistrationOrder + ")";
         }
 
-        #region Implementation
-
-        private static DefaultKey[] _keyPool = { Value };
-
         private DefaultKey(int registrationOrder)
         {
             RegistrationOrder = registrationOrder;
         }
-
-        #endregion
     }
 
     /// <summary>Returns reference to actual resolver implementation. 
@@ -2509,8 +2497,8 @@ namespace DryIoc
 
         private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
         {
-            if (request.IsWrappedInFuncWithArgs())
-                return null;
+            if (request.IsWrappedInFuncWithArgs(immediateParent: true))
+                Throw.It(Error.NotPossibleToResolveLazyEnumerableInsideFuncWithArgs, request);
 
             var container = request.Container;
             var itemType = request.ServiceType.GetGenericParamsAndArgs()[0];
@@ -2545,8 +2533,8 @@ namespace DryIoc
         // Result: r => new Lazy<TService>(() => r.Resolver.Resolve<TService>(key, ifUnresolved, requiredType));
         private static Expression GetLazyExpressionOrDefault(Request request)
         {
-            if (request.IsWrappedInFuncWithArgs())
-                return null;
+            if (request.IsWrappedInFuncWithArgs(immediateParent: true))
+                Throw.It(Error.NotPossibleToResolveLazyInsideFuncWithArgs, request);
 
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
@@ -3134,7 +3122,7 @@ namespace DryIoc
             var rules = request.Container.Rules;
             var parameterSelector = rules.Parameters.And(request.Made.Parameters)(request);
 
-            if (!request.IsWrappedInFuncWithArgs())
+            if (!request.IsWrappedInFuncWithArgs(immediateParent: true))
             {
                 var matchedCtor = ctorsWithMoreParamsFirst.FirstOrDefault(x =>
                     x.Params.All(p => IsResolvableParameter(p, parameterSelector, request)));
@@ -3143,7 +3131,9 @@ namespace DryIoc
             }
             else
             {
-                // For Func with arguments, match constructor should contain all input arguments and the rest should be resolvable.
+                // For Func with arguments, 
+                // match constructor should contain all input arguments and 
+                // the rest should be resolvable.
                 var funcType = request.ParentOrWrapper.ServiceType;
                 var funcArgs = funcType.GetGenericParamsAndArgs();
                 var inputArgCount = funcArgs.Length - 1;
@@ -5125,7 +5115,8 @@ namespace DryIoc
             return p.IsEmpty;
         }
 
-        /// <summary>Checks if request is wrapped in Func - where Func is one of request immediate wrappers.</summary>
+        /// <summary>Checks if request is wrapped in Func,
+        ///  where Func is one of request immediate wrappers.</summary>
         /// <returns>True if has Func ancestor.</returns>
         public bool IsWrappedInFunc()
         {
@@ -5133,12 +5124,17 @@ namespace DryIoc
                 .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFunc());
         }
 
-        /// <summary>Checks if request has parent with service type of Func with arguments. 
-        /// Often required to check in lazy scenarios.</summary> <returns>True if has Func with arguments ancestor.</returns>
-        public bool IsWrappedInFuncWithArgs()
+        /// <summary>Checks if request has parent with service type of Func with arguments.</summary> 
+        /// <param name="immediateParent">If set indicate to check for immediate parent only, 
+        /// otherwise will check whole parent chain.</param>
+        /// <returns>True if has Func with arguments ancestor.</returns>
+        public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
         {
-            return ParentOrWrapper.Enumerate()
-                .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFuncWithArgs());
+            var parent = ParentOrWrapper;
+            return immediateParent
+                ? parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFuncWithArgs()
+                : !parent.FirstOrEmpty(p =>
+                    p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs()).IsEmpty;
         }
 
         /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
@@ -8664,7 +8660,7 @@ namespace DryIoc
                 "When resolving {1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
-                RegisterImplementationNotAssignableToServiceType = Of(
+            RegisterImplementationNotAssignableToServiceType = Of(
                 "Registering implementation type {0} not assignable to service type {1}."),
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
@@ -8824,7 +8820,13 @@ namespace DryIoc
                 " To silence this exception Register<YourService>(setup: Setup.With(allowDisposableTransient: true)) " +
                 " or set the rule Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient())." +
                 " To enable tracking use Register<YourService>(setup: Setup.With(trackDisposableTransient: true)) " +
-                " or set the rule Container(rules => rules.WithTrackingDisposableTransient())");
+                " or set the rule Container(rules => rules.WithTrackingDisposableTransient())"),
+            NotPossibleToResolveLazyInsideFuncWithArgs = Of(
+                "Unable to resolve Lazy service inside Func<args..> because arguments can't be passed through" +
+                " Lazy boundaries: {0}"),
+            NotPossibleToResolveLazyEnumerableInsideFuncWithArgs = Of(
+                "Unable to resolve LazyEnumerable service inside Func<args..> because arguments can't be passed through" +
+                " lazy boundaries: {0}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

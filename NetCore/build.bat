@@ -4,9 +4,8 @@ dotnet restore
 
 dotnet build
 
-dotnet test ".\test\DryIoc.AspNetCore.DependencyInjection.Specification.Tests"
-dotnet test ".\test\DryIoc.NetCore.UnitTests"
+dotnet test ".\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests"
 
-dotnet pack ".\src\DryIoc.AspNetCore.DependencyInjection" -c Release -o "..\bin\NuGetPackages"
+dotnet pack ".\src\DryIoc.Microsoft.DependencyInjection" -c Release -o "..\bin\NuGetPackages"
 
 pause

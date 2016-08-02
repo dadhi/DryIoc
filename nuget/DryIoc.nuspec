@@ -12,8 +12,12 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v2.7.0
+            v2.7.0
       - fixed: #298: AspNetCore.DependencyInjection exceptions when verifying resolutions
+      v2.6.4
+      - fixed: #301: Issue with Lazy in Func with arguments
+      v2.6.3
+      - fixed: #299 Race condition between multiple containers
       v2.6.2
       - fixed: #290 Disposable Transient without reused parent should be tracked in nearest open scope
     </releaseNotes>

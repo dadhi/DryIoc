@@ -134,7 +134,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Not_possible_to_resolve_Func_With_Args_of_Lazy_cause_no_way_to_pass_the_args()
+        public void Resolving_Func_With_Args_of_Lazy_should_throw_for_missing_dependency()
         {
             var container = new Container();
             container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
@@ -143,7 +143,9 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>());
 
-            Assert.That(ex.Error, Is.EqualTo(Error.UnableToResolveUnknownService));
+            Assert.AreEqual(
+                Error.NameOf(Error.NotPossibleToResolveLazyInsideFuncWithArgs),
+                Error.NameOf(ex.Error));
         }
 
         [Test]
