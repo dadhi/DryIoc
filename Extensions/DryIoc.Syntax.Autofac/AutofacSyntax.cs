@@ -5,10 +5,14 @@ namespace DryIoc.Syntax.Autofac
 {
     public class ContainerBuilder
     {
-        public static readonly Rules DefaultAutofacRules = Rules.Default
-            .WithTrackingDisposableTransients()
-            .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-            .WithUnknownServiceResolvers(ThrowDependencyResolutionException);
+        public static Rules WithDefaultAutofacRules(Rules rules)
+        {
+             return rules
+                .With(FactoryMethod.ConstructorWithResolvableArguments)
+                .WithTrackingDisposableTransients()
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                .WithUnknownServiceResolvers(ThrowDependencyResolutionException);
+        }
 
         public static Factory ThrowDependencyResolutionException(Request request)
         {
@@ -23,7 +27,7 @@ namespace DryIoc.Syntax.Autofac
 
         public readonly List<Type> ModuleTypes;
 
-        public ContainerBuilder() : this(new Container(DefaultAutofacRules)) { }
+        public ContainerBuilder() : this(new Container(WithDefaultAutofacRules)) { }
 
         public ContainerBuilder(IContainer container)
         {
@@ -87,9 +91,9 @@ namespace DryIoc.Syntax.Autofac
             if (ModuleTypes.Count != 0)
             {
                 foreach (var moduleType in ModuleTypes)
-                    Container.Register(typeof(IModule), moduleType.DeclaringType, Reuse.Singleton);
+                    Container.Register(typeof(IModule), moduleType, Reuse.Singleton);
 
-                var modules = Container.Resolve<Module[]>();
+                var modules = Container.Resolve<IModule[]>();
                 foreach (var module in modules)
                 {
                     var moduleBuilder = new ContainerBuilder(Container);

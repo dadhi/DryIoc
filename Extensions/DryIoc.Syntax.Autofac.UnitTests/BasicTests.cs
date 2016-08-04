@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Compatibility;
 using NUnit.Framework;
 
 namespace DryIoc.Syntax.Autofac.UnitTests
@@ -176,6 +175,7 @@ namespace DryIoc.Syntax.Autofac.UnitTests
         public class AClient : IDisposable
         {
             public Owned<AService> Service { get; private set; }
+
             public AClient(Owned<AService> service)
             {
                 Service = service;
