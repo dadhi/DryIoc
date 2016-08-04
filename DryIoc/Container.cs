@@ -5677,11 +5677,16 @@ namespace DryIoc
         /// <summary>Returns generic wrapper setup.</summary>
         /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
         /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
+        /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
-        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false)
+        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
+            bool openResolutionScope = false, bool preventDisposal = false)
         {
-            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType ? Wrapper
-                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType);
+            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType
+                && !openResolutionScope && !preventDisposal 
+                ? Wrapper
+                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, openResolutionScope, preventDisposal);
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
@@ -5791,13 +5796,24 @@ namespace DryIoc
             /// <summary>Per name.</summary>
             public readonly bool AlwaysWrapsRequiredServiceType;
 
+            /// <inheritdoc />
+            public override bool OpenResolutionScope { get { return _openResolutionScope; } }
+
+            /// <inheritdoc />
+            public override bool PreventDisposal { get { return _preventDisposal; } }
+
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false)
+            /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
+            /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
+                bool openResolutionScope = false, bool preventDisposal = false)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
+                _openResolutionScope = openResolutionScope;
+                _preventDisposal = preventDisposal;
             }
 
             /// <summary>Unwraps service type or returns its.</summary>
@@ -5818,6 +5834,9 @@ namespace DryIoc
 
                 return typeArgs[typeArgIndex];
             }
+
+            private readonly bool _openResolutionScope;
+            private readonly bool _preventDisposal;
         }
 
         /// <summary>Setup applied to decorators.</summary>
