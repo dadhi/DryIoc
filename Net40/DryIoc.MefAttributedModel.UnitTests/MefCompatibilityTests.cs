@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
-    [TestFixture, Ignore]
+    [TestFixture]
     public class MefCompatibilityTests
     {
         private CompositionContainer Mef => new CompositionContainer(new AssemblyCatalog(typeof(ILogTableManager).Assembly));
@@ -60,7 +60,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(importer.Value.ImportedValues.Contains("SettingProvider3.ExportedValue"));
         }
 
-        [Test] // fails
+        [Test]
         public void DryIoc_supports_importing_static_factory_method()
         {
             // LogTableManagerConsumer creates ILogTableManager via unnamed factory method with parameters
@@ -71,7 +71,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual("SCHEMA1.LOG_ENTRIES", export.LogTableManager.TableName);
         }
 
-        [Test] // fails
+        [Test]
         public void DryIoc_supports_importing_named_static_factory_method()
         {
             // LogTableManagerConsumer creates ILogTableManager via named factory method with parameters
@@ -80,6 +80,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(export);
             Assert.IsNotNull(export.LogTableManager);
             Assert.AreEqual("SCHEMA2.LOG_ENTRIES", export.LogTableManager.TableName);
+        }
+
+        [Test]
+        public void DryIoc_supports_exporting_instance_member_of_not_exported_type()
+        {
+            var container = new Container().WithMefAttributedModel();
+
+            container.RegisterExports(typeof(Provider));
+            var abc = container.Resolve<Abc>();
+
+            Assert.IsNotNull(abc);
+            Assert.IsNull(container.Resolve<Provider>(IfUnresolved.ReturnDefault));
         }
 
         [Test, Ignore] // fails

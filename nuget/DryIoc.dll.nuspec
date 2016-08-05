@@ -14,6 +14,7 @@
           v2.7.0
           - fixed: #298: AspNetCore.DependencyInjection exceptions when verifying resolutions
           - fixed: #313: Support non public constructors with ConstructorWithResolvableArguments
+          - fixed: #195: Composable Metadata as a IDictionary&lt;string, object&gt;
           v2.6.4
           - fixed: #301: Issue with Lazy in Func with arguments
           v2.6.3
