@@ -145,7 +145,7 @@
     <Compile Include="Samples\PubSub.cs" />
     <Compile Include="Samples\ResolveMocksForNonRegisteredServices.cs" />
     <Compile Include="Samples\SelectConstructorWithAllResolvableArguments.cs" />
-    <Compile Include="SO_question_How_use_implementation_with_private_constructor_in_DryIoc.cs" />
+    <Compile Include="Issue313_Support_non_public_constructors_with_ConstructorWithResolvableArguments.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
