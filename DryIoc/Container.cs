@@ -3284,6 +3284,7 @@ namespace DryIoc
             return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo));
         }
 
+
         /// <summary>Creates factory specification with method or member selector based on request.</summary>
         /// <param name="getMethodOrMember">Method, or constructor, or member selector.</param>
         /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance method/member.</param>
@@ -5613,28 +5614,28 @@ namespace DryIoc
         /// <summary>Indicates that injected expression should be: 
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
-        public virtual bool AsResolutionCall { get { return false; } }
+        public bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
 
         /// <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
-        public virtual bool AsResolutionRoot { get { return false; } }
+        public bool AsResolutionRoot { get { return (_settings & Settings.AsResolutionRoot) != 0; } }
         
         /// <summary>In addition to <see cref="AsResolutionCall"/> opens scope.</summary>
-        public virtual bool OpenResolutionScope { get { return false; } }
+        public bool OpenResolutionScope { get { return (_settings & Settings.OpenResolutionScope) != 0; } }
 
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
-        public virtual bool PreventDisposal { get { return false; } }
+        public bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
 
         /// <summary>Stores reused instance as WeakReference.</summary>
-        public virtual bool WeaklyReferenced { get { return false; } }
+        public bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
 
         /// <summary>Allows registering transient disposable.</summary>
-        public virtual bool AllowDisposableTransient { get { return false; } }
+        public bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; } }
 
         /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
-        public virtual bool TrackDisposableTransient { get { return false; } }
+        public bool TrackDisposableTransient { get { return (_settings & Settings.TrackDisposableTransient) != 0; } }
 
         /// <summary>Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</summary>
-        public virtual bool UseParentReuse { get { return false; } }
+        public bool UseParentReuse { get { return (_settings & Settings.UseParentReuse) != 0; } }
 
         /// <summary>Returns true if passed meta key and value match the setup metadata.</summary>
         /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or the value if key passed.</param>
@@ -5654,6 +5655,55 @@ namespace DryIoc
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
+        /// <summary>Sets the basic settings.</summary>
+        /// <param name="openResolutionScope"></param> <param name="asResolutionCall"></param>
+        /// <param name="asResolutionRoot"></param> <param name="preventDisposal"></param>
+        /// <param name="weaklyReferenced"></param> <param name="allowDisposableTransient"></param>
+        /// <param name="trackDisposableTransient"></param> <param name="useParentReuse"></param>
+        private Setup(bool openResolutionScope = false, bool asResolutionCall = false, 
+            bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
+            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+            bool useParentReuse = false)
+        {
+            if (asResolutionCall)
+                _settings |= Settings.AsResolutionCall;
+            if (openResolutionScope)
+            {
+                _settings |= Settings.OpenResolutionScope;
+                _settings |= Settings.AsResolutionCall;
+            }
+            if (preventDisposal)
+                _settings |= Settings.PreventDisposal;
+            if (weaklyReferenced)
+                _settings |= Settings.WeaklyReferenced;
+            if (allowDisposableTransient)
+                _settings |= Settings.AllowDisposableTransient;
+            if (trackDisposableTransient)
+            {
+                _settings |= Settings.TrackDisposableTransient;
+                _settings |= Settings.AllowDisposableTransient;
+            }
+            if (asResolutionRoot)
+                _settings |= Settings.AsResolutionRoot;
+            if (useParentReuse)
+                _settings |= Settings.UseParentReuse;
+        }
+
+        [Flags]
+        private enum Settings
+        {
+            AsResolutionCall = 1 << 1,
+            OpenResolutionScope = 1 << 2,
+            PreventDisposal = 1 << 3,
+            WeaklyReferenced = 1 << 4,
+            AllowDisposableTransient = 1 << 5,
+            TrackDisposableTransient = 1 << 6,
+            AsResolutionRoot = 1 << 7,
+            UseParentReuse = 1 << 8
+        }
+
+        private readonly Settings _settings;
+
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
@@ -5666,8 +5716,7 @@ namespace DryIoc
         /// <param name="useParentReuse">(optional) Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(
-            object metadataOrFuncOfMetadata = null,
-            Func<RequestInfo, bool> condition = null,
+            object metadataOrFuncOfMetadata = null, Func<RequestInfo, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
@@ -5699,8 +5748,7 @@ namespace DryIoc
             bool openResolutionScope = false, bool preventDisposal = false)
         {
             return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType
-                && !openResolutionScope && !preventDisposal 
-                ? Wrapper
+                && !openResolutionScope && !preventDisposal ? Wrapper
                 : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, openResolutionScope, preventDisposal);
         }
 
@@ -5715,7 +5763,8 @@ namespace DryIoc
         /// Decorators without order (Order is 0) or with equal order are applied in registration order 
         /// - first registered are closer decoratee.</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
+        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0, 
+            bool useDecorateeReuse = false)
         {
             return condition == null && order == 0 && !useDecorateeReuse ? Decorator 
                 : new DecoratorSetup(condition, order, useDecorateeReuse);
@@ -5738,64 +5787,19 @@ namespace DryIoc
                 }
             }
 
-            public override bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
-            public override bool AsResolutionRoot { get { return (_settings & Settings.AsResolutionRoot) != 0; } }
-            public override bool OpenResolutionScope { get { return (_settings & Settings.OpenResolutionScope) != 0; } }
-            public override bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
-            public override bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
-            public override bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; } }
-            public override bool TrackDisposableTransient { get { return (_settings & Settings.TrackDisposableTransient) != 0; } }
-            public override bool UseParentReuse { get { return (_settings & Settings.UseParentReuse) != 0; } }
-
             public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null,
                 bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
                 bool preventDisposal = false, bool weaklyReferenced = false,
-                bool allowDisposableTransient = false, bool trackDisposableTransients = false,
-                bool useParentReuse = false)
+                bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+                bool useParentReuse = false) : base(openResolutionScope, asResolutionCall, asResolutionRoot,
+                    preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
+                    useParentReuse)
             {
                 Condition = condition;
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
-
-                if (asResolutionCall)
-                    _settings |= Settings.AsResolutionCall;
-                if (openResolutionScope)
-                {
-                    _settings |= Settings.OpenResolutionScope;
-                    _settings |= Settings.AsResolutionCall;
-                }
-                if (preventDisposal)
-                    _settings |= Settings.PreventDisposal;
-                if (weaklyReferenced)
-                    _settings |= Settings.WeaklyReferenced;
-                if (allowDisposableTransient)
-                    _settings |= Settings.AllowDisposableTransient;
-                if (trackDisposableTransients)
-                {
-                    _settings |= Settings.TrackDisposableTransient;
-                    _settings |= Settings.AllowDisposableTransient;
-                }
-                if (asResolutionRoot)
-                    _settings |= Settings.AsResolutionRoot;
-                if (useParentReuse)
-                    _settings |= Settings.UseParentReuse;
             }
 
             private object _metadataOrFuncOfMetadata;
-
-            [Flags]
-            private enum Settings
-            {
-                AsResolutionCall =          1 << 1,
-                OpenResolutionScope =       1 << 2,
-                PreventDisposal =           1 << 3,
-                WeaklyReferenced =          1 << 4,
-                AllowDisposableTransient =  1 << 5,
-                TrackDisposableTransient =  1 << 6,
-                AsResolutionRoot =          1 << 7,
-                UseParentReuse =            1 << 8
-            }
-
-            private readonly Settings _settings;
         }
 
         /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
@@ -5811,24 +5815,18 @@ namespace DryIoc
             /// <summary>Per name.</summary>
             public readonly bool AlwaysWrapsRequiredServiceType;
 
-            /// <inheritdoc />
-            public override bool OpenResolutionScope { get { return _openResolutionScope; } }
-
-            /// <inheritdoc />
-            public override bool PreventDisposal { get { return _preventDisposal; } }
-
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-            /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
+            /// <param name="openResolutionScope">(optional) Opens the new scope.</param><param name="asResolutionCall"></param>
             /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
             public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
-                bool openResolutionScope = false, bool preventDisposal = false)
+                bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false) 
+                : base(openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall, 
+                      preventDisposal: preventDisposal)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
-                _openResolutionScope = openResolutionScope;
-                _preventDisposal = preventDisposal;
             }
 
             /// <summary>Unwraps service type or returns its.</summary>
@@ -5849,9 +5847,6 @@ namespace DryIoc
 
                 return typeArgs[typeArgIndex];
             }
-
-            private readonly bool _openResolutionScope;
-            private readonly bool _preventDisposal;
         }
 
         /// <summary>Setup applied to decorators.</summary>
@@ -5878,6 +5873,7 @@ namespace DryIoc
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
             public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
+                : base()
             {
                 Condition = condition;
                 Order = order;

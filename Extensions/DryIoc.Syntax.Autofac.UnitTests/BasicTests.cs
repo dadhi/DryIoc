@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Autofac;
+using Autofac.Core;
+using Autofac.Features.OwnedInstances;
 using NUnit.Framework;
 
 namespace DryIoc.Syntax.Autofac.UnitTests
@@ -97,7 +100,7 @@ namespace DryIoc.Syntax.Autofac.UnitTests
             var builder = new ContainerBuilder();
             builder.RegisterType<AClient>();
             builder.RegisterType<AService>();
-            builder.RegisterType<ADependency>();
+            builder.RegisterType<ADependency>().InstancePerOwned<AService>();
             builder.RegisterType<ANestedDep>().InstancePerOwned<AService>();
             var container = builder.Build();
 
