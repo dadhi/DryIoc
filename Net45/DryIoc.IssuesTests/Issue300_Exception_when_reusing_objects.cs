@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue300_Exception_when_reusing_objects
     {
-        [Test, Ignore]
+        [Test]
         public void Test()
         {
             var factory = new Container(rules => rules

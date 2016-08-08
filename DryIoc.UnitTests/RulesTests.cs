@@ -264,7 +264,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Container_rule_for_serializing_custom_value_to_expression_should_throw_proper_exception_for_not_supported_type()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithThrowIfRuntimeStateRequired());
 
             var s = new ConnectionString("aaa");
             container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));

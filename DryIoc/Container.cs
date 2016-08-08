@@ -903,10 +903,10 @@ namespace DryIoc
             var objectDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!objectDecorators.IsNullOrEmpty())
             {
-                var matchingClosedDecorators = objectDecorators.Select(
-                    factory => factory.FactoryGenerator == null
-                        ? factory
-                        : factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
+                var matchingClosedDecorators = objectDecorators
+                    .Where(f => f.CheckCondition(request))
+                    .Select(f => f.FactoryGenerator == null ? f : 
+                        f.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
                     .Where(f => f != null)
                     .ToArray();
                 decorators = decorators.Append(matchingClosedDecorators);
@@ -1968,14 +1968,13 @@ namespace DryIoc
             return container.GenerateResolutionExpressions(out ignoredRoots, out ignoredDeps, whatRegistrations);
         }
 
+        // todo: v3: remove
+        // previously was checking for primitive value.
         /// <summary>Checks if custom value of the <paramref name="customValueType"/> is supported by DryIoc injection mechanism.</summary>
         /// <param name="customValueType">Type to check</param> <returns>True if supported, false otherwise.c</returns>
         public static bool IsSupportedInjectedCustomValueType(Type customValueType)
         {
-            return customValueType == typeof(DefaultKey)
-                   || customValueType.IsAssignableTo(typeof(Type))
-                   || customValueType.IsPrimitive()
-                   || customValueType.IsArray && IsSupportedInjectedCustomValueType(customValueType.GetArrayElementTypeOrNull());
+            return true;
         }
 
         /// <summary>Represents construction of whole request info stack as expression.</summary>
@@ -3251,10 +3250,8 @@ namespace DryIoc
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New injection rules or <see cref="Default"/>.</returns>
-        public static Made Of(
-            FactoryMethodSelector factoryMethod = null, 
-            ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
+        public static Made Of(FactoryMethodSelector factoryMethod = null, 
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return factoryMethod == null && parameters == null && propertiesAndFields == null
                 ? Default : new Made(factoryMethod, parameters, propertiesAndFields);
@@ -3262,8 +3259,10 @@ namespace DryIoc
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
+        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New injection rules.</returns>
-        public static Made Of(FactoryMethod factoryMethod)
+        public static Made Of(FactoryMethod factoryMethod,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             var methodReturnType = factoryMethod.ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
 
@@ -3272,26 +3271,29 @@ namespace DryIoc
             if (methodReturnType != null && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
-            return new Made(_ => factoryMethod, factoryMethodKnownResultType: methodReturnType);
+            return new Made(_ => factoryMethod, parameters, propertiesAndFields, methodReturnType);
         }
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
         /// <param name="factoryMethodOrMember">To create service.</param>
         /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance member.</param>
+        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New rules.</returns>
-        public static Made Of(MemberInfo factoryMethodOrMember, ServiceInfo factoryInfo = null)
+        public static Made Of(MemberInfo factoryMethodOrMember, ServiceInfo factoryInfo = null,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
             return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo));
         }
 
-
         /// <summary>Creates factory specification with method or member selector based on request.</summary>
         /// <param name="getMethodOrMember">Method, or constructor, or member selector.</param>
         /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance method/member.</param>
+        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New specification.</returns>
-        public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null)
+        public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo));
+            return Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields);
         }
 
         /// <summary>Defines how to select constructor from implementation type.</summary>
@@ -3447,7 +3449,7 @@ namespace DryIoc
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         parameters = parameters.Details((r, p) => p.Equals(parameter)
-                            ? ServiceDetails.Of(getArgValue(r.ToRequestInfo()))
+                            ? ServiceDetails.Of(getArgValue(r.RequestInfo))
                             : null);
                         hasCustomValue = true;
                     }
@@ -3497,7 +3499,7 @@ namespace DryIoc
                         propertiesAndFields = propertiesAndFields.And(r => new[]
                         {
                             PropertyOrFieldServiceInfo.Of(member).WithDetails(
-                                ServiceDetails.Of(getArgValue(r.ToRequestInfo())), r)
+                                ServiceDetails.Of(getArgValue(r.RequestInfo)), r)
                         });
                         hasCustomValue = true;
                     }
@@ -4208,39 +4210,22 @@ namespace DryIoc
         {
             initialize.ThrowIfNull();
 
-            // unique key to bind decorator factory and decorator registrations
-            var decoratorFactoryKey = new object();
-
-            registrator.RegisterDelegate(
-                _ => new InitializerFactory<TTarget>(initialize),
-                serviceKey: decoratorFactoryKey);
-
-            Func<RequestInfo, bool> decoratorCondition = r => 
-                (r.ImplementationType ?? r.GetActualServiceType()).IsAssignableTo(typeof(TTarget))
-                && (condition == null || condition(r));
-
             registrator.Register<object>(
-                made: Made.Of(request => FactoryMethod.Of(
-                    typeof(InitializerFactory<TTarget>).GetSingleMethodOrNull("Decorate").MakeGenericMethod(request.ServiceType),
-                    ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: decoratorFactoryKey))),
-                setup: Setup.DecoratorWith(decoratorCondition, useDecorateeReuse: true));
+                made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType), 
+                parameters: Parameters.Of.Type(_ => initialize)),
+                setup: Setup.DecoratorWith(useDecorateeReuse: true, condition:
+                    r => r.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(TTarget))
+                        && (condition == null || condition(r))));
         }
 
-        internal sealed class InitializerFactory<TTarget>
+        private static readonly MethodInfo _initializerMethod = 
+            typeof(Registrator).GetSingleMethodOrNull("Initializer", includeNonPublic: true).ThrowIfNull();
+
+        internal static TService Initializer<TTarget, TService>(
+            TService service, IResolver resolver, Action<TTarget, IResolver> initialize) where TService : TTarget
         {
-            private readonly Action<TTarget, IResolver> _initialize;
-
-            public InitializerFactory(Action<TTarget, IResolver> initialize)
-            {
-                _initialize = initialize;
-            }
-
-            public TService Decorate<TService>(TService service, IResolver resolver)
-                where TService : TTarget
-            {
-                _initialize(service, resolver);
-                return service;
-            }
+            initialize(service, resolver);
+            return service;
         }
 
         /// <summary>Registers dispose action for reused target service.</summary>
@@ -5873,7 +5858,6 @@ namespace DryIoc
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
             public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
-                : base()
             {
                 Condition = condition;
                 Order = order;
@@ -6489,11 +6473,11 @@ namespace DryIoc
             Made = made ?? Made.Default;
             _implementationType = GetValidImplementationTypeOrDefault(implementationType);
 
-            // Create closed type generator for open-generic implementation type
-            var maybeGenericImplType = _implementationType ?? implementationType;
-            if (maybeGenericImplType != null && (
-                maybeGenericImplType.IsGenericDefinition() ||
-                maybeGenericImplType.IsGenericParameter))
+            var originalImplementationType = _implementationType ?? implementationType;
+            if (originalImplementationType == typeof(object) || // for open-generic T implementation
+                originalImplementationType != null && (         // for open-generic X<T> implementation
+                originalImplementationType.IsGenericDefinition() ||
+                originalImplementationType.IsGenericParameter))
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
         }
 
@@ -6579,7 +6563,7 @@ namespace DryIoc
                                 if (customValue != null)
                                     customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
                                 paramExpr = paramRequest.Container
-                                    .GetOrAddStateItemExpression(customValue, paramRequest.ServiceType, throwIfStateRequired: true);
+                                    .GetOrAddStateItemExpression(customValue, paramRequest.ServiceType);
                             }
                             else
                             {
@@ -6596,7 +6580,7 @@ namespace DryIoc
 
                                     var defaultValue = paramInfo.Details.DefaultValue;
                                     paramExpr = defaultValue != null
-                                        ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue, throwIfStateRequired: true)
+                                        ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
                                         : paramRequest.ServiceType.GetDefaultValueExpression();
                                 }
                             }
@@ -6646,7 +6630,7 @@ namespace DryIoc
                 var implementationType = _openGenericFactory._implementationType;
 
                 var closedTypeArgs = 
-                    implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
+                      implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
                         ? serviceType.GetGenericParamsAndArgs()
                     : implementationType.IsGenericParameter
                         ? new [] { serviceType }
@@ -6719,7 +6703,9 @@ namespace DryIoc
                 implementationType = null; // Ensure that we do not have abstract implementation type
 
                 // Using non-abstract factory method result type is safe for conditions and diagnostics
-                if (factoryMethodResultType != null && !factoryMethodResultType.IsAbstract())
+                if (factoryMethodResultType != null && 
+                    factoryMethodResultType != typeof(object) &&
+                    !factoryMethodResultType.IsAbstract())
                     implementationType = factoryMethodResultType;
 
                 return implementationType;
@@ -6798,7 +6784,7 @@ namespace DryIoc
                         var customValue = member.Details.CustomValue;
                         if (customValue != null)
                             customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, memberRequest.ServiceType, throwIfStateRequired: true);
+                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, memberRequest.ServiceType);
                     }
                     else
                     {
@@ -8021,6 +8007,12 @@ namespace DryIoc
             return RequiredServiceType != null 
                 && RequiredServiceType.IsAssignableTo(ServiceType)
                 ? RequiredServiceType : ServiceType;
+        }
+
+        /// <summary>Returns known implementation, or otherwise actual service type.</summary> <returns>The subject.</returns>
+        public Type GetKnownImplementationOrServiceType()
+        {
+            return ImplementationType ?? GetActualServiceType();
         }
 
         /// <summary>Policy to deal with unresolved request.</summary>
