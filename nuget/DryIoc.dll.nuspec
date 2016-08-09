@@ -12,10 +12,12 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
           v2.7.0
-          - fixed: #313: Support non public constructors with ConstructorWithResolvableArguments
+          - added: #314: Allow to inject non primitive external values
+          - added: #313: Support non public constructors with ConstructorWithResolvableArguments
+          - added: #195: Composable Metadata as a IDictionary&lt;string, object&gt;
+          - fixed: #310: Problems with Decorators and Service Keys
           - fixed: #300: Exception when reusing objects.
           - fixed: #298: AspNetCore.DependencyInjection exceptions when verifying resolutions
-          - fixed: #195: Composable Metadata as a IDictionary&lt;string, object&gt;
           v2.6.4
           - fixed: #301: Issue with Lazy in Func with arguments
           v2.6.3
