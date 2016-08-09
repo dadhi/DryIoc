@@ -7,33 +7,21 @@ namespace DryIoc.Interception
     // Extension methods for interceptor registration using Castle Dynamic Proxy.
     public static class DryIocInterception
     {
-        private static readonly Lazy<DefaultProxyBuilder> ProxyBuilder =
-            new Lazy<DefaultProxyBuilder>(() => new DefaultProxyBuilder());
-
-        public static void InterceptInterface<TServiceInterface, TInterceptor>(this IRegistrator registrator)
-            where TInterceptor : class, IInterceptor
-        {
-            var serviceType = typeof(TServiceInterface);
-            if (!serviceType.IsInterface)
-                throw new ArgumentException(string.Format("Intercepted service type {0} is not an interface", serviceType));
-
-            var proxyType = ProxyBuilder.Value.CreateInterfaceProxyTypeWithTargetInterface(
-                serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
-
-            registrator.Register(serviceType, proxyType,
-                made: Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[])),
-                setup: Setup.Decorator);
-        }
-
-        public static void InterceptClass<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null) 
+        public static void Intercept<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null) 
             where TInterceptor : class, IInterceptor
         {
             var serviceType = typeof(TService);
-            if (!serviceType.IsClass)
-                throw new ArgumentException(string.Format("Intercepted service type {0} is not a class", serviceType));
 
-            var proxyType = ProxyBuilder.Value.CreateClassProxyType(
-                serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
+            Type proxyType;
+            if (serviceType.IsInterface())
+                proxyType = ProxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(
+                    serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
+            else if (serviceType.IsClass())
+                proxyType = ProxyBuilder.CreateClassProxyType(
+                    serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
+            else
+                throw new ArgumentException(string.Format(
+                    "Intercepted service type {0} is not a supported: nor class nor interface", serviceType));
 
             var decoratorSetup = serviceKey == null
                 ? Setup.Decorator
@@ -41,8 +29,15 @@ namespace DryIoc.Interception
 
             registrator.Register(serviceType, proxyType,
                 made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(c => c.GetParameters().Length != 0), 
-                    Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))), 
+                    Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))),
                 setup: decoratorSetup);
         }
+
+        private static DefaultProxyBuilder ProxyBuilder
+        {
+            get { return _proxyBuilder ?? (_proxyBuilder = new DefaultProxyBuilder()); }
+        }
+
+        private static DefaultProxyBuilder _proxyBuilder;
     }
 }

@@ -9247,6 +9247,13 @@ namespace DryIoc
             return typeInfo.IsPublic || typeInfo.IsNestedPublic && typeInfo.DeclaringType.IsPublicOrNestedPublic();
         }
 
+        /// <summary>Returns true if type is class.</summary>
+        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
+        public static bool IsClass(this Type type)
+        {
+            return type.GetTypeInfo().IsClass;
+        }
+
         /// <summary>Returns true if type is value type.</summary>
         /// <param name="type">Type to check.</param> <returns>Check result.</returns>
         public static bool IsValueType(this Type type)

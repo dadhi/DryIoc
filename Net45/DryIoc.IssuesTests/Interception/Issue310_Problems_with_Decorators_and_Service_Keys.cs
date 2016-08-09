@@ -37,13 +37,13 @@ namespace DryIoc.IssuesTests.Interception
                 container.Register<AspectInterceptor>();
 
                 container.Register<MyView>();
-                container.InterceptClass<MyView, AspectInterceptor>();
+                container.Intercept<MyView, AspectInterceptor>();
 
                 container.Register<MyForm>(serviceKey: 1);
-                container.InterceptClass<MyForm, AspectInterceptor>(1);
+                container.Intercept<MyForm, AspectInterceptor>(1);
 
                 container.Register<MyForm>(serviceKey: 2);
-                container.InterceptClass<MyForm, AspectInterceptor>(2);
+                container.Intercept<MyForm, AspectInterceptor>(2);
 
                 container.Resolve<MyForm>(1);
             }

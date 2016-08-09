@@ -21,7 +21,7 @@ namespace DryIoc.IssuesTests.Interception
                 Parameters.Of.Type<Action<IInvocation>>(_ => invocation =>
                     result = string.Join("+", invocation.Arguments.Select(x => x.ToString()))));
 
-            c.InterceptInterface<ICalculator1, CalculatorLogger>();
+            c.Intercept<ICalculator1, CalculatorLogger>();
 
             var calc = c.Resolve<ICalculator1>();
             calc.Add(1, 2);
