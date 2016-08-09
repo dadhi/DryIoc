@@ -16,12 +16,12 @@ namespace DryIoc.IssuesTests.Interception
             var c = new Container();
 
             c.Register<ICalculator1, Calculator1>();
-            c.InterceptInterface<ICalculator1, CalculatorLogger>();
-
             var result = string.Empty;
             c.Register<CalculatorLogger>(made:
                 Parameters.Of.Type<Action<IInvocation>>(_ => invocation =>
                     result = string.Join("+", invocation.Arguments.Select(x => x.ToString()))));
+
+            c.InterceptInterface<ICalculator1, CalculatorLogger>();
 
             var calc = c.Resolve<ICalculator1>();
             calc.Add(1, 2);

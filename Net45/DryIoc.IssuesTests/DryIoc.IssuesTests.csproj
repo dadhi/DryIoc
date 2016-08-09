@@ -60,6 +60,7 @@
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
       <HintPath>..\..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
       <Private>True</Private>
@@ -77,8 +78,9 @@
     <Compile Include="DotnetWeekBlogExample.cs" />
     <Compile Include="DryIocAdapterSpecificationTests.cs" />
     <Compile Include="InjectListOfDepsWithStringDeps.cs" />
-    <Compile Include="Interception\DryIocInterceptorTools.cs" />
+    <Compile Include="Interception\DryIocInterception.cs" />
     <Compile Include="Interception\InterceptionTests.cs" />
+    <Compile Include="Interception\Issue310_Problems_with_Decorators_and_Service_Keys.cs" />
     <Compile Include="Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize.cs" />
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
     <Compile Include="InjectLog4netLog.cs" />

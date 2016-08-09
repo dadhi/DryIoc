@@ -357,9 +357,9 @@ namespace DryIoc
             {
                 if (reflectionFactory.Made.FactoryMethod == null && Rules.FactoryMethod == null)
                 {
-                    var publicCounstructorCount = reflectionFactory.ImplementationType.GetPublicInstanceConstructors().Count();
-                    if (publicCounstructorCount != 1)
-                        Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, reflectionFactory.ImplementationType, publicCounstructorCount);
+                    var ctors = reflectionFactory.ImplementationType.GetPublicInstanceConstructors().ToArrayOrSelf();
+                    if (ctors.Length != 1)
+                        Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, reflectionFactory.ImplementationType, ctors);
                 }
 
                 if (!isStaticallyChecked && 
@@ -809,7 +809,8 @@ namespace DryIoc
                 // updating IfUnresolved policy to ReturnDefault.
                 if (containerRequest.IfUnresolved == IfUnresolved.Throw)
                     containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
-                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault).InheritInfoFromDependencyOwner(info));
+                        ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault)
+                            .InheritInfoFromDependencyOwner(info));
 
                 var factory = containerWeakRef.Container.ResolveFactory(containerRequest);
                 if (factory != null)
@@ -4715,18 +4716,17 @@ namespace DryIoc
                 : (T)serviceInfo.Create(serviceType, details); // otherwise: create new.
         }
 
+        // todo: v3: remove unused @shouldInheritServiceKey parameter
         /// <summary>Enables propagation/inheritance of info between dependency and its owner: 
         /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
         /// <param name="dependency">Dependency info.</param>
         /// <param name="owner">Dependency holder/owner info.</param>
         /// <param name="shouldInheritServiceKey">(optional) Self-explanatory. Usually set to true for wrapper and decorator info.</param>
+        /// <param name="ownerType">(optional)</param>
         /// <returns>Either input dependency info, or new info with properties inherited from the owner.</returns>
         public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, IServiceInfo owner,
-            bool shouldInheritServiceKey = false)
+            bool shouldInheritServiceKey = false, FactoryType ownerType = FactoryType.Service)
         {
-            // todo: v3: that an actual meaning parameter should be renamed in next major version.
-            var isNonServiceOwner = shouldInheritServiceKey;
-
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
                 return dependency;
@@ -4737,13 +4737,23 @@ namespace DryIoc
                 ? dependencyDetails.IfUnresolved
                 : ownerDetails.IfUnresolved;
 
+            var serviceType = dependency.ServiceType;
+            var requiredServiceType = dependencyDetails.RequiredServiceType;
+            var ownerRequiredServiceType = ownerDetails.RequiredServiceType;
+
             var serviceKey = dependencyDetails.ServiceKey;
             var metadataKey = dependencyDetails.MetadataKey;
             var metadata = dependencyDetails.Metadata;
-            if (isNonServiceOwner) // e.g. wrapper, then propagate key and meta to the actual service 
+
+            // propagate key and meta to the actual service
+            if (ownerType == FactoryType.Wrapper ||
+                ownerType == FactoryType.Decorator && serviceType.IsAssignableTo(owner.ServiceType))
             {
                 if (serviceKey == null)
+                {
                     serviceKey = ownerDetails.ServiceKey;
+                }
+
                 if (metadataKey == null && metadata == null)
                 {
                     metadataKey = ownerDetails.MetadataKey;
@@ -4751,11 +4761,7 @@ namespace DryIoc
                 }
             }
 
-            var serviceType = dependency.ServiceType;
-            var requiredServiceType = dependencyDetails.RequiredServiceType;
-            var ownerRequiredServiceType = ownerDetails.RequiredServiceType;
-
-            if (isNonServiceOwner && ownerRequiredServiceType != null && 
+            if (ownerType != FactoryType.Service && ownerRequiredServiceType != null && 
                 requiredServiceType == null) // if only dependency does not have its own
                 requiredServiceType = ownerRequiredServiceType;
 
@@ -5290,7 +5296,7 @@ namespace DryIoc
                 }
             }
 
-            var newInfo = serviceInfo.InheritInfoFromDependencyOwner(parentInfo, parent.FactoryType != FactoryType.Service);
+            var newInfo = serviceInfo.InheritInfoFromDependencyOwner(parentInfo, ownerType: parent.FactoryType);
             return parent.Push(newInfo);
         }
 
@@ -8708,7 +8714,9 @@ namespace DryIoc
             NoPublicConstructorDefined = Of(
                 "There is no public constructor defined for {0}."),
             NoDefinedMethodToSelectFromMultipleConstructors = Of(
-                "Unspecified how to select single constructor for implementation type {0} with {1} public constructors."),
+                "Unspecified how to select single constructor from type {0} with multiple public constructors:" + 
+                Environment.NewLine + 
+                "{1}"),
             NoMatchedImplementedTypesWithServiceType = Of(
                 "Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
             NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs = Of(
