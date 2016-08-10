@@ -1023,7 +1023,7 @@ namespace DryIoc
 
             var resolver = (IResolver)this;
             var request = _emptyRequest.Push(instanceType).WithResolvedFactory(new InstanceFactory(instance, null, Setup.Default));
-            var requestInfo = request.ToRequestInfo();
+            var requestInfo = request.RequestInfo;
 
             foreach (var serviceInfo in propertiesAndFields(request))
                 if (serviceInfo != null)
@@ -1955,8 +1955,23 @@ namespace DryIoc
             return resolutionErrorList.ToArray();
         }
 
-        /// <summary>May be used to find potential problems in service registration setup.
-        /// Methods tries to get expressions for Roots/All registrations, collects happened exceptions, and
+        /// <summary>Used to find potential problems when resolving the passed services <paramref name="resolutionRoots"/>.
+        /// Method will collect the exceptions when resolving or injecting the specific registration. 
+        /// Does not create any actual service objects.</summary>
+        /// <param name="container">for container</param>
+        /// <param name="resolutionRoots">(optional) Examined resolved services. If empty will try to resolve every service in container.</param>
+        /// <returns>Exceptions happened for corresponding registrations.</returns>
+        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] Validate(
+            this IContainer container, params Type[] resolutionRoots)
+        {
+            return container.VerifyResolutions(resolutionRoots.IsNullOrEmpty() 
+                ? (Func<ServiceRegistrationInfo, bool>)null
+                : registration => resolutionRoots.IndexOf(registration.ServiceType) != -1);
+        }
+
+        // todo: v3: rename to Validate, rename parameters too.
+        /// <summary>Used to find potential problems in service registration setup.
+        /// Method tries to get expressions for Roots/All registrations, collects happened exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
         /// <param name="container">for container</param>
         /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.</param>
@@ -4539,7 +4554,7 @@ namespace DryIoc
                 var factoryExpr = factory == null ? null : factory.GetExpressionOrDefault(newRequest);
                 if (factoryExpr != null)
                     container.Rules.DependencyResolutionCallExpressions.Swap(
-                        expr => expr.AddOrUpdate(newRequest.ToRequestInfo(), factoryExpr));
+                        expr => expr.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
             }
         }
     }
@@ -5151,7 +5166,7 @@ namespace DryIoc
             {
                 return IsEmpty ? RequestInfo.Empty
                     : RawParent.IsEmpty ? PreResolveParent.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper)
-                    : RawParent.FactoryType != FactoryType.Wrapper ? RawParent.ToRequestInfo() 
+                    : RawParent.FactoryType != FactoryType.Wrapper ? RawParent.RequestInfo 
                     : RawParent.Parent;
             }
         }
@@ -5162,7 +5177,7 @@ namespace DryIoc
         {
             get { return IsEmpty ? RequestInfo.Empty 
                     : RawParent.IsEmpty ? PreResolveParent 
-                    : RawParent.ToRequestInfo(); }
+                    : RawParent.RequestInfo; }
         }
 
         /// <summary>Gets first ancestor request which satisfies the condition, 
@@ -5914,7 +5929,7 @@ namespace DryIoc
         /// <returns>True if condition met or no condition setup.</returns>
         public bool CheckCondition(Request request)
         {
-            return (Setup.Condition == null || Setup.Condition(request.ToRequestInfo()))
+            return (Setup.Condition == null || Setup.Condition(request.RequestInfo))
                 && HasMatchingReuseScope(request);
         }
 

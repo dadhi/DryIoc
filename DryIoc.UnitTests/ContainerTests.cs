@@ -539,13 +539,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void I_want_Verify_the_registrations_to_find_potential_errors_in_their_resolution()
+        public void Can_Validate_the_registrations_to_find_potential_errors_in_their_resolution()
         {
             var container = new Container();
 
             container.Register<MyService>();
 
-            var errors = container.VerifyResolutions().ToArray();
+            var errors = container.Validate().ToArray();
             Assert.AreEqual(1, errors.Length);
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
         }
