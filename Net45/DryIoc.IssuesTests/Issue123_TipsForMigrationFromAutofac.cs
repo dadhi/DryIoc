@@ -179,7 +179,7 @@ namespace DryIoc.IssuesTests
             var builder = new ContainerBuilder();
             builder.RegisterType<AClient>();
             builder.RegisterType<AService>();
-            builder.RegisterType<ADependency>();
+            builder.RegisterType<ADependency>().InstancePerOwned<AService>();
             builder.RegisterType<ANestedDep>().InstancePerOwned<AService>();
             var container = builder.Build();
 

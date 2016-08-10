@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+The MIT License (MIT)
+
+Copyright (c) 2016 Maksim Volkau
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+using System;
 using System.Collections.Generic;
 using Autofac.Core;
 using Autofac.Features.OwnedInstances;
@@ -6,6 +30,11 @@ using DryIoc;
 
 namespace Autofac
 {
+    // todo: implement somehow
+    public interface IComponentContext : IResolver
+    {
+    }
+
     public class ContainerBuilder
     {
         public static Rules WithDefaultAutofacRules(Rules rules)
@@ -206,18 +235,18 @@ namespace Autofac.Features.OwnedInstances
     public class Owned<T> : IDisposable
     {
         public T Value { get; private set; }
-        private readonly IDisposable _scope;
+        private readonly IDisposable _lifetime;
 
-        public Owned(T value, IDisposable scope)
+        public Owned(T value, IDisposable lifetime)
         {
-            _scope = scope;
+            _lifetime = lifetime;
             Value = value;
         }
 
         public void Dispose()
         {
-            if (_scope != null)
-                _scope.Dispose();
+            if (_lifetime != null)
+                _lifetime.Dispose();
             var disposable = Value as IDisposable;
             if (disposable != null)
                 disposable.Dispose();

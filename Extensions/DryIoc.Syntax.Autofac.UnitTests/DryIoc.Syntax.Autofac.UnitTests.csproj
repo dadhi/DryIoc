@@ -16,7 +16,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -24,7 +24,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -44,23 +44,27 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BasicTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\PCL-Net45\DryIoc\DryIoc.csproj">
-      <Project>{b9fcd777-84b2-4318-8059-250805825b48}</Project>
-      <Name>DryIoc</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.Syntax.Autofac\DryIoc.Syntax.Autofac.csproj">
-      <Project>{b960d4dc-80a7-4b80-b1c6-06003813b016}</Project>
-      <Name>DryIoc.Syntax.Autofac</Name>
-    </ProjectReference>
+    <Compile Include="..\..\Net45\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac.cs">
+      <Link>Issue123_TipsForMigrationFromAutofac.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
+      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
+      <Name>DryIoc</Name>
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\DryIoc.Syntax.Autofac\DryIoc.Syntax.Autofac.csproj">
+      <Project>{67a2615c-34b5-41ac-b5c9-ce82c5d28368}</Project>
+      <Name>DryIoc.Syntax.Autofac</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
