@@ -809,7 +809,7 @@ namespace DryIoc
                 // Continue to next parent if factory is not found in first parent by
                 // updating IfUnresolved policy to ReturnDefault.
                 if (containerRequest.IfUnresolved == IfUnresolved.Throw)
-                    containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
+                    containerRequest = containerRequest.WithChangedServiceInfo(info => // todo: v3: review and remove
                         ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault)
                             .InheritInfoFromDependencyOwner(info, container: container));
 
@@ -1013,7 +1013,7 @@ namespace DryIoc
         /// If not specified then method will use container <see cref="DryIoc.Rules.PropertiesAndFields"/>, 
         /// or if not specified method fallbacks to <see cref="PropertiesAndFields.Auto"/>.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
         public object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields)
         {
             propertiesAndFields = propertiesAndFields
@@ -1797,7 +1797,7 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>        
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
         public static TService InjectPropertiesAndFields<TService>(this IContainer container,
             TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
@@ -1905,6 +1905,27 @@ namespace DryIoc
                 .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated())
                 .ToArray();
             return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
+        }
+
+        /// <summary>Creates new container with provided parameters and properties
+        /// to pass the custom dependency values for injection. The old parameters and properties are overridden, 
+        /// but not replaced.</summary>
+        /// <param name="container">Container to work with.</param>
+        /// <param name="parameters">(optional) Parameters specification, can be used to proved custom values.</param>
+        /// <param name="propertiesAndFields">(optional) Properties and fields specification, can be used to proved custom values.</param>
+        /// <returns>New container with adjusted rules.</returns>
+        /// <example><code lang="cs"><![CDATA[
+        ///     var c = container.WithDependencies(Parameters.Of.Type<string>(_ => "Nya!"));
+        ///     var a = c.Resolve<A>(); // where A accepts string parameter in constructor
+        ///     Assert.AreEqual("Nya!", a.Message)
+        /// ]]></code></example>
+        public static IContainer WithDependencies(this IContainer container,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
+        {
+            return container.With(rules => rules.With(
+                parameters: rules.Parameters.OverrideWith(parameters),
+                propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields),
+                overrideRegistrationMade: true));
         }
 
         /// <summary>Pre-defined what-registrations predicate for <seealso cref="GenerateResolutionExpressions"/>.</summary>
@@ -2056,7 +2077,7 @@ namespace DryIoc
         // todo: v3: replace with more direct access
         /// <summary>Returns the current scope, or null if not opened and <paramref name="throwIfNotFound"/> is not set.</summary>
         /// <param name="container">Container with scope to check.</param>
-        /// <param name="name">(optional) Name of scpoe to search in current scope or its parents.</param>
+        /// <param name="name">(optional) Name of scope to search in current scope or its parents.</param>
         /// <param name="throwIfNotFound">(optional) Dictates to throw exception if scope if not found.</param>
         /// <returns>Scope if found, or null otherwise (if <paramref name="throwIfNotFound"/> is not set).</returns>
         public static IScope GetCurrentScope(this IContainer container, object name = null, bool throwIfNotFound = false)
@@ -2683,18 +2704,23 @@ namespace DryIoc
         /// <summary>Shorthand to <see cref="Made.PropertiesAndFields"/></summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get { return _made.PropertiesAndFields; } }
 
+        /// <summary>Instructs to override per-registration made settings with these rules settings.</summary>
+        public bool OverrideRegistrationMade { get; private set; }
+
         /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
         /// <returns>New rules with specified <see cref="Made"/>.</returns>
         public Rules With(
             FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
+            PropertiesAndFieldsSelector propertiesAndFields = null,
+            bool overrideRegistrationMade = false)
         {
             var newRules = (Rules)MemberwiseClone();
             newRules._made = Made.Of(
                 factoryMethod ?? newRules._made.FactoryMethod,
                 parameters ?? newRules._made.Parameters,
                 propertiesAndFields ?? newRules._made.PropertiesAndFields);
+            newRules.OverrideRegistrationMade = overrideRegistrationMade;
             return newRules;
         }
 
@@ -3136,7 +3162,11 @@ namespace DryIoc
                     .OrderByDescending(x => x.Params.Length);
 
                 var rules = request.Container.Rules;
-                var parameterSelector = rules.Parameters.And(request.Made.Parameters)(request);
+                var selector = rules.OverrideRegistrationMade
+                    ? rules.Parameters.OverrideWith(request.Made.Parameters)
+                    : request.Made.Parameters.OverrideWith(rules.Parameters);
+
+                var parameterSelector = selector(request);
 
                 if (!request.IsWrappedInFuncWithArgs(immediateParent: true))
                 {
@@ -3499,7 +3529,7 @@ namespace DryIoc
                 if (methodCallExpr == null) // not an Arg.Of: e.g. constant or variable
                 {
                     var customValue = GetArgExpressionValueOrThrow(memberAssignment.Expression);
-                    propertiesAndFields = propertiesAndFields.And(r => new[]
+                    propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
                     {
                         PropertyOrFieldServiceInfo.Of(member).WithDetails(
                                 ServiceDetails.Of(customValue), r)
@@ -3513,7 +3543,7 @@ namespace DryIoc
                     if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) // handle custom value
                     {
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
-                        propertiesAndFields = propertiesAndFields.And(r => new[]
+                        propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
                         {
                             PropertyOrFieldServiceInfo.Of(member).WithDetails(
                                 ServiceDetails.Of(getArgValue(r.RequestInfo)), r)
@@ -3524,7 +3554,7 @@ namespace DryIoc
                     {
                         var memberType = member.GetReturnTypeOrDefault();
                         var argServiceDetails = GetArgServiceDetails(methodCallExpr, memberType, IfUnresolved.ReturnDefault, null);
-                        propertiesAndFields = propertiesAndFields.And(r => new[]
+                        propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
                         {
                             PropertyOrFieldServiceInfo.Of(member).WithDetails(argServiceDetails, r)
                         });
@@ -4922,7 +4952,8 @@ namespace DryIoc
             var defaultValue = isOptional ? parameter.DefaultValue : null;
             var hasDefaultValue = defaultValue != null && parameter.ParameterType.IsTypeOf(defaultValue);
 
-            return !isOptional ? new ParameterServiceInfo(parameter)
+            return !isOptional 
+                ? new ParameterServiceInfo(parameter)
                 : new WithDetails(parameter, !hasDefaultValue
                     ? ServiceDetails.IfUnresolvedReturnDefault
                     : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: defaultValue));
@@ -6255,12 +6286,25 @@ namespace DryIoc
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Request request);
 
     /// <summary>DSL for specifying <see cref="ParameterSelector"/> injection rules.</summary>
-    public static partial class Parameters
+    public static class Parameters
     {
-        /// <summary>Specifies to return default details <see cref="ServiceDetails.Default"/> for all parameters.</summary>
+        /// <summary>Returns default service info wrapper for each parameter info.</summary>
         public static ParameterSelector Of = request => ParameterServiceInfo.Of;
 
-        /// <summary>Combines source selector with other. Other will override the source.</summary>
+        /// <summary>Returns service info which considers each parameter as optional.</summary>
+        public static ParameterSelector IfUnresolvedReturnDefault = 
+            request => pi => ParameterServiceInfo.Of(pi).WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request);
+
+        /// <summary>Combines source selector with other. Other is used as fallback when source returns null.</summary>
+        /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
+        /// <returns>Combined result selector.</returns>
+        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
+        {
+            return source.And(other);
+        }
+
+        // todo: v3: remove because it is replace by OverrideWith method
+        /// <summary>Obsolete: use <see cref="OverrideWith"/>.</summary>
         /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
         /// <returns>Combined result selector.</returns>
         public static ParameterSelector And(this ParameterSelector source, ParameterSelector other)
@@ -6382,7 +6426,8 @@ namespace DryIoc
         /// <summary>Combines source properties and fields with other. Other will override the source condition.</summary>
         /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
         /// <returns>Combined result selector.</returns>
-        public static PropertiesAndFieldsSelector And(this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
+        public static PropertiesAndFieldsSelector OverrideWith(
+            this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
         {
             return source == null || source == Of ? (other ?? Of)
                 : other == null || other == Of ? source
@@ -6392,9 +6437,26 @@ namespace DryIoc
                     var otherMembers = other(r).ToArrayOrSelf();
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
-                        : sourceMembers
-                            .Where(info => info != null && otherMembers.All(o => o == null || !info.Member.Name.Equals(o.Member.Name)))
-                            .Concat(otherMembers);
+                        : otherMembers.Concat(sourceMembers.Where(s => s != null &&
+                            otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
+                };
+        }
+
+        // todo: v3: remove
+        /// <summary>Obsolete: renamed to <see cref="OverrideWith"/>.</summary>
+        public static PropertiesAndFieldsSelector And(
+            this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
+        {
+            return source == null || source == Of ? (other ?? Of)
+                : other == null || other == Of ? source
+                : r =>
+                {
+                    var sourceMembers = source(r).ToArrayOrSelf();
+                    var otherMembers = other(r).ToArrayOrSelf();
+                    return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
+                        : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
+                        : otherMembers.Concat(sourceMembers.Where(s => s != null &&
+                            otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
                 };
         }
 
@@ -6405,7 +6467,7 @@ namespace DryIoc
         {
             name.ThrowIfNull();
             getDetails.ThrowIfNull();
-            return source.And(request =>
+            return source.OverrideWith(request =>
             {
                 var implementationType = request.ImplementationType;
 
@@ -6546,6 +6608,8 @@ namespace DryIoc
                     return null;
             }
 
+            var containerRules = request.Container.Rules;
+
             Expression[] paramExprs = null;
             var constructorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
             if (constructorOrMethod != null)
@@ -6555,7 +6619,12 @@ namespace DryIoc
                 {
                     paramExprs = new Expression[parameters.Length];
 
-                    var parameterSelector = request.Container.Rules.Parameters.And(Made.Parameters)(request);
+                    var selector = 
+                        containerRules.OverrideRegistrationMade
+                        ? containerRules.Parameters.OverrideWith(Made.Parameters)
+                        : Made.Parameters.OverrideWith(containerRules.Parameters);
+
+                    var parameterSelector = selector(request);
 
                     var funcArgs = request.FuncArgs;
                     var funcArgsUsedMask = 0;
@@ -6798,7 +6867,12 @@ namespace DryIoc
 
         private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
         {
-            var members = request.Container.Rules.PropertiesAndFields.And(Made.PropertiesAndFields)(request);
+            var containerRules = request.Container.Rules;
+            var selector = containerRules.OverrideRegistrationMade
+                ? Made.PropertiesAndFields.OverrideWith(containerRules.PropertiesAndFields)
+                : containerRules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
+
+            var members = selector(request);
             if (members == null)
                 return newServiceExpr;
 
@@ -8554,7 +8628,7 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.And"/> method.</remarks>     
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>     
         object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields);
 
         /// <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,

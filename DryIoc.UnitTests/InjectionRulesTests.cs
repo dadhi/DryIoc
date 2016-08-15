@@ -110,7 +110,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>(serviceKey: "another");
 
             container.RegisterMany<ClientWithPropsAndFields>(
-                made: PropertiesAndFields.All(withFields: false).And(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
+                made: PropertiesAndFields.All(withFields: false).OverrideWith(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
