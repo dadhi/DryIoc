@@ -101,7 +101,7 @@ namespace DryIoc.UnitTests
 
             container.Resolve<InitializableService>();
 
-            CollectionAssert.AreEqual(new[] { "InitializableService" }, log);
+            CollectionAssert.AreEqual(new[] { "Container", "InitializableService" }, log);
         }
 
         [Test]

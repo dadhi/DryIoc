@@ -800,6 +800,7 @@ namespace DryIoc
 
         private static Factory ResolveFromFallbackContainers(ContainerWeakRef[] fallbackContainers, Request request)
         {
+            var container = request.Container;
             for (var i = 0; i < fallbackContainers.Length; i++)
             {
                 var containerWeakRef = fallbackContainers[i];
@@ -810,7 +811,7 @@ namespace DryIoc
                 if (containerRequest.IfUnresolved == IfUnresolved.Throw)
                     containerRequest = containerRequest.WithChangedServiceInfo(info => // NOTE Code Smell
                         ServiceInfo.Of(info.ServiceType, IfUnresolved.ReturnDefault)
-                            .InheritInfoFromDependencyOwner(info));
+                            .InheritInfoFromDependencyOwner(info, container: container));
 
                 var factory = containerWeakRef.Container.ResolveFactory(containerRequest);
                 if (factory != null)
@@ -4225,7 +4226,6 @@ namespace DryIoc
             Action<TTarget, IResolver> initialize, Func<RequestInfo, bool> condition = null)
         {
             initialize.ThrowIfNull();
-
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType), 
                 parameters: Parameters.Of.Type(_ => initialize)),
@@ -4732,16 +4732,21 @@ namespace DryIoc
         }
 
         // todo: v3: remove unused @shouldInheritServiceKey parameter
+        // todo: v3: make @container parameter non optional
         /// <summary>Enables propagation/inheritance of info between dependency and its owner: 
         /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
         /// <param name="dependency">Dependency info.</param>
         /// <param name="owner">Dependency holder/owner info.</param>
-        /// <param name="shouldInheritServiceKey">(optional) Self-explanatory. Usually set to true for wrapper and decorator info.</param>
-        /// <param name="ownerType">(optional)</param>
+        /// <param name="shouldInheritServiceKey">(optional) to be removed</param>
+        /// <param name="ownerType">(optional)to be removed</param>
+        /// <param name="container">required for <see cref="IContainer.GetWrappedType"/></param>
         /// <returns>Either input dependency info, or new info with properties inherited from the owner.</returns>
         public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, IServiceInfo owner,
-            bool shouldInheritServiceKey = false, FactoryType ownerType = FactoryType.Service)
+            bool shouldInheritServiceKey = false, FactoryType ownerType = FactoryType.Service, 
+            IContainer container = null)
         {
+            container = container.ThrowIfNull();
+
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
                 return dependency;
@@ -4762,7 +4767,8 @@ namespace DryIoc
 
             // propagate key and meta to the actual service
             if (ownerType == FactoryType.Wrapper ||
-                ownerType == FactoryType.Decorator && serviceType.IsAssignableTo(owner.ServiceType))
+                ownerType == FactoryType.Decorator && // propagate key only to decorated (and possibly wrapped) service
+                container.GetWrappedType(serviceType, requiredServiceType).IsAssignableTo(owner.ServiceType))
             {
                 if (serviceKey == null)
                 {
@@ -5275,23 +5281,24 @@ namespace DryIoc
                 preResolveParent = preResolveParent ?? RequestInfo.Empty;
                 var resolverContext = _resolverContext.With(scope).With(preResolveParent);
 
-                var requestInfo = Push(preResolveParent, info);
+                var requestInfo = Push(preResolveParent, info, Container);
 
                 return new Request(resolverContext, this, requestInfo, made: null, funcArgs: null, level: 1);
             }
 
             Throw.If(RequestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
 
-            var inheritedRequestInfo = Push(RequestInfo, info);
+            var inheritedRequestInfo = Push(RequestInfo, info, Container);
 
             return new Request(_resolverContext, this, inheritedRequestInfo, null, FuncArgs, Level + 1);
         }
 
-        private static RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo)
+        private static RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo, IContainer container)
         {
             if (parent == null || parent.IsEmpty)
                 return RequestInfo.Empty.Push(serviceInfo);
 
+            // todo: v3: review and remove if possible
             // if service info is dependency of service wrapped in collection, 
             // then change policy to collection policy
             var parentInfo = parent.ServiceInfo;
@@ -5311,7 +5318,8 @@ namespace DryIoc
                 }
             }
 
-            var newInfo = serviceInfo.InheritInfoFromDependencyOwner(parentInfo, ownerType: parent.FactoryType);
+            var newInfo = serviceInfo.InheritInfoFromDependencyOwner(parentInfo, 
+                ownerType: parent.FactoryType, container: container);
             return parent.Push(newInfo);
         }
 
@@ -6021,7 +6029,7 @@ namespace DryIoc
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             // Here's lookup for decorators
-            var decoratorExpr = FactoryType == FactoryType.Service
+            var decoratorExpr = FactoryType != FactoryType.Decorator
                     ? container.GetDecoratorExpressionOrDefault(request)
                     : null;
 
