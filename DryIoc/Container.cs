@@ -3931,6 +3931,16 @@ namespace DryIoc
             return selectedServiceTypes.ToArrayOrSelf();
         }
 
+        /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
+        /// actually a non abstract and not compiler generated classes.</summary>
+        /// <param name="assembly">Assembly to get types from.</param>
+        /// <returns>Types.</returns>
+        public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly)
+        {
+            return Portable.GetAssemblyTypes(assembly)
+                .Where(type => type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated());
+        }
+
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypes">Implementation type provider.</param>
@@ -4034,8 +4044,7 @@ namespace DryIoc
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies,
             RegisterManyAction action = null, bool nonPublicServiceTypes = false)
         {
-            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(Portable.GetAssemblyTypes)
-                .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated());
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(GetImplementationTypes);
             registrator.RegisterMany(implTypes, action, nonPublicServiceTypes);
         }
 
@@ -4055,9 +4064,7 @@ namespace DryIoc
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool nonPublicServiceTypes = false, object serviceKey = null)
         {
-            var implTypes = implTypeAssemblies.ThrowIfNull()
-                .SelectMany(Portable.GetAssemblyTypes)
-                .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated());
+            var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(GetImplementationTypes);
             registrator.RegisterMany(implTypes,
                 reuse, made, setup, ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
         }
