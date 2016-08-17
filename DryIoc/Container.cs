@@ -577,11 +577,22 @@ namespace DryIoc
 
             if (serviceKey != null) // include only single item matching key.
             {
-                items = items.Where(x => serviceKey.Equals(x.Key));
+                items = items.Where(it => serviceKey.Equals(it.Key));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Where(x => serviceKey.Equals(x.OptionalServiceKey));
+                    openGenericItems = openGenericItems.Where(it => serviceKey.Equals(it.OptionalServiceKey));
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Where(x => serviceKey.Equals(x.OptionalServiceKey));
+                    variantGenericItems = variantGenericItems.Where(it => serviceKey.Equals(it.OptionalServiceKey));
+            }
+
+            var metadataKey = preResolveParent.MetadataKey;
+            var metadata = preResolveParent.Metadata;
+            if (metadataKey != null || metadata != null)
+            {
+                items = items.Where(it => it.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                if (openGenericItems != null)
+                    openGenericItems = openGenericItems.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                if (variantGenericItems != null)
+                    variantGenericItems = variantGenericItems.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
             }
 
             // exclude composite parent from items
@@ -1184,7 +1195,6 @@ namespace DryIoc
             }
 
             var matchedFactories = factories.Enumerate();
-
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
@@ -2027,49 +2037,52 @@ namespace DryIoc
             // recursively ask for parent expression until it is empty
             var parentRequestInfoExpr = container.RequestInfoToExpression(request.ParentOrWrapper);
 
-            Expression[] args;
-            if (request.RequiredServiceType == null &&
-                request.ServiceKey == null &&
-                request.FactoryType == FactoryType.Service &&
-                request.IfUnresolved == IfUnresolved.Throw) // try simplified version of push if possible.
-            {
-                args = new[]
-                {
-                    Expression.Constant(request.ServiceType, typeof(Type)),
-                    Expression.Constant(request.FactoryID, typeof(int)),
-                    Expression.Constant(request.ImplementationType, typeof(Type)),
-                    request.Reuse.ToExpression(container)
-                };
-            }
-            else if (request.IfUnresolved == IfUnresolved.Throw)
-            {
-                args = new[]
-                {
-                    Expression.Constant(request.ServiceType, typeof(Type)),
-                    Expression.Constant(request.RequiredServiceType, typeof(Type)),
-                    Expression.Convert(container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object)),
-                    Expression.Constant(request.FactoryID, typeof(int)),
-                    Expression.Constant(request.FactoryType, typeof(FactoryType)),
-                    Expression.Constant(request.ImplementationType, typeof(Type)),
-                    request.Reuse.ToExpression(container)
-                };
-            }
-            else
-            {
-                args = new[]
-                {
-                    Expression.Constant(request.ServiceType, typeof(Type)),
-                    Expression.Constant(request.RequiredServiceType, typeof(Type)),
-                    Expression.Convert(container.GetOrAddStateItemExpression(request.ServiceKey), typeof(object)),
-                    Expression.Constant(request.IfUnresolved, typeof(IfUnresolved)),
-                    Expression.Constant(request.FactoryID, typeof(int)),
-                    Expression.Constant(request.FactoryType, typeof(FactoryType)),
-                    Expression.Constant(request.ImplementationType, typeof(Type)),
-                    request.Reuse.ToExpression(container)
-                };
-            }
+            var serviceType = request.ServiceType;
+            var factoryID = request.FactoryID;
+            var implementationType = request.ImplementationType;
+            var requiredServiceType = request.RequiredServiceType;
+            var serviceKey = request.ServiceKey;
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+            var factoryType = request.FactoryType;
+            var ifUnresolved = request.IfUnresolved;
 
-            return Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(), args);
+            var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
+            var factoryIdExpr = Expression.Constant(factoryID, typeof(int));
+            var implTypeExpr = Expression.Constant(implementationType, typeof(Type));
+            var reuseExpr = request.Reuse.ToExpression(container);
+
+            // Try simplified versions of Push first, before the Push with all arguments provided:
+
+            if (ifUnresolved == IfUnresolved.Throw &&
+                requiredServiceType == null && serviceKey == null && metadataKey == null && metadata == null &&
+                factoryType == FactoryType.Service)
+                return Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(),
+                    serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
+
+            var requiredServiceTypeExpr = Expression.Constant(requiredServiceType, typeof(Type));
+            var servicekeyExpr = Expression.Convert(container.GetOrAddStateItemExpression(serviceKey), typeof(object));
+            var factoryTypeExpr = Expression.Constant(factoryType, typeof(FactoryType));
+
+            if (ifUnresolved == IfUnresolved.Throw &&
+                metadataKey == null && metadata == null)
+                return Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(),
+                    serviceTypeExpr, requiredServiceTypeExpr, servicekeyExpr,
+                    factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr);
+
+            var ifUnresolvedExpr = Expression.Constant(ifUnresolved, typeof(IfUnresolved));
+
+            if (metadataKey == null && metadata == null)
+                return Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(),
+                    serviceTypeExpr, requiredServiceTypeExpr, servicekeyExpr, ifUnresolvedExpr,
+                    factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr);
+
+            var metadataKeyExpr = Expression.Constant(metadataKey, typeof(string));
+            var metadataExpr = Expression.Convert(container.GetOrAddStateItemExpression(metadata), typeof(object));
+
+            return Expression.Call(parentRequestInfoExpr, "Push", ArrayTools.Empty<Type>(), 
+                serviceTypeExpr, requiredServiceTypeExpr, servicekeyExpr, metadataKeyExpr, metadataExpr, ifUnresolvedExpr, 
+                factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr);
         }
 
         private static readonly Expression _emptyRequestInfoExpr = ReflectionTools.ToExpression(() => RequestInfo.Empty);
@@ -2551,13 +2564,15 @@ namespace DryIoc
                 compositeParentRequiredType = parent.RequiredServiceType;
             }
 
+            var preresolveParent = container.RequestInfoToExpression(request.RequestInfo);
+
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
                 container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                container.RequestInfoToExpression(request.RequestInfo),
+                preresolveParent,
                 Container.GetResolutionScopeExpression(request));
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
@@ -4868,15 +4883,21 @@ namespace DryIoc
         /// <param name="serviceType">Service type</param>
         /// <param name="requiredServiceType">Registered service type to search for.</param>
         /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
-        ///  <param name="serviceKey">(optional) Service key.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        /// <param name="metadataKey">(optional) Required metadata key</param> 
+        /// <param name="metadata">Required metadata or the value if key passed.</param>
         /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType, Type requiredServiceType, 
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null,
+            string metadataKey = null, object metadata = null)
         {
             serviceType.ThrowIfNull();
-            return serviceKey == null && requiredServiceType == null && ifUnresolved == IfUnresolved.Throw
+            return serviceKey == null && requiredServiceType == null
+                && metadataKey == null && metadata == null
+                && ifUnresolved == IfUnresolved.Throw
                 ? new ServiceInfo(serviceType)
-                : new WithDetails(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved));
+                : new WithDetails(serviceType, 
+                    ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
@@ -8190,11 +8211,29 @@ namespace DryIoc
         /// <param name="factoryType"></param> <param name="factoryID"></param>
         /// <param name="implementationType"></param> <param name="reuse"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
+        public RequestInfo Push(Type serviceType, 
+            Type requiredServiceType, object serviceKey, 
+            IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
         {
             var serviceInfo = DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
             return Push(serviceInfo, factoryID, factoryType, implementationType, reuse);
+        }
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param> 
+        /// <param name="ifUnresolved"></param>
+        /// <param name="factoryType"></param> <param name="factoryID"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param>
+        /// <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, 
+            Type requiredServiceType, object serviceKey, string metadataKey, object metadata, 
+            IfUnresolved ifUnresolved, 
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
+        {
+            var info = DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata);
+            return Push(info, factoryID, factoryType, implementationType, reuse);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>

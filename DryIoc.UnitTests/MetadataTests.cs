@@ -322,6 +322,21 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<Service>(consumer.Service);
         }
 
+        [Test]
+        public void Can_inject_lazy_of_service_matching_with_the_key_value_metadata()
+        {
+            var container = new Container();
+
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
+
+            container.Register<LazyMetaConsumer>(
+                made: Parameters.Of.Type<Lazy<IService>>(metadataKey: "b", metadata: 2));
+
+            var consumer = container.Resolve<LazyMetaConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
+        }
 
         [Test]
         public void Can_inject_service_matching_the_value_only_of_metadata()
@@ -341,16 +356,20 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_inject_collection_matching_the_metadata_key_value()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Can_inject_collection_matching_the_metadata_key_value(bool lazyEnumarable)
         {
-            var container = new Container();
+            IContainer container = new Container();
+            if (lazyEnumarable)
+                container = container.With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
 
             container.Register<IService, Service>(
                 setup: Setup.With(new Dictionary<string, object> { { "a", 1 } }));
             container.Register<IService, OtherService>(
                 setup: Setup.With(new Dictionary<string, object> { { "b", 2 } }));
 
-            container.Register(Made.Of(() => new ManyMetaConsumer(Arg.Of<IService[]>("b", 2))));
+            container.Register(Made.Of(() => new ManyMetaConsumer(Arg.Of<IEnumerable<IService>>("b", 2))));
 
             var consumer = container.Resolve<ManyMetaConsumer>();
             Assert.AreEqual(1, consumer.Services.Length);
@@ -382,16 +401,26 @@ namespace DryIoc.UnitTests
                 Service = getService();
             }
         }
+
+        public class LazyMetaConsumer
+        {
+            public IService Service { get; private set; }
+
+            public LazyMetaConsumer(Lazy<IService> service)
+            {
+                Service = service.Value;
+            }
+        }
+
         public class ManyMetaConsumer
         {
             public IService[] Services { get; private set; }
 
-            public ManyMetaConsumer(IService[] services)
+            public ManyMetaConsumer(IEnumerable<IService> services)
             {
-                Services = services;
+                Services = services.ToArray();
             }
         }
-
 
         public class ServiceWithMetadata
         {

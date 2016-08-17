@@ -79,9 +79,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void I_can_resolve_array_of_open_generics()
+        [TestCase(true)]
+        [TestCase(false)]
+        public void I_can_resolve_array_of_open_generics(bool lazyEnumerable)
         {
-            var container = new Container();
+            IContainer container = new Container();
+            if (lazyEnumerable)
+                container = container.With(r => r.WithResolveIEnumerableAsLazyEnumerable());
+
             container.Register(typeof(IService<>), typeof(Service<>), Reuse.Singleton);
 
             var services = container.Resolve<IEnumerable<IService<int>>>();
