@@ -227,7 +227,7 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
-                        var typeAttributes = new Attribute[] { new ExportAttribute(SpecialNames.InstanceFactory) };
+                        var typeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
                         typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
@@ -320,11 +320,11 @@ namespace DryIoc.MefAttributedModel
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
-            return GetImportDetails(type, attributes, request)
+            return GetImportDetails(attributes)
                 ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        private static ServiceDetails GetImportDetails(Type reflectedType, Attribute[] attributes, Request request)
+        private static ServiceDetails GetImportDetails(Attribute[] attributes)
         {
             object serviceKey;
             Type requiredServiceType;
@@ -350,6 +350,7 @@ namespace DryIoc.MefAttributedModel
                         serviceKey = importEx.ContractKey;
                     else
 #pragma warning disable 618 // ImportWithKeyAttribute is Obsolete.
+                        // todo: v3: remove
                         serviceKey = import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null;
 #pragma warning restore 618
                 }
@@ -359,26 +360,11 @@ namespace DryIoc.MefAttributedModel
                     ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;
             }
 
-            if (serviceKey == null)
-                serviceKey = TryGetServiceKeyWithMetadataAttribute(reflectedType, attributes, request);
+            var withMetadataAttr = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
+            var metadata = withMetadataAttr == null ? null : withMetadataAttr.Metadata;
+            var metadataKey = metadata == null ? null : Constants.ExportMetadataDefaultKey;
 
-            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
-        }
-
-        private static object TryGetServiceKeyWithMetadataAttribute(Type reflectedType, Attribute[] attributes, Request request)
-        {
-            var meta = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
-            if (meta == null)
-                return null;
-
-            var container = request.Container;
-            reflectedType = container.GetWrappedType(reflectedType, request.RequiredServiceType);
-            var metadata = meta.Metadata;
-            var factory = container.GetAllServiceFactories(reflectedType, bothClosedAndOpenGenerics: true)
-                .FirstOrDefault(f => metadata.Equals(f.Value.Setup.Metadata))
-                .ThrowIfNull(Error.NotFindDependencyWithMetadata, reflectedType, metadata, request);
-
-            return factory.Key;
+            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata);
         }
 
         private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
@@ -390,6 +376,8 @@ namespace DryIoc.MefAttributedModel
             var container = request.Container;
             serviceType = import.ContractType ?? container.GetWrappedType(serviceType, request.RequiredServiceType);
             var serviceKey = import.ContractKey;
+            var metadata = import.Metadata;
+            var metadataKey = metadata == null ? null : Constants.ExportMetadataDefaultKey;
 
             if (!container.IsRegistered(serviceType, serviceKey))
             {
@@ -404,10 +392,13 @@ namespace DryIoc.MefAttributedModel
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 container.Register(serviceType, implementationType, reuse, impl,
-                    Setup.With(metadataOrFuncOfMetadata: import.Metadata), IfAlreadyRegistered.Keep, serviceKey);
+                    Setup.With(metadataOrFuncOfMetadata: metadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
-            return ServiceDetails.Of(serviceType, serviceKey);
+            // the default because we intentionally register the service and expect it to be avaliable
+            var ifUnresolved = DryIoc.IfUnresolved.Throw;
+
+            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadataKey, metadata);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
@@ -649,8 +640,11 @@ namespace DryIoc.MefAttributedModel
     }
 
     /// <summary>Names used by Attributed Model to mark the special exports.</summary>
-    public static class SpecialNames
+    public static class Constants
     {
+        /// <summary>Predefined key in metadata dictionary for metadata provided as single object (not dictionary).</summary>
+        public static readonly string ExportMetadataDefaultKey = "ExportMetadataDefaultKey";
+
         /// <summary>Marks the Export generated for type which export its instance members, 
         /// but should not be resolved as-self by default.</summary>
         public static readonly string InstanceFactory = "SN.InstanceFactory";
@@ -669,8 +663,6 @@ namespace DryIoc.MefAttributedModel
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
                 "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
-            NotFindDependencyWithMetadata = Of(
-                "Unable to resolve dependency {0} with metadata [{1}] in {2}"),
             UnsupportedMultipleMetadata = Of(
                 "Multiple associated metadata found while exporting {0}." + Environment.NewLine +
                 "Only single metadata is supported per implementation type, please remove the rest."),
@@ -940,8 +932,9 @@ namespace DryIoc.MefAttributedModel
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
-            var metadata = !HasMetadataAttribute ? null
-                : (Func<object>)(() => GetMetadata(attributes));
+            var metadata = !HasMetadataAttribute 
+                ? default(Func<object>)
+                : () => GetMetadata(attributes);
 
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
@@ -1029,15 +1022,17 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        private object GetMetadata(Attribute[] attributes = null)
+        private IDictionary<string, object> GetMetadata(Attribute[] attributes = null)
         {
             attributes = attributes ?? ImplementationType.GetAttributes();
             var metadataAttr = attributes.FirstOrDefault(
                 a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
 
-            return metadataAttr is WithMetadataAttribute
+            var metadataValue = metadataAttr is WithMetadataAttribute
                 ? ((WithMetadataAttribute)metadataAttr).Metadata
                 : metadataAttr;
+
+            return new Dictionary<string, object> {{ Constants.ExportMetadataDefaultKey, metadataValue } };
         }
     }
 

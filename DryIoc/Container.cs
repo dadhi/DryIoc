@@ -2664,8 +2664,12 @@ namespace DryIoc
             return pairExpr;
         }
 
-        /// <remarks>If service key is not specified in request then method will search for all
-        /// registered factories with the same metadata type ignoring keys.</remarks>
+        /// <remarks>
+        /// - if service key is not specified in request then method will search for all
+        /// registered factories with the same metadata type ignoring keys.
+        /// - if metadata is IDictionary{string, object},
+        ///  then the First value matching the TMetadata type will be returned
+        /// </remarks>
         private static Expression GetMetaExpressionOrDefault(Request request)
         {
             var metaType = request.GetActualServiceType();
@@ -2677,9 +2681,27 @@ namespace DryIoc
             var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
             var serviceKey = request.ServiceKey;
 
-            var result = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true)
-                .FirstOrDefault(f => (serviceKey == null || f.Key.Equals(serviceKey))
-                    && f.Value.Setup.Metadata != null && metadataType.IsTypeOf(f.Value.Setup.Metadata));
+            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
+            if (serviceKey != null)
+                factories = factories.Where(f => serviceKey.Equals(f.Key));
+
+            var result = factories
+                .FirstOrDefault(factory =>
+                {
+                    var metadata = factory.Value.Setup.Metadata;
+                    if (metadata == null)
+                        return false;
+
+                    if (metadataType == typeof(object))
+                        return true;
+
+                    var metadataDict = metadata as IDictionary<string, object>;
+                    if (metadataDict != null)
+                        return metadataType == typeof(IDictionary<string, object>)
+                            || metadataDict.Values.Any(m => metadataType.IsTypeOf(m));
+
+                    return metadataType.IsTypeOf(metadata);
+                });
 
             if (result == null)
                 return null;
@@ -2692,8 +2714,17 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
+            var resultMetadata = result.Value.Setup.Metadata;
+            if (metadataType != typeof(object))
+            {
+                var resultMetadataDict = resultMetadata as IDictionary<string, object>;
+                if (resultMetadataDict != null && metadataType != typeof(IDictionary<string, object>))
+                    resultMetadata = resultMetadataDict.Values.FirstOrDefault(m => metadataType.IsTypeOf(m));
+            }
+
+            var metadataExpr = request.Container.GetOrAddStateItemExpression(resultMetadata, metadataType);
+
             var metaCtor = metaType.GetSingleConstructorOrNull().ThrowIfNull();
-            var metadataExpr = request.Container.GetOrAddStateItemExpression(result.Value.Setup.Metadata, metadataType);
             var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
             return metaExpr;
         }

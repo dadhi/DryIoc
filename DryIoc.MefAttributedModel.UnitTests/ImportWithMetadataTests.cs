@@ -13,12 +13,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(FooConsumerNotFound), typeof(FooHey), typeof(FooBlah));
 
-            var ex = Assert.Throws<AttributedModelException>(() => 
+            var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<FooConsumerNotFound>());
-            Assert.AreEqual(ex.Error, Error.NotFindDependencyWithMetadata);
+            Assert.AreEqual(DryIoc.Error.UnableToResolveFromRegisteredServices, ex.Error);
         }
 
-        [Test, Ignore]
+        [Test]
         public void ImportMany_with_metadata_should_work()
         {
             var container = new Container(Rules.Default.WithMefAttributedModel());
