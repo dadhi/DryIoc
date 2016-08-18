@@ -11,6 +11,39 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue123_TipsForMigrationFromAutofac
     {
+        [Test, Ignore("Not supported by Autofac Syntax at the moment")]
+        public void Transient_disposable_is_tracked_in_container()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<FooBar>().As<IFoo>();
+
+            var container = builder.Build();
+
+            var f = container.Resolve<IFoo>();
+            Assert.AreNotSame(f, container.Resolve<IFoo>());
+
+            container.Dispose();
+            Assert.IsTrue(((FooBar)f).IsDisposed);
+        }
+
+        [Test]
+        public void Transient_disposable_is_tracked_in_open_scope()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<FooBar>().As<IFoo>();
+
+            var container = builder.Build();
+
+            IFoo f;
+            using (var scope = container.BeginLifetimeScope())
+            {
+                f = scope.Resolve<IFoo>();
+                Assert.AreNotSame(f, scope.Resolve<IFoo>());
+            }
+
+            Assert.IsTrue(((FooBar)f).IsDisposed);
+        }
+
         [Test]
         public void How_to_get_all_registrations_in_registration_order()
         {
@@ -86,8 +119,11 @@ namespace DryIoc.IssuesTests
         public interface IBar { }
         public class FooBar : IFoo, IBar, IDisposable
         {
+            public bool IsDisposed { get; private set; }
+
             public void Dispose()
             {
+                IsDisposed = true;
             }
         }
 

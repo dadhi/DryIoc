@@ -13,12 +13,12 @@ namespace DryIoc.IssuesTests
             container.Register(typeof(Printer));
 
             var test = new Test { N = 1 };
-            container.RegisterInstance<ITest>(test);
+            container.AddInstance<ITest>(test);
             var printer = container.Resolve<IPrinter>(typeof(Printer));
             Assert.AreEqual("1", printer.Print()); // prints '1' as expected
 
             test = new Test { N = 2 };
-            container.RegisterInstance<ITest>(test, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.AddInstance<ITest>(test);
 
             Assert.AreEqual(2, container.Resolve<ITest>().N); // does not throws, replaced dependency
 

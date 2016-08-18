@@ -30,11 +30,6 @@ using DryIoc;
 
 namespace Autofac
 {
-    // todo: implement somehow
-    public interface IComponentContext : IResolver
-    {
-    }
-
     public class ContainerBuilder
     {
         public static Rules WithDefaultAutofacRules(Rules rules)
@@ -68,22 +63,22 @@ namespace Autofac
                 setup: Setup.WrapperWith(openResolutionScope: true, preventDisposal: true));
         }
 
-        public IContainer Build()
+        public ContainerAdapter Build()
         {
             return Build(true);
         }
 
-        private IContainer Build(bool withModules)
+        private ContainerAdapter Build(bool withModules)
         {
             if (Registrations.Count == 0)
-                return Container;
+                return new ContainerAdapter(Container);
 
             foreach (var r in Registrations)
             {
                 if (r.Factory != null)
                     Container.RegisterDelegate(r.ServiceType, r.Factory, r.Reuse);
                 else if (r.Instance != null)
-                    Container.RegisterInstance(r.ServiceType, r.Instance);
+                    Container.AddInstance(r.ServiceType, r.Instance);
                 else
                     Container.Register(r.ServiceType, r.ImplementationType, r.Reuse);
             }
@@ -99,8 +94,13 @@ namespace Autofac
                 }
             }
 
-            return Container;
+            return new ContainerAdapter(Container);
         }
+    }
+
+    public interface ILifetimeScope
+    {
+        IContainer Container { get; }
     }
 
     public static class RegistrationExtensions
@@ -153,6 +153,39 @@ namespace Autofac
             };
             builder.Registrations.Add(info);
             return info;
+        }
+    }
+
+    public interface IComponentContext
+    {
+        IContainer Container { get; }
+    }
+
+    public class ContainerAdapter : IComponentContext, ILifetimeScope, IDisposable
+    {
+        public IContainer Container { get; private set; }
+
+        public ContainerAdapter(IContainer container)
+        {
+            Container = container;
+        }
+
+        public void Dispose()
+        {
+            Container.Dispose();
+        }
+    }
+
+    public static class ContainerExtensions
+    {
+        public static T Resolve<T>(this IComponentContext context)
+        {
+            return context.Container.Resolve<T>();
+        }
+
+        public static ContainerAdapter BeginLifetimeScope(this ILifetimeScope scope)
+        {
+            return new ContainerAdapter(scope.Container.OpenScope());
         }
     }
 

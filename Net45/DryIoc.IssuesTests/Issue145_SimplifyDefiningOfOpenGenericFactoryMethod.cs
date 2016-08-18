@@ -81,7 +81,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterExports(typeof(X<>));
 
-            container.RegisterInstance<int>(1);
+            container.AddInstance<int>(1);
             var y = container.Resolve<Y<int, double>>();
 
             Assert.AreEqual(1, y.Blah);
@@ -93,7 +93,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterExports(typeof(Z<>));
 
-            container.RegisterInstance<string>("1");
+            container.AddInstance<string>("1");
             var y = container.Resolve<Y<string, string>>();
 
             Assert.AreEqual("1", y.Blah);

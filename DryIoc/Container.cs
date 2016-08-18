@@ -4270,21 +4270,44 @@ namespace DryIoc
         private static readonly Setup _preventDisposableInstanceSetup = Setup.With(preventDisposal: true);
         private static readonly Setup _weaklyReferencedAndPreventDisposableInstanceSetup = Setup.With(weaklyReferenced: true, preventDisposal: true);
 
-        /// <summary>Registers an externally created object of <typeparamref name="TService"/>. 
-        /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
-        /// <typeparam name="TService">The type of service.</typeparam>
-        /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="instance">The pre-created instance of <typeparamref name="TService"/>.</param>
-        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
-        /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance.</param>
-        /// <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
-        /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        // todo: v3: remove
+        /// <summary>Obsolete: use <see cref="AddInstance{TService}(DryIoc.IContainer,TService,bool,bool,object)"/></summary>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered,
+                preventDisposal, weaklyReferenced, serviceKey);
+        }
+
+        /// <summary>Stores the externally created instance into open scope or singleton, 
+        /// replacing the existing registration and instance if any.</summary>
+        /// <typeparam name="TService">Specified instance type. May be a base type or interface of instance actual type.</typeparam>
+        /// <param name="container">Container to register</param>
+        /// <param name="instance">Instance to register</param>
+        /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
+        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
+        /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
+        public static void AddInstance<TService>(this IContainer container, TService instance,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
+        {
+            container.AddInstance(typeof(TService), instance, preventDisposal, weaklyReferenced, serviceKey);
+        }
+
+        /// <summary>Stores the externally created instance into open scope or singleton, 
+        /// replacing the existing registration and instance if any.</summary>
+        /// <param name="container">Container to register</param>
+        /// <param name="serviceType">Runtime service type to register instance with</param>
+        /// <param name="instance">Instance to register</param>
+        /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
+        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
+        /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
+        public static void AddInstance<TService>(this IContainer container, Type serviceType, TService instance,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
+        {
+            var scope = container.GetCurrentScope();
+            var reuse = scope != null ? Reuse.InCurrentNamedScope(scope.Name) : Reuse.Singleton;
+            container.RegisterInstance(typeof(TService), instance, reuse, IfAlreadyRegistered.Replace,
                 preventDisposal, weaklyReferenced, serviceKey);
         }
 
@@ -7276,12 +7299,16 @@ namespace DryIoc
         {
             var scope = Reuse.GetScopeOrDefault(request).ThrowIfNull(Error.NoCurrentScope);
             var scopedId = scope.GetScopedItemIdOrSelf(FactoryID);
-            scope.GetOrAdd(scopedId, () => _instance);
+            var instance = _instance;
+            scope.GetOrAdd(scopedId, () => instance);
+
+            var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
+            var instanceExpr = Expression.Constant(instance, instanceType);
 
             var scopeExpr = Reuse.GetScopeExpression(request);
             Expression serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                 Expression.Constant(scopedId),
-                Expression.Lambda<CreateScopedValue>(Expression.Constant(null), ArrayTools.Empty<ParameterExpression>()));
+                Expression.Lambda<CreateScopedValue>(instanceExpr, ArrayTools.Empty<ParameterExpression>()));
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)

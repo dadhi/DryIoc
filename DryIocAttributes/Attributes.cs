@@ -619,7 +619,8 @@ namespace DryIocAttributes
         }
     }
 
-    /// <summary>Exports service with associated metadata object.</summary>
+    /// <summary>Exports service with associated metadata key and value.
+    /// Key can be omitted asuming some default key to be used.</summary>
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class 
         | AttributeTargets.Method
@@ -629,14 +630,23 @@ namespace DryIocAttributes
         Inherited = false)]
     public class WithMetadataAttribute : Attribute
     {
-        /// <summary>Metadata object</summary>
+        /// <summary>Metadata key in a dictionary</summary>
+        public readonly object MetadataKey;
+
+        /// <summary>Metadata value.</summary>
         public readonly object Metadata;
 
-        /// <summary>Creates attribute</summary> <param name="metadata"></param>
-        public WithMetadataAttribute(object metadata)
+        /// <summary>Creates attribute</summary>
+        /// <param name="metadataKey"></param>
+        /// <param name="metadata"></param>
+        public WithMetadataAttribute(string metadataKey, object metadata)
         {
             Metadata = metadata;
+            MetadataKey = metadata;
         }
+
+        /// <summary>Creates attribute</summary> <param name="metadata"></param>
+        public WithMetadataAttribute(object metadata) : this(null, metadata) {}
     }
 
     /// <summary>Imports the service. 

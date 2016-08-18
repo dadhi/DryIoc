@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.RegisterInstance<IA>(a, preventDisposal: true);
+            container.AddInstance<IA>(a, preventDisposal: true);
 
             using (var c2 = new Container(Rules.Default.WithFallbackContainer(container)))
             {
@@ -32,7 +32,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.RegisterInstance<IA>(a, preventDisposal: true);
+            container.AddInstance<IA>(a, preventDisposal: true);
 
             using (var c2 = new Container(Rules.Default.WithFallbackContainer(container)))
             {
@@ -50,7 +50,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.RegisterInstance<IA>(a, preventDisposal: true, weaklyReferenced: true);
+            container.AddInstance<IA>(a, preventDisposal: true, weaklyReferenced: true);
 
             using (var c2 = new Container(Rules.Default.WithFallbackContainer(container)))
             {
