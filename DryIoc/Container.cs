@@ -4304,10 +4304,49 @@ namespace DryIoc
         public static void AddInstance(this IContainer container, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
+            if (instance != null)
+                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
+
             var scope = container.GetCurrentScope();
             var reuse = scope != null ? Reuse.InCurrentNamedScope(scope.Name) : Reuse.Singleton;
-            container.RegisterInstance(serviceType, instance, reuse, IfAlreadyRegistered.Replace,
-                preventDisposal, weaklyReferenced, serviceKey);
+
+            var setup = Setup.Default;
+            if (preventDisposal)
+            {
+                instance = new[] { instance };
+                setup = _preventDisposableInstanceSetup;
+            }
+            if (weaklyReferenced)
+            {
+                instance = new WeakReference(instance);
+                setup = preventDisposal
+                    ? _weaklyReferencedAndPreventDisposableInstanceSetup
+                    : _weaklyReferencedInstanceSetup;
+            }
+
+            var factories = container.GetAllServiceFactories(serviceType);
+            if (serviceKey != null)
+                factories = factories.Where(f => serviceKey.Equals(f.Key));
+
+            InstanceFactory factory = null;
+
+            // Replace the single factory
+            var factoriesList = factories.ToArray();
+            if (factoriesList.Length == 1)
+                factory = factoriesList[0].Value as InstanceFactory;
+
+            if (factory != null && factory.Reuse == reuse && factory.Setup == setup)
+                factory.ReplaceInstance(instance);
+            else
+            {
+                factory = new InstanceFactory(instance, reuse, setup);
+                container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Replace, isStaticallyChecked: false);
+            }
+
+            var request = container.EmptyRequest.Push(serviceType, serviceKey);
+            reuse.GetScopeOrDefault(request)
+                .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
+                .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.

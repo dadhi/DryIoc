@@ -120,7 +120,7 @@ namespace DryIoc.WebApi
             services.RemoveAll(typeof(IFilterProvider), _ => true);
             var filterProvider = new DryIocFilterProvider(container, providers);
             services.Add(typeof(IFilterProvider), filterProvider);
-            container.RegisterInstance<IFilterProvider>(filterProvider);
+            container.AddInstance<IFilterProvider>(filterProvider);
         }
 
         /// <summary>Inserts DryIoc delegating request handler into message handlers.</summary>
@@ -272,7 +272,7 @@ namespace DryIoc.WebApi
                 .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.RequestMessageDoesnotReferenceDryiocDependencyScope);
             
             var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
-            container.RegisterInstance(request, Reuse.InWebRequest, IfAlreadyRegistered.Replace);
+            container.AddInstance(request);
         }
     }
 

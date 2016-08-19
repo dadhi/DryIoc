@@ -99,8 +99,11 @@ namespace DryIoc.Web
     {
         /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
-        public static Func<IDictionary> GetContextItems = () => 
-            HttpContext.Current.ThrowIfNull(Error.Of("No HttpContext is available.")).Items;
+        public static Func<IDictionary> GetContextItems = () =>
+        {
+            var httpContext = HttpContext.Current;
+            return httpContext == null ? null : httpContext.Items;
+        };
 
         /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
         /// <param name="getContextItems">(optional) Arbitrary/test items storage.</param>
@@ -119,7 +122,8 @@ namespace DryIoc.Web
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
         public IScope GetCurrentOrDefault()
         {
-            return _getContextItems()[_currentScopeEntryKey] as IScope;
+            var scopes = _getContextItems();
+            return scopes == null ? null : scopes[_currentScopeEntryKey] as IScope;
         }
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
@@ -128,7 +132,8 @@ namespace DryIoc.Web
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
             var newCurrentScope = setCurrentScope.ThrowIfNull()(GetCurrentOrDefault());
-            _getContextItems()[_currentScopeEntryKey] = newCurrentScope;
+            var contextScopes = _getContextItems().ThrowIfNull(Error.Of("No HttpContext is available to set scope to."));
+            contextScopes[_currentScopeEntryKey] = newCurrentScope;
             return newCurrentScope;
         }
 
@@ -139,3 +144,4 @@ namespace DryIoc.Web
         private readonly Func<IDictionary> _getContextItems;
     }
 }
+ 

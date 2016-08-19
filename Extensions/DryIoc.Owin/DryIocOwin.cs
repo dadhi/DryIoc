@@ -55,7 +55,7 @@ namespace DryIoc.Owin
             {
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                 {
-                    scope.RegisterInstance(context, Reuse.InWebRequest, IfAlreadyRegistered.Replace);
+                    scope.AddInstance(context);
                     if (registerInScope != null)
                         registerInScope(scope);
                     context.Set(ScopedContainerKeyInContext, scope);

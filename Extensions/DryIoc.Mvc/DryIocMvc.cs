@@ -111,7 +111,7 @@ namespace DryIoc.Mvc
             var filterProvider = new DryIocFilterAttributeFilterProvider(container);
             filterProviders.Add(filterProvider);
 
-            container.RegisterInstance<IFilterProvider>(filterProvider);
+            container.AddInstance<IFilterProvider>(filterProvider);
         }
     }
 
