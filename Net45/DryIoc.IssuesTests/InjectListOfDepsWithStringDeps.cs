@@ -14,8 +14,8 @@ namespace DryIoc.IssuesTests
         {
             var di = Experimental.D.I;
 
-            di.RegisterInstance("a", serviceKey: "x");
-            di.RegisterInstance("b", serviceKey: "y");
+            di.UseInstance("a", serviceKey: "x");
+            di.UseInstance("b", serviceKey: "y");
             di.Register(Made.Of(() => GetBs(Arg.Of<Func<string, B>>(), Arg.Of<KeyValuePair<string, string>[]>())));
 
             var a = di.Get<A>();

@@ -37,7 +37,7 @@ namespace DryIoc.WebApi.UnitTests
                     using (var scope = container.OpenScope())
                     {
                         // It will replace request instance inside current scope, keep all resolution cache, etc intact. It is fast.
-                        scope.RegisterInstance(message, Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
+                        scope.UseInstance(message);
 
                         var a = scope.Resolve<A>();
                         await Task.Delay(5);//processing request

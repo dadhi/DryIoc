@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
         public DryIOCSingletonFailureTest()
         {
             _container = new Container();
-            _container.RegisterInstance(new Producer());
+            _container.UseInstance(new Producer());
             _container.Register<Consumer>(Reuse.Singleton);
         }
 

@@ -38,13 +38,13 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Autofac, Version=3.5.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Autofac.3.5.2\lib\net40\Autofac.dll</HintPath>
+    <Reference Include="Autofac, Version=4.0.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Autofac.4.0.0\lib\netstandard1.1\Autofac.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="ExpressionToCodeLib, Version=1.5.2.0, Culture=neutral, PublicKeyToken=b43a6eb33831e563, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll</HintPath>
+    <Reference Include="Castle.Core, Version=3.3.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Castle.Core.3.3.3\lib\net45\Castle.Core.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="log4net, Version=1.2.13.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
       <HintPath>..\..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
@@ -60,6 +60,16 @@
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.InteropServices.RuntimeInformation, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\System.Runtime.InteropServices.RuntimeInformation.4.0.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
     <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
       <HintPath>..\..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
       <Private>True</Private>
@@ -77,6 +87,9 @@
     <Compile Include="DotnetWeekBlogExample.cs" />
     <Compile Include="DryIocAdapterSpecificationTests.cs" />
     <Compile Include="InjectListOfDepsWithStringDeps.cs" />
+    <Compile Include="Interception\DryIocInterception.cs" />
+    <Compile Include="Interception\InterceptionTests.cs" />
+    <Compile Include="Interception\Issue310_Problems_with_Decorators_and_Service_Keys.cs" />
     <Compile Include="Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize.cs" />
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
     <Compile Include="InjectLog4netLog.cs" />
@@ -118,6 +131,10 @@
     <Compile Include="Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value.cs" />
     <Compile Include="Issue281_MakeAutofacMigrationEasier.cs" />
     <Compile Include="Issue300_Exception_when_reusing_objects.cs" />
+    <Compile Include="Issue304_Add_option_to_pass_values_for_some_dependencies_on_Resolve.cs" />
+    <Compile Include="Issue311_Resolve_does_not_work_with_InThread_registration.cs" />
+    <Compile Include="Issue315_Decorator_of_wrapper.cs" />
+    <Compile Include="Issue318_RegisterInstance_doesnt_honour_current_OpenScope.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -144,6 +161,7 @@
     <Compile Include="Samples\PubSub.cs" />
     <Compile Include="Samples\ResolveMocksForNonRegisteredServices.cs" />
     <Compile Include="Samples\SelectConstructorWithAllResolvableArguments.cs" />
+    <Compile Include="Issue313_Support_non_public_constructors_with_ConstructorWithResolvableArguments.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -173,6 +191,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

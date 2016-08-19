@@ -332,7 +332,7 @@ namespace DryIoc.UnitTests
             Assert.AreSame(context, container.Resolve<IContext>());
 
             // Removes service instance from Singleton scope by setting it to null.
-            container.RegisterInstance<IContext>(null, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.UseInstance<IContext>(null);
 
             // Removes service registration.
             container.Unregister<IContext>();
@@ -533,19 +533,19 @@ namespace DryIoc.UnitTests
             container.Dispose();
 
             var ex = Assert.Throws<ContainerException>(() => 
-                container.RegisterInstance("a"));
+                container.UseInstance("a"));
 
             Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
         }
 
         [Test]
-        public void I_want_Verify_the_registrations_to_find_potential_errors_in_their_resolution()
+        public void Can_Validate_the_registrations_to_find_potential_errors_in_their_resolution()
         {
             var container = new Container();
 
-            container.Register<MyService>();
+            container.Register<Me.MyService>();
 
-            var errors = container.VerifyResolutions().ToArray();
+            var errors = container.Validate().ToArray();
             Assert.AreEqual(1, errors.Length);
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
         }

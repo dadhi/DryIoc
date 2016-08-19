@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var service = new DisposableService();
-            container.RegisterInstance<IService>(service);
+            container.UseInstance<IService>(service);
 
             container.Dispose();
 
@@ -50,7 +50,7 @@ namespace DryIoc.UnitTests
         public void When_registering_external_instance_with_prevent_disposal_parameter_Then_instance_should_Not_be_disposed()
         {
             var container = new Container();
-            container.RegisterInstance<IService>(new DisposableService(), preventDisposal: true);
+            container.UseInstance<IService>(new DisposableService(), preventDisposal: true);
             var service = container.Resolve<IService>();
 
             container.Dispose();
@@ -509,7 +509,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var service = new SomethingDisposable();
-            container.RegisterInstance(service, Reuse.Singleton);
+            container.UseInstance(service);
 
             container.Dispose();
             Assert.IsTrue(service.IsDisposed);

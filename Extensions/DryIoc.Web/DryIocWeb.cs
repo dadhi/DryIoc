@@ -1,4 +1,28 @@
-﻿[assembly: System.Web.PreApplicationStartMethod(typeof(DryIoc.Web.DryIocHttpModuleInitializer), "Initialize")]
+﻿/*
+The MIT License (MIT)
+
+Copyright (c) 2016 Maksim Volkau
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+[assembly: System.Web.PreApplicationStartMethod(typeof(DryIoc.Web.DryIocHttpModuleInitializer), "Initialize")]
 
 namespace DryIoc.Web
 {
@@ -75,8 +99,11 @@ namespace DryIoc.Web
     {
         /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
-        public static Func<IDictionary> GetContextItems = () => 
-            HttpContext.Current.ThrowIfNull(Error.Of("No HttpContext is available.")).Items;
+        public static Func<IDictionary> GetContextItems = () =>
+        {
+            var httpContext = HttpContext.Current;
+            return httpContext == null ? null : httpContext.Items;
+        };
 
         /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
         /// <param name="getContextItems">(optional) Arbitrary/test items storage.</param>
@@ -95,7 +122,8 @@ namespace DryIoc.Web
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
         public IScope GetCurrentOrDefault()
         {
-            return _getContextItems()[_currentScopeEntryKey] as IScope;
+            var scopes = _getContextItems();
+            return scopes == null ? null : scopes[_currentScopeEntryKey] as IScope;
         }
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
@@ -104,7 +132,8 @@ namespace DryIoc.Web
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
             var newCurrentScope = setCurrentScope.ThrowIfNull()(GetCurrentOrDefault());
-            _getContextItems()[_currentScopeEntryKey] = newCurrentScope;
+            var contextScopes = _getContextItems().ThrowIfNull(Error.Of("No HttpContext is available to set scope to."));
+            contextScopes[_currentScopeEntryKey] = newCurrentScope;
             return newCurrentScope;
         }
 
@@ -115,3 +144,4 @@ namespace DryIoc.Web
         private readonly Func<IDictionary> _getContextItems;
     }
 }
+ 

@@ -19,11 +19,11 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var container = new CompositionContainer(new TypeCatalog(typeof(Bazooka)));
             container.SatisfyImportsOnce(this);
 
-            Assert.That(BazookaA, Is.SameAs(BazookaB));
+            Assert.AreSame(BazookaA, BazookaB);
         }
-    }
 
-    [Export("a")]
-    [Export("b")]
-    public class Bazooka {}
+        [Export("a")]
+        [Export("b")]
+        public class Bazooka { }
+    }
 }

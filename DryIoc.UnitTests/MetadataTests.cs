@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -241,54 +242,229 @@ namespace DryIoc.UnitTests
             Assert.That(services.Length, Is.EqualTo(1));
             Assert.That(services.Single().Metadata, Is.EqualTo("m"));
         }
-    }
 
-    #region CUT
-
-    public class ServiceWithMetadata
-    {
-
-    }
-
-    public class ServiceWithDependencyAndWithMetadata
-    {
-        public string Dependency { get; set; }
-        public ServiceWithDependencyAndWithMetadata(string dependency)
+        [Test]
+        public void Can_inject_service_matching_the_key_value_metadata()
         {
-            Dependency = dependency;
-        }
-    }
+            var container = new Container();
 
-    public class Metadata
-    {
-        public bool Assigned;
-    }
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
 
-    public class MetadataDrivenFactory<TService, TMetadata>
-    {
-        private readonly Meta<Func<TService>, TMetadata>[] _factories;
+            container.Register<MetaConsumer>(
+                made: Parameters.Of.Type<IService>(metadataKey: "b", metadata: 2));
 
-        public MetadataDrivenFactory(Meta<Func<TService>, TMetadata>[] factories)
-        {
-            _factories = factories;
+            var consumer = container.Resolve<MetaConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
         }
 
-        public TService CreateOnlyIf(Func<TMetadata, bool> condition)
+        [Test]
+        public void Can_inject_service_matching_the_key_value_metadata_via_parameter_name()
         {
-            var factory = _factories.First(meta => condition(meta.Metadata));
-            return factory.Value();
+            var container = new Container();
+
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
+
+            container.Register<MetaConsumer>(
+                made: Parameters.Of.Name("service", metadataKey: "b", metadata: 2));
+
+            var consumer = container.Resolve<MetaConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
+        }
+
+        [Test]
+        public void Can_inject_service_matching_the_key_value_metadata_via_ArgOf_spec()
+        {
+            var container = new Container();
+
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
+
+            container.Register(Made.Of(() => new MetaConsumer(Arg.Of<IService>("b", 2))));
+
+            var consumer = container.Resolve<MetaConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
+        }
+
+        [Test]
+        public void Can_inject_service_matching_the_key_value_metadata_via_property()
+        {
+            var container = new Container();
+
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
+
+            container.Register<MetaPropertyConsumer>(
+                made: PropertiesAndFields.Of.Name("Service", metadataKey: "b", metadata: 2));
+
+            var consumer = container.Resolve<MetaPropertyConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
+        }
+
+        [Test]
+        public void Can_inject_func_of_service_matching_with_the_key_value_metadata()
+        {
+            var container = new Container();
+
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
+
+            container.Register<FuncMetaConsumer>(
+                made: Parameters.Of.Type<Func<IService>>(metadataKey: "b", metadata: 2));
+
+            var consumer = container.Resolve<FuncMetaConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
+        }
+
+        [Test]
+        public void Can_inject_lazy_of_service_matching_with_the_key_value_metadata()
+        {
+            var container = new Container();
+
+            container.Register<IService, OtherService>();
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 }, { "b", 2 } }));
+
+            container.Register<LazyMetaConsumer>(
+                made: Parameters.Of.Type<Lazy<IService>>(metadataKey: "b", metadata: 2));
+
+            var consumer = container.Resolve<LazyMetaConsumer>();
+            Assert.IsInstanceOf<Service>(consumer.Service);
+        }
+
+        [Test]
+        public void Can_inject_service_matching_the_value_only_of_metadata()
+        {
+            var container = new Container();
+
+            container.Register<IService, OtherService>(
+                setup: Setup.With(1));
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "b", 2 } }));
+
+            container.Register<MetaConsumer>(
+                made: Parameters.Of.Type<IService>(metadata: 1));
+
+            var consumer = container.Resolve<MetaConsumer>();
+            Assert.IsInstanceOf<OtherService>(consumer.Service);
+        }
+
+        [Test]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Can_inject_collection_matching_the_metadata_key_value(bool lazyEnumarable)
+        {
+            IContainer container = new Container();
+            if (lazyEnumarable)
+                container = container.With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.Register<IService, Service>(
+                setup: Setup.With(new Dictionary<string, object> { { "a", 1 } }));
+            container.Register<IService, OtherService>(
+                setup: Setup.With(new Dictionary<string, object> { { "b", 2 } }));
+
+            container.Register(Made.Of(() => new ManyMetaConsumer(Arg.Of<IEnumerable<IService>>("b", 2))));
+
+            var consumer = container.Resolve<ManyMetaConsumer>();
+            Assert.AreEqual(1, consumer.Services.Length);
+        }
+
+        public class OtherService : IService { }
+
+        public class MetaConsumer
+        {
+            public IService Service { get; private set; }
+
+            public MetaConsumer(IService service)
+            {
+                Service = service;
+            }
+        }
+
+        public class MetaPropertyConsumer
+        {
+            public IService Service { get; set; }
+        }
+
+        public class FuncMetaConsumer
+        {
+            public IService Service { get; private set; }
+
+            public FuncMetaConsumer(Func<IService> getService)
+            {
+                Service = getService();
+            }
+        }
+
+        public class LazyMetaConsumer
+        {
+            public IService Service { get; private set; }
+
+            public LazyMetaConsumer(Lazy<IService> service)
+            {
+                Service = service.Value;
+            }
+        }
+
+        public class ManyMetaConsumer
+        {
+            public IService[] Services { get; private set; }
+
+            public ManyMetaConsumer(IEnumerable<IService> services)
+            {
+                Services = services.ToArray();
+            }
+        }
+
+        public class ServiceWithMetadata
+        {
+
+        }
+
+        public class ServiceWithDependencyAndWithMetadata
+        {
+            public string Dependency { get; set; }
+            public ServiceWithDependencyAndWithMetadata(string dependency)
+            {
+                Dependency = dependency;
+            }
+        }
+
+        public class Metadata
+        {
+            public bool Assigned;
+        }
+
+        public class MetadataDrivenFactory<TService, TMetadata>
+        {
+            private readonly Meta<Func<TService>, TMetadata>[] _factories;
+
+            public MetadataDrivenFactory(Meta<Func<TService>, TMetadata>[] factories)
+            {
+                _factories = factories;
+            }
+
+            public TService CreateOnlyIf(Func<TMetadata, bool> condition)
+            {
+                var factory = _factories.First(meta => condition(meta.Metadata));
+                return factory.Value();
+            }
+        }
+
+        public class ServiceWithDependencyOnOpenGenericWithMetaFactoryMany
+        {
+            public MetadataDrivenFactory<ServiceWithMetadata, Metadata> Factory { get; set; }
+
+            public ServiceWithDependencyOnOpenGenericWithMetaFactoryMany(MetadataDrivenFactory<ServiceWithMetadata, Metadata> factory)
+            {
+                Factory = factory;
+            }
         }
     }
-
-    public class ServiceWithDependencyOnOpenGenericWithMetaFactoryMany
-    {
-        public MetadataDrivenFactory<ServiceWithMetadata, Metadata> Factory { get; set; }
-
-        public ServiceWithDependencyOnOpenGenericWithMetaFactoryMany(MetadataDrivenFactory<ServiceWithMetadata, Metadata> factory)
-        {
-            Factory = factory;
-        }
-    }
-
-    #endregion
 }

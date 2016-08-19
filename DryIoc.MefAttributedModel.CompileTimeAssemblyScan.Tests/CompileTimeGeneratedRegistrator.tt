@@ -13,7 +13,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     public static class CompileTimeGeneratedRegistrator
     {
-        public static readonly RegistrationInfo[] Registrations =
+        public static readonly ExportedRegistrationInfo[] Registrations =
         {
 <#
         var assembly = typeof(TransientService).Assembly;

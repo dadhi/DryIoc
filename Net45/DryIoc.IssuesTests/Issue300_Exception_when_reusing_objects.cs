@@ -16,20 +16,20 @@ namespace DryIoc.IssuesTests
             factory.Register<IPPERepository, PPERepository>();
             factory.Register<IRepositoryEntity<ntw_ppe>, PPERepository>();
 
-            //var provider = new Provider();
-            //factory.RegisterInitializer<object>(
-            //    (serviceObj, resolver) =>
-            //    {
-            //        if (serviceObj is IRepositoryEntity)
-            //        {
-            //            (serviceObj as IRepositoryEntity).Initialize(provider);
-            //        }
-            //    });
+            var provider = new Provider();
+            factory.RegisterInitializer<object>(
+                (serviceObj, resolver) =>
+                {
+                    if (serviceObj is IRepositoryEntity)
+                    {
+                        (serviceObj as IRepositoryEntity).Initialize(provider);
+                    }
+                });
 
-            factory.Register<Provider>(Reuse.Singleton);
-            factory.Register<object>(
-                made: Made.Of(GetType().GetSingleMethodOrNull(nameof(InitRepoEntity))),
-                setup: Setup.DecoratorWith(r => r.ImplementationType.IsAssignableTo(typeof(IRepositoryEntity))));
+            //factory.Register<Provider>(Reuse.Singleton);
+            //factory.Register<object>(
+            //    made: Made.Of(GetType().GetSingleMethodOrNull(nameof(InitRepoEntity))),
+            //    setup: Setup.DecoratorWith(r => r.ImplementationType.IsAssignableTo(typeof(IRepositoryEntity))));
 
             using (var scope = factory.OpenScope())
             {

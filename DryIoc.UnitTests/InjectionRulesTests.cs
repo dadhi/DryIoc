@@ -110,7 +110,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, AnotherService>(serviceKey: "another");
 
             container.RegisterMany<ClientWithPropsAndFields>(
-                made: PropertiesAndFields.All(withFields: false).And(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
+                made: PropertiesAndFields.All(withFields: false).OverrideWith(PropertiesAndFields.Of.Name("PInternal", serviceKey: "another")));
 
             var client = container.Resolve<ClientWithPropsAndFields>();
 
@@ -140,7 +140,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, Service>();
-            container.RegisterInstance("Hello string!");
+            container.UseInstance("Hello string!");
             container.Register<ClientWithServiceAndStringProperty>(made: PropertiesAndFields.Auto);
 
             var client = container.Resolve<ClientWithServiceAndStringProperty>();
@@ -194,9 +194,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Couldnot_specify_default_value_for_parameter_name_because_it_requires_state()
+        public void Unable_to_specify_default_value_for_parameter_name_because_it_requires_state()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithThrowIfRuntimeStateRequired());
             var defaultDep = new Dep();
             container.Register<Client>(made: Parameters.Of.Name("dep", defaultValue: defaultDep));
 
@@ -220,9 +220,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Couldnot_specify_default_value_for_parameter_type_because_it_requires_state()
+        public void Unable_to_specify_default_value_for_parameter_type_because_it_requires_state()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithThrowIfRuntimeStateRequired());
             var defaultDep = new Dep();
             container.Register<Client>(made: Parameters.Of.Type<Dep>(defaultValue: defaultDep));
 
@@ -286,17 +286,6 @@ namespace DryIoc.UnitTests
         public static string GetTargetName<TTarget>()
         {
             return string.Format("{0}.{1}", typeof(TTarget).Namespace, typeof(TTarget).Name);
-        }
-
-        [Test]
-        public void If_you_register_not_a_primitive_value_then_container_should_throw()
-        {
-            var container = new Container();
-
-            var ex = Assert.Throws<ContainerException>(() => 
-                container.Register<A>(made: Parameters.Of.Type(_ => new B())));
-
-            Assert.AreEqual(Error.RegisteringWithNotSupportedDepedendencyCustomValueType, ex.Error);
         }
 
         class A

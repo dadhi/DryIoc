@@ -41,7 +41,7 @@ namespace DryIoc.IssuesTests
         public class Blah { }
 
         // AsFactory says that class has factory method(s) to Export 
-        [Export, AsFactory]
+        [Export]
         public class FooDecorator<B>
         {
             // Decorator or kind of instantiation middleware implemented as normal method

@@ -12,19 +12,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("a", Reuse.Singleton, IfAlreadyRegistered.Replace);
-            container.RegisterInstance("z", Reuse.Singleton, IfAlreadyRegistered.Replace);
-        }
-
-        [Test]
-        public void Registering_instance_with_not_available_reuse_should_throw_meaningful_error()
-        {
-            var container = new Container();
-            
-            var ex = Assert.Throws<ContainerException>(() => 
-                container.RegisterInstance("a", Reuse.InCurrentNamedScope("b")));
-
-            Assert.AreEqual(Error.NoMatchingScopeWhenRegisteringInstance, ex.Error);
+            container.UseInstance("a");
+            container.UseInstance("z");
         }
 
         [Test]
@@ -32,11 +21,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("a", Reuse.Singleton, IfAlreadyRegistered.Replace);
+            container.UseInstance("a");
 
             using (var scope = container.OpenScope())
             {
-                scope.RegisterInstance("bbbb", Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
+                scope.UseInstance("bbbb");
                 Assert.AreEqual("bbbb", scope.Resolve<string>());
             }
 
@@ -51,7 +40,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance(typeof(string), "ring", serviceKey: "MyPrecious");
+            container.UseInstance(typeof(string), "ring", serviceKey: "MyPrecious");
 
             var ring = container.Resolve<string>("MyPrecious");
             Assert.That(ring, Is.EqualTo("ring"));
@@ -63,7 +52,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.RegisterInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
+                container.UseInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
 
             Assert.AreEqual(ex.Error, Error.RegisteringInstanceNotAssignableToServiceType);
         }
@@ -72,7 +61,7 @@ namespace DryIoc.UnitTests
         public void Wiping_cache_should_not_delete_current_instance_value()
         {
             var container = new Container();
-            container.RegisterInstance("mine", Reuse.Singleton);
+            container.UseInstance("mine");
 
             var mine = container.WithoutCache().Resolve<string>();
             Assert.AreEqual("mine", mine);
@@ -107,10 +96,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("hey");
+            container.UseInstance("hey");
             var regBefore = container.GetServiceRegistrations().Single();
 
-            container.RegisterInstance("nah", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.UseInstance("nah");
             var regAfter = container.GetServiceRegistrations().Single();
 
             Assert.AreEqual(regBefore.Factory.FactoryID, regAfter.Factory.FactoryID);
@@ -158,7 +147,7 @@ namespace DryIoc.UnitTests
         public void Can_register_instance_with_keep_option()
         {
             var container = new Container();
-            container.RegisterInstance("a");
+            container.UseInstance("a");
 
             container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
@@ -167,23 +156,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_register_instance_with_keep_option_without_prev_registration()
-        {
-            var container = new Container();
-
-            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
-
-            var s = container.Resolve<string>();
-            Assert.AreEqual("x", s);
-        }
-
-        [Test]
         public void Given_multiple_already_registered_services_When_registering_with_keep_option_Then_no_exception_should_be_thrown()
         {
             var container = new Container();
 
-            container.RegisterInstance("a");
-            container.RegisterInstance("b");
+            container.UseInstance("a");
+            container.UseInstance("b");
 
             Assert.DoesNotThrow(() => 
             container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep));
@@ -194,10 +172,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("a");
-            container.RegisterInstance("b");
-
-            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.UseInstance("a");
+            container.UseInstance("b");
+            container.UseInstance("x");
 
             var x = container.Resolve<string>();
             Assert.AreEqual("x", x);
@@ -208,10 +185,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("a", serviceKey: "x");
+            container.UseInstance("a", serviceKey: "x");
             Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
 
-            container.RegisterInstance("b", serviceKey: "x", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.UseInstance("b", serviceKey: "x");
             Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
         }
     }

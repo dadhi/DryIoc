@@ -18,23 +18,14 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Can_get_registration_info_with_implementation_type_replaced_by_its_full_name()
         {
-            var registrationInfo = AttributedModel.GetRegistrationInfoOrDefault(typeof(Frog));
-            registrationInfo.ImplementationTypeFullName = registrationInfo.ImplementationType.FullName;
-            registrationInfo.ImplementationType = null;
+            var registrationInfo = AttributedModel.GetExportedRegistrations(typeof(Frog)).Single().MakeLazy();
 
-            for (var i = 0; i < registrationInfo.Exports.Length; i++)
-            {
-                var export = registrationInfo.Exports[i];
-                export.ServiceTypeFullName = export.ServiceType.FullName;
-                export.ServiceType = null;
-            }
-
-            Assert.That(registrationInfo.ImplementationTypeFullName, Is.Not.Null);
-            Assert.That(registrationInfo.Exports[0].ServiceTypeFullName, Is.Not.Null);
+            Assert.IsNotNull(registrationInfo.ImplementationTypeFullName);
+            Assert.IsNotNull(registrationInfo.Exports[0].ServiceTypeFullName);
 
             var asm = Assembly.LoadFrom("DryIoc.IssuesTests.dll");
             var type = asm.GetType(registrationInfo.ImplementationTypeFullName);
-            Assert.That(type, Is.Not.Null);
+            Assert.IsNotNull(type);
         }
 
         [Test]
@@ -51,20 +42,7 @@ namespace DryIoc.IssuesTests.Samples
             var registrations = AttributedModel.Scan(new[] { assembly });
 
             // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info =>
-            {
-                info.ImplementationTypeFullName = info.ImplementationType.FullName;
-                info.ImplementationType = null; // replace implementation type with its name
-
-                for (var i = 0; i < info.Exports.Length; i++)
-                {
-                    var export = info.Exports[i];
-                    export.ServiceTypeFullName = export.ServiceType.FullName;
-                    export.ServiceType = null; // replace service type with its name
-                }
-
-                return info;
-            });
+            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
 
             // In run-time deserialize registrations and register them as rule for unresolved services
             //=========================================================================================

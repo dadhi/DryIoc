@@ -11,6 +11,17 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.7.0
+          - added: #195: Composable Metadata as a IDictionary&lt;string, object&gt;
+          - added: #232: Change RegisterInstance defaults to IfUnresolved.Replace and to Reuse.InCurrentScope
+          - added: #304: Add option to pass values for some dependencies on Resolve
+          - added: #313: Support non public constructors with ConstructorWithResolvableArguments
+          - added: #314: Allow to inject non primitive external values
+          - added: #315: Support decorator of wrappers, e.g. decorate IEnumerable&lt;T&gt;
+          - fixed: #298: AspNetCore.DependencyInjection exceptions when verifying resolutions
+          - fixed: #300: Exception when reusing objects.
+          - fixed: #310: Problems with Decorators and Service Keys
+          - fixed: #317: Skip Enums in RegisterMany(assemblies)
           v2.6.4
           - fixed: #301: Issue with Lazy in Func with arguments
           v2.6.3

@@ -75,6 +75,5 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         [ExportWithDisplayName("blah"), WithMetadata("hey")]
         public class ThrowsForMultipleMeta { }
-
     }
 }

@@ -44,8 +44,11 @@
     <Compile Include="ExportImportWithKeyTests.CUT.cs" />
     <Compile Include="ExportManyTests.CUT.cs" />
     <Compile Include="ImportExternalTests.CUT.cs" />
+    <Compile Include="ImportManyTests.CUT.cs" />
     <Compile Include="ImportWithMetadataTests.CUT.cs" />
     <Compile Include="InheritedExportTests.CUT.cs" />
+    <Compile Include="MefCompatibilityTests.CUT.cs" />
+    <Compile Include="MefCustomCatalogTests.CUT.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

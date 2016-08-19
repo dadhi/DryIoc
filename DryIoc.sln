@@ -168,6 +168,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SignalR", "Extension
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SignalR.UnitTests", "Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj", "{E68325C4-FD55-42DB-A083-ACD58FF8DF82}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Syntax.Autofac.UnitTests", "Extensions\DryIoc.Syntax.Autofac.UnitTests\DryIoc.Syntax.Autofac.UnitTests.csproj", "{9A903363-6925-4C9F-9A19-F751F4987604}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Syntax.Autofac", "Extensions\DryIoc.Syntax.Autofac\DryIoc.Syntax.Autofac.csproj", "{67A2615C-34B5-41AC-B5C9-CE82C5D28368}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -382,6 +386,14 @@ Global
 		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A903363-6925-4C9F-9A19-F751F4987604}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A903363-6925-4C9F-9A19-F751F4987604}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A903363-6925-4C9F-9A19-F751F4987604}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A903363-6925-4C9F-9A19-F751F4987604}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67A2615C-34B5-41AC-B5C9-CE82C5D28368}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67A2615C-34B5-41AC-B5C9-CE82C5D28368}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67A2615C-34B5-41AC-B5C9-CE82C5D28368}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67A2615C-34B5-41AC-B5C9-CE82C5D28368}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -430,5 +442,7 @@ Global
 		{FFBA94E2-8293-4F38-B687-72E4A64D64CD} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{2C64058F-BF04-4BBA-A84F-759AA479DB0E} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{E68325C4-FD55-42DB-A083-ACD58FF8DF82} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
+		{9A903363-6925-4C9F-9A19-F751F4987604} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
+		{67A2615C-34B5-41AC-B5C9-CE82C5D28368} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 	EndGlobalSection
 EndGlobal

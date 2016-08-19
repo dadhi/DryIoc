@@ -5,6 +5,6 @@
 [assembly: AssemblyProduct("DryIoc")]
 [assembly: AssemblyCopyright("Copyright © 2016 Maksim Volkau")]
 
-[assembly: AssemblyVersion("2.6.4")]
-[assembly: AssemblyFileVersion("2.6.4")]
-[assembly: AssemblyInformationalVersion("2.6.4")]
+[assembly: AssemblyVersion("2.7.0")]
+[assembly: AssemblyFileVersion("2.7.0")]
+[assembly: AssemblyInformationalVersion("2.7.0")]

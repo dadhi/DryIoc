@@ -147,7 +147,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
     /// <summary>Delegates service resolution to wrapped DryIoc scoped container.
     /// When disposed, disposes the scoped container.</summary>
-    public sealed class DryIocServiceProvider : IServiceProvider, IDisposable
+    public sealed class DryIocServiceProvider : IServiceProvider, ISupportRequiredService, IDisposable
     {
         private readonly IContainer _scopedContainer;
 
@@ -165,6 +165,16 @@ namespace DryIoc.Microsoft.DependencyInjection
         public object GetService(Type serviceType)
         {
             return _scopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault: true);
+        }
+
+        /// <summary> Gets service of type <paramref name="serviceType" /> from the <see cref="T:System.IServiceProvider" /> implementing
+        /// this interface. </summary>
+        /// <param name="serviceType">An object that specifies the type of service object to get.</param>
+        /// <returns>A service object of type <paramref name="serviceType" />.
+        /// Throws an exception if the <see cref="T:System.IServiceProvider" /> cannot create the object.</returns>
+        public object GetRequiredService(Type serviceType)
+        {
+            return _scopedContainer.Resolve(serviceType);
         }
 
         /// <summary>Disposes scoped container and scope.</summary>

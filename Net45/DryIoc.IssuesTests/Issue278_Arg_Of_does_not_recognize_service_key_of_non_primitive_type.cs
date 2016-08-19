@@ -10,10 +10,10 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
             
-            c.RegisterInstance(false, serviceKey: "skipAuthz");
+            c.UseInstance(false, serviceKey: "skipAuthz");
 
             var accessAll = new object();
-            c.RegisterInstance(true, serviceKey: accessAll);
+            c.UseInstance(true, serviceKey: accessAll);
             c.Register(Made.Of(() => new A(Arg.Of<bool>(accessAll))));
 
             Assert.DoesNotThrow(() => c.Resolve<A>());

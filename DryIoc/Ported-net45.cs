@@ -99,6 +99,8 @@ namespace System.Reflection
         public Type[] GenericTypeParameters { get { return _type.GetGenericArguments(); } }
         public Type[] GenericTypeArguments { get { return _type.GetGenericArguments(); } }
         public Type[] GetGenericParameterConstraints() { return _type.GetGenericParameterConstraints(); }
+        public bool IsClass { get { return _type.IsClass; } }
+        public bool IsInterface { get { return _type.IsInterface; } }
         public bool IsValueType { get { return _type.IsValueType; } }
         public bool IsPrimitive { get { return _type.IsPrimitive; } }
         public bool IsArray { get { return _type.IsArray; } }

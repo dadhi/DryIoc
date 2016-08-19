@@ -23,7 +23,6 @@ namespace DryIoc.IssuesTests
             container.Resolve<IService<Foo, string>>();
         }
 
-        [Export, AsFactory]
         public class Factory<A>
         {
             [Export]
@@ -82,7 +81,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterExports(typeof(X<>));
 
-            container.RegisterInstance<int>(1);
+            container.UseInstance<int>(1);
             var y = container.Resolve<Y<int, double>>();
 
             Assert.AreEqual(1, y.Blah);
@@ -94,7 +93,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterExports(typeof(Z<>));
 
-            container.RegisterInstance<string>("1");
+            container.UseInstance<string>("1");
             var y = container.Resolve<Y<string, string>>();
 
             Assert.AreEqual("1", y.Blah);
@@ -169,7 +168,6 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<Y<int, string>>(y);
         }
 
-        [Export, AsFactory]
         public static class X<A>
         {
             [Export]
@@ -182,7 +180,6 @@ namespace DryIoc.IssuesTests
             public static Y<int, A> YProperty { get { return YField; } }
         }
 
-        [Export, AsFactory]
         public static class XX<A>
         {
             [Export]
@@ -194,7 +191,7 @@ namespace DryIoc.IssuesTests
 
         public interface IZ<T> {}
 
-        [Export(typeof(IZ<>)), AsFactory]
+        [Export(typeof(IZ<>))]
         public class Z<A> : IZ<A>
         {
             // Deceiving method with the same signature as the closed-generic Get<string> below.
@@ -216,7 +213,6 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Export, AsFactory]
         public static class CFactory
         {
             [Export(typeof(I<,,>))]
@@ -226,7 +222,7 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Export, AsFactory]
+        [Export]
         public static class DFactory
         {
             [ExportMany] // magic export
@@ -236,7 +232,6 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Export, AsFactory]
         public static class EFactory
         {
             [ExportMany]

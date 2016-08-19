@@ -52,6 +52,7 @@
     <Compile Include="ExportImportWithKeyTests.cs" />
     <Compile Include="ImportExternalTests.cs" />
     <Compile Include="ImportAttributeTests.cs" />
+    <Compile Include="ImportManyTests.cs" />
     <Compile Include="ImportWithMetadataTests.cs" />
     <Compile Include="InheritedExportTests.cs" />
     <Compile Include="MoreAttributedModelTests.cs" />

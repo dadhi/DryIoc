@@ -62,7 +62,7 @@ namespace DryIoc.IssuesTests
             public void AddHandler<EventInfoType>(IEvntHandler<EventInfoType> evntHandler)
                 where EventInfoType : IEventInfo
             {
-                _dryContainer.RegisterInstance(evntHandler);
+                _dryContainer.UseInstance(evntHandler);
             }
 
             public void FireEvent<EventInfoType>(EventInfoType eventInfo)

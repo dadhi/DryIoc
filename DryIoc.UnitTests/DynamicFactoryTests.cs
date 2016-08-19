@@ -3,30 +3,30 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-	[TestFixture]
-	public class DynamicFactoryTests
-	{
-		[Test]
-		public void I_can_resolve_service_with_not_registered_lazy_parameter_using_dynamic_factory()
-		{
-			var container = new Container();
-			container.Register<ServiceWithNotRegisteredLazyParameter>();
-			container.Register(typeof(DynamicFactory<>));
-			container.RegisterInstance(container);
+    [TestFixture]
+    public class DynamicFactoryTests
+    {
+        [Test]
+        public void I_can_resolve_service_with_not_registered_lazy_parameter_using_dynamic_factory()
+        {
+            var container = new Container();
+            container.Register<ServiceWithNotRegisteredLazyParameter>();
+            container.Register(typeof(DynamicFactory<>));
+            container.UseInstance(container);
 
-			var service = container.Resolve<ServiceWithNotRegisteredLazyParameter>();
+            var service = container.Resolve<ServiceWithNotRegisteredLazyParameter>();
 
             Assert.That(service.Parameter.CanCreate, Is.False);
 
-			container.Register<NotRegisteredService>();
+            container.Register<NotRegisteredService>();
 
             Assert.That(service.Parameter.CanCreate, Is.True);
             Assert.That(service.Parameter.Create(), Is.Not.Null);
-		}
+        }
 
-	    [Test]
-	    public void Can_resolve_Func_of_Lazy()
-	    {
+        [Test]
+        public void Can_resolve_Func_of_Lazy()
+        {
             var container = new Container();
             container.Register<IServiceWithDependency, ServiceWithDependency>();
             container.Register(typeof(Service));
@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             var service = func().Value.Value;
 
             Assert.That(service.Dependency, Is.InstanceOf<Service>());
-	    }
+        }
 
         public class ServiceWithNotRegisteredLazyParameter
         {
@@ -82,14 +82,14 @@ namespace DryIoc.UnitTests
             }
         }
 
-	    internal class Service {}
+        internal class Service { }
 
-	    internal interface IServiceWithDependency
+        internal interface IServiceWithDependency
         {
             Service Dependency { get; }
         }
 
-	    internal class ServiceWithDependency : IServiceWithDependency
+        internal class ServiceWithDependency : IServiceWithDependency
         {
             public Service Dependency { get; private set; }
 
@@ -98,5 +98,5 @@ namespace DryIoc.UnitTests
                 Dependency = dependency;
             }
         }
-	}
+    }
 }

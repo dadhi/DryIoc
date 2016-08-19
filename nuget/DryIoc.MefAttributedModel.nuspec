@@ -11,28 +11,18 @@
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.6.0
+          - added: #323: Support multiple WithMetadataAttribute(key, value)
+          - added: #292: Add ImportManyAttribute support for full MEF compatibility
+          - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
+          - added: Support for ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
           v2.5.0
           - added: Source code (contentFiles) package for UWP (uap10.0)
-          v2.4.0
-          - added: Compatibility with DryIoc 2.5
-          v2.3.0
-          - added: #263: Add IfAlreadyRegistered.AppendNewImplementation option for better collection handling
-          v2.2.3:
-          - fixed: spelling error in AsResolutionRoot
-          v2.2.2
-          - fixed: #252: Make work together MefAttributedModel constructor selection and ConstructorWithResolvableArguments rule
-          v2.2.1
-          - fixed: #245: Automatically add condition to check T constraints in Decorator of T
-          - fixed: #250: DI.Mef: Non static class of static factory method is exported and can be resolved
-          v2.2.0
-          - added: #141: Support Decorators with open-generic factory methods of T
-          - added: Support UseParentReuseAttribute to support DryIoc Setup.UseParentReuse
-          - added: Support for UseDecorateeReuse option in AsDecoratorAttribute
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="[2.6.0,3.0.0)" />
-                <dependency id="DryIocAttributes" version="[2.5,3.0.0)" />
+                <dependency id="DryIoc" version="[2.7,3.0)" />
+                <dependency id="DryIocAttributes" version="[2.6,3.0)" />
             </group>
         </dependencies>
         <frameworkAssemblies>
