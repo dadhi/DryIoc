@@ -417,7 +417,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(Zzz<>), 
                 made: Made.Of(typeof(Zzz<>).GetConstructorOrNull(args: typeof(string))));
 
-            container.AddInstance<string>("x");
+            container.UseInstance<string>("x");
 
             container.Resolve<Zzz<string>>();
         }

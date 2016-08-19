@@ -152,7 +152,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(ClientWithFuncAndInstanceDependency));
-            container.AddInstance("I am a string");
+            container.UseInstance("I am a string");
             container.Register(typeof(IService), typeof(ServiceWithOnePrimitiveParameter), Reuse.Singleton);
 
             var client = container.Resolve<ClientWithFuncAndInstanceDependency>();
@@ -277,7 +277,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             Func<int, string> toString = i => i.ToString();
-            container.AddInstance(toString);
+            container.UseInstance(toString);
 
             var func = container.Resolve<Func<int, string>>();
 
@@ -290,7 +290,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             Func<string, TwoCtors> getTwo = s => new TwoCtors(s);
-            container.AddInstance(getTwo);
+            container.UseInstance(getTwo);
 
             var getTwoResolved = container.Resolve<Func<string, TwoCtors>>();
 

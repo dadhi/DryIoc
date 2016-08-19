@@ -4207,7 +4207,7 @@ namespace DryIoc
         }
 
         // todo: v3: remove
-        /// <summary>Obsolete: use <see cref="AddInstance{TService}(DryIoc.IContainer,TService,bool,bool,object)"/></summary>
+        /// <summary>Obsolete: use <see cref="UseInstance{TService}"/></summary>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -4270,7 +4270,7 @@ namespace DryIoc
         private static readonly Setup _weaklyReferencedAndPreventDisposableInstanceSetup = Setup.With(weaklyReferenced: true, preventDisposal: true);
 
         // todo: v3: remove
-        /// <summary>Obsolete: use <see cref="AddInstance{TService}(DryIoc.IContainer,TService,bool,bool,object)"/></summary>
+        /// <summary>Obsolete: use <see cref="UseInstance{TService}"/></summary>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -4287,10 +4287,10 @@ namespace DryIoc
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void AddInstance<TService>(this IContainer container, TService instance,
+        public static void UseInstance<TService>(this IContainer container, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
-            container.AddInstance(typeof(TService), instance, preventDisposal, weaklyReferenced, serviceKey);
+            container.UseInstance(typeof(TService), instance, preventDisposal, weaklyReferenced, serviceKey);
         }
 
         /// <summary>Stores the externally created instance into open scope or singleton, 
@@ -4301,7 +4301,7 @@ namespace DryIoc
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void AddInstance(this IContainer container, Type serviceType, object instance,
+        public static void UseInstance(this IContainer container, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             if (instance != null)

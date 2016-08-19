@@ -140,7 +140,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, Service>();
-            container.AddInstance("Hello string!");
+            container.UseInstance("Hello string!");
             container.Register<ClientWithServiceAndStringProperty>(made: PropertiesAndFields.Auto);
 
             var client = container.Resolve<ClientWithServiceAndStringProperty>();

@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             using (var c = container.OpenScope())
             {
                 var impl = new int1impl();
-                c.AddInstance<int1>(impl);
+                c.UseInstance<int1>(impl);
 
                 Assert.AreSame(impl, c.Resolve<int1>());
             }
@@ -20,7 +20,7 @@ namespace DryIoc.IssuesTests
             using (var c = container.OpenScope())
             {
                 var impl = new int1impl();
-                c.AddInstance<int1>(impl);
+                c.UseInstance<int1>(impl);
 
                 c.Resolve<int1>();
                 Assert.AreSame(impl, c.Resolve<int1>());

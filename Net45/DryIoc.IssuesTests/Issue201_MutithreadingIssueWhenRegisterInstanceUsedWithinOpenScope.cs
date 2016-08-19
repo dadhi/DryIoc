@@ -25,7 +25,7 @@ namespace DryIoc.IssuesTests
                     {
                         using (var scope = container.OpenScope(ThreadScopeContext.ScopeContextName))
                         {
-                            scope.AddInstance(new S());
+                            scope.UseInstance(new S());
                             var u = scope.Resolve<U>();
 
                             await Task.Delay(5).ConfigureAwait(true);

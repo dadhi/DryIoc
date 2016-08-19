@@ -57,7 +57,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<BlueCheese>(serviceKey: "a");
-            container.AddInstance("King");
+            container.UseInstance("King");
 
             container.Register(Made.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
 
@@ -81,7 +81,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<BlueCheese>(serviceKey: "a");
-            container.AddInstance("King");
+            container.UseInstance("King");
 
             container.Register(Made.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
 
@@ -122,7 +122,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>())));
-            container.AddInstance("King", serviceKey: "key");
+            container.UseInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
 
@@ -133,7 +133,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>(IfUnresolved.ReturnDefault))));
-            container.AddInstance("King", serviceKey: "key");
+            container.UseInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
 

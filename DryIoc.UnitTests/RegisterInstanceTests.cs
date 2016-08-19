@@ -12,8 +12,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance("a");
-            container.AddInstance("z");
+            container.UseInstance("a");
+            container.UseInstance("z");
         }
 
         [Test]
@@ -21,11 +21,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance("a");
+            container.UseInstance("a");
 
             using (var scope = container.OpenScope())
             {
-                scope.AddInstance("bbbb");
+                scope.UseInstance("bbbb");
                 Assert.AreEqual("bbbb", scope.Resolve<string>());
             }
 
@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance(typeof(string), "ring", serviceKey: "MyPrecious");
+            container.UseInstance(typeof(string), "ring", serviceKey: "MyPrecious");
 
             var ring = container.Resolve<string>("MyPrecious");
             Assert.That(ring, Is.EqualTo("ring"));
@@ -52,7 +52,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.AddInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
+                container.UseInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
 
             Assert.AreEqual(ex.Error, Error.RegisteringInstanceNotAssignableToServiceType);
         }
@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
         public void Wiping_cache_should_not_delete_current_instance_value()
         {
             var container = new Container();
-            container.AddInstance("mine");
+            container.UseInstance("mine");
 
             var mine = container.WithoutCache().Resolve<string>();
             Assert.AreEqual("mine", mine);
@@ -96,10 +96,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance("hey");
+            container.UseInstance("hey");
             var regBefore = container.GetServiceRegistrations().Single();
 
-            container.AddInstance("nah");
+            container.UseInstance("nah");
             var regAfter = container.GetServiceRegistrations().Single();
 
             Assert.AreEqual(regBefore.Factory.FactoryID, regAfter.Factory.FactoryID);
@@ -147,7 +147,7 @@ namespace DryIoc.UnitTests
         public void Can_register_instance_with_keep_option()
         {
             var container = new Container();
-            container.AddInstance("a");
+            container.UseInstance("a");
 
             container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
@@ -160,8 +160,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance("a");
-            container.AddInstance("b");
+            container.UseInstance("a");
+            container.UseInstance("b");
 
             Assert.DoesNotThrow(() => 
             container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep));
@@ -172,9 +172,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance("a");
-            container.AddInstance("b");
-            container.AddInstance("x");
+            container.UseInstance("a");
+            container.UseInstance("b");
+            container.UseInstance("x");
 
             var x = container.Resolve<string>();
             Assert.AreEqual("x", x);
@@ -185,10 +185,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.AddInstance("a", serviceKey: "x");
+            container.UseInstance("a", serviceKey: "x");
             Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
 
-            container.AddInstance("b", serviceKey: "x");
+            container.UseInstance("b", serviceKey: "x");
             Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
         }
     }

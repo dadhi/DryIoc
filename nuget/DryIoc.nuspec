@@ -14,6 +14,7 @@
     <releaseNotes>
       v2.7.0
       - added: #195: Composable Metadata as a IDictionary&lt;string, object&gt;
+      - added: #232: Change RegisterInstance defaults to IfUnresolved.Replace and to Reuse.InCurrentScope
       - added: #304: Add option to pass values for some dependencies on Resolve
       - added: #313: Support non public constructors with ConstructorWithResolvableArguments
       - added: #314: Allow to inject non primitive external values

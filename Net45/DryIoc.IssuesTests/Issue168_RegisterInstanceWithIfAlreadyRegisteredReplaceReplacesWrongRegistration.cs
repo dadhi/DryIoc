@@ -9,8 +9,8 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container();
-            container.AddInstance<A>(new A());
-            container.AddInstance<B>(new B());
+            container.UseInstance<A>(new A());
+            container.UseInstance<B>(new B());
             container.Register<C>(Reuse.Transient);
             container.Resolve<C>(IfUnresolved.Throw);
         }

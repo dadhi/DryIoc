@@ -332,7 +332,7 @@ namespace DryIoc.UnitTests
             Assert.AreSame(context, container.Resolve<IContext>());
 
             // Removes service instance from Singleton scope by setting it to null.
-            container.AddInstance<IContext>(null);
+            container.UseInstance<IContext>(null);
 
             // Removes service registration.
             container.Unregister<IContext>();
@@ -533,7 +533,7 @@ namespace DryIoc.UnitTests
             container.Dispose();
 
             var ex = Assert.Throws<ContainerException>(() => 
-                container.AddInstance("a"));
+                container.UseInstance("a"));
 
             Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
         }

@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register<IHey, Hey>();
             container.Register(Made.Of(() => Decor(Arg.Of<IHey>(), Arg.Of<string>())), setup: Setup.Decorator);
-            container.AddInstance("no");
+            container.UseInstance("no");
 
             var hey = container.Resolve<IHey>();
 
