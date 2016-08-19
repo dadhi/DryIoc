@@ -84,7 +84,7 @@ namespace DryIoc.UnitTests.Memory
             var container = new Container();
 
             var service = new Service();
-            container.RegisterInstance(service);
+            container.AddInstance(service);
 
             var serviceRef = new WeakReference(service);
             container.Dispose();

@@ -11,7 +11,7 @@ namespace DryIoc.UnitTests
         public void Can_specify_to_dispose_registered_instance()
         {
             var container = new Container();
-            container.RegisterInstance(new DisposableService(), Reuse.Singleton);
+            container.AddInstance(new DisposableService());
             var service = container.Resolve<DisposableService>();
 
             container.Dispose();

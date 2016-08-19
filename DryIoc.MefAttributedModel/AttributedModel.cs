@@ -329,6 +329,7 @@ namespace DryIoc.MefAttributedModel
             object serviceKey;
             Type requiredServiceType;
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
+            var metadata = GetRequiredMetadata(attributes);
 
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
             if (import == null)
@@ -360,11 +361,18 @@ namespace DryIoc.MefAttributedModel
                     ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;
             }
 
+            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
+        }
+
+        private static KeyValuePair<string, object> GetRequiredMetadata(Attribute[] attributes)
+        {
             var withMetadataAttr = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
             var metadata = withMetadataAttr == null ? null : withMetadataAttr.Metadata;
-            var metadataKey = metadata == null ? null : Constants.ExportMetadataDefaultKey;
+            var metadataKey = withMetadataAttr == null ? null
+                : withMetadataAttr.MetadataKey == null ? Constants.ExportMetadataDefaultKey
+                : withMetadataAttr.MetadataKey;
 
-            return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata);
+            return new KeyValuePair<string, object>(metadataKey, metadata);
         }
 
         private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
@@ -934,7 +942,7 @@ namespace DryIoc.MefAttributedModel
 
             var metadata = !HasMetadataAttribute 
                 ? default(Func<object>)
-                : () => GetMetadata(attributes);
+                : () => GetExportedMetadata(attributes);
 
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
@@ -1022,17 +1030,20 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        private IDictionary<string, object> GetMetadata(Attribute[] attributes = null)
+        private IDictionary<string, object> GetExportedMetadata(Attribute[] attributes = null)
         {
             attributes = attributes ?? ImplementationType.GetAttributes();
-            var metadataAttr = attributes.FirstOrDefault(
-                a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
+            var metadata = attributes
+                .Where(a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
+                .ToDictionary(
+                    a => a is WithMetadataAttribute 
+                        ? (((WithMetadataAttribute)a).MetadataKey ?? Constants.ExportMetadataDefaultKey)
+                        : Constants.ExportMetadataDefaultKey,
+                    a => a is WithMetadataAttribute
+                        ? ((WithMetadataAttribute)a).Metadata
+                        : a);
 
-            var metadataValue = metadataAttr is WithMetadataAttribute
-                ? ((WithMetadataAttribute)metadataAttr).Metadata
-                : metadataAttr;
-
-            return new Dictionary<string, object> {{ Constants.ExportMetadataDefaultKey, metadataValue } };
+            return metadata.Count == 0 ? null : metadata;
         }
     }
 

@@ -631,7 +631,7 @@ namespace DryIocAttributes
     public class WithMetadataAttribute : Attribute
     {
         /// <summary>Metadata key in a dictionary</summary>
-        public readonly object MetadataKey;
+        public readonly string MetadataKey;
 
         /// <summary>Metadata value.</summary>
         public readonly object Metadata;
@@ -641,8 +641,8 @@ namespace DryIocAttributes
         /// <param name="metadata"></param>
         public WithMetadataAttribute(string metadataKey, object metadata)
         {
+            MetadataKey = metadataKey;
             Metadata = metadata;
-            MetadataKey = metadata;
         }
 
         /// <summary>Creates attribute</summary> <param name="metadata"></param>

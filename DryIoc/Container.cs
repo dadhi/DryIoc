@@ -4125,10 +4125,12 @@ namespace DryIoc
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup.Default"/>)</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        /// <remarks>The method should be used as the last resort only! Though powerful it is easy to get memory leaks
-        /// (due variables captured in delegate closure) and impossible to use in generation scenarios.
-        /// Consider using FactoryMethod instead: 
-        /// <code lang="cs"><![CDATA[container.Register<ICar>(with: Method.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.</remarks>
+        /// <remarks>IMPORTANT: The method should be used as the last resort only! Though powerful it is a black-box for container,
+        /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure), 
+        /// and impossible to use in compile-time scenarios.
+        /// Consider using <see cref="Made"/> instead: 
+        /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
+        /// </remarks>
         public static void RegisterDelegate<TService>(this IRegistrator registrator, Func<IResolver, TService> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
@@ -4147,6 +4149,12 @@ namespace DryIoc
         /// <param name="setup">(optional) factory setup, by default is (<see cref="Setup.Default"/>)</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <remarks>IMPORTANT: The method should be used as the last resort only! Though powerful it is a black-box for container,
+        /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure), 
+        /// and impossible to use in compile-time scenarios.
+        /// Consider using <see cref="Made"/> instead: 
+        /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
+        /// </remarks>
         public static void RegisterDelegate(this IRegistrator registrator, Type serviceType, Func<IResolver, object> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
@@ -4198,17 +4206,8 @@ namespace DryIoc
             }
         }
 
-
-        /// <summary>Registers an externally created object of<paramref name= "serviceType" />.
-        /// If no reuse specified instance will be stored in Singleton Scope, and disposed when container is disposed.</summary>
-        /// <param name="container">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="serviceType">Service type to register.</param>
-        /// <param name="instance">The pre-created instance of <paramref name="serviceType"/>.</param>
-        /// <param name="reuse">(optional) By default means <see cref="Reuse.Singleton"/> as the longest available.</param>
-        /// <param name="ifAlreadyRegistered">(optional) If Replace specified then existing instance may be replaced in scope without introducing new factory.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance.</param>
-        /// <param name="weaklyReferenced">(optional) Store as WeakReference. </param>
-        /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        // todo: v3: remove
+        /// <summary>Obsolete: use <see cref="AddInstance{TService}(DryIoc.IContainer,TService,bool,bool,object)"/></summary>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -4302,12 +4301,12 @@ namespace DryIoc
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void AddInstance<TService>(this IContainer container, Type serviceType, TService instance,
+        public static void AddInstance(this IContainer container, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             var scope = container.GetCurrentScope();
             var reuse = scope != null ? Reuse.InCurrentNamedScope(scope.Name) : Reuse.Singleton;
-            container.RegisterInstance(typeof(TService), instance, reuse, IfAlreadyRegistered.Replace,
+            container.RegisterInstance(serviceType, instance, reuse, IfAlreadyRegistered.Replace,
                 preventDisposal, weaklyReferenced, serviceKey);
         }
 
