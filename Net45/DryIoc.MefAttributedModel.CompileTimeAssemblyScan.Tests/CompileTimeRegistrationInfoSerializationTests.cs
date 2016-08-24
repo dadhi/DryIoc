@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         }
 
         [Test]
-        [Ignore]
+        [Explicit]
         public void Given_scnanned_assembly_When_serialize_data_Then_deserialize_will_return_the_same_data()
         {
             // Given

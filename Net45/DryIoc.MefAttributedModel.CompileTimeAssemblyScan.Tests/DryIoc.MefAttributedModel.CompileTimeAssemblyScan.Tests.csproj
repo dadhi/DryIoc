@@ -10,10 +10,11 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</RootNamespace>
     <AssemblyName>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,6 +24,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,17 +33,19 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <HintPath>..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="protobuf-net, Version=2.0.0.668, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\protobuf-net.2.0.0.668\lib\net35\protobuf-net.dll</HintPath>
+    <Reference Include="protobuf-net, Version=2.1.0.0, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\protobuf-net.2.1.0\lib\net45\protobuf-net.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="CompileTimeGeneratedRegistrator.cs">
@@ -61,29 +65,29 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
-      <Project>{9E67B15C-D721-4525-9DD7-6A6ED6137748}</Project>
+      <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
       <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
-      <Project>{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}</Project>
+      <Project>{bfb1206a-3545-4369-8f23-49fd1bffc362}</Project>
       <Name>DryIoc.MefAttributedModel</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
-      <Project>{3bbd5ccf-d87c-4650-b039-334767a7cedd}</Project>
+      <Project>{9fb3bbb2-30a6-4b67-9af7-ffc152920e49}</Project>
       <Name>DryIocAttributes</Name>
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{AE41DF42-6362-4843-84C5-C3C2AB29A3C7}</Project>
+      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
       <Private>False</Private>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />

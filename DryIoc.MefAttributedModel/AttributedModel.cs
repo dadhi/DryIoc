@@ -1104,8 +1104,8 @@ namespace DryIoc.MefAttributedModel
             code.Append("new FactoryMethodInfo { ");
             code.Append("DeclaringType = ").AppendType(DeclaringType).AppendLine(",");
             code.Append("MemberName = ").AppendString(MemberName);
-            if (MethodParameterTypes != null)
-                code.AppendArray(MethodParameterTypes);
+            if (!MethodParameterTypes.IsNullOrEmpty())
+                code.AppendLine(",").AppendArray(MethodParameterTypes);
             if (InstanceFactory != null)
                 InstanceFactory.ToCode(code.Append(",").AppendLine());
             return code.AppendLine().Append("}");
