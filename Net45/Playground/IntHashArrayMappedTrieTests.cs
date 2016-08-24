@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using DryIoc;
 
-namespace DryIoc.Playground
+namespace Playground
 {
-    public sealed class HashTrie2<V>
+    public sealed class IntHashTrie<V>
     {
-        public static readonly HashTrie2<V> Empty = new HashTrie2<V>();
+        public static readonly IntHashTrie<V> Empty = new IntHashTrie<V>();
 
         public V GetValueOrDefault(int hash, V defaultValue = default(V))
         {
@@ -19,7 +20,7 @@ namespace DryIoc.Playground
                 : ((HashTrieNode<V>)node).GetValueOrDefault(hash >> 5, defaultValue);
         }
 
-        public HashTrie2<V> AddOrUpdate(int hash, V value, UpdateMethod<V> updateValue = null)
+        public IntHashTrie<V> AddOrUpdate(int hash, V value, Update<V> updateValue = null)
         {
             var index = hash & 31; // index from 0 to 31
             var restOfHash = hash >> 5;
@@ -28,7 +29,7 @@ namespace DryIoc.Playground
             if (_indexBitmap == 0)
             {
                 newNodes[index] = restOfHash == 0 ? (object)value : HashTrieNode<V>.Empty.AddOrUpdate(restOfHash, value);
-                return new HashTrie2<V>(1u << index, newNodes);
+                return new IntHashTrie<V>(1u << index, newNodes);
             }
 
             Array.Copy(_nodes, 0, newNodes, 0, newNodes.Length);
@@ -36,7 +37,7 @@ namespace DryIoc.Playground
             if ((_indexBitmap & (1u << index)) == 0) // no nodes at the index, could be inserted.
             {
                 newNodes[index] = restOfHash == 0 ? (object)value : Empty.AddOrUpdate(restOfHash, value);
-                return new HashTrie2<V>(_indexBitmap | (1u << index), newNodes);
+                return new IntHashTrie<V>(_indexBitmap | (1u << index), newNodes);
             }
 
             var updatedNode = _nodes[index];
@@ -47,14 +48,14 @@ namespace DryIoc.Playground
             else // here the actual update should go, cause old and new nodes contain values.
                 updatedNode = updateValue == null ? value : updateValue((V)updatedNode, value);
             newNodes[index] = updatedNode;
-            return new HashTrie2<V>(_indexBitmap, newNodes);
+            return new IntHashTrie<V>(_indexBitmap, newNodes);
         }
 
         #region Implementation
 
-        private HashTrie2() { }
+        private IntHashTrie() { }
 
-        private HashTrie2(uint indexBitmap, params object[] nodes)
+        private IntHashTrie(uint indexBitmap, params object[] nodes)
         {
             _indexBitmap = indexBitmap;
             _nodes = nodes;
@@ -84,7 +85,7 @@ namespace DryIoc.Playground
             get { return _indexBitmap == 0; }
         }
 
-        public HashTrieNode<V> AddOrUpdate(int hash, V value, UpdateMethod<V> updateValue = null)
+        public HashTrieNode<V> AddOrUpdate(int hash, V value, Update<V> updateValue = null)
         {
             var index = hash & LEVEL_MASK; // index from 0 to 31
             var restOfHash = hash >> LEVEL_BITS;

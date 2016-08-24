@@ -16,7 +16,7 @@ namespace DryIoc.Playground
         public readonly int Height;
         public readonly IntTree<V> Left, Right;
 
-        public IntTree<V> AddOrUpdate(int key, V value, UpdateMethod<V> updateValue = null)
+        public IntTree<V> AddOrUpdate(int key, V value, Update<V> updateValue = null)
         {
             return Height == 0 ? new IntTree<V>(key, value, Empty, Empty)
                 : (key == Key ? new IntTree<V>(key, updateValue == null ? value : updateValue(Value, value), Left, Right)
@@ -101,7 +101,7 @@ namespace DryIoc.Playground
         public static readonly IntHashTree<K, V> Empty = new IntHashTree<K, V>(IntTree<KV<K, V>>.Empty);
         public bool IsEmpty { get { return _root.IsEmpty; } }
 
-        public IntHashTree<K, V> AddOrUpdate(K key, V value, UpdateMethod<V> updateValue = null)
+        public IntHashTree<K, V> AddOrUpdate(K key, V value, Update<V> updateValue = null)
         {
             return new IntHashTree<K, V>(
                 _root.AddOrUpdate(key.GetHashCode(), new KV<K, V>(key, value), UpdateValueWithRespectToConflicts(updateValue)));
@@ -138,7 +138,7 @@ namespace DryIoc.Playground
             _root = root;
         }
 
-        private static UpdateMethod<KV<K, V>> UpdateValueWithRespectToConflicts(UpdateMethod<V> updateValue)
+        private static Update<KV<K, V>> UpdateValueWithRespectToConflicts(Update<V> updateValue)
         {
             return (old, newOne) =>
             {
@@ -157,7 +157,7 @@ namespace DryIoc.Playground
             };
         }
 
-        private static KV<K, V> UpdateValue(KV<K, V> old, KV<K, V> newOne, UpdateMethod<V> updateValue)
+        private static KV<K, V> UpdateValue(KV<K, V> old, KV<K, V> newOne, Update<V> updateValue)
         {
             return updateValue == null ? newOne : new KV<K, V>(old.Key, updateValue(old.Value, newOne.Value));
         }

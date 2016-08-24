@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using DryIoc;
 using NUnit.Framework;
 
-namespace DryIoc.Playground
+namespace Playground
 {
     [TestFixture]
     [Explicit]
