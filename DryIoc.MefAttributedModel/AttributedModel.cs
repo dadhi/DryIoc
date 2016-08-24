@@ -47,10 +47,16 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
 
-        // todo: V3: Rename to WithImports and make the original method an obsolete.
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
         /// <returns>New rules with attributed model rules.</returns>
+        public static Rules WithImports(this Rules rules)
+        {
+            return rules.WithMefAttributedModel();
+        }
+
+        // todo: V3: Rename to WithImports and make the original method an obsolete.
+        /// <summary>Obsolete: replaced with more on point <see cref="WithImports"/>.</summary>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
             // hello, Max!!! we are Martians.
@@ -151,8 +157,12 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
+
+                var serviceKey = export.ServiceKeyInfo.Key;
+
+
                 registrator.Register(factory, export.ServiceType, 
-                    export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, 
+                    serviceKey, export.IfAlreadyRegistered, 
                     isStaticallyChecked: false); // todo: it may be set to true, cause we reflecting from the compiler checked code
             }
         }

@@ -137,7 +137,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_register_decorator_of_T_without_breaking_other_exports()
         {
-            var di = D.I.WithMefAttributedModel();
+            var di = DI.New(rules => rules.WithImports());
 
             di.RegisterExports(typeof(Y), typeof(X), typeof(DecoratorFactory));
 

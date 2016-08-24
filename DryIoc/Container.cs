@@ -9998,25 +9998,36 @@ namespace DryIoc.Experimental
     using System.Reflection;
 
     /// <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
-    public static class D
+    public static class DI
     {
+        /// <summary>Pre-configured auto-magic rules.</summary>
+        public static readonly Rules AutoRules = Rules.Default
+            .With(FactoryMethod.ConstructorWithResolvableArguments)
+            .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+            .WithTrackingDisposableTransients()
+            .WithAutoConcreteTypeResolution();
+
         /// <summary>Creates new default configured container</summary>
-        /// <value>New configured container.</value>
-        public static IContainer I
+        /// <param name="configure">(optional) Additional rules.</param>
+        /// <returns>New configured container.</returns>
+        public static IContainer New(Func<Rules, Rules> configure = null)
         {
-            get
-            {
-                return new Container(Rules.Default
-                    .With(FactoryMethod.ConstructorWithResolvableArguments)
-                    .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                    .WithTrackingDisposableTransients()
-                    .WithAutoConcreteTypeResolution());
-            }
+            var rules = configure == null ? AutoRules : configure(AutoRules);
+            return new Container(AutoRules);
         }
 
         /// <summary>Auto-wired resolution of T from the container.</summary>
         /// <typeparam name="T">Type of service to resolve.</typeparam>
-        /// <param name="container">(optional) Container </param>
+        /// <param name="assemblies">(optional) Assemblies to look for services implementations.</param>
+        /// <returns>Resolved service or throws.</returns>
+        public static T Get<T>(params Assembly[] assemblies)
+        {
+            return New().Get<T>(assemblies);
+        }
+
+        /// <summary>Auto-wired resolution of T from the container.</summary>
+        /// <typeparam name="T">Type of service to resolve.</typeparam>
+        /// <param name="container">(optional) Container to resolve from.</param>
         /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
         /// <returns>Resolved service or throws.</returns>
         public static T Get<T>(this IContainer container, params Assembly[] assemblies)
