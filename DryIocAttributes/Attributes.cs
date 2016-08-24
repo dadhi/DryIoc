@@ -620,14 +620,15 @@ namespace DryIocAttributes
     }
 
     /// <summary>Exports service with associated metadata key and value.
-    /// Key can be omitted asuming some default key to be used.</summary>
+    /// Key can be skipped</summary>
     [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class 
         | AttributeTargets.Method
         | AttributeTargets.Parameter 
         | AttributeTargets.Field 
         | AttributeTargets.Property, 
-        Inherited = false)]
+        Inherited = false,
+        AllowMultiple = true)]
     public class WithMetadataAttribute : Attribute
     {
         /// <summary>Metadata key in a dictionary</summary>

@@ -153,7 +153,7 @@ namespace DryIoc.MefAttributedModel
                 var export = exports[i];
                 registrator.Register(factory, export.ServiceType, 
                     export.ServiceKeyInfo.Key, export.IfAlreadyRegistered, 
-                    isStaticallyChecked: false); // todo: it may be set to true, cause we reflecting from the compiled code
+                    isStaticallyChecked: false); // todo: it may be set to true, cause we reflecting from the compiler checked code
             }
         }
 
@@ -192,7 +192,7 @@ namespace DryIoc.MefAttributedModel
 
             ExportedRegistrationInfo typeRegistrationInfo = null;
 
-            // Exports does not make sense for static or abstract type, 
+            // Export does not make sense for static or abstract type 
             // because the instance of such type can't be created (resolved).
             if (!type.IsStatic() && !type.IsAbstract())
             {
@@ -247,7 +247,7 @@ namespace DryIoc.MefAttributedModel
                     if (memberReturnType.IsGenericParameter &&
                         memberRegistrationInfo.FactoryType == DryIoc.FactoryType.Decorator)
                     {
-                        // note: the only possiblity for now for registering completely generic T service,
+                        // note: the only possibility for now for registering completely generic T service,
                         // is registering it as object.
                         var exports = memberRegistrationInfo.Exports;
                         for (var i = 0; i < exports.Length; ++i)
@@ -503,8 +503,6 @@ namespace DryIoc.MefAttributedModel
 
                 if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    if (info.HasMetadataAttribute)
-                        Throw.It(Error.UnsupportedMultipleMetadata, type);
                     info.HasMetadataAttribute = true;
                 }
             }
@@ -671,11 +669,10 @@ namespace DryIoc.MefAttributedModel
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
                 "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
-            UnsupportedMultipleMetadata = Of(
-                "Multiple associated metadata found while exporting {0}." + Environment.NewLine +
-                "Only single metadata is supported per implementation type, please remove the rest."),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
+            DuplicateMetadataKey = Of(
+                "Duplicate metadata key {0} for the already defined {1}."),
             NoExport = Of(
                 "At least one Export attributed should be defined for {0}."),
             ExportManyDoesNotExportAnyType = Of(
@@ -1033,17 +1030,28 @@ namespace DryIoc.MefAttributedModel
         private IDictionary<string, object> GetExportedMetadata(Attribute[] attributes = null)
         {
             attributes = attributes ?? ImplementationType.GetAttributes();
-            var metadata = attributes
-                .Where(a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
-                .ToDictionary(
-                    a => a is WithMetadataAttribute 
-                        ? (((WithMetadataAttribute)a).MetadataKey ?? Constants.ExportMetadataDefaultKey)
-                        : Constants.ExportMetadataDefaultKey,
-                    a => a is WithMetadataAttribute
-                        ? ((WithMetadataAttribute)a).Metadata
-                        : a);
+            var metaAttrs = attributes
+                .Where(a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
 
-            return metadata.Count == 0 ? null : metadata;
+            Dictionary<string, object> metaDict = null;
+            foreach (var metaAttr in metaAttrs)
+            {
+                var withMetaAttr = metaAttr as WithMetadataAttribute;
+                var metaKey = withMetaAttr != null 
+                    ? (withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey)
+                    : Constants.ExportMetadataDefaultKey;
+
+                var metaValue = withMetaAttr != null 
+                    ? withMetaAttr.Metadata : metaAttr;
+
+                if (metaDict != null && metaDict.ContainsKey(metaKey))
+                    Throw.It(Error.DuplicateMetadataKey, metaKey, metaDict);
+
+                metaDict = metaDict ?? new Dictionary<string, object>();
+                metaDict.Add(metaKey, metaValue);
+            }
+
+            return metaDict;
         }
     }
 
