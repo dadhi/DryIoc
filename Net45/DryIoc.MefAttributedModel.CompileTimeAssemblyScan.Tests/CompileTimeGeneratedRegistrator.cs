@@ -1217,7 +1217,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo("slow")
+        Decorator = new DecoratorInfo("slow")
     }, 
 
     new ExportedRegistrationInfo {
@@ -1239,7 +1239,7 @@ Decorator = new DecoratorInfo("slow")
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1261,7 +1261,7 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo("transact")
+        Decorator = new DecoratorInfo("transact")
     }, 
 
     new ExportedRegistrationInfo {
@@ -1282,7 +1282,7 @@ Decorator = new DecoratorInfo("transact")
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.CustomHandlerDecorator.ForSlowHandler),
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1304,7 +1304,7 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1367,7 +1367,7 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.Fooh)
+        Decorator = new DecoratorInfo(DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.Fooh)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1408,7 +1408,7 @@ Decorator = new DecoratorInfo(DryIoc.MefAttributedModel.UnitTests.CUT.BlahFooh.F
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1429,7 +1429,7 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1470,7 +1470,7 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1491,7 +1491,7 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Decorator,
         ConditionType = null,
-Decorator = new DecoratorInfo(null)
+        Decorator = new DecoratorInfo(null)
     }, 
 
     new ExportedRegistrationInfo {
@@ -1657,10 +1657,8 @@ Decorator = new DecoratorInfo(null)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OrangeFactory),
-MemberName = "Create",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OrangeFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OrangeFactory), MemberName = "Create",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OrangeFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1701,10 +1699,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OrangeFactory), nu
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory),
-MemberName = "CreateOrange",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), MemberName = "CreateOrange",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1725,10 +1721,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), nul
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory),
-MemberName = "CreateApple",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), MemberName = "CreateApple",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1769,10 +1763,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FruitFactory), nul
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory),
-MemberName = "CreateOrange",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory), MemberName = "CreateOrange",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1793,10 +1785,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory),
-MemberName = "CreateApple",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory), MemberName = "CreateApple",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1837,10 +1827,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedFruitFactory)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransientOrangeFactory),
-MemberName = "Create",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransientOrangeFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransientOrangeFactory), MemberName = "Create",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransientOrangeFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1881,10 +1869,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.TransientOrangeFac
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FuncFactory),
-MemberName = "Create",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FuncFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FuncFactory), MemberName = "Create",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FuncFactory), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1925,9 +1911,7 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.FuncFactory), null
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.BirdFactory),
-MemberName = "GetDuck"
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.BirdFactory), MemberName = "GetDuck"}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1948,9 +1932,7 @@ MemberName = "GetDuck"
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.BirdFactory),
-MemberName = "Chicken"
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.BirdFactory), MemberName = "Chicken"}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1971,9 +1953,7 @@ MemberName = "Chicken"
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.StaticBirdFactory),
-MemberName = "Chicken"
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.StaticBirdFactory), MemberName = "Chicken"}
     }, 
 
     new ExportedRegistrationInfo {
@@ -1994,9 +1974,7 @@ MemberName = "Chicken"
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.StaticBirdFactory),
-MemberName = "Duck"
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.StaticBirdFactory), MemberName = "Duck"}
     }, 
 
     new ExportedRegistrationInfo {
@@ -2037,10 +2015,8 @@ MemberName = "Duck"
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithString),
-MemberName = "GetValue",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithString), "hey", DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithString), MemberName = "GetValue",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithString), "hey", DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -2695,12 +2671,7 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithSt
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LogTableManager),
-MemberName = "Create",
-new Type[] {
-typeof(System.String)
-}
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.LogTableManager), MemberName = "Create", new String[] {"System.String"}}
     }, 
 
     new ExportedRegistrationInfo {
@@ -2781,10 +2752,8 @@ typeof(System.String)
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Constants),
-MemberName = "ExportedValue",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Constants), "SN.InstanceFactory", DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Constants), MemberName = "ExportedValue",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Constants), "SN.InstanceFactory", DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -2825,10 +2794,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Constants), "SN.In
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Provider),
-MemberName = "ExportedValue",
-new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Provider), "SN.InstanceFactory", DryIoc.IfAlreadyRegistered.AppendNotKeyed)
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Provider), MemberName = "ExportedValue",
+new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Provider), "SN.InstanceFactory", DryIoc.IfAlreadyRegistered.AppendNotKeyed)}
     }, 
 
     new ExportedRegistrationInfo {
@@ -2929,12 +2896,7 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Provider), "SN.Ins
         HasMetadataAttribute = false,
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
-new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Daah.FoohFactory<>),
-MemberName = "Create",
-new Type[] {
-typeof(A)
-}
-}
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.Daah.FoohFactory<>), MemberName = "Create", new String[] {"A"}}
     }, 
         };
     }
