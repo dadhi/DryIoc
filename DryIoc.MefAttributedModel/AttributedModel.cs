@@ -235,6 +235,9 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
+                        // todo: Review need for factory service key. 
+                        // - May be export factory AsWrapper to hide from collection resolution
+                        // - Use an unique (GUID) service key
                         var typeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
                         typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
@@ -913,31 +916,10 @@ namespace DryIoc.MefAttributedModel
             Made made = null;
             if (FactoryMethodInfo != null)
             {
-                var factoryMethod = FactoryMethodInfo;
-                var member = factoryMethod.DeclaringType
-                    .GetAllMembers(includeBase: true)
-                    .FirstOrDefault(m =>
-                    {
-                        if (m.Name != FactoryMethodInfo.MemberName)
-                            return false;
-
-                        var method = m as MethodInfo;
-                        if (method == null) // return early if it is property or field, no need to compare method signature
-                            return true;
-
-                        var parameters = method.GetParameters();
-                        var factoryMethodParameterTypeNames = factoryMethod.MethodParameterTypeFullNamesOrNames ?? ArrayTools.Empty<string>();
-                        if (parameters.Length != factoryMethodParameterTypeNames.Length)
-                            return false;
-
-                        return parameters.Length == 0 
-                            || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                                   .SequenceEqual(factoryMethodParameterTypeNames);
-                    })
-                    .ThrowIfNull();
+                var member = GetFactoryMemberOrDefault(FactoryMethodInfo).ThrowIfNull();
 
                 ServiceInfo factoryServiceInfo = null;
-                var export = factoryMethod.InstanceFactory;
+                var export = FactoryMethodInfo.InstanceFactory;
                 if (export != null)
                     factoryServiceInfo = ServiceInfo.Of(export.ServiceType, DryIoc.IfUnresolved.ReturnDefault, export.ServiceKey);
 
@@ -945,13 +927,39 @@ namespace DryIoc.MefAttributedModel
             }
 
             var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
-            return new ReflectionFactory(ImplementationType, reuse, made, GetSetup());
+            var setup = GetSetup();
+            return new ReflectionFactory(ImplementationType, reuse, made, setup);
         }
 
-        /// <summary>Create factory setup from DTO data.</summary>
-        /// <param name="attributes">Implementation type attributes provided to get optional metadata.</param>
-        /// <returns>Created factory setup.</returns>
-        public Setup GetSetup(Attribute[] attributes = null)
+        private static MemberInfo GetFactoryMemberOrDefault(FactoryMethodInfo factoryMethod)
+        {
+            var member = factoryMethod.DeclaringType
+                .GetAllMembers(includeBase: true)
+                .FirstOrDefault(m =>
+                {
+                    if (m.Name != factoryMethod.MemberName)
+                        return false;
+
+                    var method = m as MethodInfo;
+                    if (method == null) // return early if it is property or field, no need to compare method signature
+                        return true;
+
+                    var parameters = method.GetParameters();
+                    var factoryMethodParameterTypeNames = factoryMethod.MethodParameterTypeFullNamesOrNames ??
+                                                          ArrayTools.Empty<string>();
+                    if (parameters.Length != factoryMethodParameterTypeNames.Length)
+                        return false;
+
+                    return parameters.Length == 0
+                           || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
+                               .SequenceEqual(factoryMethodParameterTypeNames);
+                });
+
+            return member;
+    }
+
+        /// <summary>Create factory setup from registration DTO.</summary> <returns>Created factory setup.</returns>
+        public Setup GetSetup()
         {
             if (FactoryType == DryIoc.FactoryType.Wrapper)
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
@@ -960,9 +968,8 @@ namespace DryIoc.MefAttributedModel
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
-            var metadata = !HasMetadataAttribute 
-                ? default(Func<object>)
-                : () => GetExportedMetadata(attributes);
+            // Eagerly discover metadata from attributes
+            object metadata = !HasMetadataAttribute ? null : GetExportedMetadata();
 
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
@@ -1052,10 +1059,9 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        private IDictionary<string, object> GetExportedMetadata(Attribute[] attributes = null)
+        private IDictionary<string, object> GetExportedMetadata()
         {
-            attributes = attributes ?? ImplementationType.GetAttributes();
-            var metaAttrs = attributes
+            var metaAttrs = ImplementationType.GetAttributes()
                 .Where(a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
 
             Dictionary<string, object> metaDict = null;
