@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
 
             ctr.Register<A>();
             ctr.Register<B>();
-            ctr.Register(
+            ctr.Register<A>(
                 Made.Of(() => Decorate(Arg.Of<A>(), Arg.Of<Func<B>>())),
                 setup: Setup.Decorator);
 

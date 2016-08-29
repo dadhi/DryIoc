@@ -894,60 +894,74 @@ namespace DryIoc
             var serviceType = request.ServiceType;
             var container = request.Container;
 
+            // Define the list of ids for the already applied decorators
+            int[] appliedDecoratorIDs = null;
+
             // Get decorators for the service type
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
+            if (!decorators.IsNullOrEmpty())
+            {
+                appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
+                if (!appliedDecoratorIDs.IsNullOrEmpty())
+                    decorators = decorators.Where(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1)
+                        .ToArrayOrSelf();
+            }
 
             // Append open-generic decorators
+            var genericDecorators = ArrayTools.Empty<Factory>();
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
+                genericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
+
+            // Append generic type argument decorators, registered as Object
+            // Note: the condition for type args should be checked before generating the closed generic version
+            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
+            if (!typeArgDecorators.IsNullOrEmpty())
+                genericDecorators = genericDecorators.Append(
+                    typeArgDecorators.Where(f => f.CheckCondition(request)).ToArrayOrSelf());
+
+            // Filter out already applied generic decorators
+            // And combine with rest of decorators
+            if (!genericDecorators.IsNullOrEmpty())
             {
-                var openGenericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
-                if (!openGenericDecorators.IsNullOrEmpty())
+                appliedDecoratorIDs = appliedDecoratorIDs ?? GetAppliedDecoratorIDs(request);
+                if (!appliedDecoratorIDs.IsNullOrEmpty())
+                    genericDecorators = genericDecorators
+                        .Where(d => d.FactoryGenerator == null 
+                            ? appliedDecoratorIDs.IndexOf(d.FactoryID) == -1
+                            : d.FactoryGenerator.GeneratedFactories.Enumerate()
+                                .All(f => appliedDecoratorIDs.IndexOf(f.Value.FactoryID) == -1))
+                        .ToArrayOrSelf();
+
+                // Generate closed-generic versions
+                if (!genericDecorators.IsNullOrEmpty())
                 {
-                    var closeGenericDecorators = openGenericDecorators
-                        .Select(d => d.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
+                    genericDecorators = genericDecorators
+                        .Select(d => d.FactoryGenerator == null ? d 
+                            : d.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
                         .Where(d => d != null)
                         .ToArrayOrSelf();
-                    decorators = decorators.Append(closeGenericDecorators);
+                    decorators = decorators.Append(genericDecorators);
                 }
             }
 
-            // Append arbitrary object decorators
-            var objectDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
-            if (!objectDecorators.IsNullOrEmpty())
+            // Filter out the recursive decorators: 
+            // the decorator with the same which was applied before up to the root
+            if (!decorators.IsNullOrEmpty())
             {
-                var matchingClosedDecorators = objectDecorators
-                    .Where(f => f.CheckCondition(request))
-                    .Select(f => f.FactoryGenerator == null ? f : 
-                        f.FactoryGenerator.GetGeneratedFactoryOrDefault(request))
-                    .Where(f => f != null)
-                    .ToArray();
-                decorators = decorators.Append(matchingClosedDecorators);
+                var parent = request.ParentOrWrapper;
+                if (!parent.IsEmpty)
+                {
+                    var ids = parent.Enumerate().Select(p => p.FactoryID).ToArray();
+                    decorators = decorators
+                        .Where(d => ids.IndexOf(d.FactoryID) == -1)
+                        .ToArrayOrSelf();
+                }
             }
 
-            // Return fast if no decorators found
+            // Return earlier if no decorators found, or we have filtered out everything
             if (decorators.IsNullOrEmpty())
                 return null;
-
-            // Find applied decorators and exclude them from the list
-            var parent = request.Parent;
-            if (!parent.IsEmpty)
-            {
-                var appliedDecoratorIDs = parent.Enumerate()
-                    .Where(p => p.FactoryType == FactoryType.Decorator)
-                    .Select(d => d.FactoryID)
-                    .ToArray();
-
-                if (appliedDecoratorIDs.Length != 0)
-                {
-                    decorators = decorators
-                        .Where(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1)
-                        .ToArray();
-
-                    if (decorators.Length == 0)
-                        return null;
-                }
-            }
 
             Factory decorator;
             if (decorators.Length == 1)
@@ -958,7 +972,7 @@ namespace DryIoc
             }
             else
             {
-                // - Within remaining decorators find one with maximum Order
+                // Within remaining decorators find one with maximum Order
                 // or if no Order for all decorators, then the last registered - with maximum FactoryID
                 decorator = decorators
                     .OrderByDescending(d => ((Setup.DecoratorSetup)d.Setup).Order)
@@ -967,6 +981,18 @@ namespace DryIoc
             }
 
             return decorator == null ? null : decorator.GetExpressionOrDefault(request);
+        }
+
+        private static int[] GetAppliedDecoratorIDs(Request request)
+        {
+            var parent = request.ParentOrWrapper;
+            return parent.IsEmpty 
+                ? ArrayTools.Empty<int>()
+                : parent.Enumerate()
+                    .TakeWhile(p => p.FactoryType != FactoryType.Service) // until the another service
+                    .Where(p => p.FactoryType == FactoryType.Decorator)
+                    .Select(d => d.FactoryID)
+                    .ToArray();
         }
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
@@ -3192,7 +3218,7 @@ namespace DryIoc
                 .Append("::").Append(ConstructorOrMethodOrMember).ToString();
         }
 
-        private static FactoryMethodSelector Constructor(bool includeNonPublic = false)
+        private static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false)
         {
             return request =>
             {
@@ -3202,6 +3228,9 @@ namespace DryIoc
                     return null; // Delegate handling of constructor absence to the Caller code.
                 if (ctors.Length == 1)
                     return Of(ctors[0]);
+
+                if (!mostResolvable)
+                    return null;
 
                 var ctorsWithMoreParamsFirst = ctors
                     .Select(c => new { Ctor = c, Params = c.GetParameters() })
@@ -3256,14 +3285,14 @@ namespace DryIoc
         }
 
         /// <summary>Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
-        /// Works both for resolving service and Func&lt;TArgs..., TService&gt;</summary>
+        /// Works both for resolving service and Func{TArgs..., TService}</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = 
-            Constructor();
+            Constructor(mostResolvable: true);
 
         /// <summary>Searches for constructor (including non public ones) with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
-        /// Works both for resolving service and Func&lt;TArgs..., TService&gt;</summary>
+        /// Works both for resolving service and Func{TArgs..., TService}</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic = 
-            Constructor(includeNonPublic: true);
+            Constructor(mostResolvable: true, includeNonPublic: true);
 
         /// <summary>Checks that parameter is selected on requested path and with provided parameter selector.</summary>
         /// <param name="parameter"></param> <param name="parameterSelector"></param> <param name="request"></param>
@@ -4285,7 +4314,7 @@ namespace DryIoc
         /// <param name="container">Container to register</param>
         /// <param name="instance">Instance to register</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
-        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
+        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance<TService>(this IContainer container, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -4299,7 +4328,7 @@ namespace DryIoc
         /// <param name="serviceType">Runtime service type to register instance with</param>
         /// <param name="instance">Instance to register</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
-        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing ti GC it.</param>
+        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance(this IContainer container, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -6847,12 +6876,11 @@ namespace DryIoc
 
                 var implementationType = _openGenericFactory._implementationType;
 
-                var closedTypeArgs = 
-                      implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
-                        ? serviceType.GetGenericParamsAndArgs()
-                    : implementationType.IsGenericParameter
-                        ? new [] { serviceType }
-                        : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
+                var closedTypeArgs =
+                    implementationType == null ? serviceType.GetGenericParamsAndArgs()
+                  : implementationType == serviceType.GetGenericDefinitionOrNull() ? serviceType.GetGenericParamsAndArgs()
+                  : implementationType.IsGenericParameter ? new[] { serviceType }
+                  : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
 
                 if (closedTypeArgs == null)
                     return null;
@@ -6871,7 +6899,7 @@ namespace DryIoc
                     if (closedFactoryMethod == null) 
                         return null;
 
-                    closedMade = Made.Of(_ => closedFactoryMethod, closedMade.Parameters, closedMade.PropertiesAndFields);
+                    closedMade = Made.Of(closedFactoryMethod, closedMade.Parameters, closedMade.PropertiesAndFields);
                 }
 
                 Type closedImplementationType = null;
@@ -8425,7 +8453,9 @@ namespace DryIoc
             return other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
                 && other.IfUnresolved == IfUnresolved
-                && other.ServiceKey == ServiceKey
+                && Equals(other.ServiceKey, ServiceKey)
+                && other.MetadataKey == MetadataKey
+                && Equals(other.Metadata, Metadata)
 
                 && other.FactoryType == FactoryType
                 && other.ImplementationType == ImplementationType
@@ -10014,7 +10044,7 @@ namespace DryIoc.Experimental
         public static IContainer New(Func<Rules, Rules> configure = null)
         {
             var rules = configure == null ? AutoRules : configure(AutoRules);
-            return new Container(AutoRules);
+            return new Container(rules);
         }
 
         /// <summary>Auto-wired resolution of T from the container.</summary>
