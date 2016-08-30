@@ -1958,9 +1958,9 @@ namespace DryIoc
         public static IContainer WithDependencies(this IContainer container,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            return container.With(rules => rules.With(
+            return container.With(rules => rules.With(Made.Of(
                 parameters: rules.Parameters.OverrideWith(parameters),
-                propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields),
+                propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields)),
                 overrideRegistrationMade: true));
         }
 
@@ -2779,19 +2779,30 @@ namespace DryIoc
         /// <summary>Instructs to override per-registration made settings with these rules settings.</summary>
         public bool OverrideRegistrationMade { get; private set; }
 
-        /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
-        /// <returns>New rules with specified <see cref="Made"/>.</returns>
+        /// <summary>Returns new instance of the rules new Made composed out of
+        /// provided factory method, parameters, propertiesAndFields.</summary>
+        /// <returns>New rules.</returns>
         public Rules With(
             FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null,
-            bool overrideRegistrationMade = false)
+            PropertiesAndFieldsSelector propertiesAndFields = null)
+        {
+            return With(Made.Of(factoryMethod, parameters, propertiesAndFields));
+        }
+
+        /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
+        /// <param name="made">New Made.Of rules.</param>
+        /// <param name="overrideRegistrationMade">Instructs to override registration level Made.Of</param>
+        /// <returns>New rules.</returns>
+        public Rules With(Made made, bool overrideRegistrationMade = false)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._made = Made.Of(
-                factoryMethod ?? newRules._made.FactoryMethod,
-                parameters ?? newRules._made.Parameters,
-                propertiesAndFields ?? newRules._made.PropertiesAndFields);
+            newRules._made = _made == Made.Default
+                ? made
+                : Made.Of(
+                    made.FactoryMethod ?? _made.FactoryMethod,
+                    made.Parameters ?? _made.Parameters,
+                    made.PropertiesAndFields ?? _made.PropertiesAndFields);
             newRules.OverrideRegistrationMade = overrideRegistrationMade;
             return newRules;
         }
