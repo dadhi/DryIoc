@@ -356,6 +356,26 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
         }
 
+        [Test, Ignore("#328. Is not fixed yet. Caching of array.")]
+        public void Should_throw_for_collection_of_scoped_services_if_no_open_scope()
+        {
+            var container = new Container();
+
+            container.Register<IAction, ActionOne>(Reuse.InCurrentNamedScope("A"));
+            container.Register<IAction, ActionTwo>(Reuse.InCurrentNamedScope("B"));
+
+            using (var aScope = container.OpenScope("A"))
+            {
+                var actionsA = aScope.Resolve<IAction[]>();
+            }
+
+            var actions = container.Resolve<IAction[]>();
+        }
+
+        public interface IAction { }
+        public class ActionOne : IAction { }
+        public class ActionTwo : IAction { }
+
         internal class IndependentService : IService { }
 
         internal class ServiceWithFuncConstructorDependency
