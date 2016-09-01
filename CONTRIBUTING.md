@@ -4,7 +4,7 @@
 
 Your contribution to the DryIoc project and extensions is highly appreciated.
 
-Changes can come in a form of:
+It may come as
 
 - Comments to existing issues
 - New issues: bugs, enhancements, and feature proposals

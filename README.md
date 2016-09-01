@@ -126,8 +126,7 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
     - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.SignalR](Extensions\SignalR)
-    - [DryIoc.Dnx.DependencyInjection-RC](https://www.nuget.org/packages/DryIoc.dnx.dependencyinjection) 
-for AspNetCore (vNext / DNX) 
+    - [DryIoc.Microsoft.DependencyInjection](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection) adapter for Asp.NET Core
 
 - OWIN:
 
