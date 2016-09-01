@@ -144,7 +144,7 @@ namespace DryIoc.Playground
             var keyHash = key.GetHashCode();
             var value = "test";
 
-            UpdateMethod<KeyValuePair<Type, string>[]> updateValue = (old, added) =>
+            Update<KeyValuePair<Type, string>[]> updateValue = (old, added) =>
             {
                 var newItem = added[0];
                 var oldItemCount = old.Length;

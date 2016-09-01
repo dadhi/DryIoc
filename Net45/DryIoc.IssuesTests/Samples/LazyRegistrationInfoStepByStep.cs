@@ -63,7 +63,7 @@ namespace DryIoc.IssuesTests.Samples
                     if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
                         regInfoByServiceTypeNameIndex.Add(serviceTypeFullName, 
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKeyInfo.Key, lazyRegistration));
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
                 }
             }
 

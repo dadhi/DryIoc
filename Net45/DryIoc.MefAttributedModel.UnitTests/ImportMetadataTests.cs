@@ -39,10 +39,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(X), typeof(A), typeof(XX));
 
             var xx = container.Resolve<XX>();
+            Assert.IsNotNull(xx);
         }
 
         [Export]
         [WithMetadata("a", 1)]
+        [WithMetadata("b")]
         public class X
         {
         }

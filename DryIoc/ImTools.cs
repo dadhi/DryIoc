@@ -267,7 +267,7 @@ namespace DryIoc
     /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
     /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
     /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
-    public sealed class KV<K, V>
+    public class KV<K, V>
     {
         /// <summary>Key.</summary>
         public readonly K Key;

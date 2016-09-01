@@ -52,7 +52,6 @@
     <Compile Include="ExpressionTreeTests.cs" />
     <Compile Include="FasterAppendStore.cs" />
     <Compile Include="GetInterfaceMapCustomImplTests.cs" />
-    <Compile Include="HashArrayMappedTrieTests.cs" />
     <Compile Include="HashTree.cs" />
     <Compile Include="HashTreeTests.cs" />
     <Compile Include="ImTreeArray.cs" />
@@ -60,7 +59,6 @@
     <Compile Include="HashTreeAccessSpeedTests.cs" />
     <Compile Include="HashTreeEnumerationSpeedTests.cs" />
     <Compile Include="HashTreeWithMonoidUpdate.cs" />
-    <Compile Include="HashTrieWithIntKeyTests.cs" />
     <Compile Include="IntNTree.cs" />
     <Compile Include="IntNTreeTests.cs" />
     <Compile Include="IntTreeTests.cs" />

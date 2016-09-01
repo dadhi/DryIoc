@@ -101,7 +101,28 @@ namespace DryIoc.UnitTests
 
             container.Resolve<InitializableService>();
 
-            CollectionAssert.AreEqual(new[] { "Container", "InitializableService" }, log);
+            CollectionAssert.AreEqual(new[] { "InitializableService" }, log);
+        }
+
+        [Test]
+        public void Can_register_initializer_for_both_service_and_dependency()
+        {
+            var container = new Container();
+            container.RegisterMany(new[] { typeof(S), typeof(D) });
+
+            var log = new List<string>();
+            container.RegisterInitializer<object>((x, _) => log.Add(x.GetType().Name));
+
+            container.Resolve<S>();
+
+            CollectionAssert.AreEqual(new[] { "D", "S" }, log);
+        }
+
+        public class D { }
+
+        public class S
+        {
+            public S(D d) { }
         }
 
         [Test]

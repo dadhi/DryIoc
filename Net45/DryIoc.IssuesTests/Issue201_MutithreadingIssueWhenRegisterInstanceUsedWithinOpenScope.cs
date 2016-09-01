@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
 {
     class Issue201_MutithreadingIssueWhenRegisterInstanceUsedWithinOpenScope
     {
-        [Test]
+        [Test] // todo: fails sometime
         public void RegisterInstance_InThread_Replace_should_return_the_same_in_thread()
         {
             var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());

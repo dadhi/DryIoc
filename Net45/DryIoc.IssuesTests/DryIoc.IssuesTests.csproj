@@ -135,6 +135,7 @@
     <Compile Include="Issue311_Resolve_does_not_work_with_InThread_registration.cs" />
     <Compile Include="Issue315_Decorator_of_wrapper.cs" />
     <Compile Include="Issue318_RegisterInstance_doesnt_honour_current_OpenScope.cs" />
+    <Compile Include="Issue333_Container_should_resolve_IEnumerable_instances_registered_without_serviceKey.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

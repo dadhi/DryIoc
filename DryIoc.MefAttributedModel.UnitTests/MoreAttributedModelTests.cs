@@ -1,5 +1,4 @@
-﻿using System.Linq.Expressions;
-using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using DryIocAttributes;
 using NUnit.Framework;
 
@@ -35,14 +34,14 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Registering_service_with_metadata_provided_with_multiple_attributes_should_fail_Cause_of_underministic_behavior()
+        public void Registering_with_etadata_with_duplicate_key_should_throw()
         {
             var container = new Container();
 
             var ex = Assert.Throws<AttributedModelException>(() =>
                 container.RegisterExports(typeof(ThrowsForMultipleMeta)));
-            Assert.AreEqual(ex.Error, Error.UnsupportedMultipleMetadata);
 
+            Assert.AreEqual(Error.DuplicateMetadataKey, ex.Error);
         }
 
         [Test]

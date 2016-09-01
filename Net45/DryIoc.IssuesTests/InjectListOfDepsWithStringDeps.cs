@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var di = Experimental.D.I;
+            var di = DI.New();
 
             di.UseInstance("a", serviceKey: "x");
             di.UseInstance("b", serviceKey: "y");
