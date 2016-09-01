@@ -10,11 +10,11 @@ namespace DryIoc.WebApi.UnitTests
 
         public class A
         {
-            public TestRequestMessage Request { get; set; }
+            public TestRequestMessage Message { get; set; }
 
             public A(TestRequestMessage r)
             {
-                Request = r;
+                Message = r;
             }
         }
 
@@ -40,9 +40,10 @@ namespace DryIoc.WebApi.UnitTests
                         scope.UseInstance(message);
 
                         var a = scope.Resolve<A>();
+                        Assert.AreSame(message, a.Message);
                         await Task.Delay(5);//processing request
-                        Assert.IsNotNull(a.Request);
-                        Assert.AreSame(a.Request, scope.Resolve<A>().Request);
+                        Assert.IsNotNull(a.Message);
+                        Assert.AreSame(a.Message, scope.Resolve<A>().Message);
                     }
                 });
             }
