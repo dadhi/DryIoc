@@ -535,7 +535,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.UseInstance("a"));
 
-            Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
+            Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));
         }
 
         [Test]

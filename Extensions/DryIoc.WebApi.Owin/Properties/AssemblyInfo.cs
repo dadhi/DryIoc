@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc")]
-[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2014-2016 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

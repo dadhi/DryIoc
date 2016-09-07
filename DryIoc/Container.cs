@@ -1174,7 +1174,7 @@ namespace DryIoc
 
         #region Factories Add/Get
 
-        private sealed class FactoriesEntry
+        internal sealed class FactoriesEntry
         {
             public readonly DefaultKey LastDefaultKey;
             public readonly ImTreeMap<object, Factory> Factories;
@@ -1320,10 +1320,142 @@ namespace DryIoc
         private readonly SingletonScope _singletonScope;
         private readonly object[] _singletonItems;
 
-        private readonly IScope _openedScope;
+        internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
-        private sealed class Registry
+        internal void AddInstance(Type serviceType, object instance, object serviceKey)
+        {
+            ThrowIfContainerDisposed();
+
+            if (instance != null)
+                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
+
+            // todo: hack for now accessing the internals
+            var scope = _openedScope ?? _singletonScope;
+            var scoped = scope != _singletonScope;
+
+            // todo: get an id
+            var instanceFactoryId = 0;
+
+            _registry.Swap(r =>
+            {
+                AddInstanceFactory factory;
+                var entry = r.Services.GetValueOrDefault(serviceType);
+                if (entry == null)
+                {
+                    factory = new AddInstanceFactory(scoped);
+                    instanceFactoryId = factory.FactoryID;
+                    var newServices = serviceKey == null
+                        ? r.Services.AddOrUpdate(serviceType, factory)
+                        : r.Services.AddOrUpdate(serviceType,
+                            new FactoriesEntry(DefaultKey.Value, ImTreeMap<object, Factory>.Empty
+                                .AddOrUpdate(serviceKey, factory)));
+                    return r.WithServices(newServices);
+                }
+
+                var existingFactory = entry as AddInstanceFactory;
+                if (existingFactory != null)
+                {
+                    if (serviceKey == null)
+                    {
+                        instanceFactoryId = existingFactory.FactoryID;
+                        return r;
+                    }
+
+                    factory = new AddInstanceFactory(scoped);
+                    instanceFactoryId = factory.FactoryID;
+                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
+                        new FactoriesEntry(DefaultKey.Value, ImTreeMap<object, Factory>.Empty
+                            .AddOrUpdate(DefaultKey.Value, existingFactory)
+                            .AddOrUpdate(serviceKey, factory))));
+                }
+
+                // add instance factory to other existing factory
+                var nonInstanceFactory = entry as Factory;
+                if (nonInstanceFactory != null)
+                {
+                    factory = new AddInstanceFactory(scoped);
+                    instanceFactoryId = factory.FactoryID;
+                    var lastDefaultKey = serviceKey == null ? DefaultKey.Value.Next() : DefaultKey.Value;
+                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
+                        new FactoriesEntry(lastDefaultKey, ImTreeMap<object, Factory>.Empty
+                            .AddOrUpdate(DefaultKey.Value, nonInstanceFactory)
+                            .AddOrUpdate(serviceKey ?? lastDefaultKey, factory))));
+                }
+
+                var factoriesEntry = (FactoriesEntry)entry;
+                if (serviceKey == null)
+                {
+                    // reuse last factory if any
+                    if (factoriesEntry.LastDefaultKey != null)
+                    {
+                        var existingLastDefaultFactory = factoriesEntry.Factories.GetValueOrDefault(factoriesEntry.LastDefaultKey);
+                        instanceFactoryId = existingLastDefaultFactory.FactoryID;
+                        return r;
+                    }
+
+                    factory = new AddInstanceFactory(scoped);
+                    instanceFactoryId = factory.FactoryID;
+                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
+                        new FactoriesEntry(DefaultKey.Value,
+                            factoriesEntry.Factories.AddOrUpdate(DefaultKey.Value, factory))));
+                }
+
+                var existingKeyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
+                if (existingKeyedFactory != null)
+                {
+                    instanceFactoryId = existingKeyedFactory.FactoryID;
+                    return r;
+                }
+
+                factory = new AddInstanceFactory(scoped);
+                instanceFactoryId = factory.FactoryID;
+                return r.WithServices(r.Services.AddOrUpdate(serviceType,
+                    new FactoriesEntry(factoriesEntry.LastDefaultKey,
+                        factoriesEntry.Factories.AddOrUpdate(serviceKey, factory))));
+            });
+
+            var instanceId = scope.GetScopedItemIdOrSelf(instanceFactoryId);
+            scope.SetOrAdd(instanceId, instance);
+        }
+
+        // todo: for now it is only factory id provider to identify 
+        internal class AddInstanceFactory : Factory
+        {
+            private static readonly Expression _singletonScopeExpr = Expression.Property(ScopesExpr, "SingletonScope");
+            private static readonly Expression _scopeExpr = Expression.Call(ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
+                Expression.Constant(null), Expression.Constant(true));
+
+            private readonly bool _scoped;
+
+            public AddInstanceFactory(bool scoped)
+            {
+                _scoped = scoped;
+            }
+
+            public override Expression CreateExpressionOrDefault(Request request)
+            {
+                var getInstanceExpr = Expression.Constant(null); // todo: review
+
+                var scopedId = _scoped ? FactoryID
+                    : request.Scopes.SingletonScope.GetScopedItemIdOrSelf(FactoryID);
+
+                var scopeExpr = _scoped ? _scopeExpr : _singletonScopeExpr;
+
+                var serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+                    Expression.Constant(scopedId),
+                    Expression.Lambda<CreateScopedValue>(getInstanceExpr, ArrayTools.Empty<ParameterExpression>()));
+
+                return Expression.Convert(serviceExpr, request.ServiceType);
+            }
+
+            public override Expression GetExpressionOrDefault(Request request)
+            {
+                return CreateExpressionOrDefault(request);
+            }
+        }
+
+        internal sealed class Registry
         {
             public static readonly Registry Empty = new Registry();
 
@@ -1382,7 +1514,7 @@ namespace DryIoc
                 _isChangePermitted = isChangePermitted;
             }
 
-            private Registry WithServices(ImTreeMap<Type, object> services)
+            internal Registry WithServices(ImTreeMap<Type, object> services)
             {
                 return services == Services ? this :
                     new Registry(services, Decorators, Wrappers,
@@ -1582,7 +1714,7 @@ namespace DryIoc
                     });
                 }
 
-                // Note: We are reusing replaced factory (with same setup and reuse) cache by inheriting its ID.
+                // Note: We are reusing replaced factory (with same setup and reuse) by using the ID.
                 // It is possible because cache depends only on ID.
                 var reuseReplacedInstanceFactory = false;
                 if (replacedFactory != null)
@@ -4305,9 +4437,12 @@ namespace DryIoc
                 .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
         }
 
-        private static readonly Setup _weaklyReferencedInstanceSetup = Setup.With(weaklyReferenced: true);
-        private static readonly Setup _preventDisposableInstanceSetup = Setup.With(preventDisposal: true);
-        private static readonly Setup _weaklyReferencedAndPreventDisposableInstanceSetup = Setup.With(weaklyReferenced: true, preventDisposal: true);
+        private static readonly Setup _weaklyReferencedInstanceSetup = 
+            Setup.With(weaklyReferenced: true, asResolutionCall: true);
+        private static readonly Setup _preventDisposableInstanceSetup = 
+            Setup.With(preventDisposal: true, asResolutionCall: true);
+        private static readonly Setup _weaklyReferencedAndPreventDisposableInstanceSetup = 
+            Setup.With(weaklyReferenced: true, preventDisposal: true, asResolutionCall: true);
 
         // todo: v3: remove
         /// <summary>Obsolete: use <see cref="UseInstance{TService}"/></summary>
@@ -4333,6 +4468,14 @@ namespace DryIoc
             container.UseInstance(typeof(TService), instance, preventDisposal, weaklyReferenced, serviceKey);
         }
 
+        /// <summary>Adds instance to container singletons or scoped container scope.</summary>
+        public static void AddInstance<TService>(this IContainer container, TService instance, 
+            object serviceKey = null)
+        {
+            // todo: hack for now
+            ((Container)container).AddInstance(typeof(TService), instance, serviceKey);
+        }
+
         /// <summary>Stores the externally created instance into open scope or singleton, 
         /// replacing the existing registration and instance if any.</summary>
         /// <param name="container">Container to register</param>
@@ -4344,49 +4487,52 @@ namespace DryIoc
         public static void UseInstance(this IContainer container, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
-            if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
+            ((Container)container).AddInstance(serviceType, instance, serviceKey);
 
-            var scope = container.GetCurrentScope();
-            var reuse = scope != null ? Reuse.InCurrentNamedScope(scope.Name) : Reuse.Singleton;
 
-            var setup = Setup.Default;
-            if (preventDisposal)
-            {
-                instance = new[] { instance };
-                setup = _preventDisposableInstanceSetup;
-            }
-            if (weaklyReferenced)
-            {
-                instance = new WeakReference(instance);
-                setup = preventDisposal
-                    ? _weaklyReferencedAndPreventDisposableInstanceSetup
-                    : _weaklyReferencedInstanceSetup;
-            }
+            //if (instance != null)
+            //    instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
-            var factories = container.GetAllServiceFactories(serviceType);
-            if (serviceKey != null)
-                factories = factories.Where(f => serviceKey.Equals(f.Key));
+            //var scope = ((Container)container)._openedScope;
+            //var reuse = scope != null ? Reuse.InCurrentScope : Reuse.Singleton;
 
-            InstanceFactory factory = null;
+            //var setup = Setup.Default;
+            //if (preventDisposal)
+            //{
+            //    instance = new[] { instance };
+            //    setup = _preventDisposableInstanceSetup;
+            //}
+            //if (weaklyReferenced)
+            //{
+            //    instance = new WeakReference(instance);
+            //    setup = preventDisposal
+            //        ? _weaklyReferencedAndPreventDisposableInstanceSetup
+            //        : _weaklyReferencedInstanceSetup;
+            //}
 
-            // Replace the single factory
-            var factoriesList = factories.ToArray();
-            if (factoriesList.Length == 1)
-                factory = factoriesList[0].Value as InstanceFactory;
+            //var factories = container.GetAllServiceFactories(serviceType);
+            //if (serviceKey != null)
+            //    factories = factories.Where(f => serviceKey.Equals(f.Key));
 
-            if (factory != null && factory.Reuse == reuse && factory.Setup == setup)
-                factory.ReplaceInstance(instance);
-            else
-            {
-                factory = new InstanceFactory(instance, reuse, setup);
-                container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Replace, isStaticallyChecked: false);
-            }
+            //InstanceFactory factory = null;
 
-            var request = container.EmptyRequest.Push(serviceType, serviceKey);
-            reuse.GetScopeOrDefault(request)
-                .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-                .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
+            //// Replace the single factory
+            //var factoriesList = factories.ToArray();
+            //if (factoriesList.Length == 1)
+            //    factory = factoriesList[0].Value as InstanceFactory;
+
+            //if (factory != null && factory.Reuse == reuse && factory.Setup == setup)
+            //    factory.ReplaceInstance(instance);
+            //else
+            //{
+            //    factory = new InstanceFactory(instance, reuse, setup);
+            //    container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Replace, isStaticallyChecked: false);
+            //}
+
+            //var request = container.EmptyRequest.Push(serviceType, serviceKey);
+            //reuse.GetScopeOrDefault(request)
+            //    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
+            //    .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -6269,32 +6415,6 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private static IReuse GetTransientDisposableTrackingReuse(Request request)
-        {
-            // Track in parent's scope
-            var parent = request.GetParentOrFuncOrEmpty(firstNonTransientParent: true);
-            if (parent.FactoryType == FactoryType.Wrapper)
-                return null;
-
-            // If no reused parent, then track in current open scope if any
-            // NOTE: No tracking in singleton scope cause it is most likely a memory leak.
-            var reuse = parent.Reuse;
-            if (reuse == null)
-            {
-                var currentScope = request.Scopes.GetCurrentScope();
-                if (currentScope != null)
-                    reuse = DryIoc.Reuse.InCurrentScope;
-            }
-
-            return reuse;
-        }
-
-        private bool IsDisposableService(Request request)
-        {
-            return request.GetActualServiceType().IsAssignableTo(typeof(IDisposable)) 
-                || ImplementationType.IsAssignableTo(typeof(IDisposable));
-        }
-
         /// <summary>Applies reuse to created expression. 
         /// Actually wraps passed expression in scoped access and produces another expression.</summary>
         /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
@@ -6425,6 +6545,32 @@ namespace DryIoc
 
         private static int _lastFactoryID;
         private Setup _setup;
+
+        private static IReuse GetTransientDisposableTrackingReuse(Request request)
+        {
+            // Track in parent's scope
+            var parent = request.GetParentOrFuncOrEmpty(firstNonTransientParent: true);
+            if (parent.FactoryType == FactoryType.Wrapper)
+                return null;
+
+            // If no reused parent, then track in current open scope if any
+            // NOTE: No tracking in singleton scope cause it is most likely a memory leak.
+            var reuse = parent.Reuse;
+            if (reuse == null)
+            {
+                var currentScope = request.Scopes.GetCurrentScope();
+                if (currentScope != null)
+                    reuse = DryIoc.Reuse.InCurrentScope;
+            }
+
+            return reuse;
+        }
+
+        private bool IsDisposableService(Request request)
+        {
+            return request.GetActualServiceType().IsAssignableTo(typeof(IDisposable))
+                || ImplementationType.IsAssignableTo(typeof(IDisposable));
+        }
 
         #endregion
     }

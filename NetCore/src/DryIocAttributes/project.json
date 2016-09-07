@@ -1,10 +1,10 @@
 ﻿{
-  "version": "2.7.1-*",
+  "version": "2.6.0-*",
 
   "buildOptions": {
     "compile": [
-      "../../../DryIoc/Container.cs",
-      "../../../DryIoc/ImTools.cs"
+      "../../../DryIocAttributes/Attributes.cs",
+      "../../../DryIocAttributes/Ported-net40.cs"
     ]
   },
 
