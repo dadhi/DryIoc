@@ -1179,10 +1179,24 @@ namespace DryIoc
             public readonly DefaultKey LastDefaultKey;
             public readonly ImTreeMap<object, Factory> Factories;
 
+            // lastDefaultKey may be null
             public FactoriesEntry(DefaultKey lastDefaultKey, ImTreeMap<object, Factory> factories)
             {
                 LastDefaultKey = lastDefaultKey;
                 Factories = factories;
+            }
+
+            public static readonly FactoriesEntry Empty = new FactoriesEntry(null, ImTreeMap<object, Factory>.Empty);
+
+            public FactoriesEntry With(Factory factory, object serviceKey = null)
+            {
+                var lastDefaultKey = serviceKey != null ? LastDefaultKey // remains the same
+                    : LastDefaultKey == null ? DefaultKey.Value 
+                    : LastDefaultKey.Next();
+
+                var factories = Factories.AddOrUpdate(serviceKey ?? lastDefaultKey, factory);
+
+                return new FactoriesEntry(lastDefaultKey, factories);
             }
         }
 
@@ -1345,9 +1359,7 @@ namespace DryIoc
 
                     var servicesWithFactory = serviceKey == null
                         ? r.Services.AddOrUpdate(serviceType, newInstanceFactory)
-                        : r.Services.AddOrUpdate(serviceType,
-                            new FactoriesEntry(DefaultKey.Value, ImTreeMap<object, Factory>.Empty
-                                .AddOrUpdate(serviceKey, newInstanceFactory)));
+                        : r.Services.AddOrUpdate(serviceType, FactoriesEntry.Empty.With(newInstanceFactory, serviceKey));
 
                     return r.WithServices(servicesWithFactory);
                 }
@@ -1365,9 +1377,7 @@ namespace DryIoc
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        new FactoriesEntry(DefaultKey.Value, ImTreeMap<object, Factory>.Empty
-                            .AddOrUpdate(DefaultKey.Value, instanceFactory)
-                            .AddOrUpdate(serviceKey, newInstanceFactory))));
+                        FactoriesEntry.Empty.With(instanceFactory).With(newInstanceFactory, serviceKey)));
                 }
 
                 // add instance factory to other existing factory
@@ -1377,11 +1387,8 @@ namespace DryIoc
                     newInstanceFactory = new AddInstanceFactory(scoped);
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
-                    var lastDefaultKey = serviceKey == null ? DefaultKey.Value.Next() : DefaultKey.Value;
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        new FactoriesEntry(lastDefaultKey, ImTreeMap<object, Factory>.Empty
-                            .AddOrUpdate(DefaultKey.Value, nonInstanceFactory)
-                            .AddOrUpdate(serviceKey ?? lastDefaultKey, newInstanceFactory))));
+                        FactoriesEntry.Empty.With(nonInstanceFactory).With(newInstanceFactory, serviceKey)));
                 }
 
                 // the only remaining option is multiple factories entry
@@ -1409,10 +1416,8 @@ namespace DryIoc
                         newInstanceFactory = new AddInstanceFactory(scoped);
                         scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
-                        var newInstanceKey = factoriesEntry.LastDefaultKey.Next();
                         return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                            new FactoriesEntry(newInstanceKey,
-                                factoriesEntry.Factories.AddOrUpdate(newInstanceKey, newInstanceFactory))));
+                            factoriesEntry.With(newInstanceFactory)));
                     }
 
                     // no default factories just add new one
@@ -1420,8 +1425,7 @@ namespace DryIoc
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        new FactoriesEntry(DefaultKey.Value,
-                            factoriesEntry.Factories.AddOrUpdate(DefaultKey.Value, newInstanceFactory))));
+                        factoriesEntry.With(newInstanceFactory)));
                 }
 
                 // for multiple factories check for existing service key
@@ -1441,8 +1445,7 @@ namespace DryIoc
                 newInstanceFactory = new AddInstanceFactory(scoped);
                 scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
                 return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                    new FactoriesEntry(factoriesEntry.LastDefaultKey,
-                        factoriesEntry.Factories.AddOrUpdate(serviceKey, newInstanceFactory))));
+                    factoriesEntry.With(newInstanceFactory, serviceKey)));
             });
         }
         // todo: for now it is only factory id provider to identify 
@@ -1651,8 +1654,7 @@ namespace DryIoc
 
                         var oldFactoriesEntry = oldEntry as FactoriesEntry;
                         if (oldFactoriesEntry != null && oldFactoriesEntry.LastDefaultKey == null) // no default registered yet
-                            return new FactoriesEntry(DefaultKey.Value,
-                                oldFactoriesEntry.Factories.AddOrUpdate(DefaultKey.Value, newFactory));
+                            return oldFactoriesEntry.With(newFactory);
 
                         var oldFactory = oldFactoriesEntry == null ? (Factory)oldEntry : null;
                         switch (ifAlreadyRegistered)
@@ -1681,7 +1683,7 @@ namespace DryIoc
                                         replacedFactories = removedFactories;
                                     }
 
-                                    return new FactoriesEntry(DefaultKey.Value,
+                                    return new FactoriesEntry(DefaultKey.Value, 
                                         newFactories.AddOrUpdate(DefaultKey.Value, newFactory));
                                 }
 
@@ -1694,26 +1696,27 @@ namespace DryIoc
                                     oldFactory != null && oldFactory.ImplementationType != implementationType ||
                                     oldFactoriesEntry != null && oldFactoriesEntry.Factories.Enumerate()
                                         .All(f => f.Value.ImplementationType != implementationType))
-                                    return AppendNonKeyed(oldFactoriesEntry, oldFactory, newFactory);
+                                {
+                                    return (oldFactoriesEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(newFactory);
+                                }
 
                                 return oldEntry;
 
                             default:
-                                return AppendNonKeyed(oldFactoriesEntry, oldFactory, newFactory);
+                                return (oldFactoriesEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(newFactory);
                         }
                     });
                 }
                 else // serviceKey != null
                 {
-                    var factories = new FactoriesEntry(null, ImTreeMap<object, Factory>.Empty.AddOrUpdate(serviceKey, factory));
+                    var factories = FactoriesEntry.Empty.With(factory, serviceKey);
                     services = Services.AddOrUpdate(serviceType, factories, (oldEntry, newEntry) =>
                     {
                         if (oldEntry == null)
                             return newEntry;
 
                         if (oldEntry is Factory) // if registered is default, just add it to new entry
-                            return new FactoriesEntry(DefaultKey.Value,
-                                ((FactoriesEntry)newEntry).Factories.AddOrUpdate(DefaultKey.Value, (Factory)oldEntry));
+                            return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
 
                         var oldFactories = (FactoriesEntry)oldEntry;
                         return new FactoriesEntry(oldFactories.LastDefaultKey,
@@ -1774,18 +1777,6 @@ namespace DryIoc
                 }
 
                 return registry;
-            }
-
-            private static object AppendNonKeyed(FactoriesEntry oldFactories, Factory oldEntry, Factory newFactory)
-            {
-                if (oldFactories == null)
-                    return new FactoriesEntry(DefaultKey.Value.Next(),
-                        ImTreeMap<object, Factory>.Empty
-                            .AddOrUpdate(DefaultKey.Value, oldEntry)
-                            .AddOrUpdate(DefaultKey.Value.Next(), newFactory));
-
-                var nextKey = oldFactories.LastDefaultKey.Next();
-                return new FactoriesEntry(nextKey, oldFactories.Factories.AddOrUpdate(nextKey, newFactory));
             }
 
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
