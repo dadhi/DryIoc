@@ -1334,91 +1334,117 @@ namespace DryIoc
             var scope = _openedScope ?? _singletonScope;
             var scoped = scope != _singletonScope;
 
-            // todo: get an id
-            var instanceFactoryId = 0;
-
             _registry.Swap(r =>
             {
-                AddInstanceFactory factory;
+                AddInstanceFactory newInstanceFactory;
                 var entry = r.Services.GetValueOrDefault(serviceType);
                 if (entry == null)
                 {
-                    factory = new AddInstanceFactory(scoped);
-                    instanceFactoryId = factory.FactoryID;
-                    var newServices = serviceKey == null
-                        ? r.Services.AddOrUpdate(serviceType, factory)
+                    newInstanceFactory = new AddInstanceFactory(scoped);
+                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
+
+                    var servicesWithFactory = serviceKey == null
+                        ? r.Services.AddOrUpdate(serviceType, newInstanceFactory)
                         : r.Services.AddOrUpdate(serviceType,
                             new FactoriesEntry(DefaultKey.Value, ImTreeMap<object, Factory>.Empty
-                                .AddOrUpdate(serviceKey, factory)));
-                    return r.WithServices(newServices);
+                                .AddOrUpdate(serviceKey, newInstanceFactory)));
+
+                    return r.WithServices(servicesWithFactory);
                 }
 
-                var existingFactory = entry as AddInstanceFactory;
-                if (existingFactory != null)
+                var instanceFactory = entry as AddInstanceFactory;
+                if (instanceFactory != null)
                 {
                     if (serviceKey == null)
                     {
-                        instanceFactoryId = existingFactory.FactoryID;
+                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
                         return r;
                     }
 
-                    factory = new AddInstanceFactory(scoped);
-                    instanceFactoryId = factory.FactoryID;
+                    newInstanceFactory = new AddInstanceFactory(scoped);
+                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
+
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
                         new FactoriesEntry(DefaultKey.Value, ImTreeMap<object, Factory>.Empty
-                            .AddOrUpdate(DefaultKey.Value, existingFactory)
-                            .AddOrUpdate(serviceKey, factory))));
+                            .AddOrUpdate(DefaultKey.Value, instanceFactory)
+                            .AddOrUpdate(serviceKey, newInstanceFactory))));
                 }
 
                 // add instance factory to other existing factory
                 var nonInstanceFactory = entry as Factory;
                 if (nonInstanceFactory != null)
                 {
-                    factory = new AddInstanceFactory(scoped);
-                    instanceFactoryId = factory.FactoryID;
+                    newInstanceFactory = new AddInstanceFactory(scoped);
+                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
+
                     var lastDefaultKey = serviceKey == null ? DefaultKey.Value.Next() : DefaultKey.Value;
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
                         new FactoriesEntry(lastDefaultKey, ImTreeMap<object, Factory>.Empty
                             .AddOrUpdate(DefaultKey.Value, nonInstanceFactory)
-                            .AddOrUpdate(serviceKey ?? lastDefaultKey, factory))));
+                            .AddOrUpdate(serviceKey ?? lastDefaultKey, newInstanceFactory))));
                 }
 
+                // the only remaining option is multiple factories entry
                 var factoriesEntry = (FactoriesEntry)entry;
                 if (serviceKey == null)
                 {
-                    // reuse last factory if any
+                    // if any default factories, find the instance factory to reuse. Throw if multiple.
                     if (factoriesEntry.LastDefaultKey != null)
                     {
-                        var existingLastDefaultFactory = factoriesEntry.Factories.GetValueOrDefault(factoriesEntry.LastDefaultKey);
-                        instanceFactoryId = existingLastDefaultFactory.FactoryID;
+                        var instanceFactories = factoriesEntry.Factories.Enumerate()
+                            .Where(it => it.Value is AddInstanceFactory)
+                            .ToArray();
+
+                        if (instanceFactories.Length != 1)
+                            Throw.It(Error.Of("Miltiple existing instance factories are registered. It is not clear what to reuse out of: {0}"),
+                                instanceFactories.Select(it => it.Value));
+
+                        if (instanceFactories.Length == 1)
+                        {
+                            instanceFactory = (AddInstanceFactory)instanceFactories[0].Value;
+                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
+                            return r;
+                        }
+
+                        newInstanceFactory = new AddInstanceFactory(scoped);
+                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
+
+                        var newInstanceKey = factoriesEntry.LastDefaultKey.Next();
+                        return r.WithServices(r.Services.AddOrUpdate(serviceType,
+                            new FactoriesEntry(newInstanceKey,
+                                factoriesEntry.Factories.AddOrUpdate(newInstanceKey, newInstanceFactory))));
+                    }
+
+                    // no default factories just add new one
+                    newInstanceFactory = new AddInstanceFactory(scoped);
+                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
+
+                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
+                        new FactoriesEntry(DefaultKey.Value,
+                            factoriesEntry.Factories.AddOrUpdate(DefaultKey.Value, newInstanceFactory))));
+                }
+
+                // for multiple factories check for existing service key
+                var keyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
+                if (keyedFactory != null)
+                {
+                    instanceFactory = keyedFactory as AddInstanceFactory;
+                    if (instanceFactory != null)
+                    {
+                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
                         return r;
                     }
 
-                    factory = new AddInstanceFactory(scoped);
-                    instanceFactoryId = factory.FactoryID;
-                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        new FactoriesEntry(DefaultKey.Value,
-                            factoriesEntry.Factories.AddOrUpdate(DefaultKey.Value, factory))));
+                    Throw.It(Error.Of("Unable to use the instance instead of existing keyed {0} factory {1}"), keyedFactory);
                 }
 
-                var existingKeyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
-                if (existingKeyedFactory != null)
-                {
-                    instanceFactoryId = existingKeyedFactory.FactoryID;
-                    return r;
-                }
-
-                factory = new AddInstanceFactory(scoped);
-                instanceFactoryId = factory.FactoryID;
+                newInstanceFactory = new AddInstanceFactory(scoped);
+                scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
                 return r.WithServices(r.Services.AddOrUpdate(serviceType,
                     new FactoriesEntry(factoriesEntry.LastDefaultKey,
-                        factoriesEntry.Factories.AddOrUpdate(serviceKey, factory))));
+                        factoriesEntry.Factories.AddOrUpdate(serviceKey, newInstanceFactory))));
             });
-
-            var instanceId = scope.GetScopedItemIdOrSelf(instanceFactoryId);
-            scope.SetOrAdd(instanceId, instance);
         }
-
         // todo: for now it is only factory id provider to identify 
         internal class AddInstanceFactory : Factory
         {
@@ -7636,7 +7662,7 @@ namespace DryIoc
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
-    public sealed class Scope : IScope
+    public sealed class Scope: IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public IScope Parent { get; private set; }
