@@ -1364,31 +1364,22 @@ namespace DryIoc
                     return r.WithServices(servicesWithFactory);
                 }
 
-                var instanceFactory = entry as AddInstanceFactory;
-                if (instanceFactory != null)
+                var singleDefaultFactory = entry as Factory;
+                if (singleDefaultFactory != null)
                 {
-                    if (serviceKey == null)
+                    // if the factory is instance factory we can reuse the factory
+                    if (singleDefaultFactory is AddInstanceFactory && serviceKey == null)
                     {
-                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
+                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(singleDefaultFactory.FactoryID), instance);
                         return r;
                     }
 
+                    // otherwise register a new factory
                     newInstanceFactory = new AddInstanceFactory(scoped);
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        FactoriesEntry.Empty.With(instanceFactory).With(newInstanceFactory, serviceKey)));
-                }
-
-                // add instance factory to other existing factory
-                var nonInstanceFactory = entry as Factory;
-                if (nonInstanceFactory != null)
-                {
-                    newInstanceFactory = new AddInstanceFactory(scoped);
-                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
-
-                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        FactoriesEntry.Empty.With(nonInstanceFactory).With(newInstanceFactory, serviceKey)));
+                        FactoriesEntry.Empty.With(singleDefaultFactory).With(newInstanceFactory, serviceKey)));
                 }
 
                 // the only remaining option is multiple factories entry
@@ -1402,44 +1393,32 @@ namespace DryIoc
                             .Where(it => it.Value is AddInstanceFactory)
                             .ToArray();
 
-                        if (instanceFactories.Length != 1)
-                            Throw.It(Error.Of("Miltiple existing instance factories are registered. It is not clear what to reuse out of: {0}"),
-                                instanceFactories.Select(it => it.Value));
-
                         if (instanceFactories.Length == 1)
                         {
-                            instanceFactory = (AddInstanceFactory)instanceFactories[0].Value;
-                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
+                            var singleInstanceFactory = (AddInstanceFactory)instanceFactories[0].Value;
+                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(singleInstanceFactory.FactoryID), instance);
                             return r;
                         }
 
-                        newInstanceFactory = new AddInstanceFactory(scoped);
-                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
-
-                        return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                            factoriesEntry.With(newInstanceFactory)));
+                        if (instanceFactories.Length >= 1)
+                            Throw.It(Error.Of("Miltiple existing instance factories are registered. It is not clear what to reuse out of: {0}"),
+                                instanceFactories.Select(it => it.Value));
                     }
-
-                    // no default factories just add new one
-                    newInstanceFactory = new AddInstanceFactory(scoped);
-                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
-
-                    return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        factoriesEntry.With(newInstanceFactory)));
                 }
-
-                // for multiple factories check for existing service key
-                var keyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
-                if (keyedFactory != null)
+                else // for multiple factories check for existing service key
                 {
-                    instanceFactory = keyedFactory as AddInstanceFactory;
-                    if (instanceFactory != null)
+                    var keyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
+                    if (keyedFactory != null)
                     {
-                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
-                        return r;
-                    }
+                        var keyedInstanceFactory = keyedFactory as AddInstanceFactory;
+                        if (keyedInstanceFactory != null)
+                        {
+                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(keyedInstanceFactory.FactoryID), instance);
+                            return r;
+                        }
 
-                    Throw.It(Error.Of("Unable to use the instance instead of existing keyed {0} factory {1}"), keyedFactory);
+                        Throw.It(Error.Of("Unable to use the instance instead of existing keyed {0} factory {1}"), keyedFactory);
+                    }
                 }
 
                 newInstanceFactory = new AddInstanceFactory(scoped);
@@ -1448,6 +1427,7 @@ namespace DryIoc
                     factoriesEntry.With(newInstanceFactory, serviceKey)));
             });
         }
+
         // todo: for now it is only factory id provider to identify 
         internal class AddInstanceFactory : Factory
         {
