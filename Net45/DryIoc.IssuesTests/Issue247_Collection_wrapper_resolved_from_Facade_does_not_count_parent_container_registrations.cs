@@ -11,10 +11,10 @@ namespace DryIoc.IssuesTests
         public void When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a");
+            container.RegisterInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b");
+            f.RegisterInstance("b");
             var strs = f.Resolve<string[]>();
 
             GC.KeepAlive(container);
@@ -25,7 +25,7 @@ namespace DryIoc.IssuesTests
         public void When_only_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a");
+            container.RegisterInstance("a");
 
             var f = container.CreateFacade();
             var strs = f.Resolve<string[]>();
@@ -38,10 +38,10 @@ namespace DryIoc.IssuesTests
         public void For_KeyValuePair_When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a", serviceKey: 1);
+            container.RegisterInstance("a", serviceKey: 1);
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: 2);
+            f.RegisterInstance("b", serviceKey: 2);
             var strs = f.Resolve<KeyValuePair<int, string>[]>();
 
             GC.KeepAlive(container);
