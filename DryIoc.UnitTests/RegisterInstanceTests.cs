@@ -16,23 +16,21 @@ namespace DryIoc.UnitTests
             container.UseInstance("z");
         }
 
-        [Test, Ignore("failed")]
+        [Test]
         public void Can_reregister_instance_with_different_reuse()
         {
             var container = new Container();
 
             container.UseInstance("a");
+            Assert.AreEqual("a", container.Resolve<string>());
 
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance("bbbb");
-                Assert.AreEqual("bbbb", scope.Resolve<string>());
+                scope.UseInstance("b");
+                Assert.AreEqual("b", scope.Resolve<string>());
             }
 
-            var ex = Assert.Throws<ContainerException>(
-                () => container.Resolve<string>());
-
-            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            Assert.AreEqual("a", container.Resolve<string>());
         }
 
         [Test]

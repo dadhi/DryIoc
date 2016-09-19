@@ -519,7 +519,7 @@ namespace DryIoc
 
             var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
             var request = _emptyRequest.Push(serviceType, ifUnresolved: ifUnresolved, scope: scope);
-            var factory = ((IContainer)this).ResolveFactory(request); // NOTE may mutate request
+            var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
@@ -532,9 +532,9 @@ namespace DryIoc
             var registryValue = _registry.Value;
             var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
 
-            // Caching disabled only if:
-            // - if no services were registered, so the service probably empty collection wrapper or alike.
-            if (!registryValue.Services.IsEmpty)
+            // Additionally disable caching when: 
+            // no services registered, so the service probably empty collection wrapper or alike.
+            if (factory.IsFactoryDelegateCacheable() && !registryValue.Services.IsEmpty)
             {
                 var cacheRef = registryValue.DefaultFactoryDelegateCache;
                 var cacheVal = cacheRef.Value;
@@ -1213,18 +1213,19 @@ namespace DryIoc
                     return !singleFactory.CheckCondition(request) ? null
                         : factorySelector(request, new[] {new KeyValuePair<object, Factory>(DefaultKey.Value, singleFactory) });
 
-                var allFactories = ((FactoriesEntry)entry).Factories.Enumerate()
+                var selectedFactories = ((FactoriesEntry)entry).Factories.Enumerate()
                     .Where(f => f.Value.CheckCondition(request))
                     .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
                     .ToArray();
-                return factorySelector(request, allFactories);
+                return factorySelector(request, selectedFactories);
             }
 
             var serviceKey = request.ServiceKey;
             if (singleFactory != null)
             {
                 return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                    && singleFactory.CheckCondition(request) ? singleFactory : null;
+                    && singleFactory.CheckCondition(request) 
+                    ? singleFactory : null;
             }
 
             var factories = ((FactoriesEntry)entry).Factories;
@@ -1234,15 +1235,30 @@ namespace DryIoc
                 return singleFactory != null && singleFactory.CheckCondition(request) ? singleFactory : null;
             }
 
-            var matchedFactories = factories.Enumerate();
+            var allFactories = factories.Enumerate();
+
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
-                matchedFactories = matchedFactories.Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                allFactories = allFactories.Where(f => 
+                    f.Value.Setup.MatchesMetadata(metadataKey, metadata));
 
-            var defaultFactories = matchedFactories
+            var defaultFactories = allFactories
                 .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
                 .ToArray();
+
+            // todo: use scoped factories if any
+            if (Rules.ImplicitCheckForReuseMatchingScope &&
+                this.GetCurrentScope() != null)
+            {
+                var scopedFactories = defaultFactories
+                    .Where(f => f.Value.Reuse is CurrentScopeReuse)
+                    .ToArray();
+                
+                // Use the only single scope instance
+                if (scopedFactories.Length == 1)
+                    defaultFactories = scopedFactories;
+            }
 
             if (defaultFactories.Length == 1)
             {
@@ -1364,14 +1380,20 @@ namespace DryIoc
                     return r.WithServices(servicesWithFactory);
                 }
 
-                var singleDefaultFactory = entry as Factory;
-                if (singleDefaultFactory != null)
+                var defaultFactory = entry as Factory;
+                if (defaultFactory != null)
                 {
-                    // if the factory is instance factory we can reuse the factory
-                    if (singleDefaultFactory is AddInstanceFactory && serviceKey == null)
+                    // new factory is also a default one, check if we can reuse the old factory
+                    if (serviceKey == null)
                     {
-                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(singleDefaultFactory.FactoryID), instance);
-                        return r;
+                        // The condition for reusing the factory:
+                        var defaultInstanceFactory = defaultFactory as AddInstanceFactory;
+                        if (defaultInstanceFactory != null &&
+                            defaultInstanceFactory.Scoped == scoped)
+                        {
+                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultInstanceFactory.FactoryID), instance);
+                            return r;
+                        }
                     }
 
                     // otherwise register a new factory
@@ -1379,7 +1401,7 @@ namespace DryIoc
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                        FactoriesEntry.Empty.With(singleDefaultFactory).With(newInstanceFactory, serviceKey)));
+                        FactoriesEntry.Empty.With(defaultFactory).With(newInstanceFactory, serviceKey)));
                 }
 
                 // the only remaining option is multiple factories entry
@@ -1435,21 +1457,30 @@ namespace DryIoc
             private static readonly Expression _scopeExpr = Expression.Call(ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
                 Expression.Constant(null), Expression.Constant(true));
 
-            private readonly bool _scoped;
-
-            public AddInstanceFactory(bool scoped)
+            public override bool IsFactoryDelegateCacheable()
             {
-                _scoped = scoped;
+                return false;
+            }
+
+            public readonly bool Scoped;
+
+            public AddInstanceFactory(bool scoped) 
+                : base(scoped ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton)
+            {
+                Scoped = scoped;
             }
 
             public override Expression CreateExpressionOrDefault(Request request)
             {
+                // todo: handle the "r.Resolve"
+                // todo: don't cache "r.Resolve" dependencies delegates ever
+
                 var getInstanceExpr = Expression.Constant(null); // todo: review
 
-                var scopedId = _scoped ? FactoryID
+                var scopedId = Scoped ? FactoryID
                     : request.Scopes.SingletonScope.GetScopedItemIdOrSelf(FactoryID);
 
-                var scopeExpr = _scoped ? _scopeExpr : _singletonScopeExpr;
+                var scopeExpr = Scoped ? _scopeExpr : _singletonScopeExpr;
 
                 var serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                     Expression.Constant(scopedId),
@@ -6252,6 +6283,12 @@ namespace DryIoc
     /// Each created factory has an unique ID set in <see cref="FactoryID"/>.</summary>
     public abstract class Factory
     {
+        /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
+        public static int GetNextID()
+        {
+            return Interlocked.Increment(ref _lastFactoryID);
+        }
+
         /// <summary>Unique factory id generated from static seed.</summary>
         public int FactoryID { get; internal set; }
 
@@ -6288,10 +6325,10 @@ namespace DryIoc
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
-        /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
-        public static int GetNextID()
+        /// <summary>Notifies the resolver that factory delegate can be cached.</summary> <returns>True if can be cached.</returns>
+        public virtual bool IsFactoryDelegateCacheable()
         {
-            return Interlocked.Increment(ref _lastFactoryID);
+            return true;
         }
 
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
@@ -7585,7 +7622,7 @@ namespace DryIoc
 
             if (FactoryType == FactoryType.Service &&
                 request.Container.GetDecoratorExpressionOrDefault(request) != null)
-                return base.GetDelegateOrDefault(request); // via expression creation
+                return base.GetDelegateOrDefault(request); // use expression creation
 
             ThrowIfReuseHasShorterLifespanThanParent(Reuse, request);
 
