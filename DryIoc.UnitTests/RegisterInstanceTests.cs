@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Linq.Expressions;
 using NUnit.Framework;
 
@@ -188,6 +189,36 @@ namespace DryIoc.UnitTests
 
             container.UseInstance("b", serviceKey: "x");
             Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
+        }
+
+        [Test]
+        public void Can_register_with_and_then_without_PreventDisposal_behavior()
+        {
+            var container = new Container();
+
+            container.UseInstance("a", preventDisposal: true);
+            container.Resolve<string>();
+
+            container.UseInstance("a");
+            container.Resolve<string>();
+        }
+
+        public class Me : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
+
+        [Test]
+        public void Can_use_intstance_of_Int_type()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42);
+
+            var int42 = container.Resolve<int>();
+
+            Assert.AreEqual(42, int42);
         }
     }
 }

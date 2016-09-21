@@ -1354,7 +1354,7 @@ namespace DryIoc
         internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
-        internal void AddInstance(Type serviceType, object instance, Setup setup, object serviceKey)
+        internal void AddInstance(Type serviceType, Type instanceType, object instance, object serviceKey)
         {
             ThrowIfContainerDisposed();
 
@@ -1364,11 +1364,11 @@ namespace DryIoc
 
             _registry.Swap(r =>
             {
-                AddInstanceFactory newInstanceFactory;
+                UsedInstanceFactory newInstanceFactory;
                 var entry = r.Services.GetValueOrDefault(serviceType);
                 if (entry == null)
                 {
-                    newInstanceFactory = new AddInstanceFactory(scoped, setup);
+                    newInstanceFactory = new UsedInstanceFactory(scoped, instanceType);
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     var servicesWithFactory = serviceKey == null
@@ -1385,7 +1385,7 @@ namespace DryIoc
                     if (serviceKey == null)
                     {
                         // The condition for reusing the factory:
-                        var defaultInstanceFactory = defaultFactory as AddInstanceFactory;
+                        var defaultInstanceFactory = defaultFactory as UsedInstanceFactory;
                         if (defaultInstanceFactory != null &&
                             defaultInstanceFactory.Scoped == scoped)
                         {
@@ -1395,7 +1395,7 @@ namespace DryIoc
                     }
 
                     // otherwise register a new factory
-                    newInstanceFactory = new AddInstanceFactory(scoped, setup);
+                    newInstanceFactory = new UsedInstanceFactory(scoped, instanceType);
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
@@ -1410,12 +1410,12 @@ namespace DryIoc
                     if (factoriesEntry.LastDefaultKey != null)
                     {
                         var instanceFactories = factoriesEntry.Factories.Enumerate()
-                            .Where(it => it.Value is AddInstanceFactory)
+                            .Where(it => it.Value is UsedInstanceFactory)
                             .ToArray();
 
                         if (instanceFactories.Length == 1)
                         {
-                            var singleInstanceFactory = (AddInstanceFactory)instanceFactories[0].Value;
+                            var singleInstanceFactory = (UsedInstanceFactory)instanceFactories[0].Value;
                             scope.SetOrAdd(scope.GetScopedItemIdOrSelf(singleInstanceFactory.FactoryID), instance);
                             return r;
                         }
@@ -1430,7 +1430,7 @@ namespace DryIoc
                     var keyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
                     if (keyedFactory != null)
                     {
-                        var keyedInstanceFactory = keyedFactory as AddInstanceFactory;
+                        var keyedInstanceFactory = keyedFactory as UsedInstanceFactory;
                         if (keyedInstanceFactory != null)
                         {
                             scope.SetOrAdd(scope.GetScopedItemIdOrSelf(keyedInstanceFactory.FactoryID), instance);
@@ -1441,7 +1441,7 @@ namespace DryIoc
                     }
                 }
 
-                newInstanceFactory = new AddInstanceFactory(scoped, setup);
+                newInstanceFactory = new UsedInstanceFactory(scoped, instanceType);
                 scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
                 return r.WithServices(r.Services.AddOrUpdate(serviceType,
                     factoriesEntry.With(newInstanceFactory, serviceKey)));
@@ -1449,60 +1449,35 @@ namespace DryIoc
         }
 
         // todo: for now it is only factory id provider to identify 
-        internal class AddInstanceFactory : Factory
+        internal class UsedInstanceFactory : Factory
         {
             private static readonly Expression _singletonScopeExpr = 
                 Expression.Property(ScopesExpr, "SingletonScope");
             private static readonly Expression _scopeExpr = Expression.Call(ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
                 Expression.Constant(null), Expression.Constant(true));
 
-            private static readonly MethodCallExpression _getInstanceExpr = Expression.Call(
-                typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull", ArrayTools.Empty<Type>(),
-                Expression.Constant(null),
-                Expression.Constant("The used (registered) instance is not available outside of container where it is registered"));
-
-            public override bool IsFactoryDelegateCacheable()
-            {
-                return false;
-            }
+            public override bool IsFactoryDelegateCacheable() { return false; }
 
             public readonly bool Scoped;
+            public readonly Type InstanceType;
 
-            public AddInstanceFactory(bool scoped, Setup setup) 
-                : base(scoped ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton, setup)
+            public override Type ImplementationType { get { return InstanceType; } }
+
+            public UsedInstanceFactory(bool scoped, Type instanceType) 
+                : base(scoped ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton)
             {
                 Scoped = scoped;
+                InstanceType = instanceType;
             }
 
             public override Expression CreateExpressionOrDefault(Request request)
             {
-                // todo: handle the "r.Resolve"
-                // todo: don't cache "r.Resolve" dependencies delegates ever
-
-                var serviceType = request.ServiceType;
-
                 var scopeExpr = Scoped ? _scopeExpr : _singletonScopeExpr;
 
-                var scopedId = Scoped ? FactoryID
-                    : request.Scopes.SingletonScope.GetScopedItemIdOrSelf(FactoryID);
+                var serviceExpr = Expression.Call(typeof(ScopeTools), "GetAndUnwrap", new[] { InstanceType },
+                    scopeExpr, Expression.Constant(FactoryID));
 
-                Expression serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                    Expression.Constant(scopedId),
-                    Expression.Lambda<CreateScopedValue>(_getInstanceExpr, ArrayTools.Empty<ParameterExpression>()));
-
-                // Unwrap WeakReference and/or array preventing disposal
-                if (Setup.WeaklyReferenced)
-                    serviceExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull",
-                        ArrayTools.Empty<Type>(),
-                        Expression.Property(Expression.Convert(serviceExpr, typeof(WeakReference)), "Target"),
-                        Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
-
-                if (Setup.PreventDisposal)
-                    serviceExpr = Expression.ArrayIndex(
-                        Expression.Convert(serviceExpr, typeof(object[])),
-                        Expression.Constant(0, typeof(int)));
-
-                return Expression.Convert(serviceExpr, serviceType);
+                return serviceExpr;
             }
 
             public override Expression GetExpressionOrDefault(Request request)
@@ -4434,7 +4409,7 @@ namespace DryIoc
             Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
             reuse = reuse ?? Reuse.Singleton;
 
-            var setup = Setup.Default;
+            var setup = _defaultInstanceSetup;
             if (preventDisposal)
             {
                 instance = new[] {instance};
@@ -4528,65 +4503,16 @@ namespace DryIoc
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
-            var setup = _defaultInstanceSetup;
+            var instanceType = instance == null ? serviceType : instance.GetType();
+
             if (preventDisposal)
-            {
                 instance = new[] { instance };
-                setup = _preventDisposableInstanceSetup;
-            }
+
             if (weaklyReferenced)
-            {
                 instance = new WeakReference(instance);
-                setup = preventDisposal
-                    ? _weaklyReferencedAndPreventDisposableInstanceSetup
-                    : _weaklyReferencedInstanceSetup;
-            }
 
-            ((Container)container).AddInstance(serviceType, instance, setup, serviceKey);
-
-            //if (instance != null)
-            //    instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
-
-            //var scope = ((Container)container)._openedScope;
-            //var reuse = scope != null ? Reuse.InCurrentScope : Reuse.Singleton;
-
-            //var setup = Setup.Default;
-            //if (preventDisposal)
-            //{
-            //    instance = new[] { instance };
-            //    setup = _preventDisposableInstanceSetup;
-            //}
-            //if (weaklyReferenced)
-            //{
-            //    instance = new WeakReference(instance);
-            //    setup = preventDisposal
-            //        ? _weaklyReferencedAndPreventDisposableInstanceSetup
-            //        : _weaklyReferencedInstanceSetup;
-            //}
-
-            //var factories = container.GetAllServiceFactories(serviceType);
-            //if (serviceKey != null)
-            //    factories = factories.Where(f => serviceKey.Equals(f.Key));
-
-            //InstanceFactory factory = null;
-
-            //// Replace the single factory
-            //var factoriesList = factories.ToArray();
-            //if (factoriesList.Length == 1)
-            //    factory = factoriesList[0].Value as InstanceFactory;
-
-            //if (factory != null && factory.Reuse == reuse && factory.Setup == setup)
-            //    factory.ReplaceInstance(instance);
-            //else
-            //{
-            //    factory = new InstanceFactory(instance, reuse, setup);
-            //    container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Replace, isStaticallyChecked: false);
-            //}
-
-            //var request = container.EmptyRequest.Push(serviceType, serviceKey);
-            //reuse.GetScopeOrDefault(request)
-            //    .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-            //    .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
+            // todo: v3: remove the hack
+            ((Container)container).AddInstance(serviceType, instanceType, instance, serviceKey);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -7817,6 +7743,33 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// todo:
+    /// </summary>
+    public static class ScopeTools
+    {
+        /// <summary>
+        /// todo:
+        /// </summary>
+        public static T GetAndUnwrap<T>(this IScope scope, int factoryId)
+        {
+            var id = scope.GetScopedItemIdOrSelf(factoryId);
+            var value = scope.GetOrAdd(id, () => Throw.For<object>(Error.Of("Meaningful error")));
+            if (value == null)
+                return default(T);
+
+            var weaklyReferenced = value as WeakReference;
+            if (weaklyReferenced != null)
+                value = weaklyReferenced.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
+
+            var preventDisposable = value as object[];
+            if (preventDisposable != null && preventDisposable.Length == 1)
+                value = preventDisposable[0];
+
+            return (T)value;
+        }
     }
 
     internal static class ScopedDisposableHandling
