@@ -220,5 +220,99 @@ namespace DryIoc.UnitTests
 
             Assert.AreEqual(42, int42);
         }
+
+        [Test]
+        public void Can_work_with_multiple_keyed_and_default_instances()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            var forties = container.Resolve<int[]>();
+
+            Assert.AreEqual(3, forties.Length);
+        }
+
+        [Test]
+        public void Can_reuse_the_default_factory()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+            container.UseInstance<int>(45); // will replace the 43
+
+            var forties = container.Resolve<int[]>();
+
+            CollectionAssert.AreEquivalent(new[] { 42, 45, 44 }, forties);
+        }
+
+        [Test, Ignore("fails")]
+        public void Wont_reuse_the_default_factory_if_reuse_is_different()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            using (var scope = container.OpenScope())
+            {
+                scope.UseInstance<int>(45);
+                CollectionAssert.AreEquivalent(new[] { 42, 45, 44 }, scope.Resolve<int[]>());
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
+        }
+
+        [Test]
+        public void The_used_instance_dependency_should_be_independent_of_scope()
+        {
+            var container = new Container();
+            container.Register<BB>();
+
+            using (var scope = container.OpenScope())
+            {
+                var a = new AA();
+                scope.UseInstance(a);
+        
+                var bb = scope.Resolve<BB>(); // will inject `a`
+                Assert.AreSame(a, bb.A);
+            }
+
+            var anotherA = new AA();
+            container.UseInstance(anotherA);
+            var anotherBB = container.Resolve<BB>(); // will inject `anotherA`
+            Assert.AreSame(anotherA, anotherBB.A);
+        }
+
+        [Test]
+        public void The_registered_instance_dependency_should_be_independent_of_scope()
+        {
+            var container = new Container();
+            container.Register<BB>();
+
+            using (var scope = container.OpenScope())
+            {
+                var a = new AA();
+                scope.RegisterInstance(a, Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
+
+                var bb = scope.Resolve<BB>(); // will inject `a`
+                Assert.AreSame(a, bb.A);
+            }
+
+            var anotherA = new AA();
+            container.RegisterInstance(anotherA, Reuse.Singleton, IfAlreadyRegistered.Replace);
+            var anotherBB = container.Resolve<BB>(); // will inject `anotherA`
+            Assert.AreSame(anotherA, anotherBB.A);
+        }
+
+        public class AA { }
+
+        public class BB
+        {
+            public readonly AA A;
+            public BB(AA a) { A = a; }
+        }
     }
 }
