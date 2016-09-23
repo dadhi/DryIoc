@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using NUnit.Framework;
@@ -248,7 +249,7 @@ namespace DryIoc.UnitTests
             CollectionAssert.AreEquivalent(new[] { 42, 45, 44 }, forties);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Wont_reuse_the_default_factory_if_reuse_is_different()
         {
             var container = new Container();
@@ -259,10 +260,27 @@ namespace DryIoc.UnitTests
             using (var scope = container.OpenScope())
             {
                 scope.UseInstance<int>(45);
-                CollectionAssert.AreEquivalent(new[] { 42, 45, 44 }, scope.Resolve<int[]>());
+                CollectionAssert.AreEquivalent(new[] { 42, 43, 44, 45 }, scope.Resolve<int[]>());
             }
 
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
+        }
+
+        [Test]
+        public void Wont_reuse_the_default_factory_if_reuse_is_different_for_lazy_collection()
+        {
+            var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            using (var scope = container.OpenScope())
+            {
+                scope.UseInstance<int>(45);
+                CollectionAssert.AreEquivalent(new[] { 42, 43, 44, 45 }, scope.Resolve<IEnumerable<int>>().ToArray());
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<IEnumerable<int>>().ToArray());
         }
 
         [Test]

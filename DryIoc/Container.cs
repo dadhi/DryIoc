@@ -2625,11 +2625,15 @@ namespace DryIoc
             var container = request.Container;
             var rules = container.Rules;
 
-            if (rules.ResolveIEnumerableAsLazyEnumerable &&
-                collectionType.GetGenericDefinitionOrNull() == typeof(IEnumerable<>))
-                return GetLazyEnumerableExpressionOrDefault(request);
-
             var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
+
+            if (rules.ResolveIEnumerableAsLazyEnumerable)
+            {
+                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request);
+                if (collectionType.GetGenericDefinitionOrNull() != typeof(IEnumerable<>))
+                    return Expression.Call(typeof(Enumerable), "ToArray", new[] { itemType }, lazyEnumerableExpr);
+                return lazyEnumerableExpr;
+            }
 
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
@@ -2735,7 +2739,8 @@ namespace DryIoc
                 Throw.It(Error.NotPossibleToResolveLazyEnumerableInsideFuncWithArgs, request);
 
             var container = request.Container;
-            var itemType = request.ServiceType.GetGenericParamsAndArgs()[0];
+            var collectionType = request.ServiceType;
+            var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
             // Composite pattern support: find composite parent key to exclude from result.

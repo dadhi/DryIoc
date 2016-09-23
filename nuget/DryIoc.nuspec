@@ -12,6 +12,9 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.8.0
+      - fixed: #327: UseInstance non-deterministic behavior in multi-threading tests
+      - fixed: #338: after re-register instance in scope used old version of object(cached)
       v2.7.1
       - fixed: #334 MissingMethodException in WithDependencyInjectionAdapter
       - fixed: #335 Decorator of IEnumerable wrapper taking nested in IEnumerable dependency fails with StackOverflow
