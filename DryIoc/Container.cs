@@ -9170,8 +9170,6 @@ namespace DryIoc
                 "Registering without implementation type and without FactoryMethod to use instead."),
             RegisteringAbstractImplementationTypeAndNoFactoryMethod = Of(
                 "Registering abstract implementation type {0} when it is should be concrete. Also there is not FactoryMethod to use instead."),
-            NoPublicConstructorDefined = Of(
-                "There is no public constructor defined for {0}."),
             NoDefinedMethodToSelectFromMultipleConstructors = Of(
                 "Unspecified how to select single constructor from type {0} with multiple public constructors:" +
                 Environment.NewLine +
@@ -9186,13 +9184,9 @@ namespace DryIoc
                 "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " +
                 Environment.NewLine +
                 "Please give the method an unique name to distinguish it from other overloads."),
-            CtorIsMissingSomeParameters = Of(
-                "Constructor [{0}] of {1} misses some arguments required for {2} dependency."),
             UnableToSelectConstructor = Of(
                 "Unable to select single constructor from {0} available in {1}." + Environment.NewLine
                 + "Please provide constructor selector when registering service."),
-            ExpectedFuncWithMultipleArgs = Of(
-                "Expecting Func with one or more arguments but found {0}."),
             ResolvingOpenGenericServiceTypeIsNotPossible = Of(
                 "Resolving open-generic service type is not possible for type: {0}."),
             RecursiveDependencyDetected = Of(
@@ -9214,8 +9208,6 @@ namespace DryIoc
                 "Unable to find writable property or field \"{0}\" when resolving: {1}."),
             PushingToRequestWithoutFactory = Of(
                 "Pushing next info {0} to request not yet resolved to factory: {1}"),
-            TargetWasAlreadyDisposed = Of(
-                "Target {0} was already disposed in {1} wrapper."),
             NoMatchedGenericParamConstraints = Of(
                 "Open-generic service does not match with registered open-generic implementation constraints {0} when resolving: {1}."),
             GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex = Of(
@@ -9237,12 +9229,8 @@ namespace DryIoc
                 "Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
             GotNullConstructorFromFactoryMethod = Of(
                 "Got null constructor when resolving {0}"),
-            NoOpenThreadScope = Of(
-                "Unable to find open thread scope in {0}. Please OpenScope with {0} to make sure thread reuse work."),
             ContainerIsGarbageCollected = Of(
                 "Container is no longer available (has been garbage-collected)."),
-            UnableToResolveDecorator = Of(
-                "Unable to resolve decorator {0}."),
             UnableToRegisterDuplicateDefault = Of(
                 "Service {0} without key is already registered as {1}."),
             UnableToRegisterDuplicateKey = Of(
@@ -9289,9 +9277,6 @@ namespace DryIoc
                 "When registering mapping unable to find factory of registered service type {0} and key {1}."),
             RegisteringInstanceNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
-            RegisteredInstanceIsNotAvailableInCurrentContext = Of(
-                "Registered instance of {0} is not available in a given context." + Environment.NewLine +
-                "It may mean that instance is requested from fallback container which is not supported at the moment."),
             RegisteringWithNotSupportedDepedendencyCustomValueType = Of(
                 "Registering {0} dependency with not supported custom value type {1}." + Environment.NewLine +
                 "Only DryIoc.DefaultValue, System.Type, .NET primitives types, or array of those are supported."),
