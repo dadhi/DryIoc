@@ -1414,20 +1414,17 @@ namespace DryIoc
                     // if any default factories, find the instance factory to reuse. Throw if multiple.
                     if (factoriesEntry.LastDefaultKey != null)
                     {
-                        var defaultFactories = factoriesEntry.Factories.Enumerate()
-                            .Where(it => it.Key is DefaultKey 
+                        // As we alway permit / re-use the Single factory only, so we cannot have more than one 
+                        var defaultInstanceFactory = factoriesEntry.Factories.Enumerate()
+                            .FirstOrDefault(it => it.Key is DefaultKey 
                                 && it.Value is UsedInstanceFactory 
-                                && ((UsedInstanceFactory)it.Value).Scoped == scoped)
-                            .ToArray();
+                                && ((UsedInstanceFactory)it.Value).Scoped == scoped);
 
-                        if (defaultFactories.Length == 1)
+                        if (defaultInstanceFactory != null)
                         {
-                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultFactories[0].Value.FactoryID), instance);
+                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultInstanceFactory.Value.FactoryID), instance);
                             return r;
                         }
-
-                        if (defaultFactories.Length >= 1)
-                            Throw.It(Error.UseInstanceIsUnableToSelectFromMultipleAlreadyUsedInstances, defaultFactories);
                     }
                 }
                 else // for multiple factories check for existing service key
@@ -1442,7 +1439,8 @@ namespace DryIoc
                             return r;
                         }
 
-                        Throw.It(Error.Of("Unable to use the instance instead of existing keyed {0} factory {1}"), keyedFactory);
+                        Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
+                            new KV<object, object>(serviceKey, instance), keyedFactory);
                     }
                 }
 
@@ -9320,8 +9318,8 @@ namespace DryIoc
                 " lazy boundaries: {0}"),
             ScopeDoesNotContainInstanceForSpecifiedFactoryID = Of(
                 "Scope does not contain instance for specified factory ID: {0}"),
-            UseInstanceIsUnableToSelectFromMultipleAlreadyUsedInstances = Of(
-                "Miltiple existing instance factories are registered already. It is not clear what to re-use: {0}");
+            UnableToUseInstanceForExistingNonInstanceFactory = Of(
+                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

@@ -193,6 +193,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Throws_on_attempt_to_replace_keyed_instance_registration_of_non_instance_factory()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(_ => "a", serviceKey: "x");
+            Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.UseInstance("b", serviceKey: "x"));
+            //Assert.AreEqual(Error.NameOf(), Error.NameOf(ex.Error));
+        }
+
+        [Test]
         public void Can_register_with_and_then_without_PreventDisposal_behavior()
         {
             var container = new Container();
