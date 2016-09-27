@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue339_GenericDecoratorWithConstraints
     {
-        [Test, Ignore("failes")]
+        [Test]
         public void Test()
         {
             var container = new Container();
@@ -16,16 +16,19 @@ namespace DryIoc.IssuesTests
             container.Register<IAsyncRequestHandler<GetStringRequest, string>, GetStringRequestHandler>();
             container.Register<IActionHandler, TransactionActionHandler>();
 
-            container.Resolve<IAsyncRequestHandler<GetStringRequest, string>>();
+            var result = container.Resolve<IAsyncRequestHandler<GetStringRequest, string>>();
+
+            Assert.IsInstanceOf<Decorator<GetStringRequest, string>>(result);
+            Assert.IsInstanceOf<TransactionActionHandler>(((Decorator<GetStringRequest, string>)result).Handler);
+            Assert.IsInstanceOf<GetStringRequestHandler>(((Decorator<GetStringRequest, string>)result).Inner);
         }
 
         // API
 
-        public interface IAsyncRequest<TResponse> { }
+        public interface IAsyncRequest<out TResponse> { }
 
-        public interface IAsyncRequestHandler<TRequest, TResponse>
-            where TRequest : IAsyncRequest<TResponse>
-        { }
+        public interface IAsyncRequestHandler<in TRequest, out TResponse>
+            where TRequest : IAsyncRequest<TResponse> { }
 
         public interface IActionHandler { }
 
@@ -34,7 +37,7 @@ namespace DryIoc.IssuesTests
 
         public interface IBusinessLayerCommand { }
 
-        public class GetStringRequest : IAsyncRequest<string> { }
+        public class GetStringRequest : IAsyncRequest<string>, IBusinessLayerCommand { }
 
         public class GetStringRequestHandler : IAsyncRequestHandler<GetStringRequest, string> { }
 
