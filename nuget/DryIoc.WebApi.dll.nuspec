@@ -11,12 +11,15 @@
         <description>DryIoc extension for ASP.NET WebAPI</description>
         <tags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.1.1:
+          - fixed: #341: DryIoc WebApi: Unable to resolve constructor for internal web api controllers
+          v2.1.0:
           - added: Optional ThrowIfUnresolved parameter in WithWebApi, DryIocDependencyResolver
           - added: Helper DryIocWebApi.IsController method which relies on DefaultHttpControllerTypeResolver
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.2.2,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.7.1,3.0.0)" />
             <dependency id="Microsoft.AspNet.WebApi.Core" version="[5.2.3,6.0.0)" />
           </group>
         </dependencies>

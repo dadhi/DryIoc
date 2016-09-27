@@ -7,7 +7,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue328_Collection_resolve_behavior_in_and_out_of_scope
     {
-        [Test, Ignore("fails")]
+        [Test]
         public void Cache_should_not_affect_results_for_lazy_enumerable()
         {
             var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
@@ -17,7 +17,9 @@ namespace DryIoc.IssuesTests
 
             using (var aScope = container.OpenScope("A"))
             {
-                var actionsA = aScope.Resolve<IEnumerable<IAction>>().ToArray();
+                var scopedActions = aScope.Resolve<IEnumerable<IAction>>().ToArray();
+                Assert.AreEqual(1, scopedActions.Length);
+                Assert.IsInstanceOf<ActionOne>(scopedActions[0]);
             }
 
             var actions = container.Resolve<IEnumerable<IAction>>().ToArray();

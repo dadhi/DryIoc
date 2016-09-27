@@ -8233,7 +8233,7 @@ namespace DryIoc
                 nameExpr = Expression.Convert(nameExpr, typeof(object));
             return Expression.Call(Container.ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
                 nameExpr,
-                Expression.Constant(true));
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw));
         }
 
         /// <summary>Asks the scope to convert factory ID into internal representation and returns it.
@@ -8295,7 +8295,7 @@ namespace DryIoc
                 request.Scopes.GetOrCreateResolutionScope(ref scope, parent.ServiceType, parent.ServiceKey);
             }
 
-            return request.Scopes.GetMatchingResolutionScope(scope, AssignableFromServiceType, ServiceKey, Outermost, false);
+            return request.Scopes.GetMatchingResolutionScope(scope, AssignableFromServiceType, ServiceKey, Outermost, throwIfNotFound: false);
         }
 
         /// <summary>Returns <see cref="IScopeAccess.GetMatchingResolutionScope"/> method call expression.</summary>
@@ -8308,7 +8308,7 @@ namespace DryIoc
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
                 Expression.Constant(Outermost, typeof(bool)),
-                Expression.Constant(true, typeof(bool)));
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw, typeof(bool)));
         }
 
         /// <summary>Just returns back passed id without changes.</summary>
