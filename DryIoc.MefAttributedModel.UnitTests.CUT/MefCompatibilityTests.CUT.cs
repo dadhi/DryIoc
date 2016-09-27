@@ -134,4 +134,26 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [ImportMany(typeof(IVersionedProtocol))]
         public IVersionedProtocol[] Protocols { get; set; }
     }
+
+    public interface IUntypedService  { string Version { get; } }
+
+    [Export("ArbitraryKey")]
+    public class UntypedService : IUntypedService
+    {
+        public string Version { get { return "123.4567"; } }
+    }
+
+    [Export]
+    public class ImportUntypedService
+    {
+        [Import("ArbitraryKey")]
+        public object UntypedService { get; set; }
+    }
+
+    [Export]
+    public class ImportManyUntypedServices
+    {
+        [ImportMany("ArbitraryKey")]
+        public object[] UntypedServices { get; set; }
+    }
 }
