@@ -488,9 +488,8 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(ad.IsDisposed);
         }
 
-
         [Test]
-        public void Should_NOT_track_transient_service_in_singleton_scope_if_no_open_scope_because_it_is_most_definitely_a_leak()
+        public void Should_track_transient_service_in_singleton_scope_if_no_open_scope()
         {
             var container = new Container();
             container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
@@ -498,7 +497,7 @@ namespace DryIoc.UnitTests
             var ad = container.Resolve<AD>();
 
             container.Dispose();
-            Assert.IsFalse(ad.IsDisposed);
+            Assert.IsTrue(ad.IsDisposed);
         }
 
         public class AD : IDisposable

@@ -5597,6 +5597,12 @@ namespace DryIoc
             return RequestInfo.GetActualServiceType();
         }
 
+        /// <summary>Returns known implementation, or otherwise actual service type.</summary> <returns>The subject.</returns>
+        public Type GetKnownImplementationOrServiceType()
+        {
+            return ImplementationType ?? GetActualServiceType();
+        }
+
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
         /// <param name="preResolveParent">(optional) Request info beyond/preceding Resolve call.</param>
@@ -6345,7 +6351,7 @@ namespace DryIoc
                    // tracking disposable transient
                    && !(request.Reuse == null
                     && (Setup.TrackDisposableTransient || request.Container.Rules.TrackingDisposableTransients)
-                    && IsDisposableService(request));
+                    && request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable)));
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
@@ -6385,15 +6391,14 @@ namespace DryIoc
                 var reuse = request.Reuse;
 
                 // Track transient disposable in parent scope (if any), or open scope (if any)
-                var tracksTransientDisposable = false;
-                if (reuse == null && !Setup.PreventDisposal &&
+                var tracksTransientDisposable = 
+                    reuse == null && !Setup.PreventDisposal &&
                     (Setup.TrackDisposableTransient ||
                     !Setup.AllowDisposableTransient && container.Rules.TrackingDisposableTransients) &&
-                    IsDisposableService(request))
-                {
+                    request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
+
+                if (tracksTransientDisposable)
                     reuse = GetTransientDisposableTrackingReuse(request);
-                    tracksTransientDisposable = true;
-                }
 
                 // As a last resort, apply per-container default reuse
                 if (reuse == null)
@@ -6535,8 +6540,12 @@ namespace DryIoc
                 s.Append(", Metadata=").Print(Setup.Metadata);
             if (Setup.Condition != null)
                 s.Append(", HasCondition");
+
             if (Setup.OpenResolutionScope)
                 s.Append(", OpensResolutionScope");
+            else if (Setup.AsResolutionCall)
+                s.Append(", AsResolutionScope");
+
             return s.Append("}").ToString();
         }
 
@@ -6552,23 +6561,13 @@ namespace DryIoc
             if (parent.FactoryType == FactoryType.Wrapper)
                 return null;
 
-            // If no reused parent, then track in current open scope if any
-            // NOTE: No tracking in singleton scope cause it is most likely a memory leak.
-            var reuse = parent.Reuse;
-            if (reuse == null)
-            {
-                var currentScope = request.Scopes.GetCurrentScope();
-                if (currentScope != null)
-                    reuse = DryIoc.Reuse.InCurrentScope;
-            }
+            if (parent.Reuse != null)
+                return parent.Reuse;
 
-            return reuse;
-        }
-
-        private bool IsDisposableService(Request request)
-        {
-            return request.GetActualServiceType().IsAssignableTo(typeof(IDisposable))
-                || ImplementationType.IsAssignableTo(typeof(IDisposable));
+            // If no reused parent, then track in current open scope, or if not opened in singleton
+            return request.Scopes.GetCurrentScope() != null
+                ? DryIoc.Reuse.InCurrentScope
+                : DryIoc.Reuse.Singleton;
         }
 
         #endregion

@@ -89,7 +89,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Can_allow_disposable_transient()
+        public void Allows_disposable_transient()
         {
             var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(DT), typeof(DT2), typeof(DTUser));
@@ -99,6 +99,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Dispose();
             Assert.IsFalse(user.Dt.IsDisposed);
             Assert.IsTrue(user.Dt2.IsDisposed);
+        }
+
+        [Test]
+        public void Allows_tracking_disposable_transient_in_singleton_scope()
+        {
+            var container = new Container().WithMefAttributedModel();
+            container.RegisterExports(typeof(DT2));
+
+            var disposable = container.Resolve<DT2>();
+
+            container.Dispose();
+            Assert.IsTrue(disposable.IsDisposed);
         }
 
         [Test]
