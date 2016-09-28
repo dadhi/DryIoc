@@ -172,6 +172,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Syntax.Autofac", "Ex
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "Net45\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{EE366065-BF63-44D1-BD65-75A214C1EE8E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc.DataAnnotationsValidator", "DryIoc.Mvc.DataAnnotationsValidator\DryIoc.Mvc.DataAnnotationsValidator.csproj", "{D1730C66-89F4-416D-89A7-41F5765B9D78}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc.DataAnnotationsValidator.UnitTests", "DryIoc.Mvc.DataAnnotationsValidator.UnitTests\DryIoc.Mvc.DataAnnotationsValidator.UnitTests.csproj", "{16532E0C-6B82-4F42-8F78-594403D13D02}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -394,6 +398,14 @@ Global
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1730C66-89F4-416D-89A7-41F5765B9D78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1730C66-89F4-416D-89A7-41F5765B9D78}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1730C66-89F4-416D-89A7-41F5765B9D78}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1730C66-89F4-416D-89A7-41F5765B9D78}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16532E0C-6B82-4F42-8F78-594403D13D02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16532E0C-6B82-4F42-8F78-594403D13D02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16532E0C-6B82-4F42-8F78-594403D13D02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16532E0C-6B82-4F42-8F78-594403D13D02}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -445,5 +457,7 @@ Global
 		{9A903363-6925-4C9F-9A19-F751F4987604} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{67A2615C-34B5-41AC-B5C9-CE82C5D28368} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
+		{D1730C66-89F4-416D-89A7-41F5765B9D78} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
+		{16532E0C-6B82-4F42-8F78-594403D13D02} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 	EndGlobalSection
 EndGlobal
