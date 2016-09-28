@@ -213,6 +213,29 @@ namespace System.ComponentModel.Composition
     [AttributeUsage(AttributeTargets.Class)]
     public class MetadataAttributeAttribute : Attribute { }
 
+    /// <summary>Specifies metadata for a type, property, field, or method marked with the <see cref="ExportAttribute"/>.</summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Interface, AllowMultiple = true, Inherited = false)]
+    public sealed class ExportMetadataAttribute : Attribute
+    {
+        /// <summary>Initializes a new instance of the <see cref="ExportMetadataAttribute"/> class.</summary>
+        /// <param name="name">The name.</param>
+        /// <param name="value">The value.</param>
+        public ExportMetadataAttribute(string name, object value)
+        {
+            Name = name;
+            Value = value;
+        }
+
+        /// <summary>Gets or sets a value that indicates whether this item is marked with this attribute more than once.</summary>
+        public bool IsMultiple { get; set; }
+
+        /// <summary>Gets the name of the metadata value.</summary>
+        public string Name { get; }
+
+        /// <summary>Gets the metadata value.</summary>
+        public object Value { get; }
+    }
+
     /// <summary>Notifies a part when its imports have been satisfied.</summary>
     public interface IPartImportsSatisfiedNotification
     {

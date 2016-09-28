@@ -109,4 +109,51 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         //[Export(Constants.SettingExportKey)]
         public string ExportedValue { get; private set; } = "SettingProvider3.ExportedValue";
     }
+
+    public interface IVersionedProtocol { string Version { get; } }
+
+    internal class GenericProtocol : IVersionedProtocol
+    {
+        public GenericProtocol(string version) { Version = version; }
+        public string Version { get; }
+    }
+
+    internal class ExportEarlyProtocolVersions
+    {
+        [Export] public IVersionedProtocol V1 => new GenericProtocol("1.0");
+        [Export] public IVersionedProtocol V2 => new GenericProtocol("2.0");
+        [Export] public IVersionedProtocol V3 => new GenericProtocol("3.0");
+    }
+
+    [Export(typeof(IVersionedProtocol))]
+    internal class ModernProtocolImplementation : IVersionedProtocol { public string Version => "4.0"; }
+
+    [Export]
+    public class ImportAllProtocolVersions
+    {
+        [ImportMany(typeof(IVersionedProtocol))]
+        public IVersionedProtocol[] Protocols { get; set; }
+    }
+
+    public interface IUntypedService  { string Version { get; } }
+
+    [Export("ArbitraryKey")]
+    public class UntypedService : IUntypedService
+    {
+        public string Version { get { return "123.4567"; } }
+    }
+
+    [Export]
+    public class ImportUntypedService
+    {
+        [Import("ArbitraryKey")]
+        public object UntypedService { get; set; }
+    }
+
+    [Export]
+    public class ImportManyUntypedServices
+    {
+        [ImportMany("ArbitraryKey")]
+        public object[] UntypedServices { get; set; }
+    }
 }
