@@ -6419,8 +6419,8 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// <summary>Applies reuse to created expression. 
-        /// Actually wraps passed expression in scoped access and produces another expression.</summary>
+        /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access 
+        /// and produces another expression.</summary>
         /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
         /// <param name="reuse">Reuse - may be different from <see cref="Reuse"/> if set <see cref="Rules.DefaultReuseInsteadOfTransient"/>.</param>
         /// <param name="tracksTransientDisposable">Specifies that reuse is to track transient disposable.</param>
@@ -6467,13 +6467,21 @@ namespace DryIoc
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-                var scopeExpr = reuse.GetScopeExpression(request);
+                var exprProvider = reuse as IReusedItemExpressionProvider;
+                if (exprProvider != null)
+                {
+                    serviceExpr = exprProvider.GetOrAddItemExpression(request, serviceExpr);
+                }
+                else
+                {
+                    var scopeExpr = reuse.GetScopeExpression(request);
 
-                // For transient disposable we does not care to bind to specific ID, because it should be created each time.
-                var scopedId = tracksTransientDisposable ? -1 : reuse.GetScopedItemIdOrSelf(FactoryID, request);
-                serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                    Expression.Constant(scopedId),
-                    Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
+                    // For transient disposable we does not care to bind to specific ID, because it should be created each time.
+                    var scopedId = tracksTransientDisposable ? -1 : reuse.GetScopedItemIdOrSelf(FactoryID, request);
+                    serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+                        Expression.Constant(scopedId),
+                        Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
+                }
             }
 
             // Unwrap WeakReference and/or array preventing disposal
@@ -7634,7 +7642,7 @@ namespace DryIoc
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
-    public sealed class Scope : IScope
+    public sealed class Scope: IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public IScope Parent { get; private set; }
@@ -8157,11 +8165,41 @@ namespace DryIoc
         int GetScopedItemIdOrSelf(int factoryID, Request request);
     }
 
+    public interface IReusedItemExpressionProvider
+    {
+        Expression GetOrAddItemExpression(Request request, Expression createItemExpr);
+    }
+
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
-    public sealed class SingletonReuse : IReuse
+    public sealed class SingletonReuse : IReuse, IReusedItemExpressionProvider
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 1000; } }
+
+        /// <summary>Returns the reused item or creates and returns item on demand.
+        /// Basically requests the scope, then requests the value from scope (if scope is available).</summary>
+        /// <typeparam name="T">Return item type</typeparam>
+        /// <param name="scopes">Container scopes to select from.</param> <param name="factoryId">ID for lookup.</param>
+        /// <param name="createValue">Delegate for creating the item.</param>
+        /// <param name="throwIfNoMatchingScope">Specify to throw if no scope available.</param>
+        /// <returns>Reused item.</returns>
+        public static T GetOrAddItem<T>(IScopeAccess scopes,
+            int factoryId, CreateScopedValue createValue, bool throwIfNoMatchingScope)
+        {
+            var scope = scopes.SingletonScope;
+            var scopedItemId = scope.GetScopedItemIdOrSelf(factoryId);
+            return (T)scope.GetOrAdd(scopedItemId, createValue);
+        }
+
+        public Expression GetOrAddItemExpression(Request request, Expression createItemExpr)
+        {
+            var ignoreThrowIfNoMatchingScopeExpr = Expression.Constant(false); // because singleton scope is always awailable
+            return Expression.Call(typeof(SingletonReuse), "GetOrAddItem", new[] { request.ServiceType },
+                Container.ScopesExpr,
+                Expression.Constant(request.FactoryID),
+                Expression.Lambda<CreateScopedValue>(createItemExpr),
+                ignoreThrowIfNoMatchingScopeExpr);
+        }
 
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
