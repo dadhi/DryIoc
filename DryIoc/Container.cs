@@ -6470,13 +6470,13 @@ namespace DryIoc
                 var exprProvider = reuse as IReusedItemExpressionProvider;
                 if (exprProvider != null)
                 {
-                    serviceExpr = exprProvider.GetOrAddItemExpression(request, serviceExpr);
+                    serviceExpr = exprProvider.GetOrAddItemExpression(request, tracksTransientDisposable, serviceExpr);
                 }
                 else
                 {
                     var scopeExpr = reuse.GetScopeExpression(request);
 
-                    // For transient disposable we does not care to bind to specific ID, because it should be created each time.
+                    // For transient disposable we don't care to bind to specific ID, because it should be created each time.
                     var scopedId = tracksTransientDisposable ? -1 : reuse.GetScopedItemIdOrSelf(FactoryID, request);
                     serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                         Expression.Constant(scopedId),
@@ -8165,9 +8165,16 @@ namespace DryIoc
         int GetScopedItemIdOrSelf(int factoryID, Request request);
     }
 
+    /// <summary>Easy way to get reused item expression. 
+    /// Should be implemented by <see cref="IReuse"/> in order to be called.</summary>
     public interface IReusedItemExpressionProvider
     {
-        Expression GetOrAddItemExpression(Request request, Expression createItemExpr);
+        /// <summary>Returns composed expression.</summary>
+        /// <param name="request">info</param>
+        /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
+        /// <param name="createItemExpr">Service creation expressiom</param>
+        /// <returns>Subject</returns>
+        Expression GetOrAddItemExpression(Request request, bool trackTransientDisposable, Expression createItemExpr);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
@@ -8176,29 +8183,31 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 1000; } }
 
-        /// <summary>Returns the reused item or creates and returns item on demand.
-        /// Basically requests the scope, then requests the value from scope (if scope is available).</summary>
-        /// <typeparam name="T">Return item type</typeparam>
-        /// <param name="scopes">Container scopes to select from.</param> <param name="factoryId">ID for lookup.</param>
+        /// <summary>Returns item from singleton scope.</summary>
+        /// <param name="containerScopes">Container scopes to select from.</param>
+        /// <param name="trackTransientDisposable">Indicates that item should be tracked instead of reused.</param>
+        /// <param name="factoryId">ID for lookup.</param>
         /// <param name="createValue">Delegate for creating the item.</param>
-        /// <param name="throwIfNoMatchingScope">Specify to throw if no scope available.</param>
         /// <returns>Reused item.</returns>
-        public static T GetOrAddItem<T>(IScopeAccess scopes,
-            int factoryId, CreateScopedValue createValue, bool throwIfNoMatchingScope)
+        public static object GetOrAddItem(IScopeAccess containerScopes, bool trackTransientDisposable, int factoryId, 
+            CreateScopedValue createValue)
         {
-            var scope = scopes.SingletonScope;
-            var scopedItemId = scope.GetScopedItemIdOrSelf(factoryId);
-            return (T)scope.GetOrAdd(scopedItemId, createValue);
+            var scope = containerScopes.SingletonScope;
+            var scopedItemId = trackTransientDisposable ? -1 : scope.GetScopedItemIdOrSelf(factoryId);
+            return scope.GetOrAdd(scopedItemId, createValue);
         }
 
-        public Expression GetOrAddItemExpression(Request request, Expression createItemExpr)
+        private static readonly MethodInfo _getOrAddItemMethod =
+            typeof(SingletonReuse).GetSingleMethodOrNull("GetOrAddItem");
+
+        /// <summary>Returns expression call to <see cref="GetOrAddItem"/>.</summary>
+        public Expression GetOrAddItemExpression(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
-            var ignoreThrowIfNoMatchingScopeExpr = Expression.Constant(false); // because singleton scope is always awailable
-            return Expression.Call(typeof(SingletonReuse), "GetOrAddItem", new[] { request.ServiceType },
-                Container.ScopesExpr,
+            return Expression.Call(_getOrAddItemMethod,
+                Container.ScopesExpr, 
+                Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
-                Expression.Lambda<CreateScopedValue>(createItemExpr),
-                ignoreThrowIfNoMatchingScopeExpr);
+                Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
 
         /// <summary>Returns container bound Singleton scope.</summary>
@@ -8235,7 +8244,7 @@ namespace DryIoc
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
-    public sealed class CurrentScopeReuse : IReuse
+    public sealed class CurrentScopeReuse : IReuse, IReusedItemExpressionProvider
     {
         /// <summary>Name to find current scope or parent with equal name.</summary>
         public readonly object Name;
@@ -8248,6 +8257,44 @@ namespace DryIoc
         public CurrentScopeReuse(object name = null)
         {
             Name = name;
+        }
+
+        /// <summary>Returns item from current scope with specified name.</summary>
+        /// <param name="containerScopes">Container scopes to select from.</param>
+        /// <param name="scopeName">scope name to look up.</param>
+        /// <param name="throwIfNoScopeFound">Specifies to throw if scope with the <paramref name="scopeName"/> is not found.</param>
+        /// <param name="trackTransientDisposable"></param>
+        /// <param name="factoryId">ID for lookup.</param>
+        /// <param name="createValue">Delegate for creating the item.</param>
+        /// <returns>Reused item.</returns>
+        public static object GetOrAddItemOrDefault(
+            IScopeAccess containerScopes, object scopeName, bool throwIfNoScopeFound, 
+            bool trackTransientDisposable, int factoryId, CreateScopedValue createValue)
+        {
+            var scope = containerScopes.GetCurrentNamedScope(scopeName, throwIfNoScopeFound);
+            if (scope == null)
+                return null;
+            var scopedItemId = trackTransientDisposable ? -1 : scope.GetScopedItemIdOrSelf(factoryId);
+            return scope.GetOrAdd(scopedItemId, createValue);
+        }
+
+        private static readonly MethodInfo _getOrAddItemOrDefaultMethod = 
+            typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetOrAddItemOrDefault");
+
+        /// <summary>Returns expression call to <see cref="GetOrAddItemOrDefault"/>.</summary>
+        public Expression GetOrAddItemExpression(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        {
+            var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
+            if (Name != null && Name.GetType().IsValueType())
+                scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
+
+            var throwIfNoScopeFoundExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
+
+            return Expression.Call(_getOrAddItemOrDefaultMethod,
+                Container.ScopesExpr, scopeNameExpr, throwIfNoScopeFoundExpr,
+                Expression.Constant(trackTransientDisposable),
+                Expression.Constant(request.FactoryID),
+                Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
 
         /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
