@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue123_TipsForMigrationFromAutofac
     {
-        [Test, Ignore("Not supported by Autofac Syntax at the moment")]
+        [Test]
         public void Transient_disposable_is_tracked_in_container()
         {
             var builder = new ContainerBuilder();
