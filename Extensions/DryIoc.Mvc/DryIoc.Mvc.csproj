@@ -75,11 +75,12 @@
     <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
       <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
+      <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\DryIoc.Web\DryIoc.Web.csproj">
       <Project>{3af3b3b0-a5da-45d0-91c7-7a9e96716fab}</Project>
       <Name>DryIoc.Web</Name>
-      <Private>True</Private>
+      <Private>False</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

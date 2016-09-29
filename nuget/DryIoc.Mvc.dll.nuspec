@@ -11,6 +11,9 @@
         <description>DryIoc extension for ASP.NET MVC</description>
         <tags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.1.0:
+          - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
+          - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
           v2.0.2
           - fixed: #273: NuGet - DryIoc.Mvc.dll has non-dll dependencies
           v2.0.1
@@ -18,26 +21,35 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.4.1,3.0.0)" />
-            <dependency id="DryIoc.Web.dll" version="[2.0,3.0.0)" />
+              <dependency id="DryIoc.dll" version="[2.8,3.0.0)" />
+              <dependency id="DryIoc.Web.dll" version="[2.1.0,3.0.0)" />
+            
+              <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />
+          </group>
+          <group targetFramework="net45">
+              <dependency id="Microsoft.AspNet.Mvc" version="5.2.3" />
+          </group>
+          <group targetFramework="net40">
+              <dependency id="Microsoft.AspNet.Mvc" version="[4.0.40804,5.0)" />
           </group>
         </dependencies>
         <frameworkAssemblies>
-            <frameworkAssembly assemblyName="System.Web" targetFramework="net45" />
-            <frameworkAssembly assemblyName="System.Web.Mvc" targetFramework="net45" />
+            <frameworkAssembly assemblyName="System.Web" />
         </frameworkAssemblies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\NuGet\DryIoc.snk" target="tools" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.xml" target="lib\net45" />
 
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
-
+        <!-- net40 -->
+        <file src="..\Net40\Extensions\bin\Release\DryIoc.Mvc.dll" target="lib\net40" />
+        <file src="..\Net40\Extensions\bin\Release\DryIoc.Mvc.pdb" target="lib\net40" />
+        <file src="..\Net40\Extensions\bin\Release\DryIoc.Mvc.xml" target="lib\net40" />
+    
     </files>
 </package>
