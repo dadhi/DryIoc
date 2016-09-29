@@ -38,30 +38,15 @@ namespace DryIoc.Mvc.DataAnnotationsValidator
 
             DataAnnotationsModelValidatorProvider.RegisterDefaultAdapterFactory(
                 (metadata, context, attribute) =>
-                new DryIocDataAnnotationsModelValidator(new DryIocServiceProvider(container), metadata, context, attribute)
+                new DryIocDataAnnotationsModelValidator(container, metadata, context, attribute)
             );
 
             DataAnnotationsModelValidatorProvider.RegisterDefaultValidatableObjectAdapterFactory(
                 (metadata, context) =>
-                new DryIocValidatableObjectAdapter(new DryIocServiceProvider(container), metadata, context)
+                new DryIocValidatableObjectAdapter(container, metadata, context)
             );
 
             return container;
-        }
-    }
-
-    public class DryIocServiceProvider : IServiceProvider
-    {
-        private readonly IResolver _container;
-
-        public DryIocServiceProvider(IResolver container)
-        {
-            _container = container;
-        }
-
-        public object GetService(Type serviceType)
-        {
-            return _container.Resolve(serviceType);
         }
     }
 

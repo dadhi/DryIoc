@@ -669,7 +669,17 @@ namespace DryIoc
 
         #endregion
 
-        #region IResolverContext
+        #region IServiceProvider
+
+        /// <inheritdoc />
+        public object GetService(Type serviceType)
+        {
+            return ((IResolver)this).Resolve(serviceType, ifUnresolvedReturnDefault: false); // todo: Add container rule.
+        }
+
+        #endregion
+
+        #region IScopeAccess
 
         /// <summary>Scope containing container singletons.</summary>
         IScope IScopeAccess.SingletonScope
@@ -2589,8 +2599,11 @@ namespace DryIoc
 
             var containerFactory = new ExpressionFactory(r =>
                 Expression.Convert(Container.ResolverExpr, r.ServiceType), setup: Setup.Wrapper);
-            wrappers = wrappers.AddOrUpdate(typeof(IRegistrator), containerFactory);
-            wrappers = wrappers.AddOrUpdate(typeof(IContainer), containerFactory);
+
+            wrappers = wrappers
+                .AddOrUpdate(typeof(IRegistrator), containerFactory)
+                .AddOrUpdate(typeof(IContainer), containerFactory)
+                .AddOrUpdate(typeof(IServiceProvider), containerFactory);
 
             wrappers = wrappers.AddOrUpdate(typeof(IDisposable),
                 new ExpressionFactory(r => r.IsResolutionRoot ? null : Container.GetResolutionScopeExpression(r),
@@ -8971,7 +8984,7 @@ namespace DryIoc
 
     /// <summary>Exposes operations required for internal registry access. 
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
-    public interface IContainer : IRegistrator, IResolver, IDisposable
+    public interface IContainer : IRegistrator, IResolver, IServiceProvider, IDisposable
     {
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }
