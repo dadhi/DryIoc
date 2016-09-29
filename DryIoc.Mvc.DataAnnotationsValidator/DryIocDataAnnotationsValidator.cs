@@ -1,11 +1,35 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Web.Mvc;
+﻿/*
+The MIT License (MIT)
 
-namespace DryIoc.Mvc
+Copyright (c) 2016 Maksim Volkau and Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+namespace DryIoc.Mvc.DataAnnotationsValidator
 {
+    using System;
+    using System.Collections.Generic;
+    using System.ComponentModel.DataAnnotations;
+    using System.Linq;
+    using System.Web.Mvc;
+
     public static class DryIocDataAnnotationsValidator
     {
         public static IContainer WithDataAnnotationsValidator(this IContainer container)
@@ -28,7 +52,7 @@ namespace DryIoc.Mvc
 
     public class DryIocServiceProvider : IServiceProvider
     {
-        readonly IResolver _container;
+        private readonly IResolver _container;
 
         public DryIocServiceProvider(IResolver container)
         {
@@ -43,7 +67,7 @@ namespace DryIoc.Mvc
 
     public class DryIocDataAnnotationsModelValidator : DataAnnotationsModelValidator
     {
-        readonly IServiceProvider _serviceProvider;
+        private readonly IServiceProvider _serviceProvider;
 
         public DryIocDataAnnotationsModelValidator(IServiceProvider serviceProvider, ModelMetadata metadata, ControllerContext context, ValidationAttribute attribute) :
             base(metadata, context, attribute)
@@ -101,7 +125,7 @@ namespace DryIoc.Mvc
             return ConvertResults(validatable.Validate(validationContext));
         }
 
-        private IEnumerable<ModelValidationResult> ConvertResults(IEnumerable<ValidationResult> results)
+        private static IEnumerable<ModelValidationResult> ConvertResults(IEnumerable<ValidationResult> results)
         {
             foreach (var result in results)
             {

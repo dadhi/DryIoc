@@ -16,7 +16,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -24,7 +24,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -74,7 +74,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DryIocDataAnnotationsValidatorTests.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -83,11 +82,16 @@
     <ProjectReference Include="..\DryIoc.Mvc.DataAnnotationsValidator\DryIoc.Mvc.DataAnnotationsValidator.csproj">
       <Project>{d1730c66-89f4-416d-89a7-41f5765b9d78}</Project>
       <Name>DryIoc.Mvc.DataAnnotationsValidator</Name>
+      <Private>False</Private>
     </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{ae41df42-6362-4843-84c5-c3c2ab29a3c7}</Project>
+    <ProjectReference Include="..\Net45\DryIoc\DryIoc.csproj">
+      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
       <Name>DryIoc</Name>
+      <Private>False</Private>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
