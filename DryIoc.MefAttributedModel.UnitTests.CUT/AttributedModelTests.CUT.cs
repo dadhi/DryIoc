@@ -530,4 +530,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             Dep = getDep();
         }
     }
+
+    [Export, WithMetadata("a", 1), ExportMetadata("b", 2)]
+    public class WithMetaKeyValue
+    {
+    }
 }

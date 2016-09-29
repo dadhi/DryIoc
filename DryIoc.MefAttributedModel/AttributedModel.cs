@@ -1062,18 +1062,31 @@ namespace DryIoc.MefAttributedModel
         private IDictionary<string, object> GetExportedMetadata()
         {
             var metaAttrs = ImplementationType.GetAttributes()
-                .Where(a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
+                .Where(a => 
+                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() || 
+                    a is ExportMetadataAttribute);
 
             Dictionary<string, object> metaDict = null;
             foreach (var metaAttr in metaAttrs)
             {
-                var withMetaAttr = metaAttr as WithMetadataAttribute;
-                var metaKey = withMetaAttr != null 
-                    ? (withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey)
-                    : Constants.ExportMetadataDefaultKey;
+                string metaKey = Constants.ExportMetadataDefaultKey;
+                object metaValue = metaAttr;
 
-                var metaValue = withMetaAttr != null 
-                    ? withMetaAttr.Metadata : metaAttr;
+                var withMetaAttr = metaAttr as WithMetadataAttribute;
+                if (withMetaAttr != null)
+                {
+                    metaKey = withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
+                    metaValue = withMetaAttr.Metadata;
+                }
+                else
+                {
+                    var exportMetaAttr = metaAttr as ExportMetadataAttribute;
+                    if (exportMetaAttr != null)
+                    {
+                        metaKey = exportMetaAttr.Name; // note: defaults to string.Empty 
+                        metaValue = exportMetaAttr.Value;
+                    }
+                }
 
                 if (metaDict != null && metaDict.ContainsKey(metaKey))
                     Throw.It(Error.DuplicateMetadataKey, metaKey, metaDict);

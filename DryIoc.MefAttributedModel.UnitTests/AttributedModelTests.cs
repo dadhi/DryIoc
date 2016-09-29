@@ -1,4 +1,6 @@
-﻿namespace DryIoc.MefAttributedModel.UnitTests
+﻿using System.Collections.Generic;
+
+namespace DryIoc.MefAttributedModel.UnitTests
 {
     using System;
     using System.Linq;
@@ -170,6 +172,15 @@
             }
 
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
+        }
+
+        [Test]
+        public void Can_resolve_export_with_multi_metadata()
+        {
+            var it = _container.Resolve<Meta<WithMetaKeyValue, IDictionary<string, object>>>();
+
+            CollectionAssert.AreEquivalent(new[] { "a", "b" }, it.Metadata.Keys);
+            CollectionAssert.AreEquivalent(new[] { 1, 2 }, it.Metadata.Values);
         }
     }
 }
