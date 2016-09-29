@@ -7546,11 +7546,9 @@ namespace DryIoc
 
             var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
             var instanceExpr = Expression.Constant(instance, instanceType);
-
-            var scopeExpr = Reuse.GetScopeExpression(request);
-            Expression serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                Expression.Constant(scopedId),
-                Expression.Lambda<CreateScopedValue>(instanceExpr, ArrayTools.Empty<ParameterExpression>()));
+            
+            var reuseExprProvider = (reuse as IReusedItemExpressionProvider).ThrowIfNull();
+            var serviceExpr = reuseExprProvider.GetOrAddItemExpression(request, tracksTransientDisposableIgnored, instanceExpr);
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
@@ -8165,11 +8163,8 @@ namespace DryIoc
         /// <returns>Located scope.</returns>
         IScope GetScopeOrDefault(Request request);
 
-        /// <summary>Supposed to create in-line expression with the same code as body of <see cref="GetScopeOrDefault"/> method.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Expression of type <see cref="IScope"/>.</returns>
-        /// <remarks>Result expression should be static: should Not create closure on any objects. 
-        /// If you require to reference some item from outside, put it into <see cref="IContainer.ResolutionStateCache"/>.</remarks>
+        // todo: v3: remove
+        /// <summary>Obsolete: use <see cref="IReusedItemExpressionProvider.GetOrAddItemExpression"/> instead.</summary>
         Expression GetScopeExpression(Request request);
 
         /// <summary>Returns special id/index to lookup scoped item, or original passed factory id otherwise.</summary>
@@ -8178,6 +8173,7 @@ namespace DryIoc
         int GetScopedItemIdOrSelf(int factoryID, Request request);
     }
 
+    // todo: v3: Promote to IReuse instead of current GetScopeExpression
     /// <summary>Easy way to get reused item expression. 
     /// Should be implemented by <see cref="IReuse"/> in order to be called.</summary>
     public interface IReusedItemExpressionProvider
@@ -8231,12 +8227,10 @@ namespace DryIoc
             return request.Scopes.SingletonScope;
         }
 
-        /// <summary>Returns expression directly accessing <see cref="IScopeAccess.SingletonScope"/>.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Singleton scope property expression.</returns>
+        /// <inheritdoc />
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Property(Container.ScopesExpr, "SingletonScope");
+            return Throw.For<Expression>(Error.Of("Obsolete"));
         }
 
         /// <summary>Returns index of new item in singleton scope.</summary>
@@ -8320,17 +8314,10 @@ namespace DryIoc
             return request.Scopes.GetCurrentNamedScope(Name, false);
         }
 
-        /// <summary>Returns <see cref="IScopeAccess.GetCurrentNamedScope"/> method call expression.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Method call expression returning matched current scope.</returns>
+        /// <inheritdoc />
         public Expression GetScopeExpression(Request request)
         {
-            var nameExpr = request.Container.GetOrAddStateItemExpression(Name);
-            if (Name != null && Name.GetType().IsValueType())
-                nameExpr = Expression.Convert(nameExpr, typeof(object));
-            return Expression.Call(Container.ScopesExpr, "GetCurrentNamedScope", ArrayTools.Empty<Type>(),
-                nameExpr,
-                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw));
+            return Throw.For<Expression>(Error.Of("Obsolete"));
         }
 
         /// <summary>Asks the scope to convert factory ID into internal representation and returns it.
