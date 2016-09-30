@@ -108,6 +108,7 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ReuseAttributeTests.cs">
       <Link>ReuseAttributeTests.cs</Link>
     </Compile>
+    <Compile Include="ContainerHierarchyTests.cs" />
     <Compile Include="GenerateFactoryDelegateTests.cs" />
     <Compile Include="ImportMetadataTests.cs" />
   </ItemGroup>

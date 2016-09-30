@@ -156,4 +156,24 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [ImportMany("ArbitraryKey")]
         public object[] UntypedServices { get; set; }
     }
+
+    public interface IDisposableScopedService : IDisposable { bool IsDisposed { get; } }
+
+    [Export(typeof(IDisposableScopedService))]
+    internal class MyScopedService : IDisposableScopedService
+    {
+        public void Dispose() { IsDisposed = true; }
+
+        public bool IsDisposed { get; private set; }
+    }
+
+    public interface IDisposableSingletonService : IDisposable { bool IsDisposed { get; } }
+
+    [Export(typeof(IDisposableSingletonService)), PartCreationPolicy(CreationPolicy.Shared)]
+    internal class MySingletonService : IDisposableSingletonService
+    {
+        public void Dispose() { IsDisposed = true; }
+
+        public bool IsDisposed { get; private set; }
+    }
 }
