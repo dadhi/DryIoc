@@ -93,7 +93,7 @@ namespace DryIoc.WebApi.UnitTests
             }
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Can_verify_if_no_controlles_were_registered()
         {
             var config = new HttpConfiguration();

@@ -549,7 +549,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Can_Validate_the_used_instance_dependency()
         {
             var container = new Container();

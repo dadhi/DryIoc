@@ -1498,7 +1498,7 @@ namespace DryIoc
             /// <summary>Called for Injection as dependency.</summary>
             public override Expression CreateExpressionOrDefault(Request request)
             {
-                return Resolver.CreateResolutionExpression(request);
+                return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
             }
 
             public override Expression GetExpressionOrDefault(Request request)
@@ -4824,9 +4824,11 @@ namespace DryIoc
             return resolver.ResolveMany<object>(serviceType, behavior, serviceKey);
         }
 
-        internal static Expression CreateResolutionExpression(Request request, bool openResolutionScope = false)
+        internal static Expression CreateResolutionExpression(Request request, 
+            bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
-            PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
+            if (!isRuntimeDependency)
+                PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
             var container = request.Container;
 
