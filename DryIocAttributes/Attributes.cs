@@ -176,6 +176,14 @@ namespace DryIocAttributes
         public ResolutionScopeReuseAttribute() : base(ReuseType.ResolutionScope) { }
     }
 
+    /// <summary>Specifies for export part to use the whatever reuse of importing site.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class UseParentReuseAttribute : Attribute { }
+
     /// <summary>Marks exported reused service to be stored as WeakReference</summary>
     public class WeaklyReferencedAttribute : Attribute { }
 
@@ -700,7 +708,8 @@ namespace DryIocAttributes
         | AttributeTargets.Field)]
     public class OpenResolutionScopeAttribute : Attribute { }
 
-    /// <summary>Marker for resolution root exports.</summary>
+    /// <summary>Specifies that export should be imported as dynamic resolution call, 
+    /// instead of inlined creation expression.</summary>
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Interface
         | AttributeTargets.Method
@@ -715,12 +724,4 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class AsResolutionRootAttribute : Attribute { }
-
-    /// <summary>Marker for resolution root exports.</summary>
-    [AttributeUsage(AttributeTargets.Class
-        | AttributeTargets.Interface
-        | AttributeTargets.Method
-        | AttributeTargets.Property
-        | AttributeTargets.Field)]
-    public class UseParentReuseAttribute : Attribute { }
 }

@@ -1464,11 +1464,6 @@ namespace DryIoc
         // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
         internal sealed class UsedInstanceFactory : Factory
         {
-            private static readonly Expression _singletonScopeExpr =
-                Expression.Property(ScopesExpr, "SingletonScope");
-            private static readonly Expression _scopeExpr = 
-                Expression.Call(ScopesExpr, "GetCurrentScope", ArrayTools.Empty<Type>());
-
             // not cacheable factory 
             public override bool IsFactoryDelegateCacheable() { return false; }
 
@@ -1484,15 +1479,26 @@ namespace DryIoc
                 InstanceType = instanceType;
             }
 
+            /// <summary>Called for Resolution call/root.</summary>
+            public override FactoryDelegate GetDelegateOrDefault(Request request)
+            {
+                return (state, resolverContext, scope) =>
+                {
+                    object result = null;
+
+                    var openScope = resolverContext.Scopes.GetCurrentScope();
+                    if (openScope != null)
+                        result = openScope.GetAndUnwrapOrDefault<object>(FactoryID);
+
+                    result = result ?? resolverContext.Scopes.SingletonScope.GetAndUnwrapOrDefault<object>(FactoryID);
+                    return result;
+                };
+            }
+
+            /// <summary>Called for Injection as dependency.</summary>
             public override Expression CreateExpressionOrDefault(Request request)
             {
-                if (!request.IsFirstNonWrapperInResolutionCall())
-                    return Resolver.CreateResolutionExpression(request);
-
-                return Expression.Call(
-                    ScopeTools.GetAndUnwrapMethod.MakeGenericMethod(InstanceType),
-                    Scoped ? _scopeExpr : _singletonScopeExpr, 
-                    Expression.Constant(FactoryID));
+                return Resolver.CreateResolutionExpression(request);
             }
 
             public override Expression GetExpressionOrDefault(Request request)
@@ -7779,8 +7785,9 @@ namespace DryIoc
     /// <summary>Syntax sugar on top of <see cref="IScope"/>.</summary>
     public static class ScopeTools
     {
-        /// <summary>Access to <see cref="GetAndUnwrap{T}"/> via reflection.</summary>
-        public static readonly MethodInfo GetAndUnwrapMethod = typeof(ScopeTools).GetSingleMethodOrNull("GetAndUnwrap");
+        /// <summary>Access to <see cref="GetAndUnwrapOrDefault{T}"/> via reflection.</summary>
+        public static readonly MethodInfo GetAndUnwrapMethod = 
+            typeof(ScopeTools).GetSingleMethodOrNull("GetAndUnwrapOrDefault");
 
         /// <summary>Try to return reused value from scope, 
         /// and unwrap it automatically if it wrapped in <see cref="WeakReference"/> or/and prevent disposal wrapper.
@@ -7789,11 +7796,10 @@ namespace DryIoc
         /// <param name="scope">Scope to get value from.</param>
         /// <param name="factoryId">Lookup ID.</param>
         /// <returns>Found value or throws exception.</returns>
-        public static T GetAndUnwrap<T>(this IScope scope, int factoryId)
+        public static T GetAndUnwrapOrDefault<T>(this IScope scope, int factoryId)
         {
             var id = scope.GetScopedItemIdOrSelf(factoryId);
-            var value = scope.GetOrAdd(id, () =>
-                Throw.For<object>(Error.ScopeDoesNotContainInstanceForSpecifiedFactoryID, factoryId));
+            var value = scope.GetOrAdd(id, () => null);
 
             if (value == null)
                 return default(T);
@@ -9385,8 +9391,6 @@ namespace DryIoc
             NotPossibleToResolveLazyEnumerableInsideFuncWithArgs = Of(
                 "Unable to resolve LazyEnumerable service inside Func<args..> because arguments can't be passed through" +
                 " lazy boundaries: {0}"),
-            ScopeDoesNotContainInstanceForSpecifiedFactoryID = Of(
-                "Scope does not contain instance for specified factory ID: {0}"),
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
                 "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}");
 

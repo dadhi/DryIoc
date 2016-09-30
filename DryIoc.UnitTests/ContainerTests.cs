@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using DryIoc.UnitTests.CUT;
+﻿using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -545,9 +544,25 @@ namespace DryIoc.UnitTests
 
             container.Register<Me.MyService>();
 
-            var errors = container.Validate().ToArray();
+            var errors = container.Validate();
             Assert.AreEqual(1, errors.Length);
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
+        }
+
+        [Test]
+        public void Can_Validate_the_used_instance_dependency()
+        {
+            var container = new Container();
+
+            container.Register<AA>();
+            container.UseInstance("bb");
+
+            var errors = container.Validate();
+        }
+
+        public class AA
+        {
+            public AA(string msg) { }
         }
 
         [Test]
