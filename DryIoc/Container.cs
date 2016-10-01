@@ -4512,8 +4512,6 @@ namespace DryIoc
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
-            var instanceType = instance == null ? serviceType : instance.GetType();
-
             if (preventDisposal)
                 instance = new[] { instance };
 
