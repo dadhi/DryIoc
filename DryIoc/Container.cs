@@ -4827,6 +4827,10 @@ namespace DryIoc
         internal static Expression CreateResolutionExpression(Request request, 
             bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
+            if (isRuntimeDependency &&
+                request.Container.Rules.ThrowIfRuntimeStateRequired)
+                Throw.It(Error.StateIsRequiredToUseItem, request);
+
             if (!isRuntimeDependency)
                 PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
@@ -9356,9 +9360,9 @@ namespace DryIoc
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
-                "Runtime state is required to inject (or use) the value {0}. " + Environment.NewLine +
-                "The reason is using RegisterDelegate, RegisterInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + Environment.NewLine +
-                "To allow the value you can use container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
+                "Runtime state is required to inject (or use) the: {0}. " + Environment.NewLine +
+                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + Environment.NewLine +
+                "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgOfValueIsProvidedButNoArgValues = Of(
                 "Arg.OfValue index is provided but no arg values specified."),
             ArgOfValueIndesIsOutOfProvidedArgValues = Of(
