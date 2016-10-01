@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2013-2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1424,7 +1424,7 @@ namespace DryIoc
                     // if any default factories, find the instance factory to reuse. Throw if multiple.
                     if (factoriesEntry.LastDefaultKey != null)
                     {
-                        // As we alway permit / re-use the Single factory only, so we cannot have more than one 
+                        // As we always permit / re-use the Single factory only, so we cannot have more than one 
                         var defaultInstanceFactory = factoriesEntry.Factories.Enumerate()
                             .FirstOrDefault(it => it.Key is DefaultKey 
                                 && it.Value is UsedInstanceFactory 
