@@ -63,7 +63,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var instance = new DisposableService();
-            container.RegisterInstance(instance, weaklyReferenced: true);
+            container.UseInstance(instance, weaklyReferenced: true);
             instance = container.Resolve<DisposableService>();
 
             container.Dispose();

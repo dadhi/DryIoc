@@ -68,19 +68,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Register_instance_with_different_if_already_registered_policies()
-        {
-            var container = new Container();
-            container.RegisterInstance("nya", Reuse.Singleton);
-            Assert.AreEqual("nya", container.Resolve<string>());
-
-            container.RegisterInstance("yours", Reuse.Singleton);
-
-            CollectionAssert.AreEquivalent(new[] { "nya", "yours" },
-                container.Resolve<string[]>());
-        }
-
-        [Test]
         public void Register_instance_in_resolution_scope_does_not_make_sense_and_should_throw()
         {
             var container = new Container();
@@ -114,7 +101,7 @@ namespace DryIoc.UnitTests
         {
             var c = new Container();
 
-            c.RegisterInstance<I>(new C(), reuse: new ShortReuse());
+            c.RegisterInstance<I>(new C(), new ShortReuse());
             c.Register<D>(Reuse.Singleton);
 
             var ex = Assert.Throws<ContainerException>(() =>
@@ -153,18 +140,6 @@ namespace DryIoc.UnitTests
 
             var s = container.Resolve<string>();
             Assert.AreEqual("a", s);
-        }
-
-        [Test]
-        public void Given_multiple_already_registered_services_When_registering_with_keep_option_Then_no_exception_should_be_thrown()
-        {
-            var container = new Container();
-
-            container.UseInstance("a");
-            container.UseInstance("b");
-
-            Assert.DoesNotThrow(() => 
-            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep));
         }
 
         [Test]
@@ -313,27 +288,6 @@ namespace DryIoc.UnitTests
 
             var anotherA = new AA();
             container.UseInstance(anotherA);
-            var anotherBB = container.Resolve<BB>(); // will inject `anotherA`
-            Assert.AreSame(anotherA, anotherBB.A);
-        }
-
-        [Test]
-        public void The_registered_instance_dependency_should_be_independent_of_scope()
-        {
-            var container = new Container();
-            container.Register<BB>();
-
-            using (var scope = container.OpenScope())
-            {
-                var a = new AA();
-                scope.RegisterInstance(a, Reuse.InCurrentScope, IfAlreadyRegistered.Replace);
-
-                var bb = scope.Resolve<BB>(); // will inject `a`
-                Assert.AreSame(a, bb.A);
-            }
-
-            var anotherA = new AA();
-            container.RegisterInstance(anotherA, Reuse.Singleton, IfAlreadyRegistered.Replace);
             var anotherBB = container.Resolve<BB>(); // will inject `anotherA`
             Assert.AreSame(anotherA, anotherBB.A);
         }

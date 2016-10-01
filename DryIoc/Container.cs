@@ -6488,10 +6488,10 @@ namespace DryIoc
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-                var exprProvider = reuse as IReusedItemExpressionProvider;
+                var exprProvider = reuse as IReuseV3;
                 if (exprProvider != null)
                 {
-                    serviceExpr = exprProvider.GetOrAddItemExpression(request, tracksTransientDisposable, serviceExpr);
+                    serviceExpr = exprProvider.Apply(request, tracksTransientDisposable, serviceExpr);
                 }
                 else
                 {
@@ -7555,8 +7555,8 @@ namespace DryIoc
             var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
             var instanceExpr = Expression.Constant(instance, instanceType);
             
-            var reuseExprProvider = (reuse as IReusedItemExpressionProvider).ThrowIfNull();
-            var serviceExpr = reuseExprProvider.GetOrAddItemExpression(request, tracksTransientDisposableIgnored, instanceExpr);
+            var reuseExprProvider = (reuse as IReuseV3).ThrowIfNull();
+            var serviceExpr = reuseExprProvider.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
@@ -8172,7 +8172,7 @@ namespace DryIoc
         IScope GetScopeOrDefault(Request request);
 
         // todo: v3: remove
-        /// <summary>Obsolete: use <see cref="IReusedItemExpressionProvider.GetOrAddItemExpression"/> instead.</summary>
+        /// <summary>ObsoIReuseV3.ApplyApply"/> instead.</summary>
         Expression GetScopeExpression(Request request);
 
         /// <summary>Returns special id/index to lookup scoped item, or original passed factory id otherwise.</summary>
@@ -8184,18 +8184,18 @@ namespace DryIoc
     // todo: v3: Promote to IReuse instead of current GetScopeExpression
     /// <summary>Easy way to get reused item expression. 
     /// Should be implemented by <see cref="IReuse"/> in order to be called.</summary>
-    public interface IReusedItemExpressionProvider
+    public interface IReuseV3
     {
         /// <summary>Returns composed expression.</summary>
         /// <param name="request">info</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
         /// <param name="createItemExpr">Service creation expressiom</param>
         /// <returns>Subject</returns>
-        Expression GetOrAddItemExpression(Request request, bool trackTransientDisposable, Expression createItemExpr);
+        Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
-    public sealed class SingletonReuse : IReuse, IReusedItemExpressionProvider
+    public sealed class SingletonReuse : IReuse, IReuseV3
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 1000; } }
@@ -8218,7 +8218,7 @@ namespace DryIoc
             typeof(SingletonReuse).GetSingleMethodOrNull("GetOrAddItem");
 
         /// <summary>Returns expression call to <see cref="GetOrAddItem"/>.</summary>
-        public Expression GetOrAddItemExpression(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
             return Expression.Call(_getOrAddItemMethod,
                 Container.ScopesExpr, 
@@ -8259,7 +8259,7 @@ namespace DryIoc
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
-    public sealed class CurrentScopeReuse : IReuse, IReusedItemExpressionProvider
+    public sealed class CurrentScopeReuse : IReuse, IReuseV3
     {
         /// <summary>Name to find current scope or parent with equal name.</summary>
         public readonly object Name;
@@ -8297,7 +8297,7 @@ namespace DryIoc
             typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetOrAddItemOrDefault");
 
         /// <summary>Returns expression call to <see cref="GetOrAddItemOrDefault"/>.</summary>
-        public Expression GetOrAddItemExpression(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
             var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
             if (Name != null && Name.GetType().IsValueType())
