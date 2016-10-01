@@ -238,7 +238,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Wont_reuse_the_default_factory_if_reuse_is_different()
+        public void Should_use_correct_instance_in_collection_in_and_out_of_scope()
         {
             var container = new Container();
             container.UseInstance<int>(42, serviceKey: "nice number");
@@ -248,14 +248,31 @@ namespace DryIoc.UnitTests
             using (var scope = container.OpenScope())
             {
                 scope.UseInstance<int>(45);
-                CollectionAssert.AreEquivalent(new[] { 42, 43, 44, 45 }, scope.Resolve<int[]>());
+                CollectionAssert.AreEquivalent(new[] { 42, 44, 45 }, scope.Resolve<int[]>());
             }
 
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
         }
 
         [Test]
-        public void Wont_reuse_the_default_factory_if_reuse_is_different_for_lazy_collection()
+        public void Should_fallback_to_singleton_in_collection_if_no_scoped_instance()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            using (var scope = container.OpenScope())
+            {
+                CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, scope.Resolve<int[]>());
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
+        }
+
+
+        [Test]
+        public void Should_use_correct_instance_in_lazy_collection_in_and_out_of_scope()
         {
             var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
             container.UseInstance<int>(42, serviceKey: "nice number");
@@ -265,7 +282,7 @@ namespace DryIoc.UnitTests
             using (var scope = container.OpenScope())
             {
                 scope.UseInstance<int>(45);
-                CollectionAssert.AreEquivalent(new[] { 42, 43, 44, 45 }, scope.Resolve<IEnumerable<int>>().ToArray());
+                CollectionAssert.AreEquivalent(new[] { 42, 44, 45 }, scope.Resolve<IEnumerable<int>>().ToArray());
             }
 
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<IEnumerable<int>>().ToArray());

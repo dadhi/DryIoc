@@ -496,10 +496,9 @@ namespace DryIoc
                 return service;
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
-
             // Additionally disable caching when: 
             // no services registered, so the service probably empty collection wrapper or alike.
-            if (factory.IsFactoryDelegateCacheable() && !registryValue.Services.IsEmpty)
+            if (!registryValue.Services.IsEmpty)
             {
                 var cachedContextFactories = (cacheEntry == null ? null : cacheEntry.Value) ?? ImTreeMap<object, FactoryDelegate>.Empty;
                 if (cacheContextKey == null)
@@ -540,7 +539,7 @@ namespace DryIoc
 
             // Additionally disable caching when: 
             // no services registered, so the service probably empty collection wrapper or alike.
-            if (factory.IsFactoryDelegateCacheable() && !registryValue.Services.IsEmpty)
+            if (!registryValue.Services.IsEmpty)
             {
                 var cacheRef = registryValue.DefaultFactoryDelegateCache;
                 var cacheVal = cacheRef.Value;
@@ -1370,12 +1369,11 @@ namespace DryIoc
         internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
-        internal void AddInstance(Type serviceType, Type instanceType, object instance, object serviceKey)
+        internal void AddInstance(Type serviceType, object instance, object serviceKey)
         {
             ThrowIfContainerDisposed();
 
             var scope = _openedScope ?? _singletonScope;
-            var scoped = scope != _singletonScope;
 
             _registry.Swap(r =>
             {
@@ -1383,7 +1381,7 @@ namespace DryIoc
                 var entry = r.Services.GetValueOrDefault(serviceType);
                 if (entry == null)
                 {
-                    newInstanceFactory = new UsedInstanceFactory(scoped, instanceType);
+                    newInstanceFactory = new UsedInstanceFactory();
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     var servicesWithFactory = serviceKey == null
@@ -1401,8 +1399,7 @@ namespace DryIoc
                     {
                         // The condition for reusing the factory:
                         var defaultInstanceFactory = defaultFactory as UsedInstanceFactory;
-                        if (defaultInstanceFactory != null &&
-                            defaultInstanceFactory.Scoped == scoped)
+                        if (defaultInstanceFactory != null)
                         {
                             scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultInstanceFactory.FactoryID), instance);
                             return r;
@@ -1410,7 +1407,7 @@ namespace DryIoc
                     }
 
                     // otherwise register a new factory
-                    newInstanceFactory = new UsedInstanceFactory(scoped, instanceType);
+                    newInstanceFactory = new UsedInstanceFactory();
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
@@ -1426,9 +1423,7 @@ namespace DryIoc
                     {
                         // As we always permit / re-use the Single factory only, so we cannot have more than one 
                         var defaultInstanceFactory = factoriesEntry.Factories.Enumerate()
-                            .FirstOrDefault(it => it.Key is DefaultKey 
-                                && it.Value is UsedInstanceFactory 
-                                && ((UsedInstanceFactory)it.Value).Scoped == scoped);
+                            .FirstOrDefault(it => it.Key is DefaultKey && it.Value is UsedInstanceFactory);
 
                         if (defaultInstanceFactory != null)
                         {
@@ -1454,7 +1449,7 @@ namespace DryIoc
                     }
                 }
 
-                newInstanceFactory = new UsedInstanceFactory(scoped, instanceType);
+                newInstanceFactory = new UsedInstanceFactory();
                 scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
                 return r.WithServices(r.Services.AddOrUpdate(serviceType,
                     factoriesEntry.With(newInstanceFactory, serviceKey)));
@@ -1464,21 +1459,6 @@ namespace DryIoc
         // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
         internal sealed class UsedInstanceFactory : Factory
         {
-            // not cacheable factory 
-            public override bool IsFactoryDelegateCacheable() { return false; }
-
-            public readonly bool Scoped;
-            public readonly Type InstanceType;
-
-            public override Type ImplementationType { get { return InstanceType; } }
-
-            public UsedInstanceFactory(bool scoped, Type instanceType)
-                : base(scoped ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton)
-            {
-                Scoped = scoped;
-                InstanceType = instanceType;
-            }
-
             /// <summary>Called for Resolution call/root.</summary>
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
@@ -4541,7 +4521,7 @@ namespace DryIoc
                 instance = new WeakReference(instance);
 
             // todo: v3: remove the hack
-            ((Container)container).AddInstance(serviceType, instanceType, instance, serviceKey);
+            ((Container)container).AddInstance(serviceType, instance, serviceKey);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -4824,7 +4804,7 @@ namespace DryIoc
             return resolver.ResolveMany<object>(serviceType, behavior, serviceKey);
         }
 
-        internal static Expression CreateResolutionExpression(Request request, 
+        internal static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
             if (isRuntimeDependency &&
@@ -6321,12 +6301,6 @@ namespace DryIoc
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
-        /// <summary>Notifies the resolver that factory delegate can be cached.</summary> <returns>True if can be cached.</returns>
-        public virtual bool IsFactoryDelegateCacheable()
-        {
-            return true;
-        }
-
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param>
         /// <param name="setup">(optional)</param>
@@ -6416,7 +6390,7 @@ namespace DryIoc
                 var reuse = request.Reuse;
 
                 // Track transient disposable in parent scope (if any), or open scope (if any)
-                var tracksTransientDisposable = 
+                var tracksTransientDisposable =
                     reuse == null && !Setup.PreventDisposal &&
                     (Setup.TrackDisposableTransient ||
                     !Setup.AllowDisposableTransient && container.Rules.TrackingDisposableTransients) &&
@@ -7558,7 +7532,7 @@ namespace DryIoc
 
             var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
             var instanceExpr = Expression.Constant(instance, instanceType);
-            
+
             var reuseExprProvider = (reuse as IReuseV3).ThrowIfNull();
             var serviceExpr = reuseExprProvider.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
 
@@ -7665,7 +7639,7 @@ namespace DryIoc
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
     /// Locking is used internally to ensure that object factory called only once.</summary>
-    public sealed class Scope: IScope
+    public sealed class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
         public IScope Parent { get; private set; }
@@ -7792,7 +7766,7 @@ namespace DryIoc
     public static class ScopeTools
     {
         /// <summary>Access to <see cref="GetAndUnwrapOrDefault{T}"/> via reflection.</summary>
-        public static readonly MethodInfo GetAndUnwrapMethod = 
+        public static readonly MethodInfo GetAndUnwrapMethod =
             typeof(ScopeTools).GetSingleMethodOrNull("GetAndUnwrapOrDefault");
 
         /// <summary>Try to return reused value from scope, 
@@ -8210,7 +8184,7 @@ namespace DryIoc
         /// <param name="factoryId">ID for lookup.</param>
         /// <param name="createValue">Delegate for creating the item.</param>
         /// <returns>Reused item.</returns>
-        public static object GetOrAddItem(IScopeAccess containerScopes, bool trackTransientDisposable, int factoryId, 
+        public static object GetOrAddItem(IScopeAccess containerScopes, bool trackTransientDisposable, int factoryId,
             CreateScopedValue createValue)
         {
             var scope = containerScopes.SingletonScope;
@@ -8225,7 +8199,7 @@ namespace DryIoc
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
             return Expression.Call(_getOrAddItemMethod,
-                Container.ScopesExpr, 
+                Container.ScopesExpr,
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
@@ -8287,7 +8261,7 @@ namespace DryIoc
         /// <param name="createValue">Delegate for creating the item.</param>
         /// <returns>Reused item.</returns>
         public static object GetOrAddItemOrDefault(
-            IScopeAccess containerScopes, object scopeName, bool throwIfNoScopeFound, 
+            IScopeAccess containerScopes, object scopeName, bool throwIfNoScopeFound,
             bool trackTransientDisposable, int factoryId, CreateScopedValue createValue)
         {
             var scope = containerScopes.GetCurrentNamedScope(scopeName, throwIfNoScopeFound);
@@ -8297,7 +8271,7 @@ namespace DryIoc
             return scope.GetOrAdd(scopedItemId, createValue);
         }
 
-        private static readonly MethodInfo _getOrAddItemOrDefaultMethod = 
+        private static readonly MethodInfo _getOrAddItemOrDefaultMethod =
             typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetOrAddItemOrDefault");
 
         /// <summary>Returns expression call to <see cref="GetOrAddItemOrDefault"/>.</summary>
