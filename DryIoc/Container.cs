@@ -4418,6 +4418,12 @@ namespace DryIoc
             Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
             reuse = reuse ?? Reuse.Singleton;
 
+            var scopedReuse = reuse as CurrentScopeReuse;
+            var containerScopes = (IScopeAccess)container;
+            var scope = scopedReuse != null
+                ? containerScopes.GetCurrentNamedScope(scopedReuse.Name, throwIfNotFound: true)
+                : containerScopes.SingletonScope;
+
             var setup = _defaultInstanceSetup;
             if (preventDisposal)
             {
@@ -4459,10 +4465,7 @@ namespace DryIoc
             if (!canReuseAlreadyRegisteredFactory)
                 container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
-            var request = container.EmptyRequest.Push(serviceType, serviceKey);
-            reuse.GetScopeOrDefault(request)
-                .ThrowIfNull(Error.NoMatchingScopeWhenRegisteringInstance, instance, reuse)
-                .SetOrAdd(reuse.GetScopedItemIdOrSelf(factory.FactoryID, request), instance);
+            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(factory.FactoryID), instance);
         }
 
         private static readonly Setup _defaultInstanceSetup =
@@ -6321,7 +6324,7 @@ namespace DryIoc
 
             if (Reuse is CurrentScopeReuse)
                 return request.IsWrappedInFunc()
-                    || Reuse.GetScopeOrDefault(request) != null;
+                    || ((IReuseV3)Reuse).CanApply(request);
 
             return true;
         }
@@ -7523,7 +7526,12 @@ namespace DryIoc
         /// <summary>Puts instance directly to available scope.</summary>
         protected override Expression ApplyReuse(Expression _, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
         {
-            var scope = Reuse.GetScopeOrDefault(request).ThrowIfNull(Error.NoCurrentScope);
+            var scopedReuse = reuse as CurrentScopeReuse;
+            var containerScopes = request.Scopes;
+            var scope = scopedReuse != null
+                ? containerScopes.GetCurrentNamedScope(scopedReuse.Name, throwIfNotFound: true)
+                : containerScopes.SingletonScope;
+
             var scopedId = scope.GetScopedItemIdOrSelf(FactoryID);
             var instance = _instance;
             scope.GetOrAdd(scopedId, () => instance);
@@ -8168,6 +8176,10 @@ namespace DryIoc
         /// <param name="createItemExpr">Service creation expressiom</param>
         /// <returns>Subject</returns>
         Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr);
+
+        /// <summary>Returns true if reuse can be applied: may check if scope or other reused item storage is present.</summary>
+        /// <param name="request">Service request.</param> <returns>Check result.</returns>
+        bool CanApply(Request request);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
@@ -8201,6 +8213,13 @@ namespace DryIoc
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
+        }
+
+        /// <summary>Returns true because singleton is always available.</summary>
+        /// <param name="request">_</param> <returns>True.</returns>
+        public bool CanApply(Request request)
+        {
+            return true;
         }
 
         /// <summary>Returns container bound Singleton scope.</summary>
@@ -8288,6 +8307,13 @@ namespace DryIoc
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
 
+        /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
+        /// <param name="request">Service request.</param> <returns>Check result.</returns>
+        public bool CanApply(Request request)
+        {
+            return request.Scopes.GetCurrentNamedScope(Name, false) != null;
+        }
+
         /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Found current scope or its parent.</returns>
@@ -8310,8 +8336,7 @@ namespace DryIoc
         /// <returns>Scope mapping of factory ID or passed factory ID without changes if scope is not available.</returns>
         public int GetScopedItemIdOrSelf(int factoryID, Request request)
         {
-            var scope = GetScopeOrDefault(request);
-            return scope == null ? factoryID : scope.GetScopedItemIdOrSelf(factoryID);
+            return Throw.For<int>(Error.Of("Obsolete"));
         }
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
