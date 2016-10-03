@@ -1462,6 +1462,13 @@ namespace DryIoc
             /// <summary>Called for Resolution call/root.</summary>
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
+                if (request.IsResolutionRoot)
+                {
+                    var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
+                    if (decoratedExpr != null)
+                        return decoratedExpr.CompileToDelegate(request.Container);
+                }
+
                 return (state, resolverContext, scope) =>
                 {
                     object result = null;
@@ -1476,14 +1483,15 @@ namespace DryIoc
             }
 
             /// <summary>Called for Injection as dependency.</summary>
+            public override Expression GetExpressionOrDefault(Request request)
+            {
+                return request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this)) 
+                    ?? CreateExpressionOrDefault(request);
+            }
+
             public override Expression CreateExpressionOrDefault(Request request)
             {
                 return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
-            }
-
-            public override Expression GetExpressionOrDefault(Request request)
-            {
-                return CreateExpressionOrDefault(request);
             }
         }
 
@@ -6467,10 +6475,10 @@ namespace DryIoc
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-                var exprProvider = reuse as IReuseV3;
-                if (exprProvider != null)
+                var reuseV3 = reuse as IReuseV3;
+                if (reuseV3 != null)
                 {
-                    serviceExpr = exprProvider.Apply(request, tracksTransientDisposable, serviceExpr);
+                    serviceExpr = reuseV3.Apply(request, tracksTransientDisposable, serviceExpr);
                 }
                 else
                 {
@@ -7539,8 +7547,8 @@ namespace DryIoc
             var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
             var instanceExpr = Expression.Constant(instance, instanceType);
 
-            var reuseExprProvider = (reuse as IReuseV3).ThrowIfNull();
-            var serviceExpr = reuseExprProvider.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
+            var reuseV3 = (reuse as IReuseV3).ThrowIfNull();
+            var serviceExpr = reuseV3.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
@@ -8165,11 +8173,14 @@ namespace DryIoc
         int GetScopedItemIdOrSelf(int factoryID, Request request);
     }
 
-    // todo: v3: Promote to IReuse instead of current GetScopeExpression
-    /// <summary>Easy way to get reused item expression. 
-    /// Should be implemented by <see cref="IReuse"/> in order to be called.</summary>
+    // todo: v3: Replace old IReuse
+    /// <summary>Simlified scope agnostic reuse abstraction. More easy to implement,
+    ///  and more powerful as can be based on other storage beside reuse.</summary>
     public interface IReuseV3
     {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        int Lifespan { get; }
+
         /// <summary>Returns composed expression.</summary>
         /// <param name="request">info</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
@@ -8351,7 +8362,7 @@ namespace DryIoc
 
     /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
-    public sealed class ResolutionScopeReuse : IReuse
+    public sealed class ResolutionScopeReuse : IReuse, IReuseV3
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 0; } }
@@ -8376,6 +8387,8 @@ namespace DryIoc
             Outermost = outermost;
         }
 
+
+
         /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Created or existing scope.</returns>
@@ -8388,7 +8401,8 @@ namespace DryIoc
                 request.Scopes.GetOrCreateResolutionScope(ref scope, parent.ServiceType, parent.ServiceKey);
             }
 
-            return request.Scopes.GetMatchingResolutionScope(scope, AssignableFromServiceType, ServiceKey, Outermost, throwIfNotFound: false);
+            return request.Scopes.GetMatchingResolutionScope(scope,
+                AssignableFromServiceType, ServiceKey, Outermost, throwIfNotFound: false);
         }
 
         /// <summary>Returns <see cref="IScopeAccess.GetMatchingResolutionScope"/> method call expression.</summary>
@@ -8421,6 +8435,24 @@ namespace DryIoc
                 .Append("}}");
             return s.ToString();
         }
+
+        /// <inheritdoc />
+        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        {
+            var scopeExpr = GetScopeExpression(request);
+
+            // For transient disposable we don't care to bind to specific ID, because it should be created each time.
+            var scopedId = trackTransientDisposable ? -1 : request.FactoryID;
+            return Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+                Expression.Constant(scopedId),
+                Expression.Lambda<CreateScopedValue>(createItemExpr, ArrayTools.Empty<ParameterExpression>()));
+        }
+
+        /// <inheritdoc />
+        public bool CanApply(Request request)
+        {
+            return GetScopeOrDefault(request) != null;
+        }
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -8429,6 +8461,9 @@ namespace DryIoc
     {
         /// <summary>Synonym for absence of reuse.</summary>
         public static readonly IReuse Transient = null; // no reuse.
+
+        /// <summary>Valid non-reuse.</summary>
+        public static readonly IReuse TransientV3 = new TransientReuse();
 
         /// <summary>Specifies to store single service instance per <see cref="Container"/>.</summary>
         public static readonly IReuse Singleton = new SingletonReuse();
@@ -8479,6 +8514,44 @@ namespace DryIoc
 
         /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
+
+        #region Internals
+
+        private sealed class TransientReuse : IReuse, IReuseV3
+        {
+            public int Lifespan { get { return 0; } }
+
+            public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+            {
+                return createItemExpr;
+            }
+
+            public bool CanApply(Request request)
+            {
+                return true;
+            }
+
+            #region Obsolete
+
+            public IScope GetScopeOrDefault(Request request)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Expression GetScopeExpression(Request request)
+            {
+                throw new NotImplementedException();
+            }
+
+            public int GetScopedItemIdOrSelf(int factoryID, Request request)
+            {
+                throw new NotImplementedException();
+            }
+
+            #endregion
+        }
+
+        #endregion
     }
 
     /// <summary>Policy to handle unresolved service.</summary>

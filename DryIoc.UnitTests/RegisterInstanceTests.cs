@@ -316,5 +316,47 @@ namespace DryIoc.UnitTests
             public readonly AA A;
             public BB(AA a) { A = a; }
         }
+
+        [Test]
+        public void Can_apply_decorator_to_resolved_used_instance()
+        {
+            var container = new Container();
+
+            container.UseInstance("x");
+            container.Register<string>(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
+
+            var xy = container.Resolve<string>();
+
+            Assert.AreEqual("xy", xy);
+        }
+
+        [Test]
+        public void Can_apply_decorator_to_injected_used_instance()
+        {
+            var container = new Container();
+
+            container.Register<XUser>();
+            container.UseInstance("x");
+            container.Register(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
+
+            var user = container.Resolve<XUser>();
+
+            Assert.AreEqual("xy", user.Name);
+        }
+
+        public static string AdjustString(string m)
+        {
+            return m + "y";
+        }
+
+        public class XUser
+        {
+            public string Name { get; private set; }
+
+            public XUser(string name)
+            {
+                Name = name;
+            }
+        }
     }
 }
