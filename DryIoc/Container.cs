@@ -1369,7 +1369,7 @@ namespace DryIoc
         internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
-        internal void AddInstance(Type serviceType, object instance, object serviceKey)
+        internal void UseInstanceInternal(Type serviceType, object instance, object serviceKey)
         {
             ThrowIfContainerDisposed();
 
@@ -1469,15 +1469,15 @@ namespace DryIoc
                         return decoratedExpr.CompileToDelegate(request.Container);
                 }
 
-                return (state, resolverContext, scope) =>
+                return (state, r, scope) =>
                 {
                     object result = null;
 
-                    var openScope = resolverContext.Scopes.GetCurrentScope();
+                    var openScope = r.Scopes.GetCurrentScope();
                     if (openScope != null)
-                        result = openScope.GetAndUnwrapOrDefault<object>(FactoryID);
+                        result = GetAndUnwrapOrDefault(openScope, FactoryID);
 
-                    result = result ?? resolverContext.Scopes.SingletonScope.GetAndUnwrapOrDefault<object>(FactoryID);
+                    result = result ?? GetAndUnwrapOrDefault(r.Scopes.SingletonScope, FactoryID);
                     return result;
                 };
             }
@@ -1492,6 +1492,25 @@ namespace DryIoc
             public override Expression CreateExpressionOrDefault(Request request)
             {
                 return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
+            }
+
+            private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
+            {
+                var id = scope.GetScopedItemIdOrSelf(factoryId);
+                var value = scope.GetOrAdd(id, () => null);
+
+                if (value == null)
+                    return null;
+
+                var weaklyReferenced = value as WeakReference;
+                if (weaklyReferenced != null)
+                    value = weaklyReferenced.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
+
+                var preventDisposable = value as object[];
+                if (preventDisposable != null && preventDisposable.Length == 1)
+                    value = preventDisposable[0];
+
+                return value;
             }
         }
 
@@ -4530,7 +4549,7 @@ namespace DryIoc
                 instance = new WeakReference(instance);
 
             // todo: v3: remove the hack
-            ((Container)container).AddInstance(serviceType, instance, serviceKey);
+            ((Container)container).UseInstanceInternal(serviceType, instance, serviceKey);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
@@ -7774,40 +7793,6 @@ namespace DryIoc
         }
 
         #endregion
-    }
-
-    /// <summary>Syntax sugar on top of <see cref="IScope"/>.</summary>
-    public static class ScopeTools
-    {
-        /// <summary>Access to <see cref="GetAndUnwrapOrDefault{T}"/> via reflection.</summary>
-        public static readonly MethodInfo GetAndUnwrapMethod =
-            typeof(ScopeTools).GetSingleMethodOrNull("GetAndUnwrapOrDefault");
-
-        /// <summary>Try to return reused value from scope, 
-        /// and unwrap it automatically if it wrapped in <see cref="WeakReference"/> or/and prevent disposal wrapper.
-        /// If instance is not present (yet), then method will throw exception.</summary>
-        /// <typeparam name="T">Required type of returned instance.</typeparam>
-        /// <param name="scope">Scope to get value from.</param>
-        /// <param name="factoryId">Lookup ID.</param>
-        /// <returns>Found value or throws exception.</returns>
-        public static T GetAndUnwrapOrDefault<T>(this IScope scope, int factoryId)
-        {
-            var id = scope.GetScopedItemIdOrSelf(factoryId);
-            var value = scope.GetOrAdd(id, () => null);
-
-            if (value == null)
-                return default(T);
-
-            var weaklyReferenced = value as WeakReference;
-            if (weaklyReferenced != null)
-                value = weaklyReferenced.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
-
-            var preventDisposable = value as object[];
-            if (preventDisposable != null && preventDisposable.Length == 1)
-                value = preventDisposable[0];
-
-            return (T)value;
-        }
     }
 
     internal static class ScopedDisposableHandling
