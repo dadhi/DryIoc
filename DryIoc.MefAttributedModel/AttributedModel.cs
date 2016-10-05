@@ -72,7 +72,7 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
             return container
-                .With(rules => rules.WithMefAttributedModel())
+                .With(WithImports)
                 .WithImportsSatisfiedNotification();
         }
 
@@ -161,7 +161,7 @@ namespace DryIoc.MefAttributedModel
 
                 registrator.Register(factory, export.ServiceType, 
                     serviceKey, export.IfAlreadyRegistered, 
-                    isStaticallyChecked: false); // todo: it may be set to true, cause we reflecting from the compiler checked code
+                    isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
 
@@ -968,11 +968,10 @@ namespace DryIoc.MefAttributedModel
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
-            // Eagerly discover metadata from attributes
-            object metadata = !HasMetadataAttribute ? null : GetExportedMetadata();
-
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
+
+            var metadata = GetExportedMetadata();
 
             return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
@@ -1061,12 +1060,33 @@ namespace DryIoc.MefAttributedModel
 
         private IDictionary<string, object> GetExportedMetadata()
         {
+            var hasKeyedExports = Exports.Any(it => it.ServiceKey != null);
+            if (!hasKeyedExports && !HasMetadataAttribute)
+                return null;
+
+            Dictionary<string, object> metaDict = null;
+
+            // Converts keys to metadata in format of "<ServiceKey hash>:<ServiceType full name>" -> ServiceKey
+            if (hasKeyedExports)
+            {
+                metaDict = new Dictionary<string, object>();
+                for (var i = 0; i < Exports.Length; ++i)
+                {
+                    var export = Exports[i];
+                    if (export.ServiceKey != null)
+                    {
+                        var metaKey = string.Concat(export.ServiceKey.GetHashCode().ToString(), ";", export.ServiceType.FullName);
+                        var metaValue = export.ServiceKey;
+                        metaDict.Add(metaKey, metaValue);
+                    }
+                }
+            }
+
             var metaAttrs = ImplementationType.GetAttributes()
                 .Where(a => 
                     a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() || 
                     a is ExportMetadataAttribute);
 
-            Dictionary<string, object> metaDict = null;
             foreach (var metaAttr in metaAttrs)
             {
                 string metaKey = Constants.ExportMetadataDefaultKey;
