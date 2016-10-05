@@ -3142,13 +3142,23 @@ namespace DryIoc
         /// <summary><see cref="WithDefaultReuseInsteadOfTransient"/>.</summary>
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
-        /// <summary>Sets different default reuse per container rules. Default is Transient.</summary>
-        /// <param name="defaultReuseInsteadOfTransient">Reuse value.</param> 
-        /// <returns>New rules with new reuse.</returns>
+        /// <summary>Obsolete: please use <see cref="WithDefaultRegistrationReuse"/> instead/</summary>
         public Rules WithDefaultReuseInsteadOfTransient(IReuse defaultReuseInsteadOfTransient)
         {
             var newRules = (Rules)MemberwiseClone();
             newRules.DefaultReuseInsteadOfTransient = defaultReuseInsteadOfTransient;
+            return newRules;
+        }
+
+        /// <summary>Obsolete: please use <see cref="DefaultRegistrationReuse"/> instead/</summary>
+        public IReuse DefaultRegistrationReuse { get; private set; }
+
+        /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
+        /// <param name="reuse">Reuse to set.</param> <returns>New rules.</returns>
+        public Rules WithDefaultRegistrationReuse(IReuse reuse)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.DefaultRegistrationReuse = reuse;
             return newRules;
         }
 
@@ -8159,7 +8169,7 @@ namespace DryIoc
     }
 
     // todo: v3: Replace old IReuse
-    /// <summary>Simlified scope agnostic reuse abstraction. More easy to implement,
+    /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
     ///  and more powerful as can be based on other storage beside reuse.</summary>
     public interface IReuseV3
     {
@@ -8169,7 +8179,7 @@ namespace DryIoc
         /// <summary>Returns composed expression.</summary>
         /// <param name="request">info</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
-        /// <param name="createItemExpr">Service creation expressiom</param>
+        /// <param name="createItemExpr">Service creation expression</param>
         /// <returns>Subject</returns>
         Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr);
 
