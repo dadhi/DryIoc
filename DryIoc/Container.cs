@@ -334,11 +334,13 @@ namespace DryIoc
             var setup = factory.Setup;
             if (setup.FactoryType != FactoryType.Wrapper)
             {
-                if (factory.Reuse == null && !factory.Setup.UseParentReuse &&
+                if ((factory.Reuse ?? Rules.DefaultRegistrationReuse) is TransientReuse && 
+                    !factory.Setup.UseParentReuse &&
                     (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
-                    setup.AllowDisposableTransient == false && Rules.ThrowOnRegisteringDisposableTransient)
-                    Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType,
-                        serviceKey ?? "{no key}", this);
+                    !setup.AllowDisposableTransient && Rules.ThrowOnRegisteringDisposableTransient)
+                {
+                    Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, serviceKey ?? "{no key}", this);
+                }
             }
             else if (serviceType.IsGeneric() &&
                 !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType)
@@ -3158,7 +3160,7 @@ namespace DryIoc
         public Rules WithDefaultRegistrationReuse(IReuse reuse)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.DefaultRegistrationReuse = reuse;
+            newRules.DefaultRegistrationReuse = reuse.ThrowIfNull(Error.DefaultRegistrationReuseShouldNotBeNull);
             return newRules;
         }
 
@@ -3371,6 +3373,7 @@ namespace DryIoc
         {
             _made = Made.Default;
             _settings = DEFAULT_SETTINGS;
+            DefaultRegistrationReuse = Reuse.Transient;
         }
 
         private Made _made;
@@ -5786,13 +5789,22 @@ namespace DryIoc
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                     Throw.If(p.FactoryID == newFactoryID, Error.RecursiveDependencyDetected, Print(newFactoryID));
 
-            var reuse = factory.Reuse ??
-                (factory.Setup.UseParentReuse
-                ? GetParentOrFuncOrEmpty().Reuse
-                : FactoryID != 0 && factory.Setup is Setup.DecoratorSetup &&
-                  ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse
-                    ? Reuse
-                    : null);
+            var reuse = factory.Reuse;
+            if (reuse == null) // unspecified reuse
+            {
+                if (factory.Setup.UseParentReuse)
+                {
+                    reuse = GetParentOrFuncOrEmpty().Reuse;
+                }
+                else
+                {
+                    var decoratorSetup = factory.Setup as Setup.DecoratorSetup;
+                    if (decoratorSetup != null && decoratorSetup.UseDecorateeReuse)
+                    {
+                        reuse = Reuse; // current reuse
+                    }
+                }
+            }
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
             var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
@@ -8188,6 +8200,47 @@ namespace DryIoc
         bool CanApply(Request request);
     }
 
+    /// <summary>No-reuse</summary>
+    public sealed class TransientReuse : IReuse, IReuseV3
+    {
+        /// <summary>0 means no reused lifespan</summary>
+        public int Lifespan { get { return 0; } }
+
+        /// <summary>Returns unchanged <paramref name="createItemExpr"/>.</summary>
+        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        {
+            return createItemExpr;
+        }
+
+        /// <summary>Can be applied</summary>
+        public bool CanApply(Request request)
+        {
+            return true;
+        }
+
+        #region Obsolete
+
+        /// <inheritdoc />
+        public IScope GetScopeOrDefault(Request request)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc />
+        public Expression GetScopeExpression(Request request)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc />
+        public int GetScopedItemIdOrSelf(int factoryID, Request request)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
+    }
+
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
     public sealed class SingletonReuse : IReuse, IReuseV3
     {
@@ -8382,8 +8435,6 @@ namespace DryIoc
             Outermost = outermost;
         }
 
-
-
         /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Created or existing scope.</returns>
@@ -8455,10 +8506,7 @@ namespace DryIoc
     public static class Reuse
     {
         /// <summary>Synonym for absence of reuse.</summary>
-        public static readonly IReuse Transient = null; // no reuse.
-
-        /// <summary>Valid non-reuse.</summary>
-        public static readonly IReuse TransientV3 = new TransientReuse();
+        public static readonly IReuse Transient = new TransientReuse();
 
         /// <summary>Specifies to store single service instance per <see cref="Container"/>.</summary>
         public static readonly IReuse Singleton = new SingletonReuse();
@@ -8509,44 +8557,6 @@ namespace DryIoc
 
         /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
-
-        #region Internals
-
-        private sealed class TransientReuse : IReuse, IReuseV3
-        {
-            public int Lifespan { get { return 0; } }
-
-            public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
-            {
-                return createItemExpr;
-            }
-
-            public bool CanApply(Request request)
-            {
-                return true;
-            }
-
-            #region Obsolete
-
-            public IScope GetScopeOrDefault(Request request)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Expression GetScopeExpression(Request request)
-            {
-                throw new NotImplementedException();
-            }
-
-            public int GetScopedItemIdOrSelf(int factoryID, Request request)
-            {
-                throw new NotImplementedException();
-            }
-
-            #endregion
-        }
-
-        #endregion
     }
 
     /// <summary>Policy to handle unresolved service.</summary>
@@ -9463,7 +9473,9 @@ namespace DryIoc
                 "Unable to resolve LazyEnumerable service inside Func<args..> because arguments can't be passed through" +
                 " lazy boundaries: {0}"),
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
-                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}");
+                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
+            DefaultRegistrationReuseShouldNotBeNull = Of(
+                "Default registration reuse should not be null.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
