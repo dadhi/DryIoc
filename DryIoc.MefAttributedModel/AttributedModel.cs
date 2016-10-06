@@ -930,7 +930,7 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var defaultReuse = (registrator as IContainer)?.Rules?.DefaultReuseInsteadOfTransient;
+            var defaultReuse = registrator.Rules.DefaultRegistrationReuse;
             var reuse = AttributedModel.GetReuse(Reuse, ReuseName, defaultReuse);
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);

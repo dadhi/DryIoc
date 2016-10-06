@@ -3141,7 +3141,7 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary><see cref="WithDefaultReuseInsteadOfTransient"/>.</summary>
+        /// <summary>Obsolete: please use <see cref="DefaultRegistrationReuse"/> instead/</summary>
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
         /// <summary>Obsolete: please use <see cref="WithDefaultRegistrationReuse"/> instead/</summary>
@@ -3152,7 +3152,7 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Obsolete: please use <see cref="DefaultRegistrationReuse"/> instead/</summary>
+        /// <summary><see cref="WithDefaultRegistrationReuse"/>.</summary>
         public IReuse DefaultRegistrationReuse { get; private set; }
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
