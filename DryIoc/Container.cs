@@ -43,7 +43,7 @@ namespace DryIoc
         { }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
-        /// <param name="rules">(optional) Rules to modify container default resolution behavior. 
+        /// <param name="rules">(optional) Rules to modify container default resolution behavior.
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
@@ -67,7 +67,7 @@ namespace DryIoc
         }
 
         /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
+        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
         /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
         /// <returns>New container.</returns>
         public IContainer With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null)
@@ -129,7 +129,7 @@ namespace DryIoc
         /// In case of previous open scope, new open scope references old one as a parent.
         /// </summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
+        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
         /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
@@ -162,7 +162,7 @@ namespace DryIoc
         public static readonly object NonAmbientRootScopeName = "NonAmbientRootScope";
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
-        /// Facade is the new empty container, with the same rules and scope context as current container. 
+        /// Facade is the new empty container, with the same rules and scope context as current container.
         /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
         /// <remarks>Singletons from container are not reused by facade - when you resolve singleton directly from parent and then ask for it from child, it will return another object.
         /// To achieve that you may use <see cref="IContainer.OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
@@ -301,10 +301,10 @@ namespace DryIoc
         /// <param name="serviceType">Type of service to resolve later.</param>
         /// <param name="serviceKey">(optional) Service key of any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>
         /// implemented.</param>
-        /// <param name="ifAlreadyRegistered">(optional) Says how to handle existing registration with the same 
+        /// <param name="ifAlreadyRegistered">(optional) Says how to handle existing registration with the same
         /// <paramref name="serviceType"/> and <paramref name="serviceKey"/>.</param>
         /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
-        /// <returns>True if factory was added to registry, false otherwise. 
+        /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked)
         {
@@ -314,8 +314,8 @@ namespace DryIoc
             if (ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
-            // Improves performance a bit by attempt to swapping registry while it is still unchanged, 
-            // if attempt fails then fallback to normal Swap with retry. 
+            // Improves performance a bit by attempt to swapping registry while it is still unchanged,
+            // if attempt fails then fallback to normal Swap with retry.
             var registry = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
@@ -334,7 +334,7 @@ namespace DryIoc
             var setup = factory.Setup;
             if (setup.FactoryType != FactoryType.Wrapper)
             {
-                if ((factory.Reuse ?? Rules.DefaultRegistrationReuse) is TransientReuse && 
+                if ((factory.Reuse ?? Rules.DefaultRegistrationReuse) is TransientReuse &&
                     !factory.Setup.UseParentReuse &&
                     (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
                     !setup.AllowDisposableTransient && Rules.ThrowOnRegisteringDisposableTransient)
@@ -429,7 +429,7 @@ namespace DryIoc
             return _registry.Value.IsRegistered(serviceType.ThrowIfNull(), serviceKey, factoryType, condition);
         }
 
-        /// <summary>Removes specified factory from registry. 
+        /// <summary>Removes specified factory from registry.
         /// Factory is removed only from registry, if there is relevant cache, it will be kept.
         /// Use <see cref="WithoutCache"/> to remove all the cache.</summary>
         /// <param name="serviceType">Service type to look for.</param>
@@ -498,7 +498,7 @@ namespace DryIoc
                 return service;
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
-            // Additionally disable caching when: 
+            // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
             if (!registryValue.Services.IsEmpty)
             {
@@ -539,7 +539,7 @@ namespace DryIoc
             var registryValue = _registry.Value;
             var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
 
-            // Additionally disable caching when: 
+            // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
             if (!registryValue.Services.IsEmpty)
             {
@@ -572,7 +572,7 @@ namespace DryIoc
                     .Select(x => new ServiceRegistrationInfo(x.Value, requiredItemOpenGenericType, x.Key));
             }
 
-            // Append registered generic types with compatible variance, 
+            // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             IEnumerable<ServiceRegistrationInfo> variantGenericItems = null;
             if (requiredItemType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
@@ -693,7 +693,7 @@ namespace DryIoc
             return ((IScopeAccess)this).GetCurrentNamedScope(null, false);
         }
 
-        /// <summary>Gets current scope matching the <paramref name="name"/>. 
+        /// <summary>Gets current scope matching the <paramref name="name"/>.
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
         /// <returns>Found scope or throws exception.</returns>
@@ -718,7 +718,7 @@ namespace DryIoc
         // note: The method required for .NET 3.5 which  does not have Expression.Assign, so the need for "ref" parameter (BTW "ref" is not supported in XAMARIN)
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
         /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceType">Marking scope with resolved service type.</param>
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope IScopeAccess.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
@@ -728,7 +728,7 @@ namespace DryIoc
 
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
         /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceType">Marking scope with resolved service type.</param>
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         public IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey)
@@ -736,9 +736,9 @@ namespace DryIoc
             return scope ?? new Scope(null, new KV<Type, object>(serviceType, serviceKey));
         }
 
-        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
+        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null,
         /// then returns input <paramref name="scope"/>.
-        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
+        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and
         /// Key equal to <paramref name="serviceKey"/>.</summary>
         /// <param name="scope">Scope to start matching with Type and Key specified.</param>
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
@@ -962,7 +962,7 @@ namespace DryIoc
                 }
             }
 
-            // Filter out the recursive decorators: 
+            // Filter out the recursive decorators:
             // the decorator with the same which was applied before up to the root
             if (!decorators.IsNullOrEmpty())
             {
@@ -1064,10 +1064,10 @@ namespace DryIoc
         /// <summary>For given instance resolves and sets properties and fields.</summary>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.
-        /// If not specified then method will use container <see cref="DryIoc.Rules.PropertiesAndFields"/>, 
+        /// If not specified then method will use container <see cref="DryIoc.Rules.PropertiesAndFields"/>,
         /// or if not specified method fallbacks to <see cref="PropertiesAndFields.Auto"/>.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
         public object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields)
         {
             propertiesAndFields = propertiesAndFields
@@ -1135,7 +1135,7 @@ namespace DryIoc
             return _singletonScope.GetOrAdd(item);
         }
 
-        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
+        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings),
         /// otherwise invokes <see cref="GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: <c>state => state.Get(index)</c>.</summary>
         /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
         /// <param name="throwIfStateRequired">(optional) Enable filtering of stateful items.</param>
@@ -1332,7 +1332,7 @@ namespace DryIoc
             var entry = serviceFactories.GetValueOrDefault(actualServiceType);
 
             // Special case for closed-generic lookup type:
-            // When entry is not found 
+            // When entry is not found
             //   Or the key in entry is not found
             // Then go to the open-generic services
             if (actualServiceType.IsClosedGeneric())
@@ -1423,7 +1423,7 @@ namespace DryIoc
                     // if any default factories, find the instance factory to reuse. Throw if multiple.
                     if (factoriesEntry.LastDefaultKey != null)
                     {
-                        // As we always permit / re-use the Single factory only, so we cannot have more than one 
+                        // As we always permit / re-use the Single factory only, so we cannot have more than one
                         var defaultInstanceFactory = factoriesEntry.Factories.Enumerate()
                             .FirstOrDefault(it => it.Key is DefaultKey && it.Value is UsedInstanceFactory);
 
@@ -1487,7 +1487,7 @@ namespace DryIoc
             /// <summary>Called for Injection as dependency.</summary>
             public override Expression GetExpressionOrDefault(Request request)
             {
-                return request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this)) 
+                return request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this))
                     ?? CreateExpressionOrDefault(request);
             }
 
@@ -2006,15 +2006,15 @@ namespace DryIoc
     public static class ContainerTools
     {
         /// <summary>For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container, 
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>, 
+        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container,
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>,
         /// or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
         /// <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
         /// <param name="container">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>        
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
         public static TService InjectPropertiesAndFields<TService>(this IContainer container,
             TService instance, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
@@ -2048,9 +2048,9 @@ namespace DryIoc
             return (T)container.New(typeof(T), made);
         }
 
-        /// <summary>Creates service given strongly-typed creation expression. 
+        /// <summary>Creates service given strongly-typed creation expression.
         /// Can be used to invoke arbitrary method returning some value with injecting its parameters from container.</summary>
-        /// <typeparam name="T">Method or constructor result type.</typeparam> 
+        /// <typeparam name="T">Method or constructor result type.</typeparam>
         /// <param name="container">Container to use for injecting dependencies.</param>
         /// <param name="made">Creation expression.</param>
         /// <returns>Created result.</returns>
@@ -2059,7 +2059,7 @@ namespace DryIoc
             return (T)container.New(typeof(T), made);
         }
 
-        /// <summary>Registers new service type with factory for registered service type. 
+        /// <summary>Registers new service type with factory for registered service type.
         /// Throw if no such registered service type in container.</summary>
         /// <param name="container">Container</param> <param name="serviceType">New service type.</param>
         /// <param name="registeredServiceType">Existing registered service type.</param>
@@ -2075,7 +2075,7 @@ namespace DryIoc
             container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Keep, false);
         }
 
-        /// <summary>Registers new service type with factory for registered service type. 
+        /// <summary>Registers new service type with factory for registered service type.
         /// Throw if no such registered service type in container.</summary>
         /// <param name="container">Container</param>
         /// <typeparam name="TService">New service type.</typeparam>
@@ -2125,7 +2125,7 @@ namespace DryIoc
         }
 
         /// <summary>Creates new container with provided parameters and properties
-        /// to pass the custom dependency values for injection. The old parameters and properties are overridden, 
+        /// to pass the custom dependency values for injection. The old parameters and properties are overridden,
         /// but not replaced.</summary>
         /// <param name="container">Container to work with.</param>
         /// <param name="parameters">(optional) Parameters specification, can be used to proved custom values.</param>
@@ -2195,7 +2195,7 @@ namespace DryIoc
         }
 
         /// <summary>Used to find potential problems when resolving the passed services <paramref name="resolutionRoots"/>.
-        /// Method will collect the exceptions when resolving or injecting the specific registration. 
+        /// Method will collect the exceptions when resolving or injecting the specific registration.
         /// Does not create any actual service objects.</summary>
         /// <param name="container">for container</param>
         /// <param name="resolutionRoots">(optional) Examined resolved services. If empty will try to resolve every service in container.</param>
@@ -2358,7 +2358,7 @@ namespace DryIoc
         Expression Convert();
     }
 
-    /// <summary>Used to represent multiple default service keys. 
+    /// <summary>Used to represent multiple default service keys.
     /// Exposes <see cref="RegistrationOrder"/> to determine order of service added.</summary>
     public sealed class DefaultKey
     {
@@ -2409,7 +2409,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Returns reference to actual resolver implementation. 
+    /// <summary>Returns reference to actual resolver implementation.
     /// Minimizes dependency to Factory Delegate on container.</summary>
     public interface IResolverContext
     {
@@ -2679,7 +2679,7 @@ namespace DryIoc
                 items = items.Append(openGenericItems);
             }
 
-            // Append registered generic types with compatible variance, 
+            // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             var includeVariantGenericItems = requiredItemType.IsGeneric() && rules.VariantGenericTypesInResolvedCollection;
             if (includeVariantGenericItems)
@@ -2951,7 +2951,7 @@ namespace DryIoc
         /// <summary>No rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        /// <summary>Dependency nesting level where to split object graph into separate Resolve call 
+        /// <summary>Dependency nesting level where to split object graph into separate Resolve call
         /// to optimize performance of large object graph.</summary>
         /// <remarks>At the moment the value is predefined. Not sure if it should be user-defined.</remarks>
         public readonly int LevelToSplitObjectGraphIntoResolveCalls = 6;
@@ -3002,12 +3002,12 @@ namespace DryIoc
         /// <returns>Single selected factory, or null if unable to select.</returns>
         public delegate Factory FactorySelectorRule(Request request, KeyValuePair<object, Factory>[] factories);
 
-        /// <summary>Rules to select single matched factory default and keyed registered factory/factories. 
+        /// <summary>Rules to select single matched factory default and keyed registered factory/factories.
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
         /// Default behavior is throw on multiple registered default factories, cause it is not obvious what to use.</summary>
         public FactorySelectorRule FactorySelector { get; private set; }
 
-        /// <summary>Sets <see cref="FactorySelector"/></summary> 
+        /// <summary>Sets <see cref="FactorySelector"/></summary>
         /// <param name="rule">Selectors to set, could be null to use default approach.</param> <returns>New rules.</returns>
         public Rules WithFactorySelector(FactorySelectorRule rule)
         {
@@ -3039,7 +3039,7 @@ namespace DryIoc
         }
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
-        /// Applied in specified array order until return not null <see cref="Factory"/>.</summary> 
+        /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
         /// <param name="request">Request to return factory for</param> <returns>Factory to resolve request, or null if unable to resolve.</returns>
         public delegate Factory UnknownServiceResolver(Request request);
 
@@ -3056,7 +3056,7 @@ namespace DryIoc
         }
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
-        /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance, 
+        /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance,
         /// so it could be check for remove success or fail.</summary>
         /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
@@ -3164,11 +3164,11 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Given item object and its type should return item "pure" expression presentation, 
-        /// without side-effects or external dependencies. 
+        /// <summary>Given item object and its type should return item "pure" expression presentation,
+        /// without side-effects or external dependencies.
         /// e.g. for string "blah" <code lang="cs"><![CDATA[]]>Expression.Constant("blah", typeof(string))</code>.
         /// If unable to convert should return null.</summary>
-        /// <param name="item">Item object. Item is not null.</param> 
+        /// <param name="item">Item object. Item is not null.</param>
         /// <param name="itemType">Item type. Item type is not null.</param>
         /// <returns>Expression or null.</returns>
         public delegate Expression ItemToExpressionConverterRule(object item, Type itemType);
@@ -3227,11 +3227,11 @@ namespace DryIoc
         }
 
         /// <summary>Turns tracking of disposable transients in dependency parent scope, or in current scope if service
-        /// is resolved directly. 
-        /// 
+        /// is resolved directly.
+        ///
         /// If no open scope at the moment then resolved transient won't be tracked and it is up to you
         /// to dispose it! That's is similar situation to creating service by new - you have full control.
-        /// 
+        ///
         /// If dependency wrapped in Func somewhere in parent chain then it also won't be tracked, because
         /// Func supposedly means multiple object creation and for container it is not clear what to do, so container
         /// delegates that to user. Func here is the similar to Owned relationship type in Autofac library.
@@ -3340,8 +3340,8 @@ namespace DryIoc
         }
 
         /// <summary>Specifies to open scope as soon as container is created (the same as for Singleton scope).
-        /// That way you don't need to call <see cref="IContainer.OpenScope"/>. 
-        /// Implicitly opened scope will be disposed together with Singletons when container is disposed.</summary> 
+        /// That way you don't need to call <see cref="IContainer.OpenScope"/>.
+        /// Implicitly opened scope will be disposed together with Singletons when container is disposed.</summary>
         /// <remarks>The setting is only valid for container without ambient scope context.</remarks>
         /// <returns>Returns new rules with flag set.</returns>
         public Rules WithImplicitRootOpenScope()
@@ -3463,8 +3463,8 @@ namespace DryIoc
                 }
                 else
                 {
-                    // For Func with arguments, 
-                    // match constructor should contain all input arguments and 
+                    // For Func with arguments,
+                    // match constructor should contain all input arguments and
                     // the rest should be resolvable.
                     var funcType = request.ParentOrWrapper.ServiceType;
                     var funcArgs = funcType.GetGenericParamsAndArgs();
@@ -3549,7 +3549,7 @@ namespace DryIoc
         /// That's mean the whole made become context based which affects caching</summary>
         public bool HasCustomDependencyValue { get; private set; }
 
-        /// <summary>Specifies how constructor parameters should be resolved: 
+        /// <summary>Specifies how constructor parameters should be resolved:
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
         public ParameterSelector Parameters { get; private set; }
 
@@ -3599,7 +3599,7 @@ namespace DryIoc
         {
             var methodReturnType = factoryMethod.ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
 
-            // Normalizes open-generic type to open-generic definition, 
+            // Normalizes open-generic type to open-generic definition,
             // because for base classes and return types it may not be the case.
             if (methodReturnType != null && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
@@ -3643,7 +3643,7 @@ namespace DryIoc
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
         /// <typeparam name="TService">Type with constructor or static method.</typeparam>
-        /// <param name="serviceReturningExpr">Expression tree with call to constructor with properties: 
+        /// <param name="serviceReturningExpr">Expression tree with call to constructor with properties:
         /// <code lang="cs"><![CDATA[() => new Car(Arg.Of<IEngine>()) { Color = Arg.Of<Color>("CarColor") }]]></code>
         /// or static method call <code lang="cs"><![CDATA[() => Car.Create(Arg.Of<IEngine>())]]></code></param>
         /// <param name="argValues">(optional) Primitive custom values for dependencies.</param>
@@ -3658,7 +3658,7 @@ namespace DryIoc
         /// <summary>Defines creation info from factory method call Expression without using strings.
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
         /// <typeparam name="TFactory">Factory type.</typeparam> <typeparam name="TService">Factory product type.</typeparam>
-        /// <param name="getFactoryInfo">Returns or resolves factory instance.</param> 
+        /// <param name="getFactoryInfo">Returns or resolves factory instance.</param>
         /// <param name="serviceReturningExpr">Method, property or field expression returning service.</param>
         /// <param name="argValues">(optional) Primitive custom values for dependencies.</param>
         /// <returns>New Made specification.</returns>
@@ -4022,7 +4022,7 @@ namespace DryIoc
         /// <returns>Ignored.</returns>
         public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved, object serviceKey) { return default(TRequired); }
 
-        /// <summary>Specifies argument index starting from 0 to use corresponding custom value factory, 
+        /// <summary>Specifies argument index starting from 0 to use corresponding custom value factory,
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
         /// <typeparam name="T">Type of dependency. Difference from actual parameter type is ignored.</typeparam>
         /// <param name="argIndex">Argument index starting from 0</param> <returns>Ignored.</returns>
@@ -4052,7 +4052,7 @@ namespace DryIoc
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <param name="serviceType">The service type to register.</param>
         /// <param name="implementationType">Implementation type. Concrete and open-generic class are supported.</param>
-        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. 
+        /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>.
         ///     Default value means no reuse, aka Transient.</param>
         /// <param name="made">(optional) specifies <see cref="Made"/>.</param>
         /// <param name="setup">(optional) Factory setup, by default is (<see cref="Setup.Default"/>)</param>
@@ -4161,7 +4161,7 @@ namespace DryIoc
 
         /// <summary>Registers many service types with the same implementation.</summary>
         /// <param name="registrator">Registrator/Container</param>
-        /// <param name="serviceTypes">1 or more service types.</param> 
+        /// <param name="serviceTypes">1 or more service types.</param>
         /// <param name="implementationType">Should implement service types. Will throw if not.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional) How to create implementation instance.</param>
         /// <param name="setup">(optional)</param> <param name="ifAlreadyRegistered">(optional) By default <see cref="IfAlreadyRegistered.AppendNotKeyed"/></param>
@@ -4197,7 +4197,7 @@ namespace DryIoc
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
         /// for open-generic <paramref name="type"/> its service type should supply all type arguments
         /// Used by RegisterMany method.</summary>
-        /// <param name="type">Source type: may be concrete, abstract or generic definition.</param> 
+        /// <param name="type">Source type: may be concrete, abstract or generic definition.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <returns>Array of types or empty.</returns>
         public static Type[] GetImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false)
@@ -4230,7 +4230,7 @@ namespace DryIoc
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypes">Implementation type provider.</param>
-        /// <param name="action">(optional) User specified registration action: 
+        /// <param name="action">(optional) User specified registration action:
         /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes, RegisterManyAction action,
@@ -4282,7 +4282,7 @@ namespace DryIoc
         /// <param name="made">(optional) Allow to select constructor/method to create service, specify how to inject its parameters and properties/fields.</param>
         /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
+        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterMany<TImplementation>(this IRegistrator registrator,
@@ -4308,7 +4308,7 @@ namespace DryIoc
         /// <param name="reuse">(optional) <see cref="IReuse"/> implementation, e.g. <see cref="Reuse.Singleton"/>. Default value means no reuse, aka Transient.</param>
         /// <param name="setup">(optional) Factory setup, by default is <see cref="Setup.Default"/>, check <see cref="Setup"/> class for available setups.</param>
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
-        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>        
+        /// <param name="serviceTypeCondition">(optional) Condition to select only specific service type to register.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.TypedMade<TMadeResult> made,
@@ -4324,7 +4324,7 @@ namespace DryIoc
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
-        /// <param name="action">(optional) User specified registration action: 
+        /// <param name="action">(optional) User specified registration action:
         /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies,
@@ -4366,9 +4366,9 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <remarks>IMPORTANT: The method should be used as the last resort only! Though powerful it is a black-box for container,
-        /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure), 
+        /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure),
         /// and impossible to use in compile-time scenarios.
-        /// Consider using <see cref="Made"/> instead: 
+        /// Consider using <see cref="Made"/> instead:
         /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
         /// </remarks>
         public static void RegisterDelegate<TService>(this IRegistrator registrator, Func<IResolver, TService> factoryDelegate,
@@ -4390,9 +4390,9 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         /// <remarks>IMPORTANT: The method should be used as the last resort only! Though powerful it is a black-box for container,
-        /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure), 
+        /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure),
         /// and impossible to use in compile-time scenarios.
-        /// Consider using <see cref="Made"/> instead: 
+        /// Consider using <see cref="Made"/> instead:
         /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
         /// </remarks>
         public static void RegisterDelegate(this IRegistrator registrator, Type serviceType, Func<IResolver, object> factoryDelegate,
@@ -4527,7 +4527,7 @@ namespace DryIoc
                 preventDisposal, weaklyReferenced, serviceKey);
         }
 
-        /// <summary>Stores the externally created instance into open scope or singleton, 
+        /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         /// <typeparam name="TService">Specified instance type. May be a base type or interface of instance actual type.</typeparam>
         /// <param name="container">Container to register</param>
@@ -4541,7 +4541,7 @@ namespace DryIoc
             container.UseInstance(typeof(TService), instance, preventDisposal, weaklyReferenced, serviceKey);
         }
 
-        /// <summary>Stores the externally created instance into open scope or singleton, 
+        /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         /// <param name="container">Container to register</param>
         /// <param name="serviceType">Runtime service type to register instance with</param>
@@ -4567,18 +4567,18 @@ namespace DryIoc
 
         /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
         /// Check example below for using initializer to automatically subscribe to singleton event aggregator.
-        /// You can register multiple initializers for single service. 
-        /// Or you can register initializer for <see cref="Object"/> type to be applied for all services and use <paramref name="condition"/> 
+        /// You can register multiple initializers for single service.
+        /// Or you can register initializer for <see cref="Object"/> type to be applied for all services and use <paramref name="condition"/>
         /// to filter target services. </summary>
         /// <typeparam name="TTarget">Any type implemented by requested service type including service type itself and object type.</typeparam>
         /// <param name="registrator">Usually is <see cref="Container"/> object.</param>
-        /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and 
+        /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and
         /// <see cref="IResolver"/> to resolve additional services required by initializer.</param>
         /// <param name="condition">(optional) Additional condition to select required target.</param>
         /// <example><code lang="cs"><![CDATA[
         ///     container.Register<EventAggregator>(Reuse.Singleton);
         ///     container.Register<ISubscriber, SomeSubscriber>();
-        /// 
+        ///
         ///     // Registers initializer for all subscribers implementing ISubscriber.
         ///     container.RegisterInitiliazer<ISubscriber>((s, r) => r.Resolve<EventAggregator>().Subscribe(s));
         /// ]]></code></example>
@@ -4606,7 +4606,7 @@ namespace DryIoc
 
         /// <summary>Registers dispose action for reused target service.</summary>
         /// <typeparam name="TService">Target service type.</typeparam>
-        /// <param name="registrator">Registrator to use.</param> 
+        /// <param name="registrator">Registrator to use.</param>
         /// <param name="dispose">Actual dispose action to be invoke when scope is disposed.</param>
         /// <param name="condition">(optional) Additional way to identify the service.</param>
         public static void RegisterDisposer<TService>(this IRegistrator registrator,
@@ -4934,7 +4934,7 @@ namespace DryIoc
         AsFixedArray
     }
 
-    /// <summary>Provides information required for service resolution: service type, 
+    /// <summary>Provides information required for service resolution: service type,
     /// and optional <see cref="ServiceDetails"/>: key, what to do if service unresolved, and required service type.</summary>
     public interface IServiceInfo
     {
@@ -5049,7 +5049,7 @@ namespace DryIoc
         // todo: Should be renamed or better to be removed, the whole operation should be hidden behind abstraction
         /// <summary>Combines service info with details: the main task is to combine service and required service type.</summary>
         /// <typeparam name="T">Type of <see cref="IServiceInfo"/>.</typeparam>
-        /// <param name="serviceInfo">Source info.</param> <param name="details">Details to combine with info.</param> 
+        /// <param name="serviceInfo">Source info.</param> <param name="details">Details to combine with info.</param>
         /// <param name="request">Owner request.</param> <returns>Original source or new combined info.</returns>
         public static T WithDetails<T>(this T serviceInfo, ServiceDetails details, Request request)
             where T : IServiceInfo
@@ -5099,7 +5099,7 @@ namespace DryIoc
 
         // todo: v3: remove unused @shouldInheritServiceKey parameter
         // todo: v3: make @container parameter non optional
-        /// <summary>Enables propagation/inheritance of info between dependency and its owner: 
+        /// <summary>Enables propagation/inheritance of info between dependency and its owner:
         /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
         /// <param name="dependency">Dependency info.</param>
         /// <param name="owner">Dependency holder/owner info.</param>
@@ -5178,7 +5178,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Represents custom or resolution root service info, there is separate representation for parameter, 
+    /// <summary>Represents custom or resolution root service info, there is separate representation for parameter,
     /// property and field dependencies.</summary>
     public class ServiceInfo : IServiceInfo
     {
@@ -5198,7 +5198,7 @@ namespace DryIoc
         /// <param name="requiredServiceType">Registered service type to search for.</param>
         /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
         /// <param name="serviceKey">(optional) Service key.</param>
-        /// <param name="metadataKey">(optional) Required metadata key</param> 
+        /// <param name="metadataKey">(optional) Required metadata key</param>
         /// <param name="metadata">Required metadata or the value if key passed.</param>
         /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType, Type requiredServiceType,
@@ -5277,7 +5277,7 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Provides <see cref="IServiceInfo"/> for parameter, 
+    /// <summary>Provides <see cref="IServiceInfo"/> for parameter,
     /// by default using parameter name as <see cref="IServiceInfo.ServiceType"/>.</summary>
     /// <remarks>For parameter default setting <see cref="ServiceDetails.IfUnresolved"/> is <see cref="IfUnresolved.Throw"/>.</remarks>
     public class ParameterServiceInfo : IServiceInfo
@@ -5525,8 +5525,8 @@ namespace DryIoc
                 .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFunc());
         }
 
-        /// <summary>Checks if request has parent with service type of Func with arguments.</summary> 
-        /// <param name="immediateParent">If set indicate to check for immediate parent only, 
+        /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
+        /// <param name="immediateParent">If set indicate to check for immediate parent only,
         /// otherwise will check whole parent chain.</param>
         /// <returns>True if has Func with arguments ancestor.</returns>
         public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
@@ -5550,7 +5550,7 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Returns direct parent either it service or not (wrapper). 
+        /// <summary>Returns direct parent either it service or not (wrapper).
         /// In comparison with logical <see cref="Parent"/> which returns first service parent skipping wrapper if any.</summary>
         public RequestInfo ParentOrWrapper
         {
@@ -5562,7 +5562,7 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Gets first ancestor request which satisfies the condition, 
+        /// <summary>Gets first ancestor request which satisfies the condition,
         /// or empty if no ancestor is found.</summary>
         /// <param name="condition">(optional) Condition to stop on.</param>
         /// <returns>Request info of found parent.</returns>
@@ -5575,7 +5575,7 @@ namespace DryIoc
         /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
         public ContainerWeakRef ContainerWeakRef { get { return _resolverContext.ContainerWeakRef; } }
 
-        /// <summary>Provides access to container currently bound to request. 
+        /// <summary>Provides access to container currently bound to request.
         /// By default it is container initiated request by calling resolve method,
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
         public IContainer Container { get { return _resolverContext.ContainerWeakRef.Container; } }
@@ -5681,7 +5681,7 @@ namespace DryIoc
                 return RequestInfo.Empty.Push(serviceInfo);
 
             // todo: v3: review and remove if possible
-            // if service info is dependency of service wrapped in collection, 
+            // if service info is dependency of service wrapped in collection,
             // then change policy to collection policy
             var parentInfo = parent.ServiceInfo;
             if (parent.IfUnresolved == IfUnresolved.ReturnDefault)
@@ -5734,7 +5734,7 @@ namespace DryIoc
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
         /// actual <see cref="DefaultKey"/></summary>
         /// <param name="serviceKey">Key to set.</param>
-        public void ChangeServiceKey(object serviceKey) // NOTE: May be removed in future versions. 
+        public void ChangeServiceKey(object serviceKey) // NOTE: May be removed in future versions.
         {
             RequestInfo = RequestInfo.With(i =>
             {
@@ -5766,7 +5766,7 @@ namespace DryIoc
             return new Request(_resolverContext, RawParent, RequestInfo, Made, funcArgsUsageAndExpr, Level);
         }
 
-        /// <summary>Changes container to passed one. Could be used by child container, 
+        /// <summary>Changes container to passed one. Could be used by child container,
         /// to switch child container to parent preserving the rest of request state.</summary>
         /// <param name="newContainer">Reference to container to switch to.</param>
         /// <returns>Request with replaced container.</returns>
@@ -5848,7 +5848,7 @@ namespace DryIoc
             return RequestInfo;
         }
 
-        /// <summary>If request corresponds to dependency injected into parameter, 
+        /// <summary>If request corresponds to dependency injected into parameter,
         /// then method calls <paramref name="parameter"/> handling and returns its result.
         /// If request corresponds to property or field, then method calls respective handler.
         /// If request does not correspond to dependency, then calls <paramref name="root"/> handler.</summary>
@@ -5888,7 +5888,7 @@ namespace DryIoc
             return default(TResult);
         }
 
-        /// <summary>Enumerates all request stack parents. 
+        /// <summary>Enumerates all request stack parents.
         /// Last returned will <see cref="IsEmpty"/> empty parent.</summary>
         /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
@@ -5910,7 +5910,7 @@ namespace DryIoc
         }
 
         /// <summary>Prints full stack of requests starting from current one using <see cref="PrintCurrent"/>.</summary>
-        /// <param name="recursiveFactoryID">Flag specifying that in case of found recursion/repetition of requests, 
+        /// <param name="recursiveFactoryID">Flag specifying that in case of found recursion/repetition of requests,
         /// mark repeated requests.</param>
         /// <returns>Builder with appended request stack info.</returns>
         public StringBuilder Print(int recursiveFactoryID = -1)
@@ -6006,7 +6006,7 @@ namespace DryIoc
     /// <summary>Base class to store optional <see cref="Factory"/> settings.</summary>
     public abstract class Setup
     {
-        /// <summary>Factory type is required to be specified by concrete setups as in 
+        /// <summary>Factory type is required to be specified by concrete setups as in
         /// <see cref="ServiceSetup"/>, <see cref="DecoratorSetup"/>, <see cref="WrapperSetup"/>.</summary>
         public abstract FactoryType FactoryType { get; }
 
@@ -6016,7 +6016,7 @@ namespace DryIoc
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
 
-        /// <summary>Indicates that injected expression should be: 
+        /// <summary>Indicates that injected expression should be:
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
@@ -6144,7 +6144,7 @@ namespace DryIoc
         public static readonly Setup Wrapper = new WrapperSetup();
 
         /// <summary>Returns generic wrapper setup.</summary>
-        /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
+        /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
         /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
         /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
@@ -6165,7 +6165,7 @@ namespace DryIoc
         /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
         /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
         public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0,
@@ -6213,7 +6213,7 @@ namespace DryIoc
             /// <summary>Returns <see cref="DryIoc.FactoryType.Wrapper"/> type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Wrapper; } }
 
-            /// <summary>Delegate to get wrapped type from provided wrapper type. 
+            /// <summary>Delegate to get wrapped type from provided wrapper type.
             /// If wrapper is generic, then wrapped type is usually a generic parameter.</summary>
             public readonly int WrappedServiceTypeArgIndex;
 
@@ -6221,7 +6221,7 @@ namespace DryIoc
             public readonly bool AlwaysWrapsRequiredServiceType;
 
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
-            /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param> 
+            /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
             /// <param name="openResolutionScope">(optional) Opens the new scope.</param><param name="asResolutionCall"></param>
             /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
@@ -6262,7 +6262,7 @@ namespace DryIoc
 
             /// <summary>If provided specifies relative decorator position in decorators chain.
             /// Greater number means further from decoratee - specify negative number to stay closer.
-            /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+            /// Decorators without order (Order is 0) or with equal order are applied in registration order
             /// - first registered are closer decoratee.</summary>
             public readonly int Order;
 
@@ -6273,7 +6273,7 @@ namespace DryIoc
             /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
             /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.
             /// Greater number means further from decoratee - specify negative number to stay closer.
-            /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+            /// Decorators without order (Order is 0) or with equal order are applied in registration order
             /// - first registered are closer decoratee.</param>
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
@@ -6286,7 +6286,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Facility for creating concrete factories from some template/prototype. Example: 
+    /// <summary>Facility for creating concrete factories from some template/prototype. Example:
     /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
     public interface IConcreteFactoryGenerator
     {
@@ -6298,7 +6298,7 @@ namespace DryIoc
         Factory GetGeneratedFactoryOrDefault(Request request);
     }
 
-    /// <summary>Base class for different ways to instantiate service: 
+    /// <summary>Base class for different ways to instantiate service:
     /// <list type="bullet">
     /// <item>Through reflection - <see cref="ReflectionFactory"/></item>
     /// <item>Using custom delegate - <see cref="DelegateFactory"/></item>
@@ -6328,7 +6328,7 @@ namespace DryIoc
             protected internal set { _setup = value ?? Setup.Default; }
         }
 
-        /// <summary>Checks that condition is met for request or there is no condition setup. 
+        /// <summary>Checks that condition is met for request or there is no condition setup.
         /// Additionally check for reuse scope availability.</summary>
         /// <param name="request">Request to check against.</param>
         /// <returns>True if condition met or no condition setup.</returns>
@@ -6347,7 +6347,7 @@ namespace DryIoc
         /// <summary>Non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="DelegateFactory"/>.</summary>
         public virtual Type ImplementationType { get { return null; } }
 
-        /// <summary>Indicates that Factory is factory provider and 
+        /// <summary>Indicates that Factory is factory provider and
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
@@ -6391,7 +6391,7 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                    && Setup.FactoryType == FactoryType.Service
-                   // the settings below specify context based resolution so that expression will be different on 
+                   // the settings below specify context based resolution so that expression will be different on
                    // different resolution paths, which prevents its caching and reuse.
                    && Setup.Condition == null
                    && !Setup.AsResolutionCall
@@ -6436,7 +6436,7 @@ namespace DryIoc
             var serviceExpr = decoratorExpr ?? CreateExpressionOrDefault(request);
             if (serviceExpr != null && !isDecorated)
             {
-                // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account 
+                // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
                 var reuse = request.Reuse;
 
                 // Track transient disposable in parent scope (if any), or open scope (if any)
@@ -6468,7 +6468,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access 
+        /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access
         /// and produces another expression.</summary>
         /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
         /// <param name="reuse">Reuse - may be different from <see cref="Reuse"/> if set <see cref="Rules.DefaultReuseInsteadOfTransient"/>.</param>
@@ -6549,7 +6549,7 @@ namespace DryIoc
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
-        /// and throws if that is true. Until there is a Func wrapper in between.</summary> 
+        /// and throws if that is true. Until there is a Func wrapper in between.</summary>
         /// <param name="reuse">Reuse to check.</param> <param name="request">Request to resolve.</param>
         protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
         {
@@ -6676,7 +6676,7 @@ namespace DryIoc
         }
 
         /// <summary>Overrides source parameter rules with specific parameter details. If it is not your parameter just return null.</summary>
-        /// <param name="source">Original parameters rules</param> 
+        /// <param name="source">Original parameters rules</param>
         /// <param name="getDetailsOrNull">Should return specific details or null.</param>
         /// <returns>New parameters rules.</returns>
         public static ParameterSelector Details(this ParameterSelector source, Func<Request, ParameterInfo, ServiceDetails> getDetailsOrNull)
@@ -6716,7 +6716,7 @@ namespace DryIoc
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
-        /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param> 
+        /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
@@ -6733,7 +6733,7 @@ namespace DryIoc
 
         /// <summary>Specify parameter by type and set custom value to it.</summary>
         /// <typeparam name="T">Parameter type.</typeparam>
-        /// <param name="source">Original parameters rules.</param> 
+        /// <param name="source">Original parameters rules.</param>
         /// <param name="getCustomValue">Custom value provider.</param>
         /// <returns>New parameters rules.</returns>
         public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue)
@@ -6858,7 +6858,7 @@ namespace DryIoc
         /// <param name="ifUnresolved">(optional) By default returns default value if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
         /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
-        /// 
+        ///
         /// <returns>Combined selector.</returns>
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null,
@@ -6950,7 +6950,7 @@ namespace DryIoc
                  || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
         }
 
-        /// <summary>Creates service expression, so for registered implementation type "Service", 
+        /// <summary>Creates service expression, so for registered implementation type "Service",
         /// you will get "new Service()". If there is <see cref="Reuse"/> specified, then expression will
         /// contain call to <see cref="Scope"/> returned by reuse.</summary>
         /// <param name="request">Request for service to resolve.</param> <returns>Created expression.</returns>
@@ -7028,11 +7028,11 @@ namespace DryIoc
                             {
                                 var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
                                 paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
-                                // Meant that parent Or parameter itself allows default value, 
+                                // Meant that parent Or parameter itself allows default value,
                                 // otherwise we did not get null but exception
                                 if (paramExpr == null)
                                 {
-                                    // Check if parameter itself (without propagated parent details) 
+                                    // Check if parameter itself (without propagated parent details)
                                     // does not allow default, then stop checking the rest of parameters.
                                     if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
                                         return null;
@@ -7132,7 +7132,7 @@ namespace DryIoc
                 var closedGenericFactory = new ReflectionFactory(
                     closedImplementationType, _openGenericFactory.Reuse, closedMade, _openGenericFactory.Setup);
 
-                // Storing generated factory ID to service type/key mapping 
+                // Storing generated factory ID to service type/key mapping
                 // to find/remove generated factories when needed
                 _generatedFactories.Swap(_ => _.AddOrUpdate(generatedFactoryKey, closedGenericFactory));
                 return closedGenericFactory;
@@ -7443,7 +7443,7 @@ namespace DryIoc
 
                 MatchOpenGenericConstraints(factoryImplTypeParams, resultFactoryImplTypeArgs);
 
-                // Close the factory type implementation 
+                // Close the factory type implementation
                 // and get factory member to use from it.
                 var closedFactoryImplType = Throw.IfThrows<ArgumentException, Type>(
                     () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
@@ -7486,7 +7486,7 @@ namespace DryIoc
                 }
             }
 
-            // If factory method is actual method and still open-generic after closing its declaring type, 
+            // If factory method is actual method and still open-generic after closing its declaring type,
             // then match remaining method type parameters and make closed method
             var openFactoryMethod = factoryMember as MethodInfo;
             if (openFactoryMethod != null && openFactoryMethod.ContainsGenericParameters)
@@ -7607,7 +7607,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>This factory is the thin wrapper for user provided delegate 
+    /// <summary>This factory is the thin wrapper for user provided delegate
     /// and where possible it uses delegate directly: without converting it to expression.</summary>
     public sealed class DelegateFactory : Factory
     {
@@ -7638,7 +7638,7 @@ namespace DryIoc
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
         /// If decorator found for request then factory fall-backs to expression creation.</summary>
-        /// <param name="request">Request to resolve.</param> 
+        /// <param name="request">Request to resolve.</param>
         /// <returns>Factory delegate directly calling wrapped delegate, or invoking expression if decorated.</returns>
         public override FactoryDelegate GetDelegateOrDefault(Request request)
         {
@@ -7663,7 +7663,7 @@ namespace DryIoc
     /// <summary>Should return value stored in scope.</summary>
     public delegate object CreateScopedValue();
 
-    /// <summary>Lazy object storage that will create object with provided factory on first access, 
+    /// <summary>Lazy object storage that will create object with provided factory on first access,
     /// then will be returning the same object for subsequent access.</summary>
     public interface IScope : IDisposable
     {
@@ -7677,7 +7677,7 @@ namespace DryIoc
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
         /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will not be stored.</param>
         /// <returns>Created and stored object.</returns>
-        /// <remarks>Scope does not store <paramref name="createValue"/> (no memory leak here), 
+        /// <remarks>Scope does not store <paramref name="createValue"/> (no memory leak here),
         /// it stores only result of <paramref name="createValue"/> call.</remarks>
         object GetOrAdd(int id, CreateScopedValue createValue);
 
@@ -7685,9 +7685,9 @@ namespace DryIoc
         /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
         void SetOrAdd(int id, object item);
 
-        /// <summary>Creates id/index for new item to be stored in scope. 
+        /// <summary>Creates id/index for new item to be stored in scope.
         /// If separate index is not supported then just returns back passed <paramref name="externalId"/>.</summary>
-        /// <param name="externalId">Id to be mapped to new item id/index</param> 
+        /// <param name="externalId">Id to be mapped to new item id/index</param>
         /// <returns>New it/index or just passed <paramref name="externalId"/></returns>
         int GetScopedItemIdOrSelf(int externalId);
     }
@@ -7768,7 +7768,7 @@ namespace DryIoc
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside, 
+        /// <remarks>If item disposal throws exception, then it won't be propagated outside,
         /// so the rest of the items could be disposed.</remarks>
         public void Dispose()
         {
@@ -7784,7 +7784,7 @@ namespace DryIoc
             _items = ImTreeMapIntToObj.Empty;
         }
 
-        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary> 
+        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
         /// <returns>String representation.</returns>
         public override string ToString()
         {
@@ -7926,7 +7926,7 @@ namespace DryIoc
             TrackDisposable(item);
         }
 
-        /// <summary>Adds external non-service item into singleton collection. 
+        /// <summary>Adds external non-service item into singleton collection.
         /// The item may not have corresponding external item ID.</summary>
         /// <param name="item">External item to add, this may be metadata, service key, etc.</param>
         /// <returns>Index of added or already added item.</returns>
@@ -8095,7 +8095,7 @@ namespace DryIoc
     /// <returns>New scope or old if do not want to change current scope.</returns>
     public delegate IScope SetCurrentScopeHandler(IScope oldScope);
 
-    /// <summary>Provides ambient current scope and optionally scope storage for container, 
+    /// <summary>Provides ambient current scope and optionally scope storage for container,
     /// examples are HttpContext storage, Execution context, Thread local.</summary>
     public interface IScopeContext : IDisposable
     {
@@ -8321,7 +8321,7 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 100; } }
 
-        /// <summary>Creates reuse optionally specifying its name.</summary> 
+        /// <summary>Creates reuse optionally specifying its name.</summary>
         /// <param name="name">(optional) Used to find matching current scope or parent.</param>
         public CurrentScopeReuse(object name = null)
         {
@@ -8501,7 +8501,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Specifies pre-defined reuse behaviors supported by container: 
+    /// <summary>Specifies pre-defined reuse behaviors supported by container:
     /// used when registering services into container with <see cref="Registrator"/> methods.</summary>
     public static class Reuse
     {
@@ -8707,7 +8707,7 @@ namespace DryIoc
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param> 
+        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param>
         /// <param name="ifUnresolved"></param>
         /// <param name="factoryType"></param> <param name="factoryID"></param>
         /// <param name="implementationType"></param> <param name="reuse"></param>
@@ -8894,7 +8894,7 @@ namespace DryIoc
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="serviceKey">Optional service key used for registering service.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
-        /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>, 
+        /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>,
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="scope">Propagated resolution scope.</param>
@@ -8933,7 +8933,7 @@ namespace DryIoc
         Keep,
         /// <summary>Replaces old registration with new one.</summary>
         Replace,
-        /// <summary>Adds new implementation or null (Made.Of), 
+        /// <summary>Adds new implementation or null (Made.Of),
         /// skips registration if the implementation is already registered.</summary>
         AppendNewImplementation
     }
@@ -8988,15 +8988,18 @@ namespace DryIoc
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
 
+        /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
+        Rules Rules { get; }
+
         /// <summary>Registers factory in registry with specified service type and key for lookup.
-        /// Returns true if factory was added to registry, false otherwise. False may be in case of <see cref="IfAlreadyRegistered.Keep"/> 
+        /// Returns true if factory was added to registry, false otherwise. False may be in case of <see cref="IfAlreadyRegistered.Keep"/>
         /// setting and already existing factory</summary>
         /// <param name="factory">To register.</param>
         /// <param name="serviceType">Service type as unique key in registry for lookup.</param>
         /// <param name="serviceKey">Service key as complementary lookup for the same service type.</param>
         /// <param name="ifAlreadyRegistered">Policy how to deal with already registered factory with same service type and key.</param>
         /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
-        /// <returns>True if factory was added to registry, false otherwise. 
+        /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
         void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked);
 
@@ -9025,7 +9028,7 @@ namespace DryIoc
         /// <summary>Current scope.</summary>
         IScope GetCurrentScope();
 
-        /// <summary>Gets current scope matching the <paramref name="name"/>. 
+        /// <summary>Gets current scope matching the <paramref name="name"/>.
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <returns>Found scope or throws exception.</returns>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
@@ -9033,21 +9036,21 @@ namespace DryIoc
 
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
         /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceType">Marking scope with resolved service type.</param>
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey);
 
         /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
         /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param> 
+        /// <param name="serviceType">Marking scope with resolved service type.</param>
         /// <param name="serviceKey">Marking scope with resolved service key.</param>
         /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
         IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey);
 
-        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null, 
+        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null,
         /// then returns input <paramref name="scope"/>.
-        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and 
+        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and
         /// Key equal to <paramref name="serviceKey"/>.</summary>
         /// <param name="scope">Scope to start matching with Type and Key specified.</param>
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
@@ -9056,15 +9059,12 @@ namespace DryIoc
         IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound);
     }
 
-    /// <summary>Exposes operations required for internal registry access. 
+    /// <summary>Exposes operations required for internal registry access.
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
     public interface IContainer : IRegistrator, IResolver, IServiceProvider, IDisposable
     {
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }
-
-        /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
-        Rules Rules { get; }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
         Request EmptyRequest { get; }
@@ -9073,7 +9073,7 @@ namespace DryIoc
         object[] ResolutionStateCache { get; }
 
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
+        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
         /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
         /// <returns>New container.</returns>
         IContainer With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null);
@@ -9107,7 +9107,7 @@ namespace DryIoc
         /// In case of previous open scope, new open scope references old one as a parent.
         /// </summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param> 
+        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
         /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
@@ -9119,7 +9119,7 @@ namespace DryIoc
         IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null);
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
-        /// Facade shares rules with this container, everything else is its own. 
+        /// Facade shares rules with this container, everything else is its own.
         /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
         /// <remarks>Singletons from container are not reused by facade, to achieve that rather use <see cref="OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
         /// <returns>New facade container.</returns>
@@ -9151,7 +9151,7 @@ namespace DryIoc
         /// <summary>Returns all decorators registered for the service type.</summary> <returns>Decorator factories.</returns>
         Factory[] GetDecoratorFactoriesOrDefault(Type serviceType);
 
-        /// <summary>Creates decorator expression: it could be either Func{TService,TService}, 
+        /// <summary>Creates decorator expression: it could be either Func{TService,TService},
         /// or service expression for replacing decorators.</summary>
         /// <param name="request">Decorated service request.</param>
         /// <returns>Decorator expression.</returns>
@@ -9161,7 +9161,7 @@ namespace DryIoc
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
         /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
         /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>     
+        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
         object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields);
 
         /// <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,
@@ -9181,7 +9181,7 @@ namespace DryIoc
         /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
         Expression GetCachedFactoryExpressionOrDefault(int factoryID);
 
-        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings), 
+        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings),
         /// otherwise invokes <see cref="Container.GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: state => state.Get(index).</summary>
         /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
         /// <param name="throwIfStateRequired">(optional) Enable filtering of stateful items.</param>
@@ -9194,7 +9194,7 @@ namespace DryIoc
         int GetOrAddStateItem(object item);
     }
 
-    /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand, 
+    /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
     /// when enumerator <see cref="IEnumerator.MoveNext"/> called. If service type is not found, empty returned.</summary>
     /// <typeparam name="TService">Service type to resolve.</typeparam>
     public sealed class LazyEnumerable<TService> : IEnumerable<TService>
@@ -9606,7 +9606,7 @@ namespace DryIoc
         }
 
         /// <summary>Throws if <paramref name="arg0"/> is not assignable from <paramref name="arg1"/>.</summary>
-        /// <param name="arg0"></param> <param name="arg1"></param> 
+        /// <param name="arg0"></param> <param name="arg1"></param>
         /// <param name="error">Error code</param>
         ///  <param name="arg2"></param> <param name="arg3"></param>
         /// <returns><paramref name="arg0"/> if no exception.</returns>
@@ -9649,7 +9649,7 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// <summary>Throws <paramref name="error"/> instead of returning value of <typeparamref name="T"/>. 
+        /// <summary>Throws <paramref name="error"/> instead of returning value of <typeparamref name="T"/>.
         /// Supposed to be used in expression that require some return value.</summary>
         /// <typeparam name="T"></typeparam> <param name="error"></param>
         /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
@@ -9689,7 +9689,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
-        /// Specify <paramref name="asImplementedType"/> to include <paramref name="sourceType"/> itself as first item and 
+        /// Specify <paramref name="asImplementedType"/> to include <paramref name="sourceType"/> itself as first item and
         /// <see cref="object"/> type as the last item.</summary>
         /// <param name="sourceType">Source type for discovery.</param>
         /// <param name="asImplementedType">Additional types to include into result collection.</param>
@@ -9745,7 +9745,7 @@ namespace DryIoc
         }
 
         /// <summary>Gets all declared and base members.</summary>
-        /// <param name="type">Type to get members from.</param> 
+        /// <param name="type">Type to get members from.</param>
         /// <param name="includeBase">(optional) When set looks into base members.</param>
         /// <returns>All members.</returns>
         public static IEnumerable<MemberInfo> GetAllMembers(this Type type, bool includeBase = false)
@@ -9757,7 +9757,7 @@ namespace DryIoc
                 includeBase);
         }
 
-        /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters 
+        /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters
         /// from <paramref name="genericParameters"/>.</summary>
         /// <param name="openGenericType">Expected to be open-generic type.</param>
         /// <param name="genericParameters">Generic parameters.</param>
@@ -9851,7 +9851,7 @@ namespace DryIoc
             return typeInfo.IsArray ? typeInfo.GetElementType() : null;
         }
 
-        /// <summary>Return base type or null, if not exist (the case for only for object type).</summary> 
+        /// <summary>Return base type or null, if not exist (the case for only for object type).</summary>
         /// <param name="type">Source type.</param> <returns>Base type or null for object.</returns>
         public static Type GetBaseType(this Type type)
         {
@@ -9910,7 +9910,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns true if instance of type is assignable to instance of <paramref name="other"/> type.</summary>
-        /// <param name="type">Type to check, could be null.</param> 
+        /// <param name="type">Type to check, could be null.</param>
         /// <param name="other">Other type to check, could be null.</param>
         /// <returns>Check result.</returns>
         public static bool IsAssignableTo(this Type type, Type other)
@@ -9928,7 +9928,7 @@ namespace DryIoc
 
         /// <summary>Returns true if provided type IsPitmitive in .Net terms, or enum, or string
         /// , or array of primitives if <paramref name="orArrayOfPrimitives"/> is true.</summary>
-        /// <param name="type">Type to check.</param> 
+        /// <param name="type">Type to check.</param>
         /// <param name="orArrayOfPrimitives">Says to return true for array or primitives recursively.</param>
         /// <returns>Check result.</returns>
         public static bool IsPrimitive(this Type type, bool orArrayOfPrimitives = false)
@@ -9985,7 +9985,7 @@ namespace DryIoc
                 : declared.Concat(baseType.GetDeclaredAndBase(getDeclared));
         }
 
-        /// <summary>Returns all public instance constructors for the type</summary> 
+        /// <summary>Returns all public instance constructors for the type</summary>
         /// <param name="type"></param> <returns></returns>
         public static IEnumerable<ConstructorInfo> GetPublicInstanceConstructors(this Type type)
         {
@@ -10123,7 +10123,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns attributes defined for parameter.</summary>
-        ///  <param name="parameter">Target parameter.</param> 
+        ///  <param name="parameter">Target parameter.</param>
         /// <param name="attributeType">(optional) Specific attribute type to return, any attribute otherwise.</param>
         /// <param name="inherit">Check for inherited attributes.</param> <returns>Found attributes or empty.</returns>
         public static IEnumerable<Attribute> GetAttributes(this ParameterInfo parameter, Type attributeType = null, bool inherit = false)
@@ -10131,7 +10131,7 @@ namespace DryIoc
             return parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
         }
 
-        /// <summary>Get types from assembly that are loaded successfully. 
+        /// <summary>Get types from assembly that are loaded successfully.
         /// Hacks to <see cref="ReflectionTypeLoadException"/> for loaded types.</summary>
         /// <param name="assembly">Assembly to get types from.</param>
         /// <returns>Array of loaded types.</returns>

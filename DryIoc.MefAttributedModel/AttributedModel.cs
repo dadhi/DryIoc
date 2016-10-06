@@ -36,9 +36,6 @@ namespace DryIoc.MefAttributedModel
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
     {
-        ///<summary>Default reuse policy is Singleton, as in MEF.</summary>
-        public static readonly ReuseType DefaultReuse = ReuseType.Singleton;
-
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/>
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
         public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
@@ -52,7 +49,8 @@ namespace DryIoc.MefAttributedModel
         /// <returns>New rules with attributed model rules.</returns>
         public static Rules WithImports(this Rules rules)
         {
-            return rules.WithMefAttributedModel();
+            return rules.WithMefAttributedModel()
+                .WithDefaultRegistrationReuse(Reuse.Singleton);
         }
 
         // todo: V3: Rename to WithImports and make the original method an obsolete.
@@ -84,7 +82,7 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithImportsSatisfiedNotification(this IContainer container)
         {
             container.Register<object>(
-                made: _importsSatisfiedNotificationFactoryMethod, 
+                made: _importsSatisfiedNotificationFactoryMethod,
                 setup: _importsSatisfiedNotificationDecoratorSetup);
             return container;
         }
@@ -151,7 +149,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
-            var factory = info.CreateFactory();
+            var factory = info.CreateFactory(registrator);
 
             var exports = info.Exports;
             for (var i = 0; i < exports.Length; i++)
@@ -159,8 +157,8 @@ namespace DryIoc.MefAttributedModel
                 var export = exports[i];
                 var serviceKey = export.ServiceKey;
 
-                registrator.Register(factory, export.ServiceType, 
-                    serviceKey, export.IfAlreadyRegistered, 
+                registrator.Register(factory, export.ServiceType,
+                    serviceKey, export.IfAlreadyRegistered,
                     isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
@@ -185,11 +183,11 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var attributes = GetAllExportAttributes(type);
-            return !IsExportDefined(attributes) ? null 
+            return !IsExportDefined(attributes) ? null
                 : GetRegistrationInfoOrDefault(type, attributes);
         }
 
-        /// <summary>Creates registration info DTOs for provided type and/or for exported members. 
+        /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
         /// <param name="type">Type to convert into registration infos.</param>
         /// <returns>Created DTOs.</returns>
@@ -200,7 +198,7 @@ namespace DryIoc.MefAttributedModel
 
             ExportedRegistrationInfo typeRegistrationInfo = null;
 
-            // Export does not make sense for static or abstract type 
+            // Export does not make sense for static or abstract type
             // because the instance of such type can't be created (resolved).
             if (!type.IsStatic() && !type.IsAbstract())
             {
@@ -212,7 +210,7 @@ namespace DryIoc.MefAttributedModel
                         yield return typeRegistrationInfo;
                 }
             }
-            
+
             var members = type.GetAllMembers(includeBase: true);
             foreach (var member in members)
             {
@@ -235,7 +233,7 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
-                        // todo: Review need for factory service key. 
+                        // todo: Review need for factory service key.
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
                         var typeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
@@ -280,13 +278,19 @@ namespace DryIoc.MefAttributedModel
         /// Returns null (transient or no reuse) if null provided reuse type.</summary>
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
+        /// <param name="defaultReuse">(optional) Default reuse used when reuseType is not specified.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(ReuseType reuseType, object reuseName = null)
+        public static IReuse GetReuse(ReuseType? reuseType, object reuseName = null, IReuse defaultReuse = null)
         {
-            return reuseType == ReuseType.Transient
+            if (!reuseType.HasValue)
+            {
+                return defaultReuse;
+            }
+
+            return reuseType.Value == ReuseType.Transient
                 ? null
-                : SupportedReuseTypes.GetValueOrDefault(reuseType)
-                    .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
+                : SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
+                    .ThrowIfNull(Error.UnsupportedReuseType, reuseType.Value)
                     .Invoke(reuseName);
         }
 
@@ -401,7 +405,7 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuseType = reuseAttr == null ? DefaultReuse : reuseAttr.ReuseType;
+                var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
                 var reuse = GetReuse(reuseType, reuseName);
 
@@ -435,7 +439,7 @@ namespace DryIoc.MefAttributedModel
             if (type.IsOpenGeneric())
                 type = type.GetGenericTypeDefinition();
 
-            var info = new ExportedRegistrationInfo { ImplementationType = type, Reuse = DefaultReuse };
+            var info = new ExportedRegistrationInfo { ImplementationType = type, Reuse = null };
 
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
@@ -660,7 +664,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Predefined key in metadata dictionary for metadata provided as single object (not dictionary).</summary>
         public static readonly string ExportMetadataDefaultKey = "ExportMetadataDefaultKey";
 
-        /// <summary>Marks the Export generated for type which export its instance members, 
+        /// <summary>Marks the Export generated for type which export its instance members,
         /// but should not be resolved as-self by default.</summary>
         public static readonly string InstanceFactory = "SN.InstanceFactory";
     }
@@ -709,8 +713,8 @@ namespace DryIoc.MefAttributedModel
 
         private static Exception GetAttributedModelOrContainerException(ErrorCheck check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner)
         {
-            return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count 
-                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner) 
+            return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count
+                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
                 : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
         }
 
@@ -845,7 +849,7 @@ namespace DryIoc.MefAttributedModel
         public bool IsLazy { get { return ImplementationTypeFullName != null; } }
 
         /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
-        public ReuseType Reuse;
+        public ReuseType? Reuse;
 
         /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
@@ -911,7 +915,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Creates factory out of registration info.</summary> <returns>Created factory.</returns>
-        public ReflectionFactory CreateFactory()
+        public ReflectionFactory CreateFactory(IRegistrator registrator = null)
         {
             Made made = null;
             if (FactoryMethodInfo != null)
@@ -926,7 +930,8 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
+            var defaultReuse = (registrator as IContainer)?.Rules?.DefaultReuseInsteadOfTransient;
+            var reuse = AttributedModel.GetReuse(Reuse, ReuseName, defaultReuse);
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
         }
@@ -1083,8 +1088,8 @@ namespace DryIoc.MefAttributedModel
             }
 
             var metaAttrs = ImplementationType.GetAttributes()
-                .Where(a => 
-                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() || 
+                .Where(a =>
+                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() ||
                     a is ExportMetadataAttribute);
 
             foreach (var metaAttr in metaAttrs)
@@ -1103,7 +1108,7 @@ namespace DryIoc.MefAttributedModel
                     var exportMetaAttr = metaAttr as ExportMetadataAttribute;
                     if (exportMetaAttr != null)
                     {
-                        metaKey = exportMetaAttr.Name; // note: defaults to string.Empty 
+                        metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
                         metaValue = exportMetaAttr.Value;
                     }
                 }

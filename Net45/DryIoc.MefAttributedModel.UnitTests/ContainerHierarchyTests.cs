@@ -18,7 +18,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         private static IContainer CreateContainer()
         {
-            var container = new Container().WithMefAttributedModel();
+            // set up the Container to work like Mef without changing the composable parts
+            var container = new Container()
+                .With(r => r.WithMefAttributedModel()
+                    .WithDefaultRegistrationReuse(Reuse.InCurrentScope)
+                    .WithTrackingDisposableTransients()); // BTW, it shouldn't be needed because the default Reuse is not Transient
+
             container.RegisterExports(new[] { typeof(ILogTableManager).GetAssembly() });
             return container;
         }
@@ -70,12 +75,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(singleton1.IsDisposed);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_can_use_container_hierarchy_to_have_scoped_same_Mef_composable_parts()
         {
-            // TODO: how do I set up the Container for this to work like in Mef without changing the composable parts?
-            var container = Container.With(r => r.WithTrackingDisposableTransients());
-
+            var container = Container;
             IDisposableScopedService scoped1, scoped2;
             IDisposableSingletonService singleton1, singleton2;
 
