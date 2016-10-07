@@ -157,8 +157,7 @@ namespace DryIoc.MefAttributedModel
                 var export = exports[i];
                 var serviceKey = export.ServiceKey;
 
-                registrator.Register(factory, export.ServiceType,
-                    serviceKey, export.IfAlreadyRegistered,
+                registrator.Register(factory, export.ServiceType, serviceKey, export.IfAlreadyRegistered, 
                     isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
@@ -342,6 +341,7 @@ namespace DryIoc.MefAttributedModel
             object serviceKey;
             Type requiredServiceType;
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
+
             var metadata = GetRequiredMetadata(attributes);
 
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
@@ -375,6 +375,13 @@ namespace DryIoc.MefAttributedModel
             }
 
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
+        }
+
+        internal static KeyValuePair<string, object> ComposeMetadataForServiceKey(object serviceKey, Type serviceType)
+        {
+            return new KeyValuePair<string, object>(
+                string.Concat(serviceKey.GetHashCode(), ":", serviceType.FullName),
+                serviceKey);
         }
 
         private static KeyValuePair<string, object> GetRequiredMetadata(Attribute[] attributes)
@@ -662,11 +669,11 @@ namespace DryIoc.MefAttributedModel
     public static class Constants
     {
         /// <summary>Predefined key in metadata dictionary for metadata provided as single object (not dictionary).</summary>
-        public static readonly string ExportMetadataDefaultKey = "ExportMetadataDefaultKey";
+        public static readonly string ExportMetadataDefaultKey = "@ExportMetadataDefaultKey";
 
         /// <summary>Marks the Export generated for type which export its instance members,
         /// but should not be resolved as-self by default.</summary>
-        public static readonly string InstanceFactory = "SN.InstanceFactory";
+        public static readonly string InstanceFactory = "@InstanceFactory";
     }
 
     /// <summary>Defines error codes and messages for <see cref="AttributedModelException"/>.</summary>
@@ -1080,9 +1087,8 @@ namespace DryIoc.MefAttributedModel
                     var export = Exports[i];
                     if (export.ServiceKey != null)
                     {
-                        var metaKey = string.Concat(export.ServiceKey.GetHashCode().ToString(), ";", export.ServiceType.FullName);
-                        var metaValue = export.ServiceKey;
-                        metaDict.Add(metaKey, metaValue);
+                        var serviceKeyMeta = AttributedModel.ComposeMetadataForServiceKey(export.ServiceKey, export.ServiceType);
+                        metaDict.Add(serviceKeyMeta.Key, serviceKeyMeta.Value);
                     }
                 }
             }
