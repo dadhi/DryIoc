@@ -358,5 +358,31 @@ namespace DryIoc.UnitTests
                 Name = name;
             }
         }
+
+        [Test]
+        public void Can_use_instance_in_upper_scope_and_resolve_it_in_nested_scope()
+        {
+            var container = new Container();
+            var a = new ClassA();
+
+            using (var scope1 = container.OpenScope("1"))
+            {
+                scope1.UseInstance(a);
+
+                using (var scope2 = scope1.OpenScope("2"))
+                {
+                    var resolvedA = scope2.Resolve<ClassA>();
+
+                    if (resolvedA == null) // it's true
+                    {
+                        throw new NullReferenceException();
+                    }
+                }
+            }
+        }
+
+        class ClassA
+        {
+        }
     }
 }

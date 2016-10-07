@@ -1471,17 +1471,7 @@ namespace DryIoc
                         return decoratedExpr.CompileToDelegate(request.Container);
                 }
 
-                return (state, r, scope) =>
-                {
-                    object result = null;
-
-                    var openScope = r.Scopes.GetCurrentScope();
-                    if (openScope != null)
-                        result = GetAndUnwrapOrDefault(openScope, FactoryID);
-
-                    result = result ?? GetAndUnwrapOrDefault(r.Scopes.SingletonScope, FactoryID);
-                    return result;
-                };
+                return GetInstanceFromScopeChainOrSingletons;
             }
 
             /// <summary>Called for Injection as dependency.</summary>
@@ -1494,6 +1484,22 @@ namespace DryIoc
             public override Expression CreateExpressionOrDefault(Request request)
             {
                 return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
+            }
+
+            #region Implementation
+
+            private object GetInstanceFromScopeChainOrSingletons(object[] _, IResolverContext r, IScope __)
+            {
+                var scope = r.Scopes.GetCurrentScope();
+                while (scope != null)
+                {
+                    var result = GetAndUnwrapOrDefault(scope, FactoryID);
+                    if (result != null)
+                        return result;
+                    scope = scope.Parent;
+                }
+
+                return GetAndUnwrapOrDefault(r.Scopes.SingletonScope, FactoryID);
             }
 
             private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
@@ -1514,6 +1520,8 @@ namespace DryIoc
 
                 return value;
             }
+
+            #endregion
         }
 
         internal sealed class Registry
