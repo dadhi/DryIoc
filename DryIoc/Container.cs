@@ -36,7 +36,7 @@ namespace DryIoc
     using System.Runtime.CompilerServices;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
-    public sealed partial class Container : IContainer, IScopeAccess
+    public sealed partial class Container : IContainer, IScopeAccess, IDefaultReuseProvider
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
         public Container() : this(Rules.Default, Ref.Of(Registry.Default), new SingletonScope())
@@ -783,6 +783,9 @@ namespace DryIoc
 
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
+
+        /// <summary>The default <see cref="IReuse" />.</summary>
+        public IReuse DefaultReuse { get { return Rules.DefaultRegistrationReuse; } }
 
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed
@@ -8996,9 +8999,6 @@ namespace DryIoc
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
 
-        /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
-        Rules Rules { get; }
-
         /// <summary>Registers factory in registry with specified service type and key for lookup.
         /// Returns true if factory was added to registry, false otherwise. False may be in case of <see cref="IfAlreadyRegistered.Keep"/>
         /// setting and already existing factory</summary>
@@ -9025,6 +9025,13 @@ namespace DryIoc
         /// <param name="factoryType">Expected factory type.</param>
         /// <param name="condition">Expected factory condition.</param>
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
+    }
+
+    /// <summary>Provides access to DefaultReuse.</summary>
+    public interface IDefaultReuseProvider
+    {
+        /// <summary>The default <see cref="IReuse"/>.</summary>
+        IReuse DefaultReuse { get; }
     }
 
     /// <summary>Provides access to scopes.</summary>
@@ -9073,6 +9080,9 @@ namespace DryIoc
     {
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }
+
+        /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
+        Rules Rules { get; }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
         Request EmptyRequest { get; }

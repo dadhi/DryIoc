@@ -157,7 +157,7 @@ namespace DryIoc.MefAttributedModel
                 var export = exports[i];
                 var serviceKey = export.ServiceKey;
 
-                registrator.Register(factory, export.ServiceType, serviceKey, export.IfAlreadyRegistered, 
+                registrator.Register(factory, export.ServiceType, serviceKey, export.IfAlreadyRegistered,
                     isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
@@ -937,7 +937,7 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var defaultReuse = registrator.Rules.DefaultRegistrationReuse;
+            var defaultReuse = (registrator as IDefaultReuseProvider)?.DefaultReuse;
             var reuse = AttributedModel.GetReuse(Reuse, ReuseName, defaultReuse);
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
