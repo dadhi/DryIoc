@@ -6613,7 +6613,7 @@ namespace DryIoc
 
         private static IReuse GetTransientDisposableTrackingReuse(Request request)
         {
-            // Track in parent's scope
+            // First, check the parent's scope
             var parent = request.GetParentOrFuncOrEmpty(firstNonTransientParent: true);
             if (parent.FactoryType == FactoryType.Wrapper)
                 return null;
