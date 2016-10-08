@@ -793,7 +793,7 @@ namespace DryIoc.MefAttributedModel
                 if (x == null)
                     return code.Print("null");
 
-                enumType = enumType.GetGenericArguments().Single();
+                enumType = enumType.GetTypeInfo().GenericTypeArguments.Single();
             }
 
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
@@ -803,7 +803,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="type">The type to check.</param>
         public static bool IsNullable(this Type type)
         {
-            return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+            return type.GetTypeInfo().IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
         }
 
         /// <summary>Prints code items.</summary>
