@@ -788,10 +788,25 @@ namespace DryIoc.MefAttributedModel
         /// <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x)
         {
+            if (enumType.IsNullable())
+            {
+                if (x == null)
+                    return code.Print("null");
+
+                enumType = enumType.GetGenericArguments().Single();
+            }
+
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
         }
 
-        /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
+        /// <summary>Determines whether the type is nullable.</summary>
+        /// <param name="type">The type to check.</param>
+        public static bool IsNullable(this Type type)
+        {
+            return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+        }
+
+        /// <summary>Prints code items.</summary>
         /// <param name="code">Code to print to.</param>
         /// <param name="items">Items to print.</param> <returns>Code with appended items.</returns>
         public static StringBuilder AppendMany<T>(this StringBuilder code, IEnumerable<T> items)
@@ -1043,7 +1058,7 @@ namespace DryIoc.MefAttributedModel
             "); for (var i = 0; i < Exports.Length; i++)
                     code = Exports[i].ToCode(code).Append(@",
             "); code.Append(@"},
-        Reuse = ").AppendEnum(typeof(ReuseType), Reuse).Append(@",
+        Reuse = ").AppendEnum(typeof(ReuseType?), Reuse).Append(@",
         ReuseName = ").AppendString(ReuseName).Append(@",
         OpenResolutionScope = ").AppendBool(OpenResolutionScope).Append(@",
         AsResolutionCall = ").AppendBool(AsResolutionCall).Append(@",
