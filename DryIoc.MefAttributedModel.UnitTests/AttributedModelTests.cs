@@ -175,6 +175,24 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Can_resolve_export_with_WithMetadata_only_metadata()
+        {
+            var it = _container.Resolve<Meta<WithWithMetadataOnlyKeyValue, IDictionary<string, object>>>();
+
+            CollectionAssert.AreEquivalent(new[] { "a" }, it.Metadata.Keys);
+            CollectionAssert.AreEquivalent(new[] { 1 }, it.Metadata.Values);
+        }
+
+        [Test]
+        public void Can_resolve_export_with_ExportAttribute_only_metadata()
+        {
+            var it = _container.Resolve<Meta<WithExportMetadataOnlyKeyValue, IDictionary<string, object>>>();
+
+            CollectionAssert.AreEquivalent(new[] { "b" }, it.Metadata.Keys);
+            CollectionAssert.AreEquivalent(new[] { 2 }, it.Metadata.Values);
+        }
+
+        [Test]
         public void Can_resolve_export_with_multi_metadata()
         {
             var it = _container.Resolve<Meta<WithMetaKeyValue, IDictionary<string, object>>>();

@@ -521,7 +521,7 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
+                if (attribute is ExportAttribute || attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
                 }
@@ -983,7 +983,7 @@ namespace DryIoc.MefAttributedModel
                 });
 
             return member;
-    }
+        }
 
         /// <summary>Create factory setup from registration DTO.</summary> <returns>Created factory setup.</returns>
         public Setup GetSetup()

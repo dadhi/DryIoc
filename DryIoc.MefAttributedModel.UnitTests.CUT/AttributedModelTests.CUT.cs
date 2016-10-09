@@ -359,7 +359,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public class B
     {
         public readonly A A;
-        
+
         public B(A a)
         {
             A = a;
@@ -459,7 +459,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             public static Fooh<A> Create(A a)
             {
                 return new Fooh<A>(a);
-            } 
+            }
         }
     }
 
@@ -533,6 +533,16 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     [Export, WithMetadata("a", 1), ExportMetadata("b", 2)]
     public class WithMetaKeyValue
+    {
+    }
+
+    [Export, WithMetadata("a", 1)]
+    public class WithWithMetadataOnlyKeyValue
+    {
+    }
+
+    [Export, ExportMetadata("b", 2)]
+    public class WithExportMetadataOnlyKeyValue
     {
     }
 }
