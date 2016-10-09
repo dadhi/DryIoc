@@ -100,6 +100,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Mef_chooses_the_default_constructor_if_no_constructors_are_marked_with_ImportingConstructorAttribute()
+        {
+            var service = Mef.GetExport<IServiceWithTwoConstructors>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.Value);
+            Assert.IsTrue(service.Value.DefaultConstructorIsUsed);
+        }
+
+        [Test]
         public void DryIoc_supports_importing_static_factory_method()
         {
             // LogTableManagerConsumer creates ILogTableManager via unnamed factory method with parameters
@@ -184,6 +194,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(importer);
             Assert.IsNotNull(importer.UntypedServices);
             Assert.AreEqual(1, importer.UntypedServices.Length);
+        }
+
+        [Test, Ignore("fails")]
+        public void DryIoc_chooses_the_default_constructor_if_no_constructors_are_marked_with_ImportingConstructorAttribute()
+        {
+            var service = Container.Resolve<IServiceWithTwoConstructors>();
+
+            Assert.IsNotNull(service);
+            Assert.IsTrue(service.DefaultConstructorIsUsed);
         }
     }
 }

@@ -176,4 +176,22 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         public bool IsDisposed { get; private set; }
     }
+
+    public interface IServiceWithTwoConstructors
+    {
+        bool DefaultConstructorIsUsed { get; }
+    }
+
+    [Export(typeof(IServiceWithTwoConstructors))]
+    internal class ServiceWithTwoConstructors : IServiceWithTwoConstructors
+    {
+        public ServiceWithTwoConstructors()
+        {
+            DefaultConstructorIsUsed = true;
+        }
+
+        public ServiceWithTwoConstructors(string name) { }
+
+        public bool DefaultConstructorIsUsed { get; private set; }
+    }
 }
