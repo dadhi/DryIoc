@@ -300,19 +300,29 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector)
+        private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector = null)
         {
             var implType = request.ImplementationType;
             var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
             var ctor = ctors.Length == 1 ? ctors[0]
                 : ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
 
-            ctor = ctor ?? ctors.SingleOrDefault(it => it.GetParameters().Length == 0);
+            if (ctor == null)
+            {
+                // next try fallback defined ctor, it may be defined as ConstructorWithResolvableArguments
+                if (fallbackSelector != null)
+                {
+                    var fallbackCtor = fallbackSelector(request);
+                    if (fallbackCtor != null)
+                        return fallbackCtor;
+                }
 
-            if (ctor != null)
-                return FactoryMethod.Of(ctor);
+                // at the end try default constructor
+                ctor = ctors.SingleOrDefault(it => it.GetParameters().Length == 0);
+            }
 
-            return fallbackSelector.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType).Invoke(request);
+            ctor.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType, request);
+            return FactoryMethod.Of(ctor);
         }
 
         private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(Request request)
@@ -716,7 +726,8 @@ namespace DryIoc.MefAttributedModel
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
-                "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
+                "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) + 
+                " nor default contructor in {0} when resolving: {1}"),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
             DuplicateMetadataKey = Of(
