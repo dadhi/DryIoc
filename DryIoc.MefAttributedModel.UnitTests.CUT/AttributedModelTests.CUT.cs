@@ -518,12 +518,14 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     [Export]
     public class MultiCtorDep { }
 
+    public class MultiCtorDepTwo { }
+
     [Export]
     public class MultiCtorSample
     {
         public MultiCtorDep Dep { get; private set; }
 
-        public MultiCtorSample() { }
+        public MultiCtorSample(MultiCtorDepTwo depTwo) { }
 
         public MultiCtorSample(Func<MultiCtorDep> getDep)
         {

@@ -49,19 +49,21 @@ namespace DryIoc.MefAttributedModel
         /// <returns>New rules with attributed model rules.</returns>
         public static Rules WithImports(this Rules rules)
         {
-            return rules.WithMefAttributedModel()
-                .WithDefaultRegistrationReuse(Reuse.Singleton);
+            return rules.WithMefAttributedModel();
         }
 
         // todo: V3: Rename to WithImports and make the original method an obsolete.
         /// <summary>Obsolete: replaced with more on point <see cref="WithImports"/>.</summary>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
-            // hello, Max!!! we are Martians.
-            return rules.With(
+            var importsMadeOf = Made.Of(
                 request => GetImportingConstructor(request, rules.FactoryMethod),
-                GetImportedParameter,
-                _getImportedPropertiesAndFields);
+                GetImportedParameter, _getImportedPropertiesAndFields);
+
+            // hello, Max!!! we are Martians.
+            return rules.With(importsMadeOf)
+                .WithDefaultRegistrationReuse(Reuse.Singleton)
+                .WithTrackingDisposableTransients();
         }
 
         /// <summary>Appends attributed model rules to passed container.</summary>
@@ -149,7 +151,10 @@ namespace DryIoc.MefAttributedModel
         /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
-            var factory = info.CreateFactory(registrator);
+            var defaultReuseProvider = registrator as IDefaultReuseProvider;
+            var defaultReuse = defaultReuseProvider == null ? null : defaultReuseProvider.DefaultReuse;
+
+            var factory = info.CreateFactory(defaultReuse);
 
             var exports = info.Exports;
             for (var i = 0; i < exports.Length; i++)
@@ -282,9 +287,7 @@ namespace DryIoc.MefAttributedModel
         public static IReuse GetReuse(ReuseType? reuseType, object reuseName = null, IReuse defaultReuse = null)
         {
             if (!reuseType.HasValue)
-            {
                 return defaultReuse;
-            }
 
             return reuseType.Value == ReuseType.Transient
                 ? null
@@ -302,10 +305,14 @@ namespace DryIoc.MefAttributedModel
             var implType = request.ImplementationType;
             var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
             var ctor = ctors.Length == 1 ? ctors[0]
-                : ctors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
-            if (ctor == null)
-                return fallbackSelector.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType).Invoke(request);
-            return FactoryMethod.Of(ctor);
+                : ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+
+            ctor = ctor ?? ctors.SingleOrDefault(it => it.GetParameters().Length == 0);
+
+            if (ctor != null)
+                return FactoryMethod.Of(ctor);
+
+            return fallbackSelector.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType).Invoke(request);
         }
 
         private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(Request request)
@@ -377,7 +384,7 @@ namespace DryIoc.MefAttributedModel
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
         }
 
-        internal static KeyValuePair<string, object> ComposeMetadataForServiceKey(object serviceKey, Type serviceType)
+        internal static KeyValuePair<string, object> ComposeServiceKeyMetadata(object serviceKey, Type serviceType)
         {
             return new KeyValuePair<string, object>(
                 string.Concat(serviceKey.GetHashCode(), ":", serviceType.FullName),
@@ -404,8 +411,27 @@ namespace DryIoc.MefAttributedModel
             var container = request.Container;
             serviceType = import.ContractType ?? container.GetWrappedType(serviceType, request.RequiredServiceType);
             var serviceKey = import.ContractKey;
-            var metadata = import.Metadata;
-            var metadataKey = metadata == null ? null : Constants.ExportMetadataDefaultKey;
+
+            IDictionary<string, object> setupMetadata = null;
+
+            // will be used for resolution and for resgitration setup, if service is not registered
+            var metadata = new KeyValuePair<string, object>(
+                import.MetadataKey ?? Constants.ExportMetadataDefaultKey,
+                import.Metadata);
+
+            if (metadata.Value != null)
+                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value }};
+
+            if (serviceKey != null)
+            {
+                var serviceKeyMetadata = ComposeServiceKeyMetadata(serviceKey, serviceType);
+                
+                setupMetadata = setupMetadata ?? new Dictionary<string, object>();
+                setupMetadata.Add(serviceKeyMetadata.Key, serviceKeyMetadata.Value);
+
+                if (metadata.Value == null)
+                    metadata = serviceKeyMetadata;
+            }
 
             if (!container.IsRegistered(serviceType, serviceKey))
             {
@@ -414,19 +440,21 @@ namespace DryIoc.MefAttributedModel
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
                 var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
-                var reuse = GetReuse(reuseType, reuseName);
+
+                var defaultReuse = request.Container.Rules.DefaultRegistrationReuse;
+                var reuse = GetReuse(reuseType, reuseName, defaultReuse);
 
                 var impl = import.ConstructorSignature == null ? null
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 container.Register(serviceType, implementationType, reuse, impl,
-                    Setup.With(metadataOrFuncOfMetadata: metadata), IfAlreadyRegistered.Keep, serviceKey);
+                    Setup.With(setupMetadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
             // the default because we intentionally register the service and expect it to be avaliable
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
 
-            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadataKey, metadata);
+            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
@@ -936,8 +964,10 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
-        /// <summary>Creates factory out of registration info.</summary> <returns>Created factory.</returns>
-        public ReflectionFactory CreateFactory(IRegistrator registrator = null)
+        /// <summary>Creates factory out of registration info.</summary> 
+        /// <param name="defaultReuse">(optional) Default reuse used when reuseType is not specified.</param>
+        /// <returns>Created factory.</returns>
+        public ReflectionFactory CreateFactory(IReuse defaultReuse = null)
         {
             Made made = null;
             if (FactoryMethodInfo != null)
@@ -952,7 +982,6 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var defaultReuse = (registrator as IDefaultReuseProvider)?.DefaultReuse;
             var reuse = AttributedModel.GetReuse(Reuse, ReuseName, defaultReuse);
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
@@ -1102,7 +1131,7 @@ namespace DryIoc.MefAttributedModel
                     var export = Exports[i];
                     if (export.ServiceKey != null)
                     {
-                        var serviceKeyMeta = AttributedModel.ComposeMetadataForServiceKey(export.ServiceKey, export.ServiceType);
+                        var serviceKeyMeta = AttributedModel.ComposeServiceKeyMetadata(export.ServiceKey, export.ServiceType);
                         metaDict.Add(serviceKeyMeta.Key, serviceKeyMeta.Value);
                     }
                 }
@@ -1154,7 +1183,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Member defining the Export.</summary>
         public string MemberName;
 
-        /// <summary>Parameter type full names (and names for generic parameters)  to identify the method overload.</summary>
+        /// <summary>Parameter type full names (and names for generic parameters) to identify the method overload.</summary>
         public string[] MethodParameterTypeFullNamesOrNames;
 
         /// <summary>Not null for exported instance member which requires factory object, null for static members.</summary>

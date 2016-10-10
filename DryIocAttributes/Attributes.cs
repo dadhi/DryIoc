@@ -641,7 +641,7 @@ namespace DryIocAttributes
         AllowMultiple = true)]
     public class WithMetadataAttribute : Attribute
     {
-        /// <summary>Metadata key in a dictionary</summary>
+        /// <summary>Metadata key in result metadata dictionary</summary>
         public readonly string MetadataKey;
 
         /// <summary>Metadata value.</summary>
@@ -674,7 +674,10 @@ namespace DryIocAttributes
         /// <summary>Use specific constructor for registration.</summary>
         public Type[] ConstructorSignature { get; set; }
 
-        /// <summary>Metadata associated with registration.</summary>
+        /// <summary>Metadata key in result metadata dictionary</summary>
+        public string MetadataKey { get; set; }
+
+        /// <summary>Metadata value, can be specified with or without <see cref="MetadataKey"/>.</summary>
         public object Metadata { get; set; }
 
         /// <summary>Registering (and importing) with specified service key.</summary>

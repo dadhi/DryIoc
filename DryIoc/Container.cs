@@ -2990,6 +2990,7 @@ namespace DryIoc
             return With(Made.Of(factoryMethod, parameters, propertiesAndFields));
         }
 
+        // todo: may be add a override with option, e.g. to fallback from made.FactoryMethod to previous FM, used by MEF at least
         /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
         /// <param name="made">New Made.Of rules.</param>
         /// <param name="overrideRegistrationMade">Instructs to override registration level Made.Of</param>

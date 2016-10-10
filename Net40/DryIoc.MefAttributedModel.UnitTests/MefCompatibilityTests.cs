@@ -196,7 +196,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, importer.UntypedServices.Length);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_chooses_the_default_constructor_if_no_constructors_are_marked_with_ImportingConstructorAttribute()
         {
             var service = Container.Resolve<IServiceWithTwoConstructors>();
