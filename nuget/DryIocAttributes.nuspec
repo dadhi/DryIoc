@@ -12,9 +12,10 @@
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
           v2.6.0
-          - added: #323: Support multiple WithMetadataAttribute(key, value)
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
+          - added: #323: Support multiple WithMetadataAttribute(key, value)
+          - added: Support for ExportMetadataAttribute
           - added: ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
           v2.5.0
           - added: Source code (contentFiles) package for UWP (uap10.0)

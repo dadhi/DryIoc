@@ -18,6 +18,7 @@
       - fixed: #327: UseInstance non-deterministic behavior in multi-threading tests
       - fixed: #328: Lazy collection resolve behavior in and out of scope
       - fixed: #338: after re-register instance in scope used old version of object(cached)
+      - fixed: #347: Not resolved instance in child scope of scope
       v2.7.1
       - fixed: #334 MissingMethodException in WithDependencyInjectionAdapter
       - fixed: #335 Decorator of IEnumerable wrapper taking nested in IEnumerable dependency fails with StackOverflow
