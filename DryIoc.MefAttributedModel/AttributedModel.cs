@@ -73,6 +73,7 @@ namespace DryIoc.MefAttributedModel
         {
             return container
                 .With(WithImports)
+                .WithExportFactoryWrapper()
                 .WithImportsSatisfiedNotification();
         }
 
@@ -88,6 +89,54 @@ namespace DryIoc.MefAttributedModel
                 setup: _importsSatisfiedNotificationDecoratorSetup);
             return container;
         }
+
+        /// <summary>Registers <see cref="ExportFactory{T}"/> wrapper into the container.</summary>
+        /// <param name="container">Container to support.</param>
+        /// <returns>The container with registration.</returns>
+        public static IContainer WithExportFactoryWrapper(this IContainer container)
+        {
+            container.Register(typeof(ExportFactory<>),
+                made: _createExportFactoryMethod,
+                setup: Setup.Wrapper);
+            return container;
+        }
+
+        #region ExportFactory<T> support
+
+        /// <summary>
+        /// Creates the <see cref="ExportFactory{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the service</typeparam>
+        /// <param name="container">The container.</param>
+        internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
+        {
+            // problem: this code doesn't release the dependencies
+            //return new ExportFactory<T>(() =>
+            //{
+            //    var it = factory();
+            //    return Tuple.Create(it, new Action(() => (it as IDisposable)?.Dispose()));
+            //});
+
+            return new ExportFactory<T>(() =>
+            {
+                var scope = container.OpenScope();
+                try
+                {
+                    var it = container.Resolve<T>();
+                    return TupleCreator.Create(it, new Action(scope.Dispose));
+                }
+                catch
+                {
+                    scope.Dispose();
+                    throw;
+                }
+            });
+        }
+
+        private static readonly Made _createExportFactoryMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true));
+
+        #endregion
 
         #region IPartImportsSatisfiedNotification support
 
@@ -435,7 +484,7 @@ namespace DryIoc.MefAttributedModel
             if (serviceKey != null)
             {
                 var serviceKeyMetadata = ComposeServiceKeyMetadata(serviceKey, serviceType);
-                
+
                 setupMetadata = setupMetadata ?? new Dictionary<string, object>();
                 setupMetadata.Add(serviceKeyMetadata.Key, serviceKeyMetadata.Value);
 
@@ -726,7 +775,7 @@ namespace DryIoc.MefAttributedModel
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
-                "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) + 
+                "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) +
                 " nor default contructor in {0} when resolving: {1}"),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
@@ -975,7 +1024,7 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
-        /// <summary>Creates factory out of registration info.</summary> 
+        /// <summary>Creates factory out of registration info.</summary>
         /// <param name="defaultReuse">(optional) Default reuse used when reuseType is not specified.</param>
         /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory(IReuse defaultReuse = null)

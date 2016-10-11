@@ -9,7 +9,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     // no Export attribute here
-    public class LogTableManager: ILogTableManager
+    public class LogTableManager : ILogTableManager
     {
         public const string FactoryMethodExportName = "LogTableManagerFactory";
 
@@ -135,7 +135,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public IVersionedProtocol[] Protocols { get; set; }
     }
 
-    public interface IUntypedService  { string Version { get; } }
+    public interface IUntypedService { string Version { get; } }
 
     [Export("ArbitraryKey")]
     public class UntypedService : IUntypedService
@@ -193,5 +193,75 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public ServiceWithTwoConstructors(string name) { }
 
         public bool DefaultConstructorIsUsed { get; private set; }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class NonSharedDependency : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.Shared)]
+    public class SharedDependency : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class NonSharedService : IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        [Import]
+        public SharedDependency SharedDependency { get; set; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export]
+    public class UsesExportFactoryOfNonSharedService
+    {
+        [Import]
+        public ExportFactory<NonSharedService> Factory { get; set; }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.Shared)]
+    public class SharedService : IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        [Import]
+        public SharedDependency SharedDependency { get; set; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export]
+    public class UsesExportFactoryOfSharedService
+    {
+        [Import]
+        public ExportFactory<SharedService> Factory { get; set; }
     }
 }

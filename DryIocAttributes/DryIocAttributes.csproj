@@ -38,6 +38,8 @@
   <ItemGroup>
     <Compile Include="Attributes.cs" />
     <Compile Include="Ported-net40.cs" />
+    <Compile Include="Ported-net45.cs" />
+    <Compile Include="Ported-Tuple.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -54,7 +54,7 @@ namespace DryIocAttributes
         Keep,
         /// <summary>Replaces old registration with new one.</summary>
         Replace,
-        /// <summary>Adds new implementation or null (Made.Of), 
+        /// <summary>Adds new implementation or null (Made.Of),
         /// skips registration if the implementation is already registered.</summary>
         AppendNewImplementation
     }
@@ -70,7 +70,7 @@ namespace DryIocAttributes
     public class ExportExAttribute : ExportAttribute
     {
         /// <summary>Creates attribute.</summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
         /// <param name="contractType">(optional) Service type.</param>
         /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
         public ExportExAttribute(object contractKey, Type contractType = null,
@@ -147,7 +147,7 @@ namespace DryIocAttributes
         public CurrentScopeReuseAttribute(string scopeName = null) : base(ReuseType.CurrentScope, scopeName) { }
     }
 
-    /// <summary>Marks exported type with Reuse.InWebRequest. 
+    /// <summary>Marks exported type with Reuse.InWebRequest.
     /// Basically it is CurrentScopeReuse with predefined name Reuse.WebRequestScopeName.</summary>
     public class WebRequestReuseAttribute : CurrentScopeReuseAttribute
     {
@@ -158,7 +158,7 @@ namespace DryIocAttributes
         public WebRequestReuseAttribute() : base(WebRequestScopeName) { }
     }
 
-    /// <summary>Marks exported type with Reuse.InThread. 
+    /// <summary>Marks exported type with Reuse.InThread.
     /// Basically it is CurrentScopeReuse with predefined name ThreadScopeContext.ScopeContextName.</summary>
     public class ThreadReuseAttribute : CurrentScopeReuseAttribute
     {
@@ -211,7 +211,7 @@ namespace DryIocAttributes
         public object ContractKey { get; set; }
 
         /// <summary>Creates attribute.</summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
         /// <param name="contractType">Service type.</param>
         public ExportWithKeyAttribute(object contractKey, Type contractType)
             : base(contractType)
@@ -220,7 +220,7 @@ namespace DryIocAttributes
         }
 
         /// <summary>Creates attribute using implementation type as <see cref="ExportAttribute.ContractType"/></summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
         public ExportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
     }
 
@@ -298,7 +298,7 @@ namespace DryIocAttributes
 
         /// <summary>If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</summary>
         public int Order { get; set; }
 
@@ -306,13 +306,13 @@ namespace DryIocAttributes
         public bool UseDecorateeReuse { get; set; }
 
         /// <summary>Creates attribute by providing its optional properties.</summary>
-        /// <param name="contractKey">(optional) Contract key of Decorated type, not for a decorator itself. 
-        /// Used to find the service to apply decorator to.</param> 
+        /// <param name="contractKey">(optional) Contract key of Decorated type, not for a decorator itself.
+        /// Used to find the service to apply decorator to.</param>
         /// <param name="order">(optional)If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</param>
-        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse. 
+        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
         /// Decorated service may be decorator itself.</param>
         public AsDecoratorAttribute(object contractKey = null, int order = 0, bool useDecorateeReuse = false)
         {
@@ -660,7 +660,7 @@ namespace DryIocAttributes
         public WithMetadataAttribute(object metadata) : this(null, metadata) { }
     }
 
-    /// <summary>Imports the service. 
+    /// <summary>Imports the service.
     /// But in case the service is not registered, attribute will exports the service in-place for registration.
     /// Useful for ad-hoc registration of types from not controlled libraries.</summary>
     [AttributeUsage(AttributeTargets.Parameter
@@ -711,7 +711,7 @@ namespace DryIocAttributes
         | AttributeTargets.Field)]
     public class OpenResolutionScopeAttribute : Attribute { }
 
-    /// <summary>Specifies that export should be imported as dynamic resolution call, 
+    /// <summary>Specifies that export should be imported as dynamic resolution call,
     /// instead of inlined creation expression.</summary>
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Interface
@@ -727,4 +727,21 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class AsResolutionRootAttribute : Attribute { }
+
+    /// <summary>Provides static methods for creating tuple objects (works around the dependency problems).</summary>
+    public static class TupleCreator
+    {
+        /// <summary>
+        /// Creates a new 2-tuple, or pair.
+        /// </summary>
+        /// <typeparam name="T1">The type of the first component.</typeparam>
+        /// <typeparam name="T2">The type of the second component.</typeparam>
+        /// <param name="item1">The first component.</param>
+        /// <param name="item2">The second component.</param>
+        /// <returns></returns>
+        public static Tuple<T1, T2> Create<T1, T2>(T1 item1, T2 item2)
+        {
+            return Tuple.Create(item1, item2);
+        }
+    }
 }
