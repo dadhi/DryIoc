@@ -908,7 +908,7 @@ namespace DryIoc
         {
             // return early if no decorators registered and no fallback containers to provide them
             if (_registry.Value.Decorators.IsEmpty &&
-                request.Container.Rules.FallbackContainers.IsNullOrEmpty())
+                request.Rules.FallbackContainers.IsNullOrEmpty())
                 return null;
 
             var serviceType = request.ServiceType;
@@ -2328,6 +2328,9 @@ namespace DryIoc
             if (reuseToExpr != null)
                 return reuseToExpr.Convert();
 
+            if (reuse is TransientReuse)
+                return _transientReuseExpr;
+
             if (reuse is SingletonReuse)
                 return _singletonReuseExpr;
 
@@ -2353,10 +2356,11 @@ namespace DryIoc
                     Expression.Constant(resolutionScopeReuse.Outermost, typeof(bool)));
             }
 
-            // transient or no reuse is default
             return Expression.Constant(null, typeof(IReuse));
         }
 
+        // todo: move closer to Reuse implementation in order to not forget it.
+        private static readonly Expression _transientReuseExpr = ReflectionTools.ToExpression(() => Reuse.Transient);
         private static readonly Expression _singletonReuseExpr = ReflectionTools.ToExpression(() => Reuse.Singleton);
         private static readonly Expression _inCurrentScopeReuseExpr = ReflectionTools.ToExpression(() => Reuse.InCurrentScope);
         private static readonly Expression _inResolutionScopeReuseExpr = ReflectionTools.ToExpression(() => Reuse.InResolutionScope);
@@ -2790,7 +2794,7 @@ namespace DryIoc
                 compositeParentRequiredType = parent.RequiredServiceType;
             }
 
-            var preresolveParent = container.RequestInfoToExpression(request.RequestInfo);
+            var preResolveParent = container.RequestInfoToExpression(request.RequestInfo);
 
             var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
@@ -2798,7 +2802,7 @@ namespace DryIoc
                 Expression.Constant(requiredItemType),
                 container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                preresolveParent,
+                preResolveParent,
                 Container.GetResolutionScopeExpression(request));
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
@@ -3172,7 +3176,7 @@ namespace DryIoc
         public Rules WithDefaultRegistrationReuse(IReuse reuse)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.DefaultRegistrationReuse = reuse.ThrowIfNull(Error.DefaultRegistrationReuseShouldNotBeNull);
+            newRules.DefaultRegistrationReuse = reuse.ThrowIfNull(Error.DefaultReuseShouldNotBeNull);
             return newRules;
         }
 
@@ -3459,7 +3463,7 @@ namespace DryIoc
                     .Select(c => new { Ctor = c, Params = c.GetParameters() })
                     .OrderByDescending(x => x.Params.Length);
 
-                var rules = request.Container.Rules;
+                var rules = request.Rules;
                 var selector = rules.OverrideRegistrationMade
                     ? rules.Parameters.OverrideWith(request.Made.Parameters)
                     : request.Made.Parameters.OverrideWith(rules.Parameters);
@@ -4860,10 +4864,6 @@ namespace DryIoc
         internal static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
-            if (isRuntimeDependency &&
-                request.Container.Rules.ThrowIfRuntimeStateRequired)
-                Throw.It(Error.StateIsRequiredToUseItem, request);
-
             if (!isRuntimeDependency)
                 PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
@@ -4931,8 +4931,8 @@ namespace DryIoc
                 var factory = request.Container.ResolveFactory(newRequest);
                 var factoryExpr = factory == null ? null : factory.GetExpressionOrDefault(newRequest);
                 if (factoryExpr != null)
-                    container.Rules.DependencyResolutionCallExpressions.Swap(
-                        expr => expr.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
+                    container.Rules.DependencyResolutionCallExpressions.Swap(it =>
+                        it.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
             }
         }
     }
@@ -5592,6 +5592,9 @@ namespace DryIoc
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
         public IContainer Container { get { return _resolverContext.ContainerWeakRef.Container; } }
 
+        /// <summary>Shortcut to issued container rules.</summary>
+        public Rules Rules { get { return Container.Rules; } }
+
         /// <summary>Separate from container because while container may be switched from parent to child, scopes should be from child/facade.</summary>
         public IScopeAccess Scopes { get { return _resolverContext.ScopesWeakRef.Scopes; } }
 
@@ -5816,6 +5819,16 @@ namespace DryIoc
                         reuse = Reuse; // current reuse
                     }
                 }
+
+                if (reuse == null) 
+                {
+                    // if no specified the warpper reuse is always Transient,
+                    // other container-wide default reuse is applied
+                    reuse = factory.FactoryType == FactoryType.Wrapper
+                        ? DryIoc.Reuse.Transient
+                        : (Container.Rules.DefaultReuseInsteadOfTransient 
+                        ?? Container.Rules.DefaultRegistrationReuse);
+                }
             }
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
@@ -5840,7 +5853,9 @@ namespace DryIoc
                     }
                     else
                     {
-                        if (!firstNonTransientParent || p.Reuse != null)
+                        if (!firstNonTransientParent ||
+                            p.Reuse != null &&
+                            p.Reuse != DryIoc.Reuse.Transient)
                             return p;
                     }
                 }
@@ -6364,8 +6379,7 @@ namespace DryIoc
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
-        /// <param name="reuse">(optional)</param>
-        /// <param name="setup">(optional)</param>
+        /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
         protected Factory(IReuse reuse = null, Setup setup = null)
         {
             FactoryID = GetNextID();
@@ -6377,17 +6391,10 @@ namespace DryIoc
         /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
         public bool HasMatchingReuseScope(Request request)
         {
-            if (Reuse == null || !request.Container.Rules.ImplicitCheckForReuseMatchingScope)
+            if (!request.Rules.ImplicitCheckForReuseMatchingScope)
                 return true;
-
-            if (Reuse is ResolutionScopeReuse)
-                return Reuse.GetScopeOrDefault(request) != null;
-
-            if (Reuse is CurrentScopeReuse)
-                return request.IsWrappedInFunc()
-                    || ((IReuseV3)Reuse).CanApply(request);
-
-            return true;
+            var reuse = Reuse as IReuseV3;
+            return reuse == null || reuse.CanApply(request);
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
@@ -6403,16 +6410,21 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                    && Setup.FactoryType == FactoryType.Service
-                   // the settings below specify context based resolution so that expression will be different on
+
+                   // the settings below specify context-based resolution so that expression will be different on
                    // different resolution paths, which prevents its caching and reuse.
                    && Setup.Condition == null
                    && !Setup.AsResolutionCall
                    && !Setup.UseParentReuse
                    && !(request.Reuse is ResolutionScopeReuse)
-                   // tracking disposable transient
-                   && !(request.Reuse == null
-                    && (Setup.TrackDisposableTransient || request.Container.Rules.TrackingDisposableTransients)
-                    && request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable)));
+                   && !IsTrackingDisposableTransient(request);
+        }
+
+        private bool IsTrackingDisposableTransient(Request request)
+        {
+            return request.Reuse == DryIoc.Reuse.Transient
+                && (Setup.TrackDisposableTransient || request.Rules.TrackingDisposableTransients)
+                && request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
@@ -6427,7 +6439,8 @@ namespace DryIoc
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
             if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
                 || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
-                // note: Split only if not wrapped in Func with args - Propagation of args across Resolve boundaries is not supported at the moment
+                // note: Split only if not wrapped in Func with args - 
+                // propagation of args across Resolve boundaries is not supported.
                 && !request.IsWrappedInFuncWithArgs())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
@@ -6446,36 +6459,41 @@ namespace DryIoc
             }
 
             var serviceExpr = decoratorExpr ?? CreateExpressionOrDefault(request);
+
             if (serviceExpr != null && !isDecorated)
-            {
-                // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
-                var reuse = request.Reuse;
-
-                // Track transient disposable in parent scope (if any), or open scope (if any)
-                var tracksTransientDisposable =
-                    reuse == null && !Setup.PreventDisposal &&
-                    (Setup.TrackDisposableTransient ||
-                    !Setup.AllowDisposableTransient && container.Rules.TrackingDisposableTransients) &&
-                    request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
-
-                if (tracksTransientDisposable)
-                    reuse = GetTransientDisposableTrackingReuse(request);
-
-                // As a last resort, apply per-container default reuse
-                if (reuse == null)
-                    reuse = container.Rules.DefaultReuseInsteadOfTransient;
-
-                ThrowIfReuseHasShorterLifespanThanParent(reuse, request);
-
-                if (reuse != null)
-                    serviceExpr = ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
-            }
+                serviceExpr = ApplyReuse(request, serviceExpr);
 
             if (cacheable && serviceExpr != null)
                 container.CacheFactoryExpression(FactoryID, serviceExpr);
 
             if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
                 Container.ThrowUnableToResolve(request);
+
+            return serviceExpr;
+        }
+
+        private Expression ApplyReuse(Request request, Expression serviceExpr)
+        {
+            // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
+            var reuse = request.Reuse.ThrowIfNull();
+
+            // Track transient disposable in parent scope (if any), or open scope (if any)
+            var tracksTransientDisposable =
+                reuse == DryIoc.Reuse.Transient &&
+                !Setup.PreventDisposal &&
+                (Setup.TrackDisposableTransient || 
+                !Setup.AllowDisposableTransient && request.Rules.TrackingDisposableTransients) &&
+                request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
+
+            if (tracksTransientDisposable)
+                reuse = GetTransientDisposableTrackingReuse(request);
+
+            ThrowIfReuseHasShorterLifespanThanParent(request);
+
+            if (reuse == DryIoc.Reuse.Transient)
+                return serviceExpr;
+
+            serviceExpr = ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
 
             return serviceExpr;
         }
@@ -6492,11 +6510,11 @@ namespace DryIoc
             var serviceType = serviceExpr.Type;
 
             // The singleton optimization: eagerly create singleton during the construction of object graph.
-            if (reuse is SingletonReuse &&
-                !tracksTransientDisposable &&
+            if (request.Rules.EagerCachingSingletonForFasterAccess &&
+                reuse is SingletonReuse &&
                 FactoryType == FactoryType.Service &&
-                !request.IsWrappedInFunc() &&
-                request.Container.Rules.EagerCachingSingletonForFasterAccess)
+                !tracksTransientDisposable &&
+                !request.IsWrappedInFunc())
             {
                 var factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
 
@@ -6557,17 +6575,21 @@ namespace DryIoc
                     Expression.Convert(serviceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
 
+            if (serviceExpr.Type.IsValueType())
+                serviceExpr = Expression.Convert(serviceExpr, typeof(object));
+
             return Expression.Convert(serviceExpr, serviceType);
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
         /// and throws if that is true. Until there is a Func wrapper in between.</summary>
-        /// <param name="reuse">Reuse to check.</param> <param name="request">Request to resolve.</param>
-        protected static void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse, Request request)
+        /// <param name="request">Request to resolve.</param>
+        protected static void ThrowIfReuseHasShorterLifespanThanParent(Request request)
         {
+            var reuse = request.Reuse;
+
             // Fast check: if reuse is not applied or the rule set then skip the check.
-            if (reuse == null || reuse.Lifespan == 0 ||
-                !request.Container.Rules.ThrowIfDependencyHasShorterReuseLifespan)
+            if (reuse.Lifespan == 0 || !request.Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 return;
 
             var parent = request.ParentOrWrapper;
@@ -6628,9 +6650,9 @@ namespace DryIoc
             // First, check the parent's scope
             var parent = request.GetParentOrFuncOrEmpty(firstNonTransientParent: true);
             if (parent.FactoryType == FactoryType.Wrapper)
-                return null;
+                return DryIoc.Reuse.Transient;
 
-            if (parent.Reuse != null)
+            if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
                 return parent.Reuse;
 
             // If no reused parent, then track in current open scope, or if not opened in singleton
@@ -7214,7 +7236,7 @@ namespace DryIoc
         private FactoryMethod GetFactoryMethod(Request request)
         {
             var implType = _implementationType;
-            var factoryMethodSelector = Made.FactoryMethod ?? request.Container.Rules.FactoryMethod;
+            var factoryMethodSelector = Made.FactoryMethod ?? request.Rules.FactoryMethod;
             if (factoryMethodSelector == null)
             {
                 var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
@@ -7239,7 +7261,7 @@ namespace DryIoc
 
         private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
         {
-            var containerRules = request.Container.Rules;
+            var containerRules = request.Rules;
             var selector = containerRules.OverrideRegistrationMade
                 ? Made.PropertiesAndFields.OverrideWith(containerRules.PropertiesAndFields)
                 : containerRules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
@@ -7660,9 +7682,10 @@ namespace DryIoc
                 request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request); // use expression creation
 
-            ThrowIfReuseHasShorterLifespanThanParent(Reuse, request);
 
-            if (Reuse != null)
+            ThrowIfReuseHasShorterLifespanThanParent(request);
+
+            if (request.Reuse != DryIoc.Reuse.Transient)
                 return base.GetDelegateOrDefault(request); // use expression creation
 
             return (state, r, scope) => _factoryDelegate(r.Resolver);
@@ -8382,7 +8405,8 @@ namespace DryIoc
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         public bool CanApply(Request request)
         {
-            return request.Scopes.GetCurrentNamedScope(Name, false) != null;
+            return request.IsWrappedInFunc()
+                || request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
         /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
@@ -8447,6 +8471,24 @@ namespace DryIoc
             Outermost = outermost;
         }
 
+        /// <inheritdoc />
+        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        {
+            var scopeExpr = GetScopeExpression(request);
+
+            // For transient disposable we don't care to bind to specific ID, because it should be created each time.
+            var scopedId = trackTransientDisposable ? -1 : request.FactoryID;
+            return Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+                Expression.Constant(scopedId),
+                Expression.Lambda<CreateScopedValue>(createItemExpr, ArrayTools.Empty<ParameterExpression>()));
+        }
+
+        /// <inheritdoc />
+        public bool CanApply(Request request)
+        {
+            return GetScopeOrDefault(request) != null;
+        }
+
         /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Created or existing scope.</returns>
@@ -8492,24 +8534,6 @@ namespace DryIoc
                 .Append(", ").Print(ServiceKey, "\"")
                 .Append("}}");
             return s.ToString();
-        }
-
-        /// <inheritdoc />
-        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
-        {
-            var scopeExpr = GetScopeExpression(request);
-
-            // For transient disposable we don't care to bind to specific ID, because it should be created each time.
-            var scopedId = trackTransientDisposable ? -1 : request.FactoryID;
-            return Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                Expression.Constant(scopedId),
-                Expression.Lambda<CreateScopedValue>(createItemExpr, ArrayTools.Empty<ParameterExpression>()));
-        }
-
-        /// <inheritdoc />
-        public bool CanApply(Request request)
-        {
-            return GetScopeOrDefault(request) != null;
         }
     }
 
@@ -9493,7 +9517,7 @@ namespace DryIoc
                 " lazy boundaries: {0}"),
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
                 "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
-            DefaultRegistrationReuseShouldNotBeNull = Of(
+            DefaultReuseShouldNotBeNull = Of(
                 "Default registration reuse should not be null.");
 
 #pragma warning restore 1591 // "Missing XML-comment"

@@ -68,7 +68,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var one = container.Resolve<Orange>();
             var another = container.Resolve<Orange>();
 
-            Assert.That(one, Is.Not.SameAs(another));
+            Assert.AreNotSame(one, another);
         }
 
         [Test]

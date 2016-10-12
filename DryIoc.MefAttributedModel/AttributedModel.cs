@@ -40,6 +40,7 @@ namespace DryIoc.MefAttributedModel
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
         public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
             ImTreeMap<ReuseType, Func<object, IReuse>>.Empty
+            .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
@@ -289,9 +290,7 @@ namespace DryIoc.MefAttributedModel
             if (!reuseType.HasValue)
                 return defaultReuse;
 
-            return reuseType.Value == ReuseType.Transient
-                ? null
-                : SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
+            return SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
                     .ThrowIfNull(Error.UnsupportedReuseType, reuseType.Value)
                     .Invoke(reuseName);
         }
@@ -451,7 +450,7 @@ namespace DryIoc.MefAttributedModel
                 var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
 
-                var defaultReuse = request.Container.Rules.DefaultRegistrationReuse;
+                var defaultReuse = request.Rules.DefaultRegistrationReuse;
                 var reuse = GetReuse(reuseType, reuseName, defaultReuse);
 
                 var impl = import.ConstructorSignature == null ? null
