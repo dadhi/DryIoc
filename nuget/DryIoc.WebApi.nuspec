@@ -4,7 +4,7 @@
         <id>DryIoc.WebApi</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
