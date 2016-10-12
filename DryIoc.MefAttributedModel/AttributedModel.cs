@@ -141,9 +141,8 @@ namespace DryIoc.MefAttributedModel
         #region IPartImportsSatisfiedNotification support
 
         internal static TService NotifyImportsSatisfied<TService>(TService service)
-            where TService : IPartImportsSatisfiedNotification
         {
-            service.OnImportsSatisfied();
+            (service as IPartImportsSatisfiedNotification)?.OnImportsSatisfied();
             return service;
         }
 
