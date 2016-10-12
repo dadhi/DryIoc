@@ -2268,7 +2268,9 @@ namespace DryIoc
             var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
             var factoryIdExpr = Expression.Constant(factoryID, typeof(int));
             var implTypeExpr = Expression.Constant(implementationType, typeof(Type));
-            var reuseExpr = request.Reuse.ToExpression(container);
+            var reuseExpr = request.Reuse == null
+                ? Expression.Constant(null, typeof(IReuse))
+                : ((IReuseV3)request.Reuse).ToExpression(it => container.GetOrAddStateItemExpression(it));
 
             // Try simplified versions of Push first, before the Push with all arguments provided:
 
@@ -2317,60 +2319,13 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Converter of given reuse to its code representation as expression tree.</summary>
-    public static class ReuseToExpressionConverter
-    {
-        /// <summary>Converts given reuse to its code representation in expression tree.</summary>
-        /// <param name="reuse">Reuse to convert</param> <param name="container"></param>
-        public static Expression ToExpression(this IReuse reuse, IContainer container)
-        {
-            var reuseToExpr = reuse as IConvertibleToExpression;
-            if (reuseToExpr != null)
-                return reuseToExpr.Convert();
-
-            if (reuse is TransientReuse)
-                return _transientReuseExpr;
-
-            if (reuse is SingletonReuse)
-                return _singletonReuseExpr;
-
-            var currentScopeReuse = reuse as CurrentScopeReuse;
-            if (currentScopeReuse != null)
-            {
-                if (currentScopeReuse.Name == null)
-                    return _inCurrentScopeReuseExpr;
-                return Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(),
-                        container.GetOrAddStateItemExpression(currentScopeReuse.Name));
-            }
-
-            var resolutionScopeReuse = reuse as ResolutionScopeReuse;
-            if (resolutionScopeReuse != null)
-            {
-                if (resolutionScopeReuse.AssignableFromServiceType == null &&
-                    resolutionScopeReuse.ServiceKey == null &&
-                    resolutionScopeReuse.Outermost == false)
-                    return _inResolutionScopeReuseExpr;
-                return Expression.Call(typeof(Reuse), "InResolutionScopeOf", ArrayTools.Empty<Type>(),
-                    Expression.Constant(resolutionScopeReuse.AssignableFromServiceType, typeof(Type)),
-                    container.GetOrAddStateItemExpression(resolutionScopeReuse.ServiceKey),
-                    Expression.Constant(resolutionScopeReuse.Outermost, typeof(bool)));
-            }
-
-            return Expression.Constant(null, typeof(IReuse));
-        }
-
-        // todo: move closer to Reuse implementation in order to not forget it.
-        private static readonly Expression _transientReuseExpr = ReflectionTools.ToExpression(() => Reuse.Transient);
-        private static readonly Expression _singletonReuseExpr = ReflectionTools.ToExpression(() => Reuse.Singleton);
-        private static readonly Expression _inCurrentScopeReuseExpr = ReflectionTools.ToExpression(() => Reuse.InCurrentScope);
-        private static readonly Expression _inResolutionScopeReuseExpr = ReflectionTools.ToExpression(() => Reuse.InResolutionScope);
-    }
-
     /// <summary>Interface used to convert reuse instance to expression.</summary>
     public interface IConvertibleToExpression
     {
-        /// <summary>Returns expression representation.</summary> <returns>subj.</returns>
-        Expression Convert();
+        /// <summary>Returns expression representation without closure.</summary> 
+        /// <param name="fallbackConverter">Delegate converting of sub-items, constants to container.</param>
+        /// <returns>Expression representation.</returns>
+        Expression ToExpression(Func<object, Expression> fallbackConverter);
     }
 
     /// <summary>Used to represent multiple default service keys.
@@ -6488,14 +6443,12 @@ namespace DryIoc
             if (tracksTransientDisposable)
                 reuse = GetTransientDisposableTrackingReuse(request);
 
-            ThrowIfReuseHasShorterLifespanThanParent(request);
-
             if (reuse == DryIoc.Reuse.Transient)
                 return serviceExpr;
 
-            serviceExpr = ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
+            ThrowIfReuseHasShorterLifespanThanParent(request);
 
-            return serviceExpr;
+            return ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
         }
 
         /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access
@@ -8218,7 +8171,7 @@ namespace DryIoc
     // todo: v3: Replace old IReuse
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
     ///  and more powerful as can be based on other storage beside reuse.</summary>
-    public interface IReuseV3
+    public interface IReuseV3 : IConvertibleToExpression
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         int Lifespan { get; }
@@ -8251,6 +8204,15 @@ namespace DryIoc
         public bool CanApply(Request request)
         {
             return true;
+        }
+
+        private static readonly Expression _transientReuseExpr = 
+            ReflectionTools.ToExpression(() => Reuse.Transient);
+
+        /// <inheritdoc />
+        public Expression ToExpression(Func<object, Expression> fallbackConverter)
+        {
+            return _transientReuseExpr;
         }
 
         #region Obsolete
@@ -8316,6 +8278,17 @@ namespace DryIoc
             return true;
         }
 
+        private static readonly Expression _singletonReuseExpr = 
+            ReflectionTools.ToExpression(() => Reuse.Singleton);
+
+        /// <inheritdoc />
+        public Expression ToExpression(Func<object, Expression> fallbackConverter)
+        {
+            return _singletonReuseExpr;
+        }
+
+        #region Obsolete
+
         /// <summary>Returns container bound Singleton scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Container singleton scope.</returns>
@@ -8338,6 +8311,8 @@ namespace DryIoc
         {
             return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
         }
+
+        #endregion
 
         /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString()
@@ -8409,6 +8384,19 @@ namespace DryIoc
                 || request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
+        private static readonly Expression _inCurrentScopeReuseExpr = 
+            ReflectionTools.ToExpression(() => Reuse.InCurrentScope);
+
+        /// <inheritdoc />
+        public Expression ToExpression(Func<object, Expression> fallbackConverter)
+        {
+            return Name == null ? _inCurrentScopeReuseExpr
+                : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(), 
+                    fallbackConverter(Name));
+        }
+
+        #region Obsolete
+
         /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Found current scope or its parent.</returns>
@@ -8433,6 +8421,8 @@ namespace DryIoc
         {
             return Throw.For<int>(Error.Of("Obsolete"));
         }
+
+        #endregion
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -8489,6 +8479,23 @@ namespace DryIoc
             return GetScopeOrDefault(request) != null;
         }
 
+        private static readonly Expression _inResolutionScopeReuseExpr = 
+            ReflectionTools.ToExpression(() => Reuse.InResolutionScope);
+
+        /// <inheritdoc />
+        public Expression ToExpression(Func<object, Expression> fallbackConverter)
+        {
+            if (AssignableFromServiceType == null && ServiceKey == null && Outermost == false)
+                return _inResolutionScopeReuseExpr;
+
+            return Expression.Call(typeof(Reuse), "InResolutionScopeOf", ArrayTools.Empty<Type>(),
+                Expression.Constant(AssignableFromServiceType, typeof(Type)),
+                fallbackConverter(ServiceKey),
+                Expression.Constant(Outermost, typeof(bool)));
+        }
+
+        #region Obsolete
+
         /// <summary>Creates or returns already created resolution root scope.</summary>
         /// <param name="request">Request to get context information or for example store something in resolution state.</param>
         /// <returns>Created or existing scope.</returns>
@@ -8525,6 +8532,8 @@ namespace DryIoc
         {
             return factoryID;
         }
+
+        #endregion
 
         /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString()
