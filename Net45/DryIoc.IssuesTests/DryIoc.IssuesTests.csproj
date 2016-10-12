@@ -139,6 +139,7 @@
     <Compile Include="Issue333_Container_should_resolve_IEnumerable_instances_registered_without_serviceKey.cs" />
     <Compile Include="Issue339_GenericDecoratorWithConstraints.cs" />
     <Compile Include="Issue344_TransientDisposableValidation.cs" />
+    <Compile Include="Issue355_UnexpectedSingletonDisposal.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
