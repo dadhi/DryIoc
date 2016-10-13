@@ -1,5 +1,4 @@
-﻿using System;
-using System.ComponentModel.Composition;
+﻿using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -15,7 +14,7 @@ namespace DryIoc.IssuesTests
 
         private static IContainer CreateContainer()
         {
-            var c = new Container(rules => rules.WithDefaultRegistrationReuse(Reuse.InCurrentScope)).WithMefAttributedModel();
+            var c = new Container().WithMefAttributedModel();
 
             c.RegisterExports(new[] { typeof(Issue357_PartImportsSatisfied).GetAssembly() });
             return c;
