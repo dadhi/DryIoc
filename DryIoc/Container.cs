@@ -334,7 +334,7 @@ namespace DryIoc
             var setup = factory.Setup;
             if (setup.FactoryType != FactoryType.Wrapper)
             {
-                if ((factory.Reuse ?? Rules.DefaultRegistrationReuse) is TransientReuse &&
+                if ((factory.Reuse ?? Rules.DefaultReuseInsteadOfTransient) is TransientReuse &&
                     !factory.Setup.UseParentReuse &&
                     (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
                     !setup.AllowDisposableTransient && Rules.ThrowOnRegisteringDisposableTransient)
@@ -784,8 +784,8 @@ namespace DryIoc
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
-        /// <summary>The default <see cref="IReuse" />.</summary>
-        public IReuse DefaultReuse { get { return Rules.DefaultRegistrationReuse; } }
+        /// <summary>Shortcut to get the default container <see cref="IReuse" />.</summary>
+        IReuse IDefaultReuseProvider.DefaultReuse { get { return Rules.DefaultReuseInsteadOfTransient; } }
 
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed
@@ -1080,7 +1080,9 @@ namespace DryIoc
             var instanceType = instance.ThrowIfNull().GetType();
 
             var resolver = (IResolver)this;
-            var request = _emptyRequest.Push(instanceType).WithResolvedFactory(new InstanceFactory(instance, null, Setup.Default));
+            var request = _emptyRequest.Push(instanceType)
+                .WithResolvedFactory(new InstanceFactory(instance, null, Setup.Default));
+
             var requestInfo = request.RequestInfo;
 
             foreach (var serviceInfo in propertiesAndFields(request))
@@ -3112,26 +3114,16 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Obsolete: please use <see cref="DefaultRegistrationReuse"/> instead/</summary>
+        /// <summary>See <see cref="WithDefaultReuseInsteadOfTransient"/></summary>
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
-        /// <summary>Obsolete: please use <see cref="WithDefaultRegistrationReuse"/> instead/</summary>
-        public Rules WithDefaultReuseInsteadOfTransient(IReuse defaultReuseInsteadOfTransient)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.DefaultReuseInsteadOfTransient = defaultReuseInsteadOfTransient;
-            return newRules;
-        }
-
-        /// <summary><see cref="WithDefaultRegistrationReuse"/>.</summary>
-        public IReuse DefaultRegistrationReuse { get; private set; }
-
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
-        /// <param name="reuse">Reuse to set.</param> <returns>New rules.</returns>
-        public Rules WithDefaultRegistrationReuse(IReuse reuse)
+        /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param> 
+        /// <returns>New rules.</returns>
+        public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.DefaultRegistrationReuse = reuse.ThrowIfNull(Error.DefaultReuseShouldNotBeNull);
+            newRules.DefaultReuseInsteadOfTransient = reuse ?? Reuse.Transient;
             return newRules;
         }
 
@@ -3344,7 +3336,7 @@ namespace DryIoc
         {
             _made = Made.Default;
             _settings = DEFAULT_SETTINGS;
-            DefaultRegistrationReuse = Reuse.Transient;
+            DefaultReuseInsteadOfTransient = Reuse.Transient;
         }
 
         private Made _made;
@@ -5763,27 +5755,20 @@ namespace DryIoc
             if (reuse == null) // unspecified reuse
             {
                 if (factory.Setup.UseParentReuse)
-                {
                     reuse = GetParentOrFuncOrEmpty().Reuse;
-                }
                 else
                 {
                     var decoratorSetup = factory.Setup as Setup.DecoratorSetup;
                     if (decoratorSetup != null && decoratorSetup.UseDecorateeReuse)
-                    {
                         reuse = Reuse; // current reuse
-                    }
                 }
 
-                if (reuse == null) 
-                {
-                    // if no specified the warpper reuse is always Transient,
-                    // other container-wide default reuse is applied
+                // if no specified the wrapper reuse is always Transient,
+                // other container-wide default reuse is applied                
+                if (reuse == null)
                     reuse = factory.FactoryType == FactoryType.Wrapper
                         ? DryIoc.Reuse.Transient
-                        : (Container.Rules.DefaultReuseInsteadOfTransient 
-                        ?? Container.Rules.DefaultRegistrationReuse);
-                }
+                        : Container.Rules.DefaultReuseInsteadOfTransient;
             }
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
@@ -6436,7 +6421,7 @@ namespace DryIoc
             var tracksTransientDisposable =
                 reuse == DryIoc.Reuse.Transient &&
                 !Setup.PreventDisposal &&
-                (Setup.TrackDisposableTransient || 
+                (Setup.TrackDisposableTransient ||
                 !Setup.AllowDisposableTransient && request.Rules.TrackingDisposableTransients) &&
                 request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
 
@@ -8206,7 +8191,7 @@ namespace DryIoc
             return true;
         }
 
-        private static readonly Expression _transientReuseExpr = 
+        private static readonly Expression _transientReuseExpr =
             ReflectionTools.ToExpression(() => Reuse.Transient);
 
         /// <inheritdoc />
@@ -8278,7 +8263,7 @@ namespace DryIoc
             return true;
         }
 
-        private static readonly Expression _singletonReuseExpr = 
+        private static readonly Expression _singletonReuseExpr =
             ReflectionTools.ToExpression(() => Reuse.Singleton);
 
         /// <inheritdoc />
@@ -8384,14 +8369,14 @@ namespace DryIoc
                 || request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
-        private static readonly Expression _inCurrentScopeReuseExpr = 
+        private static readonly Expression _inCurrentScopeReuseExpr =
             ReflectionTools.ToExpression(() => Reuse.InCurrentScope);
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
             return Name == null ? _inCurrentScopeReuseExpr
-                : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(), 
+                : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(),
                     fallbackConverter(Name));
         }
 
@@ -8479,7 +8464,7 @@ namespace DryIoc
             return GetScopeOrDefault(request) != null;
         }
 
-        private static readonly Expression _inResolutionScopeReuseExpr = 
+        private static readonly Expression _inResolutionScopeReuseExpr =
             ReflectionTools.ToExpression(() => Reuse.InResolutionScope);
 
         /// <inheritdoc />
@@ -9525,9 +9510,7 @@ namespace DryIoc
                 "Unable to resolve LazyEnumerable service inside Func<args..> because arguments can't be passed through" +
                 " lazy boundaries: {0}"),
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
-                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
-            DefaultReuseShouldNotBeNull = Of(
-                "Default registration reuse should not be null.");
+                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
@@ -10374,12 +10357,31 @@ namespace DryIoc
         {
             var assemblyParamExpr = Expression.Parameter(typeof(Assembly), "a");
 
-            var definedTypeInfosProperty = typeof(Assembly).GetPropertyOrNull("DefinedTypes");
-            var getTypesExpr = definedTypeInfosProperty != null
-                ? (Expression)Expression.Property(assemblyParamExpr, definedTypeInfosProperty)
-                : Expression.Call(assemblyParamExpr, "GetTypes", ArrayTools.Empty<Type>(), ArrayTools.Empty<Expression>());
+            Expression typesExpr;
 
-            var resultFunc = Expression.Lambda<Func<Assembly, IEnumerable<Type>>>(getTypesExpr, assemblyParamExpr);
+            var definedTypeInfosProperty = typeof(Assembly).GetPropertyOrNull("DefinedTypes");
+            if (definedTypeInfosProperty == null)
+            {
+                typesExpr = Expression.Call(assemblyParamExpr, "GetTypes", ArrayTools.Empty<Type>(),
+                    ArrayTools.Empty<Expression>());
+            }
+            else
+            {
+                typesExpr = Expression.Property(assemblyParamExpr, definedTypeInfosProperty);
+                if (typesExpr.Type == typeof(IEnumerable<TypeInfo>))
+                {
+                    var typeInfoParamExpr = Expression.Parameter(typeof(TypeInfo), "typeInfo");
+                    typesExpr = Expression.Call(typeof(Enumerable),
+                        "Select", new[] {typeof(TypeInfo), typeof(Type)},
+                        typesExpr,
+                        Expression.Lambda<Func<TypeInfo, Type>>(
+                            Expression.Call(typeInfoParamExpr, "AsType",
+                                ArrayTools.Empty<Type>(), ArrayTools.Empty<Expression>()),
+                            typeInfoParamExpr));
+                }
+            }
+
+            var resultFunc = Expression.Lambda<Func<Assembly, IEnumerable<Type>>>(typesExpr, assemblyParamExpr);
             return resultFunc.Compile();
         }
 

@@ -10,9 +10,10 @@ namespace DryIoc.IssuesTests
         public void Container_with_default_reuse_set_to_singleton_shouldnt_complain_about_transient_disposable_registration()
         {
             var container = new Container().With(r =>
-                r.WithDefaultRegistrationReuse(Reuse.Singleton));
+                r.WithDefaultReuseInsteadOfTransient(Reuse.Singleton));
 
-            container.Register<IService, Service>();
+            Assert.DoesNotThrow(() => 
+            container.Register<IService, Service>());
         }
 
         interface IService : IDisposable { }

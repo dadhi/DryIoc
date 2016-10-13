@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,29 +28,25 @@ namespace System.ComponentModel.Composition
     /// <typeparam name="T">The contract type of the created parts.</typeparam>
     public class ExportFactory<T>
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ExportFactory{T}"/> class.
-        /// </summary>
+        /// <summary>Initializes a new instance of the <see cref="ExportFactory{T}"/> class.</summary>
         /// <param name="exportCreator">Action invoked upon calls to the Create() method.</param>
         public ExportFactory(Func<Tuple<T, Action>> exportCreator)
         {
             if (exportCreator == null)
-            {
                 throw new ArgumentNullException("exportCreator");
-            }
 
-            ExportLifetimeContextCreator = exportCreator;
+            _exportLifetimeContextCreator = exportCreator;
         }
-
-        private Func<Tuple<T, Action>> ExportLifetimeContextCreator { get; }
 
         /// <summary>Create an instance of the exported part.</summary>
         /// <returns>A handle allowing the created part to be accessed then released.</returns>
         public ExportLifetimeContext<T> CreateExport()
         {
-            var untypedLifetimeContext = ExportLifetimeContextCreator();
+            var untypedLifetimeContext = _exportLifetimeContextCreator();
             return new ExportLifetimeContext<T>(untypedLifetimeContext.Item1, untypedLifetimeContext.Item2);
         }
+
+        private readonly Func<Tuple<T, Action>> _exportLifetimeContextCreator;
     }
 
     /// <summary>A handle allowing the graph of parts associated with an exported instance to be released.</summary>
@@ -63,22 +59,19 @@ namespace System.ComponentModel.Composition
         public ExportLifetimeContext(T value, Action disposeAction)
         {
             Value = value;
-            DisposeAction = disposeAction;
+            _disposeAction = disposeAction;
         }
 
-        /// <summary>
-        /// The exported value.
-        /// </summary>
-        public T Value { get; }
+        /// <summary>The exported value.</summary>
+        public T Value { get; private set; }
 
-        private Action DisposeAction { get; }
-
-        /// <summary>
-        /// Release the parts associated with the exported value.
-        /// </summary>
+        /// <summary>Release the parts associated with the exported value.</summary>
         public void Dispose()
         {
-            DisposeAction?.Invoke();
+            if (_disposeAction != null)
+                _disposeAction.Invoke();
         }
+
+        private readonly Action _disposeAction;
     }
 }

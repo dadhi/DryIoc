@@ -48,13 +48,24 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
         /// <returns>New rules with attributed model rules.</returns>
-        public static Rules WithImports(this Rules rules)
+        public static Rules WithMefRules(this Rules rules)
         {
             return rules.WithMefAttributedModel();
         }
 
-        // todo: V3: Rename to WithImports and make the original method an obsolete.
-        /// <summary>Obsolete: replaced with more on point <see cref="WithImports"/>.</summary>
+        /// <summary>Appends attributed model rules to passed container.</summary>
+        /// <param name="container">Source container to apply attributed model importing rules to.</param>
+        /// <returns>Returns new container with new rules.</returns>
+        public static IContainer WithMef(this IContainer container)
+        {
+            return container
+                .With(WithMefRules)
+                .WithExportFactoryWrapper()
+                .WithImportsSatisfiedNotification();
+        }
+
+        // todo: V3: remove
+        /// <summary>Obsolete: replaced with more on point <see cref="WithMefRules"/>.</summary>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
             var importsMadeOf = Made.Of(
@@ -63,17 +74,16 @@ namespace DryIoc.MefAttributedModel
 
             // hello, Max!!! we are Martians.
             return rules.With(importsMadeOf)
-                .WithDefaultRegistrationReuse(Reuse.Singleton)
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
                 .WithTrackingDisposableTransients();
         }
 
-        /// <summary>Appends attributed model rules to passed container.</summary>
-        /// <param name="container">Source container to apply attributed model importing rules to.</param>
-        /// <returns>Returns new container with new rules.</returns>
+        // todo: V3: remove
+        /// <summary>Obsolete: replaced with more on point <see cref="WithMef"/>.</summary>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
             return container
-                .With(WithImports)
+                .With(WithMefRules)
                 .WithExportFactoryWrapper()
                 .WithImportsSatisfiedNotification();
         }
@@ -111,13 +121,6 @@ namespace DryIoc.MefAttributedModel
         /// <param name="container">The container.</param>
         internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
         {
-            // problem: this code doesn't release the dependencies
-            //return new ExportFactory<T>(() =>
-            //{
-            //    var it = factory();
-            //    return Tuple.Create(it, new Action(() => (it as IDisposable)?.Dispose()));
-            //});
-
             return new ExportFactory<T>(() =>
             {
                 var scope = container.OpenScope();
@@ -499,7 +502,7 @@ namespace DryIoc.MefAttributedModel
                 var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
 
-                var defaultReuse = request.Rules.DefaultRegistrationReuse;
+                var defaultReuse = request.Rules.DefaultReuseInsteadOfTransient;
                 var reuse = GetReuse(reuseType, reuseName, defaultReuse);
 
                 var impl = import.ConstructorSignature == null ? null

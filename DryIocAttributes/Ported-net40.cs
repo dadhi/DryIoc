@@ -22,6 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using System.Collections;
+using System.Text;
+
 namespace System.ComponentModel.Composition
 {
     /// <summary>Specifies to register annotated type in container.
@@ -166,7 +169,7 @@ namespace System.ComponentModel.Composition
 
     /// <summary>Specifies that a property, field, or parameter should be populated with all
     /// matching exports by the <see cref="T:System.ComponentModel.Composition.Hosting.CompositionContainer" /> object.</summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
     public class ImportManyAttribute : Attribute
     {
         /// <summary>Gets the contract name of the exports to import.</summary>
@@ -193,7 +196,7 @@ namespace System.ComponentModel.Composition
         /// <summary>Initializes a new instance of the <see cref="T:System.ComponentModel.Composition.ImportManyAttribute" /> class, importing the set of exports with the specified contract name.</summary>
         /// <param name="contractName">The contract name of the exports to import, or null or an empty string ("") to use the default contract name.</param>
         public ImportManyAttribute(string contractName)
-          : this(contractName, (Type)null)
+          : this(contractName, null)
         {
         }
 
@@ -241,5 +244,94 @@ namespace System.ComponentModel.Composition
     {
         /// <summary>Called when a part's imports have been satisfied and it is safe to use.</summary>
         void OnImportsSatisfied();
+    }
+}
+
+namespace System
+{
+    /// <summary>Common properties of all tuples.</summary>
+    public interface ITuple
+    {
+        /// <summary>Gets number of components in tuple.</summary>
+        int Size { get; }
+
+        /// <summary>Appends string representation of tuple components to passed string builder.</summary>
+        /// <param name="sb">String builder to append to.</param> <returns>String builder with appended tuple.</returns>
+        string ToString(StringBuilder sb);
+
+        /// <summary> Returns the hash code for tuple object combining component's hash codes. </summary>
+        /// <param name="comparer"></param> <returns>Hash code.</returns>
+        int GetHashCode(IEqualityComparer comparer);
+    }
+
+    /// <summary>Contains utility methods for creating and working with tuple.</summary>
+    public static class Tuple
+    {
+        /// <summary>Creates a new 2-tuple, or pair. </summary>
+        ///  <returns> A 2-tuple whose value is (<paramref name="item1"/>, <paramref name="item2"/>). </returns>
+        /// <param name="item1">The value of the first component of the tuple.</param><param name="item2">The value of the second component of the tuple.</param><typeparam name="T1">The type of the first component of the tuple.</typeparam><typeparam name="T2">The type of the second component of the tuple.</typeparam>
+        public static Tuple<T1, T2> Create<T1, T2>(T1 item1, T2 item2)
+        {
+            return new Tuple<T1, T2>(item1, item2);
+        }
+    }
+
+    /// <summary>Represents a 2-tuple, or pair. </summary>
+    /// <typeparam name="T1">The type of the tuple's first component.</typeparam><typeparam name="T2">The type of the tuple's second component.</typeparam><filterpriority>2</filterpriority>
+    public sealed class Tuple<T1, T2> : ITuple
+    {
+        private readonly T1 _item1;
+        private readonly T2 _item2;
+
+        /// <summary> Gets the value of the first component.</summary>
+        public T1 Item1 { get { return _item1; } }
+
+        /// <summary> Gets the value of the current second component. </summary>
+        public T2 Item2 { get { return _item2; } }
+
+        int ITuple.Size { get { return 2; } }
+
+        /// <summary>Initializes a new instance of the <see cref="T:System.Tuple`2"/> class.</summary>
+        /// <param name="item1">The value of the tuple's first component.</param><param name="item2">The value of the tuple's second component.</param>
+        public Tuple(T1 item1, T2 item2)
+        {
+            _item1 = item1;
+            _item2 = item2;
+        }
+
+        /// <summary> Returns a value that indicates whether the current <see cref="T:System.Tuple`2"/> object is equal to a specified object.</summary>
+        /// <param name="obj">The object to compare with this instance.</param>
+        /// <returns> true if the current instance is equal to the specified object; otherwise, false. </returns>
+        public override bool Equals(object obj)
+        {
+            var other = obj as Tuple<T1, T2>;
+            return other != null && Equals(other.Item1, Item1) && Equals(other.Item2, Item2);
+        }
+
+        /// <summary> Returns the hash code for the current <see cref="T:System.Tuple`2"/> object. </summary>
+        /// <returns> A 32-bit signed integer hash code.</returns>
+        public override int GetHashCode()
+        {
+            var h1 = _item1 == null ? 0 : _item1.GetHashCode();
+            var h2 = _item2 == null ? 0 : _item2.GetHashCode();
+            return (h1 << 5) + h1 ^ h2;
+        }
+
+        int ITuple.GetHashCode(IEqualityComparer ignored)
+        {
+            return GetHashCode();
+        }
+
+        /// <summary> Returns a string that represents the value of this <see cref="T:System.Tuple`2"/> instance. </summary>
+        /// <returns> The string representation of this <see cref="T:System.Tuple`2"/> object. </returns>
+        public override string ToString()
+        {
+            return ((ITuple)this).ToString(new StringBuilder().Append("("));
+        }
+
+        string ITuple.ToString(StringBuilder sb)
+        {
+            return sb.Append(_item1).Append(", ").Append(_item2).Append(")").ToString();
+        }
     }
 }

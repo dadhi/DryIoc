@@ -1,10 +1,8 @@
-﻿using System;
-using System.ComponentModel.Composition;
+﻿using System.ComponentModel.Composition;
 using System.ComponentModel.Composition.Hosting;
 using System.ComponentModel.Composition.Primitives;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
-using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests
@@ -19,10 +17,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
         private static IContainer CreateContainer()
         {
             // set up the Container to work like Mef without changing the composable parts
-            var container = new Container()
-                .With(r => r.WithMefAttributedModel()
-                    .WithDefaultRegistrationReuse(Reuse.InCurrentScope)
-                    .WithTrackingDisposableTransients()); // BTW, it shouldn't be needed because the default Reuse is not Transient
+            var container = new Container().With(rules => rules
+                .WithMefRules()
+                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
 
             container.RegisterExports(new[] { typeof(ILogTableManager).GetAssembly() });
             return container;
