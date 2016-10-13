@@ -110,19 +110,12 @@ namespace DryIoc.MefAttributedModel
         /// <param name="container">The container.</param>
         internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
         {
-            // problem: this code doesn't release the dependencies
-            //return new ExportFactory<T>(() =>
-            //{
-            //    var it = factory();
-            //    return Tuple.Create(it, new Action(() => (it as IDisposable)?.Dispose()));
-            //});
-
             return new ExportFactory<T>(() =>
             {
                 var scope = container.OpenScope();
                 try
                 {
-                    var it = container.Resolve<T>();
+                    var it = scope.Resolve<T>();
                     return TupleCreator.Create(it, new Action(scope.Dispose));
                 }
                 catch
