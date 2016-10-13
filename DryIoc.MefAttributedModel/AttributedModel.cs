@@ -126,7 +126,7 @@ namespace DryIoc.MefAttributedModel
                 var scope = container.OpenScope();
                 try
                 {
-                    var it = container.Resolve<T>();
+                    var it = scope.Resolve<T>();
                     return TupleCreator.Create(it, new Action(scope.Dispose));
                 }
                 catch
@@ -145,9 +145,8 @@ namespace DryIoc.MefAttributedModel
         #region IPartImportsSatisfiedNotification support
 
         internal static TService NotifyImportsSatisfied<TService>(TService service)
-            where TService : IPartImportsSatisfiedNotification
         {
-            service.OnImportsSatisfied();
+            (service as IPartImportsSatisfiedNotification)?.OnImportsSatisfied();
             return service;
         }
 

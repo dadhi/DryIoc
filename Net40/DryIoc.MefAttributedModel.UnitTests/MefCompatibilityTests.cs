@@ -223,7 +223,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             }
 
             Assert.IsTrue(nonSharedDependency.IsDisposed);
-            if (System.DateTime.Now.Year > 2000) return;
 
             var nonSharedService = default(NonSharedService);
             using (var export = service.Factory.CreateExport())
