@@ -3161,7 +3161,7 @@ namespace DryIoc
         public Rules WithoutThrowIfDependencyHasShorterReuseLifespan()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings ^= Settings.ThrowIfDependencyHasShorterReuseLifespan;
+            newRules._settings &= ~Settings.ThrowIfDependencyHasShorterReuseLifespan;
             return newRules;
         }
 
@@ -3179,7 +3179,7 @@ namespace DryIoc
         public Rules WithoutThrowOnRegisteringDisposableTransient()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings ^= Settings.ThrowOnRegisteringDisposableTransient;
+            newRules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
             return newRules;
         }
 
@@ -3204,8 +3204,8 @@ namespace DryIoc
         public Rules WithTrackingDisposableTransients()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.TrackingDisposableTransients;
-            newRules._settings ^= Settings.ThrowOnRegisteringDisposableTransient;
+            newRules._settings |= Settings.TrackingDisposableTransients; // turning On
+            newRules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient; // turning Off
             return newRules;
         }
 
@@ -3220,7 +3220,7 @@ namespace DryIoc
         public Rules WithoutEagerCachingSingletonForFasterAccess()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings ^= Settings.EagerCachingSingletonForFasterAccess;
+            newRules._settings &= ~Settings.EagerCachingSingletonForFasterAccess;
             return newRules;
         }
 
@@ -3249,7 +3249,7 @@ namespace DryIoc
         public Rules WithoutImplicitCheckForReuseMatchingScope()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings ^= Settings.ImplicitCheckForReuseMatchingScope;
+            newRules._settings &= ~Settings.ImplicitCheckForReuseMatchingScope;
             return newRules;
         }
 
@@ -3279,7 +3279,7 @@ namespace DryIoc
         public Rules WithoutVariantGenericTypesInResolvedCollection()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings ^= Settings.VariantGenericTypesInResolvedCollection;
+            newRules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
             return newRules;
         }
 

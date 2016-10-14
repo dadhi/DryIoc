@@ -18,7 +18,7 @@ namespace DryIoc.IssuesTests
                 container.Register<IService, Service>());
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Container_with_Mef_support_with_tracking_disposable_transients_shouldnt_complain_about_transient_disposable_registration()
         {
             var container = new Container().WithMef()
