@@ -111,6 +111,7 @@
     <Compile Include="ContainerHierarchyTests.cs" />
     <Compile Include="GenerateFactoryDelegateTests.cs" />
     <Compile Include="ImportMetadataTests.cs" />
+    <Compile Include="MefExportFactoryTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">

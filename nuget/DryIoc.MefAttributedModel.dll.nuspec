@@ -25,11 +25,11 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.7,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.8,3.0)" />
             <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
           </group>
           <group targetFramework="netstandard1.0">
-            <dependency id="DryIoc.dll" version="[2.7,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.8,3.0)" />
             <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
 
             <dependency id="System.Collections" version="4.0.11" />

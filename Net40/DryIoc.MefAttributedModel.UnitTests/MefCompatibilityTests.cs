@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.Composition;
-using System.ComponentModel.Composition.Hosting;
+﻿using System.ComponentModel.Composition.Hosting;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
@@ -15,7 +14,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         private static IContainer CreateContainer()
         {
-            var container = new Container(r => r.WithDefaultRegistrationReuse(Reuse.InCurrentScope)).WithMefAttributedModel();
+            var container = new Container().WithMef();
+
             container.RegisterExports(new[] { typeof(ILogTableManager).GetAssembly() });
             return container;
         }
@@ -108,77 +108,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(service);
             Assert.IsNotNull(service.Value);
             Assert.IsTrue(service.Value.DefaultConstructorIsUsed);
-        }
-
-        [Test]
-        public void Mef_supports_ExportFactory_for_non_shared_parts()
-        {
-            var mef = Mef;
-            var service = mef.GetExport<UsesExportFactoryOfNonSharedService>();
-
-            Assert.IsNotNull(service);
-            Assert.IsNotNull(service.Value);
-            Assert.IsNotNull(service.Value.Factory);
-
-            var nonSharedService = default(NonSharedService);
-            using (var export = service.Value.Factory.CreateExport())
-            {
-                nonSharedService = export.Value;
-                Assert.IsNotNull(nonSharedService);
-                Assert.IsFalse(nonSharedService.IsDisposed);
-
-                Assert.IsNotNull(nonSharedService.NonSharedDependency);
-                Assert.IsFalse(nonSharedService.NonSharedDependency.IsDisposed);
-
-                Assert.IsNotNull(nonSharedService.SharedDependency);
-                Assert.IsFalse(nonSharedService.SharedDependency.IsDisposed);
-            }
-
-            Assert.IsTrue(nonSharedService.IsDisposed);
-            Assert.IsTrue(nonSharedService.NonSharedDependency.IsDisposed);
-            Assert.IsFalse(nonSharedService.SharedDependency.IsDisposed);
-
-            mef.Dispose();
-            Assert.IsTrue(nonSharedService.IsDisposed);
-            Assert.IsTrue(nonSharedService.NonSharedDependency.IsDisposed);
-            Assert.IsTrue(nonSharedService.SharedDependency.IsDisposed);
-        }
-
-        [Test, ExpectedException(typeof(ImportCardinalityMismatchException))]
-        public void Mef_doesnt_support_ExportFactory_for_shared_parts()
-        {
-            var mef = Mef;
-
-            // throws an exception
-            var service = mef.GetExport<UsesExportFactoryOfSharedService>();
-
-            // this code would work if Mef supported ExportFactory for singletons
-            Assert.IsNotNull(service);
-            Assert.IsNotNull(service.Value);
-            Assert.IsNotNull(service.Value.Factory);
-
-            var sharedService = default(SharedService);
-            using (var export = service.Value.Factory.CreateExport())
-            {
-                sharedService = export.Value;
-                Assert.IsNotNull(sharedService);
-                Assert.IsFalse(sharedService.IsDisposed);
-
-                Assert.IsNotNull(sharedService.NonSharedDependency);
-                Assert.IsFalse(sharedService.NonSharedDependency.IsDisposed);
-
-                Assert.IsNotNull(sharedService.SharedDependency);
-                Assert.IsFalse(sharedService.SharedDependency.IsDisposed);
-            }
-
-            Assert.IsFalse(sharedService.IsDisposed);
-            Assert.IsFalse(sharedService.NonSharedDependency.IsDisposed);
-            Assert.IsFalse(sharedService.SharedDependency.IsDisposed);
-
-            mef.Dispose();
-            Assert.IsTrue(sharedService.IsDisposed);
-            Assert.IsTrue(sharedService.NonSharedDependency.IsDisposed);
-            Assert.IsTrue(sharedService.SharedDependency.IsDisposed);
         }
 
         [Test]
@@ -294,7 +223,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             }
 
             Assert.IsTrue(nonSharedDependency.IsDisposed);
-            if (System.DateTime.Now.Year > 2000) return;
 
             var nonSharedService = default(NonSharedService);
             using (var export = service.Factory.CreateExport())

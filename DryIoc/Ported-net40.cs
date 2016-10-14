@@ -175,7 +175,7 @@ namespace System
 
     /// <summary>Represents a 2-tuple, or pair. </summary>
     /// <typeparam name="T1">The type of the tuple's first component.</typeparam><typeparam name="T2">The type of the tuple's second component.</typeparam><filterpriority>2</filterpriority>
-    public sealed class Tuple<T1, T2> : ITuple
+    public sealed class Tuple<T1, T2>: ITuple
     {
         private readonly T1 _item1;
         private readonly T2 _item2;
