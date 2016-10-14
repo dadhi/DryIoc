@@ -37,6 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Attributes.cs" />
+    <Compile Include="Ported-LazyMetadata.cs" />
     <Compile Include="Ported-net40.cs" />
     <Compile Include="Ported-net45.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

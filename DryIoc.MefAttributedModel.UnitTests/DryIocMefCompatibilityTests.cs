@@ -176,5 +176,21 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(sharedService.NonSharedDependency.IsDisposed);
             Assert.IsTrue(sharedService.SharedDependency.IsDisposed);
         }
+
+        [Test, Ignore("fails: Lazy<T, TMetadata> is not implemented")]
+        public void DryIoc_can_import_many_lazy_services_with_metadata()
+        {
+            var service = Container.Resolve<ImportLazyNamedServices>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.LazyNamedServices);
+
+            var services = service.LazyNamedServices.OrderBy(l => l.Metadata.Name).ToArray();
+            Assert.AreEqual(2, services.Length);
+            Assert.AreEqual("One", services[0].Metadata.Name);
+            Assert.AreEqual("Two", services[1].Metadata.Name);
+            Assert.IsNotNull(services[0].Value);
+            Assert.IsNotNull(services[1].Value);
+        }
     }
 }

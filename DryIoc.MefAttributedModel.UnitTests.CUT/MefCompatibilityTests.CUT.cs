@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
@@ -263,5 +265,33 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         [Import]
         public ExportFactory<SharedService> Factory { get; set; }
+    }
+
+    public interface ILazyMetadata { string Name { get; } }
+
+    [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class LazyMetadataAttribute : Attribute, ILazyMetadata
+    {
+        public LazyMetadataAttribute(string name)
+        {
+            Name = name;
+        }
+
+        public string Name { get; }
+    }
+
+    public interface ILazyNamedService { }
+
+    [Export(typeof(ILazyNamedService)), LazyMetadata("One")]
+    public class LazyNamedService1 : ILazyNamedService { }
+
+    [Export(typeof(ILazyNamedService)), LazyMetadata("Two")]
+    public class LazyNamedService2 : ILazyNamedService { }
+
+    [Export]
+    public class ImportLazyNamedServices
+    {
+        [ImportMany]
+        public IEnumerable<Lazy<ILazyNamedService, ILazyMetadata>> LazyNamedServices { get; set; }
     }
 }

@@ -109,5 +109,22 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(service.Value);
             Assert.IsTrue(service.Value.DefaultConstructorIsUsed);
         }
+
+        [Test]
+        public void Mef_can_import_many_lazy_services_with_metadata()
+        {
+            var service = Mef.GetExport<ImportLazyNamedServices>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.Value);
+            Assert.IsNotNull(service.Value.LazyNamedServices);
+
+            var services = service.Value.LazyNamedServices.OrderBy(l => l.Metadata.Name).ToArray();
+            Assert.AreEqual(2, services.Length);
+            Assert.AreEqual("One", services[0].Metadata.Name);
+            Assert.AreEqual("Two", services[1].Metadata.Name);
+            Assert.IsNotNull(services[0].Value);
+            Assert.IsNotNull(services[1].Value);
+        }
     }
 }

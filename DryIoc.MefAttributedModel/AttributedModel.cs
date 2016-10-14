@@ -114,7 +114,7 @@ namespace DryIoc.MefAttributedModel
 
         #region ExportFactory<T> support
 
-        /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>. 
+        /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
         /// Required to cover for missing Tuple in .NET 4.0 and lower.
         /// Provides implicit conversion in both <see cref="KeyValuePair{TKey,TValue}"/> and <see cref="Tuple{T1,T2}"/>.</summary>
         /// <typeparam name="TPart">Type of created part.</typeparam>
@@ -147,7 +147,7 @@ namespace DryIoc.MefAttributedModel
             }
         }
 
-        /// <summary> Creates the <see cref="ExportFactory{T}"/>.</summary>
+        /// <summary>Creates the <see cref="ExportFactory{T}"/>.</summary>
         /// <typeparam name="T">The type of the exported service</typeparam>
         /// <param name="container">The container.</param>
         internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
