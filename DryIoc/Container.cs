@@ -36,7 +36,7 @@ namespace DryIoc
     using System.Runtime.CompilerServices;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
-    public sealed partial class Container : IContainer, IScopeAccess, IDefaultReuseProvider
+    public sealed partial class Container : IContainer, IScopeAccess
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
         public Container() : this(Rules.Default, Ref.Of(Registry.Default), new SingletonScope())
@@ -784,9 +784,6 @@ namespace DryIoc
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
-        /// <summary>Shortcut to get the default container <see cref="IReuse" />.</summary>
-        IReuse IDefaultReuseProvider.DefaultReuse { get { return Rules.DefaultReuseInsteadOfTransient; } }
-
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed
         {
@@ -1081,7 +1078,7 @@ namespace DryIoc
 
             var resolver = (IResolver)this;
             var request = _emptyRequest.Push(instanceType)
-                .WithResolvedFactory(new InstanceFactory(instance, null, Setup.Default));
+                .WithResolvedFactory(new UsedInstanceFactory(instanceType));
 
             var requestInfo = request.RequestInfo;
 
@@ -1381,6 +1378,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             var scope = _openedScope ?? _singletonScope;
+            var instanceType = instance == null ? typeof(object) : instance.GetType();
 
             _registry.Swap(r =>
             {
@@ -1388,7 +1386,7 @@ namespace DryIoc
                 var entry = r.Services.GetValueOrDefault(serviceType);
                 if (entry == null)
                 {
-                    newInstanceFactory = new UsedInstanceFactory();
+                    newInstanceFactory = new UsedInstanceFactory(instanceType);
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     var servicesWithFactory = serviceKey == null
@@ -1414,7 +1412,7 @@ namespace DryIoc
                     }
 
                     // otherwise register a new factory
-                    newInstanceFactory = new UsedInstanceFactory();
+                    newInstanceFactory = new UsedInstanceFactory(instanceType);
                     scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
 
                     return r.WithServices(r.Services.AddOrUpdate(serviceType,
@@ -1456,7 +1454,7 @@ namespace DryIoc
                     }
                 }
 
-                newInstanceFactory = new UsedInstanceFactory();
+                newInstanceFactory = new UsedInstanceFactory(instanceType);
                 scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
                 return r.WithServices(r.Services.AddOrUpdate(serviceType,
                     factoriesEntry.With(newInstanceFactory, serviceKey)));
@@ -1466,6 +1464,14 @@ namespace DryIoc
         // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
         internal sealed class UsedInstanceFactory : Factory
         {
+            public override Type ImplementationType { get { return _instanceType;  } }
+            private Type _instanceType;
+
+            public UsedInstanceFactory(Type instanceType)
+            {
+                _instanceType = instanceType;
+            }
+
             /// <summary>Called for Resolution call/root.</summary>
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
@@ -7512,7 +7518,8 @@ namespace DryIoc
         private readonly Func<Request, Expression> _getServiceExpression;
     }
 
-    /// <summary>Factory representing external service object registered with <see cref="Registrator.RegisterInstance"/>.</summary>
+    // todo: v3: Remove
+    /// <summary>Obsolete: replaced with UsedInstanceFactory.</summary>
     public sealed class InstanceFactory : Factory
     {
         private object _instance;
@@ -9041,13 +9048,6 @@ namespace DryIoc
         /// <param name="factoryType">Expected factory type.</param>
         /// <param name="condition">Expected factory condition.</param>
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
-    }
-
-    /// <summary>Provides access to DefaultReuse.</summary>
-    public interface IDefaultReuseProvider
-    {
-        /// <summary>The default <see cref="IReuse"/>.</summary>
-        IReuse DefaultReuse { get; }
     }
 
     /// <summary>Provides access to scopes.</summary>

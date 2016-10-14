@@ -203,10 +203,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="info">Registration information provided.</param>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
-            var defaultReuseProvider = registrator as IDefaultReuseProvider;
-            var defaultReuse = defaultReuseProvider == null ? null : defaultReuseProvider.DefaultReuse;
-
-            var factory = info.CreateFactory(defaultReuse);
+            var factory = info.CreateFactory();
 
             var exports = info.Exports;
             for (var i = 0; i < exports.Length; i++)
@@ -328,25 +325,18 @@ namespace DryIoc.MefAttributedModel
             return !(type.IsValueType() || type.IsInterface() || type.IsCompilerGenerated());
         }
 
-        #region Tools
-
         /// <summary>Returns reuse object by mapping provided type to <see cref="SupportedReuseTypes"/>.
         /// Returns null (transient or no reuse) if null provided reuse type.</summary>
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
-        /// <param name="defaultReuse">(optional) Default reuse used when reuseType is not specified.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(ReuseType? reuseType, object reuseName = null, IReuse defaultReuse = null)
+        public static IReuse GetReuse(ReuseType? reuseType, object reuseName = null)
         {
-            if (!reuseType.HasValue)
-                return defaultReuse;
-
-            return SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
+            return !reuseType.HasValue ? null // unspecified reuse, decided by container rules
+                : SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
                     .ThrowIfNull(Error.UnsupportedReuseType, reuseType.Value)
                     .Invoke(reuseName);
         }
-
-        #endregion
 
         #region Rules
 
@@ -501,8 +491,7 @@ namespace DryIoc.MefAttributedModel
                 var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
 
-                var defaultReuse = request.Rules.DefaultReuseInsteadOfTransient;
-                var reuse = GetReuse(reuseType, reuseName, defaultReuse);
+                var reuse = GetReuse(reuseType, reuseName);
 
                 var impl = import.ConstructorSignature == null ? null
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
@@ -1026,9 +1015,8 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Creates factory out of registration info.</summary>
-        /// <param name="defaultReuse">(optional) Default reuse used when reuseType is not specified.</param>
         /// <returns>Created factory.</returns>
-        public ReflectionFactory CreateFactory(IReuse defaultReuse = null)
+        public ReflectionFactory CreateFactory()
         {
             Made made = null;
             if (FactoryMethodInfo != null)
@@ -1043,7 +1031,7 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var reuse = AttributedModel.GetReuse(Reuse, ReuseName, defaultReuse);
+            var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
         }
