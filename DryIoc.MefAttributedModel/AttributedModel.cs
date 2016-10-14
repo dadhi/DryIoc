@@ -60,7 +60,7 @@ namespace DryIoc.MefAttributedModel
         {
             return container
                 .With(WithMefRules)
-                .WithExportFactoryWrapper()
+                .WithMefSpecificWrappers()
                 .WithImportsSatisfiedNotification();
         }
 
@@ -84,7 +84,7 @@ namespace DryIoc.MefAttributedModel
         {
             return container
                 .With(WithMefRules)
-                .WithExportFactoryWrapper()
+                .WithMefSpecificWrappers()
                 .WithImportsSatisfiedNotification();
         }
 
@@ -104,15 +104,20 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers <see cref="ExportFactory{T}"/> wrapper into the container.</summary>
         /// <param name="container">Container to support.</param>
         /// <returns>The container with registration.</returns>
-        public static IContainer WithExportFactoryWrapper(this IContainer container)
+        public static IContainer WithMefSpecificWrappers(this IContainer container)
         {
             container.Register(typeof(ExportFactory<>),
                 made: _createExportFactoryMethod,
                 setup: Setup.Wrapper);
+
+            container.Register(typeof(Lazy<,>),
+                made: _createLazyWithMetadataMethod,
+                setup: Setup.WrapperWith(0));
+
             return container;
         }
 
-        #region ExportFactory<T> support
+        #region ExportFactory<T> and Lazy<T, TMetadata> support
 
         /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
         /// Required to cover for missing Tuple in .NET 4.0 and lower.
@@ -170,6 +175,18 @@ namespace DryIoc.MefAttributedModel
 
         private static readonly Made _createExportFactoryMethod = Made.Of(
             typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true));
+
+        /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
+        /// <typeparam name="T">The type of the exported service.</typeparam>
+        /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
+        /// <param name="metaFactory">The factory with the service metadata.</param>
+        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Func<T>, TMetadata> metaFactory)
+        {
+            return new Lazy<T, TMetadata>(metaFactory.Value, metaFactory.Metadata);
+        }
+
+        private static readonly Made _createLazyWithMetadataMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateLazyWithMetadata", includeNonPublic: true));
 
         #endregion
 

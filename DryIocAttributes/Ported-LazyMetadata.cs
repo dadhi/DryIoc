@@ -30,14 +30,6 @@ namespace System
     public class Lazy<T, TMetadata> // : Lazy<T> is defined in DryIoc
     {
         /// <summary>Initializes a new instance of the <see cref="Lazy{T, TMetadata}"/> class.</summary>
-        /// <param name="metadata">The metadata.</param>
-        public Lazy(TMetadata metadata)
-        {
-            _valueFactory = new Func<T>(() => default(T));
-            Metadata = metadata;
-        }
-
-        /// <summary>Initializes a new instance of the <see cref="Lazy{T, TMetadata}"/> class.</summary>
         /// <param name="valueFactory">The value factory.</param>
         /// <param name="metadata">The metadata.</param>
         /// <exception cref="System.ArgumentNullException">valueFactory</exception>

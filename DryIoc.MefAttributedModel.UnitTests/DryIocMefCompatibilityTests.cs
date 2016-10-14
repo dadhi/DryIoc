@@ -177,7 +177,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(sharedService.SharedDependency.IsDisposed);
         }
 
-        [Test, Ignore("fails: Lazy<T, TMetadata> is not implemented")]
+        [Test]
         public void DryIoc_can_import_many_lazy_services_with_metadata()
         {
             var service = Container.Resolve<ImportLazyNamedServices>();
