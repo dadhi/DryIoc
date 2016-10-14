@@ -73,6 +73,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\InheritedExportTests.CUT.cs">
       <Link>InheritedExportTests.CUT.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\MefCompatibilityTests.CUT.cs">
+      <Link>MefCompatibilityTests.CUT.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>

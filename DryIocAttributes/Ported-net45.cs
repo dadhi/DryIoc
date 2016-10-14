@@ -30,11 +30,10 @@ namespace System.ComponentModel.Composition
     {
         /// <summary>Initializes a new instance of the <see cref="ExportFactory{T}"/> class.</summary>
         /// <param name="exportCreator">Action invoked upon calls to the Create() method.</param>
-        public ExportFactory(Func<Tuple<T, Action>> exportCreator)
+        public ExportFactory(Func<Collections.Generic.KeyValuePair<T, Action>> exportCreator)
         {
             if (exportCreator == null)
                 throw new ArgumentNullException("exportCreator");
-
             _exportLifetimeContextCreator = exportCreator;
         }
 
@@ -42,11 +41,11 @@ namespace System.ComponentModel.Composition
         /// <returns>A handle allowing the created part to be accessed then released.</returns>
         public ExportLifetimeContext<T> CreateExport()
         {
-            var untypedLifetimeContext = _exportLifetimeContextCreator();
-            return new ExportLifetimeContext<T>(untypedLifetimeContext.Item1, untypedLifetimeContext.Item2);
+            var partAndDisposeAction = _exportLifetimeContextCreator();
+            return new ExportLifetimeContext<T>(partAndDisposeAction.Key, partAndDisposeAction.Value);
         }
 
-        private readonly Func<Tuple<T, Action>> _exportLifetimeContextCreator;
+        private readonly Func<Collections.Generic.KeyValuePair<T, Action>> _exportLifetimeContextCreator;
     }
 
     /// <summary>A handle allowing the graph of parts associated with an exported instance to be released.</summary>

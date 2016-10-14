@@ -45,6 +45,7 @@
     <Compile Include="AttributedModelTests.cs" />
     <Compile Include="AttributedModelTestsBase.cs" />
     <Compile Include="CodeGenerationTests.cs" />
+    <Compile Include="DryIocMefCompatibilityTests.cs" />
     <Compile Include="ExportFactoryTests.cs" />
     <Compile Include="ExportManyTests.cs" />
     <Compile Include="ExportAsDecoratorTests.cs" />

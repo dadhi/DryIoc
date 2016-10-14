@@ -54,6 +54,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\CodeGenerationTests.cs">
       <Link>CodeGenerationTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\DryIocMefCompatibilityTests.cs">
+      <Link>DryIocMefCompatibilityTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsDecoratorTests.cs">
       <Link>ExportAsDecoratorTests.cs</Link>
     </Compile>

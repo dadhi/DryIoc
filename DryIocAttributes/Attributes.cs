@@ -727,21 +727,4 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class AsResolutionRootAttribute : Attribute { }
-
-    /// <summary>Provides static methods for creating tuple objects (works around the dependency problems).</summary>
-    public static class TupleCreator
-    {
-        /// <summary>
-        /// Creates a new 2-tuple, or pair.
-        /// </summary>
-        /// <typeparam name="T1">The type of the first component.</typeparam>
-        /// <typeparam name="T2">The type of the second component.</typeparam>
-        /// <param name="item1">The first component.</param>
-        /// <param name="item2">The second component.</param>
-        /// <returns></returns>
-        public static Tuple<T1, T2> Create<T1, T2>(T1 item1, T2 item2)
-        {
-            return Tuple.Create(item1, item2);
-        }
-    }
 }

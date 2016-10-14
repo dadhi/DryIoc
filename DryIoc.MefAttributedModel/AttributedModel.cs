@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2013-2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -114,10 +114,41 @@ namespace DryIoc.MefAttributedModel
 
         #region ExportFactory<T> support
 
-        /// <summary>
-        /// Creates the <see cref="ExportFactory{T}"/>.
-        /// </summary>
-        /// <typeparam name="T">The type of the service</typeparam>
+        /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>. 
+        /// Required to cover for missing Tuple in .NET 4.0 and lower.
+        /// Provides implicit conversion in both <see cref="KeyValuePair{TKey,TValue}"/> and <see cref="Tuple{T1,T2}"/>.</summary>
+        /// <typeparam name="TPart">Type of created part.</typeparam>
+        public sealed class PartAndDisposeActionPair<TPart>
+        {
+            /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
+            public static implicit operator KeyValuePair<TPart, Action>(PartAndDisposeActionPair<TPart> source)
+            {
+                return new KeyValuePair<TPart, Action>(source.Part, source.DisposeAction);
+            }
+
+            /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
+            public static implicit operator Tuple<TPart, Action>(PartAndDisposeActionPair<TPart> source)
+            {
+                return Tuple.Create(source.Part, source.DisposeAction);
+            }
+
+            /// <summary>Created export part.</summary>
+            public readonly TPart Part;
+
+            /// <summary>Action to dispose the created part and its dependencies</summary>
+            public readonly Action DisposeAction;
+
+            /// <summary>Creates a proxy by wrapping the Part and Dispose action.</summary>
+            /// <param name="part"></param> <param name="disposeAction"></param>
+            public PartAndDisposeActionPair(TPart part, Action disposeAction)
+            {
+                Part = part;
+                DisposeAction = disposeAction;
+            }
+        }
+
+        /// <summary> Creates the <see cref="ExportFactory{T}"/>.</summary>
+        /// <typeparam name="T">The type of the exported service</typeparam>
         /// <param name="container">The container.</param>
         internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
         {
@@ -127,7 +158,7 @@ namespace DryIoc.MefAttributedModel
                 try
                 {
                     var it = scope.Resolve<T>();
-                    return TupleCreator.Create(it, new Action(scope.Dispose));
+                    return new PartAndDisposeActionPair<T>(it, scope.Dispose);
                 }
                 catch
                 {
