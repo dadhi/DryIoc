@@ -13,14 +13,17 @@
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
       v2.8.0
+      - added: #269: Distinguish Transient reuse from non specified reuse
       - added: #331: Track transient disposables in singleton scope if nor reused parent nor the current scope available
       - added: #342: Make IContainer implement System.IServiceProvider interface
       - fixed: #327: UseInstance non-deterministic behavior in multi-threading tests
       - fixed: #328: Lazy collection resolve behavior in and out of scope
+      - fixed: #330: Looks like rules do not work with TrackingDisposableTransients
       - fixed: #338: after re-register instance in scope used old version of object(cached)
       - fixed: #347: Not resolved instance in child scope of scope
       - fixed: #344: Transient disposable validation
       - fixed: #356: Portable.GetAssemblyTypesMethod() crash with ArgumentException
+      - fixed: #359: Some rules and setup flags applied twice will wrongly unset the flag
       v2.7.1
       - fixed: #334 MissingMethodException in WithDependencyInjectionAdapter
       - fixed: #335 Decorator of IEnumerable wrapper taking nested in IEnumerable dependency fails with StackOverflow

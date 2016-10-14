@@ -334,7 +334,7 @@ namespace DryIoc
             var setup = factory.Setup;
             if (setup.FactoryType != FactoryType.Wrapper)
             {
-                if ((factory.Reuse ?? Rules.DefaultReuseInsteadOfTransient) is TransientReuse &&
+                if ((factory.Reuse ?? Rules.DefaultReuseInsteadOfTransient) == Reuse.Transient &&
                     !factory.Setup.UseParentReuse &&
                     (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
                     !setup.AllowDisposableTransient && Rules.ThrowOnRegisteringDisposableTransient)
@@ -6445,7 +6445,7 @@ namespace DryIoc
         /// <returns>Scoped expression or originally passed expression.</returns>
         protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, bool tracksTransientDisposable, Request request)
         {
-            var serviceType = serviceExpr.Type;
+            var originalExpressionType = serviceExpr.Type;
 
             // The singleton optimization: eagerly create singleton during the construction of object graph.
             if (request.Rules.EagerCachingSingletonForFasterAccess &&
@@ -6513,10 +6513,10 @@ namespace DryIoc
                     Expression.Convert(serviceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
 
-            if (serviceExpr.Type.IsValueType())
-                serviceExpr = Expression.Convert(serviceExpr, typeof(object));
+            //if (originalExpressionType.IsValueType())
+            //    serviceExpr = Expression.Convert(serviceExpr, typeof(object));
 
-            return Expression.Convert(serviceExpr, serviceType);
+            return Expression.Convert(serviceExpr, originalExpressionType);
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
@@ -8130,9 +8130,8 @@ namespace DryIoc
         private ImTreeMapIntToObj _scopes = ImTreeMapIntToObj.Empty;
     }
 
-    /// <summary>Reuse goal is to locate or create scope where reused objects will be stored.</summary>
-    /// <remarks><see cref="IReuse"/> implementors supposed to be stateless, and provide scope location behavior only.
-    /// The reused service instances should be stored in scope(s).</remarks>
+    // todo: v3: remove
+    /// <summary>Obsolete: until v3 replaced by <see cref="IReuseV3"/>.</summary>
     public interface IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
@@ -8153,7 +8152,7 @@ namespace DryIoc
         int GetScopedItemIdOrSelf(int factoryID, Request request);
     }
 
-    // todo: v3: Replace old IReuse
+    // todo: v3: rename to IReuse
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
     ///  and more powerful as can be based on other storage beside reuse.</summary>
     public interface IReuseV3 : IConvertibleToExpression
@@ -8171,56 +8170,6 @@ namespace DryIoc
         /// <summary>Returns true if reuse can be applied: may check if scope or other reused item storage is present.</summary>
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         bool CanApply(Request request);
-    }
-
-    /// <summary>No-reuse</summary>
-    public sealed class TransientReuse : IReuse, IReuseV3
-    {
-        /// <summary>0 means no reused lifespan</summary>
-        public int Lifespan { get { return 0; } }
-
-        /// <summary>Returns unchanged <paramref name="createItemExpr"/>.</summary>
-        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
-        {
-            return createItemExpr;
-        }
-
-        /// <summary>Can be applied</summary>
-        public bool CanApply(Request request)
-        {
-            return true;
-        }
-
-        private static readonly Expression _transientReuseExpr =
-            ReflectionTools.ToExpression(() => Reuse.Transient);
-
-        /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
-        {
-            return _transientReuseExpr;
-        }
-
-        #region Obsolete
-
-        /// <inheritdoc />
-        public IScope GetScopeOrDefault(Request request)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc />
-        public Expression GetScopeExpression(Request request)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc />
-        public int GetScopedItemIdOrSelf(int factoryID, Request request)
-        {
-            throw new NotImplementedException();
-        }
-
-        #endregion
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
@@ -8263,7 +8212,7 @@ namespace DryIoc
             return true;
         }
 
-        private static readonly Expression _singletonReuseExpr =
+        private readonly Expression _singletonReuseExpr =
             ReflectionTools.ToExpression(() => Reuse.Singleton);
 
         /// <inheritdoc />
@@ -8587,6 +8536,54 @@ namespace DryIoc
 
         /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
+
+        #region Implementation
+
+        /// <summary>No-reuse</summary>
+        private sealed class TransientReuse : IReuse, IReuseV3
+        {
+            /// <summary>0 means no reused lifespan</summary>
+            public int Lifespan { get { return 0; } }
+
+            /// <summary>returns source expression without modification</summary>
+            public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+            {
+                return createItemExpr;
+            }
+
+            public bool CanApply(Request request)
+            {
+                return true;
+            }
+
+            private readonly Expression _transientReuseExpr = ReflectionTools.ToExpression(() => Transient);
+
+            public Expression ToExpression(Func<object, Expression> fallbackConverter)
+            {
+                return _transientReuseExpr;
+            }
+
+            #region Obsolete
+
+            public IScope GetScopeOrDefault(Request request)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Expression GetScopeExpression(Request request)
+            {
+                throw new NotImplementedException();
+            }
+
+            public int GetScopedItemIdOrSelf(int factoryID, Request request)
+            {
+                throw new NotImplementedException();
+            }
+
+            #endregion
+        }
+
+        #endregion
     }
 
     /// <summary>Policy to handle unresolved service.</summary>
