@@ -240,5 +240,23 @@ namespace DryIoc.UnitTests
         public interface I {}
         public class X {}
         public class Y : X, I {}
+
+        [Test]
+        public void Can_register_and_resolve_scoped_one_impl_two_services()
+        {
+            var container = new Container();
+
+            container.RegisterMany<AaBb>(Reuse.InCurrentScope);
+
+            using (var scope = container.OpenScope())
+            {
+                scope.Resolve<IAa>();
+                scope.Resolve<IBb>();
+            }
+        }
+
+        public interface IAa {}
+        public interface IBb {}
+        public class AaBb : IAa, IBb { }
     }
 }
