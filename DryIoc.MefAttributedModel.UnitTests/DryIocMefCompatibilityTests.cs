@@ -51,7 +51,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(container.Resolve<Provider>(IfUnresolved.ReturnDefault));
         }
 
-        [Test, Ignore("failes")]
+        [Test, Ignore("fails")]
         public void DryIoc_supports_named_value_imports_and_exports()
         {
             // SettingImportHelper gathers all exported string settings from the catalog
