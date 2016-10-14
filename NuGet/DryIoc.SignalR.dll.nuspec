@@ -25,15 +25,12 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\NuGet\DryIoc.snk" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.SignalR.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.SignalR.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.SignalR.xml" target="lib\net45" />
-
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
 
     </files>
 </package>

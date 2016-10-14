@@ -61,6 +61,7 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\NuGet\DryIoc.snk" />
 
         <!-- netstandard1.0 (based on PCL 259) -->
         <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />
@@ -92,8 +93,5 @@
         <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>

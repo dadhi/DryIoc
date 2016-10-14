@@ -45,7 +45,8 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-      
+        <file src="..\NuGet\DryIoc.snk" />
+
         <!-- net35 -->
         <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />
         <file src="..\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net35" />
@@ -76,8 +77,5 @@
         <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\netstandard1.0" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\netstandard1.0" />
 
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>

@@ -19,22 +19,19 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.7.1,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.8,3.0.0)" />
             <dependency id="Microsoft.AspNet.WebApi.Core" version="[5.2.3,6.0.0)" />
           </group>
         </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\NuGet\DryIoc.snk" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.WebApi.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.WebApi.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.WebApi.xml" target="lib\net45" />
-
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
 
     </files>
 </package>

@@ -48,7 +48,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 		NuGet\DryIocAttributes.dll.nuspec = NuGet\DryIocAttributes.dll.nuspec
 		NuGet\DryIocAttributes.nuspec = NuGet\DryIocAttributes.nuspec
 		NuGet\DryIocZero.nuspec = NuGet\DryIocZero.nuspec
-		NuGet\SignPackageAssemblies.ps1 = NuGet\SignPackageAssemblies.ps1
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel", "DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj", "{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}"

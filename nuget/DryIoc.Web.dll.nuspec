@@ -30,9 +30,9 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
+        <file src="..\NuGet\DryIoc.snk" />
 
-      <!-- net45 -->
+        <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.Web.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Web.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Web.xml" target="lib\net45" />

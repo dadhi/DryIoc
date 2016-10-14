@@ -39,7 +39,7 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
+        <file src="..\NuGet\DryIoc.snk" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.dll" target="lib\net45" />
