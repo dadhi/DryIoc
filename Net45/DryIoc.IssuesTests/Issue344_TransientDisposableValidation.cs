@@ -40,5 +40,30 @@ namespace DryIoc.IssuesTests
         {
             public void Dispose() { }
         }
+
+        [Test]
+        public void VerifyRules()
+        {
+            var container = new Container(Rules.Default
+               .WithDefaultReuseInsteadOfTransient(Reuse.InWebRequest)
+               .WithTrackingDisposableTransients());
+
+            container.Register<A>();
+
+            using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
+            {
+                var a1 = scope.Resolve<A>();
+                var a2 = scope.Resolve<A>();
+
+                Assert.AreEqual(a1, a2);
+            }
+        }
+
+        public class A : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
     }
 }
