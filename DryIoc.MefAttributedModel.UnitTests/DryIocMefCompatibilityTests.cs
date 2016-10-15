@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -175,6 +176,51 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(sharedService.IsDisposed);
             Assert.IsTrue(sharedService.NonSharedDependency.IsDisposed);
             Assert.IsTrue(sharedService.SharedDependency.IsDisposed);
+        }
+
+        [Test]
+        public void DryIoc_supports_ExportFactoryWithMetadata_for_non_shared_parts()
+        {
+            var container = Container;
+            var service = container.Resolve<ImportsNamedServiceExportFactories>();
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.NamedServiceFactories);
+
+            var services = service.NamedServiceFactories.OrderBy(s => s.Metadata.Name).ToArray();
+            Assert.AreEqual(2, services.Length);
+            Assert.AreEqual("One", services[0].Metadata.Name);
+            Assert.AreEqual("Two", services[1].Metadata.Name);
+
+            LazyNamedService1 ls1;
+            LazyNamedService2 ls2;
+
+            using (var s1 = services[0].CreateExport())
+            {
+                Assert.IsNotNull(s1.Value);
+                Assert.IsInstanceOf<LazyNamedService1>(s1.Value);
+                Assert.IsFalse(s1.Value.IsDisposed);
+                ls1 = (LazyNamedService1)s1.Value;
+
+                using (var s2 = services[1].CreateExport())
+                {
+                    Assert.IsNotNull(s2.Value);
+                    Assert.IsInstanceOf<LazyNamedService2>(s2.Value);
+                    Assert.IsFalse(s2.Value.IsDisposed);
+                    Assert.IsNotNull(s1.Value);
+                    Assert.IsFalse(s1.Value.IsDisposed);
+
+                    ls2 = (LazyNamedService2)s2.Value;
+                    Assert.IsNotNull(ls2.NonSharedDependency);
+                    Assert.IsFalse(ls2.NonSharedDependency.IsDisposed);
+                }
+
+                Assert.IsTrue(ls2.IsDisposed);
+                Assert.IsNotNull(ls2.NonSharedDependency);
+                Assert.IsTrue(ls2.NonSharedDependency.IsDisposed);
+                Assert.IsFalse(s1.Value.IsDisposed);
+            }
+
+            Assert.IsTrue(ls1.IsDisposed);
         }
 
         [Test]

@@ -110,6 +110,10 @@ namespace DryIoc.MefAttributedModel
                 made: _createExportFactoryMethod,
                 setup: Setup.Wrapper);
 
+            container.Register(typeof(ExportFactory<,>),
+                made: _createExportFactoryWithMetadataMethod,
+                setup: Setup.WrapperWith(0));
+
             container.Register(typeof(Lazy<,>),
                 made: _createLazyWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
@@ -117,7 +121,7 @@ namespace DryIoc.MefAttributedModel
             return container;
         }
 
-        #region ExportFactory<T> and Lazy<T, TMetadata> support
+        #region ExportFactory<T>, ExportFactory<T, TMetadata> and Lazy<T, TMetadata> support
 
         /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
         /// Required to cover for missing Tuple in .NET 4.0 and lower.
@@ -175,6 +179,32 @@ namespace DryIoc.MefAttributedModel
 
         private static readonly Made _createExportFactoryMethod = Made.Of(
             typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true));
+
+        /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
+        /// <typeparam name="T">The type of the exported service.</typeparam>
+        /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
+        /// <param name="metaFactory">The factory with the service metadata.</param>
+        /// <param name="container">The container.</param>
+        internal static ExportFactory<T, TMetadata> CreateExportFactoryWithMetadata<T, TMetadata>(Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container)
+        {
+            return new ExportFactory<T, TMetadata>(() =>
+            {
+                var scope = container.OpenScope();
+                try
+                {
+                    var result = scope.Resolve<T>(serviceKey: metaFactory.Value.Key);
+                    return new PartAndDisposeActionPair<T>(result, scope.Dispose);
+                }
+                catch
+                {
+                    scope.Dispose();
+                    throw;
+                }
+            }, metaFactory.Metadata);
+        }
+
+        private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactoryWithMetadata", includeNonPublic: true));
 
         /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
         /// <typeparam name="T">The type of the exported service.</typeparam>

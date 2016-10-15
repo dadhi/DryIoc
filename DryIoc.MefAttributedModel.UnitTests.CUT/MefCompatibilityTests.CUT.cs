@@ -280,18 +280,36 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public string Name { get; }
     }
 
-    public interface ILazyNamedService { }
+    public interface ILazyNamedService { bool IsDisposed { get; } }
 
-    [Export(typeof(ILazyNamedService)), LazyMetadata("One")]
-    public class LazyNamedService1 : ILazyNamedService { }
+    [Export(typeof(ILazyNamedService)), LazyMetadata("One"), PartCreationPolicy(CreationPolicy.NonShared)]
+    public class LazyNamedService1 : ILazyNamedService, IDisposable
+    {
+        public void Dispose() { IsDisposed = true; }
+        public bool IsDisposed { get; private set; }
+    }
 
-    [Export(typeof(ILazyNamedService)), LazyMetadata("Two")]
-    public class LazyNamedService2 : ILazyNamedService { }
+    [Export(typeof(ILazyNamedService)), LazyMetadata("Two"), PartCreationPolicy(CreationPolicy.NonShared)]
+    public class LazyNamedService2 : ILazyNamedService, IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        public void Dispose() { IsDisposed = true; }
+        public bool IsDisposed { get; private set; }
+    }
 
     [Export]
     public class ImportLazyNamedServices
     {
         [ImportMany]
         public IEnumerable<Lazy<ILazyNamedService, ILazyMetadata>> LazyNamedServices { get; set; }
+    }
+
+    [Export]
+    public class ImportsNamedServiceExportFactories
+    {
+        [ImportMany]
+        public IEnumerable<ExportFactory<ILazyNamedService, ILazyMetadata>> NamedServiceFactories { get; set; }
     }
 }
