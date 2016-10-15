@@ -163,7 +163,9 @@ namespace DryIoc.MefAttributedModel
         {
             return new ExportFactory<T>(() =>
             {
-                var scope = container.OpenScope();
+                var scope = container.With(r => r
+                    .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope))
+                    .OpenScope();
                 try
                 {
                     var it = scope.Resolve<T>();
@@ -189,7 +191,9 @@ namespace DryIoc.MefAttributedModel
         {
             return new ExportFactory<T, TMetadata>(() =>
             {
-                var scope = container.OpenScope();
+                var scope = container.With(r => r
+                    .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope))
+                    .OpenScope();
                 try
                 {
                     var result = scope.Resolve<T>(serviceKey: metaFactory.Value.Key);

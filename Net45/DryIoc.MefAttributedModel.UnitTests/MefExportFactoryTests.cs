@@ -46,6 +46,40 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Mef_supports_ExportFactory_for_parts_with_unspecified_creation_policy()
+        {
+            var mef = Mef;
+            var service = mef.GetExport<UsesExportFactoryOfUnspecifiedCreationPolicyService>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.Value);
+            Assert.IsNotNull(service.Value.Factory);
+
+            UnspecifiedCreationPolicyService unspecifiedCreationPolicyService;
+            using (var export = service.Value.Factory.CreateExport())
+            {
+                unspecifiedCreationPolicyService = export.Value;
+                Assert.IsNotNull(unspecifiedCreationPolicyService);
+                Assert.IsFalse(unspecifiedCreationPolicyService.IsDisposed);
+
+                Assert.IsNotNull(unspecifiedCreationPolicyService.NonSharedDependency);
+                Assert.IsFalse(unspecifiedCreationPolicyService.NonSharedDependency.IsDisposed);
+
+                Assert.IsNotNull(unspecifiedCreationPolicyService.SharedDependency);
+                Assert.IsFalse(unspecifiedCreationPolicyService.SharedDependency.IsDisposed);
+            }
+
+            Assert.IsTrue(unspecifiedCreationPolicyService.IsDisposed);
+            Assert.IsTrue(unspecifiedCreationPolicyService.NonSharedDependency.IsDisposed);
+            Assert.IsFalse(unspecifiedCreationPolicyService.SharedDependency.IsDisposed);
+
+            mef.Dispose();
+            Assert.IsTrue(unspecifiedCreationPolicyService.IsDisposed);
+            Assert.IsTrue(unspecifiedCreationPolicyService.NonSharedDependency.IsDisposed);
+            Assert.IsTrue(unspecifiedCreationPolicyService.SharedDependency.IsDisposed);
+        }
+
+        [Test]
         public void Mef_doesnt_support_ExportFactory_for_shared_parts()
         {
             var mef = Mef;

@@ -267,6 +267,30 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public ExportFactory<SharedService> Factory { get; set; }
     }
 
+    [Export]
+    public class UnspecifiedCreationPolicyService : IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        [Import]
+        public SharedDependency SharedDependency { get; set; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export]
+    public class UsesExportFactoryOfUnspecifiedCreationPolicyService
+    {
+        [Import]
+        public ExportFactory<UnspecifiedCreationPolicyService> Factory { get; set; }
+    }
+
     public interface ILazyMetadata { string Name { get; } }
 
     [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
@@ -282,7 +306,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public interface ILazyNamedService { bool IsDisposed { get; } }
 
-    [Export(typeof(ILazyNamedService)), LazyMetadata("One"), PartCreationPolicy(CreationPolicy.NonShared)]
+    [Export(typeof(ILazyNamedService)), LazyMetadata("One")]
     public class LazyNamedService1 : ILazyNamedService, IDisposable
     {
         public void Dispose() { IsDisposed = true; }
