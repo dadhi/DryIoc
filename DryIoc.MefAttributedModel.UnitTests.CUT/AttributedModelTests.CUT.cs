@@ -6,6 +6,8 @@ using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
+    using RequestInfo = DryIocAttributes.RequestInfo;
+
     public interface IService { }
 
     [ExportMany]
