@@ -126,5 +126,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(services[0].Value);
             Assert.IsNotNull(services[1].Value);
         }
+
+        [Test]
+        public void Mef_optional_imports_of_nonexisting_service_are_null()
+        {
+            var service = Mef.GetExport<NonExistingServiceOptionalImports>().Value;
+
+            Assert.IsNotNull(service);
+            Assert.IsNull(service.NonExistingService);
+            Assert.IsNull(service.LazyNonExistingService);
+            Assert.IsNull(service.NonExistingServiceFactory);
+        }
     }
 }

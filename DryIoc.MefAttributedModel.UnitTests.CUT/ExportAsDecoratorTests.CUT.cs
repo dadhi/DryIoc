@@ -4,6 +4,8 @@ using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
+    using RequestInfo = DryIocAttributes.RequestInfo;
+
     public interface IHandler
     {
     }
@@ -128,7 +130,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         {
             _decorated = decorated;
         }
-        
+
         public int GetResult()
         {
             return _decorated().GetResult() + 1;

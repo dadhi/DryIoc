@@ -336,4 +336,19 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [ImportMany]
         public IEnumerable<ExportFactory<ILazyNamedService, ILazyMetadata>> NamedServiceFactories { get; set; }
     }
+
+    public interface INonExistingService { }
+
+    [Export]
+    public class NonExistingServiceOptionalImports
+    {
+        [Import(AllowDefault = true)]
+        public INonExistingService NonExistingService { get; set; }
+
+        [Import(AllowDefault = true)]
+        public Lazy<INonExistingService> LazyNonExistingService { get; set; }
+
+        [Import(AllowDefault = true)]
+        public ExportFactory<INonExistingService> NonExistingServiceFactory { get; set; }
+    }
 }
