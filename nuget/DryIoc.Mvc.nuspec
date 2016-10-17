@@ -13,6 +13,7 @@
         <releaseNotes>
           v2.1.0:
           - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
+          - added: WithDataAnnotationsValidator extension method
           - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
           v2.0.1
           - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
@@ -33,6 +34,7 @@
         </dependencies>
         <frameworkAssemblies>
             <frameworkAssembly assemblyName="System.Web" />
+            <frameworkAssembly assemblyName="System.ComponentModel.DataAnnotations" />
         </frameworkAssemblies>
     </metadata>
     <files>

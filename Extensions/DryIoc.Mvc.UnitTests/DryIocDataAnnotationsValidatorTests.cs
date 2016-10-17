@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Web.Mvc;
 using NUnit.Framework;
 
-namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
+namespace DryIoc.Mvc.UnitTests
 {
     public class DryIocDataAnnotationsValidatorTests
     {
@@ -14,6 +14,12 @@ namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
         public void Initialize()
         {
             _container = new Container();
+        }
+
+        [Test]
+        public void Can_register_validators()
+        {
+            Assert.DoesNotThrow(() => _container.WithDataAnnotationsValidator());
         }
 
         [Test]

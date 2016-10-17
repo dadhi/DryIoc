@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau and Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ namespace DryIoc.Mvc
     using System;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
+    using System.ComponentModel.DataAnnotations;
     using System.Linq;
     using System.Reflection;
     using System.Runtime.InteropServices;
@@ -62,7 +63,7 @@ namespace DryIoc.Mvc
         /// <param name="scopeContext">(optional) Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/> 
         /// (if container does not have its own context specified).</param>
         /// <returns>New container with applied Web context.</returns>
-        public static IContainer WithMvc(this IContainer container, 
+        public static IContainer WithMvc(this IContainer container,
             IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
         {
             container.ThrowIfNull();
@@ -93,7 +94,7 @@ namespace DryIoc.Mvc
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IController)), 
+            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IController)),
                 Reuse.InWebRequest, FactoryMethod.ConstructorWithResolvableArguments);
         }
 
@@ -112,6 +113,24 @@ namespace DryIoc.Mvc
             filterProviders.Add(filterProvider);
 
             container.UseInstance<IFilterProvider>(filterProvider);
+        }
+
+        /// <summary>Registers both <see cref="DryIocDataAnnotationsModelValidator"/> and
+        /// <see cref="DryIocValidatableObjectAdapter"/> and provides the <paramref name="container"/> to use
+        /// as <see cref="IServiceProvider"/> for resolving dependencies.</summary>
+        /// <param name="container"><see cref="IServiceProvider"/> implementaion.</param>
+        /// <returns>Returns source container for fluent access.</returns>
+        public static IContainer WithDataAnnotationsValidator(this IContainer container)
+        {
+            container.ThrowIfNull();
+
+            DataAnnotationsModelValidatorProvider.RegisterDefaultAdapterFactory((metadata, context, attribute) =>
+                new DryIocDataAnnotationsModelValidator(container, metadata, context, attribute));
+
+            DataAnnotationsModelValidatorProvider.RegisterDefaultValidatableObjectAdapterFactory((metadata, context) =>
+                new DryIocValidatableObjectAdapter(container, metadata, context));
+
+            return container;
         }
     }
 
@@ -166,5 +185,88 @@ namespace DryIoc.Mvc
         }
 
         private readonly IContainer _container;
+    }
+
+    /// <summary>Provides a model validator and injects <see cref="IServiceProvider"/> 
+    /// implemented by <see cref="Container"/>.</summary>
+    [ComVisible(false)]
+    public class DryIocDataAnnotationsModelValidator : DataAnnotationsModelValidator
+    {
+        /// <summary>Initializes a new instance of the  class.</summary>
+        /// <param name="serviceProvider"><see cref="Container"/> to use for resolving dependencies.</param>
+        /// <param name="metadata">The metadata for the model.</param>
+        /// <param name="context">The controller context for the model.</param>
+        /// <param name="attribute">The validation attribute for the model.</param>
+        public DryIocDataAnnotationsModelValidator(IServiceProvider serviceProvider, ModelMetadata metadata, ControllerContext context, ValidationAttribute attribute) :
+            base(metadata, context, attribute)
+        {
+            _serviceProvider = serviceProvider;
+        }
+
+        /// <inheritdoc />
+        public override IEnumerable<ModelValidationResult> Validate(object container)
+        {
+            var context = new ValidationContext(container ?? Metadata.Model, _serviceProvider, items: null)
+            {
+                DisplayName = Metadata.GetDisplayName()
+            };
+
+            var result = Attribute.GetValidationResult(Metadata.Model, context);
+            if (result != ValidationResult.Success)
+                yield return new ModelValidationResult
+                {
+                    Message = result == null ? null : result.ErrorMessage
+                };
+        }
+
+        private readonly IServiceProvider _serviceProvider;
+    }
+
+    /// <summary>Provides an object adapter that can be validated,
+    /// and injects <see cref="IServiceProvider"/> implementation as <see cref="Container"/>.</summary>
+    [ComVisible(false)]
+    public class DryIocValidatableObjectAdapter : ValidatableObjectAdapter
+    {
+        /// <summary>Initializes a new instance of the class.</summary>
+        /// <param name="serviceProvider"><see cref="Container"/> to use for resolving dependencies.</param>
+        /// <param name="metadata">The model metadata.</param>
+        /// <param name="context">The controller context.</param>
+        public DryIocValidatableObjectAdapter(IServiceProvider serviceProvider, ModelMetadata metadata, ControllerContext context) :
+            base(metadata, context)
+        {
+            _serviceProvider = serviceProvider;
+        }
+
+        /// <inheritdoc />
+        public override IEnumerable<ModelValidationResult> Validate(object container)
+        {
+            var model = Metadata.Model;
+            if (model == null)
+                return Enumerable.Empty<ModelValidationResult>();
+
+            var validatable = model as IValidatableObject;
+            if (validatable == null)
+                return base.Validate(container);
+
+            var validationContext = new ValidationContext(validatable, _serviceProvider, null);
+            return ConvertResults(validatable.Validate(validationContext));
+        }
+
+        private static IEnumerable<ModelValidationResult> ConvertResults(IEnumerable<ValidationResult> results)
+        {
+            foreach (var result in results)
+            {
+                if (result != ValidationResult.Success)
+                {
+                    if (result.MemberNames == null || !result.MemberNames.Any())
+                        yield return new ModelValidationResult { Message = result.ErrorMessage };
+                    else
+                        foreach (var memberName in result.MemberNames)
+                            yield return new ModelValidationResult { Message = result.ErrorMessage, MemberName = memberName };
+                }
+            }
+        }
+
+        private readonly IServiceProvider _serviceProvider;
     }
 }
