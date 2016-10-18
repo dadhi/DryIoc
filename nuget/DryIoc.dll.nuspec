@@ -23,26 +23,7 @@
           - fixed: #344: Transient disposable validation
           - fixed: #356: Portable.GetAssemblyTypesMethod() crash with ArgumentException
           - fixed: #359: Some rules and setup flags applied twice will wrongly unset the flag
-          v2.7.1
-          - fixed: #334 MissingMethodException in WithDependencyInjectionAdapter
-          - fixed: #335 Decorator of IEnumerable wrapper taking nested in IEnumerable dependency fails with StackOverflow
-          v2.7.0
-          - added: #195: Composable Metadata as a IDictionary&lt;string, object&gt;
-          - added: #232: Change RegisterInstance defaults to IfUnresolved.Replace and to Reuse.InCurrentScope
-          - added: #304: Add option to pass values for some dependencies on Resolve
-          - added: #313: Support non public constructors with ConstructorWithResolvableArguments
-          - added: #314: Allow to inject non primitive external values
-          - added: #315: Support decorator of wrappers, e.g. decorate IEnumerable&lt;T&gt;
-          - fixed: #298: AspNetCore.DependencyInjection exceptions when verifying resolutions
-          - fixed: #300: Exception when reusing objects.
-          - fixed: #310: Problems with Decorators and Service Keys
-          - fixed: #317: Skip Enums in RegisterMany(assemblies)
-          v2.6.4
-          - fixed: #301: Issue with Lazy in Func with arguments
-          v2.6.3
-          - fixed: #299 Race condition between multiple containers
-          v2.6.2
-          - fixed: #290 Disposable Transient without reused parent should be tracked in nearest open scope
+          - fixed: #365: Container is not marked and treated as Disposed when Singletons are disposed
         </releaseNotes>
         <dependencies>
           <group targetFramework="netstandard1.0">
