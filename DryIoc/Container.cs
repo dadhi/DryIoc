@@ -2857,16 +2857,24 @@ namespace DryIoc
             return pairExpr;
         }
 
-        /// <remarks>
+        /// <summary> Universal expression factory to wrap service with metadata. 
+        /// Works with any generic type with first Type arg - Service type and second Type arg - Metadata type,
+        /// and constructor with Service and Metadata arguments respectively. 
         /// - if service key is not specified in request then method will search for all
         /// registered factories with the same metadata type ignoring keys.
         /// - if metadata is IDictionary{string, object},
         ///  then the First value matching the TMetadata type will be returned
-        /// </remarks>
-        private static Expression GetMetaExpressionOrDefault(Request request)
+        /// </summary>
+        /// <param name="request">Requested service.</param>
+        /// <returns>Wrapper creation expression.</returns>
+        public static Expression GetMetaExpressionOrDefault(Request request)
         {
             var metaType = request.GetActualServiceType();
             var typeArgs = metaType.GetGenericParamsAndArgs();
+
+            var metaCtor = metaType.GetConstructorOrNull(args: typeArgs)
+                .ThrowIfNull(Error.NotFoundMetaCtorWithTwoArgs, typeArgs, request);
+
             var metadataType = typeArgs[1];
             var serviceType = typeArgs[0];
 
@@ -2917,9 +2925,9 @@ namespace DryIoc
 
             var metadataExpr = request.Container.GetOrAddStateItemExpression(resultMetadata, metadataType);
 
-            var metaCtor = metaType.GetSingleConstructorOrNull().ThrowIfNull();
-            var metaExpr = Expression.New(metaCtor, serviceExpr, metadataExpr);
-            return metaExpr;
+
+
+            return Expression.New(metaCtor, serviceExpr, metadataExpr);
         }
     }
 
@@ -9507,7 +9515,9 @@ namespace DryIoc
                 "Unable to resolve LazyEnumerable service inside Func<args..> because arguments can't be passed through" +
                 " lazy boundaries: {0}"),
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
-                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}");
+                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
+            NotFoundMetaCtorWithTwoArgs = Of(
+                "Expecting Meta wrapper public constructor with two args {0} but not found when resolving: {1}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
