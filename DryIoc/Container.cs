@@ -3587,22 +3587,6 @@ namespace DryIoc
             return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
         }
 
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <typeparam name="TFactory"></typeparam>
-        /// <param name="factoryMethodOrMemberName">To create service.</param>
-        /// <param name="methodParamTypes">(optional) Type of arguments for requested method, 
-        /// if not provided will expect single method, otherwise will throw.</param>
-        /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance member.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New rules.</returns>
-        public static Made Of<TFactory>(string factoryMethodOrMemberName, 
-            Type[] methodParamTypes = null, ServiceInfo.Typed<TFactory> factoryInfo = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return Of(typeof(TFactory).GetMember(factoryMethodOrMemberName, methodParamTypes, throwIfNoOrMultipleFound: true), 
-                factoryInfo, parameters, propertiesAndFields);
-        }
-
         /// <summary>Creates factory specification with method or member selector based on request.</summary>
         /// <param name="getMethodOrMember">Method, or constructor, or member selector.</param>
         /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance method/member.</param>
@@ -9803,32 +9787,6 @@ namespace DryIoc
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
                 t.DeclaredFields.Cast<MemberInfo>())),
                 includeBase);
-        }
-
-        /// <summary>Returns the member with specified name and optional list of parameter types.</summary>
-        /// <param name="type">Type to search member in.</param>
-        /// <param name="memberName">Member to find.</param>
-        /// <param name="methodParamTypes">(optional) Parameter types if member is method. 
-        /// If not specified then single member expected, otherwise will throw depending on <paramref name="throwIfNoOrMultipleFound"/>.</param>
-        /// <param name="excludeBase">(optional) Exclude base type(s) members.</param>
-        /// <param name="throwIfNoOrMultipleFound">(optional) If set the method will throw if no or multiple members found.</param>
-        /// <returns>Found member info or null.</returns>
-        public static MemberInfo GetMember(this Type type, string memberName, 
-            Type[] methodParamTypes = null, bool excludeBase = false, bool throwIfNoOrMultipleFound = false)
-        {
-            var members = type.GetAllMembers(!excludeBase)
-                .Where(m => !m.Name.Equals(memberName) || methodParamTypes != null 
-                    && (!(m is MethodInfo) || !((MethodInfo)m).GetParameters()
-                        .Select(p => p.ParameterType).SequenceEqual(methodParamTypes)))
-                .ToArray();
-
-            if (members.Length != 1 && throwIfNoOrMultipleFound)
-                Throw.It(Error.Of("Expecting single factory method or member with name {0} and parameters {1}, " +
-                                  "but found no or many in {2}"),
-                    memberName, methodParamTypes, type);
-
-            var member = members[0];
-            return member;
         }
 
         /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters
