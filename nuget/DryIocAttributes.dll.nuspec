@@ -16,10 +16,10 @@
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
           - added: #323: Support multiple WithMetadataAttribute(key, value)
+          - added: #353: MEF support for ExportFactory&lt;T&gt; imports
+          - added: #360: MEF: Lazy&lt;T, TMetadata&gt; support
           - added: Support for ExportMetadataAttribute
           - added: ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
-          v2.5.0
-          - added: Package for NetStandard1.0
         </releaseNotes>
       <dependencies>
         <group targetFramework="netstandard1.0">

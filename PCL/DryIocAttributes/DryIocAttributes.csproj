@@ -41,8 +41,8 @@
     <Compile Include="..\..\DryIocAttributes\Attributes.cs">
       <Link>Attributes.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIocAttributes\Ported-LazyMetadata.cs">
-      <Link>Ported-LazyMetadata.cs</Link>
+    <Compile Include="..\..\DryIocAttributes\Ported-MefAttributes.cs">
+      <Link>Ported-MefAttributes.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIocAttributes\Ported-net40.cs">
       <Link>Ported-net40.cs</Link>
