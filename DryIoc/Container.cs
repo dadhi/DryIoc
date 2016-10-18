@@ -787,7 +787,7 @@ namespace DryIoc
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed
         {
-            get { return _disposed == 1; }
+            get { return _disposed == 1 || _singletonScope.IsDisposed; }
         }
 
         /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
@@ -7853,6 +7853,9 @@ namespace DryIoc
 
         /// <summary>Amount of items in item array.</summary>
         public static readonly int BucketSize = 32;
+
+        /// <summary>Returns true if scope was disposed.</summary>
+        public bool IsDisposed { get { return _disposed == 1; } }
 
         /// <summary>Creates scope.</summary>
         /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>

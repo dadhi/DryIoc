@@ -538,6 +538,25 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void The_container_with_disposed_singleton_should_be_marked_as_Disposed()
+        {
+            var container = new Container();
+            container.Register<Abc>(Reuse.Singleton);
+            container.Resolve<Abc>(); // creates and stores singleton
+
+            var containerWithConcreteTypes = container.With(rules => rules
+                .WithAutoConcreteTypeResolution());
+
+            containerWithConcreteTypes.Dispose();
+            Assert.IsTrue(((Container)containerWithConcreteTypes).IsDisposed);
+
+            Assert.IsTrue(container.IsDisposed);
+            container.Dispose();
+        }
+
+        public class Abc { }
+
+        [Test]
         public void Can_Validate_the_registrations_to_find_potential_errors_in_their_resolution()
         {
             var container = new Container();
