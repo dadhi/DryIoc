@@ -4,7 +4,7 @@
         <id>DryIocAttributes</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -12,12 +12,13 @@
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
           v2.6.0
-          - added: #323: Support multiple WithMetadataAttribute(key, value)
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
+          - added: #323: Support multiple WithMetadataAttribute(key, value)
+          - added: #353: MEF support for ExportFactory&lt;T&gt; imports
+          - added: #360: MEF: Lazy&lt;T, TMetadata&gt; support
+          - added: Support for ExportMetadataAttribute
           - added: ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
-          v2.5.0
-          - added: Source code (contentFiles) package for UWP (uap10.0)
         </releaseNotes>
         <frameworkAssemblies>
             <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
@@ -31,24 +32,31 @@
 
         <!-- net35 -->
         <file src="..\DryIocAttributes\Attributes.cs" target="content\net35\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\net35\DryIocAttributes" />
         <file src="..\DryIocAttributes\Ported-net40.cs" target="content\net35\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-net45.cs" target="content\net35\DryIocAttributes" />
 
         <!-- net40 -->
         <file src="..\DryIocAttributes\Attributes.cs" target="content\net40\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-net45.cs" target="content\net40\DryIocAttributes" />
 
         <!-- net45 -->
         <file src="..\DryIocAttributes\Attributes.cs" target="content\net45\DryIocAttributes" />
 
         <!-- PCL Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIocAttributes\Attributes.cs"   target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
         <file src="..\DryIocAttributes\Ported-net40.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
 
         <!-- PCL Profile259:.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIocAttributes\Attributes.cs"   target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-        <file src="..\DryIocAttributes\Ported-net40.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
+        <file src="..\DryIocAttributes\Ported-net45.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
 
         <!--uap10.0: Universal Windows Platform-->
         <file src="..\DryIocAttributes\Attributes.cs" target="contentFiles\cs\any" />
-        <file src="..\DryIocAttributes\Ported-net40.cs" target="contentFiles\cs\any" />
+        <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\any" />
+        <file src="..\DryIocAttributes\Ported-net45.cs" target="contentFiles\cs\any" />
     </files>
 </package>

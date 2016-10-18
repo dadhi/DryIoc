@@ -11,30 +11,36 @@
         <description>DryIoc extension for ASP.NET providing Web Request Reuse</description>
         <tags>Web ASP Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.1.0:
+          - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
+          - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
           v2.0.1:
           - fixed: HttpContext to return null scope if context is not available, as it supposed to be.
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.7,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.8,3.0.0)" />
+            
+            <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />
           </group>
         </dependencies>
         <frameworkAssemblies>
-            <frameworkAssembly assemblyName="System.Web" targetFramework="net45" />
-            <frameworkAssembly assemblyName="Microsoft.Web.Infrastructure" targetFramework="net45" />
+            <frameworkAssembly assemblyName="System.Web" />
         </frameworkAssemblies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\NuGet\DryIoc.snk" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.Web.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Web.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Web.xml" target="lib\net45" />
 
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
+        <!-- net40 -->
+        <file src="..\Net40\Extensions\bin\Release\DryIoc.Web.dll" target="lib\net40" />
+        <file src="..\Net40\Extensions\bin\Release\DryIoc.Web.pdb" target="lib\net40" />
+        <file src="..\Net40\Extensions\bin\Release\DryIoc.Web.xml" target="lib\net40" />
 
     </files>
 </package>

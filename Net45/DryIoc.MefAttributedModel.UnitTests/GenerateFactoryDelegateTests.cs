@@ -15,8 +15,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_load_types_from_assembly_and_generate_some_resolutions()
         {
             var container = new Container(rules => rules
-                .WithoutEagerCachingSingletonForFasterAccess()
-                .WithMefAttributedModel());
+                .WithMefRules()
+                .WithoutEagerCachingSingletonForFasterAccess());
 
             var types = typeof(BirdFactory).GetAssembly().GetLoadedTypes();
             container.RegisterExports(types);

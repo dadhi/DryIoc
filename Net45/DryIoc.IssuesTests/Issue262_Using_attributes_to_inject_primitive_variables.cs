@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 
@@ -11,17 +12,13 @@ namespace DryIoc.IssuesTests
         public void Test_parameter()
         {
             var container = new Container(rules => rules
-                .WithUnknownServiceResolvers(request => new DelegateFactory(resolver =>
+                .With(parameters: request => p =>
                 {
-                    if (request.ServiceType == typeof(string))
-                        return request.Is(parameter: p =>
-                        {
-                            var attribute = p.GetCustomAttribute<ServiceKeyResolverAttribute>();
-                            return attribute == null ? null : ConfigWrapper.GetValue(attribute.Key);
-                        });
-
-                    return null;
-                })));
+                    var attr = p.GetCustomAttribute<ServiceKeyResolverAttribute>();
+                    return attr == null ? null
+                        : ParameterServiceInfo.Of(p)
+                            .WithDetails(ServiceDetails.Of(ConfigWrapper.GetValue(attr.Key)), request);
+                }));
 
             container.Register<IService, Service>();
             var service = (Service)container.Resolve<IService>();
@@ -60,27 +57,22 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Test_field()
+        public void Test_field_2()
         {
             var container = new Container(rules => rules
-                .With(propertiesAndFields: PropertiesAndFields.Of.Name("BaseUrlField").Name("BaseUrlProperty"))
-                .WithUnknownServiceResolvers(request => new DelegateFactory(resolver =>
-                {
-                    if (request.ServiceType == typeof(string))
-                        return request.Is(
-                            field: f =>
-                            {
-                                var attribute = f.GetCustomAttribute<ServiceKeyResolverAttribute>();
-                                return attribute == null ? null : ConfigWrapper.GetValue(attribute.Key);
-                            },
-                            property: p =>
-                            {
-                                var attribute = p.GetCustomAttribute<ServiceKeyResolverAttribute>();
-                                return attribute == null ? null : ConfigWrapper.GetValue(attribute.Key);
-                            });
-
-                    return null;
-                })));
+                .With(propertiesAndFields: request => 
+                    request.ImplementationType.GetMembers(t =>
+                        t.DeclaredFields.Cast<MemberInfo>().Concat(
+                        t.DeclaredProperties.Cast<MemberInfo>()))
+                    .Select(member =>
+                    {
+                        var attr = member.GetCustomAttribute<ServiceKeyResolverAttribute>();
+                        if (attr == null)
+                            return null;
+                        var value = ConfigWrapper.GetValue(attr.Key);
+                        return PropertyOrFieldServiceInfo.Of(member)
+                            .WithDetails(ServiceDetails.Of(value), request);
+                    })));
 
             container.Register<IService, BlahService>();
             var service = (BlahService)container.Resolve<IService>();

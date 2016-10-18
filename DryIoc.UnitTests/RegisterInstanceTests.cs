@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using NUnit.Framework;
 
@@ -22,17 +24,15 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.UseInstance("a");
+            Assert.AreEqual("a", container.Resolve<string>());
 
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance("bbbb");
-                Assert.AreEqual("bbbb", scope.Resolve<string>());
+                scope.UseInstance("b");
+                Assert.AreEqual("b", scope.Resolve<string>());
             }
 
-            var ex = Assert.Throws<ContainerException>(
-                () => container.Resolve<string>());
-
-            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            Assert.AreEqual("a", container.Resolve<string>());
         }
 
         [Test]
@@ -65,19 +65,6 @@ namespace DryIoc.UnitTests
 
             var mine = container.WithoutCache().Resolve<string>();
             Assert.AreEqual("mine", mine);
-        }
-
-        [Test]
-        public void Register_instance_with_different_if_already_registered_policies()
-        {
-            var container = new Container();
-            container.RegisterInstance("nya", Reuse.Singleton);
-            Assert.AreEqual("nya", container.Resolve<string>());
-
-            container.RegisterInstance("yours", Reuse.Singleton);
-
-            CollectionAssert.AreEquivalent(new[] { "nya", "yours" },
-                container.Resolve<string[]>());
         }
 
         [Test]
@@ -114,7 +101,7 @@ namespace DryIoc.UnitTests
         {
             var c = new Container();
 
-            c.RegisterInstance<I>(new C(), reuse: new ShortReuse());
+            c.RegisterInstance<I>(new C(), new ShortReuse());
             c.Register<D>(Reuse.Singleton);
 
             var ex = Assert.Throws<ContainerException>(() =>
@@ -156,18 +143,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_multiple_already_registered_services_When_registering_with_keep_option_Then_no_exception_should_be_thrown()
-        {
-            var container = new Container();
-
-            container.UseInstance("a");
-            container.UseInstance("b");
-
-            Assert.DoesNotThrow(() => 
-            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep));
-        }
-
-        [Test]
         public void For_multiple_registered_instances_Then_Replace_should_replace_them_all()
         {
             var container = new Container();
@@ -190,6 +165,224 @@ namespace DryIoc.UnitTests
 
             container.UseInstance("b", serviceKey: "x");
             Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
+        }
+
+        [Test]
+        public void Throws_on_attempt_to_replace_keyed_instance_registration_of_non_instance_factory()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(_ => "a", serviceKey: "x");
+            Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.UseInstance("b", serviceKey: "x"));
+            //Assert.AreEqual(Error.NameOf(), Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void Can_register_with_and_then_without_PreventDisposal_behavior()
+        {
+            var container = new Container();
+
+            container.UseInstance("a", preventDisposal: true);
+            container.Resolve<string>();
+
+            container.UseInstance("a");
+            container.Resolve<string>();
+        }
+
+        public class Me : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
+
+        [Test]
+        public void Can_use_intstance_of_Int_type()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42);
+
+            var int42 = container.Resolve<int>();
+
+            Assert.AreEqual(42, int42);
+        }
+
+        [Test]
+        public void Can_work_with_multiple_keyed_and_default_instances()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            var forties = container.Resolve<int[]>();
+
+            Assert.AreEqual(3, forties.Length);
+        }
+
+        [Test]
+        public void Can_reuse_the_default_factory()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+            container.UseInstance<int>(45); // will replace the 43
+
+            var forties = container.Resolve<int[]>();
+
+            CollectionAssert.AreEquivalent(new[] { 42, 45, 44 }, forties);
+        }
+
+        [Test]
+        public void Should_use_correct_instance_in_collection_in_and_out_of_scope()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            using (var scope = container.OpenScope())
+            {
+                scope.UseInstance<int>(45);
+                CollectionAssert.AreEquivalent(new[] { 42, 44, 45 }, scope.Resolve<int[]>());
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
+        }
+
+        [Test]
+        public void Should_fallback_to_singleton_in_collection_if_no_scoped_instance()
+        {
+            var container = new Container();
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            using (var scope = container.OpenScope())
+            {
+                CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, scope.Resolve<int[]>());
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
+        }
+
+
+        [Test]
+        public void Should_use_correct_instance_in_lazy_collection_in_and_out_of_scope()
+        {
+            var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+            container.UseInstance<int>(42, serviceKey: "nice number");
+            container.UseInstance<int>(43);
+            container.UseInstance<int>(44, serviceKey: "another nice number");
+
+            using (var scope = container.OpenScope())
+            {
+                scope.UseInstance<int>(45);
+                CollectionAssert.AreEquivalent(new[] { 42, 44, 45 }, scope.Resolve<IEnumerable<int>>().ToArray());
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<IEnumerable<int>>().ToArray());
+        }
+
+        [Test]
+        public void The_used_instance_dependency_should_be_independent_of_scope()
+        {
+            var container = new Container();
+            container.Register<BB>();
+
+            using (var scope = container.OpenScope())
+            {
+                var a = new AA();
+                scope.UseInstance(a);
+        
+                var bb = scope.Resolve<BB>(); // will inject `a`
+                Assert.AreSame(a, bb.A);
+            }
+
+            var anotherA = new AA();
+            container.UseInstance(anotherA);
+            var anotherBB = container.Resolve<BB>(); // will inject `anotherA`
+            Assert.AreSame(anotherA, anotherBB.A);
+        }
+
+        public class AA { }
+
+        public class BB
+        {
+            public readonly AA A;
+            public BB(AA a) { A = a; }
+        }
+
+        [Test]
+        public void Can_apply_decorator_to_resolved_used_instance()
+        {
+            var container = new Container();
+
+            container.UseInstance("x");
+            container.Register<string>(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
+
+            var xy = container.Resolve<string>();
+
+            Assert.AreEqual("xy", xy);
+        }
+
+        [Test]
+        public void Can_apply_decorator_to_injected_used_instance()
+        {
+            var container = new Container();
+
+            container.Register<XUser>();
+            container.UseInstance("x");
+            container.Register(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
+
+            var user = container.Resolve<XUser>();
+
+            Assert.AreEqual("xy", user.Name);
+        }
+
+        public static string AdjustString(string m)
+        {
+            return m + "y";
+        }
+
+        public class XUser
+        {
+            public string Name { get; private set; }
+
+            public XUser(string name)
+            {
+                Name = name;
+            }
+        }
+
+        [Test]
+        public void Can_use_instance_in_upper_scope_and_resolve_it_in_nested_scope()
+        {
+            var container = new Container();
+            var a = new ClassA();
+
+            using (var scope1 = container.OpenScope("1"))
+            {
+                scope1.UseInstance(a);
+
+                using (var scope2 = scope1.OpenScope("2"))
+                {
+                    var resolvedA = scope2.Resolve<ClassA>();
+
+                    if (resolvedA == null) // it's true
+                    {
+                        throw new NullReferenceException();
+                    }
+                }
+            }
+        }
+
+        class ClassA
+        {
         }
     }
 }

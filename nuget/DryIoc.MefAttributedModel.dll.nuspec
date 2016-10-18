@@ -13,20 +13,23 @@
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
           v2.6.0
-          - added: #323: Support multiple WithMetadataAttribute(key, value)
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
+          - added: #323: Support multiple WithMetadataAttribute(key, value)
+          - added: #343: Specifying the default Reuse in MefAttributedModel
+          - added: #352: Mef should fallback to default constructor for types without ImportingConstructor
           - added: Support for ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
+          - fixed: #350: Metadata provided via ExportMetadata attribute is missing
           v2.5.0
           - added: Package for NetStandard1.0
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.7,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.8,3.0)" />
             <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
           </group>
           <group targetFramework="netstandard1.0">
-            <dependency id="DryIoc.dll" version="[2.7,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.8,3.0)" />
             <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
 
             <dependency id="System.Collections" version="4.0.11" />
@@ -42,7 +45,8 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-      
+        <file src="..\NuGet\DryIoc.snk" />
+
         <!-- net35 -->
         <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />
         <file src="..\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net35" />
@@ -73,8 +77,5 @@
         <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\netstandard1.0" />
         <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\netstandard1.0" />
 
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>

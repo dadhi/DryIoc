@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
@@ -9,7 +11,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     // no Export attribute here
-    public class LogTableManager: ILogTableManager
+    public class LogTableManager : ILogTableManager
     {
         public const string FactoryMethodExportName = "LogTableManagerFactory";
 
@@ -108,5 +110,245 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         //[Export(Constants.SettingExportKey)]
         public string ExportedValue { get; private set; } = "SettingProvider3.ExportedValue";
+    }
+
+    public interface IVersionedProtocol { string Version { get; } }
+
+    internal class GenericProtocol : IVersionedProtocol
+    {
+        public GenericProtocol(string version) { Version = version; }
+        public string Version { get; }
+    }
+
+    internal class ExportEarlyProtocolVersions
+    {
+        [Export] public IVersionedProtocol V1 => new GenericProtocol("1.0");
+        [Export] public IVersionedProtocol V2 => new GenericProtocol("2.0");
+        [Export] public IVersionedProtocol V3 => new GenericProtocol("3.0");
+    }
+
+    [Export(typeof(IVersionedProtocol))]
+    internal class ModernProtocolImplementation : IVersionedProtocol { public string Version => "4.0"; }
+
+    [Export]
+    public class ImportAllProtocolVersions
+    {
+        [ImportMany(typeof(IVersionedProtocol))]
+        public IVersionedProtocol[] Protocols { get; set; }
+    }
+
+    public interface IUntypedService { string Version { get; } }
+
+    [Export("ArbitraryKey")]
+    public class UntypedService : IUntypedService
+    {
+        public string Version { get { return "123.4567"; } }
+    }
+
+    [Export]
+    public class ImportUntypedService
+    {
+        [Import("ArbitraryKey")]
+        public object UntypedService { get; set; }
+    }
+
+    [Export]
+    public class ImportManyUntypedServices
+    {
+        [ImportMany("ArbitraryKey")]
+        public object[] UntypedServices { get; set; }
+    }
+
+    public interface IDisposableScopedService : IDisposable { bool IsDisposed { get; } }
+
+    [Export(typeof(IDisposableScopedService))]
+    internal class MyScopedService : IDisposableScopedService
+    {
+        public void Dispose() { IsDisposed = true; }
+
+        public bool IsDisposed { get; private set; }
+    }
+
+    public interface IDisposableSingletonService : IDisposable { bool IsDisposed { get; } }
+
+    [Export(typeof(IDisposableSingletonService)), PartCreationPolicy(CreationPolicy.Shared)]
+    internal class MySingletonService : IDisposableSingletonService
+    {
+        public void Dispose() { IsDisposed = true; }
+
+        public bool IsDisposed { get; private set; }
+    }
+
+    public interface IServiceWithTwoConstructors
+    {
+        bool DefaultConstructorIsUsed { get; }
+    }
+
+    [Export(typeof(IServiceWithTwoConstructors))]
+    internal class ServiceWithTwoConstructors : IServiceWithTwoConstructors
+    {
+        public ServiceWithTwoConstructors()
+        {
+            DefaultConstructorIsUsed = true;
+        }
+
+        public ServiceWithTwoConstructors(string name) { }
+
+        public bool DefaultConstructorIsUsed { get; private set; }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class NonSharedDependency : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.Shared)]
+    public class SharedDependency : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class NonSharedService : IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        [Import]
+        public SharedDependency SharedDependency { get; set; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export]
+    public class UsesExportFactoryOfNonSharedService
+    {
+        [Import]
+        public ExportFactory<NonSharedService> Factory { get; set; }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.Shared)]
+    public class SharedService : IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        [Import]
+        public SharedDependency SharedDependency { get; set; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export]
+    public class UsesExportFactoryOfSharedService
+    {
+        [Import]
+        public ExportFactory<SharedService> Factory { get; set; }
+    }
+
+    [Export]
+    public class UnspecifiedCreationPolicyService : IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        [Import]
+        public SharedDependency SharedDependency { get; set; }
+
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
+    }
+
+    [Export]
+    public class UsesExportFactoryOfUnspecifiedCreationPolicyService
+    {
+        [Import]
+        public ExportFactory<UnspecifiedCreationPolicyService> Factory { get; set; }
+    }
+
+    public interface ILazyMetadata { string Name { get; } }
+
+    [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class LazyMetadataAttribute : Attribute, ILazyMetadata
+    {
+        public LazyMetadataAttribute(string name)
+        {
+            Name = name;
+        }
+
+        public string Name { get; }
+    }
+
+    public interface ILazyNamedService { bool IsDisposed { get; } }
+
+    [Export(typeof(ILazyNamedService)), LazyMetadata("One")]
+    public class LazyNamedService1 : ILazyNamedService, IDisposable
+    {
+        public void Dispose() { IsDisposed = true; }
+        public bool IsDisposed { get; private set; }
+    }
+
+    [Export(typeof(ILazyNamedService)), LazyMetadata("Two"), PartCreationPolicy(CreationPolicy.NonShared)]
+    public class LazyNamedService2 : ILazyNamedService, IDisposable
+    {
+        [Import]
+        public NonSharedDependency NonSharedDependency { get; set; }
+
+        public void Dispose() { IsDisposed = true; }
+        public bool IsDisposed { get; private set; }
+    }
+
+    [Export]
+    public class ImportLazyNamedServices
+    {
+        [ImportMany]
+        public IEnumerable<Lazy<ILazyNamedService, ILazyMetadata>> LazyNamedServices { get; set; }
+    }
+
+    [Export]
+    public class ImportsNamedServiceExportFactories
+    {
+        [ImportMany]
+        public IEnumerable<ExportFactory<ILazyNamedService, ILazyMetadata>> NamedServiceFactories { get; set; }
+    }
+
+    public interface INonExistingService { }
+
+    [Export]
+    public class NonExistingServiceOptionalImports
+    {
+        [Import(AllowDefault = true)]
+        public INonExistingService NonExistingService { get; set; }
+
+        [Import(AllowDefault = true)]
+        public Lazy<INonExistingService> LazyNonExistingService { get; set; }
+
+        [Import(AllowDefault = true)]
+        public ExportFactory<INonExistingService> NonExistingServiceFactory { get; set; }
     }
 }

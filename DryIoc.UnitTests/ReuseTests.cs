@@ -63,7 +63,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var instance = new DisposableService();
-            container.RegisterInstance(instance, weaklyReferenced: true);
+            container.UseInstance(instance, weaklyReferenced: true);
             instance = container.Resolve<DisposableService>();
 
             container.Dispose();
@@ -606,7 +606,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_specify_default_reuse_per_Container_different_from_Transient()
         {
-            var container = new Container(r => r.WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var container = new Container(r => r
+                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+
             container.Register<Abc>();
 
             using (var scope = container.OpenScope())

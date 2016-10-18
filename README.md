@@ -27,7 +27,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - [DryIoc.dll]: `PM> Install-Package DryIoc.dll`
     - [DryIoc] source code: `PM> Install-Package DryIoc`
 
-- Latest stable DryIoc version: __v2.7.1__
+- Latest stable DryIoc version: __v2.8.0__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
@@ -55,8 +55,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ## Reliability
 
-* Unit-test suit with ~700 tests.
-* Thread-safe and lock-free - registrations and resolutions may proceed in parallel without corrupting container state. 
+* Unit-test suite with ~850 tests.
+* Thread-safe and lock-free — registrations and resolutions may proceed in parallel without corrupting container state. 
 * Detects recursive dependencies aka cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
 * Provides diagnostics for potential resolution problems via `container.VerifyResolutions()`.
@@ -110,7 +110,7 @@ Slim IoC Container based on service factory delegates __generated at compile-tim
 
 - __Does not depend on DryIoc at run-time.__
 - Ensures _zero_ application bootstrapping time associated with IoC registrations.
-- Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically - you can see how DryIoc is creating things.
+- Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically — you can see how DryIoc is creating things.
 - Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
 - Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
 - Allows run-time registrations too. You may register instances and delegates at run-time.

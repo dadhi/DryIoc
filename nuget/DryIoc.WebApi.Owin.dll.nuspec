@@ -13,7 +13,6 @@
         <releaseNotes></releaseNotes>
         <dependencies>
           <group>
-
               <dependency id="DryIoc.dll" version="(1.5,3.0.0)" />
               <dependency id="DryIoc.WebApi.dll" version="(1.5,3.0.0)" />
               <dependency id="DryIoc.Owin.dll" version="(1.5,3.0.0)" />
@@ -23,15 +22,12 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\NuGet\DryIoc.snk" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.WebApi.Owin.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.WebApi.Owin.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.WebApi.Owin.xml" target="lib\net45" />
-
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
-
+      
     </files>
 </package>

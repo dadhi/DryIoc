@@ -34,7 +34,7 @@ namespace DryIocAttributes
     public enum ReuseType
     {
         /// <summary>Means no reuse.</summary>
-        Transient, 
+        Transient,
         /// <summary>subj.</summary>
         Singleton,
         /// <summary>subj.</summary>
@@ -54,7 +54,7 @@ namespace DryIocAttributes
         Keep,
         /// <summary>Replaces old registration with new one.</summary>
         Replace,
-        /// <summary>Adds new implementation or null (Made.Of), 
+        /// <summary>Adds new implementation or null (Made.Of),
         /// skips registration if the implementation is already registered.</summary>
         AppendNewImplementation
     }
@@ -70,10 +70,10 @@ namespace DryIocAttributes
     public class ExportExAttribute : ExportAttribute
     {
         /// <summary>Creates attribute.</summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
         /// <param name="contractType">(optional) Service type.</param>
         /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
-        public ExportExAttribute(object contractKey, Type contractType = null, 
+        public ExportExAttribute(object contractKey, Type contractType = null,
             IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed)
             : base(contractKey as string, contractType)
         {
@@ -84,13 +84,15 @@ namespace DryIocAttributes
         /// <summary>Creates export with specified service type.</summary> <param name="contractType">Service type.</param>
         /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
         public ExportExAttribute(Type contractType,
-            IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed) : 
-            this(null, contractType, ifAlreadyExported) { }
+            IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed) :
+            this(null, contractType, ifAlreadyExported)
+        { }
 
         /// <summary>Creates export with handling existing export option.</summary>
         /// <param name="ifAlreadyExported">Handles export when other such export is already exist.</param>
         public ExportExAttribute(IfAlreadyExported ifAlreadyExported) :
-            this(null, null, ifAlreadyExported) { }
+            this(null, null, ifAlreadyExported)
+        { }
 
         /// <summary>Optional service key or string <see cref="ExportAttribute.ContractName"/>.</summary>
         public object ContractKey { get; set; }
@@ -100,11 +102,11 @@ namespace DryIocAttributes
     }
 
     /// <summary>Base attribute to specify type of reuse for annotated class.</summary>
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Field 
-        | AttributeTargets.Property 
-        | AttributeTargets.Parameter, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Field
+        | AttributeTargets.Property
+        | AttributeTargets.Parameter,
         Inherited = false)]
     public class ReuseAttribute : Attribute
     {
@@ -145,7 +147,7 @@ namespace DryIocAttributes
         public CurrentScopeReuseAttribute(string scopeName = null) : base(ReuseType.CurrentScope, scopeName) { }
     }
 
-    /// <summary>Marks exported type with Reuse.InWebRequest. 
+    /// <summary>Marks exported type with Reuse.InWebRequest.
     /// Basically it is CurrentScopeReuse with predefined name Reuse.WebRequestScopeName.</summary>
     public class WebRequestReuseAttribute : CurrentScopeReuseAttribute
     {
@@ -156,7 +158,7 @@ namespace DryIocAttributes
         public WebRequestReuseAttribute() : base(WebRequestScopeName) { }
     }
 
-    /// <summary>Marks exported type with Reuse.InThread. 
+    /// <summary>Marks exported type with Reuse.InThread.
     /// Basically it is CurrentScopeReuse with predefined name ThreadScopeContext.ScopeContextName.</summary>
     public class ThreadReuseAttribute : CurrentScopeReuseAttribute
     {
@@ -174,8 +176,16 @@ namespace DryIocAttributes
         public ResolutionScopeReuseAttribute() : base(ReuseType.ResolutionScope) { }
     }
 
+    /// <summary>Specifies for export part to use the whatever reuse of importing site.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class UseParentReuseAttribute : Attribute { }
+
     /// <summary>Marks exported reused service to be stored as WeakReference</summary>
-    public class WeaklyReferencedAttribute : Attribute {}
+    public class WeaklyReferencedAttribute : Attribute { }
 
     /// <summary>Marks exported reused service to be Not disposed together with scope.</summary>
     public class PreventDisposalAttribute : Attribute { }
@@ -190,10 +200,10 @@ namespace DryIocAttributes
     //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
     [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
         Justification = "Not available in PCL.")]
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
-        | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
         AllowMultiple = true, Inherited = false)]
     public class ExportWithKeyAttribute : ExportAttribute
     {
@@ -201,7 +211,7 @@ namespace DryIocAttributes
         public object ContractKey { get; set; }
 
         /// <summary>Creates attribute.</summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
         /// <param name="contractType">Service type.</param>
         public ExportWithKeyAttribute(object contractKey, Type contractType)
             : base(contractType)
@@ -210,15 +220,15 @@ namespace DryIocAttributes
         }
 
         /// <summary>Creates attribute using implementation type as <see cref="ExportAttribute.ContractType"/></summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param> 
+        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
         public ExportWithKeyAttribute(object contractKey) : this(contractKey, null) { }
     }
 
     /// <summary>Specifies to export all implemented contract types automatically.</summary>
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
-        | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
         Inherited = false)]
     public class ExportManyAttribute : Attribute
     {
@@ -241,18 +251,18 @@ namespace DryIocAttributes
 
     // todo: V3: remove
     /// <summary>Obsolete: Is not required anymore, you can just put Export on member without marking the containing type with AsFactory.</summary>
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
-        | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
         Inherited = false)]
     public class AsFactoryAttribute : Attribute { }
 
     /// <summary>Exports service as custom wrapper.</summary>
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
-        | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
         Inherited = false)]
     public class AsWrapperAttribute : Attribute
     {
@@ -273,10 +283,10 @@ namespace DryIocAttributes
     }
 
     /// <summary>Specifies that exported service is decorator of services of <see cref="ExportAttribute.ContractType"/>.</summary>
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
-        | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
         Inherited = false)]
     public class AsDecoratorAttribute : Attribute
     {
@@ -288,7 +298,7 @@ namespace DryIocAttributes
 
         /// <summary>If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</summary>
         public int Order { get; set; }
 
@@ -296,13 +306,13 @@ namespace DryIocAttributes
         public bool UseDecorateeReuse { get; set; }
 
         /// <summary>Creates attribute by providing its optional properties.</summary>
-        /// <param name="contractKey">(optional) Contract key of Decorated type, not for a decorator itself. 
-        /// Used to find the service to apply decorator to.</param> 
+        /// <param name="contractKey">(optional) Contract key of Decorated type, not for a decorator itself.
+        /// Used to find the service to apply decorator to.</param>
         /// <param name="order">(optional)If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order 
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</param>
-        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse. 
+        /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
         /// Decorated service may be decorator itself.</param>
         public AsDecoratorAttribute(object contractKey = null, int order = 0, bool useDecorateeReuse = false)
         {
@@ -320,7 +330,7 @@ namespace DryIocAttributes
             Order = order;
             UseDecorateeReuse = useDecorateeReuse;
         }
-}
+    }
 
     /// <summary>Type of services supported by Container.</summary>
     public enum FactoryType
@@ -346,7 +356,7 @@ namespace DryIocAttributes
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = 
+        public static readonly RequestInfo Empty =
             new RequestInfo(null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
@@ -550,10 +560,10 @@ namespace DryIocAttributes
     }
 
     /// <summary>Base type for exported type Setup Condition.</summary>
-    [AttributeUsage(AttributeTargets.Class 
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
-        | AttributeTargets.Field, 
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field,
         Inherited = false)]
     public abstract class ExportConditionAttribute : Attribute
     {
@@ -564,10 +574,10 @@ namespace DryIocAttributes
 
     /// <summary>OBSOLETE: Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
     //[Obsolete("Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.")]
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible", 
-        Justification = "Not available in PCL.")] 
-    [AttributeUsage(AttributeTargets.Parameter 
-        | AttributeTargets.Field 
+    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
+        Justification = "Not available in PCL.")]
+    [AttributeUsage(AttributeTargets.Parameter
+        | AttributeTargets.Field
         | AttributeTargets.Property)]
     public class ImportWithKeyAttribute : ImportAttribute
     {
@@ -622,16 +632,16 @@ namespace DryIocAttributes
     /// <summary>Exports service with associated metadata key and value.
     /// Key can be skipped</summary>
     [MetadataAttribute]
-    [AttributeUsage(AttributeTargets.Class 
+    [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
-        | AttributeTargets.Parameter 
-        | AttributeTargets.Field 
-        | AttributeTargets.Property, 
+        | AttributeTargets.Parameter
+        | AttributeTargets.Field
+        | AttributeTargets.Property,
         Inherited = false,
         AllowMultiple = true)]
     public class WithMetadataAttribute : Attribute
     {
-        /// <summary>Metadata key in a dictionary</summary>
+        /// <summary>Metadata key in result metadata dictionary</summary>
         public readonly string MetadataKey;
 
         /// <summary>Metadata value.</summary>
@@ -647,14 +657,14 @@ namespace DryIocAttributes
         }
 
         /// <summary>Creates attribute</summary> <param name="metadata"></param>
-        public WithMetadataAttribute(object metadata) : this(null, metadata) {}
+        public WithMetadataAttribute(object metadata) : this(null, metadata) { }
     }
 
-    /// <summary>Imports the service. 
+    /// <summary>Imports the service.
     /// But in case the service is not registered, attribute will exports the service in-place for registration.
     /// Useful for ad-hoc registration of types from not controlled libraries.</summary>
-    [AttributeUsage(AttributeTargets.Parameter 
-        | AttributeTargets.Field 
+    [AttributeUsage(AttributeTargets.Parameter
+        | AttributeTargets.Field
         | AttributeTargets.Property)]
     public class ImportExternalAttribute : Attribute
     {
@@ -664,7 +674,10 @@ namespace DryIocAttributes
         /// <summary>Use specific constructor for registration.</summary>
         public Type[] ConstructorSignature { get; set; }
 
-        /// <summary>Metadata associated with registration.</summary>
+        /// <summary>Metadata key in result metadata dictionary</summary>
+        public string MetadataKey { get; set; }
+
+        /// <summary>Metadata value, can be specified with or without <see cref="MetadataKey"/>.</summary>
         public object Metadata { get; set; }
 
         /// <summary>Registering (and importing) with specified service key.</summary>
@@ -693,12 +706,13 @@ namespace DryIocAttributes
     /// <summary>Exported type should open resolution scope when injected.</summary>
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Interface
-        | AttributeTargets.Method 
-        | AttributeTargets.Property 
+        | AttributeTargets.Method
+        | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class OpenResolutionScopeAttribute : Attribute { }
 
-    /// <summary>Marker for resolution root exports.</summary>
+    /// <summary>Specifies that export should be imported as dynamic resolution call,
+    /// instead of inlined creation expression.</summary>
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Interface
         | AttributeTargets.Method
@@ -713,12 +727,4 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class AsResolutionRootAttribute : Attribute { }
-
-    /// <summary>Marker for resolution root exports.</summary>
-    [AttributeUsage(AttributeTargets.Class
-        | AttributeTargets.Interface
-        | AttributeTargets.Method
-        | AttributeTargets.Property
-        | AttributeTargets.Field)]
-    public class UseParentReuseAttribute : Attribute { }
 }

@@ -5,7 +5,7 @@
         <version>0.0.0</version>
         <!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -13,12 +13,13 @@
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
           v2.6.0
-          - added: #323: Support multiple WithMetadataAttribute(key, value)
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
+          - added: #323: Support multiple WithMetadataAttribute(key, value)
+          - added: #353: MEF support for ExportFactory&lt;T&gt; imports
+          - added: #360: MEF: Lazy&lt;T, TMetadata&gt; support
+          - added: Support for ExportMetadataAttribute
           - added: ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
-          v2.5.0
-          - added: Package for NetStandard1.0
         </releaseNotes>
       <dependencies>
         <group targetFramework="netstandard1.0">
@@ -33,7 +34,8 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-      
+        <file src="..\NuGet\DryIoc.snk" />
+
         <!-- net35 -->
         <file src="..\bin\Release\DryIocAttributes.dll" target="lib\net35" />
         <file src="..\bin\Release\DryIocAttributes.pdb" target="lib\net35" />
@@ -64,8 +66,5 @@
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.pdb" target="lib\netstandard1.0" />
         <file src="..\PCL-Net45\bin\Release\DryIocAttributes.xml" target="lib\netstandard1.0" />
 
-        <!-- tools -->
-        <file src="..\NuGet\DryIoc.snk" target="tools" />
-        <file src="..\NuGet\SignPackageAssemblies.ps1" target="tools" />
     </files>
 </package>

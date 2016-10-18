@@ -8,7 +8,7 @@
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.Web.UnitTests")]
-[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2014-2016 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using DryIoc.UnitTests.CUT;
+﻿using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -535,8 +534,27 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.UseInstance("a"));
 
-            Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
+            Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));
         }
+
+        [Test]
+        public void The_container_with_disposed_singleton_should_be_marked_as_Disposed()
+        {
+            var container = new Container();
+            container.Register<Abc>(Reuse.Singleton);
+            container.Resolve<Abc>(); // creates and stores singleton
+
+            var containerWithConcreteTypes = container.With(rules => rules
+                .WithAutoConcreteTypeResolution());
+
+            containerWithConcreteTypes.Dispose();
+            Assert.IsTrue(((Container)containerWithConcreteTypes).IsDisposed);
+
+            Assert.IsTrue(container.IsDisposed);
+            container.Dispose();
+        }
+
+        public class Abc { }
 
         [Test]
         public void Can_Validate_the_registrations_to_find_potential_errors_in_their_resolution()
@@ -545,9 +563,25 @@ namespace DryIoc.UnitTests
 
             container.Register<Me.MyService>();
 
-            var errors = container.Validate().ToArray();
+            var errors = container.Validate();
             Assert.AreEqual(1, errors.Length);
             Assert.AreEqual(Error.UnableToResolveUnknownService, errors[0].Value.Error);
+        }
+
+        [Test]
+        public void Can_Validate_the_used_instance_dependency()
+        {
+            var container = new Container();
+
+            container.Register<AA>();
+            container.UseInstance("bb");
+
+            var errors = container.Validate();
+        }
+
+        public class AA
+        {
+            public AA(string msg) { }
         }
 
         [Test]

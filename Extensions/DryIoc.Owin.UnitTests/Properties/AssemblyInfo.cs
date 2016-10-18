@@ -5,7 +5,7 @@
 // associated with an assembly.
 [assembly: AssemblyTitle("DryIoc.Owin.UnitTests")]
 [assembly: AssemblyProduct("DryIoc.Owin.UnitTests")]
-[assembly: AssemblyCopyright("Copyright © 2014 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2014-2016 Maksim Volkau")]
 
 // Version information for an assembly consists of the following four values:
 //

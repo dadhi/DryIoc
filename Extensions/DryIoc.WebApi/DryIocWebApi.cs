@@ -84,7 +84,7 @@ namespace DryIoc.WebApi
             var controllerTypeResolver = config.Services.GetHttpControllerTypeResolver();
             var controllerTypes = controllerTypeResolver.GetControllerTypes(assembliesResolver);
 
-            container.RegisterMany(controllerTypes, Reuse.InWebRequest);
+            container.RegisterMany(controllerTypes, Reuse.InWebRequest, nonPublicServiceTypes: true);
         }
 
         /// <summary>Helps to find if type is controller type.</summary>

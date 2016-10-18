@@ -1,5 +1,5 @@
 ﻿{
-  "version": "1.0.0",
+  "version": "1.0.1",
 
   "description": "DryIoc adapter for AspNetCore Microsoft.Extensions.DependencyInjection",
   "authors": [ "Maksim Volkau" ],
@@ -15,13 +15,13 @@
     "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "vNext", "AspNetCore", "NetCore", "DNX" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
-    "releaseNotes": "- Package is renamed to DryIoc.Microsoft.DependencyInjection to align to Microsoft guidelines; - AspNetCore RTM support"
+    "releaseNotes": "- Updated to DryIoc 2.7.1"
   },
 
   "dependencies": {
     "NETStandard.Library": "1.6.0",
     "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0",
-    "DryIoc.dll": "2.6.4"
+    "DryIoc.dll": "2.7.1"
   },
 
   "frameworks": {

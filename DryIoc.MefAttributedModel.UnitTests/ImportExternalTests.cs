@@ -63,7 +63,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Can_use_arbitrary_contract_key_type_for_ExportOnce_same_as_for_Export()
+        public void Can_use_arbitrary_contract_key_type_for_ImportExternal_same_as_for_Export()
         {
             var container = new Container().WithMefAttributedModel();
             container.RegisterExports(typeof(OneDependsOnExternalTool), typeof(OtherDependsOnExternalTool));
@@ -71,8 +71,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var one = container.Resolve<OneDependsOnExternalTool>();
             var other = container.Resolve<OtherDependsOnExternalTool>();
 
-            Assert.That(one.Tool, Is.InstanceOf<ExternalTool>());
-            Assert.That(one.Tool, Is.SameAs(other.Tool));
+            Assert.IsInstanceOf<ExternalTool>(one.Tool);
+            Assert.AreSame(one.Tool, other.Tool);
         }
     }
 }

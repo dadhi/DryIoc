@@ -3,7 +3,6 @@ using System.ComponentModel.Composition;
 using System.Linq.Expressions;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
-using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
@@ -68,7 +67,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var one = container.Resolve<Orange>();
             var another = container.Resolve<Orange>();
 
-            Assert.That(one, Is.Not.SameAs(another));
+            Assert.AreNotSame(one, another);
         }
 
         [Test]
@@ -144,6 +143,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterExports(typeof(KeyedFactoryWithString));
 
             var s = container.Resolve<string>();
+            Assert.IsNotNull(s);
         }
     }
 }

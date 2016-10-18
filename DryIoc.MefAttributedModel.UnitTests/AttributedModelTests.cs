@@ -1,4 +1,6 @@
-﻿namespace DryIoc.MefAttributedModel.UnitTests
+﻿using System.Collections.Generic;
+
+namespace DryIoc.MefAttributedModel.UnitTests
 {
     using System;
     using System.Linq;
@@ -170,6 +172,51 @@
             }
 
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
+        }
+
+        [Test]
+        public void ExportedRegistrationInfo_has_non_null_metadata_provided_by_WithMetadataAttribute()
+        {
+            var regs = AttributedModel.Scan(new[] { typeof(WithWithMetadataOnlyKeyValue).GetAssembly() });
+            var reg = regs.Single(r => r.ImplementationType == typeof(WithWithMetadataOnlyKeyValue));
+            Assert.IsNotNull(reg.GetSetup().Metadata);
+            Assert.IsTrue(reg.GetSetup().MatchesMetadata("a", 1));
+        }
+
+        [Test]
+        public void ExportedRegistrationInfo_has_non_null_metadata_provided_by_ExportMetadataAttribute()
+        {
+            var regs = AttributedModel.Scan(new[] { typeof(WithExportMetadataOnlyKeyValue).GetAssembly() });
+            var reg = regs.Single(r => r.ImplementationType == typeof(WithExportMetadataOnlyKeyValue));
+            Assert.IsNotNull(reg.GetSetup().Metadata);
+            Assert.IsTrue(reg.GetSetup().MatchesMetadata("b", 2));
+        }
+
+        [Test]
+        public void Can_resolve_export_with_WithMetadata_only_metadata()
+        {
+            var it = _container.Resolve<Meta<WithWithMetadataOnlyKeyValue, IDictionary<string, object>>>();
+
+            CollectionAssert.AreEquivalent(new[] { "a" }, it.Metadata.Keys);
+            CollectionAssert.AreEquivalent(new[] { 1 }, it.Metadata.Values);
+        }
+
+        [Test]
+        public void Can_resolve_export_with_ExportAttribute_only_metadata()
+        {
+            var it = _container.Resolve<Meta<WithExportMetadataOnlyKeyValue, IDictionary<string, object>>>();
+
+            CollectionAssert.AreEquivalent(new[] { "b" }, it.Metadata.Keys);
+            CollectionAssert.AreEquivalent(new[] { 2 }, it.Metadata.Values);
+        }
+
+        [Test]
+        public void Can_resolve_export_with_multi_metadata()
+        {
+            var it = _container.Resolve<Meta<WithMetaKeyValue, IDictionary<string, object>>>();
+
+            CollectionAssert.AreEquivalent(new[] { "a", "b" }, it.Metadata.Keys);
+            CollectionAssert.AreEquivalent(new[] { 1, 2 }, it.Metadata.Values);
         }
     }
 }

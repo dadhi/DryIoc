@@ -4,29 +4,30 @@ using System.ComponentModel.DataAnnotations;
 using System.Web.Mvc;
 using NUnit.Framework;
 
-namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
+namespace DryIoc.Mvc.UnitTests
 {
     public class DryIocDataAnnotationsValidatorTests
     {
         private Container _container;
-        private DryIocServiceProvider _serviceProvider;
 
         [SetUp]
         public void Initialize()
         {
             _container = new Container();
+        }
 
-            _serviceProvider = new DryIocServiceProvider(_container);
+        [Test]
+        public void Can_register_validators()
+        {
+            Assert.DoesNotThrow(() => _container.WithDataAnnotationsValidator());
         }
 
         [Test]
         public void Can_get_instance_with_service_provider()
         {
-            _container.Register<IServiceProvider, DryIocServiceProvider>();
+            var itself = _container.GetService(typeof(IServiceProvider));
 
-            var instance = _serviceProvider.GetService(typeof(IServiceProvider));
-
-            Assert.That(instance, Is.InstanceOf<IServiceProvider>());
+            Assert.IsInstanceOf<IServiceProvider>(itself);
         }
 
         private class UserModel : IValidatableObject
@@ -72,7 +73,7 @@ namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForProperty(() => user.Login, typeof(UserModel), "Login");
 
-            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(_serviceProvider, metadata,
+            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(_container, metadata,
                 new ControllerContext(),
                 new RequiredAttribute());
 
@@ -96,7 +97,7 @@ namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForType(() => user, typeof(UserModel));
 
-            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(_serviceProvider, metadata,
+            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(_container, metadata,
                 new ControllerContext());
 
             return validatableObjectAdapter.Validate(user);
@@ -186,7 +187,7 @@ namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForType(() => login, typeof(LoginModel));
 
-            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(_serviceProvider, metadata,
+            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(_container, metadata,
                 new ControllerContext(),
                 new VerifyLoginValidationAttribute());
 
@@ -245,7 +246,7 @@ namespace DryIoc.Mvc.DataAnnotationsValidator.UnitTests
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForType(() => login, typeof(LoginModel));
 
-            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(_serviceProvider, metadata,
+            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(_container, metadata,
                 new ControllerContext());
 
             return validatableObjectAdapter.Validate(login);

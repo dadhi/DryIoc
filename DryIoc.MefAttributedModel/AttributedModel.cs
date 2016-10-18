@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2013-2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,13 +36,11 @@ namespace DryIoc.MefAttributedModel
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
     {
-        ///<summary>Default reuse policy is Singleton, as in MEF.</summary>
-        public static readonly ReuseType DefaultReuse = ReuseType.Singleton;
-
         /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/>
         /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
         public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
             ImTreeMap<ReuseType, Func<object, IReuse>>.Empty
+            .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
@@ -50,29 +48,43 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Returns new rules with attributed model importing rules appended.</summary>
         /// <param name="rules">Source rules to append importing rules to.</param>
         /// <returns>New rules with attributed model rules.</returns>
-        public static Rules WithImports(this Rules rules)
+        public static Rules WithMefRules(this Rules rules)
         {
             return rules.WithMefAttributedModel();
-        }
-
-        // todo: V3: Rename to WithImports and make the original method an obsolete.
-        /// <summary>Obsolete: replaced with more on point <see cref="WithImports"/>.</summary>
-        public static Rules WithMefAttributedModel(this Rules rules)
-        {
-            // hello, Max!!! we are Martians.
-            return rules.With(
-                request => GetImportingConstructor(request, rules.FactoryMethod),
-                GetImportedParameter,
-                _getImportedPropertiesAndFields);
         }
 
         /// <summary>Appends attributed model rules to passed container.</summary>
         /// <param name="container">Source container to apply attributed model importing rules to.</param>
         /// <returns>Returns new container with new rules.</returns>
+        public static IContainer WithMef(this IContainer container)
+        {
+            return container
+                .With(WithMefRules)
+                .WithMefSpecificWrappers()
+                .WithImportsSatisfiedNotification();
+        }
+
+        // todo: V3: remove
+        /// <summary>Obsolete: replaced with more on point <see cref="WithMefRules"/>.</summary>
+        public static Rules WithMefAttributedModel(this Rules rules)
+        {
+            var importsMadeOf = Made.Of(
+                request => GetImportingConstructor(request, rules.FactoryMethod),
+                GetImportedParameter, _getImportedPropertiesAndFields);
+
+            // hello, Max!!! we are Martians.
+            return rules.With(importsMadeOf)
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
+                .WithTrackingDisposableTransients();
+        }
+
+        // todo: V3: remove
+        /// <summary>Obsolete: replaced with more on point <see cref="WithMef"/>.</summary>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
             return container
-                .With(rules => rules.WithMefAttributedModel())
+                .With(WithMefRules)
+                .WithMefSpecificWrappers()
                 .WithImportsSatisfiedNotification();
         }
 
@@ -84,17 +96,139 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithImportsSatisfiedNotification(this IContainer container)
         {
             container.Register<object>(
-                made: _importsSatisfiedNotificationFactoryMethod, 
+                made: _importsSatisfiedNotificationFactoryMethod,
                 setup: _importsSatisfiedNotificationDecoratorSetup);
             return container;
         }
 
+        /// <summary>Registers <see cref="ExportFactory{T}"/> wrapper into the container.</summary>
+        /// <param name="container">Container to support.</param>
+        /// <returns>The container with registration.</returns>
+        public static IContainer WithMefSpecificWrappers(this IContainer container)
+        {
+            container.Register(typeof(ExportFactory<>),
+                made: _createExportFactoryMethod,
+                setup: Setup.Wrapper);
+
+            container.Register(typeof(ExportFactory<,>),
+                made: _createExportFactoryWithMetadataMethod,
+                setup: Setup.WrapperWith(0));
+
+            container.Register(typeof(Lazy<,>),
+                made: _createLazyWithMetadataMethod,
+                setup: Setup.WrapperWith(0));
+
+            return container;
+        }
+
+        #region ExportFactory<T>, ExportFactory<T, TMetadata> and Lazy<T, TMetadata> support
+
+        /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
+        /// Required to cover for missing Tuple in .NET 4.0 and lower.
+        /// Provides implicit conversion in both <see cref="KeyValuePair{TKey,TValue}"/> and <see cref="Tuple{T1,T2}"/>.</summary>
+        /// <typeparam name="TPart">Type of created part.</typeparam>
+        public sealed class PartAndDisposeActionPair<TPart>
+        {
+            /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
+            public static implicit operator KeyValuePair<TPart, Action>(PartAndDisposeActionPair<TPart> source)
+            {
+                return new KeyValuePair<TPart, Action>(source.Part, source.DisposeAction);
+            }
+
+            /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
+            public static implicit operator Tuple<TPart, Action>(PartAndDisposeActionPair<TPart> source)
+            {
+                return Tuple.Create(source.Part, source.DisposeAction);
+            }
+
+            /// <summary>Created export part.</summary>
+            public readonly TPart Part;
+
+            /// <summary>Action to dispose the created part and its dependencies</summary>
+            public readonly Action DisposeAction;
+
+            /// <summary>Creates a proxy by wrapping the Part and Dispose action.</summary>
+            /// <param name="part"></param> <param name="disposeAction"></param>
+            public PartAndDisposeActionPair(TPart part, Action disposeAction)
+            {
+                Part = part;
+                DisposeAction = disposeAction;
+            }
+        }
+
+        /// <summary>Creates the <see cref="ExportFactory{T}"/>.</summary>
+        /// <typeparam name="T">The type of the exported service</typeparam>
+        /// <param name="container">The container.</param>
+        internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
+        {
+            return new ExportFactory<T>(() =>
+            {
+                var scope = container.With(r => r
+                    .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope))
+                    .OpenScope();
+                try
+                {
+                    var it = scope.Resolve<T>();
+                    return new PartAndDisposeActionPair<T>(it, scope.Dispose);
+                }
+                catch
+                {
+                    scope.Dispose();
+                    throw;
+                }
+            });
+        }
+
+        private static readonly Made _createExportFactoryMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true));
+
+        /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
+        /// <typeparam name="T">The type of the exported service.</typeparam>
+        /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
+        /// <param name="metaFactory">The factory with the service metadata.</param>
+        /// <param name="container">The container.</param>
+        internal static ExportFactory<T, TMetadata> CreateExportFactoryWithMetadata<T, TMetadata>(Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container)
+        {
+            return new ExportFactory<T, TMetadata>(() =>
+            {
+                var scope = container.With(r => r
+                    .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope))
+                    .OpenScope();
+                try
+                {
+                    var result = scope.Resolve<T>(serviceKey: metaFactory.Value.Key);
+                    return new PartAndDisposeActionPair<T>(result, scope.Dispose);
+                }
+                catch
+                {
+                    scope.Dispose();
+                    throw;
+                }
+            }, metaFactory.Metadata);
+        }
+
+        private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactoryWithMetadata", includeNonPublic: true));
+
+        /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
+        /// <typeparam name="T">The type of the exported service.</typeparam>
+        /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
+        /// <param name="metaFactory">The factory with the service metadata.</param>
+        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Func<T>, TMetadata> metaFactory)
+        {
+            return new Lazy<T, TMetadata>(metaFactory.Value, metaFactory.Metadata);
+        }
+
+        private static readonly Made _createLazyWithMetadataMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateLazyWithMetadata", includeNonPublic: true));
+
+        #endregion
+
         #region IPartImportsSatisfiedNotification support
 
         internal static TService NotifyImportsSatisfied<TService>(TService service)
-            where TService : IPartImportsSatisfiedNotification
         {
-            service.OnImportsSatisfied();
+            (service as IPartImportsSatisfiedNotification)?.OnImportsSatisfied();
             return service;
         }
 
@@ -159,9 +293,8 @@ namespace DryIoc.MefAttributedModel
                 var export = exports[i];
                 var serviceKey = export.ServiceKey;
 
-                registrator.Register(factory, export.ServiceType, 
-                    serviceKey, export.IfAlreadyRegistered, 
-                    isStaticallyChecked: false); // todo: it may be set to true, cause we reflecting from the compiler checked code
+                registrator.Register(factory, export.ServiceType, serviceKey, export.IfAlreadyRegistered,
+                    isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
 
@@ -185,11 +318,11 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             var attributes = GetAllExportAttributes(type);
-            return !IsExportDefined(attributes) ? null 
+            return !IsExportDefined(attributes) ? null
                 : GetRegistrationInfoOrDefault(type, attributes);
         }
 
-        /// <summary>Creates registration info DTOs for provided type and/or for exported members. 
+        /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
         /// <param name="type">Type to convert into registration infos.</param>
         /// <returns>Created DTOs.</returns>
@@ -200,7 +333,7 @@ namespace DryIoc.MefAttributedModel
 
             ExportedRegistrationInfo typeRegistrationInfo = null;
 
-            // Export does not make sense for static or abstract type 
+            // Export does not make sense for static or abstract type
             // because the instance of such type can't be created (resolved).
             if (!type.IsStatic() && !type.IsAbstract())
             {
@@ -212,7 +345,7 @@ namespace DryIoc.MefAttributedModel
                         yield return typeRegistrationInfo;
                 }
             }
-            
+
             var members = type.GetAllMembers(includeBase: true);
             foreach (var member in members)
             {
@@ -235,7 +368,7 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
-                        // todo: Review need for factory service key. 
+                        // todo: Review need for factory service key.
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
                         var typeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
@@ -274,34 +407,43 @@ namespace DryIoc.MefAttributedModel
             return !(type.IsValueType() || type.IsInterface() || type.IsCompilerGenerated());
         }
 
-        #region Tools
-
         /// <summary>Returns reuse object by mapping provided type to <see cref="SupportedReuseTypes"/>.
         /// Returns null (transient or no reuse) if null provided reuse type.</summary>
         /// <param name="reuseType">Reuse type to find in supported.</param>
         /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
         /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(ReuseType reuseType, object reuseName = null)
+        public static IReuse GetReuse(ReuseType? reuseType, object reuseName = null)
         {
-            return reuseType == ReuseType.Transient
-                ? null
-                : SupportedReuseTypes.GetValueOrDefault(reuseType)
-                    .ThrowIfNull(Error.UnsupportedReuseType, reuseType)
+            return !reuseType.HasValue ? null // unspecified reuse, decided by container rules
+                : SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
+                    .ThrowIfNull(Error.UnsupportedReuseType, reuseType.Value)
                     .Invoke(reuseName);
         }
 
-        #endregion
-
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector)
+        private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector = null)
         {
             var implType = request.ImplementationType;
             var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
             var ctor = ctors.Length == 1 ? ctors[0]
-                : ctors.SingleOrDefault(x => x.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+                : ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+
             if (ctor == null)
-                return fallbackSelector.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType).Invoke(request);
+            {
+                // next try fallback defined ctor, it may be defined as ConstructorWithResolvableArguments
+                if (fallbackSelector != null)
+                {
+                    var fallbackCtor = fallbackSelector(request);
+                    if (fallbackCtor != null)
+                        return fallbackCtor;
+                }
+
+                // at the end try default constructor
+                ctor = ctors.SingleOrDefault(it => it.GetParameters().Length == 0);
+            }
+
+            ctor.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType, request);
             return FactoryMethod.Of(ctor);
         }
 
@@ -338,6 +480,7 @@ namespace DryIoc.MefAttributedModel
             object serviceKey;
             Type requiredServiceType;
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
+
             var metadata = GetRequiredMetadata(attributes);
 
             var import = GetSingleAttributeOrDefault<ImportAttribute>(attributes);
@@ -373,6 +516,13 @@ namespace DryIoc.MefAttributedModel
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
         }
 
+        internal static KeyValuePair<string, object> ComposeServiceKeyMetadata(object serviceKey, Type serviceType)
+        {
+            return new KeyValuePair<string, object>(
+                string.Concat(serviceKey.GetHashCode(), ":", serviceType.FullName),
+                serviceKey);
+        }
+
         private static KeyValuePair<string, object> GetRequiredMetadata(Attribute[] attributes)
         {
             var withMetadataAttr = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
@@ -393,29 +543,49 @@ namespace DryIoc.MefAttributedModel
             var container = request.Container;
             serviceType = import.ContractType ?? container.GetWrappedType(serviceType, request.RequiredServiceType);
             var serviceKey = import.ContractKey;
-            var metadata = import.Metadata;
-            var metadataKey = metadata == null ? null : Constants.ExportMetadataDefaultKey;
+
+            IDictionary<string, object> setupMetadata = null;
+
+            // will be used for resolution and for resgitration setup, if service is not registered
+            var metadata = new KeyValuePair<string, object>(
+                import.MetadataKey ?? Constants.ExportMetadataDefaultKey,
+                import.Metadata);
+
+            if (metadata.Value != null)
+                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value }};
+
+            if (serviceKey != null)
+            {
+                var serviceKeyMetadata = ComposeServiceKeyMetadata(serviceKey, serviceType);
+
+                setupMetadata = setupMetadata ?? new Dictionary<string, object>();
+                setupMetadata.Add(serviceKeyMetadata.Key, serviceKeyMetadata.Value);
+
+                if (metadata.Value == null)
+                    metadata = serviceKeyMetadata;
+            }
 
             if (!container.IsRegistered(serviceType, serviceKey))
             {
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuseType = reuseAttr == null ? DefaultReuse : reuseAttr.ReuseType;
+                var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
                 var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
+
                 var reuse = GetReuse(reuseType, reuseName);
 
                 var impl = import.ConstructorSignature == null ? null
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
 
                 container.Register(serviceType, implementationType, reuse, impl,
-                    Setup.With(metadataOrFuncOfMetadata: metadata), IfAlreadyRegistered.Keep, serviceKey);
+                    Setup.With(setupMetadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
             // the default because we intentionally register the service and expect it to be avaliable
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
 
-            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadataKey, metadata);
+            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
@@ -435,7 +605,7 @@ namespace DryIoc.MefAttributedModel
             if (type.IsOpenGeneric())
                 type = type.GetGenericTypeDefinition();
 
-            var info = new ExportedRegistrationInfo { ImplementationType = type, Reuse = DefaultReuse };
+            var info = new ExportedRegistrationInfo { ImplementationType = type, Reuse = null };
 
             for (var attrIndex = 0; attrIndex < attributes.Length; attrIndex++)
             {
@@ -510,7 +680,7 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
+                if (attribute is ExportAttribute || attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
                 }
@@ -658,11 +828,11 @@ namespace DryIoc.MefAttributedModel
     public static class Constants
     {
         /// <summary>Predefined key in metadata dictionary for metadata provided as single object (not dictionary).</summary>
-        public static readonly string ExportMetadataDefaultKey = "ExportMetadataDefaultKey";
+        public static readonly string ExportMetadataDefaultKey = "@ExportMetadataDefaultKey";
 
-        /// <summary>Marks the Export generated for type which export its instance members, 
+        /// <summary>Marks the Export generated for type which export its instance members,
         /// but should not be resolved as-self by default.</summary>
-        public static readonly string InstanceFactory = "SN.InstanceFactory";
+        public static readonly string InstanceFactory = "@InstanceFactory";
     }
 
     /// <summary>Defines error codes and messages for <see cref="AttributedModelException"/>.</summary>
@@ -677,7 +847,8 @@ namespace DryIoc.MefAttributedModel
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
-                "Unable to find single constructor with " + typeof(ImportingConstructorAttribute) + " in {0}."),
+                "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) +
+                " nor default contructor in {0} when resolving: {1}"),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
             DuplicateMetadataKey = Of(
@@ -709,8 +880,8 @@ namespace DryIoc.MefAttributedModel
 
         private static Exception GetAttributedModelOrContainerException(ErrorCheck check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner)
         {
-            return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count 
-                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner) 
+            return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count
+                ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
                 : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
         }
 
@@ -777,10 +948,25 @@ namespace DryIoc.MefAttributedModel
         /// <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x)
         {
+            if (enumType.IsNullable())
+            {
+                if (x == null)
+                    return code.Print("null");
+
+                enumType = enumType.GetTypeInfo().GenericTypeArguments.Single();
+            }
+
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
         }
 
-        /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
+        /// <summary>Determines whether the type is nullable.</summary>
+        /// <param name="type">The type to check.</param>
+        public static bool IsNullable(this Type type)
+        {
+            return type.GetTypeInfo().IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+        }
+
+        /// <summary>Prints code items.</summary>
         /// <param name="code">Code to print to.</param>
         /// <param name="items">Items to print.</param> <returns>Code with appended items.</returns>
         public static StringBuilder AppendMany<T>(this StringBuilder code, IEnumerable<T> items)
@@ -845,7 +1031,7 @@ namespace DryIoc.MefAttributedModel
         public bool IsLazy { get { return ImplementationTypeFullName != null; } }
 
         /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
-        public ReuseType Reuse;
+        public ReuseType? Reuse;
 
         /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ReuseName;
@@ -910,7 +1096,8 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
-        /// <summary>Creates factory out of registration info.</summary> <returns>Created factory.</returns>
+        /// <summary>Creates factory out of registration info.</summary>
+        /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory()
         {
             Made made = null;
@@ -956,7 +1143,7 @@ namespace DryIoc.MefAttributedModel
                 });
 
             return member;
-    }
+        }
 
         /// <summary>Create factory setup from registration DTO.</summary> <returns>Created factory setup.</returns>
         public Setup GetSetup()
@@ -968,11 +1155,10 @@ namespace DryIoc.MefAttributedModel
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
-            // Eagerly discover metadata from attributes
-            object metadata = !HasMetadataAttribute ? null : GetExportedMetadata();
-
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
+
+            var metadata = GetExportedMetadata();
 
             return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
@@ -1032,7 +1218,7 @@ namespace DryIoc.MefAttributedModel
             "); for (var i = 0; i < Exports.Length; i++)
                     code = Exports[i].ToCode(code).Append(@",
             "); code.Append(@"},
-        Reuse = ").AppendEnum(typeof(ReuseType), Reuse).Append(@",
+        Reuse = ").AppendEnum(typeof(ReuseType?), Reuse).Append(@",
         ReuseName = ").AppendString(ReuseName).Append(@",
         OpenResolutionScope = ").AppendBool(OpenResolutionScope).Append(@",
         AsResolutionCall = ").AppendBool(AsResolutionCall).Append(@",
@@ -1061,19 +1247,52 @@ namespace DryIoc.MefAttributedModel
 
         private IDictionary<string, object> GetExportedMetadata()
         {
-            var metaAttrs = ImplementationType.GetAttributes()
-                .Where(a => a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any());
+            var hasKeyedExports = Exports.Any(it => it.ServiceKey != null);
+            if (!hasKeyedExports && !HasMetadataAttribute)
+                return null;
 
             Dictionary<string, object> metaDict = null;
+
+            // Converts keys to metadata in format of "<ServiceKey hash>:<ServiceType full name>" -> ServiceKey
+            if (hasKeyedExports)
+            {
+                metaDict = new Dictionary<string, object>();
+                for (var i = 0; i < Exports.Length; ++i)
+                {
+                    var export = Exports[i];
+                    if (export.ServiceKey != null)
+                    {
+                        var serviceKeyMeta = AttributedModel.ComposeServiceKeyMetadata(export.ServiceKey, export.ServiceType);
+                        metaDict.Add(serviceKeyMeta.Key, serviceKeyMeta.Value);
+                    }
+                }
+            }
+
+            var metaAttrs = ImplementationType.GetAttributes()
+                .Where(a =>
+                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() ||
+                    a is ExportMetadataAttribute);
+
             foreach (var metaAttr in metaAttrs)
             {
-                var withMetaAttr = metaAttr as WithMetadataAttribute;
-                var metaKey = withMetaAttr != null 
-                    ? (withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey)
-                    : Constants.ExportMetadataDefaultKey;
+                string metaKey = Constants.ExportMetadataDefaultKey;
+                object metaValue = metaAttr;
 
-                var metaValue = withMetaAttr != null 
-                    ? withMetaAttr.Metadata : metaAttr;
+                var withMetaAttr = metaAttr as WithMetadataAttribute;
+                if (withMetaAttr != null)
+                {
+                    metaKey = withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
+                    metaValue = withMetaAttr.Metadata;
+                }
+                else
+                {
+                    var exportMetaAttr = metaAttr as ExportMetadataAttribute;
+                    if (exportMetaAttr != null)
+                    {
+                        metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
+                        metaValue = exportMetaAttr.Value;
+                    }
+                }
 
                 if (metaDict != null && metaDict.ContainsKey(metaKey))
                     Throw.It(Error.DuplicateMetadataKey, metaKey, metaDict);
@@ -1095,7 +1314,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Member defining the Export.</summary>
         public string MemberName;
 
-        /// <summary>Parameter type full names (and names for generic parameters)  to identify the method overload.</summary>
+        /// <summary>Parameter type full names (and names for generic parameters) to identify the method overload.</summary>
         public string[] MethodParameterTypeFullNamesOrNames;
 
         /// <summary>Not null for exported instance member which requires factory object, null for static members.</summary>

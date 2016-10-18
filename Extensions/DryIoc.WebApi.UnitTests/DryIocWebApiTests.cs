@@ -98,7 +98,7 @@ namespace DryIoc.WebApi.UnitTests
         {
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config, new[] { Assembly.GetExecutingAssembly() });
-            var errors = container.VerifyResolutions();
+            var errors = container.Validate();
 
             Assert.AreEqual(
                 typeof(MissingDependencyController).GetImplementedServiceTypes().Length, 

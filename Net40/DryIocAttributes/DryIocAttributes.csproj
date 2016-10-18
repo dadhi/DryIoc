@@ -46,6 +46,9 @@
     <Compile Include="..\..\DryIocAttributes\Attributes.cs">
       <Link>Attributes.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIocAttributes\Ported-net45.cs">
+      <Link>Ported-net45.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIocAttributes\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
