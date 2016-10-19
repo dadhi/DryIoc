@@ -107,7 +107,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Lazy_import_of_commands()
         {
             // the same registration code as in the lazy sample
@@ -161,9 +161,29 @@ namespace DryIoc.IssuesTests.Samples
                 return info.CreateFactory();
             };
 
+            // Step 3 - Add service type handler for resolving many factories.
+            Rules.UnknownServiceHandler createFactoriesFromAssembly = serviceType =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
+                    return null;
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var pair in regs)
+                {
+                    if (pair.Value.ImplementationType == null)
+                        pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+                    factories.Add(new KV<object, Factory>(pair.Key, pair.Value.CreateFactory()));
+                }
+
+                return factories;
+            };
+
             // Test that resolve works
             //========================
-            var container = new Container().WithMef().With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
+            var container = new Container().WithMef()
+                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
+                .With(rules => rules.WithUnknownServiceHandlers(createFactoriesFromAssembly));
 
             // the same resolution code as in previous test
             //========================
