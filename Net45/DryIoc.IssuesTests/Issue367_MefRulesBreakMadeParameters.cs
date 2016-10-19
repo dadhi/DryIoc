@@ -1,7 +1,4 @@
-﻿using System;
-using System.ComponentModel.Composition;
-using DryIoc.MefAttributedModel;
-using DryIocAttributes;
+﻿using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -36,7 +33,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("b", instance.Name);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_WithMef_supports_made_parameters()
         {
             // MEF settings
@@ -48,7 +45,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("a", instance.Name);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_WithMef_supports_made_factory_method_with_parameters()
         {
             // MEF settings + factory method

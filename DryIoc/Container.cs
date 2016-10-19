@@ -3424,10 +3424,10 @@ namespace DryIoc
                     .Select(c => new { Ctor = c, Params = c.GetParameters() })
                     .OrderByDescending(x => x.Params.Length);
 
-                var rules = request.Rules;
-                var selector = rules.OverrideRegistrationMade
-                    ? rules.Parameters.OverrideWith(request.Made.Parameters)
-                    : request.Made.Parameters.OverrideWith(rules.Parameters);
+                var containerRules = request.Rules;
+                var selector = containerRules.OverrideRegistrationMade
+                    ? request.Made.Parameters.OverrideWith(containerRules.Parameters)
+                    : containerRules.Parameters.OverrideWith(request.Made.Parameters);
 
                 var parameterSelector = selector(request);
 
@@ -6968,8 +6968,8 @@ namespace DryIoc
 
                     var selector =
                         containerRules.OverrideRegistrationMade
-                        ? containerRules.Parameters.OverrideWith(Made.Parameters)
-                        : Made.Parameters.OverrideWith(containerRules.Parameters);
+                        ? Made.Parameters.OverrideWith(containerRules.Parameters)
+                        : containerRules.Parameters.OverrideWith(Made.Parameters);
 
                     var parameterSelector = selector(request);
 
