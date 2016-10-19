@@ -350,5 +350,11 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         [Import(AllowDefault = true)]
         public ExportFactory<INonExistingService> NonExistingServiceFactory { get; set; }
+
+        [Import(AllowDefault = true)]
+        public Lazy<INonExistingService, ILazyMetadata> LazyNonExistingServiceWithMetadata { get; set; }
+
+        [Import(AllowDefault = true)]
+        public ExportFactory<INonExistingService, ILazyMetadata> NonExistingServiceFactoryWithMetadata { get; set; }
     }
 }

@@ -267,7 +267,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(services[1].Value);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_optional_imports_of_nonexisting_service_are_null()
         {
             var service = Container.Resolve<NonExistingServiceOptionalImports>();
@@ -276,6 +276,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(service.NonExistingService);
             Assert.IsNull(service.LazyNonExistingService);
             Assert.IsNull(service.NonExistingServiceFactory);
+            Assert.IsNull(service.LazyNonExistingServiceWithMetadata);
+            Assert.IsNull(service.NonExistingServiceFactoryWithMetadata);
         }
     }
 }

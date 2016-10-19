@@ -169,8 +169,16 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Creates the <see cref="ExportFactory{T}"/>.</summary>
         /// <typeparam name="T">The type of the exported service</typeparam>
         /// <param name="container">The container.</param>
-        internal static ExportFactory<T> CreateExportFactory<T>(IContainer container)
+        /// <param name="ifUnresolved"><see cref="IfUnresolved"/> behavior specification.</param>
+        internal static ExportFactory<T> CreateExportFactory<T>(IContainer container, DryIoc.IfUnresolved ifUnresolved)
         {
+            // check if the service is resolvable
+            var func = container.Resolve<Func<T>>(ifUnresolved: ifUnresolved);
+            if (func == null)
+            {
+                return null;
+            }
+
             return new ExportFactory<T>(() =>
             {
                 var scope = container.With(r => r
@@ -190,7 +198,8 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryMethod = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true));
+            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true),
+            parameters: Parameters.Of.Type(request => request.IfUnresolved));
 
         /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
         /// <typeparam name="T">The type of the exported service.</typeparam>

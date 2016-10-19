@@ -136,6 +136,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(service.NonExistingService);
             Assert.IsNull(service.LazyNonExistingService);
             Assert.IsNull(service.NonExistingServiceFactory);
+            Assert.IsNull(service.LazyNonExistingServiceWithMetadata);
+            Assert.IsNull(service.NonExistingServiceFactoryWithMetadata);
         }
     }
 }
