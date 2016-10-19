@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.8.1
+      - fixed: #368 Registration Made.Of should override the global Container Made.Of settings
       v2.8.0
       - added: #269: Distinguish Transient reuse from non specified reuse
       - added: #331: Track transient disposables in singleton scope if nor reused parent nor the current scope available
