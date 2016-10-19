@@ -118,6 +118,16 @@ namespace DryIoc.MefAttributedModel
                 made: _createLazyWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
+            // constructor: new Lazy<T>(Func<T> factory)
+            var lazyConstructor = typeof(Lazy<>).GetAllConstructors()
+                .Single(mi => mi.GetParameters().Length == 1 &&
+                    mi.GetParameters().Single().ParameterType.GetTypeInfo().IsGenericType);
+
+            container.Register(typeof(Lazy<>),
+                made: Made.Of(lazyConstructor),
+                setup: Setup.Wrapper,
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
             return container;
         }
 
