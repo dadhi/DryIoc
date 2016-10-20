@@ -670,16 +670,6 @@ namespace DryIoc
 
         #endregion
 
-        #region IServiceProvider
-
-        /// <inheritdoc />
-        public object GetService(Type serviceType)
-        {
-            return ((IResolver)this).Resolve(serviceType, ifUnresolvedReturnDefault: false); // todo: Add container rule.
-        }
-
-        #endregion
-
         #region IScopeAccess
 
         /// <summary>Scope containing container singletons.</summary>
@@ -9103,7 +9093,7 @@ namespace DryIoc
 
     /// <summary>Exposes operations required for internal registry access.
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
-    public interface IContainer : IRegistrator, IResolver, IServiceProvider, IDisposable
+    public interface IContainer : IRegistrator, IResolver, IDisposable
     {
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }

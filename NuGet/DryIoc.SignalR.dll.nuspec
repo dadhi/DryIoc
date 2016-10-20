@@ -12,7 +12,7 @@
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
           v2.0.1:
-          - added: Reference to latest DryIoc 2.8.1
+          - added: Reference to latest DryIoc 2.8.2
           v2.0.0:
           - changed: WithSignalR to not modify container and just register HubActivator, Hubs, and set GlobalHost.Resolver
           - changed: HubActivator to just resolving the Hub without opening the scope
@@ -20,7 +20,7 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.8.1,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.8.2,3.0.0)" />
             <dependency id="Microsoft.AspNet.SignalR.Core" version="[2.2,3.0)" />
           </group>
         </dependencies>

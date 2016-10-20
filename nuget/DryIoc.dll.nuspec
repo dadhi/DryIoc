@@ -4,13 +4,16 @@
         <id>DryIoc.dll</id>
         <version>0.0.0</version><!-- overridden by "NuGet pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.8.2
+          - fixed: NetStandard1.0 package dependencies 
+          - removed: #342: Make IContainer implement System.IServiceProvider interface
           v2.8.1
           - fixed: #368 Registration Made.Of should override the global Container Made.Of settings
           v2.8.0

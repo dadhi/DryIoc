@@ -5,7 +5,7 @@
         <!-- just a placeholder for "nuget pack -Version" flag -->
         <version>0.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -25,11 +25,11 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.8,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.8.2,3.0)" />
             <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
           </group>
           <group targetFramework="netstandard1.0">
-            <dependency id="DryIoc.dll" version="[2.8,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.8.2,3.0)" />
             <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
 
             <dependency id="System.Collections" version="4.0.11" />
