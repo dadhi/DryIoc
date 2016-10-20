@@ -72,7 +72,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [ExportEx(typeof(DontThrows), IfAlreadyExported.Throw)]
         public class Throws : DontThrows { }
 
-        [ExportWithDisplayName("blah"), WithMetadata("hey")]
+        [ExportWithDisplayName("blah"), WithMetadata("DisplayName", "hey")]
         public class ThrowsForMultipleMetaWithDuplicateName { }
     }
 }
