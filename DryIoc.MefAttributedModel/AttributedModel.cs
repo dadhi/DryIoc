@@ -1311,6 +1311,11 @@ namespace DryIoc.MefAttributedModel
                         metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
                         metaValue = exportMetaAttr.Value;
                     }
+                    else
+                    {
+                        // index custom metadata attributes with their type name
+                        metaKey = metaAttr.GetType().FullName;
+                    }
                 }
 
                 if (metaDict != null && metaDict.ContainsKey(metaKey))
