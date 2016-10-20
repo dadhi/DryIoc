@@ -11,8 +11,11 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.8.3
+          - fixed: NetStandard1.0 package dependencies
+          - fixed: Removing remains of IServiceProvider
           v2.8.2
-          - fixed: NetStandard1.0 package dependencies 
+          - fixed: NetStandard1.0 package dependencies
           - removed: #342: Make IContainer implement System.IServiceProvider interface
           v2.8.1
           - fixed: #368 Registration Made.Of should override the global Container Made.Of settings
