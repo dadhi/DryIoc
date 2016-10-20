@@ -1290,12 +1290,14 @@ namespace DryIoc.MefAttributedModel
             var metaAttrs = ImplementationType.GetAttributes()
                 .Where(a =>
                     a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() ||
-                    a is ExportMetadataAttribute);
+                    a is ExportMetadataAttribute)
+                .OrderBy(a => a.GetType().FullName);
 
             foreach (var metaAttr in metaAttrs)
             {
                 string metaKey = Constants.ExportMetadataDefaultKey;
                 object metaValue = metaAttr;
+                var addProperties = false;
 
                 var withMetaAttr = metaAttr as WithMetadataAttribute;
                 if (withMetaAttr != null)
@@ -1315,6 +1317,7 @@ namespace DryIoc.MefAttributedModel
                     {
                         // index custom metadata attributes with their type name
                         metaKey = metaAttr.GetType().FullName;
+                        addProperties = true;
                     }
                 }
 
@@ -1323,6 +1326,21 @@ namespace DryIoc.MefAttributedModel
 
                 metaDict = metaDict ?? new Dictionary<string, object>();
                 metaDict.Add(metaKey, metaValue);
+
+                if (addProperties)
+                {
+                    var properties = metaAttr.GetType().GetTypeInfo().DeclaredProperties;
+                    foreach (var property in properties)
+                    {
+                        metaKey = property.Name;
+                        metaValue = property.GetValue(metaAttr, new object[0]);
+
+                        if (metaDict.ContainsKey(metaKey))
+                            Throw.It(Error.DuplicateMetadataKey, metaKey, metaDict);
+
+                        metaDict.Add(metaKey, metaValue);
+                    }
+                }
             }
 
             return metaDict;
