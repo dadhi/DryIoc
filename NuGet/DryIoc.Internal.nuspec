@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata minClientVersion="3.3.0">
+    <id>DryIoc.Internal</id>
+    <version>0.0.0</version>
+    <!-- overridden by "nuget pack -Version" flag -->
+    <authors>Maksim Volkau</authors>
+    <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
+    <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
+    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
+    <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+    <releaseNotes>
+      v2.8.3
+      - fixed: NetStandard1.0 package dependencies
+      - fixed: Removing remains of IServiceProvider
+      v2.8.2
+      - fixed: NetStandard1.0 package dependencies
+      - removed: #342: Make IContainer implement System.IServiceProvider interface
+      v2.8.1
+      - fixed: #368 Registration Made.Of should override the global Container Made.Of settings
+      v2.8.0
+      - added: #269: Distinguish Transient reuse from non specified reuse
+      - added: #331: Track transient disposables in singleton scope if nor reused parent nor the current scope available
+      - added: #342: Make IContainer implement System.IServiceProvider interface
+      - fixed: #327: UseInstance non-deterministic behavior in multi-threading tests
+      - fixed: #328: Lazy collection resolve behavior in and out of scope
+      - fixed: #330: Looks like rules do not work with TrackingDisposableTransients
+      - fixed: #338: after re-register instance in scope used old version of object(cached)
+      - fixed: #347: Not resolved instance in child scope of scope
+      - fixed: #344: Transient disposable validation
+      - fixed: #356: Portable.GetAssemblyTypesMethod() crash with ArgumentException
+      - fixed: #359: Some rules and setup flags applied twice will wrongly unset the flag
+      - fixed: #365: Container is not marked and treated as Disposed when Singletons are disposed
+    </releaseNotes>
+    <contentFiles>
+      <files include="cs/any/*.*" buildAction="Compile" />
+    </contentFiles>
+  </metadata>
+  <files>
+    <file src="..\LICENSE.txt" />
+
+    <!--net35-->
+    <file src="..\DryIoc.Internal\Container.cs" target="content\net35\DryIoc" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="content\net35\DryIoc" />
+    <file src="..\DryIoc.Internal\FactoryCompiler.cs" target="content\net35\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net40.cs" target="content\net35\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\net35\DryIoc" />
+
+    <!--net40-->
+    <file src="..\DryIoc.Internal\Container.cs" target="content\net40\DryIoc" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="content\net40\DryIoc" />
+    <file src="..\DryIoc.Internal\FactoryCompiler.cs" target="content\net40\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\net40\DryIoc" />
+
+    <!--net45-->
+    <file src="..\DryIoc.Internal\Container.cs" target="content\net45\DryIoc" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="content\net45\DryIoc" />
+    <file src="..\DryIoc.Internal\FactoryCompiler.cs" target="content\net45\DryIoc" />
+    <file src="..\DryIoc.Internal\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIoc" />
+
+    <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+    <file src="..\DryIoc.Internal\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+
+    <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+    <file src="..\DryIoc.Internal\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+
+    <!--uap10.0: Universal Windows Platform-->
+    <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\any" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\any" />
+  </files>
+</package>
