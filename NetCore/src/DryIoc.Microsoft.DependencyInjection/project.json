@@ -12,16 +12,16 @@
   "packOptions": {
     "owners": [ "Maksim Volkau" ],
     "copyright": "Copyright © 2016 Maksim Volkau",
-    "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "vNext", "AspNetCore", "NetCore", "DNX" ],
+    "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "AspNet", "vNext", "AspNetCore", "NetCore", "DNX" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
-    "releaseNotes": "- Updated to DryIoc 2.7.1"
+    "releaseNotes": "Updated to DryIoc 2.8.3; Replaced obsolete RegisterInstance with UseInstance; added: throwIfUnresolved optional argument to WithDependencyInjectionAdapter; added: ConfigureServiceProvider<TCompositionRoot>"
   },
 
   "dependencies": {
     "NETStandard.Library": "1.6.0",
     "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0",
-    "DryIoc.dll": "2.7.1"
+    "DryIoc.dll": "2.8.3"
   },
 
   "frameworks": {

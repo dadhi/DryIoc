@@ -40,6 +40,8 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="container">Source container to adapt.</param>
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
+        /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
+        /// for unresolved type instead of fallback to default Resolver.</param>
         /// <returns>New container adapted to AspNetCore DI conventions.</returns>
         /// <example>
         /// <code><![CDATA[
@@ -55,7 +57,8 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// </example>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
             IEnumerable<ServiceDescriptor> descriptors = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
+            Func<Type, bool> throwIfUnresolved = null)
         {
             if (container.ScopeContext != null)
                 throw new ArgumentException("Adapted container uses ambient scope context which is not supported by AspNetCore DI.");
@@ -66,7 +69,8 @@ namespace DryIoc.Microsoft.DependencyInjection
                 .WithTrackingDisposableTransients()
                 .WithImplicitRootOpenScope());
 
-            adapter.Register<IServiceProvider, DryIocServiceProvider>(Reuse.InCurrentScope);
+            adapter.Register<IServiceProvider, DryIocServiceProvider>(Reuse.InCurrentScope, 
+                Parameters.Of.Type(_ => throwIfUnresolved));
 
             // Scope factory should be scoped itself to enable nested scopes creation
             adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.InCurrentScope);
@@ -76,6 +80,32 @@ namespace DryIoc.Microsoft.DependencyInjection
                 adapter.Populate(descriptors, registerDescriptor);
 
             return adapter;
+        }
+
+        /// <summary>Convinient helper to consolidate DryIoc registrations in specified <typeparamref name="TCompositionRoot"/></summary>
+        /// <typeparam name="TCompositionRoot">Class with will be created by container on Startup, give a chance to do registrations.</typeparam>
+        /// <param name="container">Container with DI adapter.</param>
+        /// <returns>Service provider for both adapted services collection and registrations done in <typeparamref name="TCompositionRoot"/>.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// // Example of CompositionRoot: 
+        /// public class CompositionRoot
+        /// {
+        ///    // if you need the whole container then change parameter type from IRegistrator to IContainer
+        ///    public CompositionRoot(IRegistrator r)
+        ///    {
+        ///        r.Register<ISingletonService, SingletonService>(Reuse.Singleton);
+        ///        r.Register<ITransientService, TransientService>(Reuse.Transient);
+        ///        r.Register<IScopedService, ScopedService>(Reuse.InCurrentScope);
+        ///    }
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container)
+        {
+            container.Register<TCompositionRoot>();
+            container.Resolve<TCompositionRoot>();
+            return container.Resolve<IServiceProvider>();
         }
 
         /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
@@ -125,7 +155,8 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
-                container.RegisterInstance(descriptor.ServiceType, descriptor.ImplementationInstance, reuse);
+                // todo: v1.1: plan to specify preventDisposal for the instances
+                container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance);
             }
         }
 
@@ -134,7 +165,8 @@ namespace DryIoc.Microsoft.DependencyInjection
             switch (lifetime)
             {
                 case ServiceLifetime.Singleton:
-                    return Reuse.Singleton;
+                    // todo: 1.1: will be converted back to Singleton when Rule.WithImplicitRootOpenScope is removed from adepter
+                    return Reuse.InCurrentNamedScope(Container.NonAmbientRootScopeName);
                 case ServiceLifetime.Scoped:
                     return Reuse.InCurrentScope;
                 case ServiceLifetime.Transient:
@@ -150,12 +182,16 @@ namespace DryIoc.Microsoft.DependencyInjection
     public sealed class DryIocServiceProvider : IServiceProvider, ISupportRequiredService, IDisposable
     {
         private readonly IContainer _scopedContainer;
+        private readonly Func<Type, bool> _throwIfUnresolved;
 
         /// <summary>Uses passed container for scoped resolutions.</summary> 
         /// <param name="scopedContainer">subj.</param>
-        public DryIocServiceProvider(IContainer scopedContainer)
+        /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
+        /// for unresolved type instead of fallback to default Resolver.</param>
+        public DryIocServiceProvider(IContainer scopedContainer, Func<Type, bool> throwIfUnresolved)
         {
             _scopedContainer = scopedContainer;
+            _throwIfUnresolved = throwIfUnresolved;
         }
 
         /// <summary>Delegates resolution to scoped container. 
@@ -164,7 +200,8 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <returns>Resolved service object.</returns>
         public object GetService(Type serviceType)
         {
-            return _scopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault: true);
+            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
+            return _scopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault);
         }
 
         /// <summary> Gets service of type <paramref name="serviceType" /> from the <see cref="T:System.IServiceProvider" /> implementing
@@ -187,7 +224,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// <summary>The goal of the factory is create / open new scope.
     /// The factory itself is scoped (not a singleton). 
     /// That means you need to resolve factory from outer scope to create nested scope.</summary>
-    public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
+    public sealed class DryIocServiceScopeFactory: IServiceScopeFactory
     {
         /// <summary>Using <see cref="Reuse.WebRequestScopeName"/> allows registration with both
         /// <see cref="Reuse.InCurrentScope"/> and <see cref="Reuse.InWebRequest"/>.</summary>
