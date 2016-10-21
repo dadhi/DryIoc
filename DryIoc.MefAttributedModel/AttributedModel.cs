@@ -1112,6 +1112,8 @@ namespace DryIoc.MefAttributedModel
             var exports = newInfo.Exports;
             for (var i = 0; i < exports.Length; i++)
                 exports[i] = exports[i].MakeLazy();
+            if (newInfo.FactoryMethodInfo != null)
+                newInfo.FactoryMethodInfo = newInfo.FactoryMethodInfo.MakeLazy();
             return newInfo;
         }
 
@@ -1330,6 +1332,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>The type declaring the member.</summary>
         public Type DeclaringType;
 
+        /// <summary>The declaring type name.</summary>
+        public string DeclaringTypeFullName;
+
         /// <summary>Member defining the Export.</summary>
         public string MemberName;
 
@@ -1338,6 +1343,22 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Not null for exported instance member which requires factory object, null for static members.</summary>
         public ExportInfo InstanceFactory;
+
+        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        public bool IsLazy { get { return DeclaringTypeFullName != null; } }
+
+        /// <summary>Returns new export info with type representation as type full name string, instead of
+        /// actual type.</summary> <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
+        public FactoryMethodInfo MakeLazy()
+        {
+            if (IsLazy) return this;
+            var info = (FactoryMethodInfo)MemberwiseClone();
+            info.DeclaringTypeFullName = DeclaringType.FullName;
+            info.DeclaringType = null;
+            if (info.InstanceFactory != null)
+                info.InstanceFactory = info.InstanceFactory.MakeLazy();
+            return info;
+        }
 
         /// <summary>Determines whether the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />.</summary>
         /// <returns>true if the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />; otherwise, false.</returns>

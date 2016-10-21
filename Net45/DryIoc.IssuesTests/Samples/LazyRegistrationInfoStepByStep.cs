@@ -83,6 +83,9 @@ namespace DryIoc.IssuesTests.Samples
                 if (info.ImplementationType == null)
                     info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
 
+                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
+                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
+
                 return info.CreateFactory();
             };
 
@@ -158,6 +161,9 @@ namespace DryIoc.IssuesTests.Samples
                 if (info.ImplementationType == null)
                     info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
 
+                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
+                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
+
                 return info.CreateFactory();
             };
 
@@ -173,6 +179,10 @@ namespace DryIoc.IssuesTests.Samples
                 {
                     if (pair.Value.ImplementationType == null)
                         pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+
+                    if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
+                        pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+
                     factories.Add(new KV<object, Factory>(pair.Key, pair.Value.CreateFactory()));
                 }
 
