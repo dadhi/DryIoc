@@ -110,7 +110,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Lazy_import_of_commands()
         {
             // the same registration code as in the lazy sample
@@ -142,7 +142,13 @@ namespace DryIoc.IssuesTests.Samples
                     if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
                         regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
+
+                    // multiple services workaround: generate missing service keys
+                    var serviceKey = export.ServiceKey;
+                    if (serviceKey == null)
+                        serviceKey = Guid.NewGuid().ToString();
+
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
                 }
             }
 
@@ -153,7 +159,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
                     return null;
 
-                var regIndex = regs.FindIndex(pair => Equals(pair.Key, request.ServiceKey));
+                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
                 if (regIndex == -1)
                     return null;
 
