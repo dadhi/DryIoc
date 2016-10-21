@@ -267,7 +267,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(services[1].Value);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_optional_imports_of_nonexisting_service_are_null()
         {
             var service = Container.Resolve<NonExistingServiceOptionalImports>();
@@ -276,6 +276,24 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(service.NonExistingService);
             Assert.IsNull(service.LazyNonExistingService);
             Assert.IsNull(service.NonExistingServiceFactory);
+            Assert.IsNull(service.LazyNonExistingServiceWithMetadata);
+            Assert.IsNull(service.NonExistingServiceFactoryWithMetadata);
+        }
+
+        [Test]
+        public void DryIoc_supports_multiple_metadata_attributes()
+        {
+            var service = Container.Resolve<ImportStuffWithMultipleMetadataAttributes>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.Scripts);
+            Assert.AreEqual(1, service.Scripts.Length);
+            Assert.AreEqual(123L, service.Scripts.First().Metadata.ScriptID);
+            Assert.IsNotNull(service.Scripts.First().Value);
+            Assert.IsNotNull(service.NamedServices);
+            Assert.AreEqual(1, service.NamedServices.Length);
+            Assert.AreEqual("MultipleMetadata", service.NamedServices.First().Metadata.Name);
+            Assert.IsNotNull(service.NamedServices.First().Value);
         }
     }
 }

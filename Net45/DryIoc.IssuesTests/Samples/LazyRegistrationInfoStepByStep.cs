@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
 using System.Linq;
 using System.Reflection;
 using DryIoc.MefAttributedModel;
@@ -61,7 +62,7 @@ namespace DryIoc.IssuesTests.Samples
 
                     List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                     if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
-                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName, 
+                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
                     regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
                 }
@@ -90,6 +91,110 @@ namespace DryIoc.IssuesTests.Samples
             var container = new Container(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
             var thing = container.Resolve<IThing>();
             Assert.IsNotNull(thing);
+        }
+
+        [Test]
+        public void NonLazy_import_of_commands()
+        {
+            // ordinary registration
+            var container = new Container().WithMef();
+            container.RegisterExports(new[] { typeof(LazyRegistrationInfoStepByStep).Assembly });
+
+            // check that importing commands actually works
+            var cmds = container.Resolve<CommandImporter>();
+            Assert.IsNotNull(cmds.Commands);
+            Assert.AreEqual(2, cmds.Commands.Length);
+            Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+        }
+
+        [Test, Ignore("fails")]
+        public void Lazy_import_of_commands()
+        {
+            // the same registration code as in the lazy sample
+            //========================
+            var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
+
+            // Step 1 - Scan assembly and find exported type, create DTOs for them.
+            var registrations = AttributedModel.Scan(new[] { assembly });
+
+            // Step 2 - Make DTOs lazy.
+            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
+
+            // In run-time deserialize registrations and register them as rule for unresolved services
+            //=========================================================================================
+
+            var lazyLoadedAssembly = new Lazy<Assembly>(() => assembly);
+
+            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
+            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            foreach (var lazyRegistration in lazyRegistrations)
+            {
+                var exports = lazyRegistration.Exports;
+                for (var i = 0; i < exports.Length; i++)
+                {
+                    var export = exports[i];
+                    var serviceTypeFullName = export.ServiceTypeFullName;
+
+                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
+                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
+                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
+                }
+            }
+
+            // Step 2 - Add resolution rule for creating factory on resolve.
+            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
+                    return null;
+
+                var regIndex = regs.FindIndex(pair => Equals(pair.Key, request.ServiceKey));
+                if (regIndex == -1)
+                    return null;
+
+                var info = regs[regIndex].Value;
+                if (info.ImplementationType == null)
+                    info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
+
+                return info.CreateFactory();
+            };
+
+            // Test that resolve works
+            //========================
+            var container = new Container().WithMef().With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
+
+            // the same resolution code as in previous test
+            //========================
+            var cmds = container.Resolve<CommandImporter>();
+            Assert.IsNotNull(cmds.Commands);
+            Assert.AreEqual(2, cmds.Commands.Length);
+            Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+        }
+
+        public interface ICommandMetadata { string Name { get; } }
+
+        [MetadataAttribute]
+        public class CommandAttribute : Attribute, ICommandMetadata
+        {
+            public CommandAttribute(string name) { Name = name; }
+            public string Name { get; }
+        }
+
+        public interface ICommand { }
+
+        [Export(typeof(ICommand)), Command("Sample command")]
+        public class SampleCommand : ICommand { }
+
+        [Export(typeof(ICommand)), Command("Another command")]
+        public class AnotherCommand : ICommand { }
+
+        [Export]
+        public class CommandImporter
+        {
+            [ImportMany]
+            public Lazy<ICommand, ICommandMetadata>[] Commands { get; set; }
         }
     }
 
