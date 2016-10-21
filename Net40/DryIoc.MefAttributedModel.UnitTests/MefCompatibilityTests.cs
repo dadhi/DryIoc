@@ -10,16 +10,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
     {
         private CompositionContainer Mef => new CompositionContainer(new AssemblyCatalog(typeof(ILogTableManager).Assembly));
 
-        private IContainer Container => CreateContainer();
-
-        private static IContainer CreateContainer()
-        {
-            var container = new Container().WithMef();
-
-            container.RegisterExports(new[] { typeof(ILogTableManager).GetAssembly() });
-            return container;
-        }
-
         [Test]
         public void Mef_supports_importing_static_factory_method()
         {
