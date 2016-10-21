@@ -881,6 +881,16 @@ namespace DryIoc
                 }
             }
 
+            if (Rules.UnknownServiceHandlers != null)
+            {
+                foreach (var handler in Rules.UnknownServiceHandlers)
+                {
+                    var handlerFactories = handler(serviceType);
+                    if (handlerFactories != null && handlerFactories.Any())
+                        factories = factories.Concat(handlerFactories);
+                }
+            }
+
             return factories;
         }
 
@@ -2320,7 +2330,7 @@ namespace DryIoc
     /// <summary>Interface used to convert reuse instance to expression.</summary>
     public interface IConvertibleToExpression
     {
-        /// <summary>Returns expression representation without closure.</summary> 
+        /// <summary>Returns expression representation without closure.</summary>
         /// <param name="fallbackConverter">Delegate converting of sub-items, constants to container.</param>
         /// <returns>Expression representation.</returns>
         Expression ToExpression(Func<object, Expression> fallbackConverter);
@@ -2846,9 +2856,9 @@ namespace DryIoc
             return pairExpr;
         }
 
-        /// <summary> Universal expression factory to wrap service with metadata. 
+        /// <summary> Universal expression factory to wrap service with metadata.
         /// Works with any generic type with first Type arg - Service type and second Type arg - Metadata type,
-        /// and constructor with Service and Metadata arguments respectively. 
+        /// and constructor with Service and Metadata arguments respectively.
         /// - if service key is not specified in request then method will search for all
         /// registered factories with the same metadata type ignoring keys.
         /// - if metadata is IDictionary{string, object},
@@ -3014,6 +3024,33 @@ namespace DryIoc
                 ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
         }
 
+        /// <summary>Defines delegate to return all factories for the given service type.</summary>
+        /// <param name="serviceType">Service type to return factory for</param> <returns>All factories for the given type, or null if unable to resolve.</returns>
+        public delegate IEnumerable<KV<object, Factory>> UnknownServiceHandler(Type serviceType);
+
+        /// <summary>Gets rules for resolving multiple not-registered services. Null by default.</summary>
+        public UnknownServiceHandler[] UnknownServiceHandlers { get; private set; }
+
+        /// <summary>Appends handler to current unknown service handlers.</summary>
+        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
+        public Rules WithUnknownServiceHandlers(params UnknownServiceHandler[] rules)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceHandlers = newRules.UnknownServiceHandlers.Append(rules);
+            return newRules;
+        }
+
+        /// <summary>Removes specified handler from unknown service handlers, and returns new Rules.
+        /// If no resolver was found then <see cref="UnknownServiceHandlers"/> will stay the same instance,
+        /// so it could be checked for remove success or fail.</summary>
+        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
+        public Rules WithoutUnknownServiceHandler(UnknownServiceHandler rule)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceHandlers = newRules.UnknownServiceHandlers.Remove(rule);
+            return newRules;
+        }
+
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
         /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
         /// <param name="request">Request to return factory for</param> <returns>Factory to resolve request, or null if unable to resolve.</returns>
@@ -3121,7 +3158,7 @@ namespace DryIoc
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
-        /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param> 
+        /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param>
         /// <returns>New rules.</returns>
         public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse)
         {
@@ -5768,7 +5805,7 @@ namespace DryIoc
                 }
 
                 // if no specified the wrapper reuse is always Transient,
-                // other container-wide default reuse is applied                
+                // other container-wide default reuse is applied
                 if (reuse == null)
                     reuse = factory.FactoryType == FactoryType.Wrapper
                         ? DryIoc.Reuse.Transient
@@ -6383,7 +6420,7 @@ namespace DryIoc
             // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
             if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
                 || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
-                // note: Split only if not wrapped in Func with args - 
+                // note: Split only if not wrapped in Func with args -
                 // propagation of args across Resolve boundaries is not supported.
                 && !request.IsWrappedInFuncWithArgs())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
