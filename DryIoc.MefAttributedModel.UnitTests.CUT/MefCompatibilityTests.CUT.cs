@@ -357,4 +357,32 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [Import(AllowDefault = true)]
         public ExportFactory<INonExistingService, ILazyMetadata> NonExistingServiceFactoryWithMetadata { get; set; }
     }
+
+    public interface IScriptMetadata { long ScriptID { get; } }
+
+    [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class ScriptMetadataAttribute : Attribute, IScriptMetadata
+    {
+        public ScriptMetadataAttribute(long scriptId)
+        {
+            ScriptID = scriptId;
+        }
+
+        public long ScriptID { get; }
+    }
+
+    [Export, LazyMetadata("MultipleMetadata"), ScriptMetadata(123)]
+    public class MultipleMetadataAttributes
+    {
+    }
+
+    [Export]
+    public class ImportStuffWithMultipleMetadataAttributes
+    {
+        [ImportMany]
+        public Lazy<MultipleMetadataAttributes, IScriptMetadata>[] Scripts { get; set; }
+
+        [ImportMany]
+        public Lazy<MultipleMetadataAttributes, ILazyMetadata>[] NamedServices { get; set; }
+    }
 }
