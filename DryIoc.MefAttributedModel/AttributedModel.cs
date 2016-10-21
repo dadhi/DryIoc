@@ -571,7 +571,7 @@ namespace DryIoc.MefAttributedModel
                 import.Metadata);
 
             if (metadata.Value != null)
-                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value }};
+                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value } };
 
             if (serviceKey != null)
             {
@@ -1115,7 +1115,7 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
-        /// <summary>Creates factory out of registration info.</summary>
+        /// <summary>Creates factory from registration info.</summary>
         /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory()
         {
@@ -1151,14 +1151,14 @@ namespace DryIoc.MefAttributedModel
                         return true;
 
                     var parameters = method.GetParameters();
-                    var factoryMethodParameterTypeNames = factoryMethod.MethodParameterTypeFullNamesOrNames ??
-                                                          ArrayTools.Empty<string>();
+                    var factoryMethodParameterTypeNames = 
+                        factoryMethod.MethodParameterTypeFullNamesOrNames ?? ArrayTools.Empty<string>();
                     if (parameters.Length != factoryMethodParameterTypeNames.Length)
                         return false;
 
                     return parameters.Length == 0
-                           || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                               .SequenceEqual(factoryMethodParameterTypeNames);
+                        || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
+                            .SequenceEqual(factoryMethodParameterTypeNames);
                 });
 
             return member;
@@ -1235,7 +1235,7 @@ namespace DryIoc.MefAttributedModel
         ImplementationType = ").AppendType(ImplementationType).Append(@",
         Exports = new[] {
             "); for (var i = 0; i < Exports.Length; i++)
-                    code = Exports[i].ToCode(code).Append(@",
+                code = Exports[i].ToCode(code).Append(@",
             "); code.Append(@"},
         Reuse = ").AppendEnum(typeof(ReuseType?), Reuse).Append(@",
         ReuseName = ").AppendString(ReuseName).Append(@",
@@ -1295,7 +1295,7 @@ namespace DryIoc.MefAttributedModel
 
             foreach (var metaAttr in metaAttrs)
             {
-                string metaKey = Constants.ExportMetadataDefaultKey;
+                string metaKey;
                 object metaValue = metaAttr;
                 var addProperties = false;
 
