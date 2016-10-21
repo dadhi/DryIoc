@@ -18,6 +18,13 @@ echo:================
 %NUGET% pack "NuGet\DryIoc.dll.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive -Symbols
 
 echo:
+call :ParseVersion "DryIoc\Properties\AssemblyInfo.cs"
+echo:DryIoc.Internal v%VER%
+echo:================
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\BuildScripts\MakeInternal.ps1'";
+%NUGET% pack "NuGet\DryIoc.Internal.nuspec" -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+
+echo:
 call :ParseVersion "DryIocAttributes\Properties\AssemblyInfo.cs"
 echo:DryIocAttributes v%VER%
 echo:============================

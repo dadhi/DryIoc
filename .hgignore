@@ -196,3 +196,6 @@ $RECYCLE.BIN/
 
 ### SVN ###
 .svn/
+
+## Generated build files
+DryIoc.Internal/
