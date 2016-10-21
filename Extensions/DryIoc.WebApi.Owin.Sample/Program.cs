@@ -4,7 +4,6 @@ using System.Web.Http;
 using Microsoft.Owin.Diagnostics;
 using Microsoft.Owin.Hosting;
 using Owin;
-using DryIoc.WebApi.Owin;
 
 namespace DryIoc.WebApi.Owin.Sample
 {
@@ -37,7 +36,7 @@ namespace DryIoc.WebApi.Owin.Sample
             var di = new Container();
 
             // NOTE: Registers ISession provider to work with injected Request
-            di.Register<ISession>(Made.Of(() => GetSession(Arg.Of<HttpRequestMessage>())));
+            di.Register(Made.Of(() => GetSession(Arg.Of<HttpRequestMessage>())));
 
             di.WithWebApi(config);
 

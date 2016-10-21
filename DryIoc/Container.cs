@@ -670,16 +670,6 @@ namespace DryIoc
 
         #endregion
 
-        #region IServiceProvider
-
-        /// <inheritdoc />
-        public object GetService(Type serviceType)
-        {
-            return ((IResolver)this).Resolve(serviceType, ifUnresolvedReturnDefault: false); // todo: Add container rule.
-        }
-
-        #endregion
-
         #region IScopeAccess
 
         /// <summary>Scope containing container singletons.</summary>
@@ -2605,8 +2595,7 @@ namespace DryIoc
 
             wrappers = wrappers
                 .AddOrUpdate(typeof(IRegistrator), containerFactory)
-                .AddOrUpdate(typeof(IContainer), containerFactory)
-                .AddOrUpdate(typeof(IServiceProvider), containerFactory);
+                .AddOrUpdate(typeof(IContainer), containerFactory);
 
             wrappers = wrappers.AddOrUpdate(typeof(IDisposable),
                 new ExpressionFactory(r => r.IsResolutionRoot ? null : Container.GetResolutionScopeExpression(r),
@@ -3355,7 +3344,8 @@ namespace DryIoc
 
         /// <summary>Specifies to open scope as soon as container is created (the same as for Singleton scope).
         /// That way you don't need to call <see cref="IContainer.OpenScope"/>.
-        /// Implicitly opened scope will be disposed together with Singletons when container is disposed.</summary>
+        /// Implicitly opened scope will be disposed together with Singletons when container is disposed.
+        /// The name of root scope is <see cref="Container.NonAmbientRootScopeName"/>.</summary>
         /// <remarks>The setting is only valid for container without ambient scope context.</remarks>
         /// <returns>Returns new rules with flag set.</returns>
         public Rules WithImplicitRootOpenScope()
@@ -9140,7 +9130,7 @@ namespace DryIoc
 
     /// <summary>Exposes operations required for internal registry access.
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
-    public interface IContainer : IRegistrator, IResolver, IServiceProvider, IDisposable
+    public interface IContainer : IRegistrator, IResolver, IDisposable
     {
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }

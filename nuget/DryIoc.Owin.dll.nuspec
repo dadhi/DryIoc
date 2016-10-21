@@ -11,6 +11,8 @@
         <description>DryIoc extension for OWIN</description>
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.0.3
+          - added: Reference to latest DryIoc 2.8.3
           v2.0.2
           - fixed: #306: DryIoc.Owin: Use registered middlewares in service key then registration order
           v2.0.1
@@ -18,7 +20,7 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.6.4,3.0.0)" />
+            <dependency id="DryIoc.dll" version="[2.8.3,3.0.0)" />
             <dependency id="Microsoft.Owin" version="[3.0.0,4.0.0)" />
           </group>
         </dependencies>

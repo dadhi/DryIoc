@@ -4,7 +4,7 @@
         <id>DryIoc.Mvc.dll</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2016 Maksim Volkau and Contributors</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -22,7 +22,7 @@
         </releaseNotes>
         <dependencies>
           <group>
-              <dependency id="DryIoc.dll" version="[2.8,3.0.0)" />
+              <dependency id="DryIoc.dll" version="[2.8.3,3.0.0)" />
               <dependency id="DryIoc.Web.dll" version="[2.1.0,3.0.0)" />
             
               <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />

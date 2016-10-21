@@ -4,7 +4,7 @@
         <id>DryIoc.MefAttributedModel</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -24,7 +24,7 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="[2.8,3.0)" />
+                <dependency id="DryIoc" version="[2.8.3,3.0)" />
                 <dependency id="DryIocAttributes" version="[2.6,3.0)" />
             </group>
         </dependencies>
