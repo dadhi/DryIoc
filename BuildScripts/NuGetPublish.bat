@@ -6,11 +6,11 @@ set PACKAGEDIR="bin\NuGetPackages"
 set /p APIKEY=<ApiKey.txt
 
 rem DryIoc
-%NUGET% push "%PACKAGEDIR%\DryIoc.2.8.3.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.8.3.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.2.8.3.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.8.3.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Microsoft.DependencyInjection
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
 rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
@@ -48,8 +48,8 @@ rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.2.0.1.nupkg" -Source https://n
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.dll.2.0.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.CommonServiceLocator
-%NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.dll.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.dll.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 popd
 pause
