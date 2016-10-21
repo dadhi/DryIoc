@@ -4,7 +4,7 @@
         <id>DryIoc.Web</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -19,7 +19,7 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="[2.8,3.0.0)" />
+            <dependency id="DryIoc" version="[2.8.3,3.0.0)" />
             
             <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />
           </group>

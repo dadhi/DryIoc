@@ -122,13 +122,13 @@ namespace DryIoc.Mvc
         /// <returns>Returns source container for fluent access.</returns>
         public static IContainer WithDataAnnotationsValidator(this IContainer container)
         {
-            container.ThrowIfNull();
+            var serviceProvider = new DryIocServiceProvider(container.ThrowIfNull());
 
             DataAnnotationsModelValidatorProvider.RegisterDefaultAdapterFactory((metadata, context, attribute) =>
-                new DryIocDataAnnotationsModelValidator(container, metadata, context, attribute));
+                new DryIocDataAnnotationsModelValidator(serviceProvider, metadata, context, attribute));
 
             DataAnnotationsModelValidatorProvider.RegisterDefaultValidatableObjectAdapterFactory((metadata, context) =>
-                new DryIocValidatableObjectAdapter(container, metadata, context));
+                new DryIocValidatableObjectAdapter(serviceProvider, metadata, context));
 
             return container;
         }
@@ -185,6 +185,25 @@ namespace DryIoc.Mvc
         }
 
         private readonly IContainer _container;
+    }
+
+    /// <summary>Service provider wrapping DryIoc <see cref="IResolver"/>.</summary>
+    public sealed class DryIocServiceProvider : IServiceProvider
+    {
+        /// <summary>Constructs the wrapper over resolver</summary> <param name="resolver"></param>
+        public DryIocServiceProvider(IResolver resolver)
+        {
+            _resolver = resolver;
+        }
+
+        /// <summary>Resolves the service for requested <paramref name="serviceType"/>.</summary>
+        /// <param name="serviceType">Requested service type.</param> <returns>Resolved service object</returns>
+        public object GetService(Type serviceType)
+        {
+            return _resolver.Resolve(serviceType);
+        }
+
+        private readonly IResolver _resolver;
     }
 
     /// <summary>Provides a model validator and injects <see cref="IServiceProvider"/> 

@@ -14,7 +14,11 @@ namespace DryIoc.AspNetCore.Sample
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
-            return services.AddDryIoc<Bootstrap>();
+            return new Container()
+                .WithDependencyInjectionAdapter(services, 
+                    // optional: but may provide you with exact exception when specified types are not resolved.
+                    throwIfUnresolved: type => type.Name.EndsWith("Controller"))
+                .ConfigureServiceProvider<CompositionRoot>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -32,17 +36,6 @@ namespace DryIoc.AspNetCore.Sample
             //{
             //    await context.Response.WriteAsync("Hello World!");
             //});
-        }
-    }
-
-    public static class DI
-    {
-        public static IServiceProvider AddDryIoc<TCompositionRoot>(this IServiceCollection services)
-        {
-            var container = new Container().WithDependencyInjectionAdapter(services);
-            container.RegisterMany<TCompositionRoot>();
-            container.Resolve<TCompositionRoot>();
-            return container.Resolve<IServiceProvider>();
         }
     }
 }

@@ -4,18 +4,21 @@
         <id>DryIoc.WebApi.Owin</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET WebAPI and OWIN</description>
         <tags>Web ASP WebApi OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
-        <releaseNotes></releaseNotes>
+        <releaseNotes>
+          v2.0.1:
+          - added: Reference to latest DryIoc 2.8 and DI.Owin 2.0.3 and DI.WebApi 2.1.1
+        </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="(1.5,3.0.0)" />
-            <dependency id="DryIoc.WebApi" version="(1.5,3.0.0)" />
-            <dependency id="DryIoc.Owin" version="(1.5,3.0.0)" />
+            <dependency id="DryIoc" version="[2.8.3,3.0.0)" />
+            <dependency id="DryIoc.WebApi" version="[2.1.1,3.0.0)" />
+            <dependency id="DryIoc.Owin" version="[2.0.3,3.0.0)" />
             <dependency id="Microsoft.AspNet.WebApi.Owin" version="[5.2.3,6.0.0)" />
           </group>
         </dependencies>
