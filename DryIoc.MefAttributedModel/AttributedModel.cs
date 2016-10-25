@@ -233,9 +233,9 @@ namespace DryIoc.MefAttributedModel
         /// <typeparam name="T">The type of the exported service.</typeparam>
         /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
         /// <param name="metaFactory">The factory with the service metadata.</param>
-        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Func<T>, TMetadata> metaFactory)
+        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Lazy<T>, TMetadata> metaFactory)
         {
-            return new Lazy<T, TMetadata>(metaFactory.Value, metaFactory.Metadata);
+            return new Lazy<T, TMetadata>(() => metaFactory.Value.Value, metaFactory.Metadata);
         }
 
         private static readonly Made _createLazyWithMetadataMethod = Made.Of(

@@ -6647,7 +6647,7 @@ namespace DryIoc
     /// <seealso cref="DryIoc.Factory" />
     public class LazyFactory : Factory
     {
-        /// <summary>Initializes a new instance of the <see cref="ScriptFactory"/> class.</summary>
+        /// <summary>Initializes a new instance of the <see cref="LazyFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
         public LazyFactory(Lazy<Factory> factory)
         {
