@@ -6649,12 +6649,16 @@ namespace DryIoc
     {
         /// <summary>Initializes a new instance of the <see cref="LazyFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
-        public LazyFactory(Lazy<Factory> factory)
+        /// <param name="setup">The lazily-evaluated setup (optional).</param>
+        public LazyFactory(Lazy<Factory> factory, Lazy<Setup> setup = null)
         {
             InnerFactory = factory;
+            InnerSetup = setup ?? new Lazy<Setup>(() => factory.Value.Setup);
         }
 
         private Lazy<Factory> InnerFactory { get; }
+
+        private Lazy<Setup> InnerSetup { get; }
 
         /// <summary>Gets non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="T:DryIoc.DelegateFactory" />.</summary>
         public override Type ImplementationType
@@ -6665,7 +6669,7 @@ namespace DryIoc
         /// <summary>Gets or sets the setup which may contain different/non-default factory settings.</summary>
         public override Setup Setup
         {
-            get { return InnerFactory.Value.Setup; }
+            get { return InnerSetup.Value; }
             protected internal set { /* ignored */ }
         }
 

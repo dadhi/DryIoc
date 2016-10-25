@@ -703,6 +703,11 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.HasMetadataAttribute = true;
                 }
+
+                if (info.HasMetadataAttribute)
+                {
+                    info.InitExportedMetadata();
+                }
             }
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
@@ -1082,6 +1087,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
+        /// <summary>Gets or sets the metadata.</summary>
+        public IDictionary<string, object> Metadata { get; set; }
+
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
 
@@ -1179,9 +1187,12 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            var metadata = GetExportedMetadata();
+            if (!IsLazy && Metadata == null)
+            {
+                Metadata = GetExportedMetadata();
+            }
 
-            return Setup.With(metadata, condition,
+            return Setup.With(Metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
@@ -1266,9 +1277,15 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
+        /// <summary>Initializes the exported metadata.</summary>
+        public void InitExportedMetadata()
+        {
+            Metadata = GetExportedMetadata();
+        }
+
         private IDictionary<string, object> GetExportedMetadata()
         {
-            var hasKeyedExports = Exports.Any(it => it.ServiceKey != null);
+            var hasKeyedExports = Exports != null && Exports.Any(it => it.ServiceKey != null);
             if (!hasKeyedExports && !HasMetadataAttribute)
                 return null;
 

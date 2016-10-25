@@ -263,7 +263,8 @@ namespace DryIoc.IssuesTests.Samples
                     return null;
 
                 var info = regs[regIndex].Value;
-                var lazy = new Lazy<Factory>(() =>
+                var lazySetup = new Lazy<Setup>(() => info.GetSetup());
+                var lazyFactory = new Lazy<Factory>(() =>
                 {
                     if (info.ImplementationType == null)
                         info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
@@ -274,7 +275,7 @@ namespace DryIoc.IssuesTests.Samples
                     return info.CreateFactory();
                 });
 
-                return new LazyFactory(lazy);
+                return new LazyFactory(lazyFactory, lazySetup);
             };
 
             // Step 3 - Add service type handler for resolving many factories.
@@ -287,7 +288,8 @@ namespace DryIoc.IssuesTests.Samples
                 var factories = new List<KV<object, Factory>>();
                 foreach (var pair in regs)
                 {
-                    var lazy = new Lazy<Factory>(() =>
+                    var lazySetup = new Lazy<Setup>(() => pair.Value.GetSetup());
+                    var lazyFactory = new Lazy<Factory>(() =>
                     {
                         if (pair.Value.ImplementationType == null)
                             pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
@@ -298,7 +300,7 @@ namespace DryIoc.IssuesTests.Samples
                         return pair.Value.CreateFactory();
                     });
 
-                    factories.Add(new KV<object, Factory>(pair.Key, new LazyFactory(lazy)));
+                    factories.Add(new KV<object, Factory>(pair.Key, new LazyFactory(lazyFactory, lazySetup)));
                 }
 
                 return factories;
