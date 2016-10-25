@@ -6643,56 +6643,6 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Lazy wrapper for the <see cref="Factory"/>.</summary>
-    /// <seealso cref="DryIoc.Factory" />
-    public class LazyFactory : Factory
-    {
-        /// <summary>Initializes a new instance of the <see cref="LazyFactory"/> class.</summary>
-        /// <param name="factory">The lazily-evaluated factory.</param>
-        /// <param name="setup">The lazily-evaluated setup (optional).</param>
-        public LazyFactory(Lazy<Factory> factory, Lazy<Setup> setup = null)
-        {
-            InnerFactory = factory;
-            InnerSetup = setup ?? new Lazy<Setup>(() => factory.Value.Setup);
-        }
-
-        private Lazy<Factory> InnerFactory { get; }
-
-        private Lazy<Setup> InnerSetup { get; }
-
-        /// <summary>Gets non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="T:DryIoc.DelegateFactory" />.</summary>
-        public override Type ImplementationType
-        {
-            get { return InnerFactory.Value.ImplementationType; }
-        }
-
-        /// <summary>Gets or sets the setup which may contain different/non-default factory settings.</summary>
-        public override Setup Setup
-        {
-            get { return InnerSetup.Value; }
-            protected internal set { /* ignored */ }
-        }
-
-        /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
-        /// If <paramref name="request" /> has <see cref="F:DryIoc.Request.FuncArgs" /> specified, they could be used in expression.</summary>
-        /// <param name="request">Service request.</param>
-        /// <returns>Created expression.</returns>
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            return InnerFactory.Value.CreateExpressionOrDefault(request);
-        }
-
-        /// <summary>Returns a <see cref="System.String" /> that represents this instance.</summary>
-        public override string ToString()
-        {
-            var s = new StringBuilder().Append("{ID=").Append(FactoryID);
-            s.Append(", LazyFactory, IsValueCreated=").Append(InnerFactory.IsValueCreated);
-            if (InnerFactory.IsValueCreated)
-                s.Append(", Value=").Append(InnerFactory.Value.ToString());
-            return s.Append("}").ToString();
-        }
-    }
-
     /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
     /// <param name="request">Request to resolve.</param>
     /// <returns>Factory method wrapper over constructor or method.</returns>
