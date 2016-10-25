@@ -112,16 +112,29 @@ namespace DryIocAttributes
     {
         /// <summary>Implementation of reuse. Could be null to specify transient or no reuse.</summary>
         public readonly ReuseType ReuseType;
+        
+        /// <summary>Implementation type for reuse.</summary>
+        public readonly Type CustomReuseType;
 
         /// <summary>Optional name, valid only for Current Scope Reuse.</summary>
         public readonly string ScopeName;
 
         /// <summary>Create attribute with specified type implementing reuse.</summary>
         /// <param name="reuseType">Supported reuse type.</param>
-        /// <param name="scopeName">(optional) Name is valid only for Current Scope Reuse and will be ignored by the rest of reuse types.</param>
+        /// <param name="scopeName">(optional) Scope name.</param>
         public ReuseAttribute(ReuseType reuseType, string scopeName = null)
         {
             ReuseType = reuseType;
+            ScopeName = scopeName;
+        }
+
+        /// <summary>Specify the reuse via the Reuse implementation type. 
+        /// The meaning of the type is interpreted by attribute inspection side.</summary>
+        /// <param name="customReuseType">The type.</param>
+        /// <param name="scopeName">(optional) Scope name.</param>
+        public ReuseAttribute(Type customReuseType, string scopeName = null)
+        {
+            CustomReuseType = customReuseType;
             ScopeName = scopeName;
         }
     }
