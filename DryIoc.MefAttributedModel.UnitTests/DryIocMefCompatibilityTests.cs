@@ -294,5 +294,31 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual("MultipleMetadata", service.NamedServices.First().Metadata.Name);
             Assert.IsNotNull(service.NamedServices.First().Value);
         }
+
+        [Test, Ignore("fails")]
+        public void DryIoc_calls_ImportSatisfied_for_non_shared_parts_once()
+        {
+            var container = new Container().WithMef();
+            container.RegisterExports(typeof(NonSharedWithImportSatisfiedNotification));
+
+            var service1 = container.Resolve<NonSharedWithImportSatisfiedNotification>();
+            var service2 = container.Resolve<NonSharedWithImportSatisfiedNotification>();
+
+            Assert.AreNotSame(service1, service2);
+            Assert.AreEqual(1, service1.ImportsSatisfied);
+            Assert.AreEqual(1, service2.ImportsSatisfied);
+        }
+
+        [Test]
+        public void DryIoc_calls_ImportSatisfied_for_shared_parts_once()
+        {
+            var container = Container;
+            var service1 = container.Resolve<SharedWithImportSatisfiedNotification>();
+            var service2 = container.Resolve<SharedWithImportSatisfiedNotification>();
+
+            Assert.AreSame(service1, service2);
+            Assert.AreEqual(1, service1.ImportsSatisfied);
+            Assert.AreEqual(1, service2.ImportsSatisfied);
+        }
     }
 }
