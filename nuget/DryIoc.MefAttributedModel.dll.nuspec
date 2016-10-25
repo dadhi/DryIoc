@@ -21,6 +21,7 @@
           - added: #371: MEF: multiple metadata attributes
           - added: Support for ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
           - fixed: #350: Metadata provided via ExportMetadata attribute is missing
+          - fixed: #361: Class shared part creation policy should be applied to all member exports
         </releaseNotes>
         <dependencies>
           <group>

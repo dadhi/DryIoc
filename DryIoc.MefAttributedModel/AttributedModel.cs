@@ -394,8 +394,8 @@ namespace DryIoc.MefAttributedModel
                         // todo: Review need for factory service key.
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
-                        var typeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
-                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes).ThrowIfNull();
+                        var factoryTypeAttributes = new Attribute[] {new ExportAttribute(Constants.InstanceFactory)};
+                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, factoryTypeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
 
@@ -421,6 +421,25 @@ namespace DryIoc.MefAttributedModel
                 }
 
                 memberRegistrationInfo.FactoryMethodInfo = factoryMethod;
+
+                // If member reuse is not provided get it from the declaring type (fix for #355)
+                if (!memberRegistrationInfo.Reuse.HasValue)
+                {
+                    if (typeRegistrationInfo != null)
+                        memberRegistrationInfo.Reuse = typeRegistrationInfo.Reuse;
+                    else
+                    {
+                        var creationPolicyAttrs = type.GetAttributes(typeof(PartCreationPolicyAttribute), inherit: true);
+                        if (creationPolicyAttrs.Length != 0)
+                        {
+                            var creationPolicy = ((PartCreationPolicyAttribute)creationPolicyAttrs[0]).CreationPolicy;
+                            memberRegistrationInfo.Reuse = creationPolicy == CreationPolicy.NonShared
+                                ? ReuseType.Transient
+                                : ReuseType.Singleton;
+                        }
+                    }
+                }
+
                 yield return memberRegistrationInfo;
             }
         }
@@ -703,7 +722,8 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute is ExportAttribute || attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
+                if (attribute is ExportAttribute || 
+                    attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
                 }
@@ -831,8 +851,9 @@ namespace DryIoc.MefAttributedModel
                 attributes = attributes.Append(GetInheritedExportAttributes(baseType));
 
             var interfaces = type.GetImplementedInterfaces();
-            for (var i = 0; i < interfaces.Length; i++)
-                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
+            if (interfaces.Length != 0)
+                for (var i = 0; i < interfaces.Length; i++)
+                    attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
 
             return attributes;
         }
@@ -1642,7 +1663,7 @@ namespace DryIoc.MefAttributedModel
             var s = new StringBuilder().Append("{ID=").Append(FactoryID);
             s.Append(", LazyFactory, IsValueCreated=").Append(InnerFactory.IsValueCreated);
             if (InnerFactory.IsValueCreated)
-                s.Append(", Value=").Append(InnerFactory.Value.ToString());
+                s.Append(", Value=").Append(InnerFactory.Value);
             return s.Append("}").ToString();
         }
     }
