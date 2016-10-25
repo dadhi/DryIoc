@@ -255,7 +255,8 @@ namespace DryIoc.MefAttributedModel
             typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)));
+            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)),
+            useDecorateeReuse: true);
 
         #endregion
 
@@ -1161,7 +1162,7 @@ namespace DryIoc.MefAttributedModel
                         return true;
 
                     var parameters = method.GetParameters();
-                    var factoryMethodParameterTypeNames = 
+                    var factoryMethodParameterTypeNames =
                         factoryMethod.MethodParameterTypeFullNamesOrNames ?? ArrayTools.Empty<string>();
                     if (parameters.Length != factoryMethodParameterTypeNames.Length)
                         return false;

@@ -295,7 +295,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(service.NamedServices.First().Value);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_calls_ImportSatisfied_for_non_shared_parts_once()
         {
             var container = new Container().WithMef();
