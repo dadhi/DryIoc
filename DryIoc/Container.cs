@@ -1465,7 +1465,7 @@ namespace DryIoc
         internal sealed class UsedInstanceFactory : Factory
         {
             public override Type ImplementationType { get { return _instanceType;  } }
-            private Type _instanceType;
+            private readonly Type _instanceType;
 
             public UsedInstanceFactory(Type instanceType)
             {
@@ -1563,7 +1563,8 @@ namespace DryIoc
                 return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), _isChangePermitted);
+                    Ref.Of(ImTreeMapIntToObj.Empty), 
+                    _isChangePermitted);
             }
 
             private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
@@ -4887,8 +4888,7 @@ namespace DryIoc
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
                 preResolveParentExpr, scopeExpr);
 
-            var resolveExpr = Expression.Convert(resolveCallExpr, serviceType);
-            return resolveExpr;
+            return Expression.Convert(resolveCallExpr, serviceType);
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request, bool openResolutionScope)
@@ -8346,10 +8346,9 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
-            var throwIfNoScopeFoundExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
-
             return Expression.Call(_getOrAddItemOrDefaultMethod,
-                Container.ScopesExpr, scopeNameExpr, throwIfNoScopeFoundExpr,
+                Container.ScopesExpr, scopeNameExpr, 
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));

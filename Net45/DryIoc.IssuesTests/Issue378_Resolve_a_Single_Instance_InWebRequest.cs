@@ -6,16 +6,13 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue378_Resolve_a_Single_Instance_InWebRequest
     {
-        [Test, Ignore("fails")]
-        public void Test()
+        public static IContainer ConfigureWinAppContainerAndRegisterServices()
         {
-            // base like: Win app
-            //------------------------------
             var container = new Container(rules => rules
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithoutThrowOnRegisteringDisposableTransient()
-                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton));
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)); // Specify to use singleton for services with unspecified reuse
 
             // Singletons: specified explicitly and do not depend on container default reuse
             container.RegisterMany<A>(Reuse.Singleton);
@@ -24,34 +21,49 @@ namespace DryIoc.IssuesTests
             // Reuse is not specified and will depend on container default reuse
             container.RegisterMany<X>();
 
-            var b = container.Resolve<B>();
-            Assert.AreSame(b.A, container.Resolve<B>().A);
-            Assert.AreSame(b.X, container.Resolve<B>().X);
+            return container;
+        }
 
-            // Web app
-            //------------------------------
-            var webContainer = container.With(
+        public static IContainer ReconfigureForWeb(IContainer container)
+        {
+            return container.With(
                 rules => rules.WithDefaultReuseInsteadOfTransient(Reuse.InWebRequest),
                 new AsyncExecutionFlowScopeContext());
+        }
 
-            B bb;
+        [Test]
+        public void Win_app_test()
+        {
+            var container = ConfigureWinAppContainerAndRegisterServices();
+
+            var b = container.Resolve<B>();
+
+            Assert.AreSame(b.A, container.Resolve<B>().A); // singletons
+            Assert.AreSame(b.X, container.Resolve<B>().X);
+        }
+
+        [Test]
+        public void Web_app_test()
+        {
+            var container = ConfigureWinAppContainerAndRegisterServices();
+            container = ReconfigureForWeb(container);
+
             X xx;
-            using (var scope = webContainer.OpenScope(Reuse.WebRequestScopeName))
+            using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                bb = container.Resolve<B>();
-                Assert.AreSame(bb.A, scope.Resolve<B>().A);
+                var bb = scope.Resolve<B>();
+                Assert.AreSame(bb.A, scope.Resolve<B>().A); // singletons
 
-                xx = bb.X;
-                Assert.AreSame(xx, scope.Resolve<B>().X);
+                xx = bb.X;                                  // scoped
+                Assert.AreSame(xx, scope.Resolve<B>().X);   // should be the same inside the scope
             }
 
-            using (var scope = webContainer.OpenScope(Reuse.WebRequestScopeName))
+            using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                Assert.AreSame(bb.A, scope.Resolve<B>().A);
-
-                Assert.AreNotSame(xx, scope.Resolve<B>().X);
+                Assert.AreNotSame(xx, scope.Resolve<B>().X); // should Not be the same in other scope
             }
         }
+
 
         public class A { }
 
