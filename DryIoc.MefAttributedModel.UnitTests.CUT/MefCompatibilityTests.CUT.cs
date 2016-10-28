@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -400,7 +401,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public Lazy<MultipleMetadataAttributes, ILazyMetadata>[] NamedServices { get; set; }
     }
 
-    [Export, ScriptWithCategoryMetadata(123, "Category")]
+    [Export, ScriptWithCategoryMetadata(123, "Category"), WithMetadata("DryIocMetadata", "AlsoSupported")]
     public class InheritedMetadataAttributes
     {
     }

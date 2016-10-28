@@ -159,6 +159,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(metadata);
             Assert.AreEqual(123L, metadata["ScriptID"]);
             Assert.AreEqual("Category", metadata["CategoryName"]);
+
+            // MEF doesn't support DryIoc metadata attribute
+            Assert.IsFalse(metadata.ContainsKey("DryIocMetadata"));
         }
 
         [Test]

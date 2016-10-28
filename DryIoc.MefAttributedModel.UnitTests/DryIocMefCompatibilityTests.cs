@@ -308,6 +308,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(metadata);
             Assert.AreEqual(123L, metadata["ScriptID"]);
             Assert.AreEqual("Category", metadata["CategoryName"]);
+            Assert.AreEqual("AlsoSupported", metadata["DryIocMetadata"]);
         }
 
         [Test]
