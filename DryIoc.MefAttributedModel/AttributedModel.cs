@@ -722,14 +722,10 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute is ExportAttribute || 
+                if (attribute is ExportAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
-                }
-
-                if (info.HasMetadataAttribute)
-                {
                     info.InitExportedMetadata();
                 }
             }
