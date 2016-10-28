@@ -4,7 +4,8 @@
   "buildOptions": {
     "compile": [
       "../../../DryIocAttributes/Attributes.cs",
-      "../../../DryIocAttributes/Ported-net40.cs"
+      "../../../DryIocAttributes/Ported-MefAttributes.cs",
+      "../../../DryIocAttributes/Ported-net45.cs"
     ]
   },
 

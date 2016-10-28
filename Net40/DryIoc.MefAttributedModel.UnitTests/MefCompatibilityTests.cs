@@ -10,16 +10,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
     {
         private CompositionContainer Mef => new CompositionContainer(new AssemblyCatalog(typeof(ILogTableManager).Assembly));
 
-        private IContainer Container => CreateContainer();
-
-        private static IContainer CreateContainer()
-        {
-            var container = new Container().WithMef();
-
-            container.RegisterExports(new[] { typeof(ILogTableManager).GetAssembly() });
-            return container;
-        }
-
         [Test]
         public void Mef_supports_importing_static_factory_method()
         {
@@ -154,6 +144,28 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, service.NamedServices.Length);
             Assert.AreEqual("MultipleMetadata", service.NamedServices.First().Metadata.Name);
             Assert.IsNotNull(service.NamedServices.First().Value);
+        }
+
+        public void Mef_calls_ImportSatisfied_for_non_shared_parts_once()
+        {
+            var mef = Mef;
+            var service1 = mef.GetExport<NonSharedWithImportSatisfiedNotification>().Value;
+            var service2 = mef.GetExport<NonSharedWithImportSatisfiedNotification>().Value;
+
+            Assert.AreNotSame(service1, service2);
+            Assert.AreEqual(1, service1.ImportsSatisfied);
+            Assert.AreEqual(1, service2.ImportsSatisfied);
+        }
+
+        public void Mef_calls_ImportSatisfied_for_shared_parts_once()
+        {
+            var mef = Mef;
+            var service1 = mef.GetExport<SharedWithImportSatisfiedNotification>().Value;
+            var service2 = mef.GetExport<SharedWithImportSatisfiedNotification>().Value;
+
+            Assert.AreSame(service1, service2);
+            Assert.AreEqual(1, service1.ImportsSatisfied);
+            Assert.AreEqual(1, service2.ImportsSatisfied);
         }
     }
 }

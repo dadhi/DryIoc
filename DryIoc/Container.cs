@@ -460,9 +460,7 @@ namespace DryIoc
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
-            object cacheEntryKey = serviceType;
-            if (serviceKey != null)
-                cacheEntryKey = new KV<object, object>(cacheEntryKey, serviceKey);
+            var cacheEntryKey = serviceKey == null ? (object)serviceType : new KV<object, object>(serviceType, serviceKey);
 
             object cacheContextKey = requiredServiceType;
             if (!preResolveParent.IsEmpty)
@@ -487,7 +485,11 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
             var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope, preResolveParent);
-            var factory = ((IContainer)this).ResolveFactory(request);
+
+            var factory = ((IContainer)this).ResolveFactory(request); // Hack: may mutate (set) not null request service key.
+            if (serviceKey == null && request.ServiceKey != null)
+                cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
+
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
@@ -753,8 +755,11 @@ namespace DryIoc
             while (scope != null)
             {
                 var name = scope.Name as KV<Type, object>;
-                if (name != null &&
-                    (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
+                if (name != null && (
+                    assignableFromServiceType == null || 
+                    name.Key.IsAssignableTo(assignableFromServiceType) ||
+                    assignableFromServiceType.IsOpenGeneric() && 
+                    name.Key.GetGenericDefinitionOrNull().IsAssignableTo(assignableFromServiceType)) &&
                     (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
                     matchedScope = scope;
@@ -878,6 +883,16 @@ namespace DryIoc
                 {
                     var openGenericFactories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArray();
                     factories = factories.Concat(openGenericFactories);
+                }
+            }
+
+            if (Rules.UnknownServiceHandlers != null)
+            {
+                foreach (var handler in Rules.UnknownServiceHandlers)
+                {
+                    var handlerFactories = handler(serviceType);
+                    if (handlerFactories != null && handlerFactories.Any())
+                        factories = factories.Concat(handlerFactories);
                 }
             }
 
@@ -1455,7 +1470,7 @@ namespace DryIoc
         internal sealed class UsedInstanceFactory : Factory
         {
             public override Type ImplementationType { get { return _instanceType;  } }
-            private Type _instanceType;
+            private readonly Type _instanceType;
 
             public UsedInstanceFactory(Type instanceType)
             {
@@ -1553,7 +1568,8 @@ namespace DryIoc
                 return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), _isChangePermitted);
+                    Ref.Of(ImTreeMapIntToObj.Empty), 
+                    _isChangePermitted);
             }
 
             private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
@@ -2320,7 +2336,7 @@ namespace DryIoc
     /// <summary>Interface used to convert reuse instance to expression.</summary>
     public interface IConvertibleToExpression
     {
-        /// <summary>Returns expression representation without closure.</summary> 
+        /// <summary>Returns expression representation without closure.</summary>
         /// <param name="fallbackConverter">Delegate converting of sub-items, constants to container.</param>
         /// <returns>Expression representation.</returns>
         Expression ToExpression(Func<object, Expression> fallbackConverter);
@@ -2846,9 +2862,9 @@ namespace DryIoc
             return pairExpr;
         }
 
-        /// <summary> Universal expression factory to wrap service with metadata. 
+        /// <summary> Universal expression factory to wrap service with metadata.
         /// Works with any generic type with first Type arg - Service type and second Type arg - Metadata type,
-        /// and constructor with Service and Metadata arguments respectively. 
+        /// and constructor with Service and Metadata arguments respectively.
         /// - if service key is not specified in request then method will search for all
         /// registered factories with the same metadata type ignoring keys.
         /// - if metadata is IDictionary{string, object},
@@ -3014,6 +3030,33 @@ namespace DryIoc
                 ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
         }
 
+        /// <summary>Defines delegate to return all factories for the given service type.</summary>
+        /// <param name="serviceType">Service type to return factory for</param> <returns>All factories for the given type, or null if unable to resolve.</returns>
+        public delegate IEnumerable<KV<object, Factory>> UnknownServiceHandler(Type serviceType);
+
+        /// <summary>Gets rules for resolving multiple not-registered services. Null by default.</summary>
+        public UnknownServiceHandler[] UnknownServiceHandlers { get; private set; }
+
+        /// <summary>Appends handler to current unknown service handlers.</summary>
+        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
+        public Rules WithUnknownServiceHandlers(params UnknownServiceHandler[] rules)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceHandlers = newRules.UnknownServiceHandlers.Append(rules);
+            return newRules;
+        }
+
+        /// <summary>Removes specified handler from unknown service handlers, and returns new Rules.
+        /// If no resolver was found then <see cref="UnknownServiceHandlers"/> will stay the same instance,
+        /// so it could be checked for remove success or fail.</summary>
+        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
+        public Rules WithoutUnknownServiceHandler(UnknownServiceHandler rule)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.UnknownServiceHandlers = newRules.UnknownServiceHandlers.Remove(rule);
+            return newRules;
+        }
+
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
         /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
         /// <param name="request">Request to return factory for</param> <returns>Factory to resolve request, or null if unable to resolve.</returns>
@@ -3121,7 +3164,7 @@ namespace DryIoc
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
-        /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param> 
+        /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param>
         /// <returns>New rules.</returns>
         public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse)
         {
@@ -4850,8 +4893,7 @@ namespace DryIoc
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
                 preResolveParentExpr, scopeExpr);
 
-            var resolveExpr = Expression.Convert(resolveCallExpr, serviceType);
-            return resolveExpr;
+            return Expression.Convert(resolveCallExpr, serviceType);
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request, bool openResolutionScope)
@@ -5768,7 +5810,7 @@ namespace DryIoc
                 }
 
                 // if no specified the wrapper reuse is always Transient,
-                // other container-wide default reuse is applied                
+                // other container-wide default reuse is applied
                 if (reuse == null)
                     reuse = factory.FactoryType == FactoryType.Wrapper
                         ? DryIoc.Reuse.Transient
@@ -6293,7 +6335,7 @@ namespace DryIoc
         public readonly IReuse Reuse;
 
         /// <summary>Setup may contain different/non-default factory settings.</summary>
-        public Setup Setup
+        public virtual Setup Setup
         {
             get { return _setup; }
             protected internal set { _setup = value ?? Setup.Default; }
@@ -6328,7 +6370,7 @@ namespace DryIoc
         {
             FactoryID = GetNextID();
             Reuse = reuse;
-            Setup = setup ?? Setup.Default;
+            _setup = setup ?? Setup.Default;
         }
 
         /// <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
@@ -6354,14 +6396,17 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                    && Setup.FactoryType == FactoryType.Service
-
-                   // the settings below specify context-based resolution so that expression will be different on
-                   // different resolution paths, which prevents its caching and reuse.
-                   && Setup.Condition == null
-                   && !Setup.AsResolutionCall
-                   && !Setup.UseParentReuse
-                   && !(request.Reuse is ResolutionScopeReuse)
+                   && !IsContextDependent(request)
                    && !IsTrackingDisposableTransient(request);
+        }
+
+        private bool IsContextDependent(Request request)
+        {
+            return Setup.Condition != null
+                || Setup.AsResolutionCall
+                || Setup.UseParentReuse
+                || request.Reuse is ResolutionScopeReuse 
+                || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
 
         private bool IsTrackingDisposableTransient(Request request)
@@ -6378,20 +6423,15 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            var container = request.Container;
-
-            // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
-                || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
-                // note: Split only if not wrapped in Func with args - 
-                // propagation of args across Resolve boundaries is not supported.
-                && !request.IsWrappedInFuncWithArgs())
+            if ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request))
+                && !request.IsWrappedInFuncWithArgs() && !request.IsFirstNonWrapperInResolutionCall())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
-            // Here's lookup for decorators
+            // First lookup for decorators
+            var container = request.Container;
             var decoratorExpr = FactoryType != FactoryType.Decorator
-                    ? container.GetDecoratorExpressionOrDefault(request)
-                    : null;
+                ? container.GetDecoratorExpressionOrDefault(request)
+                : null;
 
             var isDecorated = decoratorExpr != null;
             var cacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
@@ -8309,10 +8349,9 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
-            var throwIfNoScopeFoundExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
-
             return Expression.Call(_getOrAddItemOrDefaultMethod,
-                Container.ScopesExpr, scopeNameExpr, throwIfNoScopeFoundExpr,
+                Container.ScopesExpr, scopeNameExpr, 
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));

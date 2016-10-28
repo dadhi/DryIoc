@@ -233,9 +233,9 @@ namespace DryIoc.MefAttributedModel
         /// <typeparam name="T">The type of the exported service.</typeparam>
         /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
         /// <param name="metaFactory">The factory with the service metadata.</param>
-        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Func<T>, TMetadata> metaFactory)
+        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Lazy<T>, TMetadata> metaFactory)
         {
-            return new Lazy<T, TMetadata>(metaFactory.Value, metaFactory.Metadata);
+            return new Lazy<T, TMetadata>(() => metaFactory.Value.Value, metaFactory.Metadata);
         }
 
         private static readonly Made _createLazyWithMetadataMethod = Made.Of(
@@ -247,7 +247,10 @@ namespace DryIoc.MefAttributedModel
 
         internal static TService NotifyImportsSatisfied<TService>(TService service)
         {
-            (service as IPartImportsSatisfiedNotification)?.OnImportsSatisfied();
+            var notification = service as IPartImportsSatisfiedNotification;
+            if (notification != null)
+                notification.OnImportsSatisfied();
+
             return service;
         }
 
@@ -255,7 +258,8 @@ namespace DryIoc.MefAttributedModel
             typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)));
+            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)),
+            useDecorateeReuse: true);
 
         #endregion
 
@@ -390,8 +394,8 @@ namespace DryIoc.MefAttributedModel
                         // todo: Review need for factory service key.
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
-                        var typeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
-                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes).ThrowIfNull();
+                        var factoryTypeAttributes = new Attribute[] {new ExportAttribute(Constants.InstanceFactory)};
+                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, factoryTypeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
 
@@ -417,6 +421,25 @@ namespace DryIoc.MefAttributedModel
                 }
 
                 memberRegistrationInfo.FactoryMethodInfo = factoryMethod;
+
+                // If member reuse is not provided get it from the declaring type (fix for #355)
+                if (!memberRegistrationInfo.Reuse.HasValue)
+                {
+                    if (typeRegistrationInfo != null)
+                        memberRegistrationInfo.Reuse = typeRegistrationInfo.Reuse;
+                    else
+                    {
+                        var creationPolicyAttrs = type.GetAttributes(typeof(PartCreationPolicyAttribute), inherit: true);
+                        if (creationPolicyAttrs.Length != 0)
+                        {
+                            var creationPolicy = ((PartCreationPolicyAttribute)creationPolicyAttrs[0]).CreationPolicy;
+                            memberRegistrationInfo.Reuse = creationPolicy == CreationPolicy.NonShared
+                                ? ReuseType.Transient
+                                : ReuseType.Singleton;
+                        }
+                    }
+                }
+
                 yield return memberRegistrationInfo;
             }
         }
@@ -571,7 +594,7 @@ namespace DryIoc.MefAttributedModel
                 import.Metadata);
 
             if (metadata.Value != null)
-                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value }};
+                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value } };
 
             if (serviceKey != null)
             {
@@ -699,9 +722,15 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute is ExportAttribute || attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
+                if (attribute is ExportAttribute || 
+                    attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
+                }
+
+                if (info.HasMetadataAttribute)
+                {
+                    info.InitExportedMetadata();
                 }
             }
 
@@ -822,8 +851,9 @@ namespace DryIoc.MefAttributedModel
                 attributes = attributes.Append(GetInheritedExportAttributes(baseType));
 
             var interfaces = type.GetImplementedInterfaces();
-            for (var i = 0; i < interfaces.Length; i++)
-                attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
+            if (interfaces.Length != 0)
+                for (var i = 0; i < interfaces.Length; i++)
+                    attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
 
             return attributes;
         }
@@ -1082,6 +1112,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
+        /// <summary>Gets or sets the metadata.</summary>
+        public IDictionary<string, object> Metadata { get; set; }
+
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
 
@@ -1112,10 +1145,12 @@ namespace DryIoc.MefAttributedModel
             var exports = newInfo.Exports;
             for (var i = 0; i < exports.Length; i++)
                 exports[i] = exports[i].MakeLazy();
+            if (newInfo.FactoryMethodInfo != null)
+                newInfo.FactoryMethodInfo = newInfo.FactoryMethodInfo.MakeLazy();
             return newInfo;
         }
 
-        /// <summary>Creates factory out of registration info.</summary>
+        /// <summary>Creates factory from registration info.</summary>
         /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory()
         {
@@ -1151,14 +1186,14 @@ namespace DryIoc.MefAttributedModel
                         return true;
 
                     var parameters = method.GetParameters();
-                    var factoryMethodParameterTypeNames = factoryMethod.MethodParameterTypeFullNamesOrNames ??
-                                                          ArrayTools.Empty<string>();
+                    var factoryMethodParameterTypeNames =
+                        factoryMethod.MethodParameterTypeFullNamesOrNames ?? ArrayTools.Empty<string>();
                     if (parameters.Length != factoryMethodParameterTypeNames.Length)
                         return false;
 
                     return parameters.Length == 0
-                           || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                               .SequenceEqual(factoryMethodParameterTypeNames);
+                        || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
+                            .SequenceEqual(factoryMethodParameterTypeNames);
                 });
 
             return member;
@@ -1177,9 +1212,12 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            var metadata = GetExportedMetadata();
+            if (!IsLazy && Metadata == null)
+            {
+                Metadata = GetExportedMetadata();
+            }
 
-            return Setup.With(metadata, condition,
+            return Setup.With(Metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
@@ -1235,7 +1273,7 @@ namespace DryIoc.MefAttributedModel
         ImplementationType = ").AppendType(ImplementationType).Append(@",
         Exports = new[] {
             "); for (var i = 0; i < Exports.Length; i++)
-                    code = Exports[i].ToCode(code).Append(@",
+                code = Exports[i].ToCode(code).Append(@",
             "); code.Append(@"},
         Reuse = ").AppendEnum(typeof(ReuseType?), Reuse).Append(@",
         ReuseName = ").AppendString(ReuseName).Append(@",
@@ -1264,9 +1302,15 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
+        /// <summary>Initializes the exported metadata.</summary>
+        public void InitExportedMetadata()
+        {
+            Metadata = GetExportedMetadata();
+        }
+
         private IDictionary<string, object> GetExportedMetadata()
         {
-            var hasKeyedExports = Exports.Any(it => it.ServiceKey != null);
+            var hasKeyedExports = Exports != null && Exports.Any(it => it.ServiceKey != null);
             if (!hasKeyedExports && !HasMetadataAttribute)
                 return null;
 
@@ -1295,7 +1339,7 @@ namespace DryIoc.MefAttributedModel
 
             foreach (var metaAttr in metaAttrs)
             {
-                string metaKey = Constants.ExportMetadataDefaultKey;
+                string metaKey;
                 object metaValue = metaAttr;
                 var addProperties = false;
 
@@ -1353,6 +1397,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>The type declaring the member.</summary>
         public Type DeclaringType;
 
+        /// <summary>The declaring type name.</summary>
+        public string DeclaringTypeFullName;
+
         /// <summary>Member defining the Export.</summary>
         public string MemberName;
 
@@ -1361,6 +1408,22 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Not null for exported instance member which requires factory object, null for static members.</summary>
         public ExportInfo InstanceFactory;
+
+        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        public bool IsLazy { get { return DeclaringTypeFullName != null; } }
+
+        /// <summary>Returns new export info with type representation as type full name string, instead of
+        /// actual type.</summary> <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
+        public FactoryMethodInfo MakeLazy()
+        {
+            if (IsLazy) return this;
+            var info = (FactoryMethodInfo)MemberwiseClone();
+            info.DeclaringTypeFullName = DeclaringType.FullName;
+            info.DeclaringType = null;
+            if (info.InstanceFactory != null)
+                info.InstanceFactory = info.InstanceFactory.MakeLazy();
+            return info;
+        }
 
         /// <summary>Determines whether the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />.</summary>
         /// <returns>true if the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />; otherwise, false.</returns>
@@ -1555,4 +1618,53 @@ namespace DryIoc.MefAttributedModel
     }
 #pragma warning restore 659
     #endregion
+
+    /// <summary>Lazy wrapper for the <see cref="Factory"/>.</summary>
+    /// <seealso cref="DryIoc.Factory" />
+    public class LazyFactory : Factory
+    {
+        /// <summary>Initializes a new instance of the <see cref="LazyFactory"/> class.</summary>
+        /// <param name="factory">The lazily-evaluated factory.</param>
+        /// <param name="setup">The lazily-evaluated setup (optional).</param>
+        public LazyFactory(Lazy<Factory> factory, Lazy<Setup> setup = null)
+        {
+            InnerFactory = factory;
+            InnerSetup = setup ?? new Lazy<Setup>(() => factory.Value.Setup);
+        }
+
+        private Lazy<Factory> InnerFactory { get; }
+
+        private Lazy<Setup> InnerSetup { get; }
+
+        /// <summary>Gets non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="T:DryIoc.DelegateFactory" />.</summary>
+        public override Type ImplementationType
+        {
+            get { return InnerFactory.Value.ImplementationType; }
+        }
+
+        /// <summary>Gets or sets the setup which may contain different/non-default factory settings.</summary>
+        public override Setup Setup
+        {
+            get { return InnerSetup.Value; }
+        }
+
+        /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
+        /// If <paramref name="request" /> has <see cref="F:DryIoc.Request.FuncArgs" /> specified, they could be used in expression.</summary>
+        /// <param name="request">Service request.</param>
+        /// <returns>Created expression.</returns>
+        public override System.Linq.Expressions.Expression CreateExpressionOrDefault(Request request)
+        {
+            return InnerFactory.Value.CreateExpressionOrDefault(request);
+        }
+
+        /// <summary>Returns a <see cref="System.String" /> that represents this instance.</summary>
+        public override string ToString()
+        {
+            var s = new StringBuilder().Append("{ID=").Append(FactoryID);
+            s.Append(", LazyFactory, IsValueCreated=").Append(InnerFactory.IsValueCreated);
+            if (InnerFactory.IsValueCreated)
+                s.Append(", Value=").Append(InnerFactory.Value);
+            return s.Append("}").ToString();
+        }
+    }
 }

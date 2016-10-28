@@ -156,7 +156,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             else
             {
                 // todo: v1.1: plan to specify preventDisposal for the instances
-                container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance);
+                container.RegisterDelegate(descriptor.ServiceType, _ => descriptor.ImplementationInstance);
             }
         }
 

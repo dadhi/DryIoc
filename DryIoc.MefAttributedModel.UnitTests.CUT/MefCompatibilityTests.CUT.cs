@@ -385,4 +385,26 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [ImportMany]
         public Lazy<MultipleMetadataAttributes, ILazyMetadata>[] NamedServices { get; set; }
     }
+
+    [Export, PartCreationPolicy(CreationPolicy.NonShared)]
+    public class NonSharedWithImportSatisfiedNotification : IPartImportsSatisfiedNotification
+    {
+        public int ImportsSatisfied { get; private set; }
+
+        public void OnImportsSatisfied()
+        {
+            ImportsSatisfied++;
+        }
+    }
+
+    [Export, PartCreationPolicy(CreationPolicy.Shared)]
+    public class SharedWithImportSatisfiedNotification : IPartImportsSatisfiedNotification
+    {
+        public int ImportsSatisfied { get; private set; }
+
+        public void OnImportsSatisfied()
+        {
+            ImportsSatisfied++;
+        }
+    }
 }

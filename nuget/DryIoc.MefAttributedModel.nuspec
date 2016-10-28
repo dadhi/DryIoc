@@ -17,10 +17,10 @@
           - added: #323: Support multiple WithMetadataAttribute(key, value)
           - added: #343: Specifying the default Reuse in MefAttributedModel
           - added: #352: Mef should fallback to default constructor for types without ImportingConstructor
+          - added: #371: MEF: multiple metadata attributes
           - added: Support for ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
           - fixed: #350: Metadata provided via ExportMetadata attribute is missing
-          v2.5.0
-          - added: Source code (contentFiles) package for UWP (uap10.0)
+          - fixed: #361: Class shared part creation policy should be applied to all member exports
         </releaseNotes>
         <dependencies>
             <group>

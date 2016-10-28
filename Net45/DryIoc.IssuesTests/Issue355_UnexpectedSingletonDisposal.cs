@@ -1,14 +1,10 @@
 ﻿using System;
 using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
-using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    /// <summary>
-    /// Issue #355: Unexpected disposal of a singleton
-    /// </summary>
     [TestFixture]
     public class Issue355_UnexpectedSingletonDisposal
     {
@@ -37,7 +33,7 @@ namespace DryIoc.IssuesTests
             // when we don't import the singleton, everything is fine
             using (var s = Container.OpenScope())
             {
-                var us = s.Resolve<DoesntImportMySingleton>();
+                s.Resolve<DoesntImportMySingleton>();
             }
 
             Assert.IsFalse(singleton.IsDisposed);
@@ -74,7 +70,7 @@ namespace DryIoc.IssuesTests
         [PartCreationPolicy(CreationPolicy.Shared)]
         public class MySingletonService : IDisposable
         {
-            [Export, SingletonReuse]
+            [Export]
             public static MySingletonService Instance { get; } = new MySingletonService();
 
             [Import]

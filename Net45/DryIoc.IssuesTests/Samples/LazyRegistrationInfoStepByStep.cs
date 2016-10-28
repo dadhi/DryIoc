@@ -83,6 +83,9 @@ namespace DryIoc.IssuesTests.Samples
                 if (info.ImplementationType == null)
                     info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
 
+                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
+                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
+
                 return info.CreateFactory();
             };
 
@@ -107,7 +110,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Lazy_import_of_commands()
         {
             // the same registration code as in the lazy sample
@@ -139,7 +142,13 @@ namespace DryIoc.IssuesTests.Samples
                     if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
                         regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
+
+                    // multiple services workaround: generate missing service keys
+                    var serviceKey = export.ServiceKey;
+                    if (serviceKey == null)
+                        serviceKey = Guid.NewGuid().ToString();
+
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
                 }
             }
 
@@ -150,7 +159,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
                     return null;
 
-                var regIndex = regs.FindIndex(pair => Equals(pair.Key, request.ServiceKey));
+                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
                 if (regIndex == -1)
                     return null;
 
@@ -158,12 +167,150 @@ namespace DryIoc.IssuesTests.Samples
                 if (info.ImplementationType == null)
                     info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
 
+                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
+                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
+
                 return info.CreateFactory();
+            };
+
+            // Step 3 - Add service type handler for resolving many factories.
+            Rules.UnknownServiceHandler createFactoriesFromAssembly = serviceType =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
+                    return null;
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var pair in regs)
+                {
+                    if (pair.Value.ImplementationType == null)
+                        pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+
+                    if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
+                        pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+
+                    factories.Add(new KV<object, Factory>(pair.Key, pair.Value.CreateFactory()));
+                }
+
+                return factories;
             };
 
             // Test that resolve works
             //========================
-            var container = new Container().WithMef().With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
+            var container = new Container().WithMef()
+                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
+                .With(rules => rules.WithUnknownServiceHandlers(createFactoriesFromAssembly));
+
+            // the same resolution code as in previous test
+            //========================
+            var cmds = container.Resolve<CommandImporter>();
+            Assert.IsNotNull(cmds.Commands);
+            Assert.AreEqual(2, cmds.Commands.Length);
+            Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+        }
+
+        [Test]
+        public void Lazy_import_of_commands_using_LazyFactory()
+        {
+            // the same registration code as in the lazy sample
+            //========================
+            var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
+
+            // Step 1 - Scan assembly and find exported type, create DTOs for them.
+            var registrations = AttributedModel.Scan(new[] { assembly });
+
+            // Step 2 - Make DTOs lazy.
+            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
+
+            // In run-time deserialize registrations and register them as rule for unresolved services
+            //=========================================================================================
+
+            var lazyLoadedAssembly = new Lazy<Assembly>(() => assembly);
+
+            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
+            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            foreach (var lazyRegistration in lazyRegistrations)
+            {
+                var exports = lazyRegistration.Exports;
+                for (var i = 0; i < exports.Length; i++)
+                {
+                    var export = exports[i];
+                    var serviceTypeFullName = export.ServiceTypeFullName;
+
+                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
+                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
+                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
+
+                    // multiple services workaround: generate missing service keys
+                    var serviceKey = export.ServiceKey;
+                    if (serviceKey == null)
+                        serviceKey = Guid.NewGuid().ToString();
+
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
+                }
+            }
+
+            // Step 2 - Add resolution rule for creating factory on resolve.
+            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
+                    return null;
+
+                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
+                if (regIndex == -1)
+                    return null;
+
+                var info = regs[regIndex].Value;
+                var lazySetup = new Lazy<Setup>(() => info.GetSetup());
+                var lazyFactory = new Lazy<Factory>(() =>
+                {
+                    if (info.ImplementationType == null)
+                        info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
+
+                    if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
+                        info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
+
+                    return info.CreateFactory();
+                });
+
+                return new LazyFactory(lazyFactory, lazySetup);
+            };
+
+            // Step 3 - Add service type handler for resolving many factories.
+            Rules.UnknownServiceHandler createFactoriesFromAssembly = serviceType =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
+                    return null;
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var pair in regs)
+                {
+                    var lazySetup = new Lazy<Setup>(() => pair.Value.GetSetup());
+                    var lazyFactory = new Lazy<Factory>(() =>
+                    {
+                        if (pair.Value.ImplementationType == null)
+                            pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+
+                        if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
+                            pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
+
+                        return pair.Value.CreateFactory();
+                    });
+
+                    factories.Add(new KV<object, Factory>(pair.Key, new LazyFactory(lazyFactory, lazySetup)));
+                }
+
+                return factories;
+            };
+
+            // Test that resolve works
+            //========================
+            var container = new Container().WithMef()
+                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
+                .With(rules => rules.WithUnknownServiceHandlers(createFactoriesFromAssembly));
 
             // the same resolution code as in previous test
             //========================
