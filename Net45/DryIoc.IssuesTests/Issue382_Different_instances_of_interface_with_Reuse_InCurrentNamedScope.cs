@@ -6,7 +6,26 @@ namespace DryIoc.IssuesTests
     public class Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope
     {
         [Test]
-        public void Test()
+        public void Should_work_as_is()
+        {
+            var container = new Container();
+            container.Register<IAction, ActionOne>(Reuse.InCurrentNamedScope("1"));
+            container.Register<IAction, ActionTwo>(Reuse.InCurrentNamedScope("2"));
+            container.Register<Service>();
+
+            using (var scopeOne = container.OpenScope("1"))
+            {
+                scopeOne.Resolve<Service>();
+            }
+
+            using (var scopeTwo = container.OpenScope("2"))
+            {
+                scopeTwo.Resolve<Service>(); 
+            }
+        }
+
+        [Test]
+        public void Should_work_with_asResolutionCall()
         {
             var container = new Container();
             container.Register<IAction, ActionOne>(Reuse.InCurrentNamedScope("1"), setup: Setup.With(asResolutionCall: true));
@@ -20,7 +39,7 @@ namespace DryIoc.IssuesTests
 
             using (var scopeTwo = container.OpenScope("2"))
             {
-                scopeTwo.Resolve<Service>(); 
+                scopeTwo.Resolve<Service>();
             }
         }
 

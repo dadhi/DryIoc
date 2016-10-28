@@ -6367,7 +6367,7 @@ namespace DryIoc
         {
             FactoryID = GetNextID();
             Reuse = reuse;
-            Setup = setup ?? Setup.Default;
+            _setup = setup ?? Setup.Default;
         }
 
         /// <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
@@ -6393,14 +6393,17 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                    && Setup.FactoryType == FactoryType.Service
-
-                   // the settings below specify context-based resolution so that expression will be different on
-                   // different resolution paths, which prevents its caching and reuse.
-                   && Setup.Condition == null
-                   && !Setup.AsResolutionCall
-                   && !Setup.UseParentReuse
-                   && !(request.Reuse is ResolutionScopeReuse)
+                   && !IsContextDependent(request)
                    && !IsTrackingDisposableTransient(request);
+        }
+
+        private bool IsContextDependent(Request request)
+        {
+            return Setup.Condition != null
+                || Setup.AsResolutionCall
+                || Setup.UseParentReuse
+                || request.Reuse is ResolutionScopeReuse 
+                || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
 
         private bool IsTrackingDisposableTransient(Request request)
@@ -6417,17 +6420,12 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            var container = request.Container;
-
-            // Returns "r.Resolver.Resolve<IDependency>(...)" instead of "new Dependency()".
-            if (Setup.AsResolutionCall && !request.IsFirstNonWrapperInResolutionCall()
-                || request.Level >= container.Rules.LevelToSplitObjectGraphIntoResolveCalls
-                // note: Split only if not wrapped in Func with args -
-                // propagation of args across Resolve boundaries is not supported.
-                && !request.IsWrappedInFuncWithArgs())
+            if ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request))
+                && !request.IsWrappedInFuncWithArgs() && !request.IsFirstNonWrapperInResolutionCall())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
-            // Here's lookup for decorators
+            // First lookup for decorators
+            var container = request.Container;
             var decoratorExpr = FactoryType != FactoryType.Decorator
                 ? container.GetDecoratorExpressionOrDefault(request)
                 : null;
