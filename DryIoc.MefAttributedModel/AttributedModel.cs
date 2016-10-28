@@ -1369,7 +1369,16 @@ namespace DryIoc.MefAttributedModel
 
                 if (addProperties)
                 {
-                    var properties = metaAttr.GetType().GetTypeInfo().DeclaredProperties;
+                    var metaTypes = new List<TypeInfo>();
+                    var metaType = metaAttr.GetType();
+                    while (metaType != null && metaType != typeof(Attribute))
+                    {
+                        var metaTypeInfo = metaType.GetTypeInfo();
+                        metaTypes.Add(metaTypeInfo);
+                        metaType = metaTypeInfo.BaseType;
+                    }
+
+                    var properties = metaTypes.SelectMany(t => t.DeclaredProperties);
                     foreach (var property in properties)
                     {
                         metaKey = property.Name;

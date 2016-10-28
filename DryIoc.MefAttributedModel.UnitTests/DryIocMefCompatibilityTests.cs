@@ -296,6 +296,36 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void DryIoc_allows_importing_untyped_metadata()
+        {
+            var service = Container.Resolve<ImportUntypedInheritedMetadata>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.UntypedMetadataServices);
+            Assert.AreEqual(1, service.UntypedMetadataServices.Length);
+
+            var metadata = service.UntypedMetadataServices.First().Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual(123L, metadata["ScriptID"]);
+            Assert.AreEqual("Category", metadata["CategoryName"]);
+        }
+
+        [Test]
+        public void DryIoc_supports_metadata_attribute_hierarchy_properly()
+        {
+            var service = Container.Resolve<ImportUntypedInheritedMetadata>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.TypedMetadataServices);
+            Assert.AreEqual(1, service.TypedMetadataServices.Length);
+
+            var metadata = service.TypedMetadataServices.First().Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual(123L, metadata.ScriptID);
+            Assert.AreEqual("Category", metadata.CategoryName);
+        }
+
+        [Test]
         public void DryIoc_calls_ImportSatisfied_for_non_shared_parts_once()
         {
             var container = new Container().WithMef();

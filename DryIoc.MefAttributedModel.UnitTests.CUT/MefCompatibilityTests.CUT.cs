@@ -360,6 +360,8 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public interface IScriptMetadata { long ScriptID { get; } }
 
+    public interface IScriptWithCategoryMetadata : IScriptMetadata { string CategoryName { get; } }
+
     [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ScriptMetadataAttribute : Attribute, IScriptMetadata
     {
@@ -369,6 +371,18 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
 
         public long ScriptID { get; }
+    }
+
+    [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class ScriptWithCategoryMetadataAttribute : ScriptMetadataAttribute, IScriptWithCategoryMetadata
+    {
+        public ScriptWithCategoryMetadataAttribute(long scriptId, string categoryName)
+            : base(scriptId)
+        {
+            CategoryName = categoryName;
+        }
+
+        public string CategoryName { get; }
     }
 
     [Export, LazyMetadata("MultipleMetadata"), ScriptMetadata(123)]
@@ -384,6 +398,21 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         [ImportMany]
         public Lazy<MultipleMetadataAttributes, ILazyMetadata>[] NamedServices { get; set; }
+    }
+
+    [Export, ScriptWithCategoryMetadata(123, "Category")]
+    public class InheritedMetadataAttributes
+    {
+    }
+
+    [Export]
+    public class ImportUntypedInheritedMetadata
+    {
+        [ImportMany]
+        public Lazy<InheritedMetadataAttributes, IDictionary<string, object>>[] UntypedMetadataServices { get; set; }
+
+        [ImportMany]
+        public Lazy<InheritedMetadataAttributes, IScriptWithCategoryMetadata>[] TypedMetadataServices { get; set; }
     }
 
     [Export, PartCreationPolicy(CreationPolicy.NonShared)]
