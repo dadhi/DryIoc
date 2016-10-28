@@ -460,9 +460,7 @@ namespace DryIoc
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
-            object cacheEntryKey = serviceType;
-            if (serviceKey != null)
-                cacheEntryKey = new KV<object, object>(cacheEntryKey, serviceKey);
+            var cacheEntryKey = serviceKey == null ? (object)serviceType : new KV<object, object>(serviceType, serviceKey);
 
             object cacheContextKey = requiredServiceType;
             if (!preResolveParent.IsEmpty)
@@ -487,7 +485,11 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
             var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope, preResolveParent);
-            var factory = ((IContainer)this).ResolveFactory(request);
+
+            var factory = ((IContainer)this).ResolveFactory(request); // Hack: may mutate (set) not null request service key.
+            if (serviceKey == null && request.ServiceKey != null)
+                cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
+
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
@@ -6427,8 +6429,8 @@ namespace DryIoc
 
             // Here's lookup for decorators
             var decoratorExpr = FactoryType != FactoryType.Decorator
-                    ? container.GetDecoratorExpressionOrDefault(request)
-                    : null;
+                ? container.GetDecoratorExpressionOrDefault(request)
+                : null;
 
             var isDecorated = decoratorExpr != null;
             var cacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
