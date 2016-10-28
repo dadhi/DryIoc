@@ -156,6 +156,31 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Resolve_service_reused_in_resolution_scope_of_open_generic_service()
+        {
+            var container = new Container();
+
+            container.Register(typeof(Aaa<>));
+            container.Register<Bbb>(Reuse.InResolutionScopeOf(typeof(Aaa<>)));
+
+            var aaa = container.Resolve<Aaa<Bbb>>();
+
+            Assert.IsNotNull(aaa);
+        }
+
+        public class Bbb { }
+
+        public class Aaa<T>
+        {
+            public T Ttt { get; private set; }
+
+            public Aaa(T t)
+            {
+                Ttt = t;
+            }
+        }
+
+        [Test]
         public void Can_control_disposing_of_matching_resolution_scope_with_wrapper()
         {
             var container = new Container();

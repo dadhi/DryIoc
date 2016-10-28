@@ -755,8 +755,11 @@ namespace DryIoc
             while (scope != null)
             {
                 var name = scope.Name as KV<Type, object>;
-                if (name != null &&
-                    (assignableFromServiceType == null || name.Key.IsAssignableTo(assignableFromServiceType)) &&
+                if (name != null && (
+                    assignableFromServiceType == null || 
+                    name.Key.IsAssignableTo(assignableFromServiceType) ||
+                    assignableFromServiceType.IsOpenGeneric() && 
+                    name.Key.GetGenericDefinitionOrNull().IsAssignableTo(assignableFromServiceType)) &&
                     (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
                     matchedScope = scope;

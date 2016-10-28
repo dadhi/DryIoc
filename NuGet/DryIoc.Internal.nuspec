@@ -12,6 +12,10 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.8.4
+      - fixed: #382: Different instances of interface with Reuse.InCurrentNamedScope
+      - fixed: #383: Support open-generic type to specify Reuse.InResolutionScopeOf(open-generic)
+      - added: DryIoc.Internal source code package with the public types made internal.
       v2.8.3
       - fixed: NetStandard1.0 package dependencies
       - fixed: Removing remains of IServiceProvider

@@ -29,6 +29,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 		NuGet\DryIoc.CommonServiceLocator.dll.nuspec = NuGet\DryIoc.CommonServiceLocator.dll.nuspec
 		NuGet\DryIoc.CommonServiceLocator.nuspec = NuGet\DryIoc.CommonServiceLocator.nuspec
 		nuget\DryIoc.dll.nuspec = nuget\DryIoc.dll.nuspec
+		NuGet\DryIoc.Internal.nuspec = NuGet\DryIoc.Internal.nuspec
 		NuGet\DryIoc.MefAttributedModel.dll.nuspec = NuGet\DryIoc.MefAttributedModel.dll.nuspec
 		NuGet\DryIoc.MefAttributedModel.nuspec = NuGet\DryIoc.MefAttributedModel.nuspec
 		nuget\DryIoc.Mvc.dll.nuspec = nuget\DryIoc.Mvc.dll.nuspec
