@@ -437,4 +437,19 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
             ImportsSatisfied++;
         }
     }
+
+    public class MemberExportWithMetadataExample
+    {
+        [Export("UnitTestExample"), ExportMetadata("Title", "Sample")]
+        public static void TestMethodExample()
+        {
+        }
+    }
+
+    [Export]
+    public class UsesMemberExportWithMetadataExample
+    {
+        [Import("UnitTestExample")]
+        public Lazy<Action, IDictionary<string, object>> ImportedTestMethodExample { get; set; }
+    }
 }

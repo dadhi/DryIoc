@@ -179,6 +179,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual("Category", metadata.CategoryName);
         }
 
+        [Test]
         public void Mef_calls_ImportSatisfied_for_non_shared_parts_once()
         {
             var mef = Mef;
@@ -190,6 +191,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, service2.ImportsSatisfied);
         }
 
+        [Test]
         public void Mef_calls_ImportSatisfied_for_shared_parts_once()
         {
             var mef = Mef;
@@ -199,6 +201,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreSame(service1, service2);
             Assert.AreEqual(1, service1.ImportsSatisfied);
             Assert.AreEqual(1, service2.ImportsSatisfied);
+        }
+
+        [Test]
+        public void Mef_can_import_member_with_metadata()
+        {
+            var service = Mef.GetExport<UsesMemberExportWithMetadataExample>().Value;
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.ImportedTestMethodExample);
+
+            var metadata = service.ImportedTestMethodExample.Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual("Sample", metadata["Title"]);
         }
     }
 }

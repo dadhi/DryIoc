@@ -351,5 +351,18 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, service1.ImportsSatisfied);
             Assert.AreEqual(1, service2.ImportsSatisfied);
         }
+
+        [Test, Ignore("fails")]
+        public void DryIoc_can_import_member_with_metadata()
+        {
+            var service = Container.Resolve<UsesMemberExportWithMetadataExample>();
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.ImportedTestMethodExample);
+
+            var metadata = service.ImportedTestMethodExample.Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual("Sample", metadata["Title"]);
+        }
     }
 }

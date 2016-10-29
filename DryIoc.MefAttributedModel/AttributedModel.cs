@@ -726,8 +726,12 @@ namespace DryIoc.MefAttributedModel
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
-                    info.InitExportedMetadata();
                 }
+            }
+
+            if (info.HasMetadataAttribute)
+            {
+                info.InitExportedMetadata(); // FIXME: should be InitExportedMetadata(attributes) perhaps?
             }
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
