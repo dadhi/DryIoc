@@ -2782,7 +2782,7 @@ namespace DryIoc
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
-        /// <param name="ifNotRegisteredReturnNull">if set to <c>true</c> then return null if the service is not regustered.</param>
+        /// <param name="ifNotRegisteredReturnNull">if set to <c>true</c> then return null if the service is not registered.</param>
         /// <returns>Expression: r => new Lazy{TService}(() => r.Resolver.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
         public static Expression GetLazyExpressionOrDefault(Request request, bool ifNotRegisteredReturnNull = false)
         {
