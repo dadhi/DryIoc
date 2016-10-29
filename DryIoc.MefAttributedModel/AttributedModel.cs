@@ -101,7 +101,9 @@ namespace DryIoc.MefAttributedModel
             return container;
         }
 
-        /// <summary>Registers <see cref="ExportFactory{T}"/> wrapper into the container.</summary>
+        /// <summary>Registers MEF-specific wrappers into the container.</summary>
+        /// <remarks>MEF-specific wrappers are: <see cref="ExportFactory{T}"/>,
+        /// <see cref="ExportFactory{T, TMetadata}"/> and <see cref="Lazy{T, TMetadata}"/>.</remarks>
         /// <param name="container">Container to support.</param>
         /// <returns>The container with registration.</returns>
         public static IContainer WithMefSpecificWrappers(this IContainer container)
@@ -118,14 +120,11 @@ namespace DryIoc.MefAttributedModel
                 made: _createLazyWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
-            // constructor: new Lazy<T>(Func<T> factory)
-            var lazyConstructor = typeof(Lazy<>).GetAllConstructors()
-                .Single(mi => mi.GetParameters().Length == 1 &&
-                    mi.GetParameters().Single().ParameterType.GetTypeInfo().IsGenericType);
-
+            var lazyFactory = new ExpressionFactory(r =>
+                WrappersSupport.GetLazyExpressionOrDefault(r, ifNotRegisteredReturnNull: true),
+                setup: Setup.Wrapper);
             container.Register(typeof(Lazy<>),
-                made: Made.Of(lazyConstructor),
-                setup: Setup.Wrapper,
+                factory: lazyFactory,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             return container;

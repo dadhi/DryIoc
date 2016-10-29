@@ -756,9 +756,9 @@ namespace DryIoc
             {
                 var name = scope.Name as KV<Type, object>;
                 if (name != null && (
-                    assignableFromServiceType == null || 
+                    assignableFromServiceType == null ||
                     name.Key.IsAssignableTo(assignableFromServiceType) ||
-                    assignableFromServiceType.IsOpenGeneric() && 
+                    assignableFromServiceType.IsOpenGeneric() &&
                     name.Key.GetGenericDefinitionOrNull().IsAssignableTo(assignableFromServiceType)) &&
                     (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
@@ -1568,7 +1568,7 @@ namespace DryIoc
                 return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), 
+                    Ref.Of(ImTreeMapIntToObj.Empty),
                     _isChangePermitted);
             }
 
@@ -2565,7 +2565,7 @@ namespace DryIoc
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                new ExpressionFactory(GetLazyExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
@@ -2780,14 +2780,22 @@ namespace DryIoc
             return Expression.New(lazyEnumerableCtor, callResolveManyExpr);
         }
 
-        // Result: r => new Lazy<TService>(() => r.Resolver.Resolve<TService>(key, ifUnresolved, requiredType));
-        private static Expression GetLazyExpressionOrDefault(Request request)
+        /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
+        /// <param name="request">The resolution request.</param>
+        /// <param name="ifNotRegisteredReturnNull">if set to <c>true</c> then return null if the service is not regustered.</param>
+        /// <returns>Expression: r => new Lazy{TService}(() => r.Resolver.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
+        public static Expression GetLazyExpressionOrDefault(Request request, bool ifNotRegisteredReturnNull = false)
         {
             if (request.IsWrappedInFuncWithArgs(immediateParent: true))
                 Throw.It(Error.NotPossibleToResolveLazyInsideFuncWithArgs, request);
 
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
+            if (ifNotRegisteredReturnNull && !request.Container.IsRegistered(serviceType, request.ServiceKey))
+            {
+                return Expression.Constant(null, lazyType);
+            }
+
             var serviceRequest = request.Push(serviceType);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
@@ -6405,7 +6413,7 @@ namespace DryIoc
             return Setup.Condition != null
                 || Setup.AsResolutionCall
                 || Setup.UseParentReuse
-                || request.Reuse is ResolutionScopeReuse 
+                || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
 
@@ -8350,7 +8358,7 @@ namespace DryIoc
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
             return Expression.Call(_getOrAddItemOrDefaultMethod,
-                Container.ScopesExpr, scopeNameExpr, 
+                Container.ScopesExpr, scopeNameExpr,
                 Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
