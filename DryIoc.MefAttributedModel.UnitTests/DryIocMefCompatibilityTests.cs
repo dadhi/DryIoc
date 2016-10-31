@@ -279,6 +279,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(service.NonExistingServiceFactoryWithMetadata);
         }
 
+        [Test, Ignore("fails")]
+        public void DryIoc_required_import_of_nonexisting_service_cannot_be_resolved()
+        {
+            Assert.Throws<ContainerException>(() => Container.Resolve<NonExistingServiceRequiredImport>());
+            Assert.Throws<ContainerException>(() => Container.Resolve<NonExistingServiceRequiredLazyImport>());
+            Assert.Throws<ContainerException>(() => Container.Resolve<NonExistingServiceRequiredExportFactoryImport>());
+            Assert.Throws<ContainerException>(() => Container.Resolve<NonExistingServiceRequiredLazyWithMetadataImport>());
+            Assert.Throws<ContainerException>(() => Container.Resolve<NonExistingServiceRequiredExportFactoryWithMetadataImport>());
+        }
+
         [Test]
         public void DryIoc_supports_multiple_metadata_attributes()
         {

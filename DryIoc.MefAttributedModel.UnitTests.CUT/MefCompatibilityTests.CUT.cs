@@ -359,6 +359,41 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public ExportFactory<INonExistingService, ILazyMetadata> NonExistingServiceFactoryWithMetadata { get; set; }
     }
 
+    [Export]
+    public class NonExistingServiceRequiredImport
+    {
+        [Import(AllowDefault = false)]
+        public INonExistingService NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredLazyImport
+    {
+        [Import(AllowDefault = false)]
+        public Lazy<INonExistingService> NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredExportFactoryImport
+    {
+        [Import(AllowDefault = false)]
+        public ExportFactory<INonExistingService> NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredLazyWithMetadataImport
+    {
+        [Import(AllowDefault = false)]
+        public Lazy<INonExistingService, ILazyMetadata> NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredExportFactoryWithMetadataImport
+    {
+        [Import(AllowDefault = false)]
+        public ExportFactory<INonExistingService, ILazyMetadata> NonExistingService { get; set; }
+    }
+
     public interface IScriptMetadata { long ScriptID { get; } }
 
     public interface IScriptWithCategoryMetadata : IScriptMetadata { string CategoryName { get; } }

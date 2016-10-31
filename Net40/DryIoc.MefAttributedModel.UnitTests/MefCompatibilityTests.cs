@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.Composition.Hosting;
+﻿using System.ComponentModel.Composition;
+using System.ComponentModel.Composition.Hosting;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
@@ -128,6 +129,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(service.NonExistingServiceFactory);
             Assert.IsNull(service.LazyNonExistingServiceWithMetadata);
             Assert.IsNull(service.NonExistingServiceFactoryWithMetadata);
+        }
+
+        [Test]
+        public void Mef_required_import_of_nonexisting_service_cannot_be_resolved()
+        {
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredLazyImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredExportFactoryImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredLazyWithMetadataImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredExportFactoryWithMetadataImport>());
         }
 
         [Test]
