@@ -724,13 +724,14 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    info.HasMetadataAttribute = true;
+                    // todo: The property may be replaced with the local flag, we can just check Metadata for null instead
+                    info.HasMetadataAttribute = true; 
                 }
             }
 
             if (info.HasMetadataAttribute)
             {
-                info.InitExportedMetadata(); // FIXME: should be InitExportedMetadata(attributes) perhaps?
+                info.InitExportedMetadata(); // todo: should be InitExportedMetadata(attributes) perhaps?
             }
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
