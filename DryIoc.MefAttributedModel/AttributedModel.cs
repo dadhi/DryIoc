@@ -721,7 +721,7 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute is ExportAttribute ||
+                if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
@@ -1331,9 +1331,8 @@ namespace DryIoc.MefAttributedModel
             }
 
             var metaAttrs = ImplementationType.GetAttributes()
-                .Where(a =>
-                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() ||
-                    a is ExportMetadataAttribute)
+                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute ||
+                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 .OrderBy(a => a.GetType().FullName);
 
             foreach (var metaAttr in metaAttrs)
@@ -1342,26 +1341,23 @@ namespace DryIoc.MefAttributedModel
                 object metaValue = metaAttr;
                 var addProperties = false;
 
-                var withMetaAttr = metaAttr as WithMetadataAttribute;
-                if (withMetaAttr != null)
+                if (metaAttr is ExportMetadataAttribute)
                 {
-                    metaKey = withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
-                    metaValue = withMetaAttr.Metadata;
+                    var exportMetaAttr = (ExportMetadataAttribute)metaAttr;
+                    metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
+                    metaValue = exportMetaAttr.Value;
+                }
+                else if (metaAttr is WithMetadataAttribute)
+                {
+                    var withMetadataAttr = (WithMetadataAttribute)metaAttr;
+                    metaKey = withMetadataAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
+                    metaValue = withMetadataAttr.Metadata;
                 }
                 else
                 {
-                    var exportMetaAttr = metaAttr as ExportMetadataAttribute;
-                    if (exportMetaAttr != null)
-                    {
-                        metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
-                        metaValue = exportMetaAttr.Value;
-                    }
-                    else
-                    {
-                        // index custom metadata attributes with their type name
-                        metaKey = metaAttr.GetType().FullName;
-                        addProperties = true;
-                    }
+                    // index custom metadata attributes with their type name
+                    metaKey = metaAttr.GetType().FullName;
+                    addProperties = true;
                 }
 
                 if (metaDict != null && metaDict.ContainsKey(metaKey))

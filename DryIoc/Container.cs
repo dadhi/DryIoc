@@ -5041,6 +5041,9 @@ namespace DryIoc
                 s.Append("{RequiredServiceType=").Print(RequiredServiceType);
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
+            if (MetadataKey != null || Metadata != null)
+                (s.Length == 0 ? s.Append('{') : s.Append(", "))
+                    .Append("Metadata=").Append(new KeyValuePair<string, object>(MetadataKey, Metadata));
             if (IfUnresolved != IfUnresolved.Throw)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
             return (s.Length == 0 ? s : s.Append('}')).ToString();

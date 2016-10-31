@@ -24,7 +24,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void I_should_be_able_to_import_single_service_based_on_specified_metadata()
         {
-            var container = new Container().WithMefAttributedModel();
+            var container = new Container().WithMef();
             container.RegisterExports(typeof(FooConsumer), typeof(FooHey), typeof(FooBlah));
 
             var service = container.Resolve<FooConsumer>();

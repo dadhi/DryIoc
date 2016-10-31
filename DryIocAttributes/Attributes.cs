@@ -644,7 +644,6 @@ namespace DryIocAttributes
 
     /// <summary>Exports service with associated metadata key and value.
     /// Key can be skipped</summary>
-    [MetadataAttribute]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Parameter
