@@ -2791,12 +2791,13 @@ namespace DryIoc
 
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
-            var serviceRequest = request.Push(serviceType);
-            if (ifNotRegisteredReturnNull && request.Container.ResolveFactory(serviceRequest) == null)
-            {
-                return Expression.Constant(null, lazyType);
-            }
 
+            var container = request.Container;
+            var registeredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
+            if (!container.IsRegistered(registeredServiceType))
+                return Expression.Constant(null, lazyType);
+
+            var serviceRequest = request.Push(serviceType);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
             // Note: the conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
