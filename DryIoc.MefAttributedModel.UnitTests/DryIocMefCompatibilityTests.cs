@@ -279,7 +279,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(service.NonExistingServiceFactoryWithMetadata);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_required_import_of_nonexisting_service_cannot_be_resolved()
         {
             Assert.Throws<ContainerException>(() => Container.Resolve<NonExistingServiceRequiredImport>());

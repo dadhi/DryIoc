@@ -2782,9 +2782,9 @@ namespace DryIoc
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
-        /// <param name="ifNotRegisteredReturnNull">if set to <c>true</c> then return null if the service is not registered.</param>
+        /// <param name="checkRegistration">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
         /// <returns>Expression: r => new Lazy{TService}(() => r.Resolver.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
-        public static Expression GetLazyExpressionOrDefault(Request request, bool ifNotRegisteredReturnNull = false)
+        public static Expression GetLazyExpressionOrDefault(Request request, bool checkRegistration = false)
         {
             if (request.IsWrappedInFuncWithArgs(immediateParent: true))
                 Throw.It(Error.NotPossibleToResolveLazyInsideFuncWithArgs, request);
@@ -2792,12 +2792,19 @@ namespace DryIoc
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
 
-            if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+            if (checkRegistration)
             {
                 var container = request.Container;
                 var registeredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
                 if (!container.IsRegistered(registeredServiceType))
-                    return Expression.Constant(null, lazyType);
+                {
+                    if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                        return Expression.Constant(null, lazyType);
+                    else
+                        Throw.It(Error.UnableToResolveUnknownService, request,
+                            container.Rules.FallbackContainers.EmptyIfNull().Length,
+                            container.Rules.UnknownServiceResolvers.EmptyIfNull().Length);
+                }
             }
 
             var serviceRequest = request.Push(serviceType);

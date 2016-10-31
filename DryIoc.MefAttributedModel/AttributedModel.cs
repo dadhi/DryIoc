@@ -121,7 +121,7 @@ namespace DryIoc.MefAttributedModel
                 setup: Setup.WrapperWith(0));
 
             var lazyFactory = new ExpressionFactory(r =>
-                WrappersSupport.GetLazyExpressionOrDefault(r, ifNotRegisteredReturnNull: true),
+                WrappersSupport.GetLazyExpressionOrDefault(r, checkRegistration: true),
                 setup: Setup.Wrapper);
             container.Register(typeof(Lazy<>),
                 factory: lazyFactory,
@@ -725,7 +725,7 @@ namespace DryIoc.MefAttributedModel
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     // todo: The property may be replaced with the local flag, we can just check Metadata for null instead
-                    info.HasMetadataAttribute = true; 
+                    info.HasMetadataAttribute = true;
                 }
             }
 
