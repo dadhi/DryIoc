@@ -2801,9 +2801,7 @@ namespace DryIoc
                     if (request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return Expression.Constant(null, lazyType);
                     else
-                        Throw.It(Error.UnableToResolveUnknownService, request,
-                            container.Rules.FallbackContainers.EmptyIfNull().Length,
-                            container.Rules.UnknownServiceResolvers.EmptyIfNull().Length);
+                        return null;
                 }
             }
 
