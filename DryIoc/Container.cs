@@ -2792,10 +2792,13 @@ namespace DryIoc
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
 
-            var container = request.Container;
-            var registeredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
-            if (!container.IsRegistered(registeredServiceType))
-                return Expression.Constant(null, lazyType);
+            if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+            {
+                var container = request.Container;
+                var registeredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
+                if (!container.IsRegistered(registeredServiceType))
+                    return Expression.Constant(null, lazyType);
+            }
 
             var serviceRequest = request.Push(serviceType);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
