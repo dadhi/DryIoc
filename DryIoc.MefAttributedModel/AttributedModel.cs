@@ -121,7 +121,7 @@ namespace DryIoc.MefAttributedModel
                 setup: Setup.WrapperWith(0));
 
             var lazyFactory = new ExpressionFactory(r =>
-                WrappersSupport.GetLazyExpressionOrDefault(r, checkRegistration: true),
+                WrappersSupport.GetLazyExpressionOrDefault(r, nullWrapperForUnresolvedService: true),
                 setup: Setup.Wrapper);
             container.Register(typeof(Lazy<>),
                 factory: lazyFactory,

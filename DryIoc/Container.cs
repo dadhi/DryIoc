@@ -2782,9 +2782,9 @@ namespace DryIoc
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
-        /// <param name="checkRegistration">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
+        /// <param name="nullWrapperForUnresolvedService">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
         /// <returns>Expression: r => new Lazy{TService}(() => r.Resolver.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
-        public static Expression GetLazyExpressionOrDefault(Request request, bool checkRegistration = false)
+        public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
         {
             if (request.IsWrappedInFuncWithArgs(immediateParent: true))
                 Throw.It(Error.NotPossibleToResolveLazyInsideFuncWithArgs, request);
@@ -2793,30 +2793,10 @@ namespace DryIoc
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
 
-            if (checkRegistration)
-            {
-                var container = request.Container;
-                var serviceRegistered = false;
-
-                if (container.Rules.UnknownServiceResolvers.IsNullOrEmpty() &&
-                    container.Rules.UnknownServiceHandlers.IsNullOrEmpty())
-                {
-                    var registeredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
-                    serviceRegistered = container.IsRegistered(registeredServiceType);
-                }
-                else
-                {
-                    serviceRegistered = container.ResolveFactory(serviceRequest) != null;
-                }
-
-                if (!serviceRegistered)
-                {
-                    if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                        return Expression.Constant(null, lazyType);
-                    else
-                        return null;
-                }
-            }
+            if (nullWrapperForUnresolvedService && request.Container.ResolveFactory(serviceRequest) == null)
+                return request.IfUnresolved == IfUnresolved.ReturnDefault
+                    ? Expression.Constant(null, lazyType)
+                    : null;
 
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
