@@ -66,7 +66,8 @@ namespace DryIoc.MefAttributedModel
             return container
                 .With(WithMefRules)
                 .WithImportsSatisfiedNotification()
-                .WithMefSpecificWrappers();
+                .WithMefSpecificWrappers()
+                .WithSameContractNameForSameType();
         }
 
         /// <summary>The basic rules to support Mef/DryIoc Attributes for 
@@ -130,6 +131,15 @@ namespace DryIoc.MefAttributedModel
                 factory: lazyFactory,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
+            return container;
+        }
+
+        /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
+        /// <param name="container">Source container.</param> <returns>New container.</returns>
+        public static IContainer WithSameContractNameForSameType(this IContainer container)
+        {
+            // map: ContractName/Key -> { ContractType, count }[]
+            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty)); 
             return container;
         }
 
@@ -313,12 +323,47 @@ namespace DryIoc.MefAttributedModel
             var factory = info.CreateFactory();
 
             var exports = info.Exports;
+            Ref<ImTreeMap<object, KV<Type, int>[]>> contractNameLookup = null;
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
                 var serviceKey = export.ServiceKey;
+                var serviceType = export.ServiceType;
+                if (serviceKey != null)
+                {
+                    if (contractNameLookup == null)
+                    {
+                        var resolver = ((IResolver)registrator); // todo: hack for initial implementation
+                        contractNameLookup = resolver.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(DryIoc.IfUnresolved.ReturnDefault);
+                        if (contractNameLookup == null)
+                        {
+                            // stop the resolution for the next iterations
+                            contractNameLookup = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
+                        }
+                        else
+                        {
+                            contractNameLookup.Swap(it => it
+                                .AddOrUpdate(serviceKey, new[] { new KV<Type, int>(serviceType, 1) }, (types, newTypes) =>
+                                {
+                                    var newType = newTypes[0].Key;
+                                    var sameTypeIndex = types.IndexOf(t => t.Key == newType);
+                                    if (sameTypeIndex != -1)
+                                    {
+                                        var sameType = types[sameTypeIndex];
 
-                registrator.Register(factory, export.ServiceType, serviceKey, export.IfAlreadyRegistered,
+                                        // Change the serviceKey only when multiple same types are registered with the same key
+                                        serviceKey = new KV<object, int>(serviceKey, sameType.Value);
+
+                                        return types.AppendOrUpdate(new KV<Type, int>(sameType.Key, sameType.Value + 1), sameTypeIndex);
+                                    }
+
+                                    return types.Append(newTypes);
+                                }));
+                        }
+                    }
+                }
+
+                registrator.Register(factory, serviceType, serviceKey, export.IfAlreadyRegistered,
                     isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
@@ -1215,6 +1260,10 @@ namespace DryIoc.MefAttributedModel
             if (!IsLazy && Metadata == null)
             {
                 Metadata = CollectExportedMetadata();
+                if (Metadata != null)
+                {
+                    ; // todo: No tests are convering this line, requires refactoring.
+                }
             }
 
             return Setup.With(Metadata, condition,
