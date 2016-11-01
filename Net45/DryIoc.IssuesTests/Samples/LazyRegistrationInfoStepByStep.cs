@@ -220,7 +220,8 @@ namespace DryIoc.IssuesTests.Samples
             var registrations = AttributedModel.Scan(new[] { assembly });
 
             // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
+            var lazyRegistrations = registrations.Select(info => info.MakeLazy())
+                .ToArray(); // NOTE: This is required to materialized DTOs to be seriliazed.
 
             // In run-time deserialize registrations and register them as rule for unresolved services
             //=========================================================================================

@@ -724,15 +724,12 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    // todo: The property may be replaced with the local flag, we can just check Metadata for null instead
                     info.HasMetadataAttribute = true;
                 }
             }
 
             if (info.HasMetadataAttribute)
-            {
-                info.InitExportedMetadata(); // todo: should be InitExportedMetadata(attributes) perhaps?
-            }
+                info.Metadata = info.CollectExportedMetadata();
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1214,7 +1211,7 @@ namespace DryIoc.MefAttributedModel
 
             if (!IsLazy && Metadata == null)
             {
-                Metadata = GetExportedMetadata();
+                Metadata = CollectExportedMetadata();
             }
 
             return Setup.With(Metadata, condition,
@@ -1302,34 +1299,14 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        /// <summary>Initializes the exported metadata.</summary>
-        public void InitExportedMetadata()
+        /// <summary>Collects the metadata into the result dictionary.</summary>
+        /// <returns>The dictionary.</returns>
+        public IDictionary<string, object> CollectExportedMetadata()
         {
-            Metadata = GetExportedMetadata();
-        }
-
-        private IDictionary<string, object> GetExportedMetadata()
-        {
-            var hasKeyedExports = Exports != null && Exports.Any(it => it.ServiceKey != null);
-            if (!hasKeyedExports && !HasMetadataAttribute)
+            if (!HasMetadataAttribute)
                 return null;
 
             Dictionary<string, object> metaDict = null;
-
-            // Converts keys to metadata in format of "<ServiceKey hash>:<ServiceType full name>" -> ServiceKey
-            if (hasKeyedExports)
-            {
-                metaDict = new Dictionary<string, object>();
-                for (var i = 0; i < Exports.Length; ++i)
-                {
-                    var export = Exports[i];
-                    if (export.ServiceKey != null)
-                    {
-                        var serviceKeyMeta = AttributedModel.ComposeServiceKeyMetadata(export.ServiceKey, export.ServiceType);
-                        metaDict.Add(serviceKeyMeta.Key, serviceKeyMeta.Value);
-                    }
-                }
-            }
 
             var metaAttrs = ImplementationType.GetAttributes()
                 .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute ||
