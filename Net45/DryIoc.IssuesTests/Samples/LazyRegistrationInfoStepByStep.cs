@@ -209,7 +209,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
             // the same registration code as in the lazy sample
@@ -316,7 +316,7 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var cmds = container.Resolve<CommandImporter>();
             Assert.IsNotNull(cmds.LazyHandler);
-            Assert.IsNotNull(cmds.LazyHandler.Value); // fails here
+            Assert.IsNotNull(cmds.LazyHandler.Value);
 
             Assert.IsNotNull(cmds.Commands);
             Assert.AreEqual(2, cmds.Commands.Length);
