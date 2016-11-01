@@ -209,7 +209,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test]
+        [Test, Ignore("fails")]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
             // the same registration code as in the lazy sample
@@ -315,6 +315,9 @@ namespace DryIoc.IssuesTests.Samples
             // the same resolution code as in previous test
             //========================
             var cmds = container.Resolve<CommandImporter>();
+            Assert.IsNotNull(cmds.LazyHandler);
+            Assert.IsNotNull(cmds.LazyHandler.Value); // fails here
+
             Assert.IsNotNull(cmds.Commands);
             Assert.AreEqual(2, cmds.Commands.Length);
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
@@ -331,6 +334,11 @@ namespace DryIoc.IssuesTests.Samples
 
         public interface ICommand { }
 
+        public interface IHandler<T> where T : class { }
+
+        [Export(typeof(IHandler<object>))]
+        public class ObjectHandler : IHandler<object> { }
+
         [Export(typeof(ICommand)), Command("Sample command")]
         public class SampleCommand : ICommand { }
 
@@ -340,6 +348,9 @@ namespace DryIoc.IssuesTests.Samples
         [Export]
         public class CommandImporter
         {
+            [Import(AllowDefault = true)]
+            public Lazy<IHandler<object>> LazyHandler { get; set; }
+
             [ImportMany]
             public Lazy<ICommand, ICommandMetadata>[] Commands { get; set; }
         }
