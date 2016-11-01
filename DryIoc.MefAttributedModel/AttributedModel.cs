@@ -45,27 +45,34 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
 
-        /// <summary>Returns new rules with attributed model importing rules appended.</summary>
-        /// <param name="rules">Source rules to append importing rules to.</param>
-        /// <returns>New rules with attributed model rules.</returns>
+        /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
+        /// <param name="rules">Source rules.</param> <returns>New rules.</returns>
         public static Rules WithMefRules(this Rules rules)
         {
-            return rules.WithMefAttributedModel();
+            var importsMadeOf = Made.Of(
+                request => GetImportingConstructor(request, rules.FactoryMethod),
+                GetImportedParameter, _getImportedPropertiesAndFields);
+
+            return rules.With(importsMadeOf)
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
+                .WithTrackingDisposableTransients();
         }
 
-        /// <summary>Appends attributed model rules to passed container.</summary>
-        /// <param name="container">Source container to apply attributed model importing rules to.</param>
-        /// <returns>Returns new container with new rules.</returns>
+        /// <summary>Add to container rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
+        /// In addition registers the MEF specific wrappers, and adds support for <see cref="IPartImportsSatisfiedNotification"/>.</summary>
+        /// <param name="container">Source container.</param> <returns>New container.</returns>
         public static IContainer WithMef(this IContainer container)
         {
             return container
                 .With(WithMefRules)
-                .WithMefSpecificWrappers()
-                .WithImportsSatisfiedNotification();
+                .WithImportsSatisfiedNotification()
+                .WithMefSpecificWrappers();
         }
 
-        // todo: V3: remove
-        /// <summary>Obsolete: replaced with more on point <see cref="WithMefRules"/>.</summary>
+        /// <summary>The basic rules to support Mef/DryIoc Attributes for 
+        /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
+        /// and for specifying injected dependencies via Import attributes.</summary>
+        /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
             var importsMadeOf = Made.Of(
@@ -74,18 +81,14 @@ namespace DryIoc.MefAttributedModel
 
             // hello, Max!!! we are Martians.
             return rules.With(importsMadeOf)
-                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
-                .WithTrackingDisposableTransients();
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton);
         }
 
-        // todo: V3: remove
-        /// <summary>Obsolete: replaced with more on point <see cref="WithMef"/>.</summary>
+        /// <summary>Applies the <see cref="WithMefAttributedModel(DryIoc.Rules)"/> to the container.</summary>
+        /// <param name="container">source container</param><returns>New container with applied rules.</returns>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
-            return container
-                .With(WithMefRules)
-                .WithMefSpecificWrappers()
-                .WithImportsSatisfiedNotification();
+            return container.With(WithMefRules);
         }
 
         /// <summary>Registers <see cref="IPartImportsSatisfiedNotification"/> calling decorator into container.
