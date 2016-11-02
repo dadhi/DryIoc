@@ -209,7 +209,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
             // the same registration code as in the lazy sample
@@ -280,7 +280,7 @@ namespace DryIoc.IssuesTests.Samples
                     return info.CreateFactory();
                 });
 
-                return new LazyReflectionFactory(lazyFactory);
+                return new LazyReflectionFactory(lazyFactory, info.GetSetup());
             };
 
             // Step 3 - Add service type handler for resolving many factories.
@@ -304,7 +304,7 @@ namespace DryIoc.IssuesTests.Samples
                         return pair.Value.CreateFactory();
                     });
 
-                    factories.Add(new KV<object, Factory>(pair.Key, new LazyReflectionFactory(lazyFactory)));
+                    factories.Add(new KV<object, Factory>(pair.Key, new LazyReflectionFactory(lazyFactory, pair.Value.GetSetup())));
                 }
 
                 return factories;

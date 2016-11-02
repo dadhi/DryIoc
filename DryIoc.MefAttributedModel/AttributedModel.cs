@@ -72,7 +72,7 @@ namespace DryIoc.MefAttributedModel
                 .WithSameContractNameForSameType();
         }
 
-        /// <summary>The basic rules to support Mef/DryIoc Attributes for 
+        /// <summary>The basic rules to support Mef/DryIoc Attributes for
         /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
         /// and for specifying injected dependencies via Import attributes.</summary>
         /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
@@ -141,7 +141,7 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithSameContractNameForSameType(this IContainer container)
         {
             // map: ContractName/Key -> { ContractType, count }[]
-            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty)); 
+            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
             return container;
         }
 
@@ -774,12 +774,12 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    // Just setting the flag so thta runtime knows what regestrations require metadata collection.
-                    // There is no actual metadata collecting is happenning here, that happens only on demand,
-                    // when metadata is acually examined.
-                    info.HasMetadataAttribute = true; 
+                    info.HasMetadataAttribute = true;
                 }
             }
+
+            if (info.HasMetadataAttribute)
+                info.Metadata = info.CollectExportedMetadata(); // todo: CollectExportedMetadata(attributes) to handle member metadata
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1159,6 +1159,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
+        /// <summary>The metadata.</summary>
+        public IDictionary<string, object> Metadata;
+
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
 
@@ -1256,13 +1259,12 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            object metadata = null;
-            if (HasMetadataAttribute)
+            if (HasMetadataAttribute && !IsLazy && Metadata == null)
             {
-                metadata = new Func<object>(CollectExportedMetadata);
+                Metadata = CollectExportedMetadata();
             }
 
-            return Setup.With(metadata, condition,
+            return Setup.With(Metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
@@ -1347,7 +1349,7 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        private IDictionary<string, object> CollectExportedMetadata()
+        public IDictionary<string, object> CollectExportedMetadata()
         {
             Dictionary<string, object> metaDict = null;
 
@@ -1650,12 +1652,16 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Initializes a new instance of the <see cref="LazyReflectionFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
-        public LazyReflectionFactory(Lazy<ReflectionFactory> factory)
+        /// <param name="setup">The eagerly-evaluated setup (optional).</param>
+        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null)
         {
             _lazyFactory = factory;
+            _lazySetup = new Lazy<Setup>(() => setup ?? _lazyFactory.Value.Setup);
         }
 
         private readonly Lazy<ReflectionFactory> _lazyFactory;
+
+        private readonly Lazy<Setup> _lazySetup;
 
         /// <inheritdoc />
         public override Type ImplementationType
@@ -1678,7 +1684,7 @@ namespace DryIoc.MefAttributedModel
         /// <inheritdoc />
         public override Setup Setup
         {
-            get { return _lazyFactory.Value.Setup; }
+            get { return _lazySetup.Value; }
         }
 
         /// <inheritdoc />
