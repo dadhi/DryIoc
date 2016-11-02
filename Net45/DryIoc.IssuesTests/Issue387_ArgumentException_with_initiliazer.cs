@@ -6,7 +6,35 @@ namespace DryIoc.IssuesTests
     public class Issue387_ArgumentException_with_initiliazer
     {
         [Test]
-        public void Multiple_initializers_should_work()
+        public void Initializers_for_multiple_interfaces_single_impl_should_select_the_correct_one_for_the_resolved_iface()
+        {
+            var container = new Container();
+
+            container.RegisterInitializer<ITest>((test, resolver) => test.TestMe());
+            container.RegisterInitializer<ITest2>((test, resolver) => test.TestMe2());
+            container.RegisterMany<Test>();
+
+            var result = container.Resolve<ITest>();
+
+            Assert.AreEqual("TestMe;", ((Test)result).TestLog);
+        }
+
+        [Test]
+        public void Initializers_for_multiple_interfaces_single_impl_should_select_the_correct_one_for_the_other_resolved_iface()
+        {
+            var container = new Container();
+
+            container.RegisterInitializer<ITest>((test, resolver) => test.TestMe());
+            container.RegisterInitializer<ITest2>((test, resolver) => test.TestMe2());
+            container.RegisterMany<Test>();
+
+            var result = container.Resolve<ITest2>();
+
+            Assert.AreEqual("TestMe2;", ((Test)result).TestLog);
+        }
+
+        [Test]
+        public void Initializers_for_multiple_interfaces_single_impl_should_select_all_for_the_resolved_impl()
         {
             var container = new Container();
 
@@ -15,6 +43,7 @@ namespace DryIoc.IssuesTests
             container.RegisterMany<Test>();
 
             var result = container.Resolve<Test>();
+
             Assert.AreEqual("TestMe;TestMe2;", result.TestLog);
         }
 

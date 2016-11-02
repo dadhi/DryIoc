@@ -4604,9 +4604,8 @@ namespace DryIoc
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                 parameters: Parameters.Of.Type(_ => initialize)),
-                setup: Setup.DecoratorWith(useDecorateeReuse: true, condition:
-                    r => r.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(TTarget))
-                        && (condition == null || condition(r))));
+                setup: Setup.DecoratorWith(useDecorateeReuse: true, 
+                condition: r => r.ServiceType.IsAssignableTo(typeof(TTarget)) && (condition == null || condition(r))));
         }
 
         private static readonly MethodInfo _initializerMethod =
@@ -7112,9 +7111,8 @@ namespace DryIoc
 
                 var implementationType = _openGenericFactory._implementationType;
 
-                var closedTypeArgs =
-                    implementationType == null ? serviceType.GetGenericParamsAndArgs()
-                  : implementationType == serviceType.GetGenericDefinitionOrNull() ? serviceType.GetGenericParamsAndArgs()
+                var closedTypeArgs = implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
+                  ? serviceType.GetGenericParamsAndArgs()
                   : implementationType.IsGenericParameter ? new[] { serviceType }
                   : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
 
