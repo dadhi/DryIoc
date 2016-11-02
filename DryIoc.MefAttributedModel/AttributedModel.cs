@@ -1159,7 +1159,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
-        /// <summary>The metadata.</summary>
+        /// <summary>Gets or sets the metadata.</summary>
         public IDictionary<string, object> Metadata;
 
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
@@ -1349,6 +1349,8 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
+        /// <summary>Collects the metadata into the result dictionary.</summary>
+        /// <returns>The metadata dictionary.</returns>
         public IDictionary<string, object> CollectExportedMetadata()
         {
             Dictionary<string, object> metaDict = null;
