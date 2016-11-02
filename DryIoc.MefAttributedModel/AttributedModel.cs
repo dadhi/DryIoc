@@ -333,7 +333,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     if (contractNameLookup == null)
                     {
-                        var resolver = ((IResolver)registrator); // todo: hack for initial implementation
+                        var resolver = (IResolver)registrator; // todo: hack for initial implementation
                         contractNameLookup = resolver.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(DryIoc.IfUnresolved.ReturnDefault);
                         if (contractNameLookup == null)
                         {
@@ -343,7 +343,7 @@ namespace DryIoc.MefAttributedModel
                         else
                         {
                             contractNameLookup.Swap(it => it
-                                .AddOrUpdate(serviceKey, new[] { new KV<Type, int>(serviceType, 1) }, (types, newTypes) =>
+                                .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
                                 {
                                     var newType = newTypes[0].Key;
                                     var sameTypeIndex = types.IndexOf(t => t.Key == newType);
@@ -352,9 +352,9 @@ namespace DryIoc.MefAttributedModel
                                         var sameType = types[sameTypeIndex];
 
                                         // Change the serviceKey only when multiple same types are registered with the same key
-                                        serviceKey = new KV<object, int>(serviceKey, sameType.Value);
+                                        serviceKey = KV.Of(serviceKey, sameType.Value);
 
-                                        return types.AppendOrUpdate(new KV<Type, int>(sameType.Key, sameType.Value + 1), sameTypeIndex);
+                                        return types.AppendOrUpdate(sameType.WithValue(sameType.Value + 1), sameTypeIndex);
                                     }
 
                                     return types.Append(newTypes);

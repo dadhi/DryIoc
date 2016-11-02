@@ -464,8 +464,7 @@ namespace DryIoc
 
             object cacheContextKey = requiredServiceType;
             if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null ? (object)preResolveParent
-                     : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
+                cacheContextKey = cacheContextKey == null ? (object)preResolveParent : KV.Of(cacheContextKey, preResolveParent);
 
             // Check cache first:
             var registryValue = _registry.Value;
@@ -506,12 +505,9 @@ namespace DryIoc
             {
                 var cachedContextFactories = (cacheEntry == null ? null : cacheEntry.Value) ?? ImTreeMap<object, FactoryDelegate>.Empty;
                 if (cacheContextKey == null)
-                    cacheEntry = new KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>(
-                        factoryDelegate,
-                        cachedContextFactories);
+                    cacheEntry = KV.Of(factoryDelegate, cachedContextFactories);
                 else
-                    cacheEntry = new KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>(
-                        cacheEntry == null ? null : cacheEntry.Key,
+                    cacheEntry = KV.Of(cacheEntry == null ? null : cacheEntry.Key,
                         cachedContextFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
 
                 var cacheVal = cacheRef.Value;
@@ -1455,7 +1451,7 @@ namespace DryIoc
                         }
 
                         Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
-                            new KV<object, object>(serviceKey, instance), keyedFactory);
+                            KV.Of(serviceKey, instance), keyedFactory);
                     }
                 }
 
