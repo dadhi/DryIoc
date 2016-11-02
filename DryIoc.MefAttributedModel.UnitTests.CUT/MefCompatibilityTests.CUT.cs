@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
@@ -358,7 +359,44 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public ExportFactory<INonExistingService, ILazyMetadata> NonExistingServiceFactoryWithMetadata { get; set; }
     }
 
+    [Export]
+    public class NonExistingServiceRequiredImport
+    {
+        [Import(AllowDefault = false)]
+        public INonExistingService NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredLazyImport
+    {
+        [Import(AllowDefault = false)]
+        public Lazy<INonExistingService> NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredExportFactoryImport
+    {
+        [Import(AllowDefault = false)]
+        public ExportFactory<INonExistingService> NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredLazyWithMetadataImport
+    {
+        [Import(AllowDefault = false)]
+        public Lazy<INonExistingService, ILazyMetadata> NonExistingService { get; set; }
+    }
+
+    [Export]
+    public class NonExistingServiceRequiredExportFactoryWithMetadataImport
+    {
+        [Import(AllowDefault = false)]
+        public ExportFactory<INonExistingService, ILazyMetadata> NonExistingService { get; set; }
+    }
+
     public interface IScriptMetadata { long ScriptID { get; } }
+
+    public interface IScriptWithCategoryMetadata : IScriptMetadata { string CategoryName { get; } }
 
     [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class ScriptMetadataAttribute : Attribute, IScriptMetadata
@@ -369,6 +407,18 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
 
         public long ScriptID { get; }
+    }
+
+    [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class ScriptWithCategoryMetadataAttribute : ScriptMetadataAttribute, IScriptWithCategoryMetadata
+    {
+        public ScriptWithCategoryMetadataAttribute(long scriptId, string categoryName)
+            : base(scriptId)
+        {
+            CategoryName = categoryName;
+        }
+
+        public string CategoryName { get; }
     }
 
     [Export, LazyMetadata("MultipleMetadata"), ScriptMetadata(123)]
@@ -384,6 +434,21 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         [ImportMany]
         public Lazy<MultipleMetadataAttributes, ILazyMetadata>[] NamedServices { get; set; }
+    }
+
+    [Export, ScriptWithCategoryMetadata(123, "Category"), WithMetadata("DryIocMetadata", "AlsoSupported")]
+    public class InheritedMetadataAttributes
+    {
+    }
+
+    [Export]
+    public class ImportUntypedInheritedMetadata
+    {
+        [ImportMany]
+        public Lazy<InheritedMetadataAttributes, IDictionary<string, object>>[] UntypedMetadataServices { get; set; }
+
+        [ImportMany]
+        public Lazy<InheritedMetadataAttributes, IScriptWithCategoryMetadata>[] TypedMetadataServices { get; set; }
     }
 
     [Export, PartCreationPolicy(CreationPolicy.NonShared)]
@@ -406,5 +471,20 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         {
             ImportsSatisfied++;
         }
+    }
+
+    public class MemberExportWithMetadataExample
+    {
+        [Export("UnitTestExample"), ExportMetadata("Title", "Sample")]
+        public static void TestMethodExample()
+        {
+        }
+    }
+
+    [Export]
+    public class UsesMemberExportWithMetadataExample
+    {
+        [Import("UnitTestExample")]
+        public Lazy<Action, IDictionary<string, object>> ImportedTestMethodExample { get; set; }
     }
 }

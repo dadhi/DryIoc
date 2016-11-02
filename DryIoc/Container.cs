@@ -464,8 +464,7 @@ namespace DryIoc
 
             object cacheContextKey = requiredServiceType;
             if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null ? (object)preResolveParent
-                     : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
+                cacheContextKey = cacheContextKey == null ? (object)preResolveParent : KV.Of(cacheContextKey, preResolveParent);
 
             // Check cache first:
             var registryValue = _registry.Value;
@@ -506,12 +505,9 @@ namespace DryIoc
             {
                 var cachedContextFactories = (cacheEntry == null ? null : cacheEntry.Value) ?? ImTreeMap<object, FactoryDelegate>.Empty;
                 if (cacheContextKey == null)
-                    cacheEntry = new KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>(
-                        factoryDelegate,
-                        cachedContextFactories);
+                    cacheEntry = KV.Of(factoryDelegate, cachedContextFactories);
                 else
-                    cacheEntry = new KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>(
-                        cacheEntry == null ? null : cacheEntry.Key,
+                    cacheEntry = KV.Of(cacheEntry == null ? null : cacheEntry.Key,
                         cachedContextFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
 
                 var cacheVal = cacheRef.Value;
@@ -756,9 +752,9 @@ namespace DryIoc
             {
                 var name = scope.Name as KV<Type, object>;
                 if (name != null && (
-                    assignableFromServiceType == null || 
+                    assignableFromServiceType == null ||
                     name.Key.IsAssignableTo(assignableFromServiceType) ||
-                    assignableFromServiceType.IsOpenGeneric() && 
+                    assignableFromServiceType.IsOpenGeneric() &&
                     name.Key.GetGenericDefinitionOrNull().IsAssignableTo(assignableFromServiceType)) &&
                     (serviceKey == null || serviceKey.Equals(name.Value)))
                 {
@@ -1455,7 +1451,7 @@ namespace DryIoc
                         }
 
                         Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
-                            new KV<object, object>(serviceKey, instance), keyedFactory);
+                            KV.Of(serviceKey, instance), keyedFactory);
                     }
                 }
 
@@ -1568,7 +1564,7 @@ namespace DryIoc
                 return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty), 
+                    Ref.Of(ImTreeMapIntToObj.Empty),
                     _isChangePermitted);
             }
 
@@ -2565,7 +2561,7 @@ namespace DryIoc
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                new ExpressionFactory(GetLazyExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
@@ -2780,8 +2776,11 @@ namespace DryIoc
             return Expression.New(lazyEnumerableCtor, callResolveManyExpr);
         }
 
-        // Result: r => new Lazy<TService>(() => r.Resolver.Resolve<TService>(key, ifUnresolved, requiredType));
-        private static Expression GetLazyExpressionOrDefault(Request request)
+        /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
+        /// <param name="request">The resolution request.</param>
+        /// <param name="nullWrapperForUnresolvedService">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
+        /// <returns>Expression: r => new Lazy{TService}(() => r.Resolver.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
+        public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
         {
             if (request.IsWrappedInFuncWithArgs(immediateParent: true))
                 Throw.It(Error.NotPossibleToResolveLazyInsideFuncWithArgs, request);
@@ -2789,6 +2788,12 @@ namespace DryIoc
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
+
+            if (nullWrapperForUnresolvedService && request.Container.ResolveFactory(serviceRequest) == null)
+                return request.IfUnresolved == IfUnresolved.ReturnDefault
+                    ? Expression.Constant(null, lazyType)
+                    : null;
+
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
             // Note: the conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
@@ -4599,9 +4604,8 @@ namespace DryIoc
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                 parameters: Parameters.Of.Type(_ => initialize)),
-                setup: Setup.DecoratorWith(useDecorateeReuse: true, condition:
-                    r => r.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(TTarget))
-                        && (condition == null || condition(r))));
+                setup: Setup.DecoratorWith(useDecorateeReuse: true, 
+                condition: r => r.ServiceType.IsAssignableTo(typeof(TTarget)) && (condition == null || condition(r))));
         }
 
         private static readonly MethodInfo _initializerMethod =
@@ -5029,6 +5033,9 @@ namespace DryIoc
                 s.Append("{RequiredServiceType=").Print(RequiredServiceType);
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
+            if (MetadataKey != null || Metadata != null)
+                (s.Length == 0 ? s.Append('{') : s.Append(", "))
+                    .Append("Metadata=").Append(new KeyValuePair<string, object>(MetadataKey, Metadata));
             if (IfUnresolved != IfUnresolved.Throw)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
             return (s.Length == 0 ? s : s.Append('}')).ToString();
@@ -6405,7 +6412,7 @@ namespace DryIoc
             return Setup.Condition != null
                 || Setup.AsResolutionCall
                 || Setup.UseParentReuse
-                || request.Reuse is ResolutionScopeReuse 
+                || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
 
@@ -7104,9 +7111,8 @@ namespace DryIoc
 
                 var implementationType = _openGenericFactory._implementationType;
 
-                var closedTypeArgs =
-                    implementationType == null ? serviceType.GetGenericParamsAndArgs()
-                  : implementationType == serviceType.GetGenericDefinitionOrNull() ? serviceType.GetGenericParamsAndArgs()
+                var closedTypeArgs = implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
+                  ? serviceType.GetGenericParamsAndArgs()
                   : implementationType.IsGenericParameter ? new[] { serviceType }
                   : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
 
@@ -8350,7 +8356,7 @@ namespace DryIoc
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
             return Expression.Call(_getOrAddItemOrDefaultMethod,
-                Container.ScopesExpr, scopeNameExpr, 
+                Container.ScopesExpr, scopeNameExpr,
                 Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),

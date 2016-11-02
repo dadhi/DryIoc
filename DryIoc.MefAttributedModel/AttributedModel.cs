@@ -45,27 +45,35 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
 
-        /// <summary>Returns new rules with attributed model importing rules appended.</summary>
-        /// <param name="rules">Source rules to append importing rules to.</param>
-        /// <returns>New rules with attributed model rules.</returns>
+        /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
+        /// <param name="rules">Source rules.</param> <returns>New rules.</returns>
         public static Rules WithMefRules(this Rules rules)
         {
-            return rules.WithMefAttributedModel();
+            var importsMadeOf = Made.Of(
+                request => GetImportingConstructor(request, rules.FactoryMethod),
+                GetImportedParameter, _getImportedPropertiesAndFields);
+
+            return rules.With(importsMadeOf)
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
+                .WithTrackingDisposableTransients();
         }
 
-        /// <summary>Appends attributed model rules to passed container.</summary>
-        /// <param name="container">Source container to apply attributed model importing rules to.</param>
-        /// <returns>Returns new container with new rules.</returns>
+        /// <summary>Add to container rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
+        /// In addition registers the MEF specific wrappers, and adds support for <see cref="IPartImportsSatisfiedNotification"/>.</summary>
+        /// <param name="container">Source container.</param> <returns>New container.</returns>
         public static IContainer WithMef(this IContainer container)
         {
             return container
                 .With(WithMefRules)
+                .WithImportsSatisfiedNotification()
                 .WithMefSpecificWrappers()
-                .WithImportsSatisfiedNotification();
+                .WithSameContractNameForSameType();
         }
 
-        // todo: V3: remove
-        /// <summary>Obsolete: replaced with more on point <see cref="WithMefRules"/>.</summary>
+        /// <summary>The basic rules to support Mef/DryIoc Attributes for 
+        /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
+        /// and for specifying injected dependencies via Import attributes.</summary>
+        /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
             var importsMadeOf = Made.Of(
@@ -74,18 +82,14 @@ namespace DryIoc.MefAttributedModel
 
             // hello, Max!!! we are Martians.
             return rules.With(importsMadeOf)
-                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
-                .WithTrackingDisposableTransients();
+                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton);
         }
 
-        // todo: V3: remove
-        /// <summary>Obsolete: replaced with more on point <see cref="WithMef"/>.</summary>
+        /// <summary>Applies the <see cref="WithMefAttributedModel(DryIoc.Rules)"/> to the container.</summary>
+        /// <param name="container">source container</param><returns>New container with applied rules.</returns>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
-            return container
-                .With(WithMefRules)
-                .WithMefSpecificWrappers()
-                .WithImportsSatisfiedNotification();
+            return container.With(WithMefRules);
         }
 
         /// <summary>Registers <see cref="IPartImportsSatisfiedNotification"/> calling decorator into container.
@@ -101,7 +105,9 @@ namespace DryIoc.MefAttributedModel
             return container;
         }
 
-        /// <summary>Registers <see cref="ExportFactory{T}"/> wrapper into the container.</summary>
+        /// <summary>Registers MEF-specific wrappers into the container.</summary>
+        /// <remarks>MEF-specific wrappers are: <see cref="ExportFactory{T}"/>,
+        /// <see cref="ExportFactory{T, TMetadata}"/> and <see cref="Lazy{T, TMetadata}"/>.</remarks>
         /// <param name="container">Container to support.</param>
         /// <returns>The container with registration.</returns>
         public static IContainer WithMefSpecificWrappers(this IContainer container)
@@ -118,16 +124,22 @@ namespace DryIoc.MefAttributedModel
                 made: _createLazyWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
-            // constructor: new Lazy<T>(Func<T> factory)
-            var lazyConstructor = typeof(Lazy<>).GetAllConstructors()
-                .Single(mi => mi.GetParameters().Length == 1 &&
-                    mi.GetParameters().Single().ParameterType.GetTypeInfo().IsGenericType);
-
+            var lazyFactory = new ExpressionFactory(r =>
+                WrappersSupport.GetLazyExpressionOrDefault(r, nullWrapperForUnresolvedService: true),
+                setup: Setup.Wrapper);
             container.Register(typeof(Lazy<>),
-                made: Made.Of(lazyConstructor),
-                setup: Setup.Wrapper,
+                factory: lazyFactory,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
+            return container;
+        }
+
+        /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
+        /// <param name="container">Source container.</param> <returns>New container.</returns>
+        public static IContainer WithSameContractNameForSameType(this IContainer container)
+        {
+            // map: ContractName/Key -> { ContractType, count }[]
+            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty)); 
             return container;
         }
 
@@ -311,12 +323,47 @@ namespace DryIoc.MefAttributedModel
             var factory = info.CreateFactory();
 
             var exports = info.Exports;
+            Ref<ImTreeMap<object, KV<Type, int>[]>> contractNameLookup = null;
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
                 var serviceKey = export.ServiceKey;
+                var serviceType = export.ServiceType;
+                if (serviceKey != null)
+                {
+                    if (contractNameLookup == null)
+                    {
+                        var resolver = (IResolver)registrator; // todo: hack for initial implementation
+                        contractNameLookup = resolver.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(DryIoc.IfUnresolved.ReturnDefault);
+                        if (contractNameLookup == null)
+                        {
+                            // stop the resolution for the next iterations
+                            contractNameLookup = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
+                        }
+                        else
+                        {
+                            contractNameLookup.Swap(it => it
+                                .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
+                                {
+                                    var newType = newTypes[0].Key;
+                                    var sameTypeIndex = types.IndexOf(t => t.Key == newType);
+                                    if (sameTypeIndex != -1)
+                                    {
+                                        var sameType = types[sameTypeIndex];
 
-                registrator.Register(factory, export.ServiceType, serviceKey, export.IfAlreadyRegistered,
+                                        // Change the serviceKey only when multiple same types are registered with the same key
+                                        serviceKey = KV.Of(serviceKey, sameType.Value);
+
+                                        return types.AppendOrUpdate(sameType.WithValue(sameType.Value + 1), sameTypeIndex);
+                                    }
+
+                                    return types.Append(newTypes);
+                                }));
+                        }
+                    }
+                }
+
+                registrator.Register(factory, serviceType, serviceKey, export.IfAlreadyRegistered,
                     isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
             }
         }
@@ -722,17 +769,15 @@ namespace DryIoc.MefAttributedModel
                     info.ConditionType = attribute.GetType();
                 }
 
-                if (attribute is ExportAttribute || 
+                if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
                     info.HasMetadataAttribute = true;
                 }
-
-                if (info.HasMetadataAttribute)
-                {
-                    info.InitExportedMetadata();
-                }
             }
+
+            if (info.HasMetadataAttribute)
+                info.Metadata = info.CollectExportedMetadata();
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1214,7 +1259,11 @@ namespace DryIoc.MefAttributedModel
 
             if (!IsLazy && Metadata == null)
             {
-                Metadata = GetExportedMetadata();
+                Metadata = CollectExportedMetadata();
+                if (Metadata != null)
+                {
+                    ; // todo: No tests are convering this line, requires refactoring.
+                }
             }
 
             return Setup.With(Metadata, condition,
@@ -1302,39 +1351,18 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        /// <summary>Initializes the exported metadata.</summary>
-        public void InitExportedMetadata()
+        /// <summary>Collects the metadata into the result dictionary.</summary>
+        /// <returns>The dictionary.</returns>
+        public IDictionary<string, object> CollectExportedMetadata()
         {
-            Metadata = GetExportedMetadata();
-        }
-
-        private IDictionary<string, object> GetExportedMetadata()
-        {
-            var hasKeyedExports = Exports != null && Exports.Any(it => it.ServiceKey != null);
-            if (!hasKeyedExports && !HasMetadataAttribute)
+            if (!HasMetadataAttribute)
                 return null;
 
             Dictionary<string, object> metaDict = null;
 
-            // Converts keys to metadata in format of "<ServiceKey hash>:<ServiceType full name>" -> ServiceKey
-            if (hasKeyedExports)
-            {
-                metaDict = new Dictionary<string, object>();
-                for (var i = 0; i < Exports.Length; ++i)
-                {
-                    var export = Exports[i];
-                    if (export.ServiceKey != null)
-                    {
-                        var serviceKeyMeta = AttributedModel.ComposeServiceKeyMetadata(export.ServiceKey, export.ServiceType);
-                        metaDict.Add(serviceKeyMeta.Key, serviceKeyMeta.Value);
-                    }
-                }
-            }
-
             var metaAttrs = ImplementationType.GetAttributes()
-                .Where(a =>
-                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any() ||
-                    a is ExportMetadataAttribute)
+                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute ||
+                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 .OrderBy(a => a.GetType().FullName);
 
             foreach (var metaAttr in metaAttrs)
@@ -1343,26 +1371,23 @@ namespace DryIoc.MefAttributedModel
                 object metaValue = metaAttr;
                 var addProperties = false;
 
-                var withMetaAttr = metaAttr as WithMetadataAttribute;
-                if (withMetaAttr != null)
+                if (metaAttr is ExportMetadataAttribute)
                 {
-                    metaKey = withMetaAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
-                    metaValue = withMetaAttr.Metadata;
+                    var exportMetaAttr = (ExportMetadataAttribute)metaAttr;
+                    metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
+                    metaValue = exportMetaAttr.Value;
+                }
+                else if (metaAttr is WithMetadataAttribute)
+                {
+                    var withMetadataAttr = (WithMetadataAttribute)metaAttr;
+                    metaKey = withMetadataAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
+                    metaValue = withMetadataAttr.Metadata;
                 }
                 else
                 {
-                    var exportMetaAttr = metaAttr as ExportMetadataAttribute;
-                    if (exportMetaAttr != null)
-                    {
-                        metaKey = exportMetaAttr.Name; // note: defaults to string.Empty
-                        metaValue = exportMetaAttr.Value;
-                    }
-                    else
-                    {
-                        // index custom metadata attributes with their type name
-                        metaKey = metaAttr.GetType().FullName;
-                        addProperties = true;
-                    }
+                    // index custom metadata attributes with their type name
+                    metaKey = metaAttr.GetType().FullName;
+                    addProperties = true;
                 }
 
                 if (metaDict != null && metaDict.ContainsKey(metaKey))
@@ -1373,7 +1398,16 @@ namespace DryIoc.MefAttributedModel
 
                 if (addProperties)
                 {
-                    var properties = metaAttr.GetType().GetTypeInfo().DeclaredProperties;
+                    var metaTypes = new List<TypeInfo>();
+                    var metaType = metaAttr.GetType();
+                    while (metaType != null && metaType != typeof(Attribute))
+                    {
+                        var metaTypeInfo = metaType.GetTypeInfo();
+                        metaTypes.Add(metaTypeInfo);
+                        metaType = metaTypeInfo.BaseType;
+                    }
+
+                    var properties = metaTypes.SelectMany(t => t.DeclaredProperties);
                     foreach (var property in properties)
                     {
                         metaKey = property.Name;

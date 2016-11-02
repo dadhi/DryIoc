@@ -220,7 +220,8 @@ namespace DryIoc.IssuesTests.Samples
             var registrations = AttributedModel.Scan(new[] { assembly });
 
             // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
+            var lazyRegistrations = registrations.Select(info => info.MakeLazy())
+                .ToArray(); // NOTE: This is required to materialized DTOs to be seriliazed.
 
             // In run-time deserialize registrations and register them as rule for unresolved services
             //=========================================================================================
@@ -315,6 +316,9 @@ namespace DryIoc.IssuesTests.Samples
             // the same resolution code as in previous test
             //========================
             var cmds = container.Resolve<CommandImporter>();
+            Assert.IsNotNull(cmds.LazyHandler);
+            Assert.IsNotNull(cmds.LazyHandler.Value);
+
             Assert.IsNotNull(cmds.Commands);
             Assert.AreEqual(2, cmds.Commands.Length);
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
@@ -331,6 +335,11 @@ namespace DryIoc.IssuesTests.Samples
 
         public interface ICommand { }
 
+        public interface IHandler<T> where T : class { }
+
+        [Export(typeof(IHandler<object>))]
+        public class ObjectHandler : IHandler<object> { }
+
         [Export(typeof(ICommand)), Command("Sample command")]
         public class SampleCommand : ICommand { }
 
@@ -340,6 +349,9 @@ namespace DryIoc.IssuesTests.Samples
         [Export]
         public class CommandImporter
         {
+            [Import(AllowDefault = true)]
+            public Lazy<IHandler<object>> LazyHandler { get; set; }
+
             [ImportMany]
             public Lazy<ICommand, ICommandMetadata>[] Commands { get; set; }
         }

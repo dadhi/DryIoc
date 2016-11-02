@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.Composition.Hosting;
+﻿using System.ComponentModel.Composition;
+using System.ComponentModel.Composition.Hosting;
 using System.Linq;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using NUnit.Framework;
@@ -131,6 +132,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Mef_required_import_of_nonexisting_service_cannot_be_resolved()
+        {
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredLazyImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredExportFactoryImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredLazyWithMetadataImport>());
+            Assert.Throws<ImportCardinalityMismatchException>(() => Mef.GetExport<NonExistingServiceRequiredExportFactoryWithMetadataImport>());
+        }
+
+        [Test]
         public void Mef_supports_multiple_metadata_attributes()
         {
             var service = Mef.GetExport<ImportStuffWithMultipleMetadataAttributes>().Value;
@@ -146,6 +157,40 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNotNull(service.NamedServices.First().Value);
         }
 
+        [Test]
+        public void Mef_allows_importing_untyped_metadata()
+        {
+            var service = Mef.GetExport<ImportUntypedInheritedMetadata>().Value;
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.UntypedMetadataServices);
+            Assert.AreEqual(1, service.UntypedMetadataServices.Length);
+
+            var metadata = service.UntypedMetadataServices.First().Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual(123L, metadata["ScriptID"]);
+            Assert.AreEqual("Category", metadata["CategoryName"]);
+
+            // MEF doesn't support DryIoc metadata attribute
+            Assert.IsFalse(metadata.ContainsKey("DryIocMetadata"));
+        }
+
+        [Test]
+        public void Mef_supports_metadata_attribute_hierarchy_properly()
+        {
+            var service = Mef.GetExport<ImportUntypedInheritedMetadata>().Value;
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.TypedMetadataServices);
+            Assert.AreEqual(1, service.TypedMetadataServices.Length);
+
+            var metadata = service.TypedMetadataServices.First().Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual(123L, metadata.ScriptID);
+            Assert.AreEqual("Category", metadata.CategoryName);
+        }
+
+        [Test]
         public void Mef_calls_ImportSatisfied_for_non_shared_parts_once()
         {
             var mef = Mef;
@@ -157,6 +202,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, service2.ImportsSatisfied);
         }
 
+        [Test]
         public void Mef_calls_ImportSatisfied_for_shared_parts_once()
         {
             var mef = Mef;
@@ -166,6 +212,19 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreSame(service1, service2);
             Assert.AreEqual(1, service1.ImportsSatisfied);
             Assert.AreEqual(1, service2.ImportsSatisfied);
+        }
+
+        [Test]
+        public void Mef_can_import_member_with_metadata()
+        {
+            var service = Mef.GetExport<UsesMemberExportWithMetadataExample>().Value;
+
+            Assert.IsNotNull(service);
+            Assert.IsNotNull(service.ImportedTestMethodExample);
+
+            var metadata = service.ImportedTestMethodExample.Metadata;
+            Assert.IsNotNull(metadata);
+            Assert.AreEqual("Sample", metadata["Title"]);
         }
     }
 }

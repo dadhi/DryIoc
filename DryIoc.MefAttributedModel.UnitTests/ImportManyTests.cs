@@ -14,7 +14,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
         private IContainer CreateContainer()
         {
-            var container = new Container().WithMefAttributedModel();
+            var container = new Container().WithMef();
             container.RegisterExports(new[] { typeof(IPasswordHasher).GetAssembly() });
             return container;
         }

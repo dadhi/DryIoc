@@ -29,6 +29,7 @@ namespace DryIoc
     using System.Linq;
     using System.Text;
     using System.Threading;
+    using System.Runtime.CompilerServices; // for aggressive inlining hints
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools
@@ -315,6 +316,37 @@ namespace DryIoc
                 return ((object)Key == null ? 0 : Key.GetHashCode() * 397)
                        ^ ((object)Value == null ? 0 : Value.GetHashCode());
             }
+        }
+    }
+
+    /// <summary>Helpers for <see cref="KV{K,V}"/>.</summary>
+    public static class KV
+    {
+        /// <summary>Creates the key value pair.</summary>
+        /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
+        /// <param name="key">Key</param> <param name="value">Value</param> <returns>New pair.</returns>
+        [MethodImpl((MethodImplOptions)256)] // AggressiveInlining
+        public static KV<K, V> Of<K, V>(K key, V value)
+        {
+            return new KV<K, V>(key, value);
+        }
+
+        /// <summary>Creates the new pair with new key and old value.</summary>
+        /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
+        /// <param name="source">Source value</param> <param name="key">New key</param> <returns>New pair</returns>
+        [MethodImpl((MethodImplOptions)256)] // AggressiveInlining
+        public static KV<K, V> WithKey<K, V>(this KV<K, V> source, K key)
+        {
+            return new KV<K, V>(key, source.Value);
+        }
+
+        /// <summary>Creates the new pair with old key and new value.</summary>
+        /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
+        /// <param name="source">Source value</param> <param name="value">New value.</param> <returns>New pair</returns>
+        [MethodImpl((MethodImplOptions)256)] // AggressiveInlining
+        public static KV<K, V> WithValue<K, V>(this KV<K, V> source, V value)
+        {
+            return new KV<K, V>(source.Key, value);
         }
     }
 

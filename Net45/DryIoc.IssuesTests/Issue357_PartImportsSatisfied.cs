@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
 
         private static IContainer CreateContainer()
         {
-            var c = new Container().WithMefAttributedModel();
+            var c = new Container().WithMef();
 
             c.RegisterExports(new[] { typeof(Issue357_PartImportsSatisfied).GetAssembly() });
             return c;
