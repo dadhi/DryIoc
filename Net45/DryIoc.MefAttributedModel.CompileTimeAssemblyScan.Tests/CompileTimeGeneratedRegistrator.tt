@@ -5,8 +5,6 @@
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.dll" #>
 <#@ assembly Name="$(ProjectDir)..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
-<#@ import Namespace="System.Text" #>
-<#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests

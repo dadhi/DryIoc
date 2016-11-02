@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using System.Linq.Expressions;
+
 namespace DryIoc.MefAttributedModel
 {
     using System;
@@ -772,12 +774,12 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    info.HasMetadataAttribute = true;
+                    // Just setting the flag so thta runtime knows what regestrations require metadata collection.
+                    // There is no actual metadata collecting is happenning here, that happens only on demand,
+                    // when metadata is acually examined.
+                    info.HasMetadataAttribute = true; 
                 }
             }
-
-            if (info.HasMetadataAttribute)
-                info.Metadata = info.CollectExportedMetadata();
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1157,9 +1159,6 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
-        /// <summary>Gets or sets the metadata.</summary>
-        public IDictionary<string, object> Metadata { get; set; }
-
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
 
@@ -1257,16 +1256,13 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            if (!IsLazy && Metadata == null)
+            object metadata = null;
+            if (HasMetadataAttribute)
             {
-                Metadata = CollectExportedMetadata();
-                if (Metadata != null)
-                {
-                    ; // todo: No tests are convering this line, requires refactoring.
-                }
+                metadata = new Func<object>(CollectExportedMetadata);
             }
 
-            return Setup.With(Metadata, condition,
+            return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
@@ -1351,13 +1347,8 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        /// <summary>Collects the metadata into the result dictionary.</summary>
-        /// <returns>The dictionary.</returns>
-        public IDictionary<string, object> CollectExportedMetadata()
+        private IDictionary<string, object> CollectExportedMetadata()
         {
-            if (!HasMetadataAttribute)
-                return null;
-
             Dictionary<string, object> metaDict = null;
 
             var metaAttrs = ImplementationType.GetAttributes()
@@ -1654,50 +1645,55 @@ namespace DryIoc.MefAttributedModel
     #endregion
 
     /// <summary>Lazy wrapper for the <see cref="Factory"/>.</summary>
-    /// <seealso cref="DryIoc.Factory" />
-    public class LazyFactory : Factory
+    /// <seealso cref="Factory" /> and <seealso cref="ReflectionFactory"/>
+    public sealed class LazyReflectionFactory : Factory
     {
-        /// <summary>Initializes a new instance of the <see cref="LazyFactory"/> class.</summary>
+        /// <summary>Initializes a new instance of the <see cref="LazyReflectionFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
-        /// <param name="setup">The lazily-evaluated setup (optional).</param>
-        public LazyFactory(Lazy<Factory> factory, Lazy<Setup> setup = null)
+        public LazyReflectionFactory(Lazy<ReflectionFactory> factory)
         {
-            InnerFactory = factory;
-            InnerSetup = setup ?? new Lazy<Setup>(() => factory.Value.Setup);
+            _lazyFactory = factory;
         }
 
-        private Lazy<Factory> InnerFactory { get; }
+        private readonly Lazy<ReflectionFactory> _lazyFactory;
 
-        private Lazy<Setup> InnerSetup { get; }
-
-        /// <summary>Gets non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="T:DryIoc.DelegateFactory" />.</summary>
+        /// <inheritdoc />
         public override Type ImplementationType
         {
-            get { return InnerFactory.Value.ImplementationType; }
+            get { return _lazyFactory.Value.ImplementationType; }
         }
 
-        /// <summary>Gets or sets the setup which may contain different/non-default factory settings.</summary>
+        /// <inheritdoc />
+        public override Made Made
+        {
+            get { return _lazyFactory.Value.Made; }
+        }
+
+        /// <inheritdoc />
+        public override IReuse Reuse
+        {
+            get { return _lazyFactory.Value.Reuse; }
+        }
+
+        /// <inheritdoc />
         public override Setup Setup
         {
-            get { return InnerSetup.Value; }
+            get { return _lazyFactory.Value.Setup; }
         }
 
-        /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
-        /// If <paramref name="request" /> has <see cref="F:DryIoc.Request.FuncArgs" /> specified, they could be used in expression.</summary>
-        /// <param name="request">Service request.</param>
-        /// <returns>Created expression.</returns>
-        public override System.Linq.Expressions.Expression CreateExpressionOrDefault(Request request)
+        /// <inheritdoc />
+        public override Expression CreateExpressionOrDefault(Request request)
         {
-            return InnerFactory.Value.CreateExpressionOrDefault(request);
+            return _lazyFactory.Value.CreateExpressionOrDefault(request);
         }
 
-        /// <summary>Returns a <see cref="System.String" /> that represents this instance.</summary>
+        /// <summary>Returns a <see cref="String" /> that represents this instance.</summary>
         public override string ToString()
         {
             var s = new StringBuilder().Append("{ID=").Append(FactoryID);
-            s.Append(", LazyFactory, IsValueCreated=").Append(InnerFactory.IsValueCreated);
-            if (InnerFactory.IsValueCreated)
-                s.Append(", Value=").Append(InnerFactory.Value);
+            s.Append(", LazyFactory, IsValueCreated=").Append(_lazyFactory.IsValueCreated);
+            if (_lazyFactory.IsValueCreated)
+                s.Append(", Value=").Append(_lazyFactory.Value);
             return s.Append("}").ToString();
         }
     }

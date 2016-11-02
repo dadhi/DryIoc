@@ -6338,8 +6338,8 @@ namespace DryIoc
         /// <summary>Unique factory id generated from static seed.</summary>
         public int FactoryID { get; internal set; }
 
-        /// <summary>Reuse policy for factory created services.</summary>
-        public readonly IReuse Reuse;
+        /// <summary>Reuse policy for created services.</summary>
+        public virtual IReuse Reuse { get { return _reuse; } }
 
         /// <summary>Setup may contain different/non-default factory settings.</summary>
         public virtual Setup Setup
@@ -6371,12 +6371,15 @@ namespace DryIoc
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactoryOrDefault"/>  to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
 
+        /// <summary>Settings <b>(if any)</b> to select Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
+        public virtual Made Made { get { return Made.Default; } }
+
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
         protected Factory(IReuse reuse = null, Setup setup = null)
         {
             FactoryID = GetNextID();
-            Reuse = reuse;
+            _reuse = reuse;
             _setup = setup ?? Setup.Default;
         }
 
@@ -6632,6 +6635,7 @@ namespace DryIoc
         #region Implementation
 
         private static int _lastFactoryID;
+        private IReuse _reuse;
         private Setup _setup;
 
         private static IReuse GetTransientDisposableTrackingReuse(Request request)
@@ -6937,7 +6941,7 @@ namespace DryIoc
         public override IConcreteFactoryGenerator FactoryGenerator { get { return _factoryGenerator; } }
 
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
-        public readonly Made Made;
+        public override Made Made { get { return _made; } }
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
@@ -6945,7 +6949,7 @@ namespace DryIoc
         public ReflectionFactory(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
             : base(reuse, setup)
         {
-            Made = made ?? Made.Default;
+            _made = made ?? Made.Default;
             _implementationType = GetValidImplementationTypeOrDefault(implementationType);
 
             var originalImplementationType = _implementationType ?? implementationType;
@@ -7079,6 +7083,7 @@ namespace DryIoc
         #region Implementation
 
         private readonly Type _implementationType;
+        private readonly Made _made;
         private readonly ClosedGenericFactoryGenerator _factoryGenerator;
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator

@@ -3406,6 +3406,106 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
     }, 
 
     new ExportedRegistrationInfo {
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredImport),
+        Exports = new[] {
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredImport), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null
+    }, 
+
+    new ExportedRegistrationInfo {
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredLazyImport),
+        Exports = new[] {
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredLazyImport), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null
+    }, 
+
+    new ExportedRegistrationInfo {
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredExportFactoryImport),
+        Exports = new[] {
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredExportFactoryImport), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null
+    }, 
+
+    new ExportedRegistrationInfo {
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredLazyWithMetadataImport),
+        Exports = new[] {
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredLazyWithMetadataImport), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null
+    }, 
+
+    new ExportedRegistrationInfo {
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredExportFactoryWithMetadataImport),
+        Exports = new[] {
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NonExistingServiceRequiredExportFactoryWithMetadataImport), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null
+    }, 
+
+    new ExportedRegistrationInfo {
         ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultipleMetadataAttributes),
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultipleMetadataAttributes), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
@@ -3511,6 +3611,47 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SharedWithImportSatisfiedNotification), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
             },
         Reuse = DryIocAttributes.ReuseType.Singleton,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null
+    }, 
+
+    new ExportedRegistrationInfo {
+        ImplementationType = typeof(System.Void),
+        Exports = new[] {
+            new ExportInfo(typeof(System.Void), "UnitTestExample", DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
+        ReuseName = null,
+        OpenResolutionScope = false,
+        AsResolutionCall = false,
+        AsResolutionRoot = false,
+        PreventDisposal = false,
+        WeaklyReferenced = false,
+        AllowDisposableTransient = false,
+        TrackDisposableTransient = false,
+        UseParentReuse = false,
+        HasMetadataAttribute = true,
+        FactoryType = DryIoc.FactoryType.Service,
+        ConditionType = null,
+        new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MemberExportWithMetadataExample), MemberName = "TestMethodExample"}
+    }, 
+
+    new ExportedRegistrationInfo {
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.UsesMemberExportWithMetadataExample),
+        Exports = new[] {
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.UsesMemberExportWithMetadataExample), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            },
+        Reuse = null,
         ReuseName = null,
         OpenResolutionScope = false,
         AsResolutionCall = false,

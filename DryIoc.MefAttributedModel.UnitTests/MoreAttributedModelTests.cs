@@ -34,12 +34,14 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Registering_with_metadata_with_duplicate_key_should_throw()
+        public void Resolving_with_metadata_with_duplicate_key_should_throw()
         {
             var container = new Container();
 
-            var ex = Assert.Throws<AttributedModelException>(() =>
-                container.RegisterExports(typeof(ThrowsForMultipleMetaWithDuplicateName)));
+            container.RegisterExports(typeof(ThrowsForMultipleMetaWithDuplicateName));
+
+            var ex = Assert.Throws<AttributedModelException>(() => 
+            container.Resolve<Meta<ThrowsForMultipleMetaWithDuplicateName, object>>());
 
             Assert.AreEqual(Error.DuplicateMetadataKey, ex.Error);
         }
