@@ -72,7 +72,7 @@ namespace DryIoc.MefAttributedModel
                 .WithMultipleSameContractNamesSupport();
         }
 
-        /// <summary>The basic rules to support Mef/DryIoc Attributes for 
+        /// <summary>The basic rules to support Mef/DryIoc Attributes for
         /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
         /// and for specifying injected dependencies via Import attributes.</summary>
         /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
@@ -141,7 +141,7 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
         {
             // map: ContractName/Key -> { ContractType, count }[]
-            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty)); 
+            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
             return container;
         }
 
@@ -794,12 +794,12 @@ namespace DryIoc.MefAttributedModel
                 if (attribute is ExportAttribute || attribute is WithMetadataAttribute ||
                     attribute.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 {
-                    // Just setting the flag so thta runtime knows what regestrations require metadata collection.
-                    // There is no actual metadata collecting is happenning here, that happens only on demand,
-                    // when metadata is acually examined.
-                    info.HasMetadataAttribute = true; 
+                    info.HasMetadataAttribute = true;
                 }
             }
+
+            if (info.HasMetadataAttribute)
+                info.InitExportedMetadata(); // todo: InitExportedMetadata(attributes) to handle member metadata
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1048,7 +1048,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendString(this StringBuilder code, string x)
         {
-            return x == null ? code.Append("null") : code.Append('"').Append(x).Append('"');
+            return x == null ? code.Append("null") : code.Append('"').Append(x.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n")).Append('"');
         }
 
         /// <summary>Prints valid c# Type literal: typeof(Namespace.Type).</summary>
@@ -1073,6 +1073,40 @@ namespace DryIoc.MefAttributedModel
             }
 
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
+        }
+
+        /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys are strings.</summary>
+        /// <typeparam name="TValue">The type of the value.</typeparam>
+        /// <param name="code">The code.</param>
+        /// <param name="dictionary">The dictionary.</param>
+        /// <param name="appendValue">The callback to append a value (optional).</param>
+        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code, IDictionary<string, TValue> dictionary, Func<StringBuilder, string, TValue, StringBuilder> appendValue = null)
+        {
+            if (appendValue == null)
+                appendValue = (sb, key, value) => sb.AppendCode(value);
+
+            code.Append("new System.Collections.Generic.Dictionary<string, ");
+            code.Print(typeof(TValue));
+            code.AppendLine("> {");
+            foreach (var pair in dictionary)
+            {
+                code.Append("            { ");
+                code.AppendString(pair.Key);
+                code.Append(", ");
+                code = appendValue(code, pair.Key, pair.Value);
+                code.AppendLine(" },");
+            }
+
+            code.Append("        }");
+            return code;
+        }
+
+        /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys and values are strings.</summary>
+        /// <param name="code">The code.</param>
+        /// <param name="dictionary">The dictionary.</param>
+        public static StringBuilder AppendDictionary(this StringBuilder code, IDictionary<string, string> dictionary)
+        {
+            return code.AppendDictionary(dictionary, (c, k, v) => c.AppendString(v));
         }
 
         /// <summary>Determines whether the type is nullable.</summary>
@@ -1179,6 +1213,13 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
+        /// <summary>Gets or sets the metadata.</summary>
+        public IDictionary<string, object> Metadata;
+
+        /// <summary>The metadata generated code for non-scalar values (i.e., custom attributes).</summary>
+        /// <remarks>This data is used for serializing the metadata to C# code.</remarks>
+        public IDictionary<string, string> MetadataCode;
+
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
 
@@ -1231,9 +1272,15 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
+            var reuse = GetReuse();
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
+        }
+
+        /// <summary>Gets the <see cref="IReuse"/> instance.</summary>
+        public IReuse GetReuse()
+        {
+            return AttributedModel.GetReuse(Reuse, ReuseName);
         }
 
         private static MemberInfo GetFactoryMemberOrDefault(FactoryMethodInfo factoryMethod)
@@ -1276,13 +1323,12 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            object metadata = null;
-            if (HasMetadataAttribute)
+            if (HasMetadataAttribute && !IsLazy && Metadata == null)
             {
-                metadata = new Func<object>(CollectExportedMetadata);
+                Metadata = CollectExportedMetadata();
             }
 
-            return Setup.With(metadata, condition,
+            return Setup.With(Metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
@@ -1353,6 +1399,9 @@ namespace DryIoc.MefAttributedModel
         HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
         FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType).Append(@",
         ConditionType = ").AppendType(ConditionType);
+            if (Metadata != null && MetadataCode != null) code.Append(@",
+        Metadata = ").AppendDictionary(Metadata, MetadataItemToCode).Append(@",
+        MetadataCode = ").AppendDictionary(MetadataCode);
             if (Wrapper != null) code.Append(@",
         Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
                 .Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
@@ -1365,6 +1414,47 @@ namespace DryIoc.MefAttributedModel
             code.Append(@"
     }");
             return code;
+        }
+
+        private StringBuilder MetadataItemToCode(StringBuilder code, string key, object value)
+        {
+            var metadataCode = string.Empty;
+            if (MetadataCode != null && MetadataCode.TryGetValue(key, out metadataCode))
+            {
+                return code.Append(metadataCode);
+            }
+
+            return code.AppendCode(value);
+        }
+
+        /// <summary>Collects the metadata as <see cref="Dictionary{TKey, TValue}"/>.</summary>
+        public void InitExportedMetadata()
+        {
+            Metadata = CollectExportedMetadata();
+            MetadataCode = CollectAttributeConstructorsCode();
+        }
+
+        private IDictionary<string, string> CollectAttributeConstructorsCode()
+        {
+            Dictionary<string, string> attributeDict = null;
+
+            var attributes = ImplementationType.GetCustomAttributesData()
+                .OrderBy(item => item.Constructor.DeclaringType.FullName)
+                .Select(item => new
+                {
+                    Key = item.Constructor.DeclaringType.FullName,
+                    Value = string.Format("new {0}({1})", item.Constructor.DeclaringType.FullName,
+                        string.Join(", ", item.ConstructorArguments.Select(a => a.ToString()).Concat(
+                            item.NamedArguments.Select(na => na.MemberInfo.Name + " = " + na.TypedValue)).ToArray()))
+                });
+
+            foreach (var attr in attributes)
+            {
+                attributeDict = attributeDict ?? new Dictionary<string, string>();
+                attributeDict[attr.Key] = attr.Value;
+            }
+
+            return attributeDict;
         }
 
         private IDictionary<string, object> CollectExportedMetadata()
@@ -1670,12 +1760,20 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Initializes a new instance of the <see cref="LazyReflectionFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
-        public LazyReflectionFactory(Lazy<ReflectionFactory> factory)
+        /// <param name="setup">The factory setup (optional).</param>
+        /// <param name="getReuse">The factory reuse (optional).</param>
+        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null, Func<IReuse> getReuse = null)
         {
             _lazyFactory = factory;
+            _lazySetup = new Lazy<Setup>(() => setup ?? _lazyFactory.Value.Setup);
+            _lazyReuse = new Lazy<IReuse>(() => getReuse != null ? getReuse() : _lazyFactory.Value.Reuse);
         }
 
         private readonly Lazy<ReflectionFactory> _lazyFactory;
+
+        private readonly Lazy<Setup> _lazySetup;
+
+        private readonly Lazy<IReuse> _lazyReuse;
 
         /// <inheritdoc />
         public override Type ImplementationType
@@ -1692,13 +1790,13 @@ namespace DryIoc.MefAttributedModel
         /// <inheritdoc />
         public override IReuse Reuse
         {
-            get { return _lazyFactory.Value.Reuse; }
+            get { return _lazyReuse.Value; }
         }
 
         /// <inheritdoc />
         public override Setup Setup
         {
-            get { return _lazyFactory.Value.Setup; }
+            get { return _lazySetup.Value; }
         }
 
         /// <inheritdoc />
