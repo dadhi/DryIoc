@@ -17,8 +17,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         private static IContainer CreateContainer()
         {
             // set up the Container to work like Mef without changing the composable parts
-            var container = new Container().With(rules => rules
-                .WithMefRules()
+            var container = new Container().WithMef().With(rules => rules
                 .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
 
             container.RegisterExports(new[] { typeof(ILogTableManager).GetAssembly() });

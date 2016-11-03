@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [SetUp]
         public void Init()
         {
-            _container = new Container().WithMefAttributedModel();
+            _container = new Container().WithMef();
             var cutAssembly = typeof(DependentService).GetAssembly();
             _container.RegisterExports(new[] { cutAssembly });
         }

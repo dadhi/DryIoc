@@ -10,7 +10,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_export_and_resolve_composite()
         {
-            var container = new Container().WithMefAttributedModel()
+            var container = new Container().WithMef()
                 .With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
 
             container.RegisterExports(new [] { typeof(IItem<int>).GetAssembly() });

@@ -69,7 +69,7 @@ namespace DryIoc.MefAttributedModel
                 .With(WithMefRules)
                 .WithImportsSatisfiedNotification()
                 .WithMefSpecificWrappers()
-                .WithSameContractNameForSameType();
+                .WithMultipleSameContractNamesSupport();
         }
 
         /// <summary>The basic rules to support Mef/DryIoc Attributes for 
@@ -138,7 +138,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
         /// <param name="container">Source container.</param> <returns>New container.</returns>
-        public static IContainer WithSameContractNameForSameType(this IContainer container)
+        public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
         {
             // map: ContractName/Key -> { ContractType, count }[]
             container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty)); 
@@ -348,15 +348,15 @@ namespace DryIoc.MefAttributedModel
                                 .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
                                 {
                                     var newType = newTypes[0].Key;
-                                    var sameTypeIndex = types.IndexOf(t => t.Key == newType);
-                                    if (sameTypeIndex != -1)
+                                    var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
+                                    if (typeAndCountIndex != -1)
                                     {
-                                        var sameType = types[sameTypeIndex];
+                                        var typeAndCount = types[typeAndCountIndex];
 
                                         // Change the serviceKey only when multiple same types are registered with the same key
-                                        serviceKey = KV.Of(serviceKey, sameType.Value);
+                                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
-                                        return types.AppendOrUpdate(sameType.WithValue(sameType.Value + 1), sameTypeIndex);
+                                        return types.AppendOrUpdate(typeAndCount.WithValue(typeAndCount.Value + 1), typeAndCountIndex);
                                     }
 
                                     return types.Append(newTypes);
@@ -562,11 +562,11 @@ namespace DryIoc.MefAttributedModel
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
-            return GetImportDetails(attributes)
+            return GetImportDetails(type, attributes, request)
                 ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        private static ServiceDetails GetImportDetails(Attribute[] attributes)
+        private static ServiceDetails GetImportDetails(Type type, Attribute[] attributes, Request request)
         {
             object serviceKey;
             Type requiredServiceType;
@@ -602,6 +602,26 @@ namespace DryIoc.MefAttributedModel
                 requiredServiceType = import.ContractType;
                 if (import.AllowDefault)
                     ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;
+            }
+
+            // handle ContractName-first approach by translating non-unique keys into the generated unique ones.
+            if (serviceKey != null)
+            {
+                var contractNameLookup = request.Container.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(
+                    DryIoc.IfUnresolved.ReturnDefault);
+
+                if (contractNameLookup != null)
+                {
+                    var types = contractNameLookup.Value.GetValueOrDefault(serviceKey);
+                    if (types != null)
+                    {
+                        var typeAndCountIndex = types.IndexOf(it => it.Key == type);
+                        if (typeAndCountIndex != -1)
+                        {
+                            ;
+                        }
+                    }
+                }
             }
 
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
