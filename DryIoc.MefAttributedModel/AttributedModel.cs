@@ -779,7 +779,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             if (info.HasMetadataAttribute)
-                info.Metadata = info.CollectExportedMetadata(); // todo: CollectExportedMetadata(attributes) to handle member metadata
+                info.InitExportedMetadata(); // todo: InitExportedMetadata(attributes) to handle member metadata
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1028,7 +1028,7 @@ namespace DryIoc.MefAttributedModel
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendString(this StringBuilder code, string x)
         {
-            return x == null ? code.Append("null") : code.Append('"').Append(x).Append('"');
+            return x == null ? code.Append("null") : code.Append('"').Append(x.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n")).Append('"');
         }
 
         /// <summary>Prints valid c# Type literal: typeof(Namespace.Type).</summary>
@@ -1053,6 +1053,40 @@ namespace DryIoc.MefAttributedModel
             }
 
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
+        }
+
+        /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys are strings.</summary>
+        /// <typeparam name="TValue">The type of the value.</typeparam>
+        /// <param name="code">The code.</param>
+        /// <param name="dictionary">The dictionary.</param>
+        /// <param name="appendValue">The callback to append a value (optional).</param>
+        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code, IDictionary<string, TValue> dictionary, Func<StringBuilder, string, TValue, StringBuilder> appendValue = null)
+        {
+            if (appendValue == null)
+                appendValue = (sb, key, value) => sb.AppendCode(value);
+
+            code.Append("new System.Collections.Generic.Dictionary<string, ");
+            code.Print(typeof(TValue));
+            code.AppendLine("> {");
+            foreach (var pair in dictionary)
+            {
+                code.Append("            { ");
+                code.AppendString(pair.Key);
+                code.Append(", ");
+                code = appendValue(code, pair.Key, pair.Value);
+                code.AppendLine(" },");
+            }
+
+            code.Append("        }");
+            return code;
+        }
+
+        /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys and values are strings.</summary>
+        /// <param name="code">The code.</param>
+        /// <param name="dictionary">The dictionary.</param>
+        public static StringBuilder AppendDictionary(this StringBuilder code, IDictionary<string, string> dictionary)
+        {
+            return code.AppendDictionary(dictionary, (c, k, v) => c.AppendString(v));
         }
 
         /// <summary>Determines whether the type is nullable.</summary>
@@ -1161,6 +1195,10 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Gets or sets the metadata.</summary>
         public IDictionary<string, object> Metadata;
+
+        /// <summary>The metadata generated code for non-scalar values (i.e., custom attributes).</summary>
+        /// <remarks>This data is used for serializing the metadata to C# code.</remarks>
+        public IDictionary<string, string> MetadataCode;
 
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
@@ -1335,6 +1373,9 @@ namespace DryIoc.MefAttributedModel
         HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
         FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType).Append(@",
         ConditionType = ").AppendType(ConditionType);
+            if (Metadata != null && MetadataCode != null) code.Append(@",
+        Metadata = ").AppendDictionary(Metadata, MetadataItemToCode).Append(@",
+        MetadataCode = ").AppendDictionary(MetadataCode);
             if (Wrapper != null) code.Append(@",
         Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
                 .Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
@@ -1349,9 +1390,48 @@ namespace DryIoc.MefAttributedModel
             return code;
         }
 
-        /// <summary>Collects the metadata into the result dictionary.</summary>
-        /// <returns>The metadata dictionary.</returns>
-        public IDictionary<string, object> CollectExportedMetadata()
+        private StringBuilder MetadataItemToCode(StringBuilder code, string key, object value)
+        {
+            var metadataCode = string.Empty;
+            if (MetadataCode != null && MetadataCode.TryGetValue(key, out metadataCode))
+            {
+                return code.Append(metadataCode);
+            }
+
+            return code.AppendCode(value);
+        }
+
+        /// <summary>Collects the metadata as <see cref="Dictionary{TKey, TValue}"/>.</summary>
+        public void InitExportedMetadata()
+        {
+            Metadata = CollectExportedMetadata();
+            MetadataCode = CollectAttributeConstructorsCode();
+        }
+
+        private IDictionary<string, string> CollectAttributeConstructorsCode()
+        {
+            Dictionary<string, string> attributeDict = null;
+
+            var attributes = ImplementationType.GetCustomAttributesData()
+                .OrderBy(item => item.Constructor.DeclaringType.FullName)
+                .Select(item => new
+                {
+                    Key = item.Constructor.DeclaringType.FullName,
+                    Value = string.Format("new {0}({1})", item.Constructor.DeclaringType.FullName,
+                        string.Join(", ", item.ConstructorArguments.Select(a => a.ToString()).Concat(
+                            item.NamedArguments.Select(na => na.MemberInfo.Name + " = " + na.TypedValue)).ToArray()))
+                });
+
+            foreach (var attr in attributes)
+            {
+                attributeDict = attributeDict ?? new Dictionary<string, string>();
+                attributeDict[attr.Key] = attr.Value;
+            }
+
+            return attributeDict;
+        }
+
+        private IDictionary<string, object> CollectExportedMetadata()
         {
             Dictionary<string, object> metaDict = null;
 
