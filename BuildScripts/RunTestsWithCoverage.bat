@@ -16,7 +16,7 @@ for %%P in ("."; "Net40"; "Net45"; "PCL-Net45"; "Extensions"; "Net40\Extensions"
 ))
 
 echo:
-echo:Running tests with coverage into %COVERAGE% . . .
+echo:Running tests with coverage. Results are collected in %COVERAGE% . . .
 echo:
 echo:from assemblies: %TESTLIBS%
 echo: 
