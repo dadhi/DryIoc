@@ -1661,12 +1661,12 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Initializes a new instance of the <see cref="LazyReflectionFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
         /// <param name="setup">The factory setup (optional).</param>
-        /// <param name="reuse">The factory reuse (optional).</param>
-        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null, IReuse reuse = null)
+        /// <param name="getReuse">The factory reuse (optional).</param>
+        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null, Func<IReuse> getReuse = null)
         {
             _lazyFactory = factory;
             _lazySetup = new Lazy<Setup>(() => setup ?? _lazyFactory.Value.Setup);
-            _lazyReuse = new Lazy<IReuse>(() => reuse ?? _lazyFactory.Value.Reuse);
+            _lazyReuse = new Lazy<IReuse>(() => getReuse != null ? getReuse() : _lazyFactory.Value.Reuse);
         }
 
         private readonly Lazy<ReflectionFactory> _lazyFactory;
