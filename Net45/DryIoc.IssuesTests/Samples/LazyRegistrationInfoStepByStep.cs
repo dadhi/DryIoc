@@ -280,7 +280,7 @@ namespace DryIoc.IssuesTests.Samples
                     return info.CreateFactory();
                 });
 
-                return new LazyReflectionFactory(lazyFactory, info.GetSetup());
+                return new LazyReflectionFactory(lazyFactory, info.GetSetup(), info.GetReuse());
             };
 
             // Step 3 - Add service type handler for resolving many factories.
@@ -304,7 +304,7 @@ namespace DryIoc.IssuesTests.Samples
                         return pair.Value.CreateFactory();
                     });
 
-                    factories.Add(new KV<object, Factory>(pair.Key, new LazyReflectionFactory(lazyFactory, pair.Value.GetSetup())));
+                    factories.Add(new KV<object, Factory>(pair.Key, new LazyReflectionFactory(lazyFactory, pair.Value.GetSetup(), pair.Value.GetReuse())));
                 }
 
                 return factories;

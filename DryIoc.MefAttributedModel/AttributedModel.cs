@@ -1214,9 +1214,15 @@ namespace DryIoc.MefAttributedModel
                 made = Made.Of(member, factoryServiceInfo);
             }
 
-            var reuse = AttributedModel.GetReuse(Reuse, ReuseName);
+            var reuse = GetReuse();
             var setup = GetSetup();
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
+        }
+
+        /// <summary>Gets the <see cref="IReuse"/> instance.</summary>
+        public IReuse GetReuse()
+        {
+            return AttributedModel.GetReuse(Reuse, ReuseName);
         }
 
         private static MemberInfo GetFactoryMemberOrDefault(FactoryMethodInfo factoryMethod)
@@ -1654,16 +1660,20 @@ namespace DryIoc.MefAttributedModel
     {
         /// <summary>Initializes a new instance of the <see cref="LazyReflectionFactory"/> class.</summary>
         /// <param name="factory">The lazily-evaluated factory.</param>
-        /// <param name="setup">The eagerly-evaluated setup (optional).</param>
-        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null)
+        /// <param name="setup">The factory setup (optional).</param>
+        /// <param name="reuse">The factory reuse (optional).</param>
+        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null, IReuse reuse = null)
         {
             _lazyFactory = factory;
             _lazySetup = new Lazy<Setup>(() => setup ?? _lazyFactory.Value.Setup);
+            _lazyReuse = new Lazy<IReuse>(() => reuse ?? _lazyFactory.Value.Reuse);
         }
 
         private readonly Lazy<ReflectionFactory> _lazyFactory;
 
         private readonly Lazy<Setup> _lazySetup;
+
+        private readonly Lazy<IReuse> _lazyReuse;
 
         /// <inheritdoc />
         public override Type ImplementationType
@@ -1680,7 +1690,7 @@ namespace DryIoc.MefAttributedModel
         /// <inheritdoc />
         public override IReuse Reuse
         {
-            get { return _lazyFactory.Value.Reuse; }
+            get { return _lazyReuse.Value; }
         }
 
         /// <inheritdoc />
