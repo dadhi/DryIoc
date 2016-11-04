@@ -365,7 +365,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test, Ignore("fails")]
         public void DryIoc_can_import_member_with_metadata()
         {
-            var service = Container.Resolve<UsesMemberExportWithMetadataExample>();
+            var container = new Container().WithMef();
+            container.RegisterExports(
+                typeof(MemberExportWithMetadataExample), 
+                typeof(UsesMemberExportWithMetadataExample));
+
+            var service = container.Resolve<UsesMemberExportWithMetadataExample>();
 
             Assert.IsNotNull(service);
             Assert.IsNotNull(service.ImportedTestMethodExample);

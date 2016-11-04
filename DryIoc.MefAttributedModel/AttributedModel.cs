@@ -451,6 +451,12 @@ namespace DryIoc.MefAttributedModel
                     continue;
 
                 var memberReturnType = member.GetReturnTypeOrDefault();
+                if (memberReturnType.FullName == "System.Void")
+                {
+                    ; // translate to Action<> type
+
+                }
+
                 var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes)
                     .ThrowIfNull();
 
