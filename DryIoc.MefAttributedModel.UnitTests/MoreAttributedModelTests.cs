@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
 using DryIocAttributes;
 using NUnit.Framework;
 

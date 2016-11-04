@@ -94,6 +94,8 @@ namespace DryIoc.MefAttributedModel
             return container.With(WithMefRules);
         }
 
+        #region IPartImportsSatisfiedNotification support
+
         /// <summary>Registers <see cref="IPartImportsSatisfiedNotification"/> calling decorator into container.
         /// It is not directly related to MEF Exports and Imports, and may be used for notifying the injection
         /// is completed for normal DryIoc registrations.</summary>
@@ -106,6 +108,26 @@ namespace DryIoc.MefAttributedModel
                 setup: _importsSatisfiedNotificationDecoratorSetup);
             return container;
         }
+
+        internal static TService NotifyImportsSatisfied<TService>(TService service)
+        {
+            var notification = service as IPartImportsSatisfiedNotification;
+            if (notification != null)
+                notification.OnImportsSatisfied();
+
+            return service;
+        }
+
+        private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
+
+        private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
+            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)),
+            useDecorateeReuse: true);
+
+        #endregion
+
+        #region ExportFactory<T>, ExportFactory<T, TMetadata> and Lazy<T, TMetadata> support
 
         /// <summary>Registers MEF-specific wrappers into the container.</summary>
         /// <remarks>MEF-specific wrappers are: <see cref="ExportFactory{T}"/>,
@@ -135,42 +157,6 @@ namespace DryIoc.MefAttributedModel
 
             return container;
         }
-
-        #region Support for multiple same (non-unique) contract names for the same exported type
-
-        /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
-        /// <param name="container">Source container.</param> <returns>New container.</returns>
-        public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
-        {
-            // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
-            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
-
-            // decorator to filter in a presence of multiple same keys
-            container.Register(typeof(IEnumerable<>), made: _filterCollectionByMultiKey, setup: Setup.Decorator);
-
-            return container;
-        }
-
-        private static readonly Made _filterCollectionByMultiKey = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("FilterCollectionByMultiKey", includeNonPublic: true),
-            parameters: Parameters.Of.Type(request => request.ServiceKey));
-        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
-        {
-            return serviceKey == null
-                ? source.Select(it => it.Value)
-                : source.Where(it =>
-                    {
-                        if (it.Key is DefaultKey)
-                            return false;
-                        return serviceKey.Equals(it.Key)
-                               || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
-                    })
-                    .Select(it => it.Value);
-        }
-
-        #endregion
-
-        #region ExportFactory<T>, ExportFactory<T, TMetadata> and Lazy<T, TMetadata> support
 
         /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
         /// Required to cover for missing Tuple in .NET 4.0 and lower.
@@ -282,23 +268,37 @@ namespace DryIoc.MefAttributedModel
 
         #endregion
 
-        #region IPartImportsSatisfiedNotification support
+        #region Support for multiple same (non-unique) contract names for the same exported type
 
-        internal static TService NotifyImportsSatisfied<TService>(TService service)
+        /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
+        /// <param name="container">Source container.</param> <returns>New container.</returns>
+        public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
         {
-            var notification = service as IPartImportsSatisfiedNotification;
-            if (notification != null)
-                notification.OnImportsSatisfied();
+            // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
+            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
 
-            return service;
+            // decorator to filter in a presence of multiple same keys
+            container.Register(typeof(IEnumerable<>), made: _filterCollectionByMultiKey, setup: Setup.Decorator);
+
+            return container;
         }
 
-        private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
-
-        private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)),
-            useDecorateeReuse: true);
+        private static readonly Made _filterCollectionByMultiKey = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("FilterCollectionByMultiKey", includeNonPublic: true),
+            parameters: Parameters.Of.Type(request => request.ServiceKey));
+        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
+        {
+            return serviceKey == null
+                ? source.Select(it => it.Value)
+                : source.Where(it =>
+                {
+                    if (it.Key is DefaultKey)
+                        return false;
+                    return serviceKey.Equals(it.Key)
+                           || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
+                })
+                    .Select(it => it.Value);
+        }
 
         #endregion
 
