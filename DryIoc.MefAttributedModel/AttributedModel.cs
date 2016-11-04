@@ -136,14 +136,39 @@ namespace DryIoc.MefAttributedModel
             return container;
         }
 
+        #region Support for multiple same (non-unique) contract names for the same exported type
+
         /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
         /// <param name="container">Source container.</param> <returns>New container.</returns>
         public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
         {
-            // map: ContractName/Key -> { ContractType, count }[]
+            // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
             container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
+
+            // decorator to filter in a presence of multiple same keys
+            container.Register(typeof(IEnumerable<>), made: _filterCollectionByMultiKey, setup: Setup.Decorator);
+
             return container;
         }
+
+        private static readonly Made _filterCollectionByMultiKey = Made.Of(
+            typeof(AttributedModel).GetSingleMethodOrNull("FilterCollectionByMultiKey", includeNonPublic: true),
+            parameters: Parameters.Of.Type(request => request.ServiceKey));
+        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
+        {
+            return serviceKey == null
+                ? source.Select(it => it.Value)
+                : source.Where(it =>
+                    {
+                        if (it.Key is DefaultKey)
+                            return false;
+                        return serviceKey.Equals(it.Key)
+                               || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
+                    })
+                    .Select(it => it.Value);
+        }
+
+        #endregion
 
         #region ExportFactory<T>, ExportFactory<T, TMetadata> and Lazy<T, TMetadata> support
 
@@ -562,11 +587,11 @@ namespace DryIoc.MefAttributedModel
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
-            return GetImportDetails(type, attributes, request)
+            return GetImportDetails(attributes)
                 ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        private static ServiceDetails GetImportDetails(Type type, Attribute[] attributes, Request request)
+        private static ServiceDetails GetImportDetails(Attribute[] attributes)
         {
             object serviceKey;
             Type requiredServiceType;
@@ -602,26 +627,6 @@ namespace DryIoc.MefAttributedModel
                 requiredServiceType = import.ContractType;
                 if (import.AllowDefault)
                     ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;
-            }
-
-            // handle ContractName-first approach by translating non-unique keys into the generated unique ones.
-            if (serviceKey != null)
-            {
-                var contractNameLookup = request.Container.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(
-                    DryIoc.IfUnresolved.ReturnDefault);
-
-                if (contractNameLookup != null)
-                {
-                    var types = contractNameLookup.Value.GetValueOrDefault(serviceKey);
-                    if (types != null)
-                    {
-                        var typeAndCountIndex = types.IndexOf(it => it.Key == type);
-                        if (typeAndCountIndex != -1)
-                        {
-                            ;
-                        }
-                    }
-                }
             }
 
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
@@ -1418,8 +1423,9 @@ namespace DryIoc.MefAttributedModel
 
         private StringBuilder MetadataItemToCode(StringBuilder code, string key, object value)
         {
-            var metadataCode = string.Empty;
-            if (MetadataCode != null && MetadataCode.TryGetValue(key, out metadataCode))
+            string metadataCode;
+            if (MetadataCode != null && 
+                MetadataCode.TryGetValue(key, out metadataCode))
             {
                 return code.Append(metadataCode);
             }
@@ -1439,14 +1445,18 @@ namespace DryIoc.MefAttributedModel
             Dictionary<string, string> attributeDict = null;
 
             var attributes = ImplementationType.GetCustomAttributesData()
-                .OrderBy(item => item.Constructor.DeclaringType.FullName)
                 .Select(item => new
                 {
+                    // ReSharper disable PossibleNullReferenceException
+                    // ReSharper disable AssignNullToNotNullAttribute
                     Key = item.Constructor.DeclaringType.FullName,
                     Value = string.Format("new {0}({1})", item.Constructor.DeclaringType.FullName,
                         string.Join(", ", item.ConstructorArguments.Select(a => a.ToString()).Concat(
                             item.NamedArguments.Select(na => na.MemberInfo.Name + " = " + na.TypedValue)).ToArray()))
-                });
+                    // ReSharper restore AssignNullToNotNullAttribute
+                    // ReSharper restore PossibleNullReferenceException
+                })
+                .OrderBy(item => item.Key);
 
             foreach (var attr in attributes)
             {

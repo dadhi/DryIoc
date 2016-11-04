@@ -600,9 +600,11 @@ namespace DryIoc
                     variantGenericItems = variantGenericItems.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
             }
 
-            // exclude composite parent from items
-            var parent = preResolveParent.FactoryType != FactoryType.Wrapper
-                ? preResolveParent : preResolveParent.Parent;
+            // Exclude composite parent service from items, skip decorators
+            var parent = preResolveParent;
+            if (parent.FactoryType != FactoryType.Service)
+                parent = parent.Enumerate().FirstOrDefault(p => p.FactoryType == FactoryType.Service) ?? RequestInfo.Empty;
+
             if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
             {
                 items = items.Where(x => x.Value.FactoryID != parent.FactoryID);
@@ -2689,10 +2691,12 @@ namespace DryIoc
                 items = items.Append(variantGenericItems);
             }
 
-            // Composite pattern support: filter out composite root in available keys
+            // Composite pattern support: filter out composite parent service skip wrappers and decorators
             var parent = request.Parent;
-            if (!parent.IsEmpty &&
-                parent.GetActualServiceType() == requiredItemType) // check fast for the parent of the same type
+            if (parent.FactoryType != FactoryType.Service)
+                parent = parent.Enumerate().FirstOrDefault(p => p.FactoryType == FactoryType.Service) ?? RequestInfo.Empty;
+
+            if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType) // check fast for the parent of the same type
             {
                 items = items.Where(x => x.Factory.FactoryID != parent.FactoryID &&
                     (x.Factory.FactoryGenerator == null || !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().Any(f =>
@@ -3460,7 +3464,7 @@ namespace DryIoc
         /// <returns>Factory method info.</returns>
         public static FactoryMethod Of<TFactory>(string methodOrMemberName)
         {
-            var methodOrMember = typeof(TFactory).GetMembers(t => t.DeclaredMembers)
+            var methodOrMember = typeof(TFactory).GetAllMembers()
                 .SingleOrDefault(m => m.Name == methodOrMemberName)
                 .ThrowIfNull();
             return Of(methodOrMember);

@@ -1,4 +1,5 @@
-﻿using DryIoc.MefAttributedModel.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.MefAttributedModel.UnitTests.CUT;
 using DryIocAttributes;
 using NUnit.Framework;
 
@@ -10,8 +11,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_export_and_resolve_composite()
         {
-            var container = new Container().WithMef()
-                .With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+            var container = new Container().WithMef();
+                //.With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
 
             container.RegisterExports(new [] { typeof(IItem<int>).GetAssembly() });
 
