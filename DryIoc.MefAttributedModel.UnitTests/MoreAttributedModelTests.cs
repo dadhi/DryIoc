@@ -12,9 +12,20 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_export_and_resolve_composite()
         {
             var container = new Container().WithMef();
-                //.With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
 
             container.RegisterExports(new [] { typeof(IItem<int>).GetAssembly() });
+
+            var composite = (CompositeItem<int>)container.Resolve<IItem<int>>("root");
+            Assert.AreEqual(2, composite.Items.Length);
+        }
+
+        [Test]
+        public void Can_export_and_resolve_composite_as_lazy_enumerable()
+        {
+            var container = new Container().WithMef()
+                .With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.RegisterExports(new[] { typeof(IItem<int>).GetAssembly() });
 
             var composite = (CompositeItem<int>)container.Resolve<IItem<int>>("root");
             Assert.AreEqual(2, composite.Items.Length);
