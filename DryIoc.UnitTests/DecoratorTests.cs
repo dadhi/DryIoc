@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -880,34 +879,39 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_use_MyEnumerable_as_decorator()
+        public void Can_decorate_ienumerable_and_alter_the_service_key_filtering()
         {
             var container = new Container();
 
-            container.Register(typeof(IEnumerable<>), typeof(MyEnumerable<>), setup: Setup.Decorator,
-                made: Parameters.Of.Type(r => r.ServiceKey));
+            container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
+                made: Made.Of(
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"), 
+                    Parameters.Of.Type(r => r.ServiceKey)));
 
-            container.Register<Aaaa>();
+            container.Register<Aaaa>(made: Parameters.Of.Name("bs", serviceKey: "a"));
             container.Register<Bbbb>();
             container.Register<Bbbb>(serviceKey: "a");
+            container.Register<Bbbb>(serviceKey: KV.Of<object, int>("a", 1));
 
             var aaa = container.Resolve<Aaaa>();
 
-            Assert.IsInstanceOf<MyEnumerable<Bbbb>>(aaa.Bs);
             Assert.AreEqual(2, aaa.Bs.Count());
         }
 
         [Test]
-        public void Can_specify_to_use_MyEnumerable_as_decorator_and_work_with_required_service_type()
+        public void Can_decorate_ienumerable_and_alter_the_service_key_filtering_and_works_with_nested_wrappers()
         {
             var container = new Container();
 
-            container.Register(typeof(IEnumerable<>), typeof(MyEnumerable<>), setup: Setup.Decorator,
-                made: Parameters.Of.Type(r => r.ServiceKey));
+            container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
+                made: Made.Of(
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"),
+                    Parameters.Of.Type(r => r.ServiceKey)));
 
-            container.Register<AaaaFunc>(made: Parameters.Of.Name("bs", typeof(Bbbb)));
+            container.Register<AaaaFunc>(made: Parameters.Of.Name("bs", serviceKey: "a", requiredServiceType: typeof(Bbbb)));
             container.Register<Bbbb>();
             container.Register<Bbbb>(serviceKey: "a");
+            container.Register<Bbbb>(serviceKey: KV.Of<object, int>("a", 1));
 
             var aaa = container.Resolve<AaaaFunc>();
 
@@ -915,12 +919,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_use_MyEnumerable_as_decorator_for_array()
+        public void Can_decorate_array_and_alter_the_service_key_filtering()
         {
             var container = new Container();
 
-            container.Register(typeof(IEnumerable<>), typeof(MyEnumerable<>), setup: Setup.Decorator,
-                made: Parameters.Of.Type(r => r.ServiceKey));
+            container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
+                made: Made.Of(
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"),
+                    Parameters.Of.Type(r => r.ServiceKey)));
 
             container.Register<AaaaArray>(made: Parameters.Of.Name("bs", serviceKey: "a"));
             container.Register<Bbbb>();
@@ -932,44 +938,18 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(2, aaa.Bs.Length);
         }
 
-        public class MyEnumerable<T> : IEnumerable<T>
+        public static IEnumerable<T> FilterCollectionByMultiKeys<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
         {
-            private readonly IEnumerable<KeyValuePair<object, T>> _source;
-            private readonly object _serviceKey;
-
-            public MyEnumerable(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
-            {
-                _source = source;
-                _serviceKey = serviceKey;
-            }
-
-            public IEnumerator<T> GetEnumerator()
-            {
-                if (_serviceKey == null)
-                    return _source.Select(it => it.Value).GetEnumerator();
-
-                return _source
-                    .Where(it =>
+            return serviceKey == null
+                ? source.Select(it => it.Value)
+                : source.Where(it =>
                     {
                         if (it.Key is DefaultKey)
                             return false;
-
-                        if (_serviceKey.Equals(it.Key))
-                            return true;
-
-                        var multiKey = it.Key as KV<object, int>;
-                        if (multiKey != null && _serviceKey.Equals(multiKey.Key))
-                            return true;
-
-                        return false;
+                        return serviceKey.Equals(it.Key) 
+                            || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
                     })
-                    .Select(it => it.Value).GetEnumerator();
-            }
-
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return GetEnumerator();
-            }
+                .Select(it => it.Value);
         }
 
         public class Bbbb { }

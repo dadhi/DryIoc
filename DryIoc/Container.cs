@@ -3453,6 +3453,19 @@ namespace DryIoc
             return new FactoryMethod(ctorOrMethodOrMember, factoryInfo);
         }
 
+        /// <summary>Discovers the static factory method or meber by name in <typeparamref name="TFactory"/>.
+        /// Should place nice with C# nameof operator.</summary>
+        /// <param name="methodOrMemberName">Name or method or member.</param>
+        /// <typeparam name="TFactory">Class with static member.</typeparam>
+        /// <returns>Factory method info.</returns>
+        public static FactoryMethod Of<TFactory>(string methodOrMemberName)
+        {
+            var methodOrMember = typeof(TFactory).GetMembers(t => t.DeclaredMembers)
+                .SingleOrDefault(m => m.Name == methodOrMemberName)
+                .ThrowIfNull();
+            return Of(methodOrMember);
+        }
+
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
