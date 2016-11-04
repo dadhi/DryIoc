@@ -998,9 +998,9 @@ namespace DryIoc.UnitTests
         {
             public readonly Bbbb[] Bs;
 
-            public AaaaArray(IEnumerable<Bbbb> bs)
+            public AaaaArray(Bbbb[] bs)
             {
-                Bs = bs.ToArray();
+                Bs = bs;
             }
         }
     }

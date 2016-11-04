@@ -909,6 +909,11 @@ namespace DryIoc
                 request.Rules.FallbackContainers.IsNullOrEmpty())
                 return null;
 
+            var arrayItemType = request.ServiceType.GetArrayElementTypeOrNull();
+            if (arrayItemType != null)
+                request = request.WithChangedServiceInfo(info => info
+                    .With(typeof(IEnumerable<>).MakeGenericType(arrayItemType)));
+
             var serviceType = request.ServiceType;
             var container = request.Container;
 
@@ -998,7 +1003,18 @@ namespace DryIoc
                     .FirstOrDefault(d => d.CheckCondition(request));
             }
 
-            return decorator == null ? null : decorator.GetExpressionOrDefault(request);
+            if (decorator == null)
+                return null;
+
+            var decoratorExpr = decorator.GetExpressionOrDefault(request);
+            if (decoratorExpr == null)
+                return null;
+
+            // decorator of arrays should be converted back from IEnumerable to array.
+            if (arrayItemType != null)
+                decoratorExpr = Expression.Call(typeof(Enumerable), "ToArray", new[] {arrayItemType}, decoratorExpr);
+
+            return decoratorExpr;
         }
 
         private static int[] GetAppliedDecoratorIDs(Request request)
@@ -5058,6 +5074,14 @@ namespace DryIoc
     /// <summary>Contains tools for combining or propagating of <see cref="IServiceInfo"/> independent of its concrete implementations.</summary>
     public static class ServiceInfoTools
     {
+        /// <summary>Creates service info with new type but keeping the details.</summary>
+        /// <param name="source">Source info.</param> <param name="serviceType">New service type.</param>
+        /// <returns>New info.</returns>
+        public static IServiceInfo With(this IServiceInfo source, Type serviceType)
+        {
+            return source.Create(serviceType, source.Details);
+        }
+
         // todo: Should be renamed or better to be removed, the whole operation should be hidden behind abstraction
         /// <summary>Combines service info with details: the main task is to combine service and required service type.</summary>
         /// <typeparam name="T">Type of <see cref="IServiceInfo"/>.</typeparam>
