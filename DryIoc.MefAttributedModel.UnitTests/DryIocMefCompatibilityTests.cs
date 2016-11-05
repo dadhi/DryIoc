@@ -82,7 +82,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(importer.Protocols.Any(v => v.Version == "4.0"));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_supports_importing_service_as_untyped_property()
         {
             var importer = Container.Resolve<ImportUntypedService>();
@@ -366,6 +366,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void DryIoc_can_import_member_with_metadata()
         {
             var container = new Container().WithMef();
+
+            // added explicit export registrations for better debug
             container.RegisterExports(
                 typeof(MemberExportWithMetadataExample), 
                 typeof(UsesMemberExportWithMetadataExample));

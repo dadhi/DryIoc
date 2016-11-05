@@ -453,8 +453,7 @@ namespace DryIoc.MefAttributedModel
                 var memberReturnType = member.GetReturnTypeOrDefault();
                 if (memberReturnType.FullName == "System.Void")
                 {
-                    ; // translate to Action<> type
-
+                    // translate method to Action<> type
                 }
 
                 var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes)
@@ -593,11 +592,11 @@ namespace DryIoc.MefAttributedModel
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
         {
-            return GetImportDetails(attributes)
+            return GetImportDetails(type, attributes, request)
                 ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        private static ServiceDetails GetImportDetails(Attribute[] attributes)
+        private static ServiceDetails GetImportDetails(Type type, Attribute[] attributes, Request request)
         {
             object serviceKey;
             Type requiredServiceType;
@@ -635,7 +634,41 @@ namespace DryIoc.MefAttributedModel
                     ifUnresolved = DryIoc.IfUnresolved.ReturnDefault;
             }
 
+            // handle not-found, probably base or object type imports
+            if (requiredServiceType == null && serviceKey != null)
+                requiredServiceType = FindRequiredServiceTypeByServiceKey(type, request, serviceKey);
+
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
+        }
+
+        private static Type FindRequiredServiceTypeByServiceKey(Type type, Request request, object serviceKey)
+        {
+            var contractNameLookup = request.Container.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(
+                DryIoc.IfUnresolved.ReturnDefault);
+            if (contractNameLookup == null)
+                return null;
+
+            // may be null if service key is rigistered at all Or registered not through MEF
+            var types = contractNameLookup.Value.GetValueOrDefault(serviceKey);
+            if (types == null)
+                return null;
+
+            if (types.Length != 1)
+            {
+                types = types.Where(t => t.Key.IsAssignableTo(type)).ToArray();
+                if (types.Length > 1)
+                    Throw.It(DryIoc.Error.Of("Unable to select from multiple exported types {0} for the import {1}"),
+                        types, KV.Of(serviceKey, type));
+            }
+
+            if (types.Length == 1)
+            {
+                var exportedType = types[0].Key;
+                if (exportedType.IsAssignableTo(type))
+                    return exportedType;
+            }
+
+            return null;
         }
 
         internal static KeyValuePair<string, object> ComposeServiceKeyMetadata(object serviceKey, Type serviceType)
