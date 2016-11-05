@@ -413,6 +413,53 @@ namespace DryIoc.UnitTests
             Assert.AreSame(aa.Bb.Logger, aa.Logger);
         }
 
+        [Test]
+        public void Can_resolve_void_method_with_no_args_as_Action()
+        {
+            var container = new Container();
+
+            var actMethod = typeof(FuncTests).GetSingleMethodOrNull("Act");
+            var voidType = actMethod.ReturnType;
+
+            container.Register(voidType, made: Made.Of(actMethod));
+
+            var act = container.Resolve<Action>();
+            act();
+        }
+
+        [Test]
+        public void Can_resolve_void_method_with_one_arg_as_Action()
+        {
+            var container = new Container();
+
+            var actMethod = typeof(FuncTests).GetSingleMethodOrNull("Act1");
+            var voidType = actMethod.ReturnType;
+
+            container.Register<IntValue>(Reuse.Singleton);
+            container.Register(voidType, made: Made.Of(actMethod));
+
+            var act = container.Resolve<Action>();
+            act();
+
+            Assert.AreEqual(3, container.Resolve<IntValue>().Value);
+        }
+
+        public static void Act()
+        {
+        }
+
+        public static void Act1(IntValue i)
+        {
+            i.Value = 3;
+        }
+
+        public class IntValue
+        {
+            public int Value { get; set; }
+        } 
+
+        #region CUT
+
         public class BB {
             public ILogger Logger { get; set; }
             public BB(ILogger logger)
@@ -512,5 +559,7 @@ namespace DryIoc.UnitTests
             private readonly string _name;
             private readonly string _surname;
         }
+
+        #endregion
     }
 }

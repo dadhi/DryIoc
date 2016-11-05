@@ -2524,11 +2524,18 @@ namespace DryIoc
     /// </list></summary>
     public static class WrappersSupport
     {
-        /// <summary>Supported Func types up to 4 input parameters.</summary>
+        /// <summary>Supported Func types.</summary>
         public static readonly Type[] FuncTypes =
         {
             typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>),
             typeof(Func<,,,,,>), typeof(Func<,,,,,,>), typeof(Func<,,,,,,,>)
+        };
+
+        /// <summary>Supported Action types.</summary>
+        public static readonly Type[] ActionTypes =
+        {
+            typeof(Action), typeof(Action<>), typeof(Action<,>), typeof(Action<,,>), typeof(Action<,,,>),
+            typeof(Action<,,,,>), typeof(Action<,,,,,>), typeof(Action<,,,,,,>)
         };
 
         /// <summary>Supported open-generic collection types.</summary>
@@ -2599,6 +2606,11 @@ namespace DryIoc
             for (var i = 0; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.WrapperWith(i)));
+
+            for (var i = 0; i < ActionTypes.Length; i++)
+                wrappers = wrappers.AddOrUpdate(ActionTypes[i],
+                    new ExpressionFactory(GetActionExpressionOrDefault, 
+                    setup: Setup.WrapperWith(alwaysWrapsRequiredServiceType: true)));
 
             wrappers = AddContainerInterfacesAndDisposableScope(wrappers);
 
@@ -2852,6 +2864,36 @@ namespace DryIoc
                 serviceExpr = Expression.Convert(serviceExpr, serviceType);
 
             return Expression.Lambda(funcType, serviceExpr, funcArgExprs);
+        }
+
+        internal static void EmptyAction() { }
+
+        private static readonly Type _voidType = typeof(WrappersSupport)
+            .GetSingleMethodOrNull("EmptyAction", includeNonPublic: true).ReturnType;
+
+        private static Expression GetActionExpressionOrDefault(Request request)
+        {
+            var actionType = request.GetActualServiceType();
+            var argTypes = actionType.GetGenericParamsAndArgs();
+            var serviceType = _voidType;
+
+            ParameterExpression[] argExprs = null;
+            if (argTypes.Length != 0)
+            {
+                request = request.WithFuncArgs(actionType);
+                argExprs = request.FuncArgs.Value;
+            }
+
+            var serviceRequest = request.Push(serviceType);
+            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
+            if (serviceFactory == null)
+                return null;
+
+            var serviceExpr = serviceFactory.GetExpressionOrDefault(serviceRequest);
+            if (serviceExpr == null)
+                return null;
+
+            return Expression.Lambda(actionType, serviceExpr, argExprs);
         }
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
