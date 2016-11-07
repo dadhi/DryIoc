@@ -143,7 +143,7 @@
     <Compile Include="Issue357_PartImportsSatisfied.cs" />
     <Compile Include="Issue366_Facade_Returns_Null_for_ResolveMany_Fallback.cs" />
     <Compile Include="Issue367_MefRulesBreakMadeParameters.cs" />
-    <Compile Include="Issue377_ Support_custom_IReuse_with_MEF_attributes.cs" />
+    <Compile Include="Issue377_Support_custom_IReuse_with_MEF_attributes.cs" />
     <Compile Include="Issue378_Resolve_a_Single_Instance_InWebRequest.cs" />
     <Compile Include="Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope.cs" />
     <Compile Include="Issue387_ArgumentException_with_initiliazer.cs" />
