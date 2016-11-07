@@ -147,6 +147,7 @@
     <Compile Include="Issue378_Resolve_a_Single_Instance_InWebRequest.cs" />
     <Compile Include="Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope.cs" />
     <Compile Include="Issue387_ArgumentException_with_initiliazer.cs" />
+    <Compile Include="Issue394_Reimporting_services.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
