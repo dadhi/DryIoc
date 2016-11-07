@@ -260,7 +260,8 @@ namespace DryIoc.MefAttributedModel
         /// <param name="metaFactory">The factory with the service metadata.</param>
         internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Lazy<T>, TMetadata> metaFactory)
         {
-            return new Lazy<T, TMetadata>(() => metaFactory.Value.Value, metaFactory.Metadata);
+            return metaFactory == null || metaFactory.Value == null ? null :
+                new Lazy<T, TMetadata>(() => metaFactory.Value.Value, metaFactory.Metadata);
         }
 
         private static readonly Made _createLazyWithMetadataMethod = Made.Of(
@@ -1458,7 +1459,7 @@ namespace DryIoc.MefAttributedModel
         private StringBuilder MetadataItemToCode(StringBuilder code, string key, object value)
         {
             string metadataCode;
-            if (MetadataCode != null && 
+            if (MetadataCode != null &&
                 MetadataCode.TryGetValue(key, out metadataCode))
             {
                 return code.Append(metadataCode);
