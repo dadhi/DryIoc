@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual("SCHEMA2.LOG_ENTRIES", export.Value.LogTableManager.TableName);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Mef_supports_named_value_imports_and_exports()
         {
             // SettingImportHelper gathers all exported string settings from the catalog

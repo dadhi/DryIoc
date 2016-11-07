@@ -369,7 +369,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             // added explicit export registrations for better debug
             container.RegisterExports(
-                typeof(MemberExportWithMetadataExample), 
+                typeof(MemberExportWithMetadataExample),
                 typeof(UsesMemberExportWithMetadataExample));
 
             var service = container.Resolve<UsesMemberExportWithMetadataExample>();
