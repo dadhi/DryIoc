@@ -419,9 +419,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var actMethod = typeof(FuncTests).GetSingleMethodOrNull("Act");
-            var voidType = actMethod.ReturnType;
 
-            container.Register(voidType, made: Made.Of(actMethod));
+            container.Register(typeof(void), made: Made.Of(actMethod));
 
             var act = container.Resolve<Action>();
             act();
@@ -433,10 +432,9 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var actMethod = typeof(FuncTests).GetSingleMethodOrNull("Act1");
-            var voidType = actMethod.ReturnType;
 
             container.Register<IntValue>(Reuse.Singleton);
-            container.Register(voidType, made: Made.Of(actMethod));
+            container.Register(typeof(void), made: Made.Of(actMethod));
 
             var act = container.Resolve<Action>();
             act();

@@ -362,7 +362,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, service2.ImportsSatisfied);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_can_import_member_with_metadata()
         {
             var container = new Container().WithMef();

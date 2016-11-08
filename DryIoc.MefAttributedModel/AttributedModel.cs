@@ -838,7 +838,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             if (info.HasMetadataAttribute)
-                info.InitExportedMetadata(); // todo: InitExportedMetadata(attributes) to handle member metadata
+                info.InitExportedMetadata(attributes);
 
             info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
@@ -1299,9 +1299,10 @@ namespace DryIoc.MefAttributedModel
         public ReflectionFactory CreateFactory()
         {
             Made made = null;
+            MemberInfo member = null;
             if (FactoryMethodInfo != null)
             {
-                var member = GetFactoryMemberOrDefault(FactoryMethodInfo).ThrowIfNull();
+                member = GetFactoryMemberOrDefault(FactoryMethodInfo).ThrowIfNull();
 
                 ServiceInfo factoryServiceInfo = null;
                 var export = FactoryMethodInfo.InstanceFactory;
@@ -1312,7 +1313,7 @@ namespace DryIoc.MefAttributedModel
             }
 
             var reuse = GetReuse();
-            var setup = GetSetup();
+            var setup = GetSetup(member);
             return new ReflectionFactory(ImplementationType, reuse, made, setup);
         }
 
@@ -1349,8 +1350,10 @@ namespace DryIoc.MefAttributedModel
             return member;
         }
 
-        /// <summary>Create factory setup from registration DTO.</summary> <returns>Created factory setup.</returns>
-        public Setup GetSetup()
+        /// <summary>Create factory setup from registration DTO.</summary>
+        /// <param name="factoryMember">(optional) Used to collecting metadata from attributes.</param>
+        /// <returns>Created factory setup.</returns>
+        public Setup GetSetup(MemberInfo factoryMember = null)
         {
             if (FactoryType == DryIoc.FactoryType.Wrapper)
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
@@ -1364,7 +1367,10 @@ namespace DryIoc.MefAttributedModel
 
             if (HasMetadataAttribute && !IsLazy && Metadata == null)
             {
-                Metadata = CollectExportedMetadata();
+                IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
+                if (factoryMember != null)
+                    metaAttrs = metaAttrs.Concat(factoryMember.GetAttributes());
+                Metadata = CollectExportedMetadata(metaAttrs);
             }
 
             return Setup.With(Metadata, condition,
@@ -1468,9 +1474,10 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Collects the metadata as <see cref="Dictionary{TKey, TValue}"/>.</summary>
-        public void InitExportedMetadata()
+        /// <param name="attributes"></param>
+        public void InitExportedMetadata(Attribute[] attributes)
         {
-            Metadata = CollectExportedMetadata();
+            Metadata = CollectExportedMetadata(attributes);
             MetadataCode = CollectAttributeConstructorsCode();
         }
 
@@ -1501,16 +1508,16 @@ namespace DryIoc.MefAttributedModel
             return attributeDict;
         }
 
-        private IDictionary<string, object> CollectExportedMetadata()
+        private static IDictionary<string, object> CollectExportedMetadata(IEnumerable<Attribute> attributes)
         {
             Dictionary<string, object> metaDict = null;
 
-            var metaAttrs = ImplementationType.GetAttributes()
-                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute ||
-                    a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
+            var metadataAttributes = attributes
+                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute 
+                    || a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 .OrderBy(a => a.GetType().FullName);
 
-            foreach (var metaAttr in metaAttrs)
+            foreach (var metaAttr in metadataAttributes)
             {
                 string metaKey;
                 object metaValue = metaAttr;

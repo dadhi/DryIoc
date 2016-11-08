@@ -343,7 +343,8 @@ namespace DryIoc
                 }
             }
             else if (serviceType.IsGeneric() &&
-                !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType)
+                !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType &&
+                ((Setup.WrapperSetup)setup).Unwrap == null)
             {
                 var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
                 var typeArgIndex = ((Setup.WrapperSetup)setup).WrappedServiceTypeArgIndex;
@@ -2610,7 +2611,7 @@ namespace DryIoc
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
                     new ExpressionFactory(GetActionExpressionOrDefault, 
-                    setup: Setup.WrapperWith(alwaysWrapsRequiredServiceType: true)));
+                    setup: Setup.WrapperWith(unwrap: _ => typeof(void))));
 
             wrappers = AddContainerInterfacesAndDisposableScope(wrappers);
 
@@ -2866,16 +2867,10 @@ namespace DryIoc
             return Expression.Lambda(funcType, serviceExpr, funcArgExprs);
         }
 
-        internal static void EmptyAction() { }
-
-        private static readonly Type _voidType = typeof(WrappersSupport)
-            .GetSingleMethodOrNull("EmptyAction", includeNonPublic: true).ReturnType;
-
         private static Expression GetActionExpressionOrDefault(Request request)
         {
             var actionType = request.GetActualServiceType();
             var argTypes = actionType.GetGenericParamsAndArgs();
-            var serviceType = _voidType;
 
             ParameterExpression[] argExprs = null;
             if (argTypes.Length != 0)
@@ -2884,7 +2879,7 @@ namespace DryIoc
                 argExprs = request.FuncArgs.Value;
             }
 
-            var serviceRequest = request.Push(serviceType);
+            var serviceRequest = request.Push(typeof(void));
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
                 return null;
@@ -6249,15 +6244,17 @@ namespace DryIoc
         /// <summary>Returns generic wrapper setup.</summary>
         /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
         /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
+        /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
         /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
-        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
+        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, 
+            bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool preventDisposal = false)
         {
-            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType
+            return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
                 && !openResolutionScope && !preventDisposal ? Wrapper
-                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, openResolutionScope, preventDisposal);
+                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap, openResolutionScope, preventDisposal);
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
@@ -6323,24 +6320,32 @@ namespace DryIoc
             /// <summary>Per name.</summary>
             public readonly bool AlwaysWrapsRequiredServiceType;
 
+            /// <summary>Delegate returning wrapped type from wrapper type. Overwrites other options.</summary>
+            public readonly Func<Type, Type> Unwrap;
+
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
+            /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type.  Overwrites other options.</param>
             /// <param name="openResolutionScope">(optional) Opens the new scope.</param><param name="asResolutionCall"></param>
             /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
             public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
+                Func<Type, Type> unwrap = null,
                 bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false)
-                : base(openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall,
-                      preventDisposal: preventDisposal)
+                : base(openResolutionScope, asResolutionCall, preventDisposal: preventDisposal)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
+                Unwrap = unwrap;
             }
 
             /// <summary>Unwraps service type or returns its.</summary>
             /// <param name="serviceType"></param> <returns>Wrapped type or self.</returns>
             public Type GetWrappedTypeOrNullIfWrapsRequired(Type serviceType)
             {
+                if (Unwrap != null)
+                    return Unwrap(serviceType);
+
                 if (AlwaysWrapsRequiredServiceType || !serviceType.IsGeneric())
                     return null;
 
