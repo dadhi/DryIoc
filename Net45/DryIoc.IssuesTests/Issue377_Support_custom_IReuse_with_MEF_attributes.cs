@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue377_Support_custom_IReuse_with_MEF_attributes
     {
-        [Test, Ignore("fails")]
+        [Test]
         public void Test()
         {
             var container = new Container().WithMef();
@@ -67,6 +67,5 @@ namespace DryIoc.IssuesTests
 
             #endregion
         }
-
     }
 }

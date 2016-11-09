@@ -538,9 +538,9 @@ namespace DryIoc.MefAttributedModel
                 return null; // unspecified reuse, decided by container rules
 
             if (reuseInfo.CustomReuseType != null)
-            {
-                // todo: add handling
-            }
+                return reuseInfo.ScopeName == null 
+                    ? (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType)
+                    : (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeName);
 
             return SupportedReuseTypes.GetValueOrDefault(reuseInfo.ReuseType)
                 .ThrowIfNull(Error.UnsupportedReuseType, reuseInfo.ReuseType)
@@ -794,8 +794,10 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ReuseAttribute)
                 {
-                    var resueAttr = ((ReuseAttribute)attribute);
-                    info.Reuse = new ReuseInfo { ReuseType = resueAttr.ReuseType, ScopeName = resueAttr.ScopeName };
+                    var resueAttr = (ReuseAttribute)attribute;
+                    info.Reuse = resueAttr.CustomReuseType == null 
+                        ? new ReuseInfo { ReuseType = resueAttr.ReuseType, ScopeName = resueAttr.ScopeName } 
+                        : new ReuseInfo { CustomReuseType = resueAttr.CustomReuseType, ScopeName = resueAttr.ScopeName };
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
                 {
