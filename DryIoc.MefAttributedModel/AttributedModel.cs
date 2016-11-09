@@ -471,7 +471,7 @@ namespace DryIoc.MefAttributedModel
                         // todo: Review need for factory service key.
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
-                        var factoryTypeAttributes = new Attribute[] {new ExportAttribute(Constants.InstanceFactory)};
+                        var factoryTypeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
                         typeRegistrationInfo = GetRegistrationInfoOrDefault(type, factoryTypeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
@@ -500,7 +500,7 @@ namespace DryIoc.MefAttributedModel
                 memberRegistrationInfo.FactoryMethodInfo = factoryMethod;
 
                 // If member reuse is not provided get it from the declaring type (fix for #355)
-                if (!memberRegistrationInfo.Reuse.HasValue)
+                if (memberRegistrationInfo.Reuse == null)
                 {
                     if (typeRegistrationInfo != null)
                         memberRegistrationInfo.Reuse = typeRegistrationInfo.Reuse;
@@ -508,12 +508,7 @@ namespace DryIoc.MefAttributedModel
                     {
                         var creationPolicyAttrs = type.GetAttributes(typeof(PartCreationPolicyAttribute), inherit: true);
                         if (creationPolicyAttrs.Length != 0)
-                        {
-                            var creationPolicy = ((PartCreationPolicyAttribute)creationPolicyAttrs[0]).CreationPolicy;
-                            memberRegistrationInfo.Reuse = creationPolicy == CreationPolicy.NonShared
-                                ? ReuseType.Transient
-                                : ReuseType.Singleton;
-                        }
+                            memberRegistrationInfo.Reuse = GetReuseInfo((PartCreationPolicyAttribute)creationPolicyAttrs[0]);
                     }
                 }
 
@@ -526,17 +521,30 @@ namespace DryIoc.MefAttributedModel
             return !(type.IsValueType() || type.IsInterface() || type.IsCompilerGenerated());
         }
 
-        /// <summary>Returns reuse object by mapping provided type to <see cref="SupportedReuseTypes"/>.
-        /// Returns null (transient or no reuse) if null provided reuse type.</summary>
-        /// <param name="reuseType">Reuse type to find in supported.</param>
-        /// <param name="reuseName">(optional) Reuse name to match with scope name.</param>
-        /// <returns>Supported reuse object.</returns>
-        public static IReuse GetReuse(ReuseType? reuseType, object reuseName = null)
+        private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute)
         {
-            return !reuseType.HasValue ? null // unspecified reuse, decided by container rules
-                : SupportedReuseTypes.GetValueOrDefault(reuseType.Value)
-                    .ThrowIfNull(Error.UnsupportedReuseType, reuseType.Value)
-                    .Invoke(reuseName);
+            var reuseType = attribute.CreationPolicy == CreationPolicy.NonShared
+                ? ReuseType.Transient
+                : ReuseType.Singleton;
+            return new ReuseInfo { ReuseType = reuseType };
+        }
+
+        /// <summary>Converts reuse info into pre-defined (<see cref="SupportedReuseTypes"/>) or custom reuse object.</summary>
+        /// <param name="reuseInfo">Reuse type to find in supported.</param>
+        /// <returns>DryIoc reuse object.</returns>
+        public static IReuse GetReuse(ReuseInfo reuseInfo)
+        {
+            if (reuseInfo == null)
+                return null; // unspecified reuse, decided by container rules
+
+            if (reuseInfo.CustomReuseType != null)
+            {
+                // todo: add handling
+            }
+
+            return SupportedReuseTypes.GetValueOrDefault(reuseInfo.ReuseType)
+                .ThrowIfNull(Error.UnsupportedReuseType, reuseInfo.ReuseType)
+                .Invoke(reuseInfo.ScopeName);
         }
 
         #region Rules
@@ -670,7 +678,7 @@ namespace DryIoc.MefAttributedModel
             }
             else
             {
-                ; // todo: multiple required types are not supported at the moment
+                // todo: multiple required types are not supported at the moment
             }
 
             return null;
@@ -730,10 +738,8 @@ namespace DryIoc.MefAttributedModel
                 var implementationType = import.ImplementationType ?? serviceType;
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
-                var reuseType = reuseAttr == null ? default(ReuseType?) : reuseAttr.ReuseType;
-                var reuseName = reuseAttr == null ? null : reuseAttr.ScopeName;
-
-                var reuse = GetReuse(reuseType, reuseName);
+                var reuse = reuseAttr == null ? null
+                    : GetReuse(new ReuseInfo { ReuseType = reuseAttr.ReuseType, ScopeName = reuseAttr.ScopeName });
 
                 var impl = import.ConstructorSignature == null ? null
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
@@ -784,16 +790,12 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is PartCreationPolicyAttribute)
                 {
-                    var creationPolicy = ((PartCreationPolicyAttribute)attribute).CreationPolicy;
-                    info.Reuse = creationPolicy == CreationPolicy.NonShared
-                        ? ReuseType.Transient
-                        : ReuseType.Singleton;
+                    info.Reuse = GetReuseInfo((PartCreationPolicyAttribute)attribute);
                 }
                 else if (attribute is ReuseAttribute)
                 {
-                    var reuseAttribute = ((ReuseAttribute)attribute);
-                    info.Reuse = reuseAttribute.ReuseType;
-                    info.ReuseName = reuseAttribute.ScopeName;
+                    var resueAttr = ((ReuseAttribute)attribute);
+                    info.Reuse = new ReuseInfo { ReuseType = resueAttr.ReuseType, ScopeName = resueAttr.ScopeName };
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
                 {
@@ -1232,11 +1234,8 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
         public bool IsLazy { get { return ImplementationTypeFullName != null; } }
 
-        /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
-        public ReuseType? Reuse;
-
-        /// <summary>Name to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
-        public string ReuseName;
+        /// <summary>Specifies the reuse information</summary>
+        public ReuseInfo Reuse;
 
         /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
         public bool OpenResolutionScope;
@@ -1333,7 +1332,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Gets the <see cref="IReuse"/> instance.</summary>
         public IReuse GetReuse()
         {
-            return AttributedModel.GetReuse(Reuse, ReuseName);
+            return AttributedModel.GetReuse(Reuse);
         }
 
         private static MemberInfo GetFactoryMemberOrDefault(FactoryMethodInfo factoryMethod)
@@ -1443,9 +1442,9 @@ namespace DryIoc.MefAttributedModel
         Exports = new[] {
             "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].ToCode(code).Append(@",
-            "); code.Append(@"},
-        Reuse = ").AppendEnum(typeof(ReuseType?), Reuse).Append(@",
-        ReuseName = ").AppendString(ReuseName).Append(@",
+            "); code.Append(@"}");
+        if (Reuse != null) Reuse.ToCode(code.Append(@",
+        Reuse = ")); code.Append(@",
         OpenResolutionScope = ").AppendBool(OpenResolutionScope).Append(@",
         AsResolutionCall = ").AppendBool(AsResolutionCall).Append(@",
         AsResolutionRoot = ").AppendBool(AsResolutionRoot).Append(@",
@@ -1457,19 +1456,15 @@ namespace DryIoc.MefAttributedModel
         HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
         FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType).Append(@",
         ConditionType = ").AppendType(ConditionType);
-            if (Metadata != null && MetadataCode != null) code.Append(@",
+        if (Metadata != null && MetadataCode != null) code.Append(@",
         Metadata = ").AppendDictionary(Metadata, MetadataItemToCode).Append(@",
         MetadataCode = ").AppendDictionary(MetadataCode);
-            if (Wrapper != null) code.Append(@",
-        Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ")
-                .Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
-            if (Decorator != null)
-                Decorator.ToCode(code.Append(@",
-        "));
-            if (FactoryMethodInfo != null)
-                FactoryMethodInfo.ToCode(code.Append(@",
-        "));
-            code.Append(@"
+        if (Wrapper != null) code.Append(@",
+        Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ").Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
+        if (Decorator != null) Decorator.ToCode(code.Append(@",
+        Decorator = "));
+        if (FactoryMethodInfo != null) FactoryMethodInfo.ToCode(code.Append(@",
+        FactoryMethodInfo = ")); code.Append(@"
     }");
             return code;
         }
@@ -1526,7 +1521,7 @@ namespace DryIoc.MefAttributedModel
             Dictionary<string, object> metaDict = null;
 
             var metadataAttributes = attributes
-                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute 
+                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute
                     || a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
                 .OrderBy(a => a.GetType().FullName);
 
@@ -1642,9 +1637,8 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Generates valid c# code to re-create the info.</summary>
         /// <param name="code">Code to append generated code to.</param>
         /// <returns>Code with appended generated info.</returns>
-        public StringBuilder ToCode(StringBuilder code = null)
+        public StringBuilder ToCode(StringBuilder code)
         {
-            code = code ?? new StringBuilder();
             code.Append("new FactoryMethodInfo { ");
             code.Append("DeclaringType = ").AppendType(DeclaringType).Append(", ");
             code.Append("MemberName = ").AppendString(MemberName);
@@ -1653,6 +1647,33 @@ namespace DryIoc.MefAttributedModel
             if (InstanceFactory != null)
                 InstanceFactory.ToCode(code.Append(",").AppendLine());
             return code.Append("}");
+        }
+    }
+
+    /// <summary>Specifies the standard and custom reuse info.</summary>
+    public sealed class ReuseInfo
+    {
+        /// <summary>One of <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
+        public ReuseType ReuseType;
+
+        /// <summary>Name of the scope to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
+        public string ScopeName;
+
+        /// <summary>Custom reuse type, overrides the <see cref="ReuseType"/>.</summary>
+        public Type CustomReuseType;
+
+        /// <summary>Converts info to the C# code representation.</summary>
+        /// <param name="code">Code to append to.</param> <returns>Code with appended info.</returns>
+        public StringBuilder ToCode(StringBuilder code)
+        {
+            code = CustomReuseType == null 
+                ? code.Append("new ReuseInfo { ReuseType = ").AppendEnum(typeof(ReuseType), ReuseType) 
+                : code.Append("new ReuseInfo { CustomReuseType = ").AppendType(CustomReuseType);
+
+            if (ScopeName != null)
+                code = code.Append(", ScopeName = ").AppendString(ScopeName);
+
+            return code.Append(" }");
         }
     }
 
@@ -1809,10 +1830,9 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
         /// <param name="code">Code to append to.</param> <returns>Code with appended info code.</returns>
-        public StringBuilder ToCode(StringBuilder code = null)
+        public StringBuilder ToCode(StringBuilder code)
         {
-            return (code ?? new StringBuilder())
-                .Append("Decorator = new DecoratorInfo(").AppendCode(DecoratedServiceKey).Append(")");
+            return code.Append("new DecoratorInfo(").AppendCode(DecoratedServiceKey).Append(")");
         }
     }
 #pragma warning restore 659

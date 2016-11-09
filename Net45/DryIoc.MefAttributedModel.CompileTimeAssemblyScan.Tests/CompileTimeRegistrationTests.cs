@@ -17,7 +17,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), "another") },
-                    Reuse = ReuseType.Singleton,
+                    Reuse = new ReuseInfo { ReuseType = ReuseType.Singleton },
                     HasMetadataAttribute = false,
                 }
             });
@@ -37,7 +37,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(Service),
                     Exports = new[] { new ExportInfo(typeof(IService), "some") },
-                    Reuse = ReuseType.Singleton,
+                    Reuse = new ReuseInfo { ReuseType = ReuseType.Singleton },
                     HasMetadataAttribute = false
                 },
 
@@ -45,7 +45,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 {
                     ImplementationType = typeof(AnotherService),
                     Exports = new[] { new ExportInfo(typeof(IService), null) },
-                    Reuse = ReuseType.Transient,
+                    Reuse = new ReuseInfo { ReuseType = ReuseType.Transient },
                     HasMetadataAttribute = false,
                     FactoryType = FactoryType.Decorator,
                 },
@@ -53,8 +53,8 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
                 new ExportedRegistrationInfo
                 {
                     ImplementationType = typeof(Wrap<>),
-                    Exports = new[] { new ExportInfo(typeof(Wrap<>), null) }, 
-                    Reuse = ReuseType.Transient,
+                    Exports = new[] { new ExportInfo(typeof(Wrap<>), null) },
+                    Reuse = new ReuseInfo { ReuseType = ReuseType.Transient },
                     HasMetadataAttribute = false,
                     FactoryType = FactoryType.Wrapper
                 },
