@@ -295,10 +295,12 @@ namespace DryIoc.MefAttributedModel
                 {
                     if (it.Key is DefaultKey)
                         return false;
-                    return serviceKey.Equals(it.Key)
-                           || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
+                    if (serviceKey.Equals(it.Key))
+                        return true;
+                    var multiKey = it.Key as KV<object, int>;
+                    return multiKey != null && serviceKey.Equals(multiKey.Key);
                 })
-                    .Select(it => it.Value);
+                .Select(it => it.Value);
         }
 
         #endregion
@@ -649,19 +651,26 @@ namespace DryIoc.MefAttributedModel
             if (types == null)
                 return null;
 
+            // required when importing the wrappers
+            var unwrappedType = request.Container.GetWrappedType(type, null);
+
+            // first filter out non compatible / assignable types
             if (types.Length != 1)
             {
-                types = types.Where(t => t.Key.IsAssignableTo(type)).ToArray();
+                types = types.Where(t => t.Key.IsAssignableTo(unwrappedType)).ToArray();
                 if (types.Length > 1)
-                    Throw.It(DryIoc.Error.Of("Unable to select from multiple exported types {0} for the import {1}"),
-                        types, KV.Of(serviceKey, type));
+                    Throw.It(Error.UnableToSelectFromMultipleTypes, types, KV.Of(serviceKey, type));
             }
 
             if (types.Length == 1)
             {
                 var exportedType = types[0].Key;
-                if (exportedType.IsAssignableTo(type))
+                if (exportedType.IsAssignableTo(unwrappedType))
                     return exportedType;
+            }
+            else
+            {
+                ; // todo: multiple required types are not supported at the moment
             }
 
             return null;
@@ -1016,7 +1025,9 @@ namespace DryIoc.MefAttributedModel
             UnsupportedReuseType = Of(
                 "Attributed model does not support reuse type {0}."),
             UnsupportedReuseWrapperType = Of(
-                "Attributed model does not support reuse wrapper type {0}.");
+                "Attributed model does not support reuse wrapper type {0}."),
+            UnableToSelectFromMultipleTypes = Of(
+                "Unable to select from multiple exported types {0} for the import {1}");
 
 #pragma warning restore 1591
 
@@ -1025,6 +1036,13 @@ namespace DryIoc.MefAttributedModel
         public static string GetMessage(int error)
         {
             return Messages[error - FirstErrorCode];
+        }
+
+        /// <summary>Returns the ID of error message.</summary> <param name="message"></param> <returns></returns>
+        public static int Of(string message)
+        {
+            Messages.Add(message);
+            return FirstErrorCode + Messages.Count - 1;
         }
 
         #region Implementation
@@ -1039,12 +1057,6 @@ namespace DryIoc.MefAttributedModel
             return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count
                 ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
                 : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
-        }
-
-        private static int Of(string message)
-        {
-            Messages.Add(message);
-            return FirstErrorCode + Messages.Count - 1;
         }
 
         #endregion

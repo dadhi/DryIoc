@@ -145,6 +145,12 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         public string Version { get { return "123.4567"; } }
     }
 
+    //[Export("ArbitraryKey")]
+    //public class AnotherUntypedService : IUntypedService
+    //{
+    //    public string Version { get { return "42.31415"; } }
+    //}
+
     [Export]
     public class ImportUntypedService
     {

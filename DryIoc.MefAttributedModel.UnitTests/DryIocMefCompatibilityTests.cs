@@ -93,12 +93,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(typeof(UntypedService), importer.UntypedService.GetType());
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_supports_importing_services_as_untyped_array()
         {
-            var importer = Container.Resolve<ImportManyUntypedServices>();
+            var container = new Container().WithMef();
 
-            Assert.IsNotNull(importer);
+            container.RegisterExports(typeof(ImportManyUntypedServices), typeof(UntypedService));
+
+            var importer = container.Resolve<ImportManyUntypedServices>();
+
             Assert.IsNotNull(importer);
             Assert.IsNotNull(importer.UntypedServices);
             Assert.AreEqual(1, importer.UntypedServices.Length);

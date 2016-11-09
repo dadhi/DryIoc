@@ -2991,9 +2991,6 @@ namespace DryIoc
             }
 
             var metadataExpr = request.Container.GetOrAddStateItemExpression(resultMetadata, metadataType);
-
-
-
             return Expression.New(metaCtor, serviceExpr, metadataExpr);
         }
     }
@@ -5223,7 +5220,8 @@ namespace DryIoc
 
             // propagate key and meta to the actual service
             if (ownerType == FactoryType.Wrapper ||
-                ownerType == FactoryType.Decorator && // propagate key only to decorated (and possibly wrapped) service
+                // for decorated dependency, but not for other decorator dependencies
+                ownerType == FactoryType.Decorator &&
                 container.GetWrappedType(serviceType, requiredServiceType).IsAssignableTo(owner.ServiceType))
             {
                 if (serviceKey == null)
@@ -6531,8 +6529,8 @@ namespace DryIoc
                 ? container.GetDecoratorExpressionOrDefault(request)
                 : null;
 
-            var isDecorated = decoratorExpr != null;
-            var cacheable = IsFactoryExpressionCacheable(request) && !isDecorated;
+            var decorated = decoratorExpr != null;
+            var cacheable = !decorated && IsFactoryExpressionCacheable(request);
             if (cacheable)
             {
                 var cachedServiceExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
@@ -6542,7 +6540,7 @@ namespace DryIoc
 
             var serviceExpr = decoratorExpr ?? CreateExpressionOrDefault(request);
 
-            if (serviceExpr != null && !isDecorated)
+            if (!decorated && serviceExpr != null)
                 serviceExpr = ApplyReuse(request, serviceExpr);
 
             if (cacheable && serviceExpr != null)
