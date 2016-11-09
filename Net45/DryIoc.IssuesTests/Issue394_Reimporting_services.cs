@@ -54,6 +54,54 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(3, aggregator.Aggregatees.Length);
         }
 
+        [Test, Ignore("fails")]
+        public void Resolve_imports_new_services()
+        {
+            // registered on application startup
+            var container = new Container().WithMef();
+            container.Register<Aggregator>();
+            container.Register<IAggregatee, Agg1>();
+
+            // used later
+            var aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(1, aggregator.Aggregatees.Length);
+
+            // registered new service and re-imported
+            container.Register<IAggregatee, Agg2>();
+            aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(2, aggregator.Aggregatees.Length);
+
+            // registered new service and re-imported
+            container.Register<IAggregatee, Agg3>();
+            aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(3, aggregator.Aggregatees.Length);
+        }
+
+        [Test, Ignore("fails")]
+        public void Resolve_imports_new_services_WithoutCache()
+        {
+            // registered on application startup
+            var container = new Container().WithMef();
+            container.Register<Aggregator>();
+            container.Register<IAggregatee, Agg1>();
+
+            // used later
+            var aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(1, aggregator.Aggregatees.Length);
+
+            // registered new service and re-imported
+            container.Register<IAggregatee, Agg2>();
+            container = container.WithoutCache();
+            aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(2, aggregator.Aggregatees.Length);
+
+            // registered new service and re-imported
+            container.Register<IAggregatee, Agg3>();
+            container = container.WithoutCache();
+            aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(3, aggregator.Aggregatees.Length);
+        }
+
         public class Aggregator
         {
             [ImportMany]
