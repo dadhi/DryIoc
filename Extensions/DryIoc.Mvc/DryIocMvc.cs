@@ -88,7 +88,7 @@ namespace DryIoc.Mvc
 		/// <returns>True if controller type</returns>
 		public static bool IsController(this Type type)
 		{
-			return type.IsAssignableFrom(typeof(IController));
+			return type.IsAssignableTo(typeof(IController));
 		}
 
 		/// <summary>Returns all application specific referenced assemblies (except from GAC and Dynamic).</summary>
