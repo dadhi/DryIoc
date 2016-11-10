@@ -279,7 +279,9 @@ namespace DryIoc.MefAttributedModel
             container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
 
             // decorator to filter in a presence of multiple same keys
-            container.Register(typeof(IEnumerable<>), made: _filterCollectionByMultiKey, setup: Setup.Decorator);
+            // note: it explicitly set to Transient to produce new results for new filtered collection, 
+            // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
+            container.Register(typeof(IEnumerable<>), Reuse.Transient, _filterCollectionByMultiKey, Setup.Decorator);
 
             return container;
         }

@@ -14,21 +14,16 @@ namespace DryIoc.IssuesTests
             var container = new Container().WithMef();
 
             container.Register<Aggregator>(Reuse.Singleton);
-            container.Register<IAggregatee, Agg1>();
+            container.Register<IAggregatee, Agg1>(Reuse.Transient);
 
             // used later
             var aggregator = container.Resolve<Aggregator>();
             Assert.AreEqual(1, aggregator.Aggregatees.Length);
 
             // registered new service and re-imported
-            container.Register<IAggregatee, Agg2>();
+            container.Register<IAggregatee, Agg2>(Reuse.Transient);
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(2, aggregator.Aggregatees.Length);
-
-            // registered new service and re-imported
-            container.Register<IAggregatee, Agg3>();
-            container.InjectPropertiesAndFields(aggregator);
-            Assert.AreEqual(3, aggregator.Aggregatees.Length);
         }
 
         [Test, Ignore("fails")]

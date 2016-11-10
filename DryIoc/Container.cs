@@ -1174,6 +1174,10 @@ namespace DryIoc
                     Expression.Constant(((DefaultKey)item).RegistrationOrder));
 
             itemType = itemType ?? item.GetType();
+            if (itemType.IsPrimitive() ||
+                itemType.IsAssignableTo(typeof(Type)))
+                return Expression.Constant(item, itemType);
+
             if (itemType.IsArray)
             {
                 var elemType = itemType.GetElementType().ThrowIfNull();
@@ -1181,10 +1185,6 @@ namespace DryIoc
                 var elemExprs = Expression.NewArrayInit(elemType, elems);
                 return elemExprs;
             }
-
-            if (itemType.IsPrimitive() ||
-                itemType.IsAssignableTo(typeof(Type)))
-                return Expression.Constant(item, itemType);
 
             if (Rules.ItemToExpressionConverter != null)
             {
