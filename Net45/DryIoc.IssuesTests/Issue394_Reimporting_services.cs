@@ -54,7 +54,8 @@ namespace DryIoc.IssuesTests
         {
             // registered on application startup
             var container = new Container().WithMef();
-            container.Register<Aggregator>();
+
+            container.Register<Aggregator>(Reuse.Transient);
             container.Register<IAggregatee, Agg1>();
 
             // used later

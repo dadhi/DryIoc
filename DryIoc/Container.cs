@@ -885,13 +885,14 @@ namespace DryIoc
                 }
             }
 
-            if (Rules.UnknownServiceHandlers != null)
+            var unknownServicesResolvers = Rules.UnknownServicesResolvers;
+            if (!unknownServicesResolvers.IsNullOrEmpty())
             {
-                foreach (var handler in Rules.UnknownServiceHandlers)
+                for (var i = 0; i < unknownServicesResolvers.Length; i++)
                 {
-                    var handlerFactories = handler(serviceType);
-                    if (handlerFactories != null && handlerFactories.Any())
-                        factories = factories.Concat(handlerFactories);
+                    var unknownServiceFactories = unknownServicesResolvers[i](serviceType);
+                    if (unknownServiceFactories != null)
+                        factories = factories.Concat(unknownServiceFactories);
                 }
             }
 
@@ -3082,28 +3083,28 @@ namespace DryIoc
 
         /// <summary>Defines delegate to return all factories for the given service type.</summary>
         /// <param name="serviceType">Service type to return factory for</param> <returns>All factories for the given type, or null if unable to resolve.</returns>
-        public delegate IEnumerable<KV<object, Factory>> UnknownServiceHandler(Type serviceType);
+        public delegate IEnumerable<KV<object, Factory>> UnknownServicesResolver(Type serviceType);
 
         /// <summary>Gets rules for resolving multiple not-registered services. Null by default.</summary>
-        public UnknownServiceHandler[] UnknownServiceHandlers { get; private set; }
+        public UnknownServicesResolver[] UnknownServicesResolvers { get; private set; }
 
         /// <summary>Appends handler to current unknown service handlers.</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
-        public Rules WithUnknownServiceHandlers(params UnknownServiceHandler[] rules)
+        public Rules WithUnknownServicesResolvers(params UnknownServicesResolver[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServiceHandlers = newRules.UnknownServiceHandlers.Append(rules);
+            newRules.UnknownServicesResolvers = newRules.UnknownServicesResolvers.Append(rules);
             return newRules;
         }
 
         /// <summary>Removes specified handler from unknown service handlers, and returns new Rules.
-        /// If no resolver was found then <see cref="UnknownServiceHandlers"/> will stay the same instance,
+        /// If no resolver was found then <see cref="UnknownServicesResolvers"/> will stay the same instance,
         /// so it could be checked for remove success or fail.</summary>
         /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
-        public Rules WithoutUnknownServiceHandler(UnknownServiceHandler rule)
+        public Rules WithoutUnknownServicesResolver(UnknownServicesResolver rule)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServiceHandlers = newRules.UnknownServiceHandlers.Remove(rule);
+            newRules.UnknownServicesResolvers = newRules.UnknownServicesResolvers.Remove(rule);
             return newRules;
         }
 
