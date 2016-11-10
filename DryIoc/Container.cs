@@ -6512,7 +6512,9 @@ namespace DryIoc
             request = request.WithResolvedFactory(this);
 
             if ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request))
-                && !request.IsWrappedInFuncWithArgs() && !request.IsFirstNonWrapperInResolutionCall())
+                && request.GetActualServiceType() != typeof(void)
+                && !request.IsWrappedInFuncWithArgs() 
+                && !request.IsFirstNonWrapperInResolutionCall())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             // First lookup for decorators
@@ -6546,6 +6548,9 @@ namespace DryIoc
 
         private Expression ApplyReuse(Request request, Expression serviceExpr)
         {
+            if (serviceExpr.Type == typeof(void))
+                return serviceExpr;
+
             // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
             var reuse = request.Reuse.ThrowIfNull();
 

@@ -18,7 +18,7 @@ namespace DryIoc.IssuesTests
             Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo("en");
         }
 
-        [Test, Ignore("InvalidOperationException")]
+        [Test]
         public void Exported_actions_can_be_resolved_as_array()
         {
             var cnt = new Container().WithMef();
@@ -38,7 +38,7 @@ namespace DryIoc.IssuesTests
             Assert.DoesNotThrow(() => method2());
         }
 
-        [Test, Ignore("InvalidOperationException")]
+        [Test]
         public void Exported_actions_can_be_resolved_as_IEnumerable()
         {
             var cnt = new Container().WithMef();
@@ -58,7 +58,7 @@ namespace DryIoc.IssuesTests
             Assert.DoesNotThrow(() => method2());
         }
 
-        [Test, Ignore("InvalidOperationException")]
+        [Test]
         public void Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy()
         {
             var cnt = new Container().WithMef();
@@ -79,7 +79,7 @@ namespace DryIoc.IssuesTests
             Assert.DoesNotThrow(() => method2());
         }
 
-        [Test, Ignore("InvalidOperationException")]
+        [Test]
         public void Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata()
         {
             var cnt = new Container().WithMef();
@@ -99,10 +99,13 @@ namespace DryIoc.IssuesTests
             Assert.DoesNotThrow(() => method2());
         }
 
-        [Test, Ignore("ArgumentException")]
+        [Test]
         public void Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_within_scope()
         {
-            var cnt = new Container().WithMef().With(r => r.WithImplicitRootOpenScope().WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var cnt = new Container().WithMef()
+                .With(r => r.WithImplicitRootOpenScope()
+                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+
             cnt.RegisterExports(typeof(Exporter), typeof(EnumerableOfLazyImporter));
 
             // resolution works fine
@@ -120,7 +123,7 @@ namespace DryIoc.IssuesTests
             Assert.DoesNotThrow(() => method2());
         }
 
-        [Test, Ignore("ArgumentException")]
+        [Test]
         public void Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata_within_scope()
         {
             var cnt = new Container().WithMef().With(r => r.WithImplicitRootOpenScope().WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
