@@ -7,12 +7,12 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue394_Reimporting_services
     {
-        [Test, Ignore("fails")]
+        [Test]
         public void InjectPropertiesAndFields_imports_new_services_into_resolved_singleton()
         {
             // registered on application startup
-            var container = new Container() //.WithMef();
-                .With(r => r.With(propertiesAndFields: PropertiesAndFields.Auto));
+            var container = new Container().WithMef();
+
             container.Register<Aggregator>(Reuse.Singleton);
             container.Register<IAggregatee, Agg1>();
 

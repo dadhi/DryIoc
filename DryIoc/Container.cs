@@ -1164,10 +1164,27 @@ namespace DryIoc
         /// <returns>Returns constant or state access expression for added items.</returns>
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
-            itemType = itemType ?? (item == null ? typeof(object) : item.GetType());
-            var primitiveExpr = GetPrimitiveOrArrayExprOrDefault(item, itemType);
-            if (primitiveExpr != null)
-                return primitiveExpr;
+            if (item == null)
+                return itemType != null
+                    ? Expression.Constant(null, itemType)
+                    : Expression.Constant(null);
+
+            if (item is DefaultKey)
+                return Expression.Call(typeof(DefaultKey), "Of", ArrayTools.Empty<Type>(),
+                    Expression.Constant(((DefaultKey)item).RegistrationOrder));
+
+            itemType = itemType ?? item.GetType();
+            if (itemType.IsArray)
+            {
+                var elemType = itemType.GetElementType().ThrowIfNull();
+                var elems = ((IEnumerable)item).Cast<object>().Select(it => GetOrAddStateItemExpression(it, null, throwIfStateRequired));
+                var elemExprs = Expression.NewArrayInit(elemType, elems);
+                return elemExprs;
+            }
+
+            if (itemType.IsPrimitive() ||
+                itemType.IsAssignableTo(typeof(Type)))
+                return Expression.Constant(item, itemType);
 
             if (Rules.ItemToExpressionConverter != null)
             {
@@ -1181,32 +1198,6 @@ namespace DryIoc
             var itemIndex = GetOrAddStateItem(item);
             var stateItemExpr = GetStateItemExpression(itemIndex);
             return Expression.Convert(stateItemExpr, itemType);
-        }
-
-        private static Expression GetPrimitiveOrArrayExprOrDefault(object item, Type itemType)
-        {
-            if (item == null)
-                return itemType != null
-                    ? Expression.Constant(null, itemType)
-                    : Expression.Constant(null);
-
-            itemType = itemType ?? item.GetType();
-
-            if (itemType == typeof(DefaultKey))
-                return Expression.Call(typeof(DefaultKey), "Of", ArrayTools.Empty<Type>(),
-                    Expression.Constant(((DefaultKey)item).RegistrationOrder));
-
-            if (itemType.IsArray)
-            {
-                var itType = itemType.GetElementType().ThrowIfNull();
-                var items = ((IEnumerable)item).Cast<object>().Select(it => GetPrimitiveOrArrayExprOrDefault(it, null));
-                var itExprs = Expression.NewArrayInit(itType, items);
-                return itExprs;
-            }
-
-            return itemType.IsPrimitive() || itemType.IsAssignableTo(typeof(Type))
-                ? Expression.Constant(item, itemType)
-                : null;
         }
 
         #endregion
