@@ -5827,12 +5827,11 @@ namespace DryIoc
             });
         }
 
-        /// <summary>Returns new request with parameter expressions created for <paramref name="funcType"/> input arguments.
-        /// The expression is set to <see cref="FuncArgs"/> request field to use for <see cref="WrappersSupport.FuncTypes"/>
-        /// resolution.</summary>
-        /// <param name="funcType">Func type to get input arguments from.</param>
+        // todo: v3: Rename to WithArgs because the method works both for Action and Func
+        /// <summary>Returns new request with parameter expressions created for passed Func or Action with parameters type.</summary>
+        /// <param name="funcType">Func OR Action type to get input arguments from.</param>
         /// <returns>New request with <see cref="FuncArgs"/> field set.</returns>
-        public Request WithFuncArgs(Type funcType)
+        public Request WithFuncArgs(Type funcType) // todo: Rename parameter to funcOrActionType
         {
             var openGenType = funcType.GetGenericDefinitionOrNull().ThrowIfNull();
 
