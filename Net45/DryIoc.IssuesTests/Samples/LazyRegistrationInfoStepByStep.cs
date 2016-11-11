@@ -500,11 +500,8 @@ namespace DryIoc.IssuesTests.Samples
               .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
               .With(rules => rules.WithUnknownServicesResolvers(createFactoriesFromAssembly));
 
-            // make sure that CommandImporter itself is available without loading the lazy assembly
+            // make sure that ActionImporter itself is available without loading the lazy assembly
             container.RegisterExports(typeof(ActionImporter));
-
-            // the same resolution code as in previous test
-            //========================
             importer = container.Resolve<ActionImporter>();
             Assert.IsFalse(assemblyLoaded);
 
