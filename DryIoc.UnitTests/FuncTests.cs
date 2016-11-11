@@ -418,9 +418,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var actMethod = typeof(FuncTests).GetSingleMethodOrNull("Act");
-
-            container.Register(typeof(void), made: Made.Of(actMethod));
+            container.Register(typeof(void), 
+                made: Made.Of(typeof(FuncTests).GetSingleMethodOrNull("Act")));
 
             var act = container.Resolve<Action>();
             act();
@@ -431,15 +430,45 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var actMethod = typeof(FuncTests).GetSingleMethodOrNull("Act1");
-
             container.Register<IntValue>(Reuse.Singleton);
-            container.Register(typeof(void), made: Made.Of(actMethod));
+            container.Register(typeof(void), 
+                made: Made.Of(typeof(FuncTests).GetSingleMethodOrNull("Act1")));
 
             var act = container.Resolve<Action>();
             act();
 
             Assert.AreEqual(3, container.Resolve<IntValue>().Value);
+        }
+
+        [Test]
+        public void Can_resolve_void_method_with_one_arg_as_Action_of_one_arg()
+        {
+            var container = new Container();
+
+            container.Register(typeof(void), 
+                made: Made.Of(typeof(FuncTests).GetSingleMethodOrNull("Act1")));
+
+            var act = container.Resolve<Action<IntValue>>();
+            var value = new IntValue();
+            act(value);
+
+            Assert.AreEqual(3, value.Value);
+        }
+
+        [Test]
+        public void Can_inject_void_method_with_one_arg_as_Action_of_one_arg()
+        {
+            var container = new Container();
+
+            container.Register<ActionUser>();
+            container.Register(typeof(void), 
+                made: Made.Of(typeof(FuncTests).GetSingleMethodOrNull("Act1")));
+
+            var user = container.Resolve<ActionUser>();
+            var value = new IntValue();
+            user.Act(value);
+
+            Assert.AreEqual(3, value.Value);
         }
 
         public static void Act()
@@ -454,11 +483,22 @@ namespace DryIoc.UnitTests
         public class IntValue
         {
             public int Value { get; set; }
-        } 
+        }
+
+        public class ActionUser
+        {
+            public Action<IntValue> Act { get; private set; }
+
+            public ActionUser(Action<IntValue> act)
+            {
+                Act = act;
+            }
+        }
 
         #region CUT
 
-        public class BB {
+        public class BB
+        {
             public ILogger Logger { get; set; }
             public BB(ILogger logger)
             {
@@ -476,7 +516,8 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class AA {
+        public class AA
+        {
             public BB Bb { get; set; }
             public ILogger Logger { get; set; }
             public AA(BB bb, ILogger logger)
@@ -502,7 +543,7 @@ namespace DryIoc.UnitTests
 
         internal class A { }
 
-        internal class Y 
+        internal class Y
         {
             public A A { get; private set; }
             public Y(A a)

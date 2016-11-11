@@ -5834,19 +5834,26 @@ namespace DryIoc
         /// <returns>New request with <see cref="FuncArgs"/> field set.</returns>
         public Request WithFuncArgs(Type funcType)
         {
-            var funcArgs = funcType.ThrowIf(!funcType.IsFuncWithArgs()).GetGenericParamsAndArgs();
-            var funcArgExprs = new ParameterExpression[funcArgs.Length - 1];
+            var openGenType = funcType.GetGenericDefinitionOrNull().ThrowIfNull();
 
-            for (var i = 0; i < funcArgExprs.Length; ++i)
+            var funcIndex = WrappersSupport.FuncTypes.IndexOf(openGenType);
+            var actionIndex = funcIndex != -1 ? -1 : WrappersSupport.ActionTypes.IndexOf(openGenType);
+            Throw.If(funcIndex < 1 && actionIndex < 1);
+
+            var argTypes = funcType.GetGenericParamsAndArgs();
+            var argCount = funcIndex > 0 ? argTypes.Length - 1 : argTypes.Length;
+
+            var argExprs = new ParameterExpression[argCount];
+            for (var i = 0; i < argCount; ++i)
             {
-                var funcArg = funcArgs[i];
-                var funcArgName = "_" + funcArg.Name + i; // Valid non conflicting argument names for code generation
-                funcArgExprs[i] = Expression.Parameter(funcArg, funcArgName);
+                var argType = argTypes[i];
+                var argName = "_" + argType.Name + i; // Valid unique argument names for code generation
+                argExprs[i] = Expression.Parameter(argType, argName);
             }
 
-            var funcArgsUsage = new bool[funcArgExprs.Length];
-            var funcArgsUsageAndExpr = new KV<bool[], ParameterExpression[]>(funcArgsUsage, funcArgExprs);
-            return new Request(_resolverContext, RawParent, RequestInfo, Made, funcArgsUsageAndExpr, Level);
+            var argsUsed = new bool[argExprs.Length];
+            var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExprs);
+            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo, Level);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container,
