@@ -2944,8 +2944,10 @@ namespace DryIoc
             if (serviceKey != null)
                 factories = factories.Where(f => serviceKey.Equals(f.Key));
 
+            // note: this may be issue potential of selecting only the first factory 
+            // if the service keys for some reason are not unique
             var result = factories
-                .FirstOrDefault(factory =>
+                .FirstOrDefault(factory => 
                 {
                     var metadata = factory.Value.Setup.Metadata;
                     if (metadata == null)
