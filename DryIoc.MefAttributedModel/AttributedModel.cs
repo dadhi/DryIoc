@@ -279,7 +279,7 @@ namespace DryIoc.MefAttributedModel
             container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
 
             // decorator to filter in a presence of multiple same keys
-            // note: it explicitly set to Transient to produce new results for new filtered collection, 
+            // note: it explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
             container.Register(typeof(IEnumerable<>), Reuse.Transient, _filterCollectionByMultiKey, Setup.Decorator);
 
@@ -540,7 +540,7 @@ namespace DryIoc.MefAttributedModel
                 return null; // unspecified reuse, decided by container rules
 
             if (reuseInfo.CustomReuseType != null)
-                return reuseInfo.ScopeName == null 
+                return reuseInfo.ScopeName == null
                     ? (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType)
                     : (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeName);
 
@@ -797,8 +797,8 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is ReuseAttribute)
                 {
                     var resueAttr = (ReuseAttribute)attribute;
-                    info.Reuse = resueAttr.CustomReuseType == null 
-                        ? new ReuseInfo { ReuseType = resueAttr.ReuseType, ScopeName = resueAttr.ScopeName } 
+                    info.Reuse = resueAttr.CustomReuseType == null
+                        ? new ReuseInfo { ReuseType = resueAttr.ReuseType, ScopeName = resueAttr.ScopeName }
                         : new ReuseInfo { CustomReuseType = resueAttr.CustomReuseType, ScopeName = resueAttr.ScopeName };
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
@@ -1460,8 +1460,9 @@ namespace DryIoc.MefAttributedModel
         HasMetadataAttribute = ").AppendBool(HasMetadataAttribute).Append(@",
         FactoryType = ").AppendEnum(typeof(DryIoc.FactoryType), FactoryType).Append(@",
         ConditionType = ").AppendType(ConditionType);
-        if (Metadata != null && MetadataCode != null) code.Append(@",
-        Metadata = ").AppendDictionary(Metadata, MetadataItemToCode).Append(@",
+        if (Metadata != null) code.Append(@",
+        Metadata = ").AppendDictionary(Metadata, MetadataItemToCode);
+        if (MetadataCode != null) code.Append(@",
         MetadataCode = ").AppendDictionary(MetadataCode);
         if (Wrapper != null) code.Append(@",
         Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ").Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
@@ -1490,10 +1491,11 @@ namespace DryIoc.MefAttributedModel
         public void InitExportedMetadata(Attribute[] attributes)
         {
             Metadata = CollectExportedMetadata(attributes);
-            MetadataCode = CollectAttributeConstructorsCode();
+            if (Metadata != null)
+                MetadataCode = CollectAttributeConstructorsCode(Metadata.Keys);
         }
 
-        private IDictionary<string, string> CollectAttributeConstructorsCode()
+        private IDictionary<string, string> CollectAttributeConstructorsCode(IEnumerable<string> keys)
         {
             Dictionary<string, string> attributeDict = null;
 
@@ -1513,8 +1515,11 @@ namespace DryIoc.MefAttributedModel
 
             foreach (var attr in attributes)
             {
-                attributeDict = attributeDict ?? new Dictionary<string, string>();
-                attributeDict[attr.Key] = attr.Value;
+                if (keys.Contains(attr.Key))
+                {
+                    attributeDict = attributeDict ?? new Dictionary<string, string>();
+                    attributeDict[attr.Key] = attr.Value;
+                }
             }
 
             return attributeDict;
@@ -1670,8 +1675,8 @@ namespace DryIoc.MefAttributedModel
         /// <param name="code">Code to append to.</param> <returns>Code with appended info.</returns>
         public StringBuilder ToCode(StringBuilder code)
         {
-            code = CustomReuseType == null 
-                ? code.Append("new ReuseInfo { ReuseType = ").AppendEnum(typeof(ReuseType), ReuseType) 
+            code = CustomReuseType == null
+                ? code.Append("new ReuseInfo { ReuseType = ").AppendEnum(typeof(ReuseType), ReuseType)
                 : code.Append("new ReuseInfo { CustomReuseType = ").AppendType(CustomReuseType);
 
             if (ScopeName != null)

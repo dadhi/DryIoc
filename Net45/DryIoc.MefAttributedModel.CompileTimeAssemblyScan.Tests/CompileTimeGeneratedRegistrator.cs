@@ -180,7 +180,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         },
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), \"One\")" },
-            { "System.ComponentModel.Composition.PartCreationPolicyAttribute", "new System.ComponentModel.Composition.PartCreationPolicyAttribute((System.ComponentModel.Composition.CreationPolicy)2)" },
         }
     }, 
 
@@ -255,7 +254,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         },
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Down\")" },
-            { "System.ComponentModel.Composition.PartCreationPolicyAttribute", "new System.ComponentModel.Composition.PartCreationPolicyAttribute((System.ComponentModel.Composition.CreationPolicy)2)" },
         }
     }, 
 
@@ -282,8 +280,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         },
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute(DisplayName = \"Elsewhere\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata))" },
-            { "System.ComponentModel.Composition.PartCreationPolicyAttribute", "new System.ComponentModel.Composition.PartCreationPolicyAttribute((System.ComponentModel.Composition.CreationPolicy)2)" },
         }
     }, 
 
@@ -341,11 +337,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", 1 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.AsResolutionRootAttribute", "new DryIocAttributes.AsResolutionRootAttribute()" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute((Int32)1)" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute()" },
         }
     }, 
 
@@ -1058,11 +1049,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "a", 1 },
             { "b", 2 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute(\"a\", (Int32)1)" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute()" },
-            { "System.ComponentModel.Composition.ExportMetadataAttribute", "new System.ComponentModel.Composition.ExportMetadataAttribute(\"b\", (Int32)2)" },
         }
     }, 
 
@@ -1084,10 +1070,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "a", 1 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute(\"a\", (Int32)1)" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute()" },
         }
     }, 
 
@@ -1109,10 +1091,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "b", 2 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute()" },
-            { "System.ComponentModel.Composition.ExportMetadataAttribute", "new System.ComponentModel.Composition.ExportMetadataAttribute(\"b\", (Int32)2)" },
         }
     }, 
 
@@ -1210,10 +1188,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", 2 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.ExportManyAttribute", "new DryIocAttributes.ExportManyAttribute(ContractName = \"fast\")" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute((Int32)2)" },
         }
     }, 
 
@@ -1236,10 +1210,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", 1 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.ExportManyAttribute", "new DryIocAttributes.ExportManyAttribute(ContractName = \"slow\")" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute((Int32)1)" },
         }
     }, 
 
@@ -1262,10 +1232,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", 1 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.ExportManyAttribute", "new DryIocAttributes.ExportManyAttribute(ContractName = \"transact\")" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute((Int32)1)" },
         }
     }, 
 
@@ -2382,10 +2348,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithSt
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", "---" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute(\"---\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IDep))" },
         }
     }, 
 
@@ -2425,10 +2387,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithSt
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", "dep" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute(\"dep\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute(\"blah\", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IDep))" },
         }
     }, 
 
@@ -2450,10 +2408,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithSt
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", "dep" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute(\"dep\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute(\"huh\", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IDep))" },
         }
     }, 
 
@@ -2512,10 +2466,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithSt
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", DryIoc.MefAttributedModel.UnitTests.CUT.FooMetadata.Hey },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.ExportManyAttribute", "new DryIocAttributes.ExportManyAttribute()" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute((DryIoc.MefAttributedModel.UnitTests.CUT.FooMetadata)0)" },
         }
     }, 
 
@@ -2538,10 +2488,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.KeyedFactoryWithSt
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "@ExportMetadataDefaultKey", DryIoc.MefAttributedModel.UnitTests.CUT.FooMetadata.Blah },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIocAttributes.ExportManyAttribute", "new DryIocAttributes.ExportManyAttribute()" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute((DryIoc.MefAttributedModel.UnitTests.CUT.FooMetadata)1)" },
         }
     }, 
 
@@ -3279,7 +3225,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         },
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"One\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ILazyNamedService))" },
         }
     }, 
 
@@ -3306,8 +3251,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         },
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"Two\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ILazyNamedService))" },
-            { "System.ComponentModel.Composition.PartCreationPolicyAttribute", "new System.ComponentModel.Composition.PartCreationPolicyAttribute((System.ComponentModel.Composition.CreationPolicy)2)" },
         }
     }, 
 
@@ -3480,7 +3423,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"MultipleMetadata\")" },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute((Int64)123)" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute()" },
         }
     }, 
 
@@ -3526,8 +3468,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         },
         MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute((Int64)123, \"Category\")" },
-            { "DryIocAttributes.WithMetadataAttribute", "new DryIocAttributes.WithMetadataAttribute(\"DryIocMetadata\", \"AlsoSupported\")" },
-            { "System.ComponentModel.Composition.ExportAttribute", "new System.ComponentModel.Composition.ExportAttribute()" },
         }
     }, 
 
@@ -3605,11 +3545,6 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "Title", "Sample" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "__DynamicallyInvokableAttribute", "new __DynamicallyInvokableAttribute()" },
-            { "System.Runtime.InteropServices.ComVisibleAttribute", "new System.Runtime.InteropServices.ComVisibleAttribute((Boolean)True)" },
-            { "System.SerializableAttribute", "new System.SerializableAttribute()" },
         },
         FactoryMethodInfo = new FactoryMethodInfo { DeclaringType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MemberExportWithMetadataExample), MemberName = "TestMethodExample"}
     }, 
