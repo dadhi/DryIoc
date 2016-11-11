@@ -2594,15 +2594,15 @@ namespace DryIoc
                 new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Func<>),
-                new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
 
             for (var i = 0; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(FuncTypes[i],
-                    new ExpressionFactory(GetFuncExpressionOrDefault, setup: Setup.WrapperWith(i)));
+                    new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
-                    new ExpressionFactory(GetActionExpressionOrDefault, 
+                    new ExpressionFactory(GetFuncOrActionExpressionOrDefault, 
                     setup: Setup.WrapperWith(unwrap: _ => typeof(void))));
 
             wrappers = AddContainerInterfacesAndDisposableScope(wrappers);
@@ -2832,46 +2832,40 @@ namespace DryIoc
             return Expression.New(wrapperCtor, factoryExpr);
         }
 
-        private static Expression GetFuncExpressionOrDefault(Request request)
+        private static Expression GetFuncOrActionExpressionOrDefault(Request request)
         {
-            var funcType = request.GetActualServiceType();
-            var funcArgs = funcType.GetGenericParamsAndArgs();
-            var serviceType = funcArgs[funcArgs.Length - 1];
-
-            ParameterExpression[] funcArgExprs = null;
-            if (funcArgs.Length > 1)
+            var wrapperType = request.GetActualServiceType();
+            var isAction = wrapperType == typeof(Action);
+            if (!isAction)
             {
-                request = request.WithFuncArgs(funcType);
-                funcArgExprs = request.FuncArgs.Value;
+                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull()
+                    .ThrowIfNull();
+                var funcIndex = FuncTypes.IndexOf(openGenericWrapperType);
+                if (funcIndex == -1)
+                {
+                    isAction = ActionTypes.IndexOf(openGenericWrapperType) != -1;
+                    Throw.If(!isAction);
+                }
+            }
+
+            var argTypes = wrapperType.GetGenericParamsAndArgs();
+            var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
+            var serviceType = isAction ? typeof(void) : argTypes[argCount];
+
+            var argExprs = new ParameterExpression[argCount]; // may be empty, that's OK
+            if (argCount != 0)
+            {
+                for (var i = 0; i < argCount; ++i)
+                {
+                    var argType = argTypes[i];
+                    var argName = "_" + argType.Name + i; // valid unique argument names for code generation
+                    argExprs[i] = Expression.Parameter(argType, argName);
+                }
+
+                request = request.WithArgs(argExprs);
             }
 
             var serviceRequest = request.Push(serviceType);
-            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
-            if (serviceExpr == null)
-                return null;
-
-            // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
-            // So that Func<Derived> may be used for Func<Base>
-            if (serviceExpr.Type != serviceType)
-                serviceExpr = Expression.Convert(serviceExpr, serviceType);
-
-            return Expression.Lambda(funcType, serviceExpr, funcArgExprs);
-        }
-
-        private static Expression GetActionExpressionOrDefault(Request request)
-        {
-            var actionType = request.GetActualServiceType();
-            var argTypes = actionType.GetGenericParamsAndArgs();
-
-            ParameterExpression[] argExprs = null;
-            if (argTypes.Length != 0)
-            {
-                request = request.WithFuncArgs(actionType);
-                argExprs = request.FuncArgs.Value;
-            }
-
-            var serviceRequest = request.Push(typeof(void));
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
                 return null;
@@ -2880,7 +2874,12 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            return Expression.Lambda(actionType, serviceExpr, argExprs);
+            // Note: the conversation is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // So that Func<Derived> may be used for Func<Base>
+            if (!isAction && serviceExpr.Type != serviceType)
+                serviceExpr = Expression.Convert(serviceExpr, serviceType);
+
+            return Expression.Lambda(wrapperType, serviceExpr, argExprs);
         }
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
@@ -5827,11 +5826,19 @@ namespace DryIoc
             });
         }
 
-        // todo: v3: Rename to WithArgs because the method works both for Action and Func
-        /// <summary>Returns new request with parameter expressions created for passed Func or Action with parameters type.</summary>
-        /// <param name="funcType">Func OR Action type to get input arguments from.</param>
-        /// <returns>New request with <see cref="FuncArgs"/> field set.</returns>
-        public Request WithFuncArgs(Type funcType) // todo: Rename parameter to funcOrActionType
+        /// <summary>Adds input argument expression list to request. 
+        /// The arguments are provided by Func and Action wrappers.</summary>
+        /// <param name="argExpressions">Argument parameter expressions.</param> <returns>New request.</returns>
+        public Request WithArgs(ParameterExpression[] argExpressions)
+        {
+            var argsUsed = new bool[argExpressions.Length];
+            var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
+            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo, Level);
+        }
+
+        // todo: v3: remove
+        /// <summary>Obsolete: replaced with <see cref="WithArgs"/>.</summary>
+        public Request WithFuncArgs(Type funcType)
         {
             var openGenType = funcType.GetGenericDefinitionOrNull().ThrowIfNull();
 
