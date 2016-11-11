@@ -49,7 +49,7 @@ Solution combines projects for all supported platforms starting from .NET 3.5 (m
 __Note:__ At the moment there is a separate solution for [.NET Core DependencyInjection adapter](https://github.com/aspnet/dependencyinjection) in NetCore sub-folder.
 
 To simplify development, you may unload projects under solution root and platform folders except the platform you are working with.  
-Usually, I unload everything except projects in _Net45_ and _Extensions_ folders. But before commit, I do run _build.bat_ which builds all the platforms (__Except the .Net Core at the moment__).
+Usually, I am unloading everything except projects in _Net45_ and _Extensions_ folders. But before commit, I do run _build.bat_ which builds all the platforms (__Except the .Net Core at the moment__).
 
 __Hint:__ Main solution is configured to build and run Unit Tests continuously with [NCrunch](http://www.ncrunch.net/).
 
