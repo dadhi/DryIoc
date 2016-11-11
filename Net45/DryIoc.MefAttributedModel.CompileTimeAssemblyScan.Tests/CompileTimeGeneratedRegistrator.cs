@@ -173,13 +173,11 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), "One") },
-            { "DisplayName", "One" },
             { "ContractName", null },
             { "ContractType", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations) },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), \"One\")" },
+            { "DisplayName", "One" },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), "One") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), \"One\")" },
         }
     }, 
 
@@ -219,13 +217,11 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), "Up") },
-            { "DisplayName", "Up" },
             { "ContractName", null },
             { "ContractType", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata) },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Up\")" },
+            { "DisplayName", "Up" },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), "Up") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Up\")" },
         }
     }, 
 
@@ -247,13 +243,11 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), "Down") },
-            { "DisplayName", "Down" },
             { "ContractName", null },
             { "ContractType", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata) },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Down\")" },
+            { "DisplayName", "Down" },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), "Down") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Down\")" },
         }
     }, 
 
@@ -275,11 +269,9 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute(DisplayName = "Elsewhere") },
             { "DisplayName", "Elsewhere" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute(DisplayName = \"Elsewhere\")" },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute(DisplayName = "Elsewhere") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ViewWithAttribute(DisplayName = \"Elsewhere\")" },
         }
     }, 
 
@@ -3221,10 +3213,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute("One") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"One\")" },
             { "Name", "One" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"One\")" },
         }
     }, 
 
@@ -3247,10 +3237,8 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute("Two") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"Two\")" },
             { "Name", "Two" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"Two\")" },
         }
     }, 
 
@@ -3416,13 +3404,11 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute("MultipleMetadata") },
-            { "Name", "MultipleMetadata" },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"MultipleMetadata\")" },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute((Int64)123) },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute((Int64)123)" },
+            { "Name", "MultipleMetadata" },
             { "ScriptID", 123 },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.LazyMetadataAttribute(\"MultipleMetadata\")" },
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptMetadataAttribute((Int64)123)" },
         }
     }, 
 
@@ -3461,13 +3447,11 @@ new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ExportEarlyProtoco
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute((Int64)123, "Category") },
             { "CategoryName", "Category" },
-            { "ScriptID", 123 },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute((Int64)123, "Category") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute((Int64)123, \"Category\")" },
             { "DryIocMetadata", "AlsoSupported" },
-        },
-        MetadataCode = new System.Collections.Generic.Dictionary<string, String> {
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute", "new DryIoc.MefAttributedModel.UnitTests.CUT.ScriptWithCategoryMetadataAttribute((Int64)123, \"Category\")" },
+            { "ScriptID", 123 },
         }
     }, 
 

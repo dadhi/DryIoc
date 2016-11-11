@@ -1146,7 +1146,7 @@ namespace DryIoc.MefAttributedModel
             code.Append("new System.Collections.Generic.Dictionary<string, ");
             code.Print(typeof(TValue));
             code.AppendLine("> {");
-            foreach (var pair in dictionary)
+            foreach (var pair in dictionary.OrderBy(p => p.Key).ThenBy(p => p.Key.Length))
             {
                 code.Append("            { ");
                 code.AppendString(pair.Key);
@@ -1270,10 +1270,6 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Gets or sets the metadata.</summary>
         public IDictionary<string, object> Metadata;
-
-        /// <summary>The metadata generated code for non-scalar values (i.e., custom attributes).</summary>
-        /// <remarks>This data is used for serializing the metadata to C# code.</remarks>
-        public IDictionary<string, string> MetadataCode;
 
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
@@ -1462,8 +1458,6 @@ namespace DryIoc.MefAttributedModel
         ConditionType = ").AppendType(ConditionType);
         if (Metadata != null) code.Append(@",
         Metadata = ").AppendDictionary(Metadata, MetadataItemToCode);
-        if (MetadataCode != null) code.Append(@",
-        MetadataCode = ").AppendDictionary(MetadataCode);
         if (Wrapper != null) code.Append(@",
         Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ").Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
         if (Decorator != null) Decorator.ToCode(code.Append(@",
@@ -1476,9 +1470,9 @@ namespace DryIoc.MefAttributedModel
 
         private StringBuilder MetadataItemToCode(StringBuilder code, string key, object value)
         {
-            string metadataCode;
-            if (MetadataCode != null &&
-                MetadataCode.TryGetValue(key, out metadataCode))
+            object metadataCode;
+            if (Metadata != null &&
+                Metadata.TryGetValue(key + ToCodeKeySuffix, out metadataCode))
             {
                 return code.Append(metadataCode);
             }
@@ -1492,13 +1486,14 @@ namespace DryIoc.MefAttributedModel
         {
             Metadata = CollectExportedMetadata(attributes);
             if (Metadata != null)
-                MetadataCode = CollectAttributeConstructorsCode(Metadata.Keys);
+                CollectAttributeConstructorsCode(Metadata);
         }
 
-        private IDictionary<string, string> CollectAttributeConstructorsCode(IEnumerable<string> keys)
-        {
-            Dictionary<string, string> attributeDict = null;
+        /// <summary>Metadata key suffix for the C# representation of the custom attribute constructors.</summary>
+        public const string ToCodeKeySuffix = ".ToCode()";
 
+        private void CollectAttributeConstructorsCode(IDictionary<string, object> metadata)
+        {
             var attributes = ImplementationType.GetCustomAttributesData()
                 .Select(item => new
                 {
@@ -1515,14 +1510,11 @@ namespace DryIoc.MefAttributedModel
 
             foreach (var attr in attributes)
             {
-                if (keys.Contains(attr.Key))
+                if (metadata.ContainsKey(attr.Key))
                 {
-                    attributeDict = attributeDict ?? new Dictionary<string, string>();
-                    attributeDict[attr.Key] = attr.Value;
+                    metadata[attr.Key + ToCodeKeySuffix] = attr.Value;
                 }
             }
-
-            return attributeDict;
         }
 
         private static IDictionary<string, object> CollectExportedMetadata(IEnumerable<Attribute> attributes)
