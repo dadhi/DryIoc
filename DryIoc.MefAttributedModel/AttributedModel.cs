@@ -1423,7 +1423,7 @@ namespace DryIoc.MefAttributedModel
             var other = obj as ExportedRegistrationInfo;
             return other != null
                 && other.ImplementationType == ImplementationType
-                && other.Reuse == Reuse
+                && Equals(other.Reuse, Reuse)
                 && other.FactoryType == FactoryType
                 && Equals(other.Wrapper, Wrapper)
                 && Equals(other.Decorator, Decorator)
@@ -1662,6 +1662,17 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Custom reuse type, overrides the <see cref="ReuseType"/>.</summary>
         public Type CustomReuseType;
+
+        /// <summary>Compares with another info for equality.</summary>
+        /// <param name="obj">Other info to compare.</param> <returns>True if equal.</returns>
+        public override bool Equals(object obj)
+        {
+            var other = obj as ReuseInfo;
+            return other != null
+                && other.ReuseType == ReuseType
+                && other.ScopeName == ScopeName
+                && other.CustomReuseType == CustomReuseType;
+        }
 
         /// <summary>Converts info to the C# code representation.</summary>
         /// <param name="code">Code to append to.</param> <returns>Code with appended info.</returns>
