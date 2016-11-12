@@ -20,7 +20,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeExample), 1, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IPrintToCode), 1, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
-            },
+        },
         Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Singleton },
         OpenResolutionScope = false,
         AsResolutionCall = false,
@@ -49,7 +49,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PrintToCodeNoCreationPolicyExample), 2, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IPrintToCode), 2, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
-            },
+        },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = false,
