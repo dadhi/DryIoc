@@ -1113,7 +1113,9 @@ namespace DryIoc.MefAttributedModel
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
-            return x == null ? code.Append("null") : code.Append("typeof(").Print(x, t => t.FullName ?? t.Name).Append(')');
+            return x == null ? code.Append("null") : code.Append("typeof(")
+                .Print(x, t => t == typeof(void) ? "void" : t.FullName ?? t.Name)
+                .Append(')');
         }
 
         /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
@@ -1440,9 +1442,9 @@ namespace DryIoc.MefAttributedModel
     new ExportedRegistrationInfo {
         ImplementationType = ").AppendType(ImplementationType).Append(@",
         Exports = new[] {
-            "); for (var i = 0; i < Exports.Length; i++)
-                code = Exports[i].ToCode(code).Append(@",
-            "); code.Append(@"}");
+        "); for (var i = 0; i < Exports.Length; i++)
+                code = Exports[i].ToCode(code.Append("    ")).Append(@",
+        "); code.Append(@"}");
         if (Reuse != null) Reuse.ToCode(code.Append(@",
         Reuse = ")); code.Append(@",
         OpenResolutionScope = ").AppendBool(OpenResolutionScope).Append(@",
@@ -1458,8 +1460,8 @@ namespace DryIoc.MefAttributedModel
         ConditionType = ").AppendType(ConditionType);
         if (Metadata != null) code.Append(@",
         Metadata = ").AppendDictionary(Metadata, MetadataItemToCode);
-        if (Wrapper != null) code.Append(@",
-        Wrapper = new WrapperInfo { WrappedServiceTypeGenericArgIndex = ").Append(Wrapper.WrappedServiceTypeArgIndex).Append(" }");
+        if (Wrapper != null) Wrapper.ToCode(code.Append(@",
+        Wrapper = "));
         if (Decorator != null) Decorator.ToCode(code.Append(@",
         Decorator = "));
         if (FactoryMethodInfo != null) FactoryMethodInfo.ToCode(code.Append(@",
@@ -1500,9 +1502,12 @@ namespace DryIoc.MefAttributedModel
                     // ReSharper disable PossibleNullReferenceException
                     // ReSharper disable AssignNullToNotNullAttribute
                     Key = item.Constructor.DeclaringType.FullName,
-                    Value = string.Format("new {0}({1})", item.Constructor.DeclaringType.FullName,
-                        string.Join(", ", item.ConstructorArguments.Select(a => a.ToString()).Concat(
-                            item.NamedArguments.Select(na => na.MemberInfo.Name + " = " + na.TypedValue)).ToArray()))
+                    Value = string.Format("new {0}({1})",
+                        item.Constructor.DeclaringType.FullName,
+                        string.Join(", ", item.ConstructorArguments.Select(a => a.ToString()).ToArray())) +
+                        (item.NamedArguments.Any() ?
+                            " { " + string.Join(", ", item.NamedArguments.Select(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArray()) + " }" :
+                            string.Empty)
                     // ReSharper restore AssignNullToNotNullAttribute
                     // ReSharper restore PossibleNullReferenceException
                 })
@@ -1640,14 +1645,15 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Code with appended generated info.</returns>
         public StringBuilder ToCode(StringBuilder code)
         {
-            code.Append("new FactoryMethodInfo { ");
-            code.Append("DeclaringType = ").AppendType(DeclaringType).Append(", ");
-            code.Append("MemberName = ").AppendString(MemberName);
-            if (!MethodParameterTypeFullNamesOrNames.IsNullOrEmpty())
-                code.Append(", ").AppendMany(MethodParameterTypeFullNamesOrNames);
-            if (InstanceFactory != null)
-                InstanceFactory.ToCode(code.Append(",").AppendLine());
-            return code.Append("}");
+            code.Append(@"new FactoryMethodInfo {
+            DeclaringType = ").AppendType(DeclaringType).Append(@",
+            MemberName = ").AppendString(MemberName);
+            if (!MethodParameterTypeFullNamesOrNames.IsNullOrEmpty()) code.Append(@",
+            MethodParameterTypeFullNamesOrNames = ").AppendMany(MethodParameterTypeFullNamesOrNames);
+            if (InstanceFactory != null) InstanceFactory.ToCode(code.Append(@",
+            InstanceFactory = "));
+            return code.Append(@"
+        }");
         }
     }
 
@@ -1800,9 +1806,9 @@ namespace DryIoc.MefAttributedModel
         public StringBuilder ToCode(StringBuilder code = null)
         {
             return (code ?? new StringBuilder())
-                .Append("Wrapper = new WrapperInfo(")
-                .AppendCode(WrappedServiceTypeArgIndex).Append(", ")
-                .AppendCode(AlwaysWrapsRequiredServiceType).Append(")");
+                .Append("new WrapperInfo { WrappedServiceTypeArgIndex = ")
+                .AppendCode(WrappedServiceTypeArgIndex).Append(", AlwaysWrapsRequiredServiceType = ")
+                .AppendBool(AlwaysWrapsRequiredServiceType).Append(" }");
         }
     }
 
@@ -1844,7 +1850,9 @@ namespace DryIoc.MefAttributedModel
         /// <param name="code">Code to append to.</param> <returns>Code with appended info code.</returns>
         public StringBuilder ToCode(StringBuilder code)
         {
-            return code.Append("new DecoratorInfo(").AppendCode(DecoratedServiceKey).Append(")");
+            return code.Append("new DecoratorInfo { DecoratedServiceKey = ")
+                .AppendCode(DecoratedServiceKey).Append(", Order = ").AppendCode(Order)
+                .Append(", UseDecorateeReuse = ").AppendBool(UseDecorateeReuse).Append(" }");
         }
     }
 #pragma warning restore 659

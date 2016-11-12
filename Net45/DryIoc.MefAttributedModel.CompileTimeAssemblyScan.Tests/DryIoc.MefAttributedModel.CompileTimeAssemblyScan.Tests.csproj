@@ -40,6 +40,7 @@
       <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
     <Reference Include="Wire, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -48,11 +49,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="CompileTimeGeneratedRegistrator.cs">
+    <Compile Include="CompileTimeGeneratedRegistrator.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>CompileTimeGeneratedRegistrator.tt</DependentUpon>
-    </Content>
+    </Compile>
     <Compile Include="CompileTimeRegistrationInfoSerializationTests.cs" />
     <Compile Include="CompileTimeRegistrationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
