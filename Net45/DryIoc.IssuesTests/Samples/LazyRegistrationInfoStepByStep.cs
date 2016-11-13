@@ -174,7 +174,7 @@ namespace DryIoc.IssuesTests.Samples
             };
 
             // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownServicesResolver createFactoriesFromAssembly = serviceType =>
+            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
@@ -199,7 +199,7 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var container = new Container().WithMef()
                 .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-                .With(rules => rules.WithUnknownServicesResolvers(createFactoriesFromAssembly));
+                .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
 
             // the same resolution code as in previous test
             //========================
@@ -284,7 +284,7 @@ namespace DryIoc.IssuesTests.Samples
             };
 
             // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownServicesResolver createFactoriesFromAssembly = serviceType =>
+            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
@@ -314,7 +314,7 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var container = new Container().WithMef()
                 .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-                .With(rules => rules.WithUnknownServicesResolvers(createFactoriesFromAssembly));
+                .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
 
             // make sure that CommandImporter itself is available without loading the lazy assembly
             container.RegisterExports(typeof(CommandImporter));
@@ -446,7 +446,7 @@ namespace DryIoc.IssuesTests.Samples
             };
 
             // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownServicesResolver createFactoriesFromAssembly = serviceType =>
+            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
@@ -498,7 +498,7 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var container = new Container().WithMef()
               .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-              .With(rules => rules.WithUnknownServicesResolvers(createFactoriesFromAssembly));
+              .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
 
             // make sure that ActionImporter itself is available without loading the lazy assembly
             container.RegisterExports(typeof(ActionImporter));

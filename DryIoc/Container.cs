@@ -885,7 +885,7 @@ namespace DryIoc
                 }
             }
 
-            var unknownServicesResolvers = Rules.UnknownServicesResolvers;
+            var unknownServicesResolvers = Rules.UnknownManyServiceResolvers;
             if (!unknownServicesResolvers.IsNullOrEmpty())
             {
                 for (var i = 0; i < unknownServicesResolvers.Length; i++)
@@ -3084,28 +3084,28 @@ namespace DryIoc
 
         /// <summary>Defines delegate to return all factories for the given service type.</summary>
         /// <param name="serviceType">Service type to return factory for</param> <returns>All factories for the given type, or null if unable to resolve.</returns>
-        public delegate IEnumerable<KV<object, Factory>> UnknownServicesResolver(Type serviceType);
+        public delegate IEnumerable<KV<object, Factory>> UnknownManyServiceResolver(Type serviceType);
 
         /// <summary>Gets rules for resolving multiple not-registered services. Null by default.</summary>
-        public UnknownServicesResolver[] UnknownServicesResolvers { get; private set; }
+        public UnknownManyServiceResolver[] UnknownManyServiceResolvers { get; private set; }
 
         /// <summary>Appends handler to current unknown service handlers.</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
-        public Rules WithUnknownServicesResolvers(params UnknownServicesResolver[] rules)
+        public Rules WithUnknownManyServiceResolvers(params UnknownManyServiceResolver[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServicesResolvers = newRules.UnknownServicesResolvers.Append(rules);
+            newRules.UnknownManyServiceResolvers = newRules.UnknownManyServiceResolvers.Append(rules);
             return newRules;
         }
 
         /// <summary>Removes specified handler from unknown service handlers, and returns new Rules.
-        /// If no resolver was found then <see cref="UnknownServicesResolvers"/> will stay the same instance,
+        /// If no resolver was found then <see cref="UnknownManyServiceResolvers"/> will stay the same instance,
         /// so it could be checked for remove success or fail.</summary>
         /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
-        public Rules WithoutUnknownServicesResolver(UnknownServicesResolver rule)
+        public Rules WithoutUnknownServicesResolver(UnknownManyServiceResolver rule)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServicesResolvers = newRules.UnknownServicesResolvers.Remove(rule);
+            newRules.UnknownManyServiceResolvers = newRules.UnknownManyServiceResolvers.Remove(rule);
             return newRules;
         }
 
