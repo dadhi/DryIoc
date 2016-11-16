@@ -79,14 +79,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                if (info.ImplementationType == null)
-                    info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
-                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                return info.CreateFactory();
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Test that resolve works
@@ -163,14 +156,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                if (info.ImplementationType == null)
-                    info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
-                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                return info.CreateFactory();
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Step 3 - Add service type handler for resolving many factories.
@@ -182,15 +168,8 @@ namespace DryIoc.IssuesTests.Samples
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var pair in regs)
-                {
-                    if (pair.Value.ImplementationType == null)
-                        pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                    if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
-                        pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                    factories.Add(new KV<object, Factory>(pair.Key, pair.Value.CreateFactory()));
-                }
+                    factories.Add(new KV<object, Factory>(pair.Key,
+                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
 
                 return factories;
             };
@@ -268,19 +247,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                var lazyFactory = new Lazy<ReflectionFactory>(() =>
-                {
-                    if (info.ImplementationType == null)
-                        info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                    if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
-                        info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                    return info.CreateFactory();
-                });
-
-                return new LazyReflectionFactory(lazyFactory, info.GetSetup(), info.GetReuse);
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Step 3 - Add service type handler for resolving many factories.
@@ -292,20 +259,8 @@ namespace DryIoc.IssuesTests.Samples
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var pair in regs)
-                {
-                    var lazyFactory = new Lazy<ReflectionFactory>(() =>
-                    {
-                        if (pair.Value.ImplementationType == null)
-                            pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                        if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
-                            pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                        return pair.Value.CreateFactory();
-                    });
-
-                    factories.Add(new KV<object, Factory>(pair.Key, new LazyReflectionFactory(lazyFactory, pair.Value.GetSetup(), pair.Value.GetReuse)));
-                }
+                    factories.Add(new KV<object, Factory>(pair.Key,
+                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
 
                 return factories;
             };
@@ -424,25 +379,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                var lazyFactory = new Lazy<ReflectionFactory>(() =>
-                {
-                    if (info.ImplementationType == null)
-                        info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                    if (info.FactoryMethodInfo != null)
-                    {
-                        if (info.FactoryMethodInfo.DeclaringType == null)
-                            info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                        if (info.FactoryMethodInfo.InstanceFactory != null && info.FactoryMethodInfo.InstanceFactory.ServiceType == null)
-                            info.FactoryMethodInfo.InstanceFactory.ServiceType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.InstanceFactory.ServiceTypeFullName);
-                    }
-
-                    return info.CreateFactory();
-                });
-
-                return new LazyReflectionFactory(lazyFactory, info.GetSetup(), info.GetReuse);
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Step 3 - Add service type handler for resolving many factories.
@@ -454,26 +391,8 @@ namespace DryIoc.IssuesTests.Samples
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var pair in regs)
-                {
-                    var lazyFactory = new Lazy<ReflectionFactory>(() =>
-                    {
-                        if (pair.Value.ImplementationType == null)
-                            pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                        if (pair.Value.FactoryMethodInfo != null)
-                        {
-                            if (pair.Value.FactoryMethodInfo.DeclaringType == null)
-                                pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                            if (pair.Value.FactoryMethodInfo.InstanceFactory != null && pair.Value.FactoryMethodInfo.InstanceFactory.ServiceType == null)
-                                pair.Value.FactoryMethodInfo.InstanceFactory.ServiceType = lazyLoadedAssembly.Value.GetType(pair.Value.FactoryMethodInfo.InstanceFactory.ServiceTypeFullName);
-                        }
-
-                        return pair.Value.CreateFactory();
-                    });
-
-                    factories.Add(new KV<object, Factory>(pair.Key, new LazyReflectionFactory(lazyFactory, pair.Value.GetSetup(), pair.Value.GetReuse)));
-                }
+                    factories.Add(new KV<object, Factory>(pair.Key,
+                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
 
                 return factories;
             };

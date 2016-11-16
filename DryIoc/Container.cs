@@ -1016,7 +1016,7 @@ namespace DryIoc
 
             // decorator of arrays should be converted back from IEnumerable to array.
             if (arrayItemType != null)
-                decoratorExpr = Expression.Call(typeof(Enumerable), "ToArray", new[] {arrayItemType}, decoratorExpr);
+                decoratorExpr = Expression.Call(typeof(Enumerable), "ToArray", new[] { arrayItemType }, decoratorExpr);
 
             return decoratorExpr;
         }
@@ -1476,7 +1476,7 @@ namespace DryIoc
         // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
         internal sealed class UsedInstanceFactory : Factory
         {
-            public override Type ImplementationType { get { return _instanceType;  } }
+            public override Type ImplementationType { get { return _instanceType; } }
             private readonly Type _instanceType;
 
             public UsedInstanceFactory(Type instanceType)
@@ -2602,7 +2602,7 @@ namespace DryIoc
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
-                    new ExpressionFactory(GetFuncOrActionExpressionOrDefault, 
+                    new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
                     setup: Setup.WrapperWith(unwrap: _ => typeof(void))));
 
             wrappers = AddContainerInterfacesAndDisposableScope(wrappers);
@@ -2947,7 +2947,7 @@ namespace DryIoc
             // note: this may be issue potential of selecting only the first factory 
             // if the service keys for some reason are not unique
             var result = factories
-                .FirstOrDefault(factory => 
+                .FirstOrDefault(factory =>
                 {
                     var metadata = factory.Value.Setup.Metadata;
                     if (metadata == null)
@@ -4208,7 +4208,7 @@ namespace DryIoc
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null) where TMadeResult : TService
         {
-            var factory = new ReflectionFactory(null, reuse, made, setup);
+            var factory = new ReflectionFactory(default(Type), reuse, made, setup);
             registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
@@ -4664,7 +4664,7 @@ namespace DryIoc
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                 parameters: Parameters.Of.Type(_ => initialize)),
-                setup: Setup.DecoratorWith(useDecorateeReuse: true, 
+                setup: Setup.DecoratorWith(useDecorateeReuse: true,
                 condition: r => r.ServiceType.IsAssignableTo(typeof(TTarget)) && (condition == null || condition(r))));
         }
 
@@ -6253,7 +6253,7 @@ namespace DryIoc
         /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
-        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1, 
+        public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool preventDisposal = false)
         {
@@ -6528,7 +6528,7 @@ namespace DryIoc
 
             if ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request))
                 && request.GetActualServiceType() != typeof(void)
-                && !request.IsWrappedInFuncWithArgs() 
+                && !request.IsWrappedInFuncWithArgs()
                 && !request.IsFirstNonWrapperInResolutionCall())
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
@@ -7033,7 +7033,15 @@ namespace DryIoc
     public sealed class ReflectionFactory : Factory
     {
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
-        public override Type ImplementationType { get { return _implementationType; } }
+        public override Type ImplementationType
+        {
+            get
+            {
+                if (_implementationType == null && _implementationTypeProvider != null)
+                    SetKnownImplementationType(_implementationTypeProvider(), Made);
+                return _implementationType;
+            }
+        }
 
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         public override IConcreteFactoryGenerator FactoryGenerator { get { return _factoryGenerator; } }
@@ -7048,14 +7056,17 @@ namespace DryIoc
             : base(reuse, setup)
         {
             _made = made ?? Made.Default;
-            _implementationType = GetValidImplementationTypeOrDefault(implementationType);
+            SetKnownImplementationType(implementationType, _made);
+        }
 
-            var originalImplementationType = _implementationType ?? implementationType;
-            if (originalImplementationType == typeof(object) || // for open-generic T implementation
-                originalImplementationType != null && (         // for open-generic X<T> implementation
-                originalImplementationType.IsGenericDefinition() ||
-                originalImplementationType.IsGenericParameter))
-                _factoryGenerator = new ClosedGenericFactoryGenerator(this);
+        /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
+        /// <param name="implementationTypeProvider">Provider of non-abstract close or open generic type.</param>
+        /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
+        public ReflectionFactory(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null)
+            : base(reuse, setup)
+        {
+            _made = made ?? Made.Default;
+            _implementationTypeProvider = implementationTypeProvider.ThrowIfNull();
         }
 
         /// <summary>Add to base rules: do not cache if Made is context based.</summary>
@@ -7180,9 +7191,10 @@ namespace DryIoc
 
         #region Implementation
 
-        private readonly Type _implementationType;
+        private Type _implementationType; // non-readonly to be set by provider
+        private readonly Func<Type> _implementationTypeProvider;
         private readonly Made _made;
-        private readonly ClosedGenericFactoryGenerator _factoryGenerator;
+        private ClosedGenericFactoryGenerator _factoryGenerator;
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
@@ -7214,7 +7226,7 @@ namespace DryIoc
 
                 var implementationType = _openGenericFactory._implementationType;
 
-                var closedTypeArgs = implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull() 
+                var closedTypeArgs = implementationType == null || implementationType == serviceType.GetGenericDefinitionOrNull()
                   ? serviceType.GetGenericParamsAndArgs()
                   : implementationType.IsGenericParameter ? new[] { serviceType }
                   : GetClosedTypeArgsOrNullForOpenGenericType(implementationType, serviceType, request);
@@ -7268,37 +7280,46 @@ namespace DryIoc
                 _generatedFactories = Ref.Of(ImTreeMap<KV<Type, object>, ReflectionFactory>.Empty);
         }
 
-        private Type GetValidImplementationTypeOrDefault(Type implementationType)
+        private void SetKnownImplementationType(Type implType, Made made)
         {
+            var knownImplType = implType;
+
             var factoryMethodResultType = Made.FactoryMethodKnownResultType;
-            if (implementationType == null ||
-                implementationType == typeof(object) ||
-                implementationType.IsAbstract())
+            if (implType == null ||
+                implType == typeof(object) ||
+                implType.IsAbstract())
             {
-                if (Made.FactoryMethod == null)
+                if (made.FactoryMethod == null)
                 {
-                    if (implementationType == null)
+                    if (implType == null)
                         Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
-                    if (implementationType.IsAbstract())
-                        Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implementationType);
+                    if (implType.IsAbstract())
+                        Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implType);
                 }
 
-                implementationType = null; // Ensure that we do not have abstract implementation type
+                knownImplType = null; // Ensure that we do not have abstract implementation type
 
                 // Using non-abstract factory method result type is safe for conditions and diagnostics
                 if (factoryMethodResultType != null &&
                     factoryMethodResultType != typeof(object) &&
                     !factoryMethodResultType.IsAbstract())
-                    implementationType = factoryMethodResultType;
-
-                return implementationType;
+                    knownImplType = factoryMethodResultType;
+            }
+            else if (factoryMethodResultType != null
+                  && factoryMethodResultType != implType)
+            {
+                implType.ThrowIfNotImplementedBy(factoryMethodResultType,
+                    Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType);
             }
 
-            if (factoryMethodResultType != null && factoryMethodResultType != implementationType)
-                implementationType.ThrowIfNotImplementedBy(factoryMethodResultType,
-                    Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType);
+            var openGenericImplType = knownImplType ?? implType;
+            if (openGenericImplType == typeof(object) || // for open-generic T implementation
+                openGenericImplType != null && (         // for open-generic X<T> implementation
+                openGenericImplType.IsGenericDefinition() ||
+                openGenericImplType.IsGenericParameter))
+                _factoryGenerator = new ClosedGenericFactoryGenerator(this);
 
-            return implementationType;
+            _implementationType = knownImplType;
         }
 
         private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
@@ -10516,7 +10537,7 @@ namespace DryIoc
                 {
                     var typeInfoParamExpr = Expression.Parameter(typeof(TypeInfo), "typeInfo");
                     typesExpr = Expression.Call(typeof(Enumerable),
-                        "Select", new[] {typeof(TypeInfo), typeof(Type)},
+                        "Select", new[] { typeof(TypeInfo), typeof(Type) },
                         typesExpr,
                         Expression.Lambda<Func<TypeInfo, Type>>(
                             Expression.Call(typeInfoParamExpr, "AsType",

@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using System.Linq.Expressions;
-
 namespace DryIoc.MefAttributedModel
 {
     using System;
@@ -1310,25 +1308,22 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Creates factory from registration info.</summary>
         /// <returns>Created factory.</returns>
-        public ReflectionFactory CreateFactory()
+        public ReflectionFactory CreateFactory(Func<string, Type> typeProvider = null)
         {
-            Made made = null;
-            MemberInfo member = null;
-            if (FactoryMethodInfo != null)
-            {
-                member = GetFactoryMemberOrDefault(FactoryMethodInfo).ThrowIfNull();
+            if (!IsLazy)
+                return new ReflectionFactory(ImplementationType, GetReuse(), GetMade(), GetSetup());
 
-                ServiceInfo factoryServiceInfo = null;
-                var export = FactoryMethodInfo.InstanceFactory;
-                if (export != null)
-                    factoryServiceInfo = ServiceInfo.Of(export.ServiceType, DryIoc.IfUnresolved.ReturnDefault, export.ServiceKey);
+            typeProvider = typeProvider.ThrowIfNull();
+            var made = GetMade(typeProvider);
+            var setup = GetSetup(made);
+            return new ReflectionFactory(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
+        }
 
-                made = Made.Of(member, factoryServiceInfo);
-            }
-
-            var reuse = GetReuse();
-            var setup = GetSetup(member);
-            return new ReflectionFactory(ImplementationType, reuse, made, setup);
+        private Made GetMade(Func<string, Type> typeProvider = null)
+        {
+            return FactoryMethodInfo == null 
+                ? Made.Default 
+                : FactoryMethodInfo.CreateMade(typeProvider);
         }
 
         /// <summary>Gets the <see cref="IReuse"/> instance.</summary>
@@ -1337,37 +1332,10 @@ namespace DryIoc.MefAttributedModel
             return AttributedModel.GetReuse(Reuse);
         }
 
-        private static MemberInfo GetFactoryMemberOrDefault(FactoryMethodInfo factoryMethod)
-        {
-            var member = factoryMethod.DeclaringType
-                .GetAllMembers(includeBase: true)
-                .FirstOrDefault(m =>
-                {
-                    if (m.Name != factoryMethod.MemberName)
-                        return false;
-
-                    var method = m as MethodInfo;
-                    if (method == null) // return early if it is property or field, no need to compare method signature
-                        return true;
-
-                    var parameters = method.GetParameters();
-                    var factoryMethodParameterTypeNames =
-                        factoryMethod.MethodParameterTypeFullNamesOrNames ?? ArrayTools.Empty<string>();
-                    if (parameters.Length != factoryMethodParameterTypeNames.Length)
-                        return false;
-
-                    return parameters.Length == 0
-                        || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                            .SequenceEqual(factoryMethodParameterTypeNames);
-                });
-
-            return member;
-        }
-
         /// <summary>Create factory setup from registration DTO.</summary>
-        /// <param name="factoryMember">(optional) Used to collecting metadata from attributes.</param>
+        /// <param name="made">(optional) Used for collecting metadata from factory method attributes if any.</param>
         /// <returns>Created factory setup.</returns>
-        public Setup GetSetup(MemberInfo factoryMember = null)
+        public Setup GetSetup(Made made = null)
         {
             if (FactoryType == DryIoc.FactoryType.Wrapper)
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
@@ -1379,19 +1347,30 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            if (HasMetadataAttribute && !IsLazy && Metadata == null)
-            {
-                IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
-                if (factoryMember != null)
-                    metaAttrs = metaAttrs.Concat(factoryMember.GetAttributes());
-                Metadata = CollectExportedMetadata(metaAttrs);
-            }
+            // collect metadata
+            object metadata = Metadata;
+            if (metadata == null && HasMetadataAttribute)
+                metadata = IsLazy
+                    ? new Func<object>(() => CollectExportedMetadata(CollectMetadataAttributes(made)))
+                    : (object)CollectExportedMetadata(CollectMetadataAttributes(made));
 
-            return Setup.With(Metadata, condition,
+            return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
                 UseParentReuse);
+        }
+
+        private IEnumerable<Attribute> CollectMetadataAttributes(Made made)
+        {
+            IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
+            if (made != null && made.FactoryMethodKnownResultType != null)
+            {
+                var member = made.FactoryMethod(null).ConstructorOrMethodOrMember;
+                if (member != null)
+                    metaAttrs = metaAttrs.Concat(member.GetAttributes());
+            }
+            return metaAttrs;
         }
 
         private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo source)
@@ -1444,7 +1423,7 @@ namespace DryIoc.MefAttributedModel
         Exports = new[] {
         "); for (var i = 0; i < Exports.Length; i++)
                 code = Exports[i].ToCode(code.Append("    ")).Append(@",
-        "); code.Append(@"}");
+        "); code.Append("}");
         if (Reuse != null) Reuse.ToCode(code.Append(@",
         Reuse = ")); code.Append(@",
         OpenResolutionScope = ").AppendBool(OpenResolutionScope).Append(@",
@@ -1606,7 +1585,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Parameter type full names (and names for generic parameters) to identify the method overload.</summary>
         public string[] MethodParameterTypeFullNamesOrNames;
 
-        /// <summary>Not null for exported instance member which requires factory object, null for static members.</summary>
+        /// <summary>(optional) Not null for exported instance member which requires factory object, null for static members.</summary>
         public ExportInfo InstanceFactory;
 
         /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
@@ -1623,6 +1602,47 @@ namespace DryIoc.MefAttributedModel
             if (info.InstanceFactory != null)
                 info.InstanceFactory = info.InstanceFactory.MakeLazy();
             return info;
+        }
+
+        /// <summary>Constructs Made out of info properties.</summary>
+        /// <returns>New made</returns>
+        public Made CreateMade(Func<string, Type> typeProvider = null)
+        {
+            if (!IsLazy)
+                return Made.Of(GetMember(DeclaringType), 
+                    InstanceFactory == null ? null : ServiceInfo.Of(
+                        InstanceFactory.ServiceType, DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey));
+
+            typeProvider = typeProvider.ThrowIfNull();
+            return Made.Of(_ => FactoryMethod.Of(
+                GetMember(typeProvider(DeclaringTypeFullName)),
+                InstanceFactory == null ? null : ServiceInfo.Of(
+                    InstanceFactory.ServiceType, DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey)));
+        }
+
+        private MemberInfo GetMember(Type declaringType)
+        {
+            return declaringType
+                .GetAllMembers(includeBase: true)
+                .FirstOrDefault(m =>
+                {
+                    if (m.Name != MemberName)
+                        return false;
+
+                    var method = m as MethodInfo;
+                    if (method == null) // return early if it is property or field, no need to compare method signature
+                        return true;
+
+                    var parameters = method.GetParameters();
+                    var factoryMethodParameterTypeNames = MethodParameterTypeFullNamesOrNames ?? ArrayTools.Empty<string>();
+                    if (parameters.Length != factoryMethodParameterTypeNames.Length)
+                        return false;
+
+                    return parameters.Length == 0
+                           || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
+                               .SequenceEqual(factoryMethodParameterTypeNames);
+                })
+                .ThrowIfNull();
         }
 
         /// <summary>Determines whether the specified <see cref="T:System.Object" /> is equal to the current <see cref="T:System.Object" />.</summary>
@@ -1857,66 +1877,4 @@ namespace DryIoc.MefAttributedModel
     }
 #pragma warning restore 659
     #endregion
-
-    /// <summary>Lazy wrapper for the <see cref="Factory"/>.</summary>
-    /// <seealso cref="Factory" /> and <seealso cref="ReflectionFactory"/>
-    public sealed class LazyReflectionFactory : Factory
-    {
-        /// <summary>Initializes a new instance of the <see cref="LazyReflectionFactory"/> class.</summary>
-        /// <param name="factory">The lazily-evaluated factory.</param>
-        /// <param name="setup">The factory setup (optional).</param>
-        /// <param name="getReuse">The factory reuse (optional).</param>
-        public LazyReflectionFactory(Lazy<ReflectionFactory> factory, Setup setup = null, Func<IReuse> getReuse = null)
-        {
-            _lazyFactory = factory;
-            _lazySetup = new Lazy<Setup>(() => setup ?? _lazyFactory.Value.Setup);
-            _lazyReuse = new Lazy<IReuse>(() => getReuse != null ? getReuse() : _lazyFactory.Value.Reuse);
-        }
-
-        private readonly Lazy<ReflectionFactory> _lazyFactory;
-
-        private readonly Lazy<Setup> _lazySetup;
-
-        private readonly Lazy<IReuse> _lazyReuse;
-
-        /// <inheritdoc />
-        public override Type ImplementationType
-        {
-            get { return _lazyFactory.Value.ImplementationType; }
-        }
-
-        /// <inheritdoc />
-        public override Made Made
-        {
-            get { return _lazyFactory.Value.Made; }
-        }
-
-        /// <inheritdoc />
-        public override IReuse Reuse
-        {
-            get { return _lazyReuse.Value; }
-        }
-
-        /// <inheritdoc />
-        public override Setup Setup
-        {
-            get { return _lazySetup.Value; }
-        }
-
-        /// <inheritdoc />
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            return _lazyFactory.Value.CreateExpressionOrDefault(request);
-        }
-
-        /// <summary>Returns a <see cref="String" /> that represents this instance.</summary>
-        public override string ToString()
-        {
-            var s = new StringBuilder().Append("{ID=").Append(FactoryID);
-            s.Append(", LazyFactory, IsValueCreated=").Append(_lazyFactory.IsValueCreated);
-            if (_lazyFactory.IsValueCreated)
-                s.Append(", Value=").Append(_lazyFactory.Value);
-            return s.Append("}").ToString();
-        }
-    }
 }
