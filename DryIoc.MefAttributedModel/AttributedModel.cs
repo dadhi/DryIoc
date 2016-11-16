@@ -547,6 +547,13 @@ namespace DryIoc.MefAttributedModel
                 .Invoke(reuseInfo.ScopeName);
         }
 
+        /// <summary>Gets the custom attributes data.</summary>
+        /// <param name="type">The type information.</param>
+        public static IList<CustomAttributeData> GetCustomAttributesData(this Type type)
+        {
+            return CustomAttributeData.GetCustomAttributes(type).ToList();
+        }
+
         #region Rules
 
         private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector = null)
@@ -1475,7 +1482,7 @@ namespace DryIoc.MefAttributedModel
 
         private void CollectAttributeConstructorsCode(IDictionary<string, object> metadata)
         {
-            var attributes = ImplementationType.GetCustomAttributesData()
+            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType).ToList()
                 .Select(item => new
                 {
                     // ReSharper disable PossibleNullReferenceException
