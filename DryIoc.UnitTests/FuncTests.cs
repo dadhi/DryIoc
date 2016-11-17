@@ -413,7 +413,10 @@ namespace DryIoc.UnitTests
             Assert.AreSame(aa.Bb.Logger, aa.Logger);
         }
 
-        public class BB {
+        #region CUT
+
+        public class BB
+        {
             public ILogger Logger { get; set; }
             public BB(ILogger logger)
             {
@@ -431,7 +434,8 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class AA {
+        public class AA
+        {
             public BB Bb { get; set; }
             public ILogger Logger { get; set; }
             public AA(BB bb, ILogger logger)
@@ -457,7 +461,7 @@ namespace DryIoc.UnitTests
 
         internal class A { }
 
-        internal class Y 
+        internal class Y
         {
             public A A { get; private set; }
             public Y(A a)
@@ -512,5 +516,7 @@ namespace DryIoc.UnitTests
             private readonly string _name;
             private readonly string _surname;
         }
+
+        #endregion
     }
 }

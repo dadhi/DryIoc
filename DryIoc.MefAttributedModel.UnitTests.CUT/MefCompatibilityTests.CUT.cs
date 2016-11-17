@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using DryIocAttributes;
@@ -95,21 +94,21 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     // no Export attribute here
     internal class SettingProvider1
     {
-        //[Export(Constants.SettingExportKey)]
+        [Export(Constants.SettingExportKey)]
         private string ExportedValue { get; } = "SettingProvider1.ExportedValue";
     }
 
     // no Export attribute here
     internal class SettingProvider2
     {
-        //[Export(Constants.SettingExportKey)]
+        [Export(Constants.SettingExportKey)]
         protected string ExportedValue { get; } = "SettingProvider2.ExportedValue";
     }
 
     // no Export attribute here
     internal class SettingProvider3
     {
-        //[Export(Constants.SettingExportKey)]
+        [Export(Constants.SettingExportKey)]
         public string ExportedValue { get; private set; } = "SettingProvider3.ExportedValue";
     }
 
@@ -145,6 +144,12 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
         public string Version { get { return "123.4567"; } }
     }
+
+    //[Export("ArbitraryKey")]
+    //public class AnotherUntypedService : IUntypedService
+    //{
+    //    public string Version { get { return "42.31415"; } }
+    //}
 
     [Export]
     public class ImportUntypedService

@@ -11,7 +11,7 @@
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.6.0
+          v3.0.0
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
           - added: #323: Support multiple WithMetadataAttribute(key, value)
@@ -24,8 +24,8 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="[2.8.3,3.0)" />
-                <dependency id="DryIocAttributes" version="[2.6,3.0)" />
+                <dependency id="DryIoc" version="[2.9,3.0)" />
+                <dependency id="DryIocAttributes" version="3.0.0-preview-01" />
             </group>
         </dependencies>
         <frameworkAssemblies>
@@ -40,20 +40,25 @@
 
         <!-- net35 -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net35\DryIoc\MefAttributedModel" />
+        <file src="..\DryIoc.MefAttributedModel\Ported-net45.cs" target="content\net35\DryIoc\MefAttributedModel" />
 
         <!-- net40 -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net40\DryIoc\MefAttributedModel" />
+        <file src="..\DryIoc.MefAttributedModel\Ported-net45.cs" target="content\net40\DryIoc\MefAttributedModel" />
 
         <!-- net45 -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net45\DryIoc\MefAttributedModel" />
 
         <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc\MefAttributedModel" />
+        <file src="..\DryIoc.MefAttributedModel\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc\MefAttributedModel" />
 
         <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc\MefAttributedModel" />
+        <file src="..\DryIoc.MefAttributedModel\Ported-net45.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc\MefAttributedModel" />
 
         <!--uap10.0: Universal Windows Platform-->
         <file src="..\DryIoc.MefAttributedModel\AttributedModel.cs" target="contentFiles\cs\any" />
+        <file src="..\DryIoc.MefAttributedModel\Ported-net45.cs" target="contentFiles\cs\any" />
     </files>
 </package>

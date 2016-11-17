@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 
@@ -873,6 +875,112 @@ namespace DryIoc.UnitTests
             public TalkingBirdDecorator(IBird bird)
             {
                 Decoratee = bird;
+            }
+        }
+
+        [Test]
+        public void Can_decorate_ienumerable_and_alter_the_service_key_filtering()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
+                made: Made.Of(
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"), 
+                    Parameters.Of.Type(r => r.ServiceKey)));
+
+            container.Register<Aaaa>(made: Parameters.Of.Name("bs", serviceKey: "a"));
+            container.Register<Bbbb>();
+            container.Register<Bbbb>(serviceKey: "a");
+            container.Register<Bbbb>(serviceKey: KV.Of<object, int>("a", 1));
+
+            var aaa = container.Resolve<Aaaa>();
+
+            Assert.AreEqual(2, aaa.Bs.Count());
+        }
+
+        [Test]
+        public void Can_decorate_ienumerable_and_alter_the_service_key_filtering_and_works_with_nested_wrappers()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
+                made: Made.Of(
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"),
+                    Parameters.Of.Type(r => r.ServiceKey)));
+
+            container.Register<AaaaFunc>(made: Parameters.Of.Name("bs", serviceKey: "a", requiredServiceType: typeof(Bbbb)));
+            container.Register<Bbbb>();
+            container.Register<Bbbb>(serviceKey: "a");
+            container.Register<Bbbb>(serviceKey: KV.Of<object, int>("a", 1));
+
+            var aaa = container.Resolve<AaaaFunc>();
+
+            Assert.AreEqual(2, aaa.Bs.Count());
+        }
+
+        [Test]
+        public void Can_decorate_array_and_alter_the_service_key_filtering()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
+                made: Made.Of(
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"),
+                    Parameters.Of.Type(r => r.ServiceKey)));
+
+            container.Register<AaaaArray>(made: Parameters.Of.Name("bs", serviceKey: "a"));
+            container.Register<Bbbb>();
+            container.Register<Bbbb>(serviceKey: "a");
+            container.Register<Bbbb>(serviceKey: KV.Of<object, int>("a", 1));
+
+            var aaa = container.Resolve<AaaaArray>();
+
+            Assert.AreEqual(2, aaa.Bs.Length);
+        }
+
+        public static IEnumerable<T> FilterCollectionByMultiKeys<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
+        {
+            return serviceKey == null
+                ? source.Select(it => it.Value)
+                : source.Where(it =>
+                    {
+                        if (it.Key is DefaultKey)
+                            return false;
+                        return serviceKey.Equals(it.Key) 
+                            || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
+                    })
+                .Select(it => it.Value);
+        }
+
+        public class Bbbb { }
+
+        public class Aaaa
+        {
+            public readonly IEnumerable<Bbbb> Bs;
+
+            public Aaaa(IEnumerable<Bbbb> bs)
+            {
+                Bs = bs;
+            }
+        }
+
+        public class AaaaFunc
+        {
+            public readonly IEnumerable<Bbbb> Bs;
+
+            public AaaaFunc(IEnumerable<Func<object>> bs)
+            {
+                Bs = bs.Select(f => f()).Cast<Bbbb>().ToArray();
+            }
+        }
+
+        public class AaaaArray
+        {
+            public readonly Bbbb[] Bs;
+
+            public AaaaArray(Bbbb[] bs)
+            {
+                Bs = bs;
             }
         }
     }

@@ -15,6 +15,8 @@
     <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <TargetFrameworkProfile>Profile259</TargetFrameworkProfile>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -40,6 +42,9 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
     <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
       <Link>AttributedModel.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Ported-net45.cs">
+      <Link>Ported-net45.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>

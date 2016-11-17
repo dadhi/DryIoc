@@ -34,7 +34,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         }
 
         [Test]
-        [Explicit]
         public void Given_scnanned_assembly_When_serialize_data_Then_deserialize_will_return_the_same_data()
         {
             var assembly = typeof(TransientService).GetAssembly();
@@ -56,7 +55,6 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         }
 
         [Test]
-        [Explicit]
         public void Given_deserialized_data_When_registering_scanned_data_into_container_Then_metadata_should_correctly_registered_too()
         {
             var assembly = typeof(TransientService).GetAssembly();
@@ -73,7 +71,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
             using (var file = File.OpenRead(DATA_FILE))
                 infos = serializer.Deserialize<ExportedRegistrationInfo[]>(file);
 
-            var container = new Container().WithMefAttributedModel();
+            var container = new Container().WithMef();
             container.RegisterExports(infos);
 
             var factories = container.Resolve<Meta<Func<IServiceWithMetadata>, IViewMetadata>[]>();

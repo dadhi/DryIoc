@@ -12,10 +12,8 @@ namespace DryIoc.IssuesTests
 
         private static IContainer CreateContainer()
         {
-            var c = new Container(rules => rules
-                .WithMefRules()
+            var c = new Container().WithMef().With(rules => rules
                 .WithImplicitRootOpenScope()
-                .WithoutThrowIfDependencyHasShorterReuseLifespan()
                 .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
 
             c.RegisterExports(new[] { typeof(Issue355_UnexpectedSingletonDisposal).GetAssembly() });

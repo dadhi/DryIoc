@@ -7,8 +7,8 @@ using DryIocAttributes;
 
 namespace DryIoc.IssuesTests
 {
-    [TestFixture, Ignore("fails")]
-    public class Issue377__Support_custom_IReuse_with_MEF_attributes
+    [TestFixture]
+    public class Issue377_Support_custom_IReuse_with_MEF_attributes
     {
         [Test]
         public void Test()
@@ -67,6 +67,5 @@ namespace DryIoc.IssuesTests
 
             #endregion
         }
-
     }
 }

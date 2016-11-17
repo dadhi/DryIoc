@@ -54,6 +54,9 @@
     <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
       <Link>AttributedModel.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Ported-net45.cs">
+      <Link>Ported-net45.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>

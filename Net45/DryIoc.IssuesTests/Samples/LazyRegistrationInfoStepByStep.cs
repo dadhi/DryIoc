@@ -79,14 +79,7 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                if (info.ImplementationType == null)
-                    info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
-                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                return info.CreateFactory();
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Test that resolve works
@@ -106,7 +99,7 @@ namespace DryIoc.IssuesTests.Samples
             // check that importing commands actually works
             var cmds = container.Resolve<CommandImporter>();
             Assert.IsNotNull(cmds.Commands);
-            Assert.AreEqual(2, cmds.Commands.Length);
+            Assert.AreEqual(2, cmds.Commands.Count());
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
@@ -163,18 +156,11 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                if (info.ImplementationType == null)
-                    info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
-                    info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                return info.CreateFactory();
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownServiceHandler createFactoriesFromAssembly = serviceType =>
+            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
@@ -182,15 +168,8 @@ namespace DryIoc.IssuesTests.Samples
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var pair in regs)
-                {
-                    if (pair.Value.ImplementationType == null)
-                        pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                    if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
-                        pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                    factories.Add(new KV<object, Factory>(pair.Key, pair.Value.CreateFactory()));
-                }
+                    factories.Add(new KV<object, Factory>(pair.Key,
+                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
 
                 return factories;
             };
@@ -199,13 +178,13 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var container = new Container().WithMef()
                 .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-                .With(rules => rules.WithUnknownServiceHandlers(createFactoriesFromAssembly));
+                .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
 
             // the same resolution code as in previous test
             //========================
             var cmds = container.Resolve<CommandImporter>();
             Assert.IsNotNull(cmds.Commands);
-            Assert.AreEqual(2, cmds.Commands.Length);
+            Assert.AreEqual(2, cmds.Commands.Count());
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
@@ -226,7 +205,12 @@ namespace DryIoc.IssuesTests.Samples
             // In run-time deserialize registrations and register them as rule for unresolved services
             //=========================================================================================
 
-            var lazyLoadedAssembly = new Lazy<Assembly>(() => assembly);
+            var assemblyLoaded = false;
+            var lazyLoadedAssembly = new Lazy<Assembly>(() =>
+            {
+                assemblyLoaded = true;
+                return assembly;
+            });
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
             var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
@@ -263,24 +247,11 @@ namespace DryIoc.IssuesTests.Samples
                 if (regIndex == -1)
                     return null;
 
-                var info = regs[regIndex].Value;
-                var lazySetup = new Lazy<Setup>(() => info.GetSetup());
-                var lazyFactory = new Lazy<Factory>(() =>
-                {
-                    if (info.ImplementationType == null)
-                        info.ImplementationType = lazyLoadedAssembly.Value.GetType(info.ImplementationTypeFullName);
-
-                    if (info.FactoryMethodInfo != null && info.FactoryMethodInfo.DeclaringType == null)
-                        info.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(info.FactoryMethodInfo.DeclaringTypeFullName);
-
-                    return info.CreateFactory();
-                });
-
-                return new LazyFactory(lazyFactory, lazySetup);
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
             // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownServiceHandler createFactoriesFromAssembly = serviceType =>
+            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
                 if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
@@ -288,21 +259,8 @@ namespace DryIoc.IssuesTests.Samples
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var pair in regs)
-                {
-                    var lazySetup = new Lazy<Setup>(() => pair.Value.GetSetup());
-                    var lazyFactory = new Lazy<Factory>(() =>
-                    {
-                        if (pair.Value.ImplementationType == null)
-                            pair.Value.ImplementationType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                        if (pair.Value.FactoryMethodInfo != null && pair.Value.FactoryMethodInfo.DeclaringType == null)
-                            pair.Value.FactoryMethodInfo.DeclaringType = lazyLoadedAssembly.Value.GetType(pair.Value.ImplementationTypeFullName);
-
-                        return pair.Value.CreateFactory();
-                    });
-
-                    factories.Add(new KV<object, Factory>(pair.Key, new LazyFactory(lazyFactory, lazySetup)));
-                }
+                    factories.Add(new KV<object, Factory>(pair.Key,
+                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
 
                 return factories;
             };
@@ -311,16 +269,22 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var container = new Container().WithMef()
                 .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-                .With(rules => rules.WithUnknownServiceHandlers(createFactoriesFromAssembly));
+                .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
+
+            // make sure that CommandImporter itself is available without loading the lazy assembly
+            container.RegisterExports(typeof(CommandImporter));
 
             // the same resolution code as in previous test
             //========================
             var cmds = container.Resolve<CommandImporter>();
+            Assert.IsFalse(assemblyLoaded);
+
             Assert.IsNotNull(cmds.LazyHandler);
             Assert.IsNotNull(cmds.LazyHandler.Value);
+            Assert.IsTrue(assemblyLoaded);
 
             Assert.IsNotNull(cmds.Commands);
-            Assert.AreEqual(2, cmds.Commands.Length);
+            Assert.AreEqual(2, cmds.Commands.Count());
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
@@ -353,7 +317,150 @@ namespace DryIoc.IssuesTests.Samples
             public Lazy<IHandler<object>> LazyHandler { get; set; }
 
             [ImportMany]
-            public Lazy<ICommand, ICommandMetadata>[] Commands { get; set; }
+            public IEnumerable<Lazy<ICommand, ICommandMetadata>> Commands { get; set; }
+        }
+
+        [Test, Ignore("fails to distinguish between imported Actions")]
+        public void Lazy_import_of_Actions()
+        {
+            // the same registration code as in the lazy sample
+            //========================
+            var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
+
+            // Step 1 - Scan assembly and find exported type, create DTOs for them.
+            var registrations = AttributedModel.Scan(new[] { assembly });
+
+            // Step 2 - Make DTOs lazy.
+            var lazyRegistrations = registrations.Select(info => info.MakeLazy())
+                .ToArray(); // NOTE: This is required to materialized DTOs to be seriliazed.
+
+            // In run-time deserialize registrations and register them as rule for unresolved services
+            //=========================================================================================
+
+            var assemblyLoaded = false;
+            var lazyLoadedAssembly = new Lazy<Assembly>(() =>
+            {
+                assemblyLoaded = true;
+                return assembly;
+            });
+
+            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
+            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            foreach (var lazyRegistration in lazyRegistrations)
+            {
+                var exports = lazyRegistration.Exports;
+                for (var i = 0; i < exports.Length; i++)
+                {
+                    var export = exports[i];
+                    var serviceTypeFullName = export.ServiceTypeFullName;
+
+                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
+                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
+                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
+
+                    // multiple services workaround: generate missing service keys
+                    var serviceKey = export.ServiceKey;
+                    if (serviceKey == null)
+                        serviceKey = Guid.NewGuid().ToString();
+
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
+                }
+            }
+
+            // Step 2 - Add resolution rule for creating factory on resolve.
+            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
+                    return null;
+
+                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
+                if (regIndex == -1)
+                    return null;
+
+                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
+            };
+
+            // Step 3 - Add service type handler for resolving many factories.
+            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
+                    return null;
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var pair in regs)
+                    factories.Add(new KV<object, Factory>(pair.Key,
+                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
+
+                return factories;
+            };
+
+            // Test that resolve works fine with the non-lazy scenario
+            //========================
+            var cnt = new Container().WithMef();
+            cnt.RegisterExports(typeof(ActionImporter), typeof(ActionExporter));
+
+            // validate imported metadata
+            var importer = cnt.Resolve<ActionImporter>();
+            Assert.AreEqual(2, importer.Actions.Length);
+            Assert.AreEqual("One, Two", string.Join(", ", importer.Actions.Select(a => a.Metadata["Name"].ToString()).OrderBy(n => n)));
+
+            // validate imported actions
+            var action1 = importer.Actions.First(m => m.Metadata["Name"].Equals("One")).Value;
+            Assert.DoesNotThrow(() => action1());
+            var action2 = importer.Actions.First(m => m.Metadata["Name"].Equals("Two")).Value;
+            Assert.Throws<NotImplementedException>(() => action2());
+
+            // Test that resolve works with the lazy scenario
+            //========================
+            var container = new Container().WithMef()
+              .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
+              .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
+
+            // make sure that ActionImporter itself is available without loading the lazy assembly
+            container.RegisterExports(typeof(ActionImporter));
+            importer = container.Resolve<ActionImporter>();
+            Assert.IsFalse(assemblyLoaded);
+
+            // validate imported metadata
+            Assert.IsNotNull(importer.Actions);
+            Assert.AreEqual(2, importer.Actions.Length);
+
+            // fails here: "One, One" instead of "One, Two"
+            Assert.AreEqual("One, Two", string.Join(", ", importer.Actions.Select(a => a.Metadata["Name"].ToString()).OrderBy(n => n)));
+            Assert.IsFalse(assemblyLoaded);
+
+            // validate imported actions
+            action1 = importer.Actions.First(m => m.Metadata["Name"].Equals("One")).Value;
+            Assert.IsTrue(assemblyLoaded);
+            Assert.DoesNotThrow(() => action1());
+            action2 = importer.Actions.First(m => m.Metadata["Name"].Equals("Two")).Value;
+            Assert.Throws<NotImplementedException>(() => action2());
+        }
+
+        [Export]
+        public class ActionImporter
+        {
+            public const string ContractName = "ActionImporter";
+
+            [ImportMany(ContractName)]
+            public Lazy<Action, IDictionary<string, object>>[] Actions { get; set; }
+        }
+
+        public class ActionExporter
+        {
+            [Export(ActionImporter.ContractName), ExportMetadata("Name", "One")]
+            public void Method1()
+            {
+            }
+
+            [Export(ActionImporter.ContractName), ExportMetadata("Name", "Two")]
+            public void Method2()
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 

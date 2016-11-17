@@ -12,7 +12,7 @@
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.6.0
+          v3.0.0
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
           - added: #323: Support multiple WithMetadataAttribute(key, value)
@@ -25,16 +25,17 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.8.3,3.0)" />
-            <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.9,3.0)" />
+            <dependency id="DryIocAttributes.dll" version="3.0.0-preview-01" />
           </group>
           <group targetFramework="netstandard1.0">
-            <dependency id="DryIoc.dll" version="[2.8.3,3.0)" />
-            <dependency id="DryIocAttributes.dll" version="[2.6,3.0)" />
+            <dependency id="DryIoc.dll" version="[2.9,3.0)" />
+            <dependency id="DryIocAttributes.dll" version="[3.0,4.0)" />
 
             <dependency id="System.Collections" version="4.0.11" />
             <dependency id="System.Diagnostics.Debug" version="4.0.11" />
             <dependency id="System.Linq" version="4.1.0" />
+            <dependency id="System.Linq.Expressions" version="4.1.0" />
             <dependency id="System.Reflection" version="4.1.0" />
             <dependency id="System.Runtime" version="4.1.0" />
             <dependency id="System.Runtime.Extensions" version="4.1.0" />

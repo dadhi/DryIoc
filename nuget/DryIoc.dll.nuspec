@@ -11,6 +11,10 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v2.9.0
+          - added: #386: Support for resolving void Factory Method as Action
+          - added: Support for array decorators
+          - added: #405: Support for resolving unknown services in ResolveMany via UnknownManyServiceResolvers 
           v2.8.5
           - fixed: #387: ArgumentException with initializer
           v2.8.4

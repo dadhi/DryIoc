@@ -51,7 +51,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsNull(container.Resolve<Provider>(IfUnresolved.ReturnDefault));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_supports_named_value_imports_and_exports()
         {
             // SettingImportHelper gathers all exported string settings from the catalog
@@ -82,7 +82,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.IsTrue(importer.Protocols.Any(v => v.Version == "4.0"));
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_supports_importing_service_as_untyped_property()
         {
             var importer = Container.Resolve<ImportUntypedService>();
@@ -93,12 +93,15 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(typeof(UntypedService), importer.UntypedService.GetType());
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_supports_importing_services_as_untyped_array()
         {
-            var importer = Container.Resolve<ImportManyUntypedServices>();
+            var container = new Container().WithMef();
 
-            Assert.IsNotNull(importer);
+            container.RegisterExports(typeof(ImportManyUntypedServices), typeof(UntypedService));
+
+            var importer = container.Resolve<ImportManyUntypedServices>();
+
             Assert.IsNotNull(importer);
             Assert.IsNotNull(importer.UntypedServices);
             Assert.AreEqual(1, importer.UntypedServices.Length);
@@ -362,10 +365,17 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, service2.ImportsSatisfied);
         }
 
-        [Test, Ignore("fails")]
+        [Test]
         public void DryIoc_can_import_member_with_metadata()
         {
-            var service = Container.Resolve<UsesMemberExportWithMetadataExample>();
+            var container = new Container().WithMef();
+
+            // added explicit export registrations for better debug
+            container.RegisterExports(
+                typeof(MemberExportWithMetadataExample),
+                typeof(UsesMemberExportWithMetadataExample));
+
+            var service = container.Resolve<UsesMemberExportWithMetadataExample>();
 
             Assert.IsNotNull(service);
             Assert.IsNotNull(service.ImportedTestMethodExample);

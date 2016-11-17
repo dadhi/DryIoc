@@ -2,21 +2,22 @@
 pushd ".."
 setlocal EnableDelayedExpansion
 
-set NUNIT="packages\NUnit.Console.3.0.1\tools\nunit3-console.exe"
-set OPENCOVER="packages\OpenCover.4.6.166\tools\OpenCover.Console.exe"
-set REPORTGEN="packages\ReportGenerator.2.4.0.0\tools\ReportGenerator.exe"
+set NUNIT="packages\NUnit.ConsoleRunner.3.5.0\tools\nunit3-console.exe"
+set OPENCOVER="packages\OpenCover.4.6.519\tools\OpenCover.Console.exe"
+set REPORTGEN="packages\ReportGenerator.2.4.5.0\tools\ReportGenerator.exe"
 set REPORTS=bin\Reports
 set COVERAGE="%REPORTS%\Coverage.xml"
 
 if not exist %REPORTS% md %REPORTS% 
 
-for %%P in ("."; "Net40"; "Net45"; "PCL-Net45"; "Extensions"; "Net40\Extensions") do (
+REM Excluded the "PCL-Net45" because .NETPortable test assemblies are not yet supported by the engine
+for %%P in ("."; "Net40"; "Net45"; "Extensions"; "Net40\Extensions") do (
 	for %%T in ("%%P\bin\Release\*Tests.dll") do (
 		set TESTLIBS=!TESTLIBS! %%T
 ))
 
 echo:
-echo:Running tests with coverage into %COVERAGE% . . .
+echo:Running tests with coverage. Results are collected in %COVERAGE% . . .
 echo:
 echo:from assemblies: %TESTLIBS%
 echo: 

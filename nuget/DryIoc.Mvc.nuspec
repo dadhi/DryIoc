@@ -11,6 +11,9 @@
         <description>DryIoc extension for ASP.NET MVC</description>
         <tags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.2.0:
+          - fixed: #398: How to enable clear error messages when DryIoc is not able to resolve a service?
+          - added: WithMvc option to propagate DryIoc errors to the client
           v2.1.0:
           - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
           - added: WithDataAnnotationsValidator extension method

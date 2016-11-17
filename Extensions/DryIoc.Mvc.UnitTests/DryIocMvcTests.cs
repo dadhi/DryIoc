@@ -1,5 +1,7 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Web.Mvc;
+using DryIoc.Web;
 using NSubstitute;
 using NUnit.Framework;
 
@@ -16,6 +18,20 @@ namespace DryIoc.Mvc.UnitTests
             var filterProvider = container.Resolve<IFilterProvider>();
 
             Assert.IsInstanceOf<DryIocFilterAttributeFilterProvider>(filterProvider);
+        }
+
+        [Test]
+        public void Can_specify_to_throw_on_unresolved_controller()
+        {
+            var fakeItems = new Dictionary<object, object>();
+            var root = new Container(scopeContext: new HttpContextScopeContext(() => fakeItems))
+                .WithMvc(new[] { typeof(DryIocMvcTests).Assembly }, throwIfUnresolved: type => type.IsController());
+
+            using (var scoped = root.OpenScope(Reuse.WebRequestScopeName))
+            {
+                var ex = Assert.Throws<ContainerException>(() =>
+                    DependencyResolver.Current.GetService(typeof(MissingDependencyController)));
+            }
         }
 
         [Test]
@@ -62,7 +78,7 @@ namespace DryIoc.Mvc.UnitTests
             FilterProviders.Providers.Add(new FilterAttributeFilterProvider());
             Assert.IsNotEmpty(FilterProviders.Providers.OfType<FilterAttributeFilterProvider>());
 
-            new Container().WithMvc(new[] {typeof(DryIocMvcTests).Assembly});
+            new Container().WithMvc(new[] { typeof(DryIocMvcTests).Assembly });
 
             Assert.IsEmpty(FilterProviders.Providers.OfType<FilterAttributeFilterProvider>()
                 .Except(FilterProviders.Providers.OfType<DryIocFilterAttributeFilterProvider>()));
@@ -71,5 +87,17 @@ namespace DryIoc.Mvc.UnitTests
 
         public class Blah { }
         public class Fooh { }
+
+        public interface ISomeDep { }
+
+        public class MissingDependencyController : Controller
+        {
+            public ISomeDep Dep { get; private set; }
+
+            public MissingDependencyController(ISomeDep dep)
+            {
+                Dep = dep;
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau and Contributors
+Copyright © 2014-2016 Maksim Volkau and Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -62,9 +62,12 @@ namespace DryIoc.Mvc
         /// <param name="controllerAssemblies">(optional) By default uses <see cref="BuildManager.GetReferencedAssemblies"/>.</param>
         /// <param name="scopeContext">(optional) Specific scope context to use, by default MVC uses <see cref="HttpContextScopeContext"/> 
         /// (if container does not have its own context specified).</param>
+        /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
+        /// for unresolved type instead of fallback to default Resolver.</param>
         /// <returns>New container with applied Web context.</returns>
         public static IContainer WithMvc(this IContainer container,
-            IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null)
+            IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null,
+            Func<Type, bool> throwIfUnresolved = null)
         {
             container.ThrowIfNull();
 
@@ -75,9 +78,17 @@ namespace DryIoc.Mvc
 
             container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
-            DependencyResolver.SetResolver(new DryIocDependencyResolver(container));
+            DependencyResolver.SetResolver(new DryIocDependencyResolver(container, throwIfUnresolved));
 
             return container;
+        }
+
+        /// <summary>Helps to find if type is controller type.</summary>
+        /// <param name="type">Type to check.</param>
+        /// <returns>True if controller type</returns>
+        public static bool IsController(this Type type)
+        {
+            return type.IsAssignableTo(typeof(IController));
         }
 
         /// <summary>Returns all application specific referenced assemblies (except from GAC and Dynamic).</summary>
@@ -139,9 +150,12 @@ namespace DryIoc.Mvc
     {
         /// <summary>Creates resolver from DryIoc resolver.</summary>
         /// <param name="resolver">DryIoc resolver (container interface).</param>
-        public DryIocDependencyResolver(IResolver resolver)
+        /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
+        /// for unresolved type instead of fallback to default Resolver.</param>
+        public DryIocDependencyResolver(IResolver resolver, Func<Type, bool> throwIfUnresolved = null)
         {
             _resolver = resolver;
+            _throwIfUnresolved = throwIfUnresolved;
         }
 
         /// <summary> Resolves singly registered services that support arbitrary object creation. </summary>
@@ -149,7 +163,8 @@ namespace DryIoc.Mvc
         /// <param name="serviceType">The type of the requested service or object.</param>
         public object GetService(Type serviceType)
         {
-            return _resolver.Resolve(serviceType, IfUnresolved.ReturnDefault);
+            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
+            return _resolver.Resolve(serviceType, ifUnresolvedReturnDefault);
         }
 
         /// <summary> Resolves multiply registered services. </summary>
@@ -161,6 +176,7 @@ namespace DryIoc.Mvc
         }
 
         private readonly IResolver _resolver;
+        private readonly Func<Type, bool> _throwIfUnresolved;
     }
 
     /// <summary>Defines an filter provider for filter attributes. Uses DryIoc container to inject filter properties.</summary>

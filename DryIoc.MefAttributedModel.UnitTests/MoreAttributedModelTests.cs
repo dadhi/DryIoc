@@ -10,10 +10,21 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_export_and_resolve_composite()
         {
-            var container = new Container().WithMefAttributedModel()
-                .With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+            var container = new Container().WithMef();
 
             container.RegisterExports(new [] { typeof(IItem<int>).GetAssembly() });
+
+            var composite = (CompositeItem<int>)container.Resolve<IItem<int>>("root");
+            Assert.AreEqual(2, composite.Items.Length);
+        }
+
+        [Test]
+        public void Can_export_and_resolve_composite_as_lazy_enumerable()
+        {
+            var container = new Container().WithMef()
+                .With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+
+            container.RegisterExports(new[] { typeof(IItem<int>).GetAssembly() });
 
             var composite = (CompositeItem<int>)container.Resolve<IItem<int>>("root");
             Assert.AreEqual(2, composite.Items.Length);
@@ -34,12 +45,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Registering_with_metadata_with_duplicate_key_should_throw()
+        public void Resolving_with_metadata_with_duplicate_key_should_throw()
         {
             var container = new Container();
 
             var ex = Assert.Throws<AttributedModelException>(() =>
-                container.RegisterExports(typeof(ThrowsForMultipleMetaWithDuplicateName)));
+            container.RegisterExports(typeof(ThrowsForMultipleMetaWithDuplicateName)));
 
             Assert.AreEqual(Error.DuplicateMetadataKey, ex.Error);
         }
