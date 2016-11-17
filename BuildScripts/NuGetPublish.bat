@@ -6,9 +6,9 @@ set PACKAGEDIR="bin\NuGetPackages"
 set /p APIKEY=<ApiKey.txt
 
 rem DryIoc
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.8.5.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.2.8.5.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Internal.2.8.5.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.9.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.2.9.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.Internal.2.9.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Microsoft.DependencyInjection
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
@@ -17,20 +17,20 @@ rem DryIocZero
 rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocAttributes
-rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocAttributes.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocAttributes.dll.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.MefAttributedModel
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.2.5.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Web
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.dll.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Mvc
-%NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
