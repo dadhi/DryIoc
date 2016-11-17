@@ -26,7 +26,7 @@
         <dependencies>
           <group>
             <dependency id="DryIoc.dll" version="[2.9,3.0)" />
-            <dependency id="DryIocAttributes.dll" version="[3.0,4.0)" />
+            <dependency id="DryIocAttributes.dll" version="3.0.0-preview-01" />
           </group>
           <group targetFramework="netstandard1.0">
             <dependency id="DryIoc.dll" version="[2.9,3.0)" />
