@@ -5962,12 +5962,11 @@ namespace DryIoc
             return RequestInfo.Empty;
         }
 
-        /// <summary>Serializable request info stripped from run-time info.</summary>
+        /// <summary>Serializable request info stripped off run-time info.</summary>
         public RequestInfo RequestInfo { get; private set; } // note: mutable to change key in place
 
         // todo: v3: remove
         /// <summary>Obsolete: use <see cref="RequestInfo"/> instead.</summary>
-        /// <returns>Mirrored request info.</returns>
         public RequestInfo ToRequestInfo()
         {
             return RequestInfo;
