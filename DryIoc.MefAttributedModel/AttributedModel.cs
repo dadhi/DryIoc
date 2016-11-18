@@ -518,7 +518,7 @@ namespace DryIoc.MefAttributedModel
 
         private static bool CanBeExported(Type type)
         {
-            return !(type.IsValueType() || type.IsInterface() || type.IsCompilerGenerated());
+            return type.IsClass() && !type.IsCompilerGenerated();
         }
 
         private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute)
@@ -545,13 +545,6 @@ namespace DryIoc.MefAttributedModel
             return SupportedReuseTypes.GetValueOrDefault(reuseInfo.ReuseType)
                 .ThrowIfNull(Error.UnsupportedReuseType, reuseInfo.ReuseType)
                 .Invoke(reuseInfo.ScopeName);
-        }
-
-        /// <summary>Gets the custom attributes data.</summary>
-        /// <param name="type">The type information.</param>
-        public static IList<CustomAttributeData> GetCustomAttributesData(this Type type)
-        {
-            return CustomAttributeData.GetCustomAttributes(type).ToList();
         }
 
         #region Rules
@@ -1482,7 +1475,7 @@ namespace DryIoc.MefAttributedModel
 
         private void CollectAttributeConstructorsCode(IDictionary<string, object> metadata)
         {
-            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType).ToList()
+            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType)
                 .Select(item => new
                 {
                     // ReSharper disable PossibleNullReferenceException

@@ -2151,7 +2151,7 @@ namespace DryIoc
         {
             var types = implTypeAssemblies.ThrowIfNull()
                 .SelectMany(assembly => assembly.GetLoadedTypes())
-                .Where(type => !type.IsAbstract() && !type.IsCompilerGenerated())
+                .Where(Registrator.IsImplementationType)
                 .ToArray();
             return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
         }
@@ -4298,8 +4298,15 @@ namespace DryIoc
         /// <returns>Types.</returns>
         public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly)
         {
-            return Portable.GetAssemblyTypes(assembly)
-                .Where(type => type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated());
+            return Portable.GetAssemblyTypes(assembly).Where(IsImplementationType);
+        }
+
+        /// <summary>Checks if type can be used as implementation type for reflection factory, 
+        /// and therefore registered to container. Usually used to discover implementation types from assembly.</summary>
+        /// <param name="type">Type to check.</param> <returns>True if implementation type.</returns>
+        public static bool IsImplementationType(this Type type)
+        {
+            return type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
         }
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
@@ -5134,6 +5141,21 @@ namespace DryIoc
         public static T WithDetails<T>(this T serviceInfo, ServiceDetails details, Request request)
             where T : IServiceInfo
         {
+            details = details ?? ServiceDetails.Default;
+            var sourceDetails = serviceInfo.Details;
+            if (!details.HasCustomValue &&
+                sourceDetails != ServiceDetails.Default &&
+                sourceDetails != details)
+            {
+                var serviceKey = details.ServiceKey ?? sourceDetails.ServiceKey;
+                var metadataKey = details.MetadataKey ?? sourceDetails.MetadataKey;
+                var metadata = metadataKey == details.MetadataKey ? details.Metadata : sourceDetails.Metadata;
+                var defaultValue = details.DefaultValue ?? sourceDetails.DefaultValue;
+
+                details = ServiceDetails.Of(details.RequiredServiceType, serviceKey, 
+                    details.IfUnresolved, defaultValue, metadataKey, metadata);
+            }
+
             return WithRequiredServiceType(serviceInfo, details, request);
         }
 
@@ -5141,7 +5163,7 @@ namespace DryIoc
             where T : IServiceInfo
         {
             var serviceType = serviceInfo.ServiceType;
-            var requiredServiceType = details == null ? null : details.RequiredServiceType;
+            var requiredServiceType = details.RequiredServiceType;
             if (requiredServiceType != null)
             {
                 if (requiredServiceType == serviceType)
