@@ -1,4 +1,5 @@
 ﻿using DryIoc.AspNetCore.Sample.Services;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.AspNetCore.Sample
 {
@@ -10,6 +11,9 @@ namespace DryIoc.AspNetCore.Sample
             r.Register<ISingletonService, SingletonService>(Reuse.Singleton);
             r.Register<ITransientService, TransientService>(Reuse.Transient);
             r.Register<IScopedService, ScopedService>(Reuse.InCurrentScope);
+
+            var assemblies = new[] { typeof(ExportedService).GetAssembly() };
+            r.RegisterExports(assemblies);
         }
     }
 }

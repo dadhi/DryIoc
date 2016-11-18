@@ -11,7 +11,8 @@
     "Microsoft.Extensions.Logging.Console": "1.0.0",
     "Microsoft.AspNetCore.Mvc": "1.0.1",
 
-    "DryIoc.Microsoft.DependencyInjection": { "target": "project" }
+    "DryIoc.Microsoft.DependencyInjection": "1.0.2",
+    "DryIoc.MefAttributedModel.dll": "3.0.0-preview-02" 
   },
 
   "tools": {
@@ -49,3 +50,4 @@
     "postpublish": [ "dotnet publish-iis --publish-folder %publish:OutputPath% --framework %publish:FullTargetFramework%" ]
   }
 }
+
