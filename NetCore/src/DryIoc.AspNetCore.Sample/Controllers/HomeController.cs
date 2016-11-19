@@ -10,11 +10,13 @@ namespace DryIoc.AspNetCore.Sample.Controllers
     {
         public IScopedService Scoped { get; }
         public ITransientService Transient { get; }
+        public IExportedService Imported { get; }
 
-        public HomeController(IScopedService scoped, ITransientService transient, TransientService s)
+        public HomeController(IScopedService scoped, ITransientService transient, IExportedService imported)
         {
             Scoped = scoped;
             Transient = transient;
+            Imported = imported;
         }
 
         [Route("/")]
@@ -23,9 +25,9 @@ namespace DryIoc.AspNetCore.Sample.Controllers
         {
             var model = new HomeModel
             {
-                Message = 
-                    $"Transient services are different: {Transient != Scoped.Transient}, " +
-                    $"but Singletons are the same: {Transient.Singleton == Scoped.Singleton} "
+                Message = $"Transient services are different: {Transient != Scoped.Transient}; "
+                        + $"Singletons are the same: {Transient.Singleton == Scoped.Singleton}; "
+                        + $"Exported service is successfully imported {Imported != null}"
             };
 
             return View(model);

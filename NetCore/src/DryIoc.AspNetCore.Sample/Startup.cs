@@ -1,4 +1,5 @@
 ﻿using System;
+using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -14,10 +15,15 @@ namespace DryIoc.AspNetCore.Sample
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
+
             return new Container()
-                .WithDependencyInjectionAdapter(services, 
-                    // optional: but may provide you with exact exception when specified types are not resolved.
+                // optional: to support MEF attributed services discovery
+                .WithMef()
+                // setup DI adapter
+                .WithDependencyInjectionAdapter(services,
+                // optional: propagate exception if specified types are not resolved, and prevent fallback to default Asp resolution
                     throwIfUnresolved: type => type.Name.EndsWith("Controller"))
+                // add registrations from CompositionRoot classs
                 .ConfigureServiceProvider<CompositionRoot>();
         }
 
@@ -31,7 +37,7 @@ namespace DryIoc.AspNetCore.Sample
 
             app.UseMvc();
 
-            // just for test:
+            // uncomment to test:
             //app.Run(async (context) =>
             //{
             //    await context.Response.WriteAsync("Hello World!");
