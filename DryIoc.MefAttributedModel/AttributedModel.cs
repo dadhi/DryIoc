@@ -149,9 +149,7 @@ namespace DryIoc.MefAttributedModel
             var lazyFactory = new ExpressionFactory(r =>
                 WrappersSupport.GetLazyExpressionOrDefault(r, nullWrapperForUnresolvedService: true),
                 setup: Setup.Wrapper);
-            container.Register(typeof(Lazy<>),
-                factory: lazyFactory,
-                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.Register(typeof(Lazy<>), lazyFactory, IfAlreadyRegistered.Replace);
 
             return container;
         }
@@ -256,6 +254,7 @@ namespace DryIoc.MefAttributedModel
         /// <typeparam name="T">The type of the exported service.</typeparam>
         /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
         /// <param name="metaFactory">The factory with the service metadata.</param>
+        /// <returns></returns>
         internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Lazy<T>, TMetadata> metaFactory)
         {
             return metaFactory == null || metaFactory.Value == null ? null :
@@ -1307,6 +1306,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Creates factory from registration info.</summary>
+        /// <param name="typeProvider">(optional) But required for <see cref="IsLazy"/> info.</param>
         /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory(Func<string, Type> typeProvider = null)
         {
@@ -1318,6 +1318,17 @@ namespace DryIoc.MefAttributedModel
             var setup = GetSetup(made);
             return new ReflectionFactory(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
         }
+
+        /// <summary>Returns already created or creating and storing the factory.</summary>
+        /// <param name="typeProvider">(optional) But required for <see cref="IsLazy"/> info.</param>
+        /// <returns>Created factory.</returns>
+        public ReflectionFactory GetOrCreateFactory(Func<string, Type> typeProvider = null)
+        {
+            return CreatedFactory ?? (CreatedFactory = CreateFactory(typeProvider));
+        }
+
+        /// <summary>Factory created and stored via <see cref="GetOrCreateFactory"/></summary>
+        public ReflectionFactory CreatedFactory { get; private set; }
 
         private Made GetMade(Func<string, Type> typeProvider = null)
         {
@@ -1617,7 +1628,8 @@ namespace DryIoc.MefAttributedModel
             return Made.Of(_ => FactoryMethod.Of(
                 GetMember(typeProvider(DeclaringTypeFullName)),
                 InstanceFactory == null ? null : ServiceInfo.Of(
-                    InstanceFactory.ServiceType, DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey)));
+                    InstanceFactory.ServiceType ?? typeProvider(InstanceFactory.ServiceTypeFullName), 
+                    DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey)));
         }
 
         private MemberInfo GetMember(Type declaringType)
