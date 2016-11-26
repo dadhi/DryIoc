@@ -1332,8 +1332,8 @@ namespace DryIoc.MefAttributedModel
 
         private Made GetMade(Func<string, Type> typeProvider = null)
         {
-            return FactoryMethodInfo == null 
-                ? Made.Default 
+            return FactoryMethodInfo == null
+                ? Made.Default
                 : FactoryMethodInfo.CreateMade(typeProvider);
         }
 
@@ -1374,6 +1374,9 @@ namespace DryIoc.MefAttributedModel
 
         private IEnumerable<Attribute> CollectMetadataAttributes(Made made)
         {
+            if (ImplementationType == null)
+                return new Attribute[0];
+
             IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
             if (made != null && made.FactoryMethodKnownResultType != null)
             {
@@ -1620,7 +1623,7 @@ namespace DryIoc.MefAttributedModel
         public Made CreateMade(Func<string, Type> typeProvider = null)
         {
             if (!IsLazy)
-                return Made.Of(GetMember(DeclaringType), 
+                return Made.Of(GetMember(DeclaringType),
                     InstanceFactory == null ? null : ServiceInfo.Of(
                         InstanceFactory.ServiceType, DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey));
 
@@ -1628,7 +1631,7 @@ namespace DryIoc.MefAttributedModel
             return Made.Of(_ => FactoryMethod.Of(
                 GetMember(typeProvider(DeclaringTypeFullName)),
                 InstanceFactory == null ? null : ServiceInfo.Of(
-                    InstanceFactory.ServiceType ?? typeProvider(InstanceFactory.ServiceTypeFullName), 
+                    InstanceFactory.ServiceType ?? typeProvider(InstanceFactory.ServiceTypeFullName),
                     DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey)));
         }
 
