@@ -169,7 +169,7 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(0, noServices.Count());
         }
 
-        [Test, Ignore]
+        [Test]
         public void Should_throw_on_undetermined_dependency()
         {
             var container = new Container();

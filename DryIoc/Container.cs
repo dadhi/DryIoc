@@ -557,10 +557,16 @@ namespace DryIoc
             object compositeParentKey, Type compositeParentRequiredType,
             RequestInfo preResolveParent, IScope scope)
         {
-            preResolveParent = preResolveParent ?? RequestInfo.Empty;
+            var requiredItemType = requiredServiceType ?? serviceType;
+
+            // Emulating the collection parent so that collection related rules and conditions were applied
+            // the same way as if resolving IEnumerable<T>
+            if (preResolveParent == null || preResolveParent.IsEmpty)
+                preResolveParent = RequestInfo.Empty.Push(
+                    typeof(IEnumerable<object>), requiredItemType, serviceKey, IfUnresolved.Throw,
+                    0, FactoryType.Wrapper, implementationType:null, reuse:null);
 
             var container = (IContainer)this;
-            var requiredItemType = requiredServiceType ?? serviceType;
             var items = container.GetAllServiceFactories(requiredItemType);
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
