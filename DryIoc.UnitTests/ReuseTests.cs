@@ -121,7 +121,7 @@ namespace DryIoc.UnitTests
             container.Register<Account>(setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AccountUser>());
 
             Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
@@ -234,7 +234,7 @@ namespace DryIoc.UnitTests
             container.Register<K>(Reuse.InResolutionScope);
             container.Register<L>(setup: Setup.With(openResolutionScope: true));
 
-            K k; 
+            K k;
             using (var scope = container.OpenScope())
             {
                 var l = scope.Resolve<L>();
@@ -276,7 +276,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        internal interface IViewModel {}
+        internal interface IViewModel { }
 
         internal class ViewModel1 : IViewModel
         {
@@ -307,7 +307,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        internal class DisposableLog : Log, IDisposable 
+        internal class DisposableLog : Log, IDisposable
         {
             public void Dispose()
             {
@@ -401,7 +401,8 @@ namespace DryIoc.UnitTests
             {
                 using (var threadLocal = container.OpenScope())
                     one = threadLocal.Resolve<Service>();
-            }) { IsBackground = true };
+            })
+            { IsBackground = true };
 
             threadOne.Start();
 
@@ -546,7 +547,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<F>(Reuse.Singleton);
             container.Register<S>(Reuse.Singleton);
-            
+
             var fst = container.Resolve<F>();
             container.Dispose();
 
@@ -666,7 +667,7 @@ namespace DryIoc.UnitTests
             container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
             container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
             container.Resolve<AResolutionScoped>());
         }
 
@@ -754,6 +755,24 @@ namespace DryIoc.UnitTests
         }
 
         public class Abc { }
+
+        [Test]
+        public void Resolving_the_object_should_use_required_service_type_for_matching_the_resolution_scope()
+        {
+            var container = new Container();
+
+            container.Register<O>();
+            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+
+            container.Resolve<object>(typeof(O));
+        }
+
+        public class Ho {}
+
+        public class O
+        {
+            public O(Ho ho) { }
+        }
 
         #region CUT
 

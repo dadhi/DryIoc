@@ -168,5 +168,36 @@ namespace DryIoc.UnitTests
             var noServices = container.ResolveMany<IService>(serviceKey: "wrong");
             Assert.AreEqual(0, noServices.Count());
         }
+
+        [Test, Ignore]
+        public void Should_throw_on_undetermined_dependency()
+        {
+            var container = new Container();
+
+            container.Register<K>();
+            container.Register<F>(Reuse.InCurrentNamedScope(1));
+            container.Register<F, FF>(Reuse.InCurrentScope);
+
+            var scope = container.OpenScope(1);
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                scope.ResolveMany<K>().First());
+
+            Assert.AreEqual(Error.NameOf(Error.ExpectedSingleDefaultFactory), Error.NameOf(ex.Error));
+        }
+
+        public class K
+        {
+            public K(F f)
+            {
+                F = f;
+            }
+
+            public F F { get; private set; }
+        }
+
+        public class F { }
+        public class FF : F { }
+
     }
 }
