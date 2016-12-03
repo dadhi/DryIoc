@@ -55,7 +55,6 @@ namespace DryIoc.CommonServiceLocator.UnitTests
         public void Get_all_instances_of_not_registered_service_should_return_empty_collection()
         {
             var locator = new DryIocServiceLocator(new Container());
-            locator.Container.Register<IClient, Client>();
 
             var clients = locator.GetAllInstances<IClient>().ToArray();
 

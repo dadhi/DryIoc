@@ -557,10 +557,16 @@ namespace DryIoc
             object compositeParentKey, Type compositeParentRequiredType,
             RequestInfo preResolveParent, IScope scope)
         {
-            preResolveParent = preResolveParent ?? RequestInfo.Empty;
+            var requiredItemType = requiredServiceType ?? serviceType;
+
+            // Emulating the collection parent so that collection related rules and conditions were applied
+            // the same way as if resolving IEnumerable<T>
+            if (preResolveParent == null || preResolveParent.IsEmpty)
+                preResolveParent = RequestInfo.Empty.Push(
+                    typeof(IEnumerable<object>), requiredItemType, serviceKey, IfUnresolved.Throw,
+                    0, FactoryType.Wrapper, implementationType:null, reuse:null);
 
             var container = (IContainer)this;
-            var requiredItemType = requiredServiceType ?? serviceType;
             var items = container.GetAllServiceFactories(requiredItemType);
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
@@ -3484,8 +3490,8 @@ namespace DryIoc
             return new FactoryMethod(ctorOrMethodOrMember, factoryInfo);
         }
 
-        /// <summary>Discovers the static factory method or meber by name in <typeparamref name="TFactory"/>.
-        /// Should place nice with C# nameof operator.</summary>
+        /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
+        /// Should play nice with C# <c>nameof</c> operator.</summary>
         /// <param name="methodOrMemberName">Name or method or member.</param>
         /// <typeparam name="TFactory">Class with static member.</typeparam>
         /// <returns>Factory method info.</returns>
@@ -8637,7 +8643,7 @@ namespace DryIoc
             if (scope == null)
             {
                 var parent = request.Enumerate().Last();
-                request.Scopes.GetOrCreateResolutionScope(ref scope, parent.ServiceType, parent.ServiceKey);
+                request.Scopes.GetOrCreateResolutionScope(ref scope, parent.GetActualServiceType(), parent.ServiceKey);
             }
 
             return request.Scopes.GetMatchingResolutionScope(scope,
@@ -9680,8 +9686,8 @@ namespace DryIoc
                 "Container does not allow further registrations." + Environment.NewLine +
                 "Attempting to register {0}{1} with implementation factory {2}."),
             NoMoreUnregistrationsAllowed = Of(
-                "Container does not allow further (un)registrations." + Environment.NewLine +
-                "Attempting to unregister {0}{1} with factory type {2}."),
+                "Container does not allow further registry modification." + Environment.NewLine +
+                "Attempting to Unregister {0}{1} with factory type {2}."),
             GotNullFactoryWhenResolvingService = Of(
                 "Got null factory method when resolving {0}"),
             RegisteredDisposableTransientWontBeDisposedByContainer = Of(

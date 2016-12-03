@@ -139,13 +139,11 @@ namespace DryIoc.WebApi
         /// <summary>Original DryIoc container.</summary>
         public readonly IContainer Container;
 
-        private readonly Func<Type, bool> _throwIfUnresolved;
-
         /// <summary>Creates dependency resolver.</summary>
         /// <param name="container">Container.</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
-        internal DryIocDependencyResolver(IContainer container, Func<Type, bool> throwIfUnresolved = null)
+        public DryIocDependencyResolver(IContainer container, Func<Type, bool> throwIfUnresolved = null)
         {
             Container = container;
             _throwIfUnresolved = throwIfUnresolved;
@@ -181,6 +179,8 @@ namespace DryIoc.WebApi
             var scope = Container.OpenScope(Reuse.WebRequestScopeName);
             return new DryIocDependencyScope(scope, _throwIfUnresolved);
         }
+
+        private readonly Func<Type, bool> _throwIfUnresolved;
     }
 
     /// <summary>Dependency scope adapter to scoped DryIoc container (created by <see cref="IContainer.OpenScope"/>).</summary>
