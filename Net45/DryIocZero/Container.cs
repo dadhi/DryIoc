@@ -673,7 +673,8 @@ namespace DryIocZero
     public static class Resolver
     {
         /// <summary>Resolves non-keyed service of <typeparamref name="TService"/> type.</summary>
-        /// <typeparam name="TService">Type of service to resolve.</typeparam> <param name="resolver"></param>
+        /// <typeparam name="TService">Type of service to resolve.</typeparam> 
+        /// <param name="resolver"></param>
         /// <param name="requiredServiceType">(optional) Required service type.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <param name="serviceKey">(optional) Service key.</param>
@@ -686,6 +687,27 @@ namespace DryIocZero
                 : resolver.Resolve(typeof(TService), serviceKey, ifUnresolvedReturnDefault, requiredServiceType,
                     RequestInfo.Empty, null));
         }
+
+        /// <summary>For given instance resolves and sets properties.</summary>
+        /// <param name="resolver"></param>
+        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
+        /// <returns>Instance with assigned properties.</returns>
+        public static object InjectProperties(this IResolver resolver, object instance)
+        {
+            var instanceType = instance.GetType();
+
+            var properties = instanceType.GetProperties();
+
+            foreach (var propertyInfo in properties)
+            {
+                var value = resolver.Resolve(propertyInfo.PropertyType, ifUnresolvedReturnDefault: false);
+                if (value != null)
+                    propertyInfo.SetValue(instance, value);
+            }
+
+            return instance;
+        }
+
     }
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
@@ -1221,6 +1243,12 @@ namespace DryIocZero
                 ? InResolutionScope
                 : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, outermost);
         }
+
+        /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
+        public static readonly string WebRequestScopeName = "WebRequestScopeName";
+
+        /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
+        public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
     }
 
     /// <summary>Represents lifetime of transient reuse.</summary>
