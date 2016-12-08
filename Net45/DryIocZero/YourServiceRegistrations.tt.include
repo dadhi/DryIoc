@@ -9,8 +9,8 @@
 // implementation below is just an EXAMPLE!
 //===========================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.2.4.0\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.2.4.0\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.3.0.0-preview-01\lib\net45\DryIocAttributes.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.3.0.0-preview-02\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 
 <#/* EXAMPLE: I am referencing assembly and namespace with my services to register. Replace it with yours! */#>
@@ -21,17 +21,17 @@
 // Specify your container and registrations
 IContainer GetContainerWithRegistrations()
 {
-    var container = new Container().WithMefAttributedModel();
+    var container = new Container().WithMef();
 
-	// EXAMPLE: Replace with your assemblies and types. 
+    // EXAMPLE: Replace with your assemblies and types. 
     var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
     container.RegisterExports(types);
 
-	// NOTE: RegisterDelegate and RegisterInstance are not supported because of runtime state usage. 
-	// Instead you can use Register(Made.Of(() => GetSomething())) registrations which generally are preferred over Delegate/Instance
-	// because container may inspect and warn you on possible resolution errors.
-	// Below registration is not supported and will output error message during generation.
-	// container.RegisterDelegate(_ => "delegate result", setup: Setup.With(asResolutionRoot: true));
+    // NOTE: RegisterDelegate and RegisterInstance are not supported because of runtime state usage. 
+    // Instead you can use Register(Made.Of(() => GetSomething())) registrations which generally are preferred over Delegate/Instance
+    // because container may inspect and warn you on possible resolution errors.
+    // Below registration is not supported and will output error message during generation.
+    // container.RegisterDelegate(_ => "delegate result", setup: Setup.With(asResolutionRoot: true));
 
     return container;
 }
@@ -39,8 +39,8 @@ IContainer GetContainerWithRegistrations()
 // Specify what resolution roots should be generated
 bool IsResolutionRoot(ServiceRegistrationInfo info) 
 {
-	// EXAMPLE: I am selecting the roots registered with Setup.With(asResolutionRoot: true) or AsResolutionRootAttribute.
-	// You may apply any custom filter against input ServiceRegistrationInfo.
-	return ContainerTools.SetupAsResolutionRoots(info);
+    // EXAMPLE: I am selecting the roots registered with Setup.With(asResolutionRoot: true) or AsResolutionRootAttribute.
+    // You may apply any custom filter against input ServiceRegistrationInfo.
+    return ContainerTools.SetupAsResolutionRoots(info);
 }
 #>

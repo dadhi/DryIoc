@@ -1,0 +1,22 @@
+﻿<SolutionConfiguration>
+  <Settings>
+    <AllowParallelTestExecution>True</AllowParallelTestExecution>
+    <MetricsExclusionList>
+      <Value>Extensions\DryIoc.CommonServiceLocator.UnitTests\DryIoc.CommonServiceLocator.UnitTests.csproj</Value>
+      <Value>Extensions\DryIoc.Mvc.Owin.UnitTests\DryIoc.Mvc.Owin.UnitTests.csproj</Value>
+      <Value>Extensions\DryIoc.Mvc.UnitTests\DryIoc.Mvc.UnitTests.csproj</Value>
+      <Value>Extensions\DryIoc.Owin.UnitTests\DryIoc.Owin.UnitTests.csproj</Value>
+      <Value>Extensions\DryIoc.Web.UnitTests\DryIoc.Web.UnitTests.csproj</Value>
+      <Value>Extensions\DryIoc.WebApi.Owin.UnitTests\DryIoc.WebApi.Owin.UnitTests.csproj</Value>
+      <Value>Extensions\DryIoc.WebApi.UnitTests\DryIoc.WebApi.UnitTests.csproj</Value>
+      <Value>Net40\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj</Value>
+      <Value>Net45\DryIoc.CompileTimeGeneration.Tests\DryIoc.CompileTimeGeneration.Tests.csproj</Value>
+      <Value>Net45\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj</Value>
+      <Value>Net45\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj</Value>
+      <Value>Net45\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj</Value>
+      <Value>Net45\DryIoc.Samples.CUT\DryIoc.Samples.CUT.csproj</Value>
+      <Value>Net45\DryIoc.UnitTests\DryIoc.UnitTests.csproj</Value>
+    </MetricsExclusionList>
+    <SolutionConfigured>True</SolutionConfigured>
+  </Settings>
+</SolutionConfiguration>

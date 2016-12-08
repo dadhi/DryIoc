@@ -25,7 +25,7 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.5.0\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.9.3\lib\net45\DryIoc.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
@@ -35,7 +35,7 @@ THE SOFTWARE.
 <#@ include File="YourServiceRegistrations.tt.include" #><#
 
 var container = GetContainerWithRegistrations()
-	.With(rules => rules.WithThrowIfRuntimeStateRequired());
+    .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
 KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
 KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
@@ -44,15 +44,20 @@ var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out r
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 var objectToCode = ObjectStringify.WithFullTypeNames;
 Func<object, string> code = null;
-	code = x => x == null ? "null"
-		: x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")" 
-		: x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
-		: x is Expression ? exprToCode.ToCode((Expression)x)
-			.Replace("DryIoc.RequestInfo", "RequestInfo")
-			.Replace("DryIoc.Reuse", "Reuse")
-			.Replace("DryIoc.IReuse", "IReuse")
-			.Replace("DryIoc.FactoryType", "FactoryType")
-		: objectToCode.PlainObjectToCode(x);
+    code = x => x == null ? "null"
+        : x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")"
+        : x.GetType().GetGenericDefinitionOrNull() == typeof(KV<,>) 
+            ? "KV.Of(" + code(x.GetType().GetFieldOrNull("Key").GetValue(x)) 
+            + ", " + code(x.GetType().GetFieldOrNull("Value").GetValue(x)) +")"
+        : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
+        : x is Expression ? exprToCode.ToCode((Expression)x)
+            .Replace("DryIoc.RequestInfo", "RequestInfo")
+            .Replace("DryIoc.IReuse", "IReuse")
+            .Replace("DryIoc.Reuse", "Reuse")
+            .Replace("DryIoc.SingletonReuse", "SingletonReuse")
+            .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
+            .Replace("DryIoc.FactoryType", "FactoryType")
+        : objectToCode.PlainObjectToCode(x) ?? code(x.GetType());
 
 var roots = resolutionsRoots.Select((r, i) => 
     new { Index = i, ServiceType = code(r.Key.ServiceType), ServiceKey = code(r.Key.OptionalServiceKey), Expression = code(r.Value.Body) });
@@ -76,22 +81,22 @@ using DryIoc; // for ImTools, not for Container
 namespace DryIocZero
 {
 /* 
-Errors during resolution:
------------------------------
+FAILED to generate resolution for:
+----------------------------------
+
 <#
     if (errors.Length == 0)
-        WriteLine("Generation went without errors.");
+        WriteLine("Resolution generation is completed without errors.");
+    var errorNumber = 0;
     foreach (var e in errors)
     {
 #>
-SERVICE: <#=e.Key#>
-ERROR: <#=e.Value.Message#>
+<#=errorNumber++#>) <#=e.Key#>
+Error: <#=e.Value.Message#>
 
 <#
     }
 #>
------------------------------
-end of exception list
 */
 
     partial class Container
@@ -193,40 +198,40 @@ end of exception list
         private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
         {
 <#
-		if (!roots.Any())
-		{
+        if (!roots.Any())
+        {
 #>
-			yield break;
+            yield break;
 <#
-		}
-		else 
-		{
-			foreach (var rootGroup in roots.GroupBy(f => f.ServiceType))
-			{
+        }
+        else 
+        {
+            foreach (var rootGroup in roots.GroupBy(f => f.ServiceType))
+            {
 #>
-			if (serviceType == <#= rootGroup.Key #>)
-			{
+            if (serviceType == <#= rootGroup.Key #>)
+            {
 <#
-				foreach (var factory in rootGroup)
-				{
+                foreach (var factory in rootGroup)
+                {
 #>
-				yield return new KV<object, FactoryDelegate>(<#= factory.ServiceKey #>, (FactoryDelegate)Create_<#= factory.Index #>);
+                yield return new KV<object, FactoryDelegate>(<#= factory.ServiceKey #>, Create_<#= factory.Index #>);
 <#
-				}
+                }
 #>
-			}
+            }
 
 <#
-		}
-		}
+        }
+        }
 #>
-		}
+        }
 
 <#
     foreach (var root in roots)
     {
 #>
-		// <#= root.ServiceType #>
+        // <#= root.ServiceType #>
         internal static object Create_<#=root.Index#>(IResolverContext r, IScope scope)
         {
             return <#= root.Expression #>;
@@ -239,14 +244,14 @@ end of exception list
     foreach (var dep in deps)
     {
 #>
-		// <#= dep.ServiceType #>
+        // <#= dep.ServiceType #>
         internal static object CreateDependency_<#=dep.Index#>(IResolverContext r, IScope scope)
         {
             return <#= dep.Expression #>;
         }
 
-<#        
+<#
     }
 #>
-	}
+    }
 }
