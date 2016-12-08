@@ -89,7 +89,6 @@
     <Compile Include="InjectListOfDepsWithStringDeps.cs" />
     <Compile Include="Interception\DryIocInterception.cs" />
     <Compile Include="Interception\InterceptionTests.cs" />
-    <Compile Include="Interception\Issue310_Problems_with_Decorators_and_Service_Keys.cs" />
     <Compile Include="Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize.cs" />
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
     <Compile Include="InjectLog4netLog.cs" />
@@ -132,6 +131,7 @@
     <Compile Include="Issue281_MakeAutofacMigrationEasier.cs" />
     <Compile Include="Issue300_Exception_when_reusing_objects.cs" />
     <Compile Include="Issue304_Add_option_to_pass_values_for_some_dependencies_on_Resolve.cs" />
+    <Compile Include="Issue310_Problems_with_Decorators_and_Service_Keys.cs" />
     <Compile Include="Issue311_Resolve_does_not_work_with_InThread_registration.cs" />
     <Compile Include="Issue315_Decorator_of_wrapper.cs" />
     <Compile Include="Issue318_RegisterInstance_doesnt_honour_current_OpenScope.cs" />

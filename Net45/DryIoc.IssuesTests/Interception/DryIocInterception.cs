@@ -21,11 +21,11 @@ namespace DryIoc.Interception
                     serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
             else
                 throw new ArgumentException(string.Format(
-                    "Intercepted service type {0} is not a supported: nor class nor interface", serviceType));
+                    "Intercepted service type {0} is not a supported: it is nor class nor interface", serviceType));
 
             var decoratorSetup = serviceKey == null
-                ? Setup.Decorator
-                : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey));
+                ? Setup.DecoratorWith(useDecorateeReuse: true)
+                : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
 
             registrator.Register(serviceType, proxyType,
                 made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(c => c.GetParameters().Length != 0), 

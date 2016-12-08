@@ -27,7 +27,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - [DryIoc.dll]: `PM> Install-Package DryIoc.dll`
     - [DryIoc] source code: `PM> Install-Package DryIoc`
 
-- Latest stable DryIoc version: __v2.9.2__
+- Latest stable DryIoc version is __2.9.3__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
@@ -59,7 +59,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Thread-safe and lock-free — registrations and resolutions may proceed in parallel without corrupting container state. 
 * Detects recursive dependencies aka cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.
-* Provides diagnostics for potential resolution problems via `container.VerifyResolutions()`.
+* Provides diagnostics for potential resolution problems via `container.Validate()`.
 
 
 ## Features
