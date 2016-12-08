@@ -335,11 +335,13 @@ namespace DryIoc
             if (setup.FactoryType != FactoryType.Wrapper)
             {
                 if ((factory.Reuse ?? Rules.DefaultReuseInsteadOfTransient) == Reuse.Transient &&
-                    !factory.Setup.UseParentReuse &&
+                    !factory.Setup.UseParentReuse && 
+                    !(factory.FactoryType == FactoryType.Decorator && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse) &&
                     (factory.ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
                     !setup.AllowDisposableTransient && Rules.ThrowOnRegisteringDisposableTransient)
                 {
-                    Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, serviceKey ?? "{no key}", this);
+                    Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer, 
+                        serviceType, serviceKey ?? "{no key}", factory);
                 }
             }
             else if (serviceType.IsGeneric() &&
@@ -7395,7 +7397,7 @@ namespace DryIoc
                     Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
             }
 
-            return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType);
+            return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType, request);
         }
 
         private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
@@ -9598,7 +9600,7 @@ namespace DryIoc
             NotFoundOpenGenericImplTypeArgInService = Of(
                 "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
             UnableToGetConstructorFromSelector = Of(
-                "Unable to get constructor of {0} using provided constructor selector."),
+                "Unable to get constructor of {0} using provided constructor selector when resolving {1}."),
             UnableToFindCtorWithAllResolvableArgs = Of(
                 "Unable to find constructor with all resolvable parameters when resolving {0}."),
             UnableToFindMatchingCtorForFuncWithArgs = Of(

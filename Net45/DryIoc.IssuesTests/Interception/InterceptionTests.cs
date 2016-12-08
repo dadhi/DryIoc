@@ -17,24 +17,41 @@ namespace DryIoc.IssuesTests.Interception
 
             c.Register<ICalculator1, Calculator1>();
             var result = string.Empty;
-            c.Register<CalculatorLogger>(made:
+            c.Register<LoggerInterceptor>(made:
                 Parameters.Of.Type<Action<IInvocation>>(_ => invocation =>
                     result = string.Join("+", invocation.Arguments.Select(x => x.ToString()))));
 
-            c.Intercept<ICalculator1, CalculatorLogger>();
+            c.Intercept<ICalculator1, LoggerInterceptor>();
 
             var calc = c.Resolve<ICalculator1>();
             calc.Add(1, 2);
 
             Assert.AreEqual("1+2", result);
         }
+
+        [Test]
+        public void Intercepting_disposable_transient()
+        {
+            var container = new Container();
+            container.Register<ITestDisposable, TestDisposable>(Reuse.Singleton);
+            container.Intercept<ITestDisposable, LoggerInterceptor>();
+
+            string methodCallLog = null;
+            container.Register<LoggerInterceptor>(
+                made: Parameters.Of.Type<Action<IInvocation>>(_ => 
+                    invocation => methodCallLog = invocation.Method.Name));
+
+            container.Resolve<ITestDisposable>().Dispose();
+
+            Assert.AreEqual("Dispose", methodCallLog);
+        }
     }
 
-    public sealed class CalculatorLogger : IInterceptor
+    public sealed class LoggerInterceptor : IInterceptor
     {
         private readonly Action<IInvocation> _logAction;
 
-        public CalculatorLogger(Action<IInvocation> logAction)
+        public LoggerInterceptor(Action<IInvocation> logAction)
         {
             _logAction = logAction;
         }
@@ -58,4 +75,16 @@ namespace DryIoc.IssuesTests.Interception
             return first + second;
         }
     }
+
+    public interface ITestDisposable : IDisposable
+    {
+    }
+
+    public class TestDisposable : ITestDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
+
 }
