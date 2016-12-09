@@ -63,10 +63,19 @@
       <Link>DryIocZero\Container.cs</Link>
     </Compile>
     <Compile Include="DryIocWebApi.cs" />
+    <Compile Include="DryIocZero\Container.Generated.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Container.Generated.tt</DependentUpon>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="DryIocZero\YourServiceRegistrations.tt.include" />
+    <Content Include="DryIocZero\Container.Generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Container.Generated.cs</LastGenOutput>
+    </Content>
+    <Content Include="DryIocZero\Registrations.tt" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

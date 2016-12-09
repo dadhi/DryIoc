@@ -32,7 +32,8 @@ THE SOFTWARE.
 <#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
-<#@ include File="YourServiceRegistrations.tt.include" #><#
+
+<#@ include File="Registrations.tt" #><#
 
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
@@ -81,22 +82,22 @@ using DryIoc; // for ImTools, not for Container
 namespace DryIocZero
 {
 /* 
-FAILED to generate resolution for:
-----------------------------------
-
 <#
     if (errors.Length == 0)
         WriteLine("Resolution generation is completed without errors.");
-    var errorNumber = 0;
-    foreach (var e in errors)
-    {
+    else
+        WriteLine("FAILED to generate resolution for:");
 #>
-<#=errorNumber++#>) <#=e.Key#>
+----------------------------------
+<#
+    for(var i = 0; i < errors.Length; ++i)
+    {
+        var e = errors[i];
+#>
+<#=i+1#>) <#=e.Key#>
 Error: <#=e.Value.Message#>
 
-<#
-    }
-#>
+<#  }#>
 */
 
     partial class Container

@@ -32,7 +32,6 @@ namespace DryIocZero.WebApi
     using System.Threading.Tasks;
     using System.Web.Http;
     using System.Web.Http.Dependencies;
-    using System.Web.Http.Dispatcher;
     using System.Web.Http.Controllers;
     using System.Web.Http.Filters;
     using System.Net.Http;
@@ -51,8 +50,6 @@ namespace DryIocZero.WebApi
         public static Container WithWebApi(this Container container, HttpConfiguration config,
             IEnumerable<Assembly> controllerAssemblies = null, Func<Type, bool> throwIfUnresolved = null)
         {
-            //container.RegisterWebApiControllers(config, controllerAssemblies);
-
             container.SetFilterProvider(config.Services);
 
             InsertRegisterRequestMessageHandler(config);
@@ -60,46 +57,6 @@ namespace DryIocZero.WebApi
             config.DependencyResolver = new DryIocDependencyResolver(container, throwIfUnresolved);
 
             return container;
-        }
-
-        /// <summary>Registers controllers found in provided assemblies with <see cref="Reuse.InWebRequest"/>.</summary>
-        /// <param name="config">Http configuration.</param>
-        /// <param name="assemblies">Assemblies to look for controllers.</param>
-        public static Type[] GetWebApiControllerTypes(HttpConfiguration config, IEnumerable<Assembly> assemblies = null)
-        {
-            var assembliesResolver = assemblies == null
-                 ? config.Services.GetAssembliesResolver()
-                 : new GivenAssembliesResolver(assemblies.ToArray());
-
-            var controllerTypeResolver = config.Services.GetHttpControllerTypeResolver();
-            var controllerTypes = controllerTypeResolver.GetControllerTypes(assembliesResolver);
-
-            return controllerTypes.ToArray();
-        }
-
-        /// <summary>Helps to find if type is controller type.</summary>
-        /// <param name="type">Type to check.</param>
-        /// <returns>True if controller type</returns>
-        public static bool IsController(this Type type)
-        {
-            return ControllerResolver.Default.IsController(type);
-        }
-
-        private sealed class ControllerResolver : DefaultHttpControllerTypeResolver
-        {
-            public static readonly ControllerResolver Default = new ControllerResolver();
-
-            public bool IsController(Type type)
-            {
-                return IsControllerTypePredicate(type);
-            }
-        }
-
-        private sealed class GivenAssembliesResolver : IAssembliesResolver
-        {
-            private readonly ICollection<Assembly> _assemblies;
-            public GivenAssembliesResolver(ICollection<Assembly> assemblies) { _assemblies = assemblies; }
-            public ICollection<Assembly> GetAssemblies() { return _assemblies; }
         }
 
         /// <summary>Replaces all filter providers in services with <see cref="DryIocFilterProvider"/>, and registers it in container.</summary>

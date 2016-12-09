@@ -1,19 +1,21 @@
 ﻿<#
-//===========================================
-// The code is provided by YOU:
+//=======================================================================
+// The code is provided by User:
 // You may configure container,
 // Register your services,
-// And return container ready for generation.
+// And return container for resolution generation.
 //
-// GetContainerWithRegistrations  
-// implementation below is just an EXAMPLE!
-//===========================================
+// GetContainerWithRegistrations implementation below is just an EXAMPLE!
+//=======================================================================
 #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.9.3\lib\net45\DryIoc.dll" #>
+<#@ import Namespace="DryIoc" #>
+
 <#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.3.0.0-preview-01\lib\net45\DryIocAttributes.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.3.0.0-preview-02\lib\net45\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 
-<#/* EXAMPLE: I am referencing assembly and namespace with my services to register. Replace it with yours! */#>
+<#/* TODO: Replace it with your assemblies to get registrations from */#>
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 
@@ -23,7 +25,7 @@ IContainer GetContainerWithRegistrations()
 {
     var container = new Container().WithMef();
 
-    // EXAMPLE: Replace with your assemblies and types. 
+    // TODO: Replace with your assemblies and types. 
     var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
     container.RegisterExports(types);
 
