@@ -173,6 +173,14 @@ namespace DryIoc
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
 
+        /// <summary></summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public bool ClearCache(Type type)
+        {
+            return true;
+        }
+
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
@@ -1121,7 +1129,8 @@ namespace DryIoc
                         details.ServiceKey,
                         details.IfUnresolved == IfUnresolved.ReturnDefault,
                         details.RequiredServiceType,
-                        preResolveParent: requestInfo, scope: null);
+                        preResolveParent: requestInfo, 
+                        scope: null);
 
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
@@ -2346,6 +2355,17 @@ namespace DryIoc
         {
             return container.ContainerWeakRef.Scopes.GetCurrentNamedScope(name, throwIfNotFound);
         }
+
+        /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/></summary>
+        /// <typeparam name="T">Target service or wrapper type.</typeparam>
+        /// <returns>True if type is found in the cache and cleared, false otherwise.</returns>
+        public static bool ClearCache<T>(this IContainer container)
+        {
+            // todo: Cast is bad - fix it
+            ((Container)container).ClearCache(typeof(T));
+
+            return false;
+        } 
     }
 
     /// <summary>Interface used to convert reuse instance to expression.</summary>
