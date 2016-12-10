@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.Composition;
+﻿using System.Collections.Generic;
+using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -40,6 +41,10 @@ namespace DryIoc.IssuesTests
 
             // registered new service and re-imported
             container.Register<IAggregatee, Agg2>();
+
+            // should make test pass
+            //container.ClearCache<IEnumerable<IAggregatee>>();
+
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(2, aggregator.Aggregatees.Length);
 
