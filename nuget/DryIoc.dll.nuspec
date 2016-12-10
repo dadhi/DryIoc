@@ -2,7 +2,8 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.dll</id>
-        <version>0.0.0</version><!-- overridden by "NuGet pack -Version" flag -->
+        <version>0.0.0</version>
+        <!-- overridden by "NuGet pack -Version" flag -->
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
@@ -11,31 +12,33 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v2.9.3
-          - fixed: #415: Decorators useDecorateeReuse should permit decorating disposable transient
-          v2.9.2
-          - fixed: #409: Resolution scope is created with the service type instead of actual required service type
-          - fixed: #410: ResolveMany is treated differently comparing to Resolve IEnumerable
-          v2.9.1
-          - fixed: #404: ConstructorWithResolvableArguments does not take into account parameter service key
-          v2.9.0
-          - added: #386: Support for resolving void Factory Method as Action
-          - added: Support for array decorators
-          - added: #405: Support for resolving unknown services in ResolveMany via UnknownManyServiceResolvers
+            v2.9.4
+            - fixed: #416: Adding always true condition to decorator changes the decorated outcome - but should not
+            v2.9.3
+            - fixed: #415: Decorators useDecorateeReuse should permit decorating disposable transient
+            v2.9.2
+            - fixed: #409: Resolution scope is created with the service type instead of actual required service type
+            - fixed: #410: ResolveMany is treated differently comparing to Resolve IEnumerable
+            v2.9.1
+            - fixed: #404: ConstructorWithResolvableArguments does not take into account parameter service key
+            v2.9.0
+            - added: #386: Support for resolving void Factory Method as Action
+            - added: Support for array decorators
+            - added: #405: Support for resolving unknown services in ResolveMany via UnknownManyServiceResolvers
         </releaseNotes>
         <dependencies>
-          <group targetFramework="netstandard1.0">
-            <dependency id="System.Collections" version="4.0.11" />
-            <dependency id="System.Diagnostics.Debug" version="4.0.11" />
-            <dependency id="System.Diagnostics.Tools" version="4.0.1" />
-            <dependency id="System.Linq" version="4.1.0" />
-            <dependency id="System.Linq.Expressions" version="4.1.0" />
-            <dependency id="System.Reflection" version="4.1.0" />
-            <dependency id="System.Reflection.Extensions" version="4.0.1" />
-            <dependency id="System.Runtime" version="4.1.0" />
-            <dependency id="System.Runtime.Extensions" version="4.1.0" />
-            <dependency id="System.Threading" version="4.0.11" />
-          </group>
+            <group targetFramework="netstandard1.0">
+                <dependency id="System.Collections" version="4.0.11" />
+                <dependency id="System.Diagnostics.Debug" version="4.0.11" />
+                <dependency id="System.Diagnostics.Tools" version="4.0.1" />
+                <dependency id="System.Linq" version="4.1.0" />
+                <dependency id="System.Linq.Expressions" version="4.1.0" />
+                <dependency id="System.Reflection" version="4.1.0" />
+                <dependency id="System.Reflection.Extensions" version="4.0.1" />
+                <dependency id="System.Runtime" version="4.1.0" />
+                <dependency id="System.Runtime.Extensions" version="4.1.0" />
+                <dependency id="System.Threading" version="4.0.11" />
+            </group>
         </dependencies>
     </metadata>
     <files>
