@@ -10,8 +10,8 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: AssemblyVersion("2.6.0")]
-[assembly: AssemblyFileVersion("2.6.0")]
-[assembly: AssemblyInformationalVersion("2.6.0")]
+[assembly: AssemblyVersion(             "2.7.0")]
+[assembly: AssemblyFileVersion(         "2.7.0")]
+[assembly: AssemblyInformationalVersion("2.7.0-preview-01")]
 
 [assembly: InternalsVisibleTo("DryIocZero.UnitTests")]

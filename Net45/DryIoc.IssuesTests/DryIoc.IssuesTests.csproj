@@ -50,6 +50,10 @@
       <HintPath>..\..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="MediatR, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\MediatR.2.1.0\lib\net45\MediatR.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="NSubstitute">
       <HintPath>..\..\packages\NSubstitute.1.8.1.0\lib\net45\NSubstitute.dll</HintPath>
     </Reference>
@@ -151,6 +155,7 @@
     <Compile Include="Issue397_ActionExportsTypeConversion.cs" />
     <Compile Include="Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter service_key.cs" />
     <Compile Include="Issue407_Cannot_resolve_MadeOf_params_explicitly.cs" />
+    <Compile Include="Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
