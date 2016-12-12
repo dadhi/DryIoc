@@ -3,7 +3,7 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue181__RegisterInstanceUnregister
+    public class Issue181_RegisterInstanceUnregister
     {
         [Test]
         public void Test_without_Unregister()

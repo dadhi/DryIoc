@@ -286,6 +286,7 @@ namespace DryIoc.MefAttributedModel
         private static readonly Made _filterCollectionByMultiKey = Made.Of(
             typeof(AttributedModel).GetSingleMethodOrNull("FilterCollectionByMultiKey", includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.ServiceKey));
+
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
         {
             return serviceKey == null

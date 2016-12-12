@@ -118,7 +118,7 @@
     <Compile Include="Issue168_RegisterInstanceWithIfAlreadyRegisteredReplaceReplacesWrongRegistration.cs" />
     <Compile Include="Issue169_FalseAlarmCheckingScopeLifetimeConsistencyForFuncWrapper.cs" />
     <Compile Include="Issue178_FallbackContainerDisposesInstanceRegisteredInParent.cs" />
-    <Compile Include="Issue181_ RegisterInstanceUnregister.cs" />
+    <Compile Include="Issue181_RegisterInstanceUnregister.cs" />
     <Compile Include="Issue200_MultipleInstancesForSingletonCreatedWhenContainerIsSharedAmongMultipleThreads.cs" />
     <Compile Include="Issue201_MutithreadingIssueWhenRegisterInstanceUsedWithinOpenScope.cs" />
     <Compile Include="Issue212_ResolveManyOfObjectWithGenericRequiredServiceTypeIsFailingWithArgumentException.cs" />

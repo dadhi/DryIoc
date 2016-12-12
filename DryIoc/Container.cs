@@ -173,20 +173,17 @@ namespace DryIoc
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
 
-        ///// <summary></summary>
-        ///// <param name="serviceType"></param>
-        ///// <param name="factoryType"></param>
-        ///// <param name="serviceKey"></param>
-        ///// <returns></returns>
-        //public bool ClearCache(Type serviceType, 
-        //    FactoryType factoryType = FactoryType.Service, object serviceKey = null)
-        //{
-        //    // todo: should we clear all wrappers of the provided type or opt-in for that?
-        //    var registry = _registry.Value;
-        //    var factories = registry.GetRegisteredFactories(serviceType, serviceKey, factoryType, null);
-
-        //    return factories != null;
-        //}
+        /// <summary></summary>
+        /// <param name="serviceType"></param>
+        /// <param name="factoryType"></param>
+        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all resgitrations of <paramref name="serviceType"/>.</param>
+        /// <param name="condition">(optional) Condition to check on found factories.</param>
+        /// <returns></returns>
+        public bool ClearCache(Type serviceType,
+            FactoryType factoryType = FactoryType.Service, object serviceKey = null, Func<Factory, bool> condition = null)
+        {
+            return _registry.Value.WithoutCache(serviceType, serviceKey, factoryType, condition);
+        }
 
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
@@ -479,15 +476,19 @@ namespace DryIoc
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
-            var cacheEntryKey = serviceKey == null ? (object)serviceType : new KV<object, object>(serviceType, serviceKey);
+            var cacheEntryKey = serviceKey == null
+                ? (object)serviceType
+                : new KV<object, object>(serviceType, serviceKey);
 
             object cacheContextKey = requiredServiceType;
             if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null ? (object)preResolveParent : KV.Of(cacheContextKey, preResolveParent);
+                cacheContextKey = cacheContextKey == null
+                    ? (object)preResolveParent
+                    : KV.Of(cacheContextKey, preResolveParent);
 
             // Check cache first:
-            var registryValue = _registry.Value;
-            var cacheRef = registryValue.KeyedFactoryDelegateCache;
+            var registry = _registry.Value;
+            var cacheRef = registry.KeyedFactoryDelegateCache;
             var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
             if (cacheEntry != null)
             {
@@ -502,9 +503,12 @@ namespace DryIoc
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
             var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
-            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope, preResolveParent);
+            var request = _emptyRequest.Push(serviceType, serviceKey, ifUnresolved, requiredServiceType, scope,
+                preResolveParent);
 
-            var factory = ((IContainer)this).ResolveFactory(request); // Hack: may mutate (set) not null request service key.
+            var factory = ((IContainer)this).ResolveFactory(request);
+            
+            // Hack: may mutate (set) not null request service key.
             if (serviceKey == null && request.ServiceKey != null)
                 cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
 
@@ -514,25 +518,25 @@ namespace DryIoc
 
             var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
 
-            if (registryValue.Services.IsEmpty)
+            if (registry.Services.IsEmpty)
                 return service;
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
-            if (!registryValue.Services.IsEmpty)
-            {
-                var cachedContextFactories = (cacheEntry == null ? null : cacheEntry.Value) ?? ImTreeMap<object, FactoryDelegate>.Empty;
-                if (cacheContextKey == null)
-                    cacheEntry = KV.Of(factoryDelegate, cachedContextFactories);
-                else
-                    cacheEntry = KV.Of(cacheEntry == null ? null : cacheEntry.Key,
-                        cachedContextFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
+            var cachedContextFactories = 
+                (cacheEntry == null ? null : cacheEntry.Value) ??
+                ImTreeMap<object, FactoryDelegate>.Empty;
 
-                var cacheVal = cacheRef.Value;
-                if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(cacheEntryKey, cacheEntry)))
-                    cacheRef.Swap(_ => _.AddOrUpdate(cacheEntryKey, cacheEntry));
-            }
+            if (cacheContextKey == null)
+                cacheEntry = KV.Of(factoryDelegate, cachedContextFactories);
+            else
+                cacheEntry = KV.Of(cacheEntry == null ? null : cacheEntry.Key,
+                    cachedContextFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
+
+            var cacheVal = cacheRef.Value;
+            if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(cacheEntryKey, cacheEntry)))
+                cacheRef.Swap(_ => _.AddOrUpdate(cacheEntryKey, cacheEntry));
 
             return service;
         }
@@ -937,10 +941,10 @@ namespace DryIoc
                 request.Rules.FallbackContainers.IsNullOrEmpty())
                 return null;
 
-            var arrayItemType = request.ServiceType.GetArrayElementTypeOrNull();
-            if (arrayItemType != null)
+            var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
+            if (arrayElementType != null)
                 request = request.WithChangedServiceInfo(info => info
-                    .With(typeof(IEnumerable<>).MakeGenericType(arrayItemType)));
+                    .With(typeof(IEnumerable<>).MakeGenericType(arrayElementType)));
 
             var serviceType = request.ServiceType;
             var container = request.Container;
@@ -1040,8 +1044,8 @@ namespace DryIoc
                 return null;
 
             // decorator of arrays should be converted back from IEnumerable to array.
-            if (arrayItemType != null)
-                decoratorExpr = Expression.Call(typeof(Enumerable), "ToArray", new[] { arrayItemType }, decoratorExpr);
+            if (arrayElementType != null)
+                decoratorExpr = Expression.Call(typeof(Enumerable), "ToArray", new[] { arrayElementType }, decoratorExpr);
 
             return decoratorExpr;
         }
@@ -1060,7 +1064,7 @@ namespace DryIoc
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
         {
-            return _registry.Value.GetWrapperOrDefault(serviceType);
+            return _registry.Value.Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
         }
 
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
@@ -1584,13 +1588,11 @@ namespace DryIoc
             public readonly ImTreeMap<Type, Factory> Wrappers;
 
             // Cache:
-            public readonly Ref<ImTreeMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
-
-            // key: KV where Key is ServiceType and object is ServiceKey
-            // value: FactoryDelegate or/and IntTreeMap<contextBasedKeyObject, FactoryDelegate>
-            public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
-
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
+            public readonly Ref<ImTreeMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
+            // key: KV where Key is ServiceType and object is ServiceKey
+            // value: FactoryDelegate or/and IntTreeMap<{requiredServicType+preResolvedParent}, FactoryDelegate>
+            public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
             private readonly IsChangePermitted _isChangePermitted;
@@ -1695,13 +1697,21 @@ namespace DryIoc
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
-                        var wrapper = GetWrapperOrDefault(serviceType);
+                        var arrayElementType = serviceType.GetArrayElementTypeOrNull();
+                        if (arrayElementType != null)
+                            serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
+
+                        var wrapper = Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
                         return wrapper != null && (condition == null || condition(wrapper))
                             ? new[] { wrapper } 
                             : null;
 
                     case FactoryType.Decorator:
                         var decorators = Decorators.GetValueOrDefault(serviceType);
+                        var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
+                        if (openGenServiceType != null)
+                            decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType));
+
                         if (decorators != null && decorators.Length != 0)
                             return condition == null
                                 ? decorators
@@ -1741,9 +1751,16 @@ namespace DryIoc
                 }
             }
 
-            public Factory GetWrapperOrDefault(Type serviceType)
+            public bool WithoutCache(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
             {
-                return Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
+                var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType, condition);
+                if (factories.IsNullOrEmpty())
+                    return false;
+
+                for (var i = 0; i < factories.Length; i++)
+                    WithoutFactoryCache(factories[i], serviceType, serviceKey);
+
+                return true;
             }
 
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
@@ -1877,10 +1894,10 @@ namespace DryIoc
                         !reuseReplacedInstanceFactory)
                     {
                         if (replacedFactory != null)
-                            registry = WithoutFactoryCache(registry, replacedFactory, serviceType, serviceKey);
+                            registry = registry.WithoutFactoryCache(replacedFactory, serviceType, serviceKey);
                         else if (replacedFactories != null)
                             foreach (var f in replacedFactories.Enumerate())
-                                registry = WithoutFactoryCache(registry, f.Value, serviceType, serviceKey);
+                                registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
                     }
                 }
 
@@ -1906,8 +1923,7 @@ namespace DryIoc
                             return null;
                         }));
 
-                        return removedWrapper == null ? this
-                            : WithoutFactoryCache(registry, removedWrapper, serviceType);
+                        return removedWrapper == null ? this : registry.WithoutFactoryCache(removedWrapper, serviceType);
 
                     case FactoryType.Decorator:
                         Factory[] removedDecorators = null;
@@ -1922,7 +1938,8 @@ namespace DryIoc
                             return this;
 
                         foreach (var removedDecorator in removedDecorators)
-                            registry = WithoutFactoryCache(registry, removedDecorator, serviceType);
+                            registry = registry.WithoutFactoryCache(removedDecorator, serviceType);
+
                         return registry;
 
                     default:
@@ -2007,39 +2024,39 @@ namespace DryIoc
                 var registry = WithServices(services);
 
                 if (removed is Factory)
-                    return WithoutFactoryCache(registry, (Factory)removed, serviceType, serviceKey);
+                    return registry.WithoutFactoryCache((Factory)removed, serviceType, serviceKey);
 
                 var removedFactories = removed as Factory[]
                     ?? ((FactoriesEntry)removed).Factories.Enumerate().Select(f => f.Value).ToArray();
 
                 foreach (var removedFactory in removedFactories)
-                    registry = WithoutFactoryCache(registry, removedFactory, serviceType, serviceKey);
+                    registry = registry.WithoutFactoryCache(removedFactory, serviceType, serviceKey);
 
                 return registry;
             }
 
-            public static Registry WithoutFactoryCache(Registry registry, Factory factory, Type serviceType, object serviceKey = null)
+            // Does not change registry, returning Registry just for convinience of fluent syntax
+            private Registry WithoutFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
             {
                 if (factory.FactoryGenerator != null)
                 {
                     foreach (var f in factory.FactoryGenerator.GeneratedFactories.Enumerate())
-                        WithoutFactoryCache(registry, f.Value, f.Key.Key, f.Key.Value);
+                        WithoutFactoryCache(f.Value, f.Key.Key, f.Key.Value);
                 }
                 else
                 {
                     // clean expression cache using FactoryID as key
-                    registry.FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
+                    FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
 
                     // clean default factory cache
-                    registry.DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
+                    DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
 
                     // clean keyed/context cache from keyed and context based resolutions
-                    var keyedCacheKey = serviceKey == null ? serviceType
-                        : (object)new KV<object, object>(serviceType, serviceKey);
-                    registry.KeyedFactoryDelegateCache.Swap(_ => _.Update(keyedCacheKey, null));
+                    var keyedCacheKey = serviceKey == null ? (object)serviceType : new KV<object, object>(serviceType, serviceKey);
+                    KeyedFactoryDelegateCache.Swap(_ => _.Update(keyedCacheKey, null));
                 }
 
-                return registry;
+                return this;
             }
 
             public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow)
@@ -2383,14 +2400,13 @@ namespace DryIoc
             return container.ContainerWeakRef.Scopes.GetCurrentNamedScope(name, throwIfNotFound);
         }
 
-        ///// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/></summary>
-        ///// <typeparam name="T">Target service or wrapper type.</typeparam>
-        ///// <returns>True if type is found in the cache and cleared, false otherwise.</returns>
-        //public static bool ClearCache<T>(this IContainer container)
-        //{
-        //    // todo: Cast is bad - fix it
-        //    return ((Container)container).ClearCache(typeof(T));
-        //}
+        /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/></summary>
+        /// <typeparam name="T">Target service or wrapper type.</typeparam>
+        /// <returns>True if type is found in the cache and cleared, false otherwise.</returns>
+        public static bool ClearCache<T>(this IContainer container, FactoryType factoryType)
+        {
+            return ((Container)container).ClearCache(typeof(T), factoryType);
+        }
     }
 
     /// <summary>Interface used to convert reuse instance to expression.</summary>
@@ -3268,6 +3284,7 @@ namespace DryIoc
         /// <summary>See <see cref="WithDefaultReuseInsteadOfTransient"/></summary>
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
+        // todo: v3: Rename to WithDefaultReuse, because using rules.WithDefaultReuseInsteadOfTransient(Reuse.Transient)) seems off.
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param>
         /// <returns>New rules.</returns>
@@ -4796,7 +4813,8 @@ namespace DryIoc
         /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
         /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
         /// <param name="serviceType">The type of the registered service.</param>
-        /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="serviceKey">(optional) Identifies registration via service key.
+        /// Not provided or <c>null</c> service key means to check the <paramref name="serviceType"/> alone with any service key.</param>
         /// <param name="factoryType">(optional) factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
         /// <param name="condition">(optional) condition to specify what registered factory do you expect.</param>
         /// <returns>True if <paramref name="serviceType"/> is registered, false - otherwise.</returns>
@@ -4809,7 +4827,8 @@ namespace DryIoc
         /// <summary>Returns true if <typeparamref name="TService"/> type is registered in container or its open generic definition is registered in container.</summary>
         /// <typeparam name="TService">The type of service.</typeparam>
         /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
+        /// <param name="serviceKey">(optional) Identifies registration via service key.
+        /// Not provided or <c>null</c> service key means to check the <typeparamref name="TService"/> alone with any service key.</param>
         /// <param name="factoryType">(optional) factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
         /// <param name="condition">(optional) condition to specify what registered factory do you expect.</param>
         /// <returns>True if <typeparamref name="TService"/> name="serviceType"/> is registered, false - otherwise.</returns>
@@ -9276,7 +9295,8 @@ namespace DryIoc
 
         /// <summary>Returns true if expected factory is registered with specified service key and type.</summary>
         /// <param name="serviceType">Type to lookup.</param>
-        /// <param name="serviceKey">Key to lookup for the same type.</param>
+        /// <param name="serviceKey">(optional) Identifies registration via service key.
+        /// Not provided or <c>null</c> service key means to check the <paramref name="serviceType"/> alone with any service key.</param>
         /// <param name="factoryType">Expected factory type.</param>
         /// <param name="condition">Expected factory condition.</param>
         /// <returns>True if expected factory found in registry.</returns>

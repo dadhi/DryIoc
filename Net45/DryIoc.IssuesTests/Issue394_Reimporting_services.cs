@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Linq.Expressions;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -31,7 +32,9 @@ namespace DryIoc.IssuesTests
         public void InjectPropertiesAndFields_imports_new_services_into_an_instance()
         {
             // registered on application startup
-            var container = new Container().WithMef();
+            var container = new Container().WithMef()
+                .With(rules => rules.WithDefaultReuseInsteadOfTransient(Reuse.Transient));
+
             container.Register<IAggregatee, Agg1>();
 
             // used later
@@ -39,11 +42,17 @@ namespace DryIoc.IssuesTests
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(1, aggregator.Aggregatees.Length);
 
+            var expr = container.Resolve<LambdaExpression>(typeof(IEnumerable<IAggregatee>));
+
             // registered new service and re-imported
             container.Register<IAggregatee, Agg2>();
 
             // should make test pass
-            //container.ClearCache<IEnumerable<IAggregatee>>();
+            container.ClearCache<IAggregatee[]>(FactoryType.Wrapper);
+            container.ClearCache<IAggregatee[]>(FactoryType.Decorator);
+            container.ClearCache<LambdaExpression>(FactoryType.Wrapper);
+
+            var expr2 = container.Resolve<LambdaExpression>(typeof(IEnumerable<IAggregatee>));
 
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(2, aggregator.Aggregatees.Length);
