@@ -12,7 +12,7 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
           v2.7.0-preview-01
-          - changed: Updated to use of DryIoc 2.9.*
+          - changed: Updated to use of DryIoc 2.9.3
           - renamed: YourServiceRegistrations.tt.include to Registrations.tt to enable tt language support for inclusion script.
           v2.6.0
           - changed: Remove "optional" package dependency on MefAttibutedModel. TODO: Include readme how to utilize MefAttibutedModel
@@ -27,7 +27,7 @@
           - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate
         </releaseNotes>
         <dependencies>
-            <dependency id="DryIoc.dll" version="2.8.3" />
+            <dependency id="DryIoc.dll" version="2.9.3" />
             <dependency id="ExpressionToCodeLib" version="1.5.4" />
         </dependencies>
     </metadata>
