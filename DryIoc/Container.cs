@@ -173,16 +173,21 @@ namespace DryIoc
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
 
-        /// <summary></summary>
-        /// <param name="serviceType"></param>
-        /// <param name="factoryType"></param>
+        /// <summary>Clears cache for specified service(s). 
+        /// But does clears instances of already resolved/created singletons and scoped services!</summary>
+        /// <param name="serviceType">Target service type.</param>
+        /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
         /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all resgitrations of <paramref name="serviceType"/>.</param>
-        /// <param name="condition">(optional) Condition to check on found factories.</param>
-        /// <returns></returns>
-        public bool ClearCache(Type serviceType,
-            FactoryType factoryType = FactoryType.Service, object serviceKey = null, Func<Factory, bool> condition = null)
+        /// <returns>True if target service was found, false - otherwise.</returns>
+        public bool ClearCache(Type serviceType, FactoryType? factoryType = null, object serviceKey = null)
         {
-            return _registry.Value.WithoutCache(serviceType, serviceKey, factoryType, condition);
+            if (factoryType != null)
+                return _registry.Value.ClearCache(serviceType, serviceKey, factoryType.Value);
+
+            var registry = _registry.Value;
+            return registry.ClearCache(serviceType, serviceKey, FactoryType.Service)
+                || registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper)
+                || registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
         }
 
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
@@ -1691,7 +1696,8 @@ namespace DryIoc
                             Wrappers.AddOrUpdate(serviceType, factory));
             }
 
-            public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
+            public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType, 
+                Func<Factory, bool> condition)
             {
                 serviceType = serviceType.ThrowIfNull();
                 switch (factoryType)
@@ -1708,12 +1714,13 @@ namespace DryIoc
 
                     case FactoryType.Decorator:
                         var decorators = Decorators.GetValueOrDefault(serviceType);
+
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null)
                             decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType));
 
                         if (decorators != null && decorators.Length != 0)
-                            return condition == null
+                            return condition == null 
                                 ? decorators
                                 : decorators.Where(condition).ToArray();
                         return null;
@@ -1736,12 +1743,10 @@ namespace DryIoc
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null)
                         {
-                            if (condition == null)
-                                return factories.Enumerate()
-                                    .Select(f => f.Value).ToArray();
-
-                            return factories.Enumerate().Where(f => condition(f.Value))
-                                .Select(f => f.Value).ToArray();
+                            var selectedFactories = condition == null
+                                ? factories.Enumerate()
+                                : factories.Enumerate().Where(f => condition(f.Value));
+                            return selectedFactories.Select(f => f.Value).ToArray();
                         }
 
                         factory = factories.GetValueOrDefault(serviceKey);
@@ -1751,9 +1756,9 @@ namespace DryIoc
                 }
             }
 
-            public bool WithoutCache(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
+            public bool ClearCache(Type serviceType, object serviceKey, FactoryType factoryType)
             {
-                var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType, condition);
+                var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType, null);
                 if (factories.IsNullOrEmpty())
                     return false;
 
@@ -2400,12 +2405,30 @@ namespace DryIoc
             return container.ContainerWeakRef.Scopes.GetCurrentNamedScope(name, throwIfNotFound);
         }
 
-        /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/></summary>
+        /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/>.
+        /// But does clears instances of already resolved/created singletons and scoped services!</summary>
         /// <typeparam name="T">Target service or wrapper type.</typeparam>
-        /// <returns>True if type is found in the cache and cleared, false otherwise.</returns>
-        public static bool ClearCache<T>(this IContainer container, FactoryType factoryType)
+        /// <param name="container">Container to operate.</param>
+        /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
+        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all resgitrations of <typeparamref name="T"/>.</param>
+        /// <returns>True if type is found in the cache and cleared - false otherwise.</returns>
+        public static bool ClearCache<T>(this IContainer container, FactoryType? factoryType = null, object serviceKey = null)
         {
-            return ((Container)container).ClearCache(typeof(T), factoryType);
+            return container.ClearCache(typeof(T), factoryType, serviceKey);
+        }
+
+        /// <summary>Clears delegate and expression cache for specified service.
+        /// But does clears instances of already resolved/created singletons and scoped services!</summary>
+        /// <param name="container">Container to operate.</param>
+        /// <param name="serviceType">Target service type.</param>
+        /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
+        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all resgitrations of <paramref name="serviceType"/>.</param>
+        /// <returns>True if type is found in the cache and cleared - false otherwise.</returns>
+        public static bool ClearCache(this IContainer container, Type serviceType, 
+            FactoryType? factoryType = null, object serviceKey = null)
+        {
+            // todo: v3: remove cast. Move to IContainer.
+            return ((Container)container).ClearCache(serviceType, factoryType, serviceKey);
         }
     }
 

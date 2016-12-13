@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel.Composition;
-using System.Linq.Expressions;
+﻿using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -28,12 +26,11 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(2, aggregator.Aggregatees.Length);
         }
 
-        [Test, Ignore("fails")]
-        public void InjectPropertiesAndFields_imports_new_services_into_an_instance()
+        [Test]
+        public void InjectPropertiesAndFields_of_new_imports_for_external_instance_via_ClearCache()
         {
             // registered on application startup
-            var container = new Container().WithMef()
-                .With(rules => rules.WithDefaultReuseInsteadOfTransient(Reuse.Transient));
+            var container = new Container().WithMef();
 
             container.Register<IAggregatee, Agg1>();
 
@@ -42,56 +39,30 @@ namespace DryIoc.IssuesTests
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(1, aggregator.Aggregatees.Length);
 
-            var expr = container.Resolve<LambdaExpression>(typeof(IEnumerable<IAggregatee>));
-
             // registered new service and re-imported
             container.Register<IAggregatee, Agg2>();
 
-            // should make test pass
-            container.ClearCache<IAggregatee[]>(FactoryType.Wrapper);
-            container.ClearCache<IAggregatee[]>(FactoryType.Decorator);
-            container.ClearCache<LambdaExpression>(FactoryType.Wrapper);
-
-            var expr2 = container.Resolve<LambdaExpression>(typeof(IEnumerable<IAggregatee>));
-
+            // required to clear cache
+            container.ClearCache<IAggregatee[]>();
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(2, aggregator.Aggregatees.Length);
 
             // registered new service and re-imported
             container.Register<IAggregatee, Agg3>();
+
+            // required to clear cache
+            container.ClearCache<IAggregatee[]>();
             container.InjectPropertiesAndFields(aggregator);
             Assert.AreEqual(3, aggregator.Aggregatees.Length);
         }
 
-        [Test, Ignore("fails")]
-        public void Resolve_imports_new_services()
+        [Test]
+        public void Resolve_new_imports_for_transient_via_ClearCache()
         {
             // registered on application startup
-            var container = new Container().WithMef();
+            var container = new Container().WithMef()
+                .With(r => r.WithDefaultReuseInsteadOfTransient(Reuse.Transient));
 
-            container.Register<Aggregator>(Reuse.Transient);
-            container.Register<IAggregatee, Agg1>();
-
-            // used later
-            var aggregator = container.Resolve<Aggregator>();
-            Assert.AreEqual(1, aggregator.Aggregatees.Length);
-
-            // registered new service and re-imported
-            container.Register<IAggregatee, Agg2>();
-            aggregator = container.Resolve<Aggregator>();
-            Assert.AreEqual(2, aggregator.Aggregatees.Length);
-
-            // registered new service and re-imported
-            container.Register<IAggregatee, Agg3>();
-            aggregator = container.Resolve<Aggregator>();
-            Assert.AreEqual(3, aggregator.Aggregatees.Length);
-        }
-
-        [Test, Ignore("fails")]
-        public void Resolve_imports_new_services_WithoutCache()
-        {
-            // registered on application startup
-            var container = new Container().WithMef();
             container.Register<Aggregator>();
             container.Register<IAggregatee, Agg1>();
 
@@ -101,13 +72,40 @@ namespace DryIoc.IssuesTests
 
             // registered new service and re-imported
             container.Register<IAggregatee, Agg2>();
-            container = container.WithoutCache();
+
+            container.ClearCache<Aggregator>();
             aggregator = container.Resolve<Aggregator>();
             Assert.AreEqual(2, aggregator.Aggregatees.Length);
 
             // registered new service and re-imported
             container.Register<IAggregatee, Agg3>();
-            container = container.WithoutCache();
+            container.ClearCache<Aggregator>();
+            aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(3, aggregator.Aggregatees.Length);
+        }
+
+        [Test]
+        public void Resolve_new_imports_for_singleton_via_WithoutSingletonsAndCache()
+        {
+            // registered on application startup
+            var container = new Container().WithMef();
+
+            container.Register<Aggregator>();
+            container.Register<IAggregatee, Agg1>();
+
+            // used later
+            var aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(1, aggregator.Aggregatees.Length);
+
+            // registered new service and re-imported
+            container.Register<IAggregatee, Agg2>();
+            container = container.WithoutSingletonsAndCache();
+            aggregator = container.Resolve<Aggregator>();
+            Assert.AreEqual(2, aggregator.Aggregatees.Length);
+
+            // registered new service and re-imported
+            container.Register<IAggregatee, Agg3>();
+            container = container.WithoutSingletonsAndCache();
             aggregator = container.Resolve<Aggregator>();
             Assert.AreEqual(3, aggregator.Aggregatees.Length);
         }
