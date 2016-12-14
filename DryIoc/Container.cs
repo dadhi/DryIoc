@@ -2409,7 +2409,7 @@ namespace DryIoc
         }
 
         /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/>.
-        /// But does clears instances of already resolved/created singletons and scoped services!</summary>
+        /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
         /// <typeparam name="T">Target service or wrapper type.</typeparam>
         /// <param name="container">Container to operate.</param>
         /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
