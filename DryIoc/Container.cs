@@ -174,7 +174,7 @@ namespace DryIoc
         }
 
         /// <summary>Clears cache for specified service(s). 
-        /// But does clears instances of already resolved/created singletons and scoped services!</summary>
+        /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
         /// <param name="serviceType">Target service type.</param>
         /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
         /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all resgitrations of <paramref name="serviceType"/>.</param>
@@ -185,9 +185,12 @@ namespace DryIoc
                 return _registry.Value.ClearCache(serviceType, serviceKey, factoryType.Value);
 
             var registry = _registry.Value;
-            return registry.ClearCache(serviceType, serviceKey, FactoryType.Service)
-                || registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper)
-                || registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
+
+            var clearedServices = registry.ClearCache(serviceType, serviceKey, FactoryType.Service);
+            var clearWrapper = registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper);
+            var clearDecorator = registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
+
+            return clearedServices || clearWrapper || clearDecorator;
         }
 
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
@@ -2418,7 +2421,7 @@ namespace DryIoc
         }
 
         /// <summary>Clears delegate and expression cache for specified service.
-        /// But does clears instances of already resolved/created singletons and scoped services!</summary>
+        /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
         /// <param name="container">Container to operate.</param>
         /// <param name="serviceType">Target service type.</param>
         /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
