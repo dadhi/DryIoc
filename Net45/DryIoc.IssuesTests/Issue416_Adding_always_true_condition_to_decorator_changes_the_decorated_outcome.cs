@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using MediatR;
@@ -10,8 +10,71 @@ namespace DryIoc.IssuesTests
     public class Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome
     {
         [Test]
-        public void Main()
+        public void Resolve_can_resolve_decorator_as_resolution_call_together_with_resolution_scope_reuse()
         {
+            var container = new Container();
+
+            container.Register<B>(Reuse.InResolutionScopeOf<IA>());
+            container.Register<IA, A>();
+            container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
+
+            var a = container.Resolve(typeof(IA));
+
+            Assert.IsInstanceOf<D>(a);
+            Assert.AreSame(((D)a).B, ((D)a).Bb);
+        }
+
+        [Test, Ignore]
+        public void ResolveMany_can_resolve_decorator_as_resolution_call_together_with_resolution_scope_reuse()
+        {
+            var container = new Container();
+
+            container.Register<B>(Reuse.InResolutionScopeOf<IA>());
+            container.Register<IA, A>();
+            container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
+
+            var a = container.ResolveMany(typeof(IA)).First();
+
+            Assert.IsInstanceOf<D>(a);
+            Assert.AreSame(((D)a).B, ((D)a).Bb);
+        }
+
+        public class B {}
+
+        public interface IA
+        {
+            B B { get; }
+        }
+
+        public class A : IA
+        {
+            public B B { get; private set; }
+
+            public A(B b)
+            {
+                B = b;
+            }
+        }
+
+        public class D : IA
+        {
+            public IA A { get; private set; }
+
+            public B B { get { return A.B; } }
+            public B Bb { get; private set; }
+
+            public D(IA a, B b)
+            {
+                A = a;
+                Bb = b;
+            }
+        }
+
+        [Test, Ignore]
+        public void Test()
+        {
+            PrintTools.GetTypeNameDefault = type => type.Name;
+
             var c = new Container(r => r
                 .WithoutThrowOnRegisteringDisposableTransient()
                 .With(FactoryMethod.ConstructorWithResolvableArguments));
@@ -28,8 +91,9 @@ namespace DryIoc.IssuesTests
 
             c.Register<IActionHandler, SomeActionHandler>(serviceKey: "key1");
             c.Register<IActionHandler, SomeActionHandler2>(serviceKey: "key2");
+            c.Register<IActionHandler, SomeActionHandler3>(serviceKey: "key3");
+            c.Register<IActionHandler, SomeActionHandler4>(serviceKey: "key4");
 
-            // specifying DecoratorWith does not work (DbContext isn't injected in the resolution scope of IAsyncNotificationHandler 
             c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
                        made: Parameters.Of.Type<IActionHandler>(serviceKey: "key1"),
                        setup: Setup.DecoratorWith(r => true));
@@ -38,20 +102,19 @@ namespace DryIoc.IssuesTests
                        made: Parameters.Of.Type<IActionHandler>(serviceKey: "key2"),
                        setup: Setup.DecoratorWith(r => true));
 
-            // using simply setup: DryIoc.Setup.Decorator works
-            //c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
-            //           made: Parameters.Of.Type<IActionHandler>(serviceKey: "key1"),
-            //           setup: Setup.Decorator);
+            c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
+                       made: Parameters.Of.Type<IActionHandler>(serviceKey: "key3"),
+                       setup: Setup.DecoratorWith(r => true));
 
-            //c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
-            //           made: Parameters.Of.Type<IActionHandler>(serviceKey: "key2"),
-            //           setup: Setup.Decorator);
+            c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
+                       made: Parameters.Of.Type<IActionHandler>(serviceKey: "key4"),
+                       setup: Setup.DecoratorWith(r => true));
 
             c.Register<Command1>();
             c.Register<CommandFactory>();
 
             c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncRequestHandler<,>)));
-            c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncNotificationHandler<>)));
+            //c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncNotificationHandler<>)));
 
             var mediator = c.Resolve<IMediator>();
             var x = mediator.SendAsync(new RequestCommand()).Result;
@@ -103,7 +166,6 @@ namespace DryIoc.IssuesTests
 
             public Task Handle(Notification notification)
             {
-                Console.WriteLine("notification called");
                 return Task.FromResult(0);
             }
         }
@@ -153,7 +215,6 @@ namespace DryIoc.IssuesTests
 
         public interface IActionHandler
         {
-            DbContext DbContext { get; }
         }
 
         public class SomeActionHandler : IActionHandler
@@ -174,6 +235,14 @@ namespace DryIoc.IssuesTests
             {
                 DbContext = context;
             }
+        }
+
+        public class SomeActionHandler3 : IActionHandler
+        {
+        }
+
+        public class SomeActionHandler4 : IActionHandler
+        {
         }
     }
 }

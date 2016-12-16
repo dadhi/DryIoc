@@ -272,7 +272,7 @@ namespace DryIoc
             if (request.Scope != null)
                 return ResolutionScopeParamExpr;
 
-            // the only situation when we could here is: where are in first resolution call (in the root)
+            // the only situation when we could be here: the root resolution call
             // and scope was not created on the boundary of Resolve call.
             var parent = request.Enumerate().Last();
 
@@ -475,7 +475,8 @@ namespace DryIoc
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
-        object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, IScope scope)
+        object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, 
+            IScope scope)
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
@@ -644,10 +645,9 @@ namespace DryIoc
                     variantGenericItems = variantGenericItems.Where(x => x.Factory.FactoryID != parent.FactoryID);
             }
 
-            IResolver resolver = this;
             foreach (var item in items)
             {
-                var service = resolver.Resolve(serviceType, item.Key,
+                var service = container.Resolve(serviceType, item.Key,
                     true, requiredServiceType, preResolveParent, scope);
                 if (service != null) // skip unresolved items
                     yield return service;
@@ -657,7 +657,7 @@ namespace DryIoc
                 foreach (var item in openGenericItems)
                 {
                     var serviceKeyWithOpenGenericRequiredType = new[] { item.ServiceType, item.OptionalServiceKey };
-                    var service = resolver.Resolve(serviceType, serviceKeyWithOpenGenericRequiredType,
+                    var service = container.Resolve(serviceType, serviceKeyWithOpenGenericRequiredType,
                         true, requiredItemType, preResolveParent, scope);
                     if (service != null) // skip unresolved items
                         yield return service;
@@ -666,7 +666,7 @@ namespace DryIoc
             if (variantGenericItems != null)
                 foreach (var item in variantGenericItems)
                 {
-                    var service = resolver.Resolve(serviceType, item.OptionalServiceKey,
+                    var service = container.Resolve(serviceType, item.OptionalServiceKey,
                         true, item.ServiceType, preResolveParent, scope);
                     if (service != null) // skip unresolved items
                         yield return service;
@@ -763,12 +763,12 @@ namespace DryIoc
         IScope IScopeAccess.GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
             bool outermost, bool throwIfNotFound)
         {
-            return GetMatchingScopeOrDefault(scope, assignableFromServiceType, serviceKey, outermost)
+            return FindMatchingResolutionScope(scope, assignableFromServiceType, serviceKey, outermost)
                 ?? (!throwIfNotFound ? null
                 : Throw.For<IScope>(Error.NoMatchedScopeFound, new KV<Type, object>(assignableFromServiceType, serviceKey)));
         }
 
-        private static IScope GetMatchingScopeOrDefault(IScope scope, Type assignableFromServiceType, object serviceKey,
+        private static IScope FindMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
             bool outermost)
         {
             if (assignableFromServiceType == null && serviceKey == null)
@@ -942,14 +942,19 @@ namespace DryIoc
                 request = request.WithChangedServiceInfo(info => info
                     .With(typeof(IEnumerable<>).MakeGenericType(arrayItemType)));
 
-            var serviceType = request.ServiceType;
-            var container = request.Container;
-
             // Define the list of ids for the already applied decorators
             int[] appliedDecoratorIDs = null;
 
-            // Get decorators for the service type
+            var container = request.Container;
+
+            var serviceType = request.ServiceType;
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
+
+            // Combine with required service type if different from service type
+            var requiredServiceType = request.GetActualServiceType();
+            if (requiredServiceType != serviceType)
+                decorators = decorators.Append(container.GetDecoratorFactoriesOrDefault(requiredServiceType));
+
             if (!decorators.IsNullOrEmpty())
             {
                 appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
@@ -960,9 +965,17 @@ namespace DryIoc
 
             // Append open-generic decorators
             var genericDecorators = ArrayTools.Empty<Factory>();
-            var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
-            if (openGenericServiceType != null)
-                genericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
+            var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
+            if (openGenServiceType != null)
+                genericDecorators = container.GetDecoratorFactoriesOrDefault(openGenServiceType);
+
+            // Combine with open-generic required type if they are different from service type
+            if (requiredServiceType != serviceType)
+            {
+                var openGenRequiredType = requiredServiceType.GetGenericDefinitionOrNull();
+                if (openGenRequiredType != null && openGenRequiredType != openGenServiceType)
+                    genericDecorators = genericDecorators.Append(container.GetDecoratorFactoriesOrDefault(openGenRequiredType));
+            }
 
             // Append generic type argument decorators, registered as Object
             // Note: the condition for type args should be checked before generating the closed generic version
@@ -1842,8 +1855,6 @@ namespace DryIoc
                                         replacedFactory = oldFactory;
                                         return newFactory;
 
-                                    case IfAlreadyRegistered.Throw:
-                                    case IfAlreadyRegistered.AppendNewImplementation:
                                     default:
                                         return Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, serviceType, newFactory, serviceKey, oldFactory);
                                 }
@@ -5221,7 +5232,9 @@ namespace DryIoc
             {
                 if (requiredServiceType == serviceType)
                 {
-                    details = ServiceDetails.Of(null, details.ServiceKey, details.IfUnresolved);
+                    details = ServiceDetails.Of(null, 
+                        details.ServiceKey, details.IfUnresolved, details.DefaultValue, 
+                        details.MetadataKey, details.Metadata);
                 }
                 else if (requiredServiceType.IsOpenGeneric())
                 {
@@ -5240,6 +5253,11 @@ namespace DryIoc
                     if (wrappedType != null)
                     {
                         var wrappedRequiredType = container.GetWrappedType(requiredServiceType, null);
+                        //if (!wrappedRequiredType.IsAssignableTo(wrappedType))
+                        //    details = ServiceDetails.Of(null,
+                        //        details.ServiceKey, details.IfUnresolved, details.DefaultValue,
+                        //        details.MetadataKey, details.Metadata);
+
                         wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType,
                             request);
                     }
@@ -5878,7 +5896,8 @@ namespace DryIoc
         {
             serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
             var details = ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved);
-            return Push(ServiceInfo.Of(serviceType).WithDetails(details, this), scope ?? Scope, preResolveParent);
+            var serviceInfo = ServiceInfo.Of(serviceType).WithDetails(details, this);
+            return Push(serviceInfo, scope ?? Scope, preResolveParent);
         }
 
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
@@ -6573,14 +6592,14 @@ namespace DryIoc
         {
             return request.FuncArgs == null
                    && Setup.FactoryType == FactoryType.Service
+                   && !Setup.AsResolutionCall
                    && !IsContextDependent(request)
                    && !IsTrackingDisposableTransient(request);
         }
 
         private bool IsContextDependent(Request request)
         {
-            return (FactoryType == FactoryType.Service && Setup.Condition != null)
-                || Setup.AsResolutionCall
+            return Setup.Condition != null
                 || Setup.UseParentReuse
                 || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
@@ -6593,6 +6612,15 @@ namespace DryIoc
                 && request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
         }
 
+        private bool ShouldBeInjectedAsResolutionCall(Request request)
+        {
+            return (Setup.AsResolutionCall ||
+                    ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request)) 
+                    && !request.IsWrappedInFuncWithArgs()))
+                && request.GetActualServiceType() != typeof(void)
+                && !request.IsFirstNonWrapperInResolutionCall();
+        }
+
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
         /// <param name="request">Request for service.</param> <returns>Service expression.</returns>
@@ -6600,10 +6628,7 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            if ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request))
-                && request.GetActualServiceType() != typeof(void)
-                && !request.IsWrappedInFuncWithArgs()
-                && !request.IsFirstNonWrapperInResolutionCall())
+            if (ShouldBeInjectedAsResolutionCall(request))
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             // First lookup for decorators
@@ -10492,7 +10517,7 @@ namespace DryIoc
     public static class PrintTools
     {
         /// <summary>Default separator used for printing enumerable.</summary>
-        public readonly static string DefaultItemSeparator = ";" + Environment.NewLine;
+        public static string DefaultItemSeparator = ";" + Environment.NewLine;
 
         /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
         /// <param name="s">Builder to append output to.</param>
@@ -10542,7 +10567,7 @@ namespace DryIoc
 
         /// <summary>Default delegate to print Type details: by default prints Type FullName and
         /// skips namespace if it start with "System."</summary>
-        public static readonly Func<Type, string> GetTypeNameDefault = t =>
+        public static Func<Type, string> GetTypeNameDefault = t =>
             t.FullName != null && t.Namespace != null && !t.Namespace.StartsWith("System") ? t.FullName : t.Name;
 
         /// <summary>Appends type details to string builder.</summary>
