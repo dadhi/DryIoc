@@ -10266,7 +10266,7 @@ namespace DryIoc
                 return members;
             var baseType = typeInfo.BaseType;
             return baseType == null || baseType == typeof(object) ? members
-                : members.Concat(baseType.GetMembers(getMembers));
+                : members.Concat(baseType.GetMembers(getMembers,true));
         }
 
         // todo: V3: remove.
