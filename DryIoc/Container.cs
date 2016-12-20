@@ -509,7 +509,10 @@ namespace DryIoc
             if (serviceKey == null && request.ServiceKey != null)
                 cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
 
-            var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
+            if (factory == null)
+                return null;
+
+            var factoryDelegate = factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
 
@@ -719,7 +722,7 @@ namespace DryIoc
             return currentScope == null
                 ? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null)
                 : GetMatchingScopeOrDefault(currentScope, name)
-                ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, name) : null);
+                ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, currentScope, name) : null);
         }
 
         private static IScope GetMatchingScopeOrDefault(IScope scope, object name)
@@ -765,7 +768,7 @@ namespace DryIoc
         {
             return FindMatchingResolutionScope(scope, assignableFromServiceType, serviceKey, outermost)
                 ?? (!throwIfNotFound ? null
-                : Throw.For<IScope>(Error.NoMatchedScopeFound, new KV<Type, object>(assignableFromServiceType, serviceKey)));
+                : Throw.For<IScope>(Error.NoMatchedScopeFound, scope, new KV<Type, object>(assignableFromServiceType, serviceKey)));
         }
 
         private static IScope FindMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
@@ -6614,7 +6617,8 @@ namespace DryIoc
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
-            return (Setup.AsResolutionCall ||
+            return request.FactoryType != FactoryType.Wrapper
+                && (Setup.AsResolutionCall ||
                     ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request)) 
                     && !request.IsWrappedInFuncWithArgs()))
                 && request.GetActualServiceType() != typeof(void)
@@ -9717,7 +9721,7 @@ namespace DryIoc
             WrappedNotAssignableFromRequiredType = Of(
                 "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
             NoMatchedScopeFound = Of(
-                "Unable to find scope with matching name: {0}."),
+                "Unable to find scope starting from {0} with matching name: {1}."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
@@ -10265,8 +10269,9 @@ namespace DryIoc
             if (!includeBase)
                 return members;
             var baseType = typeInfo.BaseType;
-            return baseType == null || baseType == typeof(object) ? members
-                : members.Concat(baseType.GetMembers(getMembers));
+            return baseType == null || baseType == typeof(object) 
+                ? members
+                : members.Concat(baseType.GetMembers(getMembers, true));
         }
 
         // todo: V3: remove.

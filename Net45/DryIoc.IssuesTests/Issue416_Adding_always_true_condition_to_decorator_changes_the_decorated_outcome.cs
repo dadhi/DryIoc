@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<B>(Reuse.InResolutionScopeOf<IA>());
-            container.Register<IA, A>();
+            container.Register<IA, A>(setup: Setup.With(asResolutionCall: true));
             container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
 
             var a = container.Resolve(typeof(IA));
@@ -69,6 +69,58 @@ namespace DryIoc.IssuesTests
                 Bb = b;
             }
         }
+
+        [Test]
+        public void Minimal_test()
+        {
+            var container = new Container();
+
+            container.Register<Aa>();
+            container.Register<Bb>();
+            container.Register<Dd>();
+            container.Register<IXx, Xx>(Reuse.InResolutionScopeOf<Aa>());
+            container.Register<IXx, Yy>(Reuse.InResolutionScopeOf<Bb>());
+
+            var a = container.Resolve<Aa>();
+            Assert.IsInstanceOf<Xx>(a.D.Xx);
+
+            var b = container.Resolve<Bb>();
+            Assert.IsInstanceOf<Yy>(b.D.Xx);
+        }
+
+        public class Aa
+        {
+            public Dd D { get; private set; }
+
+            public Aa(Dd d)
+            {
+                D = d;
+            }
+        }
+
+        public class Bb
+        {
+            public Dd D { get; private set; }
+
+            public Bb(Dd d)
+            {
+                D = d;
+            }
+        }
+
+        public class Dd
+        {
+            public IXx Xx { get; set; }
+
+            public Dd(IXx xx)
+            {
+                Xx = xx;
+            }
+        }
+
+        public interface IXx { }
+        public class Xx : IXx { }
+        public class Yy : IXx { }
 
         [Test, Ignore]
         public void Test()
