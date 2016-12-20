@@ -6656,7 +6656,16 @@ namespace DryIoc
                 serviceExpr = ApplyReuse(request, serviceExpr);
 
             if (cacheable && serviceExpr != null)
-                container.CacheFactoryExpression(FactoryID, serviceExpr);
+            {
+                // todo: hackingly hack, remove asap
+                var containsResolutionDependency = serviceExpr.ToString().Contains(".Resolve(");
+                if (!containsResolutionDependency)
+                    container.CacheFactoryExpression(FactoryID, serviceExpr);
+                else
+                {
+                    ;
+                }
+            }
 
             if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
                 Container.ThrowUnableToResolve(request);

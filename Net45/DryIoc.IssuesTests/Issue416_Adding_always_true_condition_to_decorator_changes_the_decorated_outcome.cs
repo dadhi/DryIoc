@@ -122,7 +122,7 @@ namespace DryIoc.IssuesTests
         public class Xx : IXx { }
         public class Yy : IXx { }
 
-        [Test, Ignore]
+        [Test]
         public void Test()
         {
             PrintTools.GetTypeNameDefault = type => type.Name;
@@ -166,7 +166,7 @@ namespace DryIoc.IssuesTests
             c.Register<CommandFactory>();
 
             c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncRequestHandler<,>)));
-            //c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncNotificationHandler<>)));
+            c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncNotificationHandler<>)));
 
             var mediator = c.Resolve<IMediator>();
             var x = mediator.SendAsync(new RequestCommand()).Result;
