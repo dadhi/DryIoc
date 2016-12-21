@@ -24,8 +24,8 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(((D)a).B, ((D)a).Bb);
         }
 
-        [Test, Ignore]
-        public void ResolveMany_can_resolve_decorator_as_resolution_call_together_with_resolution_scope_reuse()
+        [Test]
+        public void ResolveMany_can_resolve_decorator_with_dependency()
         {
             var container = new Container();
 

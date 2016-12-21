@@ -127,16 +127,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_throw_if_required_service_is_not_assignable_collection_item_type()
+        public void Should_return_empty_collection_if_required_service_is_not_assignable_collection_item_type()
         {
             var container = new Container();
             container.Register<Service>();
 
-            var ex = Assert.Throws<ContainerException>(() =>
-                // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-                container.ResolveMany<AnotherService>(typeof(Service)).ToArray());
+            var items = container.ResolveMany<AnotherService>(typeof(Service));
 
-            Assert.AreEqual(ex.Error, Error.WrappedNotAssignableFromRequiredType);
+            Assert.IsFalse(items.Any());
         }
 
         [Test]

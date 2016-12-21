@@ -130,10 +130,11 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<BadTypePropertyClient>();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<BadTypePropertyClient>());
+                    container.Resolve<BadTypePropertyClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Service (wrapped) type"));
-            Assert.That(ex.Message, Is.StringContaining("is not assignable"));
+            Assert.AreEqual(
+                DryIoc.Error.NameOf(DryIoc.Error.UnableToResolveUnknownService),
+                DryIoc.Error.NameOf(ex.Error));
         }
 
         [Test]

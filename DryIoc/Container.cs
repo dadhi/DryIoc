@@ -5258,13 +5258,10 @@ namespace DryIoc
                     if (wrappedType != null)
                     {
                         var wrappedRequiredType = container.GetWrappedType(requiredServiceType, null);
-                        //if (!wrappedRequiredType.IsAssignableTo(wrappedType))
-                        //    details = ServiceDetails.Of(null,
-                        //        details.ServiceKey, details.IfUnresolved, details.DefaultValue,
-                        //        details.MetadataKey, details.Metadata);
-
-                        wrappedType.ThrowIfNotImplementedBy(wrappedRequiredType, Error.WrappedNotAssignableFromRequiredType,
-                            request);
+                        if (!wrappedRequiredType.IsAssignableTo(wrappedType))
+                            details = ServiceDetails.Of(null,
+                                details.ServiceKey, details.IfUnresolved, details.DefaultValue,
+                                details.MetadataKey, details.Metadata);
                     }
                 }
             }
@@ -6630,12 +6627,13 @@ namespace DryIoc
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
-            return request.FactoryType != FactoryType.Wrapper
-                && (Setup.AsResolutionCall ||
-                    ((request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls || IsContextDependent(request)) 
-                    && !request.IsWrappedInFuncWithArgs()))
-                && request.GetActualServiceType() != typeof(void)
-                && !request.IsFirstNonWrapperInResolutionCall();
+            return (Setup.AsResolutionCall
+                || ((request.FactoryType == FactoryType.Service && request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
+                || IsContextDependent(request)) 
+                    && !request.IsWrappedInFuncWithArgs() // the check is only applied for implicit check, and not for setup option
+                   )
+                && !request.IsFirstNonWrapperInResolutionCall()
+                && request.GetActualServiceType() != typeof(void);
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
@@ -9731,8 +9729,6 @@ namespace DryIoc
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." +
                 Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
-            WrappedNotAssignableFromRequiredType = Of(
-                "Service (wrapped) type {0} is not assignable from required service type {1} when resolving {2}."),
             NoMatchedScopeFound = Of(
                 "Unable to find scope starting from {0} with matching name: {1}."),
             NoMatchingScopeWhenRegisteringInstance = Of(
