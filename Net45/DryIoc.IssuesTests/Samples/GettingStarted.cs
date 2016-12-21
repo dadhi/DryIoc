@@ -45,7 +45,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.That(client.Service, Is.SameAs(anotherClient.Service));
         }
 
-        [Test, Ignore]
+        [Test]
         public void If_you_forgot_to_register_service_type_Container_will_guide_you_with_exception_message()
         {
             var container = new Container();

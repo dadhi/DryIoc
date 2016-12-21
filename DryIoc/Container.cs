@@ -4996,6 +4996,8 @@ namespace DryIoc
         internal static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
+            request.ContainsNestedResolutionCall = true;
+
             if (!isRuntimeDependency)
                 PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
@@ -5715,6 +5717,15 @@ namespace DryIoc
                     p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs()).IsEmpty;
         }
 
+        /// <summary>Gathers the info from resolved dependency graph. 
+        /// If dependency injected <c>asResolutionCall</c> the whole graph is not cacheable (issue #416).</summary>
+        /// <returns>True if contains, false - otherwise or if not known.</returns>
+        public bool ContainsNestedResolutionCall
+        {
+            get { return _resolverContext.ContainsNestedResolutionCall; }
+            set { if (value) _resolverContext.ContainsNestedResolutionCall = true; }
+        }
+
         /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
         public RequestInfo Parent
         {
@@ -6162,6 +6173,8 @@ namespace DryIoc
             public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
 
+            public bool ContainsNestedResolutionCall; // mutable, supposed to be set once when dependency factory expressions are created
+
             public ResolverContext(ContainerWeakRef container, ContainerWeakRef scopes, IScope scope, RequestInfo preResolveParent)
             {
                 ContainerWeakRef = container;
@@ -6593,11 +6606,11 @@ namespace DryIoc
         /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
         protected virtual bool IsFactoryExpressionCacheable(Request request)
         {
-            return request.FuncArgs == null
-                   && Setup.FactoryType == FactoryType.Service
-                   && !Setup.AsResolutionCall
-                   && !IsContextDependent(request)
-                   && !IsTrackingDisposableTransient(request);
+            return Setup.FactoryType == FactoryType.Service
+                && request.FuncArgs == null
+                && !Setup.AsResolutionCall
+                && !IsContextDependent(request)
+                && !IsTrackingDisposableTransient(request);
         }
 
         private bool IsContextDependent(Request request)
@@ -6655,17 +6668,8 @@ namespace DryIoc
             if (!decorated && serviceExpr != null)
                 serviceExpr = ApplyReuse(request, serviceExpr);
 
-            if (cacheable && serviceExpr != null)
-            {
-                // todo: hackingly hack, remove asap
-                var containsResolutionDependency = serviceExpr.ToString().Contains(".Resolve(");
-                if (!containsResolutionDependency)
-                    container.CacheFactoryExpression(FactoryID, serviceExpr);
-                else
-                {
-                    ;
-                }
-            }
+            if (cacheable && serviceExpr != null && !request.ContainsNestedResolutionCall)
+                container.CacheFactoryExpression(FactoryID, serviceExpr);
 
             if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
                 Container.ThrowUnableToResolve(request);

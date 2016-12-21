@@ -125,8 +125,6 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            PrintTools.GetTypeNameDefault = type => type.Name;
-
             var c = new Container(r => r
                 .WithoutThrowOnRegisteringDisposableTransient()
                 .With(FactoryMethod.ConstructorWithResolvableArguments));
