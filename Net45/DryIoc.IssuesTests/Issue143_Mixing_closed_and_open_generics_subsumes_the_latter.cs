@@ -62,7 +62,9 @@ namespace DryIoc.IssuesTests
             var ex = Assert.Throws<ContainerException>(() => 
                 c.Resolve<I<int>>(typeof(Unrelated<>)));
 
-            Assert.AreEqual(Error.ServiceIsNotAssignableFromOpenGenericRequiredServiceType, ex.Error);
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToResolveFromRegisteredServices),
+                Error.NameOf(ex.Error));
         }
 
         [Test]

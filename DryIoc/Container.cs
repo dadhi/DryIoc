@@ -5233,38 +5233,11 @@ namespace DryIoc
         {
             var serviceType = serviceInfo.ServiceType;
             var requiredServiceType = details.RequiredServiceType;
-            if (requiredServiceType != null)
-            {
-                if (requiredServiceType == serviceType)
-                {
-                    details = ServiceDetails.Of(null, 
-                        details.ServiceKey, details.IfUnresolved, details.DefaultValue, 
-                        details.MetadataKey, details.Metadata);
-                }
-                else if (requiredServiceType.IsOpenGeneric())
-                {
-                    // Checks that open-generic has corresponding closed service type to fill in its generic parameters.
-                    var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
-                    if (openGenericServiceType == null ||
-                        requiredServiceType != openGenericServiceType &&
-                        Array.IndexOf(requiredServiceType.GetImplementedTypes(), openGenericServiceType) == -1)
-                        Throw.It(Error.ServiceIsNotAssignableFromOpenGenericRequiredServiceType,
-                            openGenericServiceType, requiredServiceType, request);
-                }
-                else
-                {
-                    var container = request.Container;
-                    var wrappedType = container.GetWrappedType(serviceType, null);
-                    if (wrappedType != null)
-                    {
-                        var wrappedRequiredType = container.GetWrappedType(requiredServiceType, null);
-                        if (!wrappedRequiredType.IsAssignableTo(wrappedType))
-                            details = ServiceDetails.Of(null,
-                                details.ServiceKey, details.IfUnresolved, details.DefaultValue,
-                                details.MetadataKey, details.Metadata);
-                    }
-                }
-            }
+
+            if (requiredServiceType != null && requiredServiceType == serviceType)
+                details = ServiceDetails.Of(null,
+                    details.ServiceKey, details.IfUnresolved, details.DefaultValue,
+                    details.MetadataKey, details.Metadata);
 
             return serviceType == serviceInfo.ServiceType
                    && (details == null || details == serviceInfo.Details)
@@ -9706,8 +9679,6 @@ namespace DryIoc
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
             ServiceIsNotAssignableFromFactoryMethod = Of(
                 "Service of {0} is not assignable from factory method {1} when resolving: {2}."),
-            ServiceIsNotAssignableFromOpenGenericRequiredServiceType = Of(
-                "Service of {0} is not assignable from open-generic required service type {1} when resolving: {2}."),
             FactoryObjIsNullInFactoryMethod = Of(
                 "Unable to use null factory object with *instance* factory method {0} when resolving: {1}."),
             FactoryObjProvidedButMethodIsStatic = Of(
