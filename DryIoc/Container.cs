@@ -6619,31 +6619,50 @@ namespace DryIoc
             if (ShouldBeInjectedAsResolutionCall(request))
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
-            // First lookup for decorators
             var container = request.Container;
-            var decoratorExpr = FactoryType != FactoryType.Decorator
-                ? container.GetDecoratorExpressionOrDefault(request)
-                : null;
 
-            var decorated = decoratorExpr != null;
-            var cacheable = !decorated && IsFactoryExpressionCacheable(request);
-            if (cacheable)
+            // First look for decorators
+            if (FactoryType != FactoryType.Decorator)
             {
-                var cachedServiceExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
-                if (cachedServiceExpr != null)
-                    return cachedServiceExpr;
+                var decoratorExpr = container.GetDecoratorExpressionOrDefault(request);
+                if (decoratorExpr != null)
+                    return decoratorExpr;
             }
 
-            var serviceExpr = decoratorExpr ?? CreateExpressionOrDefault(request);
+            // Then optimize for already resolved singleton object
+            if (request.Rules.EagerCachingSingletonForFasterAccess &&
+                request.Reuse is SingletonReuse)
+                {
+                    var singletonID = ((SingletonScope)request.Scopes.SingletonScope).IndexOf(FactoryID);
+                    if (singletonID != -1)
+                        return Expression.Convert(Container.GetStateItemExpression(singletonID), request.ServiceType);
+                }
 
-            if (!decorated && serviceExpr != null)
+            // Then check the expression cache
+            var isExpressionCacheable = IsFactoryExpressionCacheable(request);
+            if (isExpressionCacheable)
+            {
+                var cachedExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
+                if (cachedExpr != null)
+                    return cachedExpr;
+            }
+
+            // Then create new expression
+            var serviceExpr = CreateExpressionOrDefault(request);
+            if (serviceExpr != null)
+            {
                 serviceExpr = ApplyReuse(request, serviceExpr);
 
-            if (cacheable && serviceExpr != null && !request.ContainsNestedResolutionCall)
-                container.CacheFactoryExpression(FactoryID, serviceExpr);
-
-            if (serviceExpr == null && request.IfUnresolved == IfUnresolved.Throw)
+                // cache the new expression
+                if (isExpressionCacheable && 
+                    !request.ContainsNestedResolutionCall) // can be checked only after expression is created
+                    container.CacheFactoryExpression(FactoryID, serviceExpr);
+            }
+            // Otherwise throw
+            else if (request.IfUnresolved == IfUnresolved.Throw)
+            {
                 Container.ThrowUnableToResolve(request);
+            }
 
             return serviceExpr;
         }
@@ -6693,7 +6712,20 @@ namespace DryIoc
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
+                FactoryDelegate factoryDelegate = null;
+                if (serviceExpr.NodeType == ExpressionType.New)
+                {
+                    var newExpr = (NewExpression)serviceExpr;
+                    if (newExpr.Arguments.Count == 0)
+                    {
+                        var exprType = serviceExpr.Type;
+                        var singleton = Activator.CreateInstance(exprType, true);
+                        factoryDelegate = (state, context, scope) => singleton;
+                    }
+                }
+
+                if (factoryDelegate == null)
+                    factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
 
                 if (Setup.PreventDisposal)
                 {
@@ -6751,9 +6783,6 @@ namespace DryIoc
                 serviceExpr = Expression.ArrayIndex(
                     Expression.Convert(serviceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
-
-            //if (originalExpressionType.IsValueType())
-            //    serviceExpr = Expression.Convert(serviceExpr, typeof(object));
 
             return Expression.Convert(serviceExpr, originalExpressionType);
         }
@@ -8114,6 +8143,14 @@ namespace DryIoc
             Items = new object[BucketSize];
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
             _lastItemIndex = 0;
+        }
+
+        /// <summary>Returns existing item from scope.</summary>
+        /// <param name="externalId">External item ID, e.g. FactoryID</param> <returns>Found indexm or -1</returns>
+        internal int IndexOf(int externalId)
+        {
+            var id = _factoryIdToIndexMap.GetValueOrDefault(externalId);
+            return (int?)id ?? -1;
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>

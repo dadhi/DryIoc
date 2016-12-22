@@ -99,7 +99,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var factory = factories.First(meta => meta.Metadata.DisplayName.Equals("Down"));
             var service = factory.Value();
-            Assert.That(service, Is.InstanceOf<AnotherServiceWithMetadata>());
+            Assert.IsInstanceOf<AnotherServiceWithMetadata>(service);
 
             var anotherService = factory.Value();
             Assert.That(anotherService, Is.Not.SameAs(service));

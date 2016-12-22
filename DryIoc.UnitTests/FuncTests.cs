@@ -413,6 +413,23 @@ namespace DryIoc.UnitTests
             Assert.AreSame(aa.Bb.Logger, aa.Logger);
         }
 
+        [Test]
+        public void For_singleton_can_use_func_without_args_or_just_resolve_after_func_with_args()
+        {
+            var container = new Container();
+
+            container.Register<BB>(Reuse.Singleton);
+
+            var logger = new SomeLogger();
+            var bb = container.Resolve<Func<ILogger, BB>>().Invoke(logger);
+
+            var bb2 = container.Resolve<Func<BB>>().Invoke();
+            Assert.AreSame(bb, bb2);
+
+            var bb3 = container.Resolve<BB>();
+            Assert.AreSame(bb, bb3);
+        }
+
         #region CUT
 
         public class BB
