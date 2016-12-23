@@ -6674,10 +6674,14 @@ namespace DryIoc
         {
             var originalExpressionType = serviceExpr.Type;
 
-            // The singleton optimization: eagerly create singleton during the construction of object graph.
+            // Optimize: eagerly create singleton during the construction of object graph,
+            // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
             if (request.Rules.EagerCachingSingletonForFasterAccess &&
                 reuse is SingletonReuse &&
+
+                // except: For decorators and wrappers, when tracking tansient disposable and for lazy consumption in Func
                 FactoryType == FactoryType.Service &&
+                //!HasSingletonParent(request) &&
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
@@ -6688,11 +6692,29 @@ namespace DryIoc
                 if (serviceExpr.NodeType == ExpressionType.New)
                 {
                     var newExpr = (NewExpression)serviceExpr;
-                    if (newExpr.Arguments.Count == 0)
-                    {
-                        var singletonType = newExpr.Type;
-                        CreateScopedValue createSingleton = () => Activator.CreateInstance(singletonType, false);
+                    var argExprs = newExpr.Arguments;
+                    var singletonType = newExpr.Type;
 
+                    CreateScopedValue createSingleton = null;
+                    if (argExprs.Count == 0)
+                    {
+                        createSingleton = () => Activator.CreateInstance(singletonType, false);
+                    }
+                    else if (argExprs.Count == 1)
+                    {
+                        var argExpr = argExprs[0] as ConstantExpression;
+                        if (argExpr != null)
+                            createSingleton = () => Activator.CreateInstance(singletonType, argExpr.Value);
+                    }
+                    else
+                    {
+                        var constantArgs = argExprs.OfType<ConstantExpression>().Select(a => a.Value).ToArray();
+                        if (constantArgs.Length == argExprs.Count)
+                            createSingleton = () => Activator.CreateInstance(singletonType, constantArgs);
+                    }
+
+                    if (createSingleton != null)
+                    {
                         if (!Setup.PreventDisposal && !Setup.WeaklyReferenced)
                             return Expression.Constant(singletons.GetOrAdd(singletons.GetScopedItemIdOrSelf(FactoryID), createSingleton));
 
@@ -6758,6 +6780,14 @@ namespace DryIoc
                     Expression.Constant(0, typeof(int)));
 
             return Expression.Convert(serviceExpr, originalExpressionType);
+        }
+
+        private bool HasSingletonParent(Request request)
+        {
+            for (var p = request.RawParent; !p.IsEmpty; p = p.RawParent)
+                if (p.Reuse is SingletonReuse)
+                    return true;
+            return false;
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
