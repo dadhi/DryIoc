@@ -195,13 +195,12 @@ namespace DryIoc
             if (_openedScope != null &&
                 !(Rules.ImplicitOpenedRootScope && _openedScope.Parent == null && _scopeContext == null))
             {
-                if (_openedScope == null)
-                    return;
-
-                _openedScope.Dispose();
-
-                if (_scopeContext != null)
-                    _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
+                if (_openedScope != null)
+                {
+                    _openedScope.Dispose();
+                    if (_scopeContext != null)
+                        _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
+                }
             }
             else // whole Container with singletons.
             {
@@ -245,28 +244,6 @@ namespace DryIoc
         public static readonly ParameterExpression ResolutionScopeParamExpr =
             Expression.Parameter(typeof(IScope), "scope");
 
-        /// <summary>Creates state item access expression given item index.
-        /// State items actually are singleton items. So that method knows about Singleton items structure.</summary>
-        /// <param name="itemIndex">Index of item.</param>
-        /// <returns>Expression.</returns>
-        public static Expression GetStateItemExpression(int itemIndex)
-        {
-            var bucketSize = SingletonScope.BucketSize;
-            if (itemIndex < bucketSize)
-                return Expression.ArrayIndex(StateParamExpr, Expression.Constant(itemIndex, typeof(int)));
-
-            //  Result: ((object[][])_singletonItems[0])[itemIndex/bucketSize][itemIndex%bucketSize];
-            var bucketsExpr = Expression.Convert(
-                Expression.ArrayIndex(StateParamExpr, Expression.Constant(0, typeof(int))),
-                typeof(object[][]));
-
-            var bucketExpr = Expression.ArrayIndex(bucketsExpr,
-                Expression.Constant(itemIndex / bucketSize - 1, typeof(int)));
-
-            return Expression.ArrayIndex(bucketExpr,
-                Expression.Constant(itemIndex % bucketSize, typeof(int)));
-        }
-
         internal static Expression GetResolutionScopeExpression(Request request)
         {
             if (request.Scope != null)
@@ -296,7 +273,6 @@ namespace DryIoc
 
         private static readonly MethodInfo _expressionAssignMethod =
             typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression));
-
 
         #endregion
 
@@ -1192,18 +1168,11 @@ namespace DryIoc
             get { return _singletonItems; }
         }
 
-        /// <summary>Adds item if it is not already added to singleton state, returns added or existing item index.</summary>
-        /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
-        /// <returns>Index of found or added item.</returns>
-        public int GetOrAddStateItem(object item)
-        {
-            return _singletonScope.GetOrAdd(item);
-        }
-
-        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings),
-        /// otherwise invokes <see cref="GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: <c>state => state.Get(index)</c>.</summary>
-        /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
-        /// <param name="throwIfStateRequired">(optional) Enable filtering of stateful items.</param>
+        /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
+        /// <param name="item">Item to convert.</param> 
+        /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
+        /// <param name="throwIfStateRequired">(optional) Throws for non-primitive and not-recognized items, 
+        /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
         public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
@@ -1236,11 +1205,16 @@ namespace DryIoc
                     return itemExpr;
             }
 
-            Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired, Error.StateIsRequiredToUseItem, item);
+            Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired, 
+                Error.StateIsRequiredToUseItem, item);
 
-            var itemIndex = GetOrAddStateItem(item);
-            var stateItemExpr = GetStateItemExpression(itemIndex);
-            return Expression.Convert(stateItemExpr, itemType);
+            return Expression.Constant(item, itemType);
+        }
+
+        /// <inheritdoc />
+        public int GetOrAddStateItem(object item)
+        {
+            return -1;
         }
 
         #endregion
@@ -2541,25 +2515,11 @@ namespace DryIoc
         {
             expression = OptimizeExpression(expression);
 
-            // Optimization for fast singleton compilation
+            // Optimize: just extract singleton from expression without compiling
             if (expression.NodeType == ExpressionType.Constant)
             {
                 var value = ((ConstantExpression)expression).Value;
                 return (state, context, scope) => value;
-            }
-
-            if (expression.NodeType == ExpressionType.ArrayIndex)
-            {
-                var arrayIndexExpr = (BinaryExpression)expression;
-                if (arrayIndexExpr.Left.NodeType == ExpressionType.Parameter)
-                {
-                    var index = (int)((ConstantExpression)arrayIndexExpr.Right).Value;
-                    if (index < container.ResolutionStateCache.Length)
-                    {
-                        var value = container.ResolutionStateCache[index];
-                        return (state, context, scope) => value;
-                    }
-                }
             }
 
             FactoryDelegate factoryDelegate = null;
@@ -6728,23 +6688,11 @@ namespace DryIoc
                 if (serviceExpr.NodeType == ExpressionType.New)
                 {
                     var newExpr = (NewExpression)serviceExpr;
-                    var argExprs = newExpr.Arguments;
-                    var singletonType = newExpr.Type;
+                    if (newExpr.Arguments.Count == 0)
+                    {
+                        var singletonType = newExpr.Type;
+                        CreateScopedValue createSingleton = () => Activator.CreateInstance(singletonType, false);
 
-                    CreateScopedValue createSingleton = null;
-                    if (argExprs.Count == 0)
-                    {
-                        createSingleton = () => Activator.CreateInstance(singletonType, false);
-                    }
-                    else
-                    {
-                        var constantArgs = argExprs.OfType<ConstantExpression>().Select(a => a.Value).ToArray();
-                        if (constantArgs.Length == argExprs.Count)
-                            createSingleton = () => Activator.CreateInstance(singletonType, constantArgs);
-                    }
-
-                    if (createSingleton != null)
-                    {
                         if (!Setup.PreventDisposal && !Setup.WeaklyReferenced)
                             return Expression.Constant(singletons.GetOrAdd(singletons.GetScopedItemIdOrSelf(FactoryID), createSingleton));
 
@@ -8170,15 +8118,15 @@ namespace DryIoc
             _lastItemIndex = 0;
         }
 
-        internal int IndexOf(int externalId)
+        internal int IndexOf(int factoryId)
         {
-            return (int?)_factoryIdToIndexMap.GetValueOrDefault(externalId) ?? -1;
+            return (int?)_factoryIdToIndexMap.GetValueOrDefault(factoryId) ?? -1;
         }
 
         internal object Get(int index)
         {
             return index < BucketSize ? Items[index]
-                : ((object[][])Items[0])[index / BucketSize][index % BucketSize];
+                : ((object[][])Items[0])[(index / BucketSize) - 1][index % BucketSize];
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
@@ -8228,21 +8176,6 @@ namespace DryIoc
             }
 
             TrackDisposable(item);
-        }
-
-        /// <summary>Adds external non-service item into singleton collection.
-        /// The item may not have corresponding external item ID.</summary>
-        /// <param name="item">External item to add, this may be metadata, service key, etc.</param>
-        /// <returns>Index of added or already added item.</returns>
-        internal int GetOrAdd(object item)
-        {
-            var index = IndexOf(item);
-            if (index == -1)
-            {
-                index = Interlocked.Increment(ref _lastItemIndex);
-                SetOrAdd(index, item);
-            }
-            return index;
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
@@ -8330,7 +8263,7 @@ namespace DryIoc
         // if not - create new buckets array and copy old buckets into it
         private object[] GetOrAddBucket(int index)
         {
-            var bucketIndex = index / BucketSize - 1;
+            var bucketIndex = (index / BucketSize) - 1;
             var buckets = Items[0] as object[][];
             if (buckets == null ||
                 buckets.Length < bucketIndex + 1 ||
@@ -8363,32 +8296,6 @@ namespace DryIoc
 
             var bucket = ((object[][])Items[0])[bucketIndex];
             return bucket;
-        }
-
-        private int IndexOf(object item)
-        {
-            var index = Items.IndexOf(item);
-            if (index != -1)
-                return index;
-
-            // look in other buckets
-            var bucketsObj = Items[0];
-            if (bucketsObj != null)
-            {
-                var buckets = (object[][])bucketsObj;
-                for (var i = 0; i < buckets.Length; i++)
-                {
-                    var b = buckets[i];
-                    if (b != null)
-                    {
-                        index = b.IndexOf(item);
-                        if (index != -1)
-                            return (i + 1) * BucketSize + index;
-                    }
-                }
-            }
-
-            return -1;
         }
 
         #endregion
@@ -9533,16 +9440,16 @@ namespace DryIoc
         /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
         Expression GetCachedFactoryExpressionOrDefault(int factoryID);
 
-        /// <summary>If possible wraps added item in <see cref="ConstantExpression"/> (possible for primitive type, Type, strings),
-        /// otherwise invokes <see cref="Container.GetOrAddStateItem"/> and wraps access to added item (by returned index) into expression: state => state.Get(index).</summary>
-        /// <param name="item">Item to wrap or to add.</param> <param name="itemType">(optional) Specific type of item, otherwise item <see cref="object.GetType()"/>.</param>
-        /// <param name="throwIfStateRequired">(optional) Enable filtering of stateful items.</param>
+        /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
+        /// <param name="item">Item to convert.</param> 
+        /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
+        /// <param name="throwIfStateRequired">(optional) Throws for non-primitive and not-recognized items, 
+        /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
         Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
 
-        /// <summary>Adds item if it is not already added to state, returns added or existing item index.</summary>
-        /// <param name="item">Item to find in existing items with <see cref="object.Equals(object, object)"/> or add if not found.</param>
-        /// <returns>Index of found or added item.</returns>
+        // todo: v3: remove with implementation
+        /// <summary>Obsolete: Please don't use. Will be removed in V3.</summary>
         int GetOrAddStateItem(object item);
     }
 
