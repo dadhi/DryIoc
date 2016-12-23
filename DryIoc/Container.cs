@@ -475,7 +475,7 @@ namespace DryIoc
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
-        object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, 
+        object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent,
             IScope scope)
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
@@ -1713,7 +1713,7 @@ namespace DryIoc
                     case FactoryType.Wrapper:
                         var wrapper = GetWrapperOrDefault(serviceType);
                         return wrapper != null && (condition == null || condition(wrapper))
-                            ? new[] { wrapper } 
+                            ? new[] { wrapper }
                             : null;
 
                     case FactoryType.Decorator:
@@ -1733,8 +1733,8 @@ namespace DryIoc
                         if (factory != null)
                         {
                             if (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                                return condition == null || condition(factory) 
-                                    ? new[] { factory } 
+                                return condition == null || condition(factory)
+                                    ? new[] { factory }
                                     : null;
                             return null;
                         }
@@ -2540,7 +2540,14 @@ namespace DryIoc
         public static FactoryDelegate CompileToDelegate(this Expression expression, IContainer container)
         {
             expression = OptimizeExpression(expression);
+
             // Optimization for fast singleton compilation
+            if (expression.NodeType == ExpressionType.Constant)
+            {
+                var value = ((ConstantExpression)expression).Value;
+                return (state, context, scope) => value;
+            }
+
             if (expression.NodeType == ExpressionType.ArrayIndex)
             {
                 var arrayIndexExpr = (BinaryExpression)expression;
@@ -6602,7 +6609,7 @@ namespace DryIoc
         {
             return (Setup.AsResolutionCall
                 || ((request.FactoryType == FactoryType.Service && request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
-                || IsContextDependent(request)) 
+                || IsContextDependent(request))
                     && !request.IsWrappedInFuncWithArgs() // the check is only applied for implicit check, and not for setup option
                    )
                 && !request.IsFirstNonWrapperInResolutionCall()
@@ -6629,14 +6636,16 @@ namespace DryIoc
                     return decoratorExpr;
             }
 
-            // Then optimize for already resolved singleton object
+            // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (request.Rules.EagerCachingSingletonForFasterAccess &&
-                request.Reuse is SingletonReuse)
-                {
-                    var singletonID = ((SingletonScope)request.Scopes.SingletonScope).IndexOf(FactoryID);
-                    if (singletonID != -1)
-                        return Expression.Convert(Container.GetStateItemExpression(singletonID), request.ServiceType);
-                }
+                request.Reuse is SingletonReuse &&
+                !Setup.PreventDisposal && !Setup.WeaklyReferenced)
+            {
+                var singletons = (SingletonScope)request.Scopes.SingletonScope;
+                var singletonID = singletons.IndexOf(FactoryID);
+                if (singletonID != -1)
+                    return Expression.Constant(singletons.Get(singletonID));
+            }
 
             // Then check the expression cache
             var isExpressionCacheable = IsFactoryExpressionCacheable(request);
@@ -6654,7 +6663,7 @@ namespace DryIoc
                 serviceExpr = ApplyReuse(request, serviceExpr);
 
                 // cache the new expression
-                if (isExpressionCacheable && 
+                if (isExpressionCacheable &&
                     !request.ContainsNestedResolutionCall) // can be checked only after expression is created
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
             }
@@ -6713,14 +6722,33 @@ namespace DryIoc
                 !request.IsWrappedInFunc())
             {
                 FactoryDelegate factoryDelegate = null;
+
+                var singletons = request.Scopes.SingletonScope;
+
                 if (serviceExpr.NodeType == ExpressionType.New)
                 {
                     var newExpr = (NewExpression)serviceExpr;
-                    if (newExpr.Arguments.Count == 0)
+                    var argExprs = newExpr.Arguments;
+                    var singletonType = newExpr.Type;
+
+                    CreateScopedValue createSingleton = null;
+                    if (argExprs.Count == 0)
                     {
-                        var exprType = serviceExpr.Type;
-                        var singleton = Activator.CreateInstance(exprType, true);
-                        factoryDelegate = (state, context, scope) => singleton;
+                        createSingleton = () => Activator.CreateInstance(singletonType, false);
+                    }
+                    else
+                    {
+                        var constantArgs = argExprs.OfType<ConstantExpression>().Select(a => a.Value).ToArray();
+                        if (constantArgs.Length == argExprs.Count)
+                            createSingleton = () => Activator.CreateInstance(singletonType, constantArgs);
+                    }
+
+                    if (createSingleton != null)
+                    {
+                        if (!Setup.PreventDisposal && !Setup.WeaklyReferenced)
+                            return Expression.Constant(singletons.GetOrAdd(singletons.GetScopedItemIdOrSelf(FactoryID), createSingleton));
+
+                        factoryDelegate = (state, context, scope) => createSingleton();
                     }
                 }
 
@@ -6739,13 +6767,10 @@ namespace DryIoc
                     factoryDelegate = (st, cs, rs) => new WeakReference(factory(st, cs, rs));
                 }
 
-                var singletonScope = request.Scopes.SingletonScope;
-
-                var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
-                singletonScope.GetOrAdd(singletonId, () =>
+                var singletonId = singletons.GetScopedItemIdOrSelf(FactoryID);
+                var singleton = singletons.GetOrAdd(singletonId, () =>
                     factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
-
-                serviceExpr = Container.GetStateItemExpression(singletonId);
+                serviceExpr = Expression.Constant(singleton);
             }
             else
             {
@@ -8145,12 +8170,15 @@ namespace DryIoc
             _lastItemIndex = 0;
         }
 
-        /// <summary>Returns existing item from scope.</summary>
-        /// <param name="externalId">External item ID, e.g. FactoryID</param> <returns>Found indexm or -1</returns>
         internal int IndexOf(int externalId)
         {
-            var id = _factoryIdToIndexMap.GetValueOrDefault(externalId);
-            return (int?)id ?? -1;
+            return (int?)_factoryIdToIndexMap.GetValueOrDefault(externalId) ?? -1;
+        }
+
+        internal object Get(int index)
+        {
+            return index < BucketSize ? Items[index]
+                : ((object[][])Items[0])[index / BucketSize][index % BucketSize];
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
@@ -10286,7 +10314,7 @@ namespace DryIoc
             if (!includeBase)
                 return members;
             var baseType = typeInfo.BaseType;
-            return baseType == null || baseType == typeof(object) 
+            return baseType == null || baseType == typeof(object)
                 ? members
                 : members.Concat(baseType.GetMembers(getMembers, true));
         }
