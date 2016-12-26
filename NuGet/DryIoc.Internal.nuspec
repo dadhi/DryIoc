@@ -12,6 +12,13 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+            v2.9.5:
+            - fixed: #416 (now for real): Adding always true condition to decorator changes the decorated outcome - but should not
+            - fixed: #417 Performance issue with Func of singleton
+            - fixed: #418  Performance issue with resolving singletons
+            - fixed: #419 In some cases ResolveMany unable to resolve Decorator with dependency due issue with required service type
+            - fixed: #420: Singleton resolved and created via Func with arguments then may be resolved directly
+            - fixed: GetMembers did not considered base of the base class
             v2.9.4
             - fixed: #416: Adding always true condition to decorator changes the decorated outcome - but should not
             v2.9.3
