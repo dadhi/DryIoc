@@ -447,7 +447,7 @@ namespace DryIoc
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(_singletonItems, _containerWeakRef, null)
+                ? factoryDelegate(null, _containerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -473,7 +473,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(_singletonItems, _containerWeakRef, scope);
+                    return cachedFactoryDelegate(null, _containerWeakRef, scope);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -492,7 +492,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
+            var service = factoryDelegate(null, _containerWeakRef, scope);
 
             if (registryValue.Services.IsEmpty)
                 return service;
@@ -534,7 +534,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(_singletonItems, _containerWeakRef, scope);
+            var service = factoryDelegate(null, _containerWeakRef, scope);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
@@ -1162,10 +1162,11 @@ namespace DryIoc
             return _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID) as Expression;
         }
 
+        // todo: v3: remove
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         public object[] ResolutionStateCache
         {
-            get { return _singletonItems; }
+            get { return null; }
         }
 
         /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
@@ -1396,7 +1397,6 @@ namespace DryIoc
         private readonly Request _emptyRequest;
 
         private readonly SingletonScope _singletonScope;
-        private readonly object[] _singletonItems;
 
         internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
@@ -2050,7 +2050,6 @@ namespace DryIoc
             _defaultFactoryDelegateCache = registry.Value.DefaultFactoryDelegateCache;
 
             _singletonScope = singletonScope;
-            _singletonItems = singletonScope.Items;
 
             _scopeContext = scopeContext;
 
@@ -6568,7 +6567,8 @@ namespace DryIoc
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
             return (Setup.AsResolutionCall
-                || ((request.FactoryType == FactoryType.Service && request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
+                || ((request.FactoryType == FactoryType.Service && 
+                     request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
                 || IsContextDependent(request))
                     && !request.IsWrappedInFuncWithArgs() // the check is only applied for implicit check, and not for setup option
                    )
@@ -6681,7 +6681,6 @@ namespace DryIoc
 
                 // except: For decorators and wrappers, when tracking tansient disposable and for lazy consumption in Func
                 FactoryType == FactoryType.Service &&
-                //!HasSingletonParent(request) &&
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
@@ -6739,7 +6738,7 @@ namespace DryIoc
 
                 var singletonId = singletons.GetScopedItemIdOrSelf(FactoryID);
                 var singleton = singletons.GetOrAdd(singletonId, () =>
-                    factoryDelegate(request.Container.ResolutionStateCache, request.ContainerWeakRef, request.Scope));
+                    factoryDelegate(null, request.ContainerWeakRef, request.Scope));
                 serviceExpr = Expression.Constant(singleton);
             }
             else
@@ -6780,14 +6779,6 @@ namespace DryIoc
                     Expression.Constant(0, typeof(int)));
 
             return Expression.Convert(serviceExpr, originalExpressionType);
-        }
-
-        private bool HasSingletonParent(Request request)
-        {
-            for (var p = request.RawParent; !p.IsEmpty; p = p.RawParent)
-                if (p.Reuse is SingletonReuse)
-                    return true;
-            return false;
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
