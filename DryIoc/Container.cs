@@ -3027,10 +3027,11 @@ namespace DryIoc
         /// <summary>No rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        /// <summary>Dependency nesting level where to split object graph into separate Resolve call
-        /// to optimize performance of large object graph.</summary>
-        /// <remarks>At the moment the value is predefined. Not sure if it should be user-defined.</remarks>
-        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 6;
+        // todo: v3: Rename to MaxObjectGrapthSizePerExpression
+        /// <summary>Required to handle large object graphs, by limiting the maximum graph expression size.
+        /// Number of dependencies disregarding the nesting level, when DryIoc will start inserting dependencies as Resolve calls.</summary>
+        /// <remarks>The moment the value is predefined. Not sure if it should be user-defined.</remarks>
+        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 30;
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -5662,6 +5663,10 @@ namespace DryIoc
             set { if (value) _resolverContext.ContainsNestedResolutionCall = true; }
         }
 
+        /// <summary>Provides approximate nummber of dependencies in resolution graph (starting from Resolve method), 
+        /// excluding registered delegates, instances, and wrappers.</summary>
+        public int DependencyCount {  get { return _resolverContext.DependencyCount; } }
+
         /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
         public RequestInfo Parent
         {
@@ -5719,9 +5724,6 @@ namespace DryIoc
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
         /// <remarks>Mutable: tracks used arguments</remarks>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
-
-        /// <summary>Counting nested levels. May be used to split object graph if level is too deep.</summary>
-        public readonly int Level;
 
         /// <summary>Requested service type.</summary>
         public Type ServiceType { get { return RequestInfo.ServiceType; } }
@@ -5792,14 +5794,14 @@ namespace DryIoc
 
                 var requestInfo = Push(preResolveParent, info, Container);
 
-                return new Request(resolverContext, this, requestInfo, made: null, funcArgs: null, level: 1);
+                return new Request(resolverContext, this, requestInfo, made: null, funcArgs: null);
             }
 
             Throw.If(RequestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
 
             var inheritedRequestInfo = Push(RequestInfo, info, Container);
 
-            return new Request(_resolverContext, this, inheritedRequestInfo, null, FuncArgs, Level + 1);
+            return new Request(_resolverContext, this, inheritedRequestInfo, null, FuncArgs);
         }
 
         private static RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo, IContainer container)
@@ -5856,7 +5858,7 @@ namespace DryIoc
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             var newRequestInfo = RequestInfo.With(getInfo);
-            return new Request(_resolverContext, RawParent, newRequestInfo, Made, FuncArgs, Level);
+            return new Request(_resolverContext, RawParent, newRequestInfo, Made, FuncArgs);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -5879,7 +5881,7 @@ namespace DryIoc
         {
             var argsUsed = new bool[argExpressions.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
-            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo, Level);
+            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo);
         }
 
         // todo: v3: remove
@@ -5905,7 +5907,7 @@ namespace DryIoc
 
             var argsUsed = new bool[argExprs.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExprs);
-            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo, Level);
+            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container,
@@ -5915,7 +5917,7 @@ namespace DryIoc
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
             var newContext = _resolverContext.With(newContainer);
-            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs, Level);
+            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs);
         }
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -5953,7 +5955,8 @@ namespace DryIoc
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
             var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
-            return new Request(_resolverContext, RawParent, newInfo, made, FuncArgs, Level);
+            _resolverContext.IncrementDependencyCount();
+            return new Request(_resolverContext, RawParent, newInfo, made, FuncArgs);
         }
 
         /// <summary>Returns non-wrapper parent of Func wrapper if any.</summary>
@@ -6089,15 +6092,13 @@ namespace DryIoc
         #region Implementation
 
         internal Request(ResolverContext resolverContext,
-            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs,
-            int level = 0)
+            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs)
         {
             _resolverContext = resolverContext;
             RawParent = parent;
             RequestInfo = requestInfo;
             Made = made;
             FuncArgs = funcArgs;
-            Level = level;
         }
 
         private readonly ResolverContext _resolverContext;
@@ -6109,7 +6110,11 @@ namespace DryIoc
             public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
 
-            public bool ContainsNestedResolutionCall; // mutable, supposed to be set once when dependency factory expressions are created
+            // mutable, supposed to be set once when dependency factory expressions are created
+            public bool ContainsNestedResolutionCall;
+
+            // mutable, increment via IncrementDependencyCount method.
+            public int DependencyCount;
 
             public ResolverContext(ContainerWeakRef container, ContainerWeakRef scopes, IScope scope, RequestInfo preResolveParent)
             {
@@ -6134,6 +6139,11 @@ namespace DryIoc
             {
                 return preResolveParent == null || preResolveParent.IsEmpty ? this
                     : new ResolverContext(ContainerWeakRef, ScopesWeakRef, Scope, preResolveParent);
+            }
+
+            internal void IncrementDependencyCount()
+            {
+                Interlocked.Increment(ref DependencyCount);
             }
         }
 
@@ -6567,11 +6577,10 @@ namespace DryIoc
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
             return (Setup.AsResolutionCall
-                || ((request.FactoryType == FactoryType.Service && 
-                     request.Level >= request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
-                || IsContextDependent(request))
-                    && !request.IsWrappedInFuncWithArgs() // the check is only applied for implicit check, and not for setup option
-                   )
+                || ((request.FactoryType == FactoryType.Service &&
+                     request.DependencyCount > request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
+                    || IsContextDependent(request))
+                    && !request.IsWrappedInFuncWithArgs()) // the check is only applied for implicit check, and not for setup option
                 && !request.IsFirstNonWrapperInResolutionCall()
                 && request.GetActualServiceType() != typeof(void);
         }
