@@ -156,6 +156,7 @@
     <Compile Include="Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter service_key.cs" />
     <Compile Include="Issue407_Cannot_resolve_MadeOf_params_explicitly.cs" />
     <Compile Include="Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome.cs" />
+    <Compile Include="Issue417_Performance_issue_with_Func.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

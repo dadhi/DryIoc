@@ -47,7 +47,6 @@ namespace DryIoc.IssuesTests
         {
             public TestClass(Log log)
             {
-                Console.WriteLine(log);
             }
         }
     }

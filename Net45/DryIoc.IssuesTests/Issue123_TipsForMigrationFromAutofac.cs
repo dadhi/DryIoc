@@ -303,6 +303,7 @@ namespace DryIoc.IssuesTests
         public class AClient : IDisposable
         {
             public Owned<AService> Service { get; private set; }
+
             public AClient(Owned<AService> service)
             {
                 Service = service;

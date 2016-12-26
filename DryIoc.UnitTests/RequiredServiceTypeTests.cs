@@ -18,8 +18,9 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<string>(typeof(Service)));
 
-            Assert.That(ex.Message, Is.StringContaining("Service (wrapped) type"));
-            Assert.That(ex.Message, Is.StringContaining("String"));
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToResolveUnknownService),
+                Error.NameOf(ex.Error));
         }
 
         [Test]
