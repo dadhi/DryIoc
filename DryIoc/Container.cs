@@ -6726,7 +6726,7 @@ namespace DryIoc
         /// <returns>Scoped expression or originally passed expression.</returns>
         protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, bool tracksTransientDisposable, Request request)
         {
-            var originalExpressionType = serviceExpr.Type;
+            var serviceType = serviceExpr.Type;
 
             // Optimize: eagerly create singleton during the construction of object graph,
             // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
@@ -6738,61 +6738,33 @@ namespace DryIoc
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                FactoryDelegate factoryDelegate = null;
-
                 var singletons = request.Scopes.SingletonScope;
 
+                FactoryDelegate factoryDelegate = null;
+
                 if (serviceExpr.NodeType == ExpressionType.New)
-                {
-                    var newExpr = (NewExpression)serviceExpr;
-                    var argExprs = newExpr.Arguments;
-                    var singletonType = newExpr.Type;
-
-                    CreateScopedValue createSingleton = null;
-                    if (argExprs.Count == 0)
-                    {
-                        createSingleton = () => Activator.CreateInstance(singletonType, false);
-                    }
-                    else if (argExprs.Count == 1)
-                    {
-                        var argExpr = argExprs[0] as ConstantExpression;
-                        if (argExpr != null)
-                            createSingleton = () => Activator.CreateInstance(singletonType, argExpr.Value);
-                    }
-                    else
-                    {
-                        var constantArgs = argExprs.OfType<ConstantExpression>().Select(a => a.Value).ToArray();
-                        if (constantArgs.Length == argExprs.Count)
-                            createSingleton = () => Activator.CreateInstance(singletonType, constantArgs);
-                    }
-
-                    if (createSingleton != null)
-                    {
-                        if (!Setup.PreventDisposal && !Setup.WeaklyReferenced)
-                            return Expression.Constant(singletons.GetOrAdd(singletons.GetScopedItemIdOrSelf(FactoryID), createSingleton));
-
-                        factoryDelegate = (state, context, scope) => createSingleton();
-                    }
-                }
+                    factoryDelegate = ActivateSingleton(serviceExpr, singletons);
 
                 if (factoryDelegate == null)
+                {
                     factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
+                    if (Setup.PreventDisposal)
+                    {
+                        var factory = factoryDelegate;
+                        factoryDelegate = (_, cs, rs) => new[] { factory(null, cs, rs) };
+                    }
 
-                if (Setup.PreventDisposal)
-                {
-                    var factory = factoryDelegate;
-                    factoryDelegate = (st, cs, rs) => new[] { factory(st, cs, rs) };
-                }
-
-                if (Setup.WeaklyReferenced)
-                {
-                    var factory = factoryDelegate;
-                    factoryDelegate = (st, cs, rs) => new WeakReference(factory(st, cs, rs));
+                    if (Setup.WeaklyReferenced)
+                    {
+                        var factory = factoryDelegate;
+                        factoryDelegate = (_, cs, rs) => new WeakReference(factory(null, cs, rs));
+                    }
                 }
 
                 var singletonId = singletons.GetScopedItemIdOrSelf(FactoryID);
                 var singleton = singletons.GetOrAdd(singletonId, () =>
                     factoryDelegate(null, request.ContainerWeakRef, request.Scope));
+
                 serviceExpr = Expression.Constant(singleton);
             }
             else
@@ -6832,7 +6804,54 @@ namespace DryIoc
                     Expression.Convert(serviceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
 
-            return Expression.Convert(serviceExpr, originalExpressionType);
+            return Expression.Convert(serviceExpr, serviceType);
+        }
+
+        private FactoryDelegate ActivateSingleton(Expression serviceExpr, IScope singletons)
+        {
+            var newExpr = (NewExpression)serviceExpr;
+            var argExprs = newExpr.Arguments;
+            var singletonType = newExpr.Type;
+
+            CreateScopedValue createSingleton = null;
+            if (argExprs.Count == 0)
+            {
+                createSingleton = () => Activator.CreateInstance(singletonType, false);
+            }
+            else if (argExprs.Count == 1)
+            {
+                var argExpr = argExprs[0];
+                if (argExpr.NodeType == ExpressionType.Convert)
+                    argExpr = ((UnaryExpression)argExpr).Operand;
+
+                var constExpr = argExpr as ConstantExpression;
+                if (constExpr != null)
+                    createSingleton = () => Activator.CreateInstance(singletonType, constExpr.Value);
+            }
+            else
+            {
+                var constantArgs = new object[argExprs.Count];
+                int i = constantArgs.Length - 1;
+                for (; i >= 0; --i)
+                {
+                    var argExpr = argExprs[i];
+                    if (argExpr.NodeType == ExpressionType.Convert)
+                        argExpr = ((UnaryExpression)argExpr).Operand;
+
+                    var constExpr = argExpr as ConstantExpression;
+                    if (constExpr == null)
+                        break;
+                    constantArgs[i] = constExpr.Value;
+                }
+
+                if (i == -1) // all args are constants
+                    createSingleton = () => Activator.CreateInstance(singletonType, constantArgs);
+            }
+
+            if (createSingleton != null && !Setup.PreventDisposal && !Setup.WeaklyReferenced)
+                return (state, context, scope) => createSingleton();
+
+            return null;
         }
 
         /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,

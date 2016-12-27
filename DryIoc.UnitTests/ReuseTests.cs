@@ -774,6 +774,28 @@ namespace DryIoc.UnitTests
             public O(Ho ho) { }
         }
 
+        [Test]
+        public void Singleton_with_all_singleton_dependencies_will_be_evaluated_to_constant_expression()
+        {
+            var container = new Container();
+
+            container.Register<O>(Reuse.Singleton);
+            container.Register<Ho>(Reuse.Singleton);
+            container.Register<P>(Reuse.Singleton);
+
+            var p = container.Resolve<P>();
+
+            Assert.IsNotNull(p);
+        }
+
+        public class P
+        {
+            public P(Ho ho, O o)
+            {
+                
+            }
+        }
+
         #region CUT
 
         public class Soose
