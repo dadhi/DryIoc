@@ -1306,6 +1306,12 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
+        /// <summary>Sugar on top of <see cref="CreateFactory(Lazy{Assembly})"/>.</summary>
+        public ReflectionFactory CreateFactory(Lazy<Assembly> assembly)
+        {
+            return CreateFactory(typeName => assembly.Value.GetType(typeName));
+        }
+
         /// <summary>Creates factory from registration info.</summary>
         /// <param name="typeProvider">(optional) But required for <see cref="IsLazy"/> info.</param>
         /// <returns>Created factory.</returns>

@@ -894,20 +894,19 @@ namespace DryIoc
             {
                 var openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
                 if (openGenericEntry != null)
-                {
-                    var openGenericFactories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArray();
-                    factories = factories.Concat(openGenericFactories);
-                }
+                    factories = factories.Concat(GetRegistryEntryKeyFactoryPairs(openGenericEntry));
             }
 
-            var unknownServicesResolvers = Rules.UnknownManyServiceResolvers;
-            if (!unknownServicesResolvers.IsNullOrEmpty())
+            var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
+            if (!dynamicRegistrationProviders.IsNullOrEmpty())
             {
-                for (var i = 0; i < unknownServicesResolvers.Length; i++)
+                for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
                 {
-                    var unknownServiceFactories = unknownServicesResolvers[i](serviceType);
-                    if (unknownServiceFactories != null)
-                        factories = factories.Concat(unknownServiceFactories);
+                    var provider = dynamicRegistrationProviders[i];
+                    var dynamicFactories = provider(serviceType, null, FactoryType.Service);
+                    // todo: Do I need to filter for FactoryType.Service?
+                    if (dynamicFactories != null)
+                        factories = factories.Concat(dynamicFactories);
                 }
             }
 
@@ -3158,30 +3157,27 @@ namespace DryIoc
                 ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
         }
 
-        /// <summary>Defines delegate to return all factories for the given service type.</summary>
-        /// <param name="serviceType">Service type to return factory for</param> <returns>All factories for the given type, or null if unable to resolve.</returns>
-        public delegate IEnumerable<KV<object, Factory>> UnknownManyServiceResolver(Type serviceType);
+        /// <summary>Specify the method signature for returning mutiple keyed factories. This is dynamic analog to the normal Container Registry.</summary>
+        /// <param name="serviceType"></param> 
+        /// <param name="serviceKey">(optional) If <c>null</c> will request all factories of <paramref name="serviceType"/></param> 
+        /// <param name="requiredFactoryType">Specifies what kind of service is requested.</param>
+        /// <returns>Key-Factory pairs.</returns>
+        public delegate IEnumerable<KV<object, Factory>> DynamicRegistrationProvider(
+            Type serviceType,
+            object serviceKey,
+            FactoryType requiredFactoryType
+            // todo: other options like IfAlreadyRegistered?
+            );
 
-        /// <summary>Gets rules for resolving multiple not-registered services. Null by default.</summary>
-        public UnknownManyServiceResolver[] UnknownManyServiceResolvers { get; private set; }
+        /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
+        public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
-        /// <summary>Appends handler to current unknown service handlers.</summary>
+        /// <summary>Appends handler to current unknown service providers.</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
-        public Rules WithUnknownManyServiceResolvers(params UnknownManyServiceResolver[] rules)
+        public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownManyServiceResolvers = newRules.UnknownManyServiceResolvers.Append(rules);
-            return newRules;
-        }
-
-        /// <summary>Removes specified handler from unknown service handlers, and returns new Rules.
-        /// If no resolver was found then <see cref="UnknownManyServiceResolvers"/> will stay the same instance,
-        /// so it could be checked for remove success or fail.</summary>
-        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
-        public Rules WithoutUnknownServicesResolver(UnknownManyServiceResolver rule)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownManyServiceResolvers = newRules.UnknownManyServiceResolvers.Remove(rule);
+            newRules.DynamicRegistrationProviders = newRules.DynamicRegistrationProviders.Append(rules);
             return newRules;
         }
 

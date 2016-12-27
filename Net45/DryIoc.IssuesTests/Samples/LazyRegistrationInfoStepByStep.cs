@@ -122,7 +122,7 @@ namespace DryIoc.IssuesTests.Samples
             var lazyLoadedAssembly = new Lazy<Assembly>(() => assembly);
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
             foreach (var lazyRegistration in lazyRegistrations)
             {
                 var exports = lazyRegistration.Exports;
@@ -132,8 +132,8 @@ namespace DryIoc.IssuesTests.Samples
                     var serviceTypeFullName = export.ServiceTypeFullName;
 
                     List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
-                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
+                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
+                        registrationByServiceTypeName.Add(serviceTypeFullName,
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
 
                     // multiple services workaround: generate missing service keys
@@ -145,40 +145,51 @@ namespace DryIoc.IssuesTests.Samples
                 }
             }
 
+            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey, factoryType) =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
+                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                    return null;
+
+                if (serviceKey != null)
+                {
+                    var regIndex = serviceTypeRegistrations.FindIndex(pair => serviceKey.Equals(pair.Key));
+                    if (regIndex == -1)
+                        return null;
+
+                    Factory factory = serviceTypeRegistrations[regIndex].Value.CreateFactory(lazyLoadedAssembly);
+                    return new[] { KV.Of(serviceKey, factory) };
+                }
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var r in serviceTypeRegistrations)
+                    factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
+
+                return factories;
+            };
+
             // Step 2 - Add resolution rule for creating factory on resolve.
             Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
             {
+                var serviceType = request.ServiceType;
+                var serviceKey = request.ServiceKey;
+
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
+                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out regs))
                     return null;
 
-                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
+                var regIndex = regs.FindIndex(pair => serviceKey == null || Equals(pair.Key, serviceKey));
                 if (regIndex == -1)
                     return null;
 
                 return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
-            // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
-                    return null;
-
-                var factories = new List<KV<object, Factory>>();
-                foreach (var pair in regs)
-                    factories.Add(new KV<object, Factory>(pair.Key,
-                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
-
-                return factories;
-            };
-
             // Test that resolve works
             //========================
             var container = new Container().WithMef()
-                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-                .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
+                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations))
+                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
 
             // the same resolution code as in previous test
             //========================
@@ -213,7 +224,7 @@ namespace DryIoc.IssuesTests.Samples
             });
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
             foreach (var lazyRegistration in lazyRegistrations)
             {
                 var exports = lazyRegistration.Exports;
@@ -223,8 +234,8 @@ namespace DryIoc.IssuesTests.Samples
                     var serviceTypeFullName = export.ServiceTypeFullName;
 
                     List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
-                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
+                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
+                        registrationByServiceTypeName.Add(serviceTypeFullName,
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
 
                     // multiple services workaround: generate missing service keys
@@ -236,11 +247,34 @@ namespace DryIoc.IssuesTests.Samples
                 }
             }
 
+            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey, factoryType) =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
+                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                    return null;
+
+                if (serviceKey != null)
+                {
+                    var regIndex = serviceTypeRegistrations.FindIndex(pair => serviceKey.Equals(pair.Key));
+                    if (regIndex == -1)
+                        return null;
+
+                    Factory factory = serviceTypeRegistrations[regIndex].Value.CreateFactory(lazyLoadedAssembly);
+                    return new[] { KV.Of(serviceKey, factory) };
+                }
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var r in serviceTypeRegistrations)
+                    factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
+
+                return factories;
+            };
+
             // Step 2 - Add resolution rule for creating factory on resolve.
             Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
+                if (!registrationByServiceTypeName.TryGetValue(request.ServiceType.FullName, out regs))
                     return null;
 
                 var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
@@ -250,26 +284,11 @@ namespace DryIoc.IssuesTests.Samples
                 return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
             };
 
-            // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
-                    return null;
-
-                var factories = new List<KV<object, Factory>>();
-                foreach (var pair in regs)
-                    factories.Add(new KV<object, Factory>(pair.Key,
-                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
-
-                return factories;
-            };
-
             // Test that resolve works
             //========================
             var container = new Container().WithMef()
                 .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-                .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
+                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
 
             // make sure that CommandImporter itself is available without loading the lazy assembly
             container.RegisterExports(typeof(CommandImporter));
@@ -345,7 +364,7 @@ namespace DryIoc.IssuesTests.Samples
             });
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
             foreach (var lazyRegistration in lazyRegistrations)
             {
                 var exports = lazyRegistration.Exports;
@@ -355,8 +374,8 @@ namespace DryIoc.IssuesTests.Samples
                     var serviceTypeFullName = export.ServiceTypeFullName;
 
                     List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
-                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
+                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
+                        registrationByServiceTypeName.Add(serviceTypeFullName,
                             regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
 
                     // multiple services workaround: generate missing service keys
@@ -368,11 +387,34 @@ namespace DryIoc.IssuesTests.Samples
                 }
             }
 
+            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey, factoryType) =>
+            {
+                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
+                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                    return null;
+
+                if (serviceKey != null)
+                {
+                    var regIndex = serviceTypeRegistrations.FindIndex(pair => serviceKey.Equals(pair.Key));
+                    if (regIndex == -1)
+                        return null;
+
+                    Factory factory = serviceTypeRegistrations[regIndex].Value.CreateFactory(lazyLoadedAssembly);
+                    return new[] { KV.Of(serviceKey, factory) };
+                }
+
+                var factories = new List<KV<object, Factory>>();
+                foreach (var r in serviceTypeRegistrations)
+                    factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
+
+                return factories;
+            };
+
             // Step 2 - Add resolution rule for creating factory on resolve.
             Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
+                if (!registrationByServiceTypeName.TryGetValue(request.ServiceType.FullName, out regs))
                     return null;
 
                 var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
@@ -380,21 +422,6 @@ namespace DryIoc.IssuesTests.Samples
                     return null;
 
                 return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
-            };
-
-            // Step 3 - Add service type handler for resolving many factories.
-            Rules.UnknownManyServiceResolver createFactoriesFromAssembly = serviceType =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceType.FullName, out regs))
-                    return null;
-
-                var factories = new List<KV<object, Factory>>();
-                foreach (var pair in regs)
-                    factories.Add(new KV<object, Factory>(pair.Key,
-                        pair.Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName))));
-
-                return factories;
             };
 
             // Test that resolve works fine with the non-lazy scenario
@@ -417,7 +444,7 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var container = new Container().WithMef()
               .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
-              .With(rules => rules.WithUnknownManyServiceResolvers(createFactoriesFromAssembly));
+              .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
 
             // make sure that ActionImporter itself is available without loading the lazy assembly
             container.RegisterExports(typeof(ActionImporter));
