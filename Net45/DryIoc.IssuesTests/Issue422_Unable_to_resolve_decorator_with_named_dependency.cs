@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -12,21 +13,52 @@ namespace DryIoc.IssuesTests
 
             container.Register<ClientFactory>();
 
-            container.UseInstance("a", serviceKey: "namea");
-            container.UseInstance("b", serviceKey: "nameb");
-
-            container.Register<IClient>(Made.Of(
+            // One with condition to be resolved under ControllerA
+            container.Register(Made.Of(
                 x => ServiceInfo.Of<ClientFactory>(), 
-                f => f.CreateClient(Arg.Of<string>("namea"))), 
-                serviceKey: DepKind.A);
+                f => f.CreateClient("a")), 
+                setup: Setup.With(condition: r => r.Parent.Enumerate().Any(p => p.ImplementationType == typeof(ControllerA))));
+
+            // Another with condition to be resolved under ControllerB
+            container.Register(Made.Of(
+                x => ServiceInfo.Of<ClientFactory>(),
+                f => f.CreateClient("b")),
+                setup: Setup.With(condition: r => r.Parent.Enumerate().Any(p => p.ImplementationType == typeof(ControllerB))));
 
             container.Register<IClient, ClientDecorator>(setup: Setup.Decorator, 
-                made: Made.Of(() => new ClientDecorator(Arg.Of<IClient>(DepKind.A))));
+                made: Made.Of(() => new ClientDecorator(Arg.Of<IClient>())));
 
-            var client = container.Resolve<IClient>(DepKind.A);
+            container.Register<ControllerA>();
+            container.Register<ControllerB>();
 
-            Assert.IsInstanceOf<ClientDecorator>(client);
-            Assert.AreEqual("a", ((Client)((ClientDecorator)client).client).name);
+            var controllerA = container.Resolve<ControllerA>();
+            var controllerB = container.Resolve<ControllerB>();
+
+            Assert.IsInstanceOf<ClientDecorator>(controllerA.client);
+            Assert.AreEqual("a", ((Client)((ClientDecorator)controllerA.client).client).name);
+
+            Assert.IsInstanceOf<ClientDecorator>(controllerB.client);
+            Assert.AreEqual("b", ((Client)((ClientDecorator)controllerB.client).client).name);
+        }
+
+        public class ControllerA
+        {
+            public readonly IClient client;
+
+            public ControllerA(IClient client)
+            {
+                this.client = client;
+            }
+        }
+
+        public class ControllerB
+        {
+            public readonly IClient client;
+
+            public ControllerB(IClient client)
+            {
+                this.client = client;
+            }
         }
 
         public interface IClient { }
