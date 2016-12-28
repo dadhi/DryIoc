@@ -1261,18 +1261,19 @@ namespace DryIoc
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
         {
-            var entry = GetServiceFactoryEntryOrDefault(request);
-            if (entry == null) // no entry - no factories: return earlier
+            var factoryOrFactories = GetServiceFactoryEntryOrDefault(request);
+
+            if (factoryOrFactories == null)
                 return null;
 
-            var singleFactory = entry as Factory;
+            var factory = factoryOrFactories as Factory;
             if (factorySelector != null)
             {
-                if (singleFactory != null)
-                    return !singleFactory.CheckCondition(request) ? null
-                        : factorySelector(request, new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, singleFactory) });
+                if (factory != null)
+                    return !factory.CheckCondition(request) ? null
+                        : factorySelector(request, new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, factory) });
 
-                var selectedFactories = ((FactoriesEntry)entry).Factories.Enumerate()
+                var selectedFactories = ((IEnumerable<KV<object, Factory>>)factoryOrFactories)
                     .Where(f => f.Value.CheckCondition(request))
                     .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
                     .ToArray();
@@ -1280,29 +1281,27 @@ namespace DryIoc
             }
 
             var serviceKey = request.ServiceKey;
-            if (singleFactory != null)
+            if (factory != null)
             {
                 return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                    && singleFactory.CheckCondition(request)
-                    ? singleFactory : null;
+                    && factory.CheckCondition(request)
+                    ? factory : null;
             }
 
-            var factories = ((FactoriesEntry)entry).Factories;
+            var factories = (IEnumerable<KV<object, Factory>>)factoryOrFactories;
             if (serviceKey != null)
             {
-                singleFactory = factories.GetValueOrDefault(serviceKey);
-                return singleFactory != null && singleFactory.CheckCondition(request) ? singleFactory : null;
+                var keyFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
+                return keyFactory != null 
+                    && keyFactory.Value.CheckCondition(request) ? keyFactory.Value : null;
             }
-
-            var allFactories = factories.Enumerate();
 
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
-                allFactories = allFactories.Where(f =>
-                    f.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                factories = factories.Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
 
-            var defaultFactories = allFactories
+            var defaultFactories = factories
                 .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
                 .ToArray();
 
@@ -1337,6 +1336,7 @@ namespace DryIoc
             return null;
         }
 
+        // returns either Factory or IEnumerable<KV<object, Factory>> or null
         private object GetServiceFactoryEntryOrDefault(Request request)
         {
             var serviceKey = request.ServiceKey;
@@ -1356,10 +1356,12 @@ namespace DryIoc
                 if (actualServiceType.IsClosedGeneric())
                 {
                     var serviceKeyWithOpenGenericRequiredType = serviceKey as object[];
-                    if (serviceKeyWithOpenGenericRequiredType != null && serviceKeyWithOpenGenericRequiredType.Length == 2)
+                    if (serviceKeyWithOpenGenericRequiredType != null && 
+                        serviceKeyWithOpenGenericRequiredType.Length == 2)
                     {
                         var openGenericType = serviceKeyWithOpenGenericRequiredType[0] as Type;
-                        if (openGenericType != null && openGenericType == actualServiceType.GetGenericDefinitionOrNull())
+                        if (openGenericType != null && 
+                            openGenericType == actualServiceType.GetGenericDefinitionOrNull())
                         {
                             actualServiceType = openGenericType;
                             serviceKey = serviceKeyWithOpenGenericRequiredType[1];
@@ -1375,7 +1377,7 @@ namespace DryIoc
 
             // Special case for closed-generic lookup type:
             // When entry is not found
-            //   Or the key in entry is not found
+            //   or the key in entry is not found
             // Then go to the open-generic services
             if (actualServiceType.IsClosedGeneric())
             {
@@ -1392,7 +1394,10 @@ namespace DryIoc
                 }
             }
 
-            return entry;
+            if (entry == null)
+                return null;
+
+            return (object)(entry as Factory) ?? ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
         #endregion
@@ -6812,7 +6817,7 @@ namespace DryIoc
             CreateScopedValue createSingleton = null;
             if (argExprs.Count == 0)
             {
-                createSingleton = () => Activator.CreateInstance(singletonType, false);
+                createSingleton = () => Activator.CreateInstance(singletonType, true);
             }
             else if (argExprs.Count == 1)
             {
