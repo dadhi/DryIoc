@@ -5664,10 +5664,14 @@ namespace DryIoc
         public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
         {
             var parent = ParentOrWrapper;
-            return immediateParent
-                ? parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFuncWithArgs()
-                : !parent.FirstOrEmpty(p =>
-                    p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs()).IsEmpty;
+            if (immediateParent)
+                return parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFuncWithArgs();
+
+            for (var p = parent; !p.IsEmpty; p = p.ParentOrWrapper)
+                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
+                    return true;
+
+            return false;
         }
 
         /// <summary>Gathers the info from resolved dependency graph. 
@@ -5962,7 +5966,7 @@ namespace DryIoc
 
         private IReuse GetDefaultReuse(Factory factory)
         {
-            IReuse reuse  = null;
+            IReuse reuse = null;
             if (factory.Setup.UseParentReuse)
                 reuse = GetParentOrFuncOrEmpty().Reuse;
             else
@@ -5988,23 +5992,18 @@ namespace DryIoc
         /// <returns>Found parent or Func parent or empty.</returns>
         public RequestInfo GetParentOrFuncOrEmpty(bool firstNonTransientParent = false)
         {
-            var parent = ParentOrWrapper;
-            if (!parent.IsEmpty)
+            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
             {
-                foreach (var p in parent.Enumerate())
+                if (p.FactoryType == FactoryType.Wrapper)
                 {
-                    if (p.FactoryType == FactoryType.Wrapper)
-                    {
-                        if (p.GetActualServiceType().IsFunc())
-                            return p;
-                    }
-                    else
-                    {
-                        if (!firstNonTransientParent ||
-                            p.Reuse != null &&
-                            p.Reuse != DryIoc.Reuse.Transient)
-                            return p;
-                    }
+                    if (p.GetActualServiceType().IsFunc())
+                        return p;
+                }
+                else
+                {
+                    if (!firstNonTransientParent ||
+                        p.Reuse != null && p.Reuse != DryIoc.Reuse.Transient)
+                        return p;
                 }
             }
 
