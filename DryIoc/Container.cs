@@ -5951,24 +5951,8 @@ namespace DryIoc
                         Throw.It(Error.RecursiveDependencyDetected, Print(newFactoryID));
 
             var reuse = factory.Reuse;
-            if (reuse == null) // unspecified reuse
-            {
-                if (factory.Setup.UseParentReuse)
-                    reuse = GetParentOrFuncOrEmpty().Reuse;
-                else
-                {
-                    var decoratorSetup = factory.Setup as Setup.DecoratorSetup;
-                    if (decoratorSetup != null && decoratorSetup.UseDecorateeReuse)
-                        reuse = Reuse; // current reuse
-                }
-
-                // if no specified the wrapper reuse is always Transient,
-                // other container-wide default reuse is applied
-                if (reuse == null)
-                    reuse = factory.FactoryType == FactoryType.Wrapper
-                        ? DryIoc.Reuse.Transient
-                        : Container.Rules.DefaultReuseInsteadOfTransient;
-            }
+            if (reuse == null)
+                reuse = GetDefaultReuse(factory);
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
             var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
@@ -5976,6 +5960,29 @@ namespace DryIoc
             return new Request(_resolverContext, RawParent, newInfo, made, FuncArgs);
         }
 
+        private IReuse GetDefaultReuse(Factory factory)
+        {
+            IReuse reuse  = null;
+            if (factory.Setup.UseParentReuse)
+                reuse = GetParentOrFuncOrEmpty().Reuse;
+            else
+            {
+                var decoratorSetup = factory.Setup as Setup.DecoratorSetup;
+                if (decoratorSetup != null && decoratorSetup.UseDecorateeReuse)
+                    reuse = Reuse; // current reuse
+            }
+
+            // if no specified the wrapper reuse is always Transient,
+            // other container-wide default reuse is applied
+            if (reuse == null)
+                reuse = factory.FactoryType == FactoryType.Wrapper
+                    ? DryIoc.Reuse.Transient
+                    : Container.Rules.DefaultReuseInsteadOfTransient;
+
+            return reuse;
+        }
+
+        // todo: Improve perf.
         /// <summary>Returns non-wrapper parent of Func wrapper if any.</summary>
         /// <param name="firstNonTransientParent">(optional) When set specifies to search for first not transient parent.</param>
         /// <returns>Found parent or Func parent or empty.</returns>
@@ -6680,7 +6687,7 @@ namespace DryIoc
                 return serviceExpr;
 
             // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
-            var reuse = request.Reuse.ThrowIfNull();
+            var reuse = request.Reuse;
 
             // Track transient disposable in parent scope (if any), or open scope (if any)
             var tracksTransientDisposable =
@@ -6845,21 +6852,24 @@ namespace DryIoc
             var reuse = request.Reuse;
 
             // Fast check: if reuse is not applied or the rule set then skip the check.
-            if (reuse.Lifespan == 0 || !request.Rules.ThrowIfDependencyHasShorterReuseLifespan)
+            var reuseLifespan = reuse.Lifespan;
+            if (reuseLifespan == 0 || !request.Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 return;
 
-            var parent = request.ParentOrWrapper;
-            if (parent.IsEmpty)
-                return;
-
-            var parentWithLongerLifespan = parent.Enumerate()
-                .TakeWhile(r => r.FactoryType != FactoryType.Wrapper || !r.GetActualServiceType().IsFunc())
-                .FirstOrDefault(r => r.FactoryType == FactoryType.Service
-                    && r.ReuseLifespan > reuse.Lifespan);
-
-            if (parentWithLongerLifespan != null)
-                Throw.It(Error.DependencyHasShorterReuseLifespan,
-                    request.PrintCurrent(), reuse, parentWithLongerLifespan);
+            for (var p = request.ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
+            {
+                if (p.FactoryType == FactoryType.Wrapper)
+                {
+                    if (p.GetActualServiceType().IsFunc())
+                        return; // stop on Func
+                }
+                else if (p.FactoryType == FactoryType.Service)
+                {
+                    if (p.ReuseLifespan > reuseLifespan)
+                        Throw.It(Error.DependencyHasShorterReuseLifespan,
+                            request.PrintCurrent(), reuse, p);
+                }
+            }
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.
@@ -7493,7 +7503,10 @@ namespace DryIoc
         {
             var ctor = ctorOrMethodOrMember as ConstructorInfo;
             if (ctor != null)
-                return InitPropertiesAndFields(Expression.New(ctor, paramExprs), request);
+            {
+                var newServiceExpr = Expression.New(ctor, paramExprs);
+                return InitPropertiesAndFields(newServiceExpr, request);
+            }
 
             var method = ctorOrMethodOrMember as MethodInfo;
             var serviceExpr = method != null
