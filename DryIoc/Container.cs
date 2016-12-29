@@ -5947,7 +5947,8 @@ namespace DryIoc
 
             if (factory.FactoryType == FactoryType.Service)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
-                    Throw.If(p.FactoryID == newFactoryID, Error.RecursiveDependencyDetected, Print(newFactoryID));
+                    if (p.FactoryID == newFactoryID)
+                        Throw.It(Error.RecursiveDependencyDetected, Print(newFactoryID));
 
             var reuse = factory.Reuse;
             if (reuse == null) // unspecified reuse

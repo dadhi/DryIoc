@@ -15,6 +15,15 @@ namespace PerformanceTests
             Measure(PrepareDryIoc());
         }
 
+        [Test, Explicit]
+        public void DryIoc_test_1000_times()
+        {
+            for (var i = 0; i < 1000; i++)
+            {
+                Measure(PrepareDryIoc());
+            }
+        }
+
         public static global::DryIoc.IContainer PrepareDryIoc()
         {
             var container = new Container();
