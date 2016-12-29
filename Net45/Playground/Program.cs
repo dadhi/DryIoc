@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 using System.Threading;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using PerformanceTests;
 
 namespace Playground
 {
@@ -14,7 +15,8 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<IfVsTernaryOperator>();
+            BenchmarkRunner.Run<AutofacVsDryIocNestedSingletons_RegistrationAndResolution>();
+            //BenchmarkRunner.Run<IfVsTernaryOperator>();
             //BenchmarkRunner.Run<ArrayAccessVsGetOrAddItem>();
             //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
             //new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
