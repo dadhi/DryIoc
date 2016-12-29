@@ -1523,7 +1523,7 @@ namespace DryIoc
                 {
                     var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                     if (decoratedExpr != null)
-                        return decoratedExpr.CompileToDelegate(request.Container);
+                        return decoratedExpr.CompileToDelegate();
                 }
 
                 return GetInstanceFromScopeChainOrSingletons;
@@ -2549,13 +2549,29 @@ namespace DryIoc
 
         static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result);
 
-        /// <summary>First wraps the input service creation expression into lambda expression and
-        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.
-        /// By default it is using Expression.Compile but if corresponding rule specified (available on .Net 4.0 and higher),
-        /// it will compile to DymanicMethod/Assembly.</summary>
+        /// <summary>First wraps the input service expression into lambda expression and
+        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param>
-        /// <param name="container">To access container state that may be required for compilation.</param>
         /// <returns>Compiled factory delegate to use for service resolution.</returns>
+        public static FactoryDelegate CompileToDelegate(this Expression expression)
+        {
+            expression = OptimizeExpression(expression);
+
+            // Optimize: just extract singleton from expression without compiling
+            if (expression.NodeType == ExpressionType.Constant)
+            {
+                var value = ((ConstantExpression)expression).Value;
+                return (state, context, scope) => value;
+            }
+
+            FactoryDelegate factoryDelegate = null;
+            CompileToDelegate(expression, ref factoryDelegate);
+            // ReSharper disable once ConstantNullCoalescingCondition
+            return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
+        }
+
+        // todo: v3: remove
+        /// <summary>Obsolete: replace with overload without unused container parameter</summary>
         public static FactoryDelegate CompileToDelegate(this Expression expression, IContainer container)
         {
             expression = OptimizeExpression(expression);
@@ -6658,8 +6674,12 @@ namespace DryIoc
             {
                 var singletons = (SingletonScope)request.Scopes.SingletonScope;
                 var singletonID = singletons.IndexOf(FactoryID);
-                if (singletonID != -1)
-                    return Expression.Constant(singletons.Get(singletonID));
+                if (singletonID > 0)
+                {
+                    var value = singletons.GetOrDefault(singletonID);
+                    if (value != null)
+                        return Expression.Convert(Expression.Constant(value), request.ServiceType);
+                }
             }
 
             // Then check the expression cache
@@ -6675,10 +6695,18 @@ namespace DryIoc
             var serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr != null)
             {
+                var originalServiceExprType = serviceExpr.Type;
+
                 serviceExpr = ApplyReuse(request, serviceExpr);
+
+                var isSingletonConstantExpr = serviceExpr.NodeType == ExpressionType.Constant;
+
+                if (serviceExpr.Type != originalServiceExprType)
+                    serviceExpr = Expression.Convert(serviceExpr, originalServiceExprType);
 
                 // cache the new expression
                 if (isExpressionCacheable &&
+                    !isSingletonConstantExpr &&            // but not evaluated singleton constant
                     !request.ContainsNestedResolutionCall) // can be checked only after expression is created
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
             }
@@ -6744,11 +6772,11 @@ namespace DryIoc
                 FactoryDelegate factoryDelegate = null;
 
                 if (serviceExpr.NodeType == ExpressionType.New)
-                    factoryDelegate = ActivateSingleton(serviceExpr, singletons);
+                    factoryDelegate = ActivateSingleton((NewExpression)serviceExpr, singletons);
 
                 if (factoryDelegate == null)
                 {
-                    factoryDelegate = serviceExpr.CompileToDelegate(request.Container);
+                    factoryDelegate = serviceExpr.CompileToDelegate();
                     if (Setup.PreventDisposal)
                     {
                         var factory = factoryDelegate;
@@ -6805,19 +6833,18 @@ namespace DryIoc
                     Expression.Convert(serviceExpr, typeof(object[])),
                     Expression.Constant(0, typeof(int)));
 
-            return Expression.Convert(serviceExpr, serviceType);
+            return serviceExpr;
         }
 
-        private FactoryDelegate ActivateSingleton(Expression serviceExpr, IScope singletons)
+        private FactoryDelegate ActivateSingleton(NewExpression newExpr, IScope singletons)
         {
-            var newExpr = (NewExpression)serviceExpr;
             var argExprs = newExpr.Arguments;
             var singletonType = newExpr.Type;
 
             CreateScopedValue createSingleton = null;
             if (argExprs.Count == 0)
             {
-                createSingleton = () => Activator.CreateInstance(singletonType, true);
+                createSingleton = () => Activator.CreateInstance(singletonType, ArrayTools.Empty<object>());
             }
             else if (argExprs.Count == 1)
             {
@@ -6887,7 +6914,7 @@ namespace DryIoc
         public virtual FactoryDelegate GetDelegateOrDefault(Request request)
         {
             var expression = GetExpressionOrDefault(request);
-            return expression == null ? null : expression.CompileToDelegate(request.Container);
+            return expression == null ? null : expression.CompileToDelegate();
         }
 
         /// <summary>Returns nice string representation of factory.</summary>
@@ -8215,13 +8242,28 @@ namespace DryIoc
 
         internal int IndexOf(int factoryId)
         {
-            return (int?)_factoryIdToIndexMap.GetValueOrDefault(factoryId) ?? -1;
+            var indexObj = _factoryIdToIndexMap.GetValueOrDefault(factoryId);
+            return indexObj == null ? -1 : (int)indexObj;
         }
 
-        internal object Get(int index)
+        internal object GetOrDefault(int index)
         {
-            return index < BucketSize ? Items[index]
-                : ((object[][])Items[0])[(index / BucketSize) - 1][index % BucketSize];
+            if (index < BucketSize)
+                return Items[index];
+
+            var buckets = Items[0] as object[][];
+            if (buckets == null)
+                return null;
+
+            var bucketIndex = (index / BucketSize) - 1; // bucket indeces start with 0
+            if (bucketIndex >= buckets.Length)
+                return null;
+
+            var bucket = buckets[bucketIndex];
+            if (bucket == null)
+                return null;
+
+            return bucket[index % BucketSize];
         }
 
         /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
