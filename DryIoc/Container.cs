@@ -7158,7 +7158,6 @@ namespace DryIoc
         /// <param name="ifUnresolved">(optional) By default returns default value if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
         /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
-        ///
         /// <returns>Combined selector.</returns>
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null,
@@ -7503,8 +7502,23 @@ namespace DryIoc
             var ctor = ctorOrMethodOrMember as ConstructorInfo;
             if (ctor != null)
             {
-                var newServiceExpr = Expression.New(ctor, paramExprs);
-                return InitPropertiesAndFields(newServiceExpr, request);
+                var newServiceExpr = paramExprs.IsNullOrEmpty()
+                    ? Expression.New(ctor.DeclaringType)
+                    : Expression.New(ctor, paramExprs);
+
+                var rules = request.Rules;
+                if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
+                    return newServiceExpr;
+
+                var selector = rules.OverrideRegistrationMade
+                    ? Made.PropertiesAndFields.OverrideWith(rules.PropertiesAndFields)
+                    : rules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
+
+                var propertiesAndFields = selector(request);
+                if (propertiesAndFields == null)
+                    return newServiceExpr;
+
+                return InitPropertiesAndFields(newServiceExpr, request, propertiesAndFields);
             }
 
             var method = ctorOrMethodOrMember as MethodInfo;
@@ -7550,17 +7564,9 @@ namespace DryIoc
             return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType, request);
         }
 
-        private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
+        private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request,
+            IEnumerable<PropertyOrFieldServiceInfo> members)
         {
-            var containerRules = request.Rules;
-            var selector = containerRules.OverrideRegistrationMade
-                ? Made.PropertiesAndFields.OverrideWith(containerRules.PropertiesAndFields)
-                : containerRules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
-
-            var members = selector(request);
-            if (members == null)
-                return newServiceExpr;
-
             var bindings = new List<MemberBinding>();
             foreach (var member in members)
                 if (member != null)
@@ -10397,11 +10403,40 @@ namespace DryIoc
 
         /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="args">Argument types</param> <returns>Found method or null.</returns>
-        public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] args)
+        /// <param name="paramTypes">Argument types</param> <returns>Found method or null.</returns>
+        public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
-            return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m =>
-                m.Name == name && args.SequenceEqual(m.GetParameters().Select(p => p.ParameterType)));
+            var typeInfo = type.GetTypeInfo();
+            var paramCount = paramTypes.Length;
+            foreach (var method in typeInfo.DeclaredMethods)
+            {
+                if (method.Name == name)
+                {
+                    var methodParams = method.GetParameters();
+                    if (paramCount == methodParams.Length)
+                    {
+                        if (paramCount == 0)
+                            return method;
+
+                        if (paramCount == 1)
+                        {
+                            if (paramTypes[0] == methodParams[0].ParameterType)
+                                return method;
+                        }
+                        else
+                        {
+                            var i = 0;
+                            for (; i < paramCount; ++i)
+                                if (paramTypes[i] != methodParams[i].ParameterType)
+                                    break;
+                            if (i == paramCount)
+                                return method;
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
