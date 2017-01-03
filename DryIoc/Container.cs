@@ -61,9 +61,10 @@ namespace DryIoc
         public override string ToString()
         {
             var scope = ((IScopeAccess)this).GetCurrentScope();
-            if (scope != null)
-                return "container with open scope: " + scope;
-            return "container";
+            var scopeStr = scope != null ? "Scoped container: " + scope : "Container";
+            if (IsDisposed)
+                scopeStr = "Disposed! " + scopeStr;
+            return scopeStr;
         }
 
         /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
@@ -191,6 +192,9 @@ namespace DryIoc
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+                return;
+
             // for container created with OpenScope
             if (_openedScope != null &&
                 !(Rules.ImplicitOpenedRootScope && _openedScope.Parent == null && _scopeContext == null))
@@ -204,9 +208,6 @@ namespace DryIoc
             }
             else // whole Container with singletons.
             {
-                if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                    return;
-
                 if (_openedScope != null)
                     _openedScope.Dispose();
 
@@ -2444,20 +2445,20 @@ namespace DryIoc
     /// Minimizes dependency to Factory Delegate on container.</summary>
     public interface IResolverContext
     {
-        /// <summary>Provides access to resolver implementation.</summary>
+        /// <summary>Provides access to current / scoped resolver.</summary>
         IResolver Resolver { get; }
 
-        /// <summary>Scopes access.</summary>
+        /// <summary>Access to the singleton and current scopes.</summary>
         IScopeAccess Scopes { get; }
     }
 
     /// <summary>Guards access to <see cref="Container"/> WeakReference target with more DryIoc specific exceptions.</summary>
     public sealed class ContainerWeakRef : IResolverContext
     {
-        /// <summary>Provides access to resolver implementation.</summary>
+        /// <summary>Provides access to current / scoped resolver.</summary>
         public IResolver Resolver { get { return GetTarget(); } }
 
-        /// <summary>Scope access.</summary>
+        /// <summary>Access to the singleton and current scopes.</summary>
         public IScopeAccess Scopes { get { return GetTarget(); } }
 
         /// <summary>Container access.</summary>
@@ -2468,7 +2469,8 @@ namespace DryIoc
         public Container GetTarget()
         {
             var container = _ref.Target as Container;
-            return container != null && !container.IsDisposed ? container
+            return container != null && !container.IsDisposed 
+                ? container
                 : container == null
                     ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
                     : Throw.For<Container>(Error.ContainerIsDisposed);
@@ -9777,7 +9779,7 @@ namespace DryIoc
             NoCurrentScope = Of(
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
             ContainerIsDisposed = Of(
-                "Container is disposed and its operations are no longer available."),
+                "Container is disposed and cannot be used anymore."),
             NotDirectScopeParent = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." +
                 Environment.NewLine +
