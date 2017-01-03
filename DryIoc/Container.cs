@@ -2680,6 +2680,7 @@ namespace DryIoc
             return wrappers;
         }
 
+        // todo: Probably move to container to consolidate work with factories.
         /// <summary>Returns wrapper factory. For open-generic wrapper - generated closed factory first.</summary>
         /// <param name="request">Wrapper request.</param>
         /// <returns>Found wrapper factory or default null otherwise.</returns>
@@ -2694,6 +2695,10 @@ namespace DryIoc
             var factory = request.Container.GetWrapperFactoryOrDefault(actualServiceType);
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
+
+            if (factory != null && factory.Setup.Condition != null &&
+                !factory.Setup.Condition(request.RequestInfo))
+                return null;
 
             return factory;
         }
@@ -5971,12 +5976,9 @@ namespace DryIoc
             IReuse reuse = null;
             if (factory.Setup.UseParentReuse)
                 reuse = GetParentOrFuncOrEmpty().Reuse;
-            else
-            {
-                var decoratorSetup = factory.Setup as Setup.DecoratorSetup;
-                if (decoratorSetup != null && decoratorSetup.UseDecorateeReuse)
-                    reuse = Reuse; // current reuse
-            }
+            else if (factory.Setup.FactoryType == FactoryType.Decorator 
+                && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
+                reuse = Reuse;
 
             // if no specified the wrapper reuse is always Transient,
             // other container-wide default reuse is applied
@@ -6243,16 +6245,20 @@ namespace DryIoc
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
-        /// <summary>Sets the basic settings.</summary>
+        /// <summary>Sets the base settings.</summary>
+        /// <param name="condition"></param>
         /// <param name="openResolutionScope"></param> <param name="asResolutionCall"></param>
         /// <param name="asResolutionRoot"></param> <param name="preventDisposal"></param>
         /// <param name="weaklyReferenced"></param> <param name="allowDisposableTransient"></param>
         /// <param name="trackDisposableTransient"></param> <param name="useParentReuse"></param>
-        private Setup(bool openResolutionScope = false, bool asResolutionCall = false,
+        private Setup(Func<RequestInfo, bool> condition = null,
+            bool openResolutionScope = false, bool asResolutionCall = false,
             bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
             bool useParentReuse = false)
         {
+            Condition = condition;
+
             if (asResolutionCall)
                 _settings |= Settings.AsResolutionCall;
             if (openResolutionScope)
@@ -6293,7 +6299,8 @@ namespace DryIoc
         private readonly Settings _settings;
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
-        /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
+        /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> 
+        /// <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
         /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
         /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
@@ -6331,15 +6338,20 @@ namespace DryIoc
         /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
         /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
         /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
+        /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
+        /// <param name="condition">(optional)</param>
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
-            bool openResolutionScope = false, bool preventDisposal = false)
+            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
+            Func<RequestInfo, bool> condition = null)
         {
             return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-                && !openResolutionScope && !preventDisposal ? Wrapper
-                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap, openResolutionScope, preventDisposal);
+                && !openResolutionScope && !preventDisposal && condition == null 
+                ? Wrapper
+                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+                    condition, openResolutionScope, asResolutionCall, preventDisposal);
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
@@ -6377,15 +6389,17 @@ namespace DryIoc
                 }
             }
 
-            public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null,
-                bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
-                bool preventDisposal = false, bool weaklyReferenced = false,
-                bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-                bool useParentReuse = false) : base(openResolutionScope, asResolutionCall, asResolutionRoot,
+            public ServiceSetup() {}
+
+            public ServiceSetup(Func<RequestInfo, bool> condition, object metadataOrFuncOfMetadata,
+                bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
+                bool preventDisposal, bool weaklyReferenced,
+                bool allowDisposableTransient, bool trackDisposableTransient,
+                bool useParentReuse) 
+                : base(condition, openResolutionScope, asResolutionCall, asResolutionRoot,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
                     useParentReuse)
             {
-                Condition = condition;
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
             }
 
@@ -6393,7 +6407,7 @@ namespace DryIoc
         }
 
         /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
-        public sealed class WrapperSetup : Setup
+        internal sealed class WrapperSetup : Setup
         {
             /// <summary>Returns <see cref="DryIoc.FactoryType.Wrapper"/> type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Wrapper; } }
@@ -6408,16 +6422,24 @@ namespace DryIoc
             /// <summary>Delegate returning wrapped type from wrapper type. Overwrites other options.</summary>
             public readonly Func<Type, Type> Unwrap;
 
+            /// <summary>Default setup</summary>
+            /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. 
+            /// Need to be set for multiple type arguments.</param>
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1)
+            {
+                WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
+            }
+
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-            /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type.  Overwrites other options.</param>
-            /// <param name="openResolutionScope">(optional) Opens the new scope.</param><param name="asResolutionCall"></param>
-            /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
-                Func<Type, Type> unwrap = null,
-                bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false)
-                : base(openResolutionScope, asResolutionCall, preventDisposal: preventDisposal)
+            /// <param name="unwrap">Delegate returning wrapped type from wrapper type.  Overwrites other options.</param>
+            /// <param name="openResolutionScope">Opens the new scope.</param><param name="asResolutionCall"></param>
+            /// <param name="preventDisposal">Prevents disposal of reused instance if it is disposable.</param>
+            /// <param name="condition">Predicate to check if factory could be used for resolved request.</param>
+            public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
+                Func<RequestInfo, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal)
+                : base(condition, openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall, preventDisposal: preventDisposal)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
@@ -6448,7 +6470,7 @@ namespace DryIoc
         }
 
         /// <summary>Setup applied to decorators.</summary>
-        public sealed class DecoratorSetup : Setup
+        internal sealed class DecoratorSetup : Setup
         {
             /// <summary>Returns Decorator factory type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
@@ -6462,6 +6484,9 @@ namespace DryIoc
             /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
             public readonly bool UseDecorateeReuse;
 
+            /// <summary>Default setup.</summary>
+            public DecoratorSetup() { }
+
             /// <summary>Creates decorator setup with optional condition.</summary>
             /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
             /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.
@@ -6470,9 +6495,9 @@ namespace DryIoc
             /// - first registered are closer decoratee.</param>
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
-            public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
+            public DecoratorSetup(Func<RequestInfo, bool> condition, int order, bool useDecorateeReuse)
+                : base(condition)
             {
-                Condition = condition;
                 Order = order;
                 UseDecorateeReuse = useDecorateeReuse;
             }
@@ -6684,7 +6709,7 @@ namespace DryIoc
 
         private Expression ApplyReuse(Request request, Expression serviceExpr)
         {
-            if (serviceExpr.Type == typeof(void))
+            if (request.ServiceType == typeof(void))
                 return serviceExpr;
 
             // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
