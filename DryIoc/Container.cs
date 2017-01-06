@@ -77,7 +77,7 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed);
+            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -87,7 +87,7 @@ namespace DryIoc
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
-            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -97,7 +97,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -108,7 +108,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             var newSingletons = new SingletonScope();
-            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -119,7 +119,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Returns ambient scope context associated with container.</summary>
@@ -156,7 +156,9 @@ namespace DryIoc
                      nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed);
+
+            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed, 
+                parent: this);
         }
 
         /// <summary>The default name of root scope without ambient context.</summary>
@@ -223,6 +225,19 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Returns root for scope container or itself for non-scoped.</summary> <returns>Always not null.</returns>
+        public Container GetRootContainer()
+        {
+            if (_parent == null)
+                return this;
+
+            var last = _parent;
+            for (var p = _parent._parent; p != null; p = p._parent)
+                last = p;
+
+            return last;
+        }
+
         #region Static state
 
         /// <summary>State parameter expression in FactoryDelegate.</summary>
@@ -236,6 +251,12 @@ namespace DryIoc
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression ResolverExpr =
             Expression.Property(ResolverContextParamExpr, "Resolver");
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression RootResolverExpr =
+            Expression.Property(
+                Expression.Convert(ResolverContextParamExpr, typeof(ContainerWeakRef)), 
+                "RootResolver");
 
         /// <summary>Access to scopes in FactoryDelegate.</summary>
         public static readonly Expression ScopesExpr =
@@ -448,7 +469,7 @@ namespace DryIoc
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(null, _containerWeakRef, null)
+                ? factoryDelegate(null, _thisContainerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -474,7 +495,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(null, _containerWeakRef, scope);
+                    return cachedFactoryDelegate(null, _thisContainerWeakRef, scope);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -493,7 +514,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(null, _containerWeakRef, scope);
+            var service = factoryDelegate(null, _thisContainerWeakRef, scope);
 
             if (registryValue.Services.IsEmpty)
                 return service;
@@ -535,7 +556,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(null, _containerWeakRef, scope);
+            var service = factoryDelegate(null, _thisContainerWeakRef, scope);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
@@ -797,7 +818,7 @@ namespace DryIoc
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef IContainer.ContainerWeakRef
         {
-            get { return _containerWeakRef; }
+            get { return _thisContainerWeakRef; }
         }
 
         Factory IContainer.ResolveFactory(Request request)
@@ -1394,7 +1415,13 @@ namespace DryIoc
         private readonly Ref<Registry> _registry;
         private Ref<ImTreeMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
 
-        private readonly ContainerWeakRef _containerWeakRef;
+        // pre-created and stored for performance reasons
+        private readonly ContainerWeakRef _thisContainerWeakRef;
+
+        // internal to be used by ResolverContext
+        internal readonly Container _parent;
+
+        // created once per container, and cached for faster Request creation
         private readonly Request _emptyRequest;
 
         private readonly SingletonScope _singletonScope;
@@ -2041,7 +2068,8 @@ namespace DryIoc
         }
 
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
-            IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0)
+            IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0,
+            Container parent = null)
         {
             _disposed = disposed;
 
@@ -2059,8 +2087,10 @@ namespace DryIoc
             else if (scopeContext == null && rules.ImplicitOpenedRootScope) // only valid for non ambient context
                 _openedScope = new Scope(null, NonAmbientRootScopeName);
 
-            _containerWeakRef = new ContainerWeakRef(this);
-            _emptyRequest = Request.CreateEmpty(_containerWeakRef);
+            _thisContainerWeakRef = new ContainerWeakRef(this);
+            _emptyRequest = Request.CreateEmpty(_thisContainerWeakRef);
+
+            _parent = parent;
         }
 
         #endregion
@@ -2455,6 +2485,13 @@ namespace DryIoc
     /// <summary>Guards access to <see cref="Container"/> WeakReference target with more DryIoc specific exceptions.</summary>
     public sealed class ContainerWeakRef : IResolverContext
     {
+        // todo: v3: pull to IResolverContext interface.
+        /// <summary>Provideas access to Parent resolver if any.</summary>
+        public IResolver RootResolver
+        {
+            get { return GetTarget(maybeDisposed: true).GetRootContainer(); }
+        }
+
         /// <summary>Provides access to current / scoped resolver.</summary>
         public IResolver Resolver { get { return GetTarget(); } }
 
@@ -2465,19 +2502,24 @@ namespace DryIoc
         public IContainer Container { get { return GetTarget(); } }
 
         /// <summary>Returns target container when it is not null and not disposed. Otherwise throws exception.</summary>
+        /// <param name="maybeDisposed">(optional) If set will return even disposed container.</param>
         /// <returns>Target container.</returns>
-        public Container GetTarget()
+        public Container GetTarget(bool maybeDisposed = false)
         {
             var container = _ref.Target as Container;
-            return container != null && !container.IsDisposed 
+            return container != null && (maybeDisposed || !container.IsDisposed) 
                 ? container
                 : container == null
                     ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
                     : Throw.For<Container>(Error.ContainerIsDisposed);
         }
 
-        /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
-        public ContainerWeakRef(IContainer container) { _ref = new WeakReference(container); }
+        /// <summary>Creates weak reference wrapper over passed container object.</summary> 
+        /// <param name="container">Container to reference.</param>
+        public ContainerWeakRef(IContainer container)
+        {
+            _ref = new WeakReference(container);
+        }
 
         private readonly WeakReference _ref;
     }
@@ -2664,10 +2706,14 @@ namespace DryIoc
         private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
         {
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(_ => Container.ResolverExpr, setup: Setup.Wrapper));
+                new ExpressionFactory(r => r.Parent.Reuse is SingletonReuse ? Container.RootResolverExpr : Container.ResolverExpr, 
+                setup: Setup.Wrapper));
 
             var containerFactory = new ExpressionFactory(r =>
-                Expression.Convert(Container.ResolverExpr, r.ServiceType), setup: Setup.Wrapper);
+                Expression.Convert(
+                    r.Parent.Reuse is SingletonReuse ? Container.RootResolverExpr : Container.ResolverExpr, 
+                    r.ServiceType), 
+                setup: Setup.Wrapper);
 
             wrappers = wrappers
                 .AddOrUpdate(typeof(IRegistrator), containerFactory)
@@ -2870,10 +2916,13 @@ namespace DryIoc
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
 
-            if (nullWrapperForUnresolvedService && request.Container.ResolveFactory(serviceRequest) == null)
+            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
+            if (serviceFactory == null)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault
                     ? Expression.Constant(null, lazyType)
                     : null;
+
+            serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, allowRecursiveDependency: true);
 
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
@@ -5018,8 +5067,12 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
             var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
 
+            // todo: traverse to singleton parent
+            var resolverExpr = request.Reuse is SingletonReuse 
+                ? Container.RootResolverExpr : Container.ResolverExpr;
+
             var resolveCallExpr = Expression.Call(
-                Container.ResolverExpr, "Resolve", ArrayTools.Empty<Type>(),
+                resolverExpr, "Resolve", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
                 preResolveParentExpr, scopeExpr);
 
@@ -5949,14 +6002,16 @@ namespace DryIoc
 
         /// <summary>Returns new request with set implementation details.</summary>
         /// <param name="factory">Factory to which request is resolved.</param>
+        /// <param name="allowRecursiveDependency">(optional) does not check for recursive dependency. 
+        /// Use with caution. Make sense for Resolution expression.</param>
         /// <returns>New request with set factory.</returns>
-        public Request WithResolvedFactory(Factory factory)
+        public Request WithResolvedFactory(Factory factory, bool allowRecursiveDependency = false)
         {
             var newFactoryID = factory.FactoryID;
             if (IsEmpty || FactoryID == newFactoryID)
                 return this; // resolving only once, no need to check recursion again.
 
-            if (factory.FactoryType == FactoryType.Service)
+            if (factory.FactoryType == FactoryType.Service && !allowRecursiveDependency)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                     if (p.FactoryID == newFactoryID)
                         Throw.It(Error.RecursiveDependencyDetected, Print(newFactoryID));
@@ -6137,10 +6192,10 @@ namespace DryIoc
             public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
 
-            // mutable, supposed to be set once when dependency factory expressions are created
+            // Mutable, supposed to be set once when dependency factory expressions are created
             public bool ContainsNestedResolutionCall;
 
-            // mutable, increment via IncrementDependencyCount method.
+            // Mutable, incremented via IncrementDependencyCount method.
             public int DependencyCount;
 
             public ResolverContext(ContainerWeakRef container, ContainerWeakRef scopes, IScope scope, RequestInfo preResolveParent)
@@ -9160,6 +9215,9 @@ namespace DryIoc
         {
             if (IsEmpty)
                 return s.Append("{empty}");
+
+            if (Reuse != null && Reuse != DryIoc.Reuse.Transient)
+                s.Append(Reuse is SingletonReuse ? "singleton" : "scoped").Append(' ');
 
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');

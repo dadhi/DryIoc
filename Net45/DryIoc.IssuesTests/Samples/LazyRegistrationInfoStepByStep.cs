@@ -188,7 +188,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test]
+        [Test, Ignore]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
             // the same registration code as in the lazy sample

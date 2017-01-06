@@ -14,7 +14,19 @@ namespace DryIoc.IssuesTests
             var scope = container.OpenScope();
             var singleton = scope.Resolve<Singleton>();
 
+            scope.Dispose();
+
             Assert.AreSame(container, singleton.Container);
+        }
+
+        public class Singleton
+        {
+            public IContainer Container { get; }
+
+            public Singleton(IContainer container)
+            {
+                Container = container;
+            }
         }
 
         [Test]
@@ -24,11 +36,11 @@ namespace DryIoc.IssuesTests
 
             c.Register(typeof(IFactory<>), typeof(Factory<>), setup: Setup.Wrapper);
 
-            c.Register<Singleton>(Reuse.Singleton);
+            c.Register<SingletonWithFactory>(Reuse.Singleton);
             c.Register<Service>();
 
             var scope = c.OpenScope();
-            var singleton = scope.Resolve<Singleton>();
+            var singleton = scope.Resolve<SingletonWithFactory>();
 
             scope.Dispose();
 
@@ -36,15 +48,13 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(service);
         }
 
-        public class Singleton
+        public class SingletonWithFactory
         {
             public IFactory<Service> ServiceFactory { get; }
-            public IContainer Container { get; }
 
-            public Singleton(IFactory<Service> serviceFactory, IContainer container)
+            public SingletonWithFactory(IFactory<Service> serviceFactory)
             {
                 ServiceFactory = serviceFactory;
-                Container = container;
             }
         }
 
