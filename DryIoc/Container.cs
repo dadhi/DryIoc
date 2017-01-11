@@ -268,11 +268,17 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression RootResolverExpr =
-            Expression.Call(typeof(ResolverContextTools), "RootResolver", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+            Expression.Call(typeof(ResolverContext), "RootResolver", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static Expression GetResolverExpr(RequestInfo r)
+        {
+            return r.IsSingletonOrDependencyOfSingleton ? RootResolverExpr : ResolverExpr;
+        }
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression SingletonScopeExpr =
-            Expression.Call(typeof(ResolverContextTools), "SingletonScope", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+            Expression.Call(typeof(ResolverContext), "SingletonScope", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
 
         /// <summary>Access to scopes in FactoryDelegate.</summary>
         public static readonly Expression ScopesExpr =
@@ -2495,7 +2501,7 @@ namespace DryIoc
 
     // todo: v3: remove cause the IResolverContext should contain all needed members
     /// <summary>Adds new members to <see cref="IResolverContext"/></summary>
-    public static class ResolverContextTools
+    public static class ResolverContext
     {
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
@@ -2742,15 +2748,11 @@ namespace DryIoc
         private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
         {
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(r => r.IsSingletonOrSingletonDependency
-                    ? Container.RootResolverExpr : Container.ResolverExpr, 
+                new ExpressionFactory(r => Container.GetResolverExpr(r.RequestInfo), 
                 setup: Setup.Wrapper));
 
             var containerFactory = new ExpressionFactory(r =>
-                Expression.Convert(
-                    r.IsSingletonOrSingletonDependency 
-                    ? Container.RootResolverExpr : Container.ResolverExpr, 
-                    r.ServiceType), 
+                Expression.Convert(Container.GetResolverExpr(r.RequestInfo), r.ServiceType), 
                 setup: Setup.Wrapper);
 
             wrappers = wrappers
@@ -2925,7 +2927,8 @@ namespace DryIoc
 
             var preResolveParent = container.RequestInfoToExpression(request.RequestInfo);
 
-            var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
+            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            var callResolveManyExpr = Expression.Call(resolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
@@ -5104,8 +5107,7 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
             var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
 
-            var resolverExpr = request.IsSingletonOrSingletonDependency 
-                ? Container.RootResolverExpr : Container.ResolverExpr;
+            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
 
             var resolveCallExpr = Expression.Call(
                 resolverExpr, "Resolve", ArrayTools.Empty<Type>(),
@@ -5806,9 +5808,6 @@ namespace DryIoc
                   : RawParent.RequestInfo;
             }
         } 
-
-        /// <summary>Subj.</summary>
-        public bool IsSingletonOrSingletonDependency { get { return RequestInfo.IsSingletonOrSingletonDependency; } }
 
         /// <summary>Provides access to container currently bound to request.
         /// By default it is container initiated request by calling resolve method,
@@ -8079,7 +8078,8 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.Container.GetOrAddStateItemExpression(_factoryDelegate);
-            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, Container.ResolverExpr), request.ServiceType);
+            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, resolverExpr), request.ServiceType);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -9081,7 +9081,7 @@ namespace DryIoc
 
         // todo: calculate once.
         /// <summary>subj.</summary>
-        public bool IsSingletonOrSingletonDependency
+        public bool IsSingletonOrDependencyOfSingleton
         {
             get
             {
