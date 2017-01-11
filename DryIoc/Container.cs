@@ -5763,8 +5763,10 @@ namespace DryIoc
         /// <returns>True if has Func ancestor.</returns>
         public bool IsWrappedInFunc()
         {
-            return ParentOrWrapper.Enumerate()
-                .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFunc());
+            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
+                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                    return true;
+            return false;
         }
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
@@ -5785,7 +5787,10 @@ namespace DryIoc
         }
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
-        public bool TracksTransientDisposable { get { return (_flags & Flags.TracksTransientDisposable) != 0; } }
+        public bool TracksTransientDisposable
+        {
+            get { return (_flags & Flags.TracksTransientDisposable) != 0; }
+        }
 
         /// <summary>Gathers the info from resolved dependency graph. 
         /// If dependency injected <c>asResolutionCall</c> the whole graph is not cacheable (issue #416).</summary>
@@ -6882,9 +6887,8 @@ namespace DryIoc
 
             // Optimize: eagerly create singleton during the construction of object graph,
             // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
-            if (request.Rules.EagerCachingSingletonForFasterAccess &&
-                reuse is SingletonReuse &&
-
+            if (reuse is SingletonReuse && 
+                request.Rules.EagerCachingSingletonForFasterAccess &&
                 // except: For decorators and wrappers, when tracking tansient disposable and for lazy consumption in Func
                 FactoryType == FactoryType.Service &&
                 !tracksTransientDisposable &&
