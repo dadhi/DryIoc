@@ -12,6 +12,9 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+            v2.9.6:
+            - fixed: #421: MissingMethodException
+            - fixed: Perf of first Resolve in some cases - now is up to ~10x faster
             v2.9.5:
             - fixed: #416 (now for real): Adding always true condition to decorator changes the decorated outcome - but should not
             - fixed: #417 Performance issue with Func of singleton
