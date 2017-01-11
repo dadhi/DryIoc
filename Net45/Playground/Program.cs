@@ -15,9 +15,10 @@ namespace Playground
     {
         static void Main()
         {
-            //BenchmarkRunner.Run<AutofacVsDryIocNestedSingletons_Resolution>();
-            //BenchmarkRunner.Run<AutofacVsDryIocNestedSingletons_RegistrationAndResolution>();
-            BenchmarkRunner.Run<IfVsNullСoalesOperator>();
+            BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<BenchmarkResolution>();
+            //BenchmarkRunner.Run<IfVsNullСoalesOperator>();
             //BenchmarkRunner.Run<IfVsTernaryOperator>();
             //BenchmarkRunner.Run<ArrayAccessVsGetOrAddItem>();
             //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());

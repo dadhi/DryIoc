@@ -134,44 +134,39 @@ namespace PerformanceTests
 
 
         #endregion
-    }
 
-    public class AutofacVsDryIocNestedSingletons_Resolution
-    {
-        private IContainer _autofac =
-            ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.PrepareAutofac();
-
-        private global::DryIoc.IContainer _dryioc =
-            ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.PrepareDryIoc();
-
-        [Benchmark]
-        public object BmarkAutofac()
+        public class BenchmarkResolution
         {
-            return ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.Measure(_autofac);
+            private IContainer _autofac = PrepareAutofac();
+
+            private global::DryIoc.IContainer _dryioc = PrepareDryIoc();
+
+            [Benchmark]
+            public object BmarkAutofac()
+            {
+                return Measure(_autofac);
+            }
+
+            [Benchmark]
+            public object BmarkDryIoc()
+            {
+                return Measure(_dryioc);
+            }
         }
 
-        [Benchmark]
-        public object BmarkDryIoc()
+        public class BenchmarkRegistrationAndResolution
         {
-            return ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.Measure(_dryioc);
-        }
-    }
+            [Benchmark]
+            public object BmarkAutofac()
+            {
+                return Measure(PrepareAutofac());
+            }
 
-    public class AutofacVsDryIocNestedSingletons_RegistrationAndResolution
-    {
-        [Benchmark]
-        public object BmarkAutofac()
-        {
-            var autofac = ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.PrepareAutofac();
-            return ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.Measure(autofac);
-        }
-
-        [Benchmark]
-        public object BmarkDryIoc()
-        {
-            var dryioc = ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.PrepareDryIoc();
-            return ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.Measure(dryioc);
+            [Benchmark]
+            public object BmarkDryIoc()
+            {
+                return Measure(PrepareDryIoc());
+            }
         }
     }
-
 }
