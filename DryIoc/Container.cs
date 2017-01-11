@@ -239,16 +239,19 @@ namespace DryIoc
         }
 
         /// <summary>Returns root for scope container or itself for non-scoped.</summary> <returns>Always not null.</returns>
-        public Container GetRootContainer()
+        public Container RootContainer
         {
-            if (_parent == null)
-                return this;
+            get
+            {
+                if (_parent == null)
+                    return this;
 
-            var last = _parent;
-            for (var p = last._parent; p != null; p = p._parent)
-                last = p;
+                var last = _parent;
+                for (var p = last._parent; p != null; p = p._parent)
+                    last = p;
 
-            return last;
+                return last;
+            }
         }
 
         #region Static state
@@ -270,7 +273,7 @@ namespace DryIoc
         public static readonly Expression RootResolverExpr =
             Expression.Call(typeof(ResolverContext), "RootResolver", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
 
-        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        /// <summary>Returns <see cref="ResolverExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
         public static Expression GetResolverExpr(RequestInfo r)
         {
             return r.IsSingletonOrDependencyOfSingleton ? RootResolverExpr : ResolverExpr;
@@ -283,6 +286,16 @@ namespace DryIoc
         /// <summary>Access to scopes in FactoryDelegate.</summary>
         public static readonly Expression ScopesExpr =
             Expression.Property(ResolverContextParamExpr, "Scopes");
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression RootScopesExpr =
+            Expression.Call(typeof(ResolverContext), "RootScopes", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+
+        /// <summary>Returns <see cref="ScopesExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
+        public static Expression GetScopesExpr(RequestInfo r)
+        {
+            return r.IsSingletonOrDependencyOfSingleton ? RootScopesExpr : ScopesExpr;
+        }
 
         /// <summary>Resolution scope parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolutionScopeParamExpr =
@@ -303,15 +316,16 @@ namespace DryIoc
             var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
 
             // if assign in expression is supported then use it.
+            var scopesExpr = GetScopesExpr(request.RequestInfo);
             if (_expressionAssignMethod != null)
             {
-                var getOrNewScopeExpr = Expression.Call(ScopesExpr, "GetOrNewResolutionScope",
+                var getOrNewScopeExpr = Expression.Call(scopesExpr, "GetOrNewResolutionScope",
                     ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
                 var parameters = new object[] { ResolutionScopeParamExpr, getOrNewScopeExpr };
                 return (Expression)_expressionAssignMethod.Invoke(null, parameters);
             }
 
-            return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope",
+            return Expression.Call(scopesExpr, "GetOrCreateResolutionScope",
                 ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
@@ -2488,8 +2502,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Returns reference to actual resolver implementation.
-    /// Minimizes dependency to Factory Delegate on container.</summary>
+    /// <summary>Holds all required info by <see cref="FactoryDelegate"/>.</summary>
     public interface IResolverContext
     {
         /// <summary>Provides access to current / scoped resolver.</summary>
@@ -2499,41 +2512,40 @@ namespace DryIoc
         IScopeAccess Scopes { get; }
     }
 
-    // todo: v3: remove cause the IResolverContext should contain all needed members
-    /// <summary>Adds new members to <see cref="IResolverContext"/></summary>
+    /// <summary>Provides the shortcuts and sugar based onto <see cref="IResolverContext"/> 
+    /// to be consumed in <see cref="FactoryDelegate"/></summary>
     public static class ResolverContext
     {
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
-        public static IScope SingletonScope(this IResolverContext ctx)
+        public static IResolver RootResolver(this IResolverContext ctx)
         {
-            return ((ContainerWeakRef)ctx).SingletonScope;
+            return ctx.RootContainer();
         }
 
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
-        public static IResolver RootResolver(this IResolverContext ctx)
+        public static IScopeAccess RootScopes(this IResolverContext ctx)
         {
-            return ((ContainerWeakRef)ctx).RootResolver;
+            return ctx.RootContainer();
+        }
+
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IScope SingletonScope(this IResolverContext ctx)
+        {
+            return ctx.RootContainer().SingletonScope;
+        }
+
+        private static Container RootContainer(this IResolverContext ctx)
+        {
+            return ((ContainerWeakRef)ctx).GetTarget(maybeDisposed: true).RootContainer;
         }
     }
 
-    /// <summary>Guards access to <see cref="Container"/> WeakReference target with more DryIoc specific exceptions.</summary>
+    /// <summary>Wraps access to <see cref="Container"/> WeakReference target with DryIoc specific exceptions.</summary>
     public sealed class ContainerWeakRef : IResolverContext
     {
-        // todo: v3: pull to IResolverContext interface.
-        /// <summary>Provides access to Parent resolver if any.</summary>
-        public IResolver RootResolver
-        {
-            get { return GetTarget(maybeDisposed: true).GetRootContainer(); }
-        }
-
-        /// <summary>Access to singletons - always from the root container.</summary>
-        public IScope SingletonScope
-        {
-            get { return GetTarget(maybeDisposed: true).GetRootContainer().SingletonScope; }
-        }
-
         /// <summary>Provides access to current / scoped resolver.</summary>
         public IResolver Resolver { get { return GetTarget(); } }
 
@@ -8759,8 +8771,10 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
+            var scopesExpr = Container.GetScopesExpr(request.RequestInfo);
+
             return Expression.Call(_getOrAddItemOrDefaultMethod,
-                Container.ScopesExpr, scopeNameExpr,
+                scopesExpr, scopeNameExpr,
                 Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
@@ -8908,7 +8922,8 @@ namespace DryIoc
         /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Call(Container.ScopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
+            var scopesExpr = Container.GetScopesExpr(request.RequestInfo);
+            return Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
                 Container.GetResolutionScopeExpression(request),
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),

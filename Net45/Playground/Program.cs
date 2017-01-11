@@ -15,7 +15,9 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<AutofacVsDryIocNestedSingletons_RegistrationAndResolution>();
+            //BenchmarkRunner.Run<AutofacVsDryIocNestedSingletons_Resolution>();
+            //BenchmarkRunner.Run<AutofacVsDryIocNestedSingletons_RegistrationAndResolution>();
+            BenchmarkRunner.Run<IfVsNullСoalesOperator>();
             //BenchmarkRunner.Run<IfVsTernaryOperator>();
             //BenchmarkRunner.Run<ArrayAccessVsGetOrAddItem>();
             //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
@@ -23,6 +25,25 @@ namespace Playground
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
+        }
+
+        public class IfVsNullСoalesOperator
+        {
+            private object x = "a";
+
+            [Benchmark]
+            public string If()
+            {
+                var s = x as string;
+                if (s != null) return s;
+                return string.Empty;
+            }
+
+            [Benchmark]
+            public string NullCoalescOperator()
+            {
+                return (x as string) ?? string.Empty;
+            }
         }
 
         public class IfVsTernaryOperator

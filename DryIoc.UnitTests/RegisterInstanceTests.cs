@@ -121,7 +121,7 @@ namespace DryIoc.UnitTests
 
             public Expression GetScopeExpression(Request request)
             {
-                return Expression.Property(Container.ScopesExpr, "SingletonScope");
+                return Expression.Property(Container.GetScopesExpr(request.RequestInfo), "SingletonScope");
             }
 
             public int GetScopedItemIdOrSelf(int factoryID, Request request)
