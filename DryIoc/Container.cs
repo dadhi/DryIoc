@@ -5729,7 +5729,7 @@ namespace DryIoc
         public static Request CreateEmpty(Container container)
         {
             var resolverContext = new RequestContext(container, container, null, RequestInfo.Empty);
-            return new Request(resolverContext, parent: null, requestInfo: RequestInfo.Empty, made: null, funcArgs: null);
+            return new Request(resolverContext, null, RequestInfo.Empty, null, null, default(Flags));
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
@@ -5783,6 +5783,9 @@ namespace DryIoc
 
             return false;
         }
+
+        /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
+        public bool TracksTransientDisposable { get { return (_flags & Flags.TracksTransientDisposable) != 0; } }
 
         /// <summary>Gathers the info from resolved dependency graph. 
         /// If dependency injected <c>asResolutionCall</c> the whole graph is not cacheable (issue #416).</summary>
@@ -5895,12 +5898,6 @@ namespace DryIoc
             return RequestInfo.GetActualServiceType();
         }
 
-        /// <summary>Returns known implementation, or otherwise actual service type.</summary> <returns>The subject.</returns>
-        public Type GetKnownImplementationOrServiceType()
-        {
-            return ImplementationType ?? GetActualServiceType();
-        }
-
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
         /// <param name="preResolveParent">(optional) Request info beyond/preceding Resolve call.</param>
@@ -5917,14 +5914,14 @@ namespace DryIoc
 
                 var requestInfo = Push(preResolveParent, info, Container);
 
-                return new Request(resolverContext, this, requestInfo, made: null, funcArgs: null);
+                return new Request(resolverContext, this, requestInfo, null, null, default(Flags));
             }
 
             Throw.If(RequestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
 
             var inheritedRequestInfo = Push(RequestInfo, info, Container);
 
-            return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs);
+            return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs, default(Flags));
         }
 
         private static RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo, IContainer container)
@@ -5981,7 +5978,7 @@ namespace DryIoc
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             var newRequestInfo = RequestInfo.With(getInfo);
-            return new Request(_requestContext, RawParent, newRequestInfo, Made, FuncArgs);
+            return new Request(_requestContext, RawParent, newRequestInfo, Made, FuncArgs, _flags);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -6004,7 +6001,7 @@ namespace DryIoc
         {
             var argsUsed = new bool[argExpressions.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
-            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo);
+            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo, _flags);
         }
 
         // todo: v3: remove
@@ -6030,7 +6027,7 @@ namespace DryIoc
 
             var argsUsed = new bool[argExprs.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExprs);
-            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo);
+            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo, _flags);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container,
@@ -6040,7 +6037,7 @@ namespace DryIoc
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
             var newContext = _requestContext.With(newContainer.Container);
-            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs);
+            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs, _flags);
         }
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -6063,13 +6060,17 @@ namespace DryIoc
             if (reuse == null)
                 reuse = GetDefaultReuse(factory);
 
-            ThrowIfReuseHasShorterLifespanThanParent(reuse);
+            var flags = default(Flags);
+            if (reuse == DryIoc.Reuse.Transient)
+                reuse = GetTransientDisposableTrackingReuse(factory, ref flags);
+            else
+                ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
             var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
 
             _requestContext.IncrementDependencyCount();
-            return new Request(_requestContext, RawParent, newInfo, made, FuncArgs);
+            return new Request(_requestContext, RawParent, newInfo, made, FuncArgs, flags);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -6089,6 +6090,32 @@ namespace DryIoc
                     : Container.Rules.DefaultReuseInsteadOfTransient;
 
             return reuse;
+        }
+
+        private IReuse GetTransientDisposableTrackingReuse(Factory factory, ref Flags flags)
+        {
+            // Track transient disposable in parent scope (if any), or open scope (if any)
+            var setup = factory.Setup;
+            var tracksTransientDisposable = 
+                !setup.PreventDisposal &&
+                (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
+                (factory.ImplementationType ?? GetActualServiceType()).IsAssignableTo(typeof(IDisposable));
+
+            if (!tracksTransientDisposable)
+                return DryIoc.Reuse.Transient;
+
+            flags |= Flags.TracksTransientDisposable;
+
+            // First, check the parent's scope
+            var parent = GetParentOrFuncOrEmpty(firstNonTransientParent: true);
+            if (parent.FactoryType == FactoryType.Wrapper)
+                return DryIoc.Reuse.Transient;
+
+            if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
+                return parent.Reuse;
+            
+            // If no reused parent, then track in current open scope, or if not opened in singleton
+            return Scopes.GetCurrentScope() != null ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton;
         }
 
         private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
@@ -6241,15 +6268,25 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(RequestContext requestContext,
-            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs)
+        private Request(RequestContext requestContext,
+            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs,
+            Flags flags)
         {
             _requestContext = requestContext;
             RawParent = parent;
             RequestInfo = requestInfo;
             Made = made;
             FuncArgs = funcArgs;
+            _flags = flags;
         }
+
+        [Flags]
+        private enum Flags
+        {
+            TracksTransientDisposable = 1 << 1
+        }
+
+        private readonly Flags _flags;
 
         private readonly RequestContext _requestContext;
 
@@ -6726,10 +6763,10 @@ namespace DryIoc
         protected virtual bool IsFactoryExpressionCacheable(Request request)
         {
             return Setup.FactoryType == FactoryType.Service
+                && !request.TracksTransientDisposable
                 && request.FuncArgs == null
                 && !Setup.AsResolutionCall
-                && !IsContextDependent(request)
-                && !IsTrackingDisposableTransient(request);
+                && !IsContextDependent(request);
         }
 
         private bool IsContextDependent(Request request)
@@ -6738,13 +6775,6 @@ namespace DryIoc
                 || Setup.UseParentReuse
                 || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
-        }
-
-        private bool IsTrackingDisposableTransient(Request request)
-        {
-            return request.Reuse == DryIoc.Reuse.Transient
-                && (Setup.TrackDisposableTransient || request.Rules.TrackingDisposableTransients)
-                && request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
         }
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
@@ -6806,20 +6836,28 @@ namespace DryIoc
             var serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr != null)
             {
-                var originalServiceExprType = serviceExpr.Type;
+                // can be checked only after expression is created
+                if (request.ContainsNestedResolutionCall)
+                    isExpressionCacheable = false;
 
-                serviceExpr = ApplyReuse(request, serviceExpr);
+                if (request.Reuse != DryIoc.Reuse.Transient &&
+                    request.ServiceType != typeof(void))
+                {
+                    var originalServiceExprType = serviceExpr.Type;
 
-                var isSingletonConstantExpr = serviceExpr.NodeType == ExpressionType.Constant;
+                    serviceExpr = ApplyReuse(serviceExpr, request.Reuse, request.TracksTransientDisposable, request);
 
-                if (serviceExpr.Type != originalServiceExprType)
-                    serviceExpr = Expression.Convert(serviceExpr, originalServiceExprType);
+                    if (serviceExpr.NodeType == ExpressionType.Constant)
+                        isExpressionCacheable = false;
 
-                // cache the new expression
-                if (isExpressionCacheable &&
-                    !isSingletonConstantExpr &&            // but not evaluated singleton constant
-                    !request.ContainsNestedResolutionCall) // can be checked only after expression is created
+                    if (serviceExpr.Type != originalServiceExprType)
+                        serviceExpr = Expression.Convert(serviceExpr, originalServiceExprType);
+                }
+
+                if (isExpressionCacheable)
+                {
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
+                }
             }
             // Otherwise throw
             else if (request.IfUnresolved == IfUnresolved.Throw)
@@ -6830,32 +6868,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        // todo: Move tracksTransientDisposable flag to Request
-        private Expression ApplyReuse(Request request, Expression serviceExpr)
-        {
-            if (request.ServiceType == typeof(void))
-                return serviceExpr;
-
-            // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
-            var reuse = request.Reuse;
-
-            // Track transient disposable in parent scope (if any), or open scope (if any)
-            var tracksTransientDisposable =
-                reuse == DryIoc.Reuse.Transient &&
-                !Setup.PreventDisposal &&
-                (Setup.TrackDisposableTransient ||
-                !Setup.AllowDisposableTransient && request.Rules.TrackingDisposableTransients) &&
-                request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
-
-            if (tracksTransientDisposable)
-                reuse = GetTransientDisposableTrackingReuse(request);
-
-            if (reuse == DryIoc.Reuse.Transient)
-                return serviceExpr;
-
-            return ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
-        }
-
+        // todo: remove trackTransientDisposable param as it is available from Request param.
         /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access
         /// and produces another expression.</summary>
         /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
@@ -7031,22 +7044,6 @@ namespace DryIoc
         private static int _lastFactoryID;
         private IReuse _reuse;
         private Setup _setup;
-
-        private static IReuse GetTransientDisposableTrackingReuse(Request request)
-        {
-            // First, check the parent's scope
-            var parent = request.GetParentOrFuncOrEmpty(firstNonTransientParent: true);
-            if (parent.FactoryType == FactoryType.Wrapper)
-                return DryIoc.Reuse.Transient;
-
-            if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
-                return parent.Reuse;
-
-            // If no reused parent, then track in current open scope, or if not opened in singleton
-            return request.Scopes.GetCurrentScope() != null
-                ? DryIoc.Reuse.InCurrentScope
-                : DryIoc.Reuse.Singleton;
-        }
 
         #endregion
     }
@@ -7626,12 +7623,9 @@ namespace DryIoc
             var ctor = ctorOrMethodOrMember as ConstructorInfo;
             if (ctor != null)
             {
-                var newServiceExpr = paramExprs.IsNullOrEmpty()
-                    ? Expression.New(ctor.DeclaringType)
-                    : Expression.New(ctor, paramExprs);
+                var newServiceExpr = Expression.New(ctor, paramExprs);
 
                 var rules = container.Rules;
-
                 if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
                     return newServiceExpr;
 
@@ -8631,6 +8625,7 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         int Lifespan { get; }
 
+        // todo: remove trackTransientDisposable param as it is available from Request param.
         /// <summary>Returns composed expression.</summary>
         /// <param name="request">info</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
