@@ -8778,8 +8778,11 @@ namespace DryIoc
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         public bool CanApply(Request request)
         {
-            return request.IsWrappedInFunc()
-                || request.Scopes.GetCurrentNamedScope(Name, false) != null;
+            return // first is the special case whith ambient scope context, 
+                // where scope can be switched for already resolved singleton. 
+                // So it may be no valid initially but only afterwars
+                (request.Container.ScopeContext != null && request.IsWrappedInFunc()) || 
+                request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
         private static readonly Expression _inCurrentScopeReuseExpr =
@@ -9915,7 +9918,7 @@ namespace DryIoc
                 Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             NoMatchedScopeFound = Of(
-                "Unable to find scope starting from {0} with matching name: {1}."),
+                "Unable to find scope starting from current opened {0} with name: {1}."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),

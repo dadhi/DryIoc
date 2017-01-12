@@ -159,6 +159,7 @@
     <Compile Include="Issue417_Performance_issue_with_Func.cs" />
     <Compile Include="Issue422_Unable_to_resolve_decorator_with_named_dependency.cs" />
     <Compile Include="Issue423_InnerScopeIsInjectedIntoSingleton.cs" />
+    <Compile Include="Issue429_Resolve_instance_from_named_scope_with_Func.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
