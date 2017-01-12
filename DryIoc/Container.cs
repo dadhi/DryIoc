@@ -6072,10 +6072,9 @@ namespace DryIoc
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
-            var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
 
             _requestContext.IncrementDependencyCount();
-            return new Request(_requestContext, RawParent, newInfo, made, FuncArgs, flags);
+            return new Request(_requestContext, RawParent, newInfo, factory.Made, FuncArgs, flags);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -6090,9 +6089,9 @@ namespace DryIoc
             // if no specified the wrapper reuse is always Transient,
             // other container-wide default reuse is applied
             if (reuse == null)
-                reuse = factory.FactoryType == FactoryType.Wrapper
-                    ? DryIoc.Reuse.Transient
-                    : Container.Rules.DefaultReuseInsteadOfTransient;
+                reuse = factory.FactoryType != FactoryType.Wrapper
+                    ? Container.Rules.DefaultReuseInsteadOfTransient
+                    : DryIoc.Reuse.Transient;
 
             return reuse;
         }
@@ -7196,11 +7195,11 @@ namespace DryIoc
                   PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved), r);
             return r =>
             {
-                var properties = r.ImplementationType.GetDeclaredAndBase(_ => _.DeclaredProperties)
+                var properties = r.ImplementationType.GetMembers(_ => _.DeclaredProperties, includeBase: true)
                     .Where(p => p.IsInjectable(withNonPublic, withPrimitive))
                     .Select(m => getInfo(m, r));
                 return !withFields ? properties :
-                    properties.Concat(r.ImplementationType.GetDeclaredAndBase(_ => _.DeclaredFields)
+                    properties.Concat(r.ImplementationType.GetMembers(_ => _.DeclaredFields, includeBase: true)
                     .Where(f => f.IsInjectable(withNonPublic, withPrimitive))
                     .Select(m => getInfo(m, r)));
             };
@@ -7913,7 +7912,7 @@ namespace DryIoc
                 if (factoryMethodBase != null)
                 {
                     var factoryMethodParameters = factoryMethodBase.GetParameters();
-                    var targetMethods = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredMethods)
+                    var targetMethods = closedFactoryImplType.GetMembers(t => t.DeclaredMethods, includeBase: true)
                         .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
                         .ToArray();
 
@@ -7931,12 +7930,12 @@ namespace DryIoc
                 }
                 else if (factoryMember is FieldInfo)
                 {
-                    factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredFields)
+                    factoryMember = closedFactoryImplType.GetMembers(t => t.DeclaredFields, includeBase: true)
                         .Single(f => f.Name == factoryMember.Name);
                 }
                 else if (factoryMember is PropertyInfo)
                 {
-                    factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredProperties)
+                    factoryMember = closedFactoryImplType.GetMembers(t => t.DeclaredProperties, includeBase: true)
                         .Single(f => f.Name == factoryMember.Name);
                 }
             }
@@ -10577,7 +10576,7 @@ namespace DryIoc
         /// <returns>Found property or null.</returns>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name)
         {
-            return type.GetDeclaredAndBase(_ => _.DeclaredProperties).FirstOrDefault(p => p.Name == name);
+            return type.GetMembers(_ => _.DeclaredProperties, includeBase: true).FirstOrDefault(p => p.Name == name);
         }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
@@ -10585,7 +10584,7 @@ namespace DryIoc
         /// <returns>Found field or null.</returns>
         public static FieldInfo GetFieldOrNull(this Type type, string name)
         {
-            return type.GetDeclaredAndBase(_ => _.DeclaredFields).FirstOrDefault(p => p.Name == name);
+            return type.GetMembers(_ => _.DeclaredFields, includeBase: true).FirstOrDefault(p => p.Name == name);
         }
 
         /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>

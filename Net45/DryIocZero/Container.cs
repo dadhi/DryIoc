@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-
 namespace DryIocZero
 {
     using System;
@@ -689,20 +688,21 @@ namespace DryIocZero
         }
 
         /// <summary>For given instance resolves and sets properties.</summary>
-        /// <param name="resolver"></param>
+        /// <param name="resolver">Target resolver.</param>
         /// <param name="instance">Service instance with properties to resolve and initialize.</param>
+        /// <param name="includeBase">(optional) By default only declared properties are injected, if set will add base properties too.</param>
         /// <returns>Instance with assigned properties.</returns>
-        public static object InjectProperties(this IResolver resolver, object instance)
+        public static object InjectProperties(this IResolver resolver, object instance, bool includeBase = false)
         {
             var instanceType = instance.GetType();
 
-            var properties = instanceType.GetProperties();
+            var properties = instanceType.Properties(includeBase);
 
             foreach (var propertyInfo in properties)
             {
                 var value = resolver.Resolve(propertyInfo.PropertyType, ifUnresolvedReturnDefault: false);
                 if (value != null)
-                    propertyInfo.SetValue(instance, value);
+                    propertyInfo.SetValue(instance, value, null);
             }
 
             return instance;
@@ -853,6 +853,36 @@ namespace DryIocZero
         #endregion
     }
 
+    internal static class ScopedDisposableHandling
+    {
+        public static IDisposable TryUnwrapDisposable(object item)
+        {
+            var disposable = item as IDisposable;
+            if (disposable != null)
+                return disposable;
+
+            // Unwrap WeakReference if item wrapped in it.
+            var weakRefItem = item as WeakReference;
+            if (weakRefItem != null)
+                return weakRefItem.Target as IDisposable;
+
+            return null;
+        }
+
+        public static void DisposeItem(object item)
+        {
+            var disposable = TryUnwrapDisposable(item);
+            if (disposable != null)
+            {
+                try { disposable.Dispose(); }
+                catch (Exception)
+                {
+                    // NOTE: Ignoring disposing exception, they not so important for program to proceed.
+                }
+            }
+        }
+    }
+
     /// <summary>Different from <see cref="Scope"/> so that uses single array of items for fast access.
     /// The array structure is:
     /// items[0] is reserved for storing object[][] buckets.
@@ -953,31 +983,19 @@ namespace DryIocZero
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            var factoryIdToIndexMap = _factoryIdToIndexMap;
-            if (!factoryIdToIndexMap.IsEmpty)
-            {
-                var ids = factoryIdToIndexMap.Enumerate().ToArray();
-                for (var i = ids.Length - 1; i >= 0; --i)
-                    Scope.DisposeItem(GetItemOrDefault((int)ids[i].Value));
-            }
+            var disposables = _disposables;
+            if (!disposables.IsEmpty)
+                foreach (var disposable in disposables.Enumerate())
+                    ScopedDisposableHandling.DisposeItem(disposable.Value);
+
+            _disposables = ImTreeMapIntToObj.Empty;
             _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-
-            var disposableTransients = _disposableTransients;
-            if (!disposableTransients.IsNullOrEmpty())
-                for (var i = 0; i < disposableTransients.Length; i++)
-                    Scope.DisposeItem(_disposableTransients[i]);
-            _disposableTransients = null;
-
             Items = ArrayTools.Empty<object>();
         }
 
         #region Implementation
 
-        private static readonly object[] _lockers =
-        {
-            new object(), new object(), new object(), new object(),
-            new object(), new object(), new object(), new object()
-        };
+        private readonly object _syncRoot = new object();
 
         private ImTreeMapIntToObj _factoryIdToIndexMap;
         private int _lastItemIndex;
@@ -986,15 +1004,27 @@ namespace DryIocZero
         /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
         internal object[] Items;
 
-        private object[] _disposableTransients;
+        private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
+        private int _nextDisposablelID = int.MaxValue;
+
+        private void TrackDisposable(object item)
+        {
+            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
+            {
+                // Decrement here is because dispose should happen in reverse resolution order
+                // By adding items with decreasing IDs we get rid off ordering on Dispose.
+                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
+                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
+            }
+        }
 
         private object GetOrAddItem(int index, CreateScopedValue createValue)
         {
             if (index == -1) // disposable transient
             {
-                var item = createValue();
-                Ref.Swap(ref _disposableTransients, items => items.AppendOrUpdate(item));
-                return item;
+                var transient = createValue();
+                TrackDisposable(transient);
+                return transient;
             }
 
             var bucket = GetOrAddBucket(index);
@@ -1002,22 +1032,26 @@ namespace DryIocZero
             return GetOrAddItem(bucket, index, createValue);
         }
 
-        private static object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
+        private object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
         {
             var value = bucket[index];
             if (value != null)
                 return value;
 
-            var locker = _lockers[index % _lockers.Length];
-            lock (locker)
+            lock (_syncRoot)
             {
                 value = bucket[index];
                 if (value == null)
-                    bucket[index] = value = createValue();
+                {
+                    value = createValue();
+                    TrackDisposable(value);
+                    bucket[index] = value;
+                }
             }
 
             return value;
         }
+
 
         private object GetItemOrDefault(int index)
         {
@@ -1688,6 +1722,37 @@ namespace DryIocZero
         public ExcludeFromCodeCoverageAttribute(string reason = null)
         {
             Reason = reason;
+        }
+    }
+
+    /// <summary>Helper and portblity extensions to Reflection.</summary>
+    public static class ReflectionTools
+    {
+        /// <summary>Returns specific type members. Does not look into base class by default.
+        /// Specific members are returned by <paramref name="getMembers"/> delegate.</summary>
+        /// <typeparam name="TMember">Details type: properties, fields, methods, etc.</typeparam>
+        /// <param name="type">Input type.</param> <param name="getMembers">Get declared type details.</param>
+        /// <param name="includeBase">(optional) If set looks into base members.</param>
+        /// <returns>Members.</returns>
+        public static IEnumerable<TMember> Members<TMember>(this Type type,
+            Func<TypeInfo, IEnumerable<TMember>> getMembers,
+            bool includeBase = false)
+        {
+            var typeInfo = type.GetTypeInfo();
+            var members = getMembers(typeInfo);
+            if (!includeBase)
+                return members;
+            var baseType = typeInfo.BaseType;
+            return baseType == null || baseType == typeof(object)
+                ? members
+                : members.Concat(baseType.Members(getMembers, true));
+        }
+
+        /// <summary>Properties only.</summary> <param name="type">Type to reflect.</param>
+        /// <param name="includeBase">(optional). False by default.</param> <returns>Properties.</returns>
+        public static IEnumerable<PropertyInfo> Properties(this Type type, bool includeBase = false)
+        {
+            return type.Members(t => t.DeclaredProperties, includeBase: true);
         }
     }
 }
