@@ -83,6 +83,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="HashArrayMappedTrieTests.cs" />
+    <Compile Include="ResolveInstancePerDependencyWith2ParametersOncePerContainer.cs" />
     <Compile Include="ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.cs" />
     <Compile Include="TreeBenchmarks.cs" />
     <Compile Include="IntHashArrayMappedTrieTests.cs" />

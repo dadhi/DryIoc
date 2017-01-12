@@ -19,7 +19,10 @@ namespace DryIoc.UnitTests
             container.Dispose();
 
             var ex = Assert.Throws<ContainerException>(() => factory());
-            Assert.That(ex.Message, Is.StringContaining("is disposed and its operations are no longer available"));
+
+            Assert.AreEqual(
+                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(ex.Error));
         }
 
         [Test]

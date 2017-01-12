@@ -474,6 +474,30 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(2, aas.Count);
         }
 
+        [Test]
+        public void Autofac_Lazy_of_non_registered_dependency_should_throw()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterType<BLazy>();
+
+            var container = builder.Build();
+
+            Assert.Throws<DependencyResolutionException>(() => 
+            container.Resolve<BLazy>());
+        }
+
+        [Test]
+        public void DryIoc_Lazy_of_non_registered_dependency_should_throw()
+        {
+            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+
+            container.Register<BLazy>();
+
+            Assert.Throws<ContainerException>(() =>
+            container.Resolve<BLazy>());
+        }
+
         public class AutofacModule : Module
         {
             protected override void Load(ContainerBuilder builder)
@@ -504,6 +528,16 @@ namespace DryIoc.IssuesTests
             public BB(B b)
             {
                 B = b;
+            }
+        }
+
+        public class BLazy
+        {
+            public Lazy<B> LazyB { get; private set; }
+
+            public BLazy(Lazy<B> lazyB)
+            {
+                LazyB = lazyB;
             }
         }
 

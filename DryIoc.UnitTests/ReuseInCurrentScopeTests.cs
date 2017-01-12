@@ -99,8 +99,14 @@ namespace DryIoc.UnitTests
             using (var containerWithNewScope = container.OpenScope())
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
-            Assert.AreEqual(Error.ScopeIsDisposed, Assert.Throws<ContainerException>(() => getLog()).Error);
-            Assert.AreEqual(Error.ScopeIsDisposed, Assert.Throws<ContainerException>(() => getLog()).Error);
+            Assert.AreEqual(
+                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Assert.Throws<ContainerException>(() => getLog()).Error));
+
+            // the same error should be kept for further operations
+            Assert.AreEqual(
+                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Assert.Throws<ContainerException>(() => getLog()).Error));
         }
 
         [Test]

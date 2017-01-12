@@ -116,17 +116,17 @@ namespace DryIoc.UnitTests
 
             public IScope GetScopeOrDefault(Request request)
             {
-                return request.Scopes.SingletonScope;
+                return request.SingletonScope;
             }
 
             public Expression GetScopeExpression(Request request)
             {
-                return Expression.Property(Container.ScopesExpr, "SingletonScope");
+                return Expression.Property(Container.GetScopesExpr(request.RequestInfo), "SingletonScope");
             }
 
             public int GetScopedItemIdOrSelf(int factoryID, Request request)
             {
-                return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
+                return request.SingletonScope.GetScopedItemIdOrSelf(factoryID);
             }
         }
 

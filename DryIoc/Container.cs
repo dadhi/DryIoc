@@ -61,9 +61,13 @@ namespace DryIoc
         public override string ToString()
         {
             var scope = ((IScopeAccess)this).GetCurrentScope();
-            if (scope != null)
-                return "container with open scope: " + scope;
-            return "container";
+            var scopeStr 
+                = scope == null ? "Container" 
+                : _scopeContext != null ? "Ambiently scoped container: " + scope 
+                : "Scoped container: " + scope;
+            if (IsDisposed)
+                scopeStr = "Disposed (!) " + scopeStr;
+            return scopeStr;
         }
 
         /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
@@ -76,7 +80,7 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed);
+            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -86,7 +90,7 @@ namespace DryIoc
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
-            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -96,7 +100,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -107,7 +111,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             var newSingletons = new SingletonScope();
-            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -118,7 +122,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed);
+            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
         }
 
         /// <summary>Returns ambient scope context associated with container.</summary>
@@ -155,7 +159,9 @@ namespace DryIoc
                      nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
 
             var rules = configure == null ? Rules : configure(Rules);
-            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed);
+
+            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed, 
+                parent: this);
         }
 
         /// <summary>The default name of root scope without ambient context.</summary>
@@ -196,6 +202,9 @@ namespace DryIoc
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+                return;
+
             // for container created with OpenScope
             if (_openedScope != null &&
                 !(Rules.ImplicitOpenedRootScope && _openedScope.Parent == null && _scopeContext == null))
@@ -209,9 +218,6 @@ namespace DryIoc
             }
             else // whole Container with singletons.
             {
-                if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-                    return;
-
                 if (_openedScope != null)
                     _openedScope.Dispose();
 
@@ -227,8 +233,35 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Scope containing container singletons.</summary>
+        public IScope SingletonScope
+        {
+            get
+            {
+                ThrowIfContainerDisposed(); // todo: move to GetRootContainer
+                return _singletonScope;
+            }
+        }
+
+        /// <summary>Returns root for scope container or itself for non-scoped.</summary> <returns>Always not null.</returns>
+        public Container RootContainer
+        {
+            get
+            {
+                if (_parent == null)
+                    return this;
+
+                var last = _parent;
+                for (var p = last._parent; p != null; p = p._parent)
+                    last = p;
+
+                return last;
+            }
+        }
+
         #region Static state
 
+        // todo: v3: remove
         /// <summary>State parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression StateParamExpr =
             Expression.Parameter(typeof(object[]), "state");
@@ -241,9 +274,33 @@ namespace DryIoc
         public static readonly Expression ResolverExpr =
             Expression.Property(ResolverContextParamExpr, "Resolver");
 
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression RootResolverExpr =
+            Expression.Call(typeof(ResolverContext), "RootResolver", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+
+        /// <summary>Returns <see cref="ResolverExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
+        public static Expression GetResolverExpr(RequestInfo r)
+        {
+            return r.IsSingletonOrDependencyOfSingleton ? RootResolverExpr : ResolverExpr;
+        }
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression SingletonScopeExpr =
+            Expression.Call(typeof(ResolverContext), "SingletonScope", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+
         /// <summary>Access to scopes in FactoryDelegate.</summary>
         public static readonly Expression ScopesExpr =
             Expression.Property(ResolverContextParamExpr, "Scopes");
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression RootScopesExpr =
+            Expression.Call(typeof(ResolverContext), "RootScopes", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+
+        /// <summary>Returns <see cref="ScopesExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
+        public static Expression GetScopesExpr(RequestInfo r)
+        {
+            return r.IsSingletonOrDependencyOfSingleton ? RootScopesExpr : ScopesExpr;
+        }
 
         /// <summary>Resolution scope parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolutionScopeParamExpr =
@@ -264,15 +321,16 @@ namespace DryIoc
             var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
 
             // if assign in expression is supported then use it.
+            var scopesExpr = GetScopesExpr(request.RequestInfo);
             if (_expressionAssignMethod != null)
             {
-                var getOrNewScopeExpr = Expression.Call(ScopesExpr, "GetOrNewResolutionScope",
+                var getOrNewScopeExpr = Expression.Call(scopesExpr, "GetOrNewResolutionScope",
                     ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
                 var parameters = new object[] { ResolutionScopeParamExpr, getOrNewScopeExpr };
                 return (Expression)_expressionAssignMethod.Invoke(null, parameters);
             }
 
-            return Expression.Call(ScopesExpr, "GetOrCreateResolutionScope",
+            return Expression.Call(scopesExpr, "GetOrCreateResolutionScope",
                 ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
@@ -452,7 +510,7 @@ namespace DryIoc
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(null, _containerWeakRef, null)
+                ? factoryDelegate(null, _thisContainerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -482,7 +540,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(null, _containerWeakRef, scope);
+                    return cachedFactoryDelegate(null, _thisContainerWeakRef, scope);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -504,7 +562,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(null, _containerWeakRef, scope);
+            var service = factoryDelegate(null, _thisContainerWeakRef, scope);
 
             if (registry.Services.IsEmpty)
                 return service;
@@ -546,7 +604,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(null, _containerWeakRef, scope);
+            var service = factoryDelegate(null, _thisContainerWeakRef, scope);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
@@ -688,12 +746,6 @@ namespace DryIoc
 
         #region IScopeAccess
 
-        /// <summary>Scope containing container singletons.</summary>
-        IScope IScopeAccess.SingletonScope
-        {
-            get { return _singletonScope; }
-        }
-
         IScope IScopeAccess.GetCurrentScope()
         {
             return ((IScopeAccess)this).GetCurrentNamedScope(null, false);
@@ -805,10 +857,11 @@ namespace DryIoc
             get { return _emptyRequest; }
         }
 
+        // todo: v3: Rename to ResolverContext
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef IContainer.ContainerWeakRef
         {
-            get { return _containerWeakRef; }
+            get { return _thisContainerWeakRef; }
         }
 
         Factory IContainer.ResolveFactory(Request request)
@@ -1409,7 +1462,13 @@ namespace DryIoc
         private readonly Ref<Registry> _registry;
         private Ref<ImTreeMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
 
-        private readonly ContainerWeakRef _containerWeakRef;
+        // pre-created and stored for performance reasons
+        private readonly ContainerWeakRef _thisContainerWeakRef;
+
+        // internal to be used by RequestContext
+        internal readonly Container _parent;
+
+        // created once per container, and cached for faster Request creation
         private readonly Request _emptyRequest;
 
         private readonly SingletonScope _singletonScope;
@@ -1554,7 +1613,7 @@ namespace DryIoc
                     scope = scope.Parent;
                 }
 
-                return GetAndUnwrapOrDefault(r.Scopes.SingletonScope, FactoryID);
+                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID);
             }
 
             private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
@@ -2069,7 +2128,8 @@ namespace DryIoc
         }
 
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
-            IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0)
+            IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0,
+            Container parent = null)
         {
             _disposed = disposed;
 
@@ -2087,8 +2147,10 @@ namespace DryIoc
             else if (scopeContext == null && rules.ImplicitOpenedRootScope) // only valid for non ambient context
                 _openedScope = new Scope(null, NonAmbientRootScopeName);
 
-            _containerWeakRef = new ContainerWeakRef(this);
-            _emptyRequest = Request.CreateEmpty(_containerWeakRef);
+            _thisContainerWeakRef = new ContainerWeakRef(this);
+            _emptyRequest = Request.CreateEmpty(this);
+
+            _parent = parent;
         }
 
         #endregion
@@ -2486,42 +2548,78 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Returns reference to actual resolver implementation.
-    /// Minimizes dependency to Factory Delegate on container.</summary>
+    /// <summary>Holds all required info by <see cref="FactoryDelegate"/>.</summary>
     public interface IResolverContext
     {
-        /// <summary>Provides access to resolver implementation.</summary>
+        /// <summary>Provides access to current / scoped resolver.</summary>
         IResolver Resolver { get; }
 
-        /// <summary>Scopes access.</summary>
+        /// <summary>Access to the singleton and current scopes.</summary>
         IScopeAccess Scopes { get; }
     }
 
-    /// <summary>Guards access to <see cref="Container"/> WeakReference target with more DryIoc specific exceptions.</summary>
+    /// <summary>Provides the shortcuts and sugar based onto <see cref="IResolverContext"/> 
+    /// to be consumed in <see cref="FactoryDelegate"/></summary>
+    public static class ResolverContext
+    {
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IResolver RootResolver(this IResolverContext ctx)
+        {
+            return ctx.RootContainer();
+        }
+
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IScopeAccess RootScopes(this IResolverContext ctx)
+        {
+            return ctx.RootContainer();
+        }
+
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IScope SingletonScope(this IResolverContext ctx)
+        {
+            return ctx.RootContainer().SingletonScope;
+        }
+
+        private static Container RootContainer(this IResolverContext ctx)
+        {
+            return ((ContainerWeakRef)ctx).GetTarget(maybeDisposed: true).RootContainer;
+        }
+    }
+
+    /// <summary>Wraps access to <see cref="Container"/> WeakReference target with DryIoc specific exceptions.</summary>
     public sealed class ContainerWeakRef : IResolverContext
     {
-        /// <summary>Provides access to resolver implementation.</summary>
+        /// <summary>Provides access to current / scoped resolver.</summary>
         public IResolver Resolver { get { return GetTarget(); } }
 
-        /// <summary>Scope access.</summary>
+        /// <summary>Access to the singleton and current scopes.</summary>
         public IScopeAccess Scopes { get { return GetTarget(); } }
 
         /// <summary>Container access.</summary>
         public IContainer Container { get { return GetTarget(); } }
 
         /// <summary>Returns target container when it is not null and not disposed. Otherwise throws exception.</summary>
+        /// <param name="maybeDisposed">(optional) If set will return even disposed container.</param>
         /// <returns>Target container.</returns>
-        public Container GetTarget()
+        public Container GetTarget(bool maybeDisposed = false)
         {
             var container = _ref.Target as Container;
-            return container != null && !container.IsDisposed ? container
+            return container != null && (maybeDisposed || !container.IsDisposed) 
+                ? container
                 : container == null
                     ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
                     : Throw.For<Container>(Error.ContainerIsDisposed);
         }
 
-        /// <summary>Creates weak reference wrapper over passed container object.</summary> <param name="container">Object to wrap.</param>
-        public ContainerWeakRef(IContainer container) { _ref = new WeakReference(container); }
+        /// <summary>Creates weak reference wrapper over passed container object.</summary> 
+        /// <param name="container">Container to reference.</param>
+        public ContainerWeakRef(IContainer container)
+        {
+            _ref = new WeakReference(container);
+        }
 
         private readonly WeakReference _ref;
     }
@@ -2708,10 +2806,12 @@ namespace DryIoc
         private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
         {
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(_ => Container.ResolverExpr, setup: Setup.Wrapper));
+                new ExpressionFactory(r => Container.GetResolverExpr(r.RequestInfo), 
+                setup: Setup.Wrapper));
 
             var containerFactory = new ExpressionFactory(r =>
-                Expression.Convert(Container.ResolverExpr, r.ServiceType), setup: Setup.Wrapper);
+                Expression.Convert(Container.GetResolverExpr(r.RequestInfo), r.ServiceType), 
+                setup: Setup.Wrapper);
 
             wrappers = wrappers
                 .AddOrUpdate(typeof(IRegistrator), containerFactory)
@@ -2724,6 +2824,7 @@ namespace DryIoc
             return wrappers;
         }
 
+        // todo: Probably move to container to consolidate work with factories.
         /// <summary>Returns wrapper factory. For open-generic wrapper - generated closed factory first.</summary>
         /// <param name="request">Wrapper request.</param>
         /// <returns>Found wrapper factory or default null otherwise.</returns>
@@ -2738,6 +2839,10 @@ namespace DryIoc
             var factory = request.Container.GetWrapperFactoryOrDefault(actualServiceType);
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactoryOrDefault(request);
+
+            if (factory != null && factory.Setup.Condition != null &&
+                !factory.Setup.Condition(request.RequestInfo))
+                return null;
 
             return factory;
         }
@@ -2880,7 +2985,8 @@ namespace DryIoc
 
             var preResolveParent = container.RequestInfoToExpression(request.RequestInfo);
 
-            var callResolveManyExpr = Expression.Call(Container.ResolverExpr, _resolveManyMethod,
+            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            var callResolveManyExpr = Expression.Call(resolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
@@ -2909,10 +3015,13 @@ namespace DryIoc
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
 
-            if (nullWrapperForUnresolvedService && request.Container.ResolveFactory(serviceRequest) == null)
+            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
+            if (serviceFactory == null)
                 return request.IfUnresolved == IfUnresolved.ReturnDefault
                     ? Expression.Constant(null, lazyType)
                     : null;
+
+            serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, allowRecursiveDependency: true);
 
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
@@ -4635,10 +4744,9 @@ namespace DryIoc
             reuse = reuse ?? Reuse.Singleton;
 
             var scopedReuse = reuse as CurrentScopeReuse;
-            var containerScopes = (IScopeAccess)container;
             var scope = scopedReuse != null
-                ? containerScopes.GetCurrentNamedScope(scopedReuse.Name, throwIfNotFound: true)
-                : containerScopes.SingletonScope;
+                ? ((IScopeAccess)container).GetCurrentNamedScope(scopedReuse.Name, throwIfNotFound: true)
+                : ((Container)container).SingletonScope;
 
             var setup = _defaultInstanceSetup;
             if (preventDisposal)
@@ -5057,8 +5165,10 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
             var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
 
+            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+
             var resolveCallExpr = Expression.Call(
-                Container.ResolverExpr, "Resolve", ArrayTools.Empty<Type>(),
+                resolverExpr, "Resolve", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
                 preResolveParentExpr, scopeExpr);
 
@@ -5662,10 +5772,10 @@ namespace DryIoc
         /// Every resolution will start from this request by pushing service information into, and then resolving it.</summary>
         /// <param name="container">Reference to container issued the request. Could be changed later with <see cref="WithNewContainer"/> method.</param>
         /// <returns>New empty request.</returns>
-        public static Request CreateEmpty(ContainerWeakRef container)
+        public static Request CreateEmpty(Container container)
         {
-            var resolverContext = new ResolverContext(container, container, null, RequestInfo.Empty);
-            return new Request(resolverContext, parent: null, requestInfo: RequestInfo.Empty, made: null, funcArgs: null);
+            var resolverContext = new RequestContext(container, container, null, RequestInfo.Empty);
+            return new Request(resolverContext, null, RequestInfo.Empty, null, null, default(Flags));
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
@@ -5681,7 +5791,7 @@ namespace DryIoc
         public bool IsResolutionRoot { get { return IsResolutionCall && PreResolveParent.IsEmpty; } }
 
         /// <summary>Request prior to Resolve call.</summary>
-        public RequestInfo PreResolveParent { get { return _resolverContext.PreResolveParent; } }
+        public RequestInfo PreResolveParent { get { return _requestContext.PreResolveParent; } }
 
         /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
         public bool IsFirstNonWrapperInResolutionCall()
@@ -5699,8 +5809,10 @@ namespace DryIoc
         /// <returns>True if has Func ancestor.</returns>
         public bool IsWrappedInFunc()
         {
-            return ParentOrWrapper.Enumerate()
-                .Any(r => r.FactoryType == FactoryType.Wrapper && r.GetActualServiceType().IsFunc());
+            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
+                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                    return true;
+            return false;
         }
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
@@ -5710,10 +5822,20 @@ namespace DryIoc
         public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
         {
             var parent = ParentOrWrapper;
-            return immediateParent
-                ? parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFuncWithArgs()
-                : !parent.FirstOrEmpty(p =>
-                    p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs()).IsEmpty;
+            if (immediateParent)
+                return parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFuncWithArgs();
+
+            for (var p = parent; !p.IsEmpty; p = p.ParentOrWrapper)
+                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
+        public bool TracksTransientDisposable
+        {
+            get { return (_flags & Flags.TracksTransientDisposable) != 0; }
         }
 
         /// <summary>Gathers the info from resolved dependency graph. 
@@ -5721,13 +5843,13 @@ namespace DryIoc
         /// <returns>True if contains, false - otherwise or if not known.</returns>
         public bool ContainsNestedResolutionCall
         {
-            get { return _resolverContext.ContainsNestedResolutionCall; }
-            set { if (value) _resolverContext.ContainsNestedResolutionCall = true; }
+            get { return _requestContext.ContainsNestedResolutionCall; }
+            set { if (value) _requestContext.ContainsNestedResolutionCall = true; }
         }
 
         /// <summary>Provides approximate nummber of dependencies in resolution graph (starting from Resolve method), 
         /// excluding registered delegates, instances, and wrappers.</summary>
-        public int DependencyCount {  get { return _resolverContext.DependencyCount; } }
+        public int DependencyCount {  get { return _requestContext.DependencyCount; } }
 
         /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
         public RequestInfo Parent
@@ -5751,34 +5873,27 @@ namespace DryIoc
                   : RawParent.IsEmpty ? PreResolveParent
                   : RawParent.RequestInfo;
             }
-        }
-
-        /// <summary>Gets first ancestor request which satisfies the condition,
-        /// or empty if no ancestor is found.</summary>
-        /// <param name="condition">(optional) Condition to stop on.</param>
-        /// <returns>Request info of found parent.</returns>
-        public RequestInfo Ancestor(Func<RequestInfo, bool> condition = null)
-        {
-            var parent = ParentOrWrapper;
-            return condition == null ? parent : parent.FirstOrEmpty(condition);
-        }
-
-        /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
-        public ContainerWeakRef ContainerWeakRef { get { return _resolverContext.ContainerWeakRef; } }
+        } 
 
         /// <summary>Provides access to container currently bound to request.
         /// By default it is container initiated request by calling resolve method,
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
-        public IContainer Container { get { return _resolverContext.ContainerWeakRef.Container; } }
+        public IContainer Container { get { return _requestContext.Container; } }
 
         /// <summary>Shortcut to issued container rules.</summary>
-        public Rules Rules { get { return Container.Rules; } }
+        public Rules Rules { get { return _requestContext.Container.Rules; } }
 
         /// <summary>Separate from container because while container may be switched from parent to child, scopes should be from child/facade.</summary>
-        public IScopeAccess Scopes { get { return _resolverContext.ScopesWeakRef.Scopes; } }
+        public IScopeAccess Scopes { get { return _requestContext.Scopes; } }
 
-        /// <summary>Optionally associated resolution scope.</summary>
-        public IScope Scope { get { return _resolverContext.Scope; } }
+        /// <summary>Singletons</summary>
+        public IScope SingletonScope { get { return ((Container)_requestContext.Container).SingletonScope; } }
+
+        /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
+        public ContainerWeakRef ContainerWeakRef { get { return _requestContext.Container.ContainerWeakRef; } }
+
+        /// <summary>Resolution scope.</summary>
+        public IScope Scope { get { return _requestContext.Scope; } }
 
         /// <summary>(optional) Made spec used for resolving request.</summary>
         public readonly Made Made;
@@ -5834,12 +5949,6 @@ namespace DryIoc
             return RequestInfo.GetActualServiceType();
         }
 
-        /// <summary>Returns known implementation, or otherwise actual service type.</summary> <returns>The subject.</returns>
-        public Type GetKnownImplementationOrServiceType()
-        {
-            return ImplementationType ?? GetActualServiceType();
-        }
-
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param> <param name="scope">(optional) Resolution scope.</param>
         /// <param name="preResolveParent">(optional) Request info beyond/preceding Resolve call.</param>
@@ -5852,18 +5961,18 @@ namespace DryIoc
             if (IsEmpty)
             {
                 preResolveParent = preResolveParent ?? RequestInfo.Empty;
-                var resolverContext = _resolverContext.With(scope).With(preResolveParent);
+                var resolverContext = _requestContext.With(scope).With(preResolveParent);
 
                 var requestInfo = Push(preResolveParent, info, Container);
 
-                return new Request(resolverContext, this, requestInfo, made: null, funcArgs: null);
+                return new Request(resolverContext, this, requestInfo, null, null, default(Flags));
             }
 
             Throw.If(RequestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
 
             var inheritedRequestInfo = Push(RequestInfo, info, Container);
 
-            return new Request(_resolverContext, this, inheritedRequestInfo, null, FuncArgs);
+            return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs, default(Flags));
         }
 
         private static RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo, IContainer container)
@@ -5920,7 +6029,7 @@ namespace DryIoc
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
             var newRequestInfo = RequestInfo.With(getInfo);
-            return new Request(_resolverContext, RawParent, newRequestInfo, Made, FuncArgs);
+            return new Request(_requestContext, RawParent, newRequestInfo, Made, FuncArgs, _flags);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -5943,7 +6052,7 @@ namespace DryIoc
         {
             var argsUsed = new bool[argExpressions.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
-            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo);
+            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo, _flags);
         }
 
         // todo: v3: remove
@@ -5969,7 +6078,7 @@ namespace DryIoc
 
             var argsUsed = new bool[argExprs.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExprs);
-            return new Request(_resolverContext, RawParent, RequestInfo, Made, argsInfo);
+            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo, _flags);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container,
@@ -5978,71 +6087,127 @@ namespace DryIoc
         /// <returns>Request with replaced container.</returns>
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
-            var newContext = _resolverContext.With(newContainer);
-            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs);
+            var newContext = _requestContext.With(newContainer.Container);
+            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs, _flags);
         }
 
         /// <summary>Returns new request with set implementation details.</summary>
         /// <param name="factory">Factory to which request is resolved.</param>
+        /// <param name="allowRecursiveDependency">(optional) does not check for recursive dependency. 
+        /// Use with caution. Make sense for Resolution expression.</param>
         /// <returns>New request with set factory.</returns>
-        public Request WithResolvedFactory(Factory factory)
+        public Request WithResolvedFactory(Factory factory, bool allowRecursiveDependency = false)
         {
             var newFactoryID = factory.FactoryID;
             if (IsEmpty || FactoryID == newFactoryID)
                 return this; // resolving only once, no need to check recursion again.
 
-            if (factory.FactoryType == FactoryType.Service)
+            if (factory.FactoryType == FactoryType.Service && !allowRecursiveDependency)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
-                    Throw.If(p.FactoryID == newFactoryID, Error.RecursiveDependencyDetected, Print(newFactoryID));
+                    if (p.FactoryID == newFactoryID)
+                        Throw.It(Error.RecursiveDependencyDetected, Print(newFactoryID));
 
             var reuse = factory.Reuse;
-            if (reuse == null) // unspecified reuse
-            {
-                if (factory.Setup.UseParentReuse)
-                    reuse = GetParentOrFuncOrEmpty().Reuse;
-                else
-                {
-                    var decoratorSetup = factory.Setup as Setup.DecoratorSetup;
-                    if (decoratorSetup != null && decoratorSetup.UseDecorateeReuse)
-                        reuse = Reuse; // current reuse
-                }
+            if (reuse == null)
+                reuse = GetDefaultReuse(factory);
 
-                // if no specified the wrapper reuse is always Transient,
-                // other container-wide default reuse is applied
-                if (reuse == null)
-                    reuse = factory.FactoryType == FactoryType.Wrapper
-                        ? DryIoc.Reuse.Transient
-                        : Container.Rules.DefaultReuseInsteadOfTransient;
-            }
+            var flags = default(Flags);
+            if (reuse == DryIoc.Reuse.Transient)
+                reuse = GetTransientDisposableTrackingReuse(factory, ref flags);
+            else
+                ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
             var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
-            var made = factory is ReflectionFactory ? ((ReflectionFactory)factory).Made : null;
-            _resolverContext.IncrementDependencyCount();
-            return new Request(_resolverContext, RawParent, newInfo, made, FuncArgs);
+
+            _requestContext.IncrementDependencyCount();
+            return new Request(_requestContext, RawParent, newInfo, factory.Made, FuncArgs, flags);
         }
 
+        private IReuse GetDefaultReuse(Factory factory)
+        {
+            IReuse reuse = null;
+            if (factory.Setup.UseParentReuse)
+                reuse = GetParentOrFuncOrEmpty().Reuse;
+            else if (factory.Setup.FactoryType == FactoryType.Decorator 
+                && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
+                reuse = Reuse;
+
+            // if no specified the wrapper reuse is always Transient,
+            // other container-wide default reuse is applied
+            if (reuse == null)
+                reuse = factory.FactoryType != FactoryType.Wrapper
+                    ? Container.Rules.DefaultReuseInsteadOfTransient
+                    : DryIoc.Reuse.Transient;
+
+            return reuse;
+        }
+
+        private IReuse GetTransientDisposableTrackingReuse(Factory factory, ref Flags flags)
+        {
+            // Track transient disposable in parent scope (if any), or open scope (if any)
+            var setup = factory.Setup;
+            var tracksTransientDisposable = 
+                !setup.PreventDisposal &&
+                (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
+                (factory.ImplementationType ?? GetActualServiceType()).IsAssignableTo(typeof(IDisposable));
+
+            if (!tracksTransientDisposable)
+                return DryIoc.Reuse.Transient;
+
+            flags |= Flags.TracksTransientDisposable;
+
+            // First, check the parent's scope
+            var parent = GetParentOrFuncOrEmpty(firstNonTransientParent: true);
+            if (parent.FactoryType == FactoryType.Wrapper)
+                return DryIoc.Reuse.Transient;
+
+            if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
+                return parent.Reuse;
+            
+            // If no reused parent, then track in current open scope, or if not opened in singleton
+            return Scopes.GetCurrentScope() != null ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton;
+        }
+
+        private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
+        {
+            // Fast check: if reuse is not applied or the rule set then skip the check.
+            var reuseLifespan = reuse.Lifespan;
+            if (reuseLifespan == 0 || !Rules.ThrowIfDependencyHasShorterReuseLifespan)
+                return;
+
+            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
+            {
+                if (p.FactoryType == FactoryType.Wrapper)
+                {
+                    if (p.GetActualServiceType().IsFunc())
+                        return; // stop on Func
+                }
+                else if (p.FactoryType == FactoryType.Service)
+                {
+                    if (p.ReuseLifespan > reuseLifespan)
+                        Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
+                }
+            }
+        }
+
+        // todo: Improve perf.
         /// <summary>Returns non-wrapper parent of Func wrapper if any.</summary>
         /// <param name="firstNonTransientParent">(optional) When set specifies to search for first not transient parent.</param>
         /// <returns>Found parent or Func parent or empty.</returns>
         public RequestInfo GetParentOrFuncOrEmpty(bool firstNonTransientParent = false)
         {
-            var parent = ParentOrWrapper;
-            if (!parent.IsEmpty)
+            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
             {
-                foreach (var p in parent.Enumerate())
+                if (p.FactoryType == FactoryType.Wrapper)
                 {
-                    if (p.FactoryType == FactoryType.Wrapper)
-                    {
-                        if (p.GetActualServiceType().IsFunc())
-                            return p;
-                    }
-                    else
-                    {
-                        if (!firstNonTransientParent ||
-                            p.Reuse != null &&
-                            p.Reuse != DryIoc.Reuse.Transient)
-                            return p;
-                    }
+                    if (p.GetActualServiceType().IsFunc())
+                        return p;
+                }
+                else
+                {
+                    if (!firstNonTransientParent ||
+                        p.Reuse != null && p.Reuse != DryIoc.Reuse.Transient)
+                        return p;
                 }
             }
 
@@ -6153,54 +6318,64 @@ namespace DryIoc
 
         #region Implementation
 
-        internal Request(ResolverContext resolverContext,
-            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs)
+        private Request(RequestContext requestContext,
+            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs,
+            Flags flags)
         {
-            _resolverContext = resolverContext;
+            _requestContext = requestContext;
             RawParent = parent;
             RequestInfo = requestInfo;
             Made = made;
             FuncArgs = funcArgs;
+            _flags = flags;
         }
 
-        private readonly ResolverContext _resolverContext;
-
-        internal sealed class ResolverContext
+        [Flags]
+        private enum Flags
         {
-            public readonly ContainerWeakRef ContainerWeakRef;
-            public readonly ContainerWeakRef ScopesWeakRef;
+            TracksTransientDisposable = 1 << 1
+        }
+
+        private readonly Flags _flags;
+
+        private readonly RequestContext _requestContext;
+
+        internal sealed class RequestContext
+        {
+            public readonly IContainer Container;
+            public readonly IScopeAccess Scopes;
             public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
 
-            // mutable, supposed to be set once when dependency factory expressions are created
+            // Mutable, supposed to be set once when dependency factory expressions are created
             public bool ContainsNestedResolutionCall;
 
-            // mutable, increment via IncrementDependencyCount method.
+            // Mutable, incremented via IncrementDependencyCount method.
             public int DependencyCount;
 
-            public ResolverContext(ContainerWeakRef container, ContainerWeakRef scopes, IScope scope, RequestInfo preResolveParent)
+            public RequestContext(IContainer container, IScopeAccess scopes, IScope scope, RequestInfo preResolveParent)
             {
-                ContainerWeakRef = container;
-                ScopesWeakRef = scopes;
+                Container = container;
+                Scopes = scopes;
                 Scope = scope;
                 PreResolveParent = preResolveParent;
             }
 
-            public ResolverContext With(ContainerWeakRef newContainer)
+            public RequestContext With(IContainer newContainer)
             {
-                return new ResolverContext(newContainer, ScopesWeakRef, Scope, PreResolveParent);
+                return new RequestContext(newContainer, Scopes, Scope, PreResolveParent);
             }
 
-            public ResolverContext With(IScope scope)
+            public RequestContext With(IScope scope)
             {
                 return scope == null ? this
-                    : new ResolverContext(ContainerWeakRef, ScopesWeakRef, scope, PreResolveParent);
+                    : new RequestContext(Container, Scopes, scope, PreResolveParent);
             }
 
-            public ResolverContext With(RequestInfo preResolveParent)
+            public RequestContext With(RequestInfo preResolveParent)
             {
                 return preResolveParent == null || preResolveParent.IsEmpty ? this
-                    : new ResolverContext(ContainerWeakRef, ScopesWeakRef, Scope, preResolveParent);
+                    : new RequestContext(Container, Scopes, Scope, preResolveParent);
             }
 
             internal void IncrementDependencyCount()
@@ -6280,16 +6455,20 @@ namespace DryIoc
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
 
-        /// <summary>Sets the basic settings.</summary>
+        /// <summary>Sets the base settings.</summary>
+        /// <param name="condition"></param>
         /// <param name="openResolutionScope"></param> <param name="asResolutionCall"></param>
         /// <param name="asResolutionRoot"></param> <param name="preventDisposal"></param>
         /// <param name="weaklyReferenced"></param> <param name="allowDisposableTransient"></param>
         /// <param name="trackDisposableTransient"></param> <param name="useParentReuse"></param>
-        private Setup(bool openResolutionScope = false, bool asResolutionCall = false,
+        private Setup(Func<RequestInfo, bool> condition = null,
+            bool openResolutionScope = false, bool asResolutionCall = false,
             bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
             bool useParentReuse = false)
         {
+            Condition = condition;
+
             if (asResolutionCall)
                 _settings |= Settings.AsResolutionCall;
             if (openResolutionScope)
@@ -6330,7 +6509,8 @@ namespace DryIoc
         private readonly Settings _settings;
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
-        /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> <param name="condition">(optional)</param>
+        /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> 
+        /// <param name="condition">(optional)</param>
         /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
         /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
         /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
@@ -6368,15 +6548,20 @@ namespace DryIoc
         /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
         /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
         /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
+        /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
+        /// <param name="condition">(optional)</param>
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
-            bool openResolutionScope = false, bool preventDisposal = false)
+            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
+            Func<RequestInfo, bool> condition = null)
         {
             return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-                && !openResolutionScope && !preventDisposal ? Wrapper
-                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap, openResolutionScope, preventDisposal);
+                && !openResolutionScope && !preventDisposal && condition == null 
+                ? Wrapper
+                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+                    condition, openResolutionScope, asResolutionCall, preventDisposal);
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
@@ -6414,15 +6599,17 @@ namespace DryIoc
                 }
             }
 
-            public ServiceSetup(Func<RequestInfo, bool> condition = null, object metadataOrFuncOfMetadata = null,
-                bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
-                bool preventDisposal = false, bool weaklyReferenced = false,
-                bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-                bool useParentReuse = false) : base(openResolutionScope, asResolutionCall, asResolutionRoot,
+            public ServiceSetup() {}
+
+            public ServiceSetup(Func<RequestInfo, bool> condition, object metadataOrFuncOfMetadata,
+                bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
+                bool preventDisposal, bool weaklyReferenced,
+                bool allowDisposableTransient, bool trackDisposableTransient,
+                bool useParentReuse) 
+                : base(condition, openResolutionScope, asResolutionCall, asResolutionRoot,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
                     useParentReuse)
             {
-                Condition = condition;
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
             }
 
@@ -6430,7 +6617,7 @@ namespace DryIoc
         }
 
         /// <summary>Setup for <see cref="DryIoc.FactoryType.Wrapper"/> factory.</summary>
-        public sealed class WrapperSetup : Setup
+        internal sealed class WrapperSetup : Setup
         {
             /// <summary>Returns <see cref="DryIoc.FactoryType.Wrapper"/> type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Wrapper; } }
@@ -6445,16 +6632,24 @@ namespace DryIoc
             /// <summary>Delegate returning wrapped type from wrapper type. Overwrites other options.</summary>
             public readonly Func<Type, Type> Unwrap;
 
+            /// <summary>Default setup</summary>
+            /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. 
+            /// Need to be set for multiple type arguments.</param>
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1)
+            {
+                WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
+            }
+
             /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
             /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-            /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type.  Overwrites other options.</param>
-            /// <param name="openResolutionScope">(optional) Opens the new scope.</param><param name="asResolutionCall"></param>
-            /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-            public WrapperSetup(int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false,
-                Func<Type, Type> unwrap = null,
-                bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false)
-                : base(openResolutionScope, asResolutionCall, preventDisposal: preventDisposal)
+            /// <param name="unwrap">Delegate returning wrapped type from wrapper type.  Overwrites other options.</param>
+            /// <param name="openResolutionScope">Opens the new scope.</param><param name="asResolutionCall"></param>
+            /// <param name="preventDisposal">Prevents disposal of reused instance if it is disposable.</param>
+            /// <param name="condition">Predicate to check if factory could be used for resolved request.</param>
+            public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
+                Func<RequestInfo, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal)
+                : base(condition, openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall, preventDisposal: preventDisposal)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
@@ -6485,7 +6680,7 @@ namespace DryIoc
         }
 
         /// <summary>Setup applied to decorators.</summary>
-        public sealed class DecoratorSetup : Setup
+        internal sealed class DecoratorSetup : Setup
         {
             /// <summary>Returns Decorator factory type.</summary>
             public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
@@ -6499,6 +6694,9 @@ namespace DryIoc
             /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
             public readonly bool UseDecorateeReuse;
 
+            /// <summary>Default setup.</summary>
+            public DecoratorSetup() { }
+
             /// <summary>Creates decorator setup with optional condition.</summary>
             /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
             /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.
@@ -6507,9 +6705,9 @@ namespace DryIoc
             /// - first registered are closer decoratee.</param>
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
-            public DecoratorSetup(Func<RequestInfo, bool> condition = null, int order = 0, bool useDecorateeReuse = false)
+            public DecoratorSetup(Func<RequestInfo, bool> condition, int order, bool useDecorateeReuse)
+                : base(condition)
             {
-                Condition = condition;
                 Order = order;
                 UseDecorateeReuse = useDecorateeReuse;
             }
@@ -6615,10 +6813,10 @@ namespace DryIoc
         protected virtual bool IsFactoryExpressionCacheable(Request request)
         {
             return Setup.FactoryType == FactoryType.Service
+                && !request.TracksTransientDisposable
                 && request.FuncArgs == null
                 && !Setup.AsResolutionCall
-                && !IsContextDependent(request)
-                && !IsTrackingDisposableTransient(request);
+                && !IsContextDependent(request);
         }
 
         private bool IsContextDependent(Request request)
@@ -6627,13 +6825,6 @@ namespace DryIoc
                 || Setup.UseParentReuse
                 || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
-        }
-
-        private bool IsTrackingDisposableTransient(Request request)
-        {
-            return request.Reuse == DryIoc.Reuse.Transient
-                && (Setup.TrackDisposableTransient || request.Rules.TrackingDisposableTransients)
-                && request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
         }
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
@@ -6672,7 +6863,7 @@ namespace DryIoc
                 request.Reuse is SingletonReuse &&
                 !Setup.PreventDisposal && !Setup.WeaklyReferenced)
             {
-                var singletons = (SingletonScope)request.Scopes.SingletonScope;
+                var singletons = (SingletonScope)request.SingletonScope;
                 var singletonID = singletons.IndexOf(FactoryID);
                 if (singletonID > 0)
                 {
@@ -6695,20 +6886,28 @@ namespace DryIoc
             var serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr != null)
             {
-                var originalServiceExprType = serviceExpr.Type;
+                // can be checked only after expression is created
+                if (request.ContainsNestedResolutionCall)
+                    isExpressionCacheable = false;
 
-                serviceExpr = ApplyReuse(request, serviceExpr);
+                if (request.Reuse != DryIoc.Reuse.Transient &&
+                    request.ServiceType != typeof(void))
+                {
+                    var originalServiceExprType = serviceExpr.Type;
 
-                var isSingletonConstantExpr = serviceExpr.NodeType == ExpressionType.Constant;
+                    serviceExpr = ApplyReuse(serviceExpr, request.Reuse, request.TracksTransientDisposable, request);
 
-                if (serviceExpr.Type != originalServiceExprType)
-                    serviceExpr = Expression.Convert(serviceExpr, originalServiceExprType);
+                    if (serviceExpr.NodeType == ExpressionType.Constant)
+                        isExpressionCacheable = false;
 
-                // cache the new expression
-                if (isExpressionCacheable &&
-                    !isSingletonConstantExpr &&            // but not evaluated singleton constant
-                    !request.ContainsNestedResolutionCall) // can be checked only after expression is created
+                    if (serviceExpr.Type != originalServiceExprType)
+                        serviceExpr = Expression.Convert(serviceExpr, originalServiceExprType);
+                }
+
+                if (isExpressionCacheable)
+                {
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
+                }
             }
             // Otherwise throw
             else if (request.IfUnresolved == IfUnresolved.Throw)
@@ -6719,33 +6918,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private Expression ApplyReuse(Request request, Expression serviceExpr)
-        {
-            if (serviceExpr.Type == typeof(void))
-                return serviceExpr;
-
-            // Getting reuse from Request to take useParentReuse or useDecorateeReuse into account
-            var reuse = request.Reuse.ThrowIfNull();
-
-            // Track transient disposable in parent scope (if any), or open scope (if any)
-            var tracksTransientDisposable =
-                reuse == DryIoc.Reuse.Transient &&
-                !Setup.PreventDisposal &&
-                (Setup.TrackDisposableTransient ||
-                !Setup.AllowDisposableTransient && request.Rules.TrackingDisposableTransients) &&
-                request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable));
-
-            if (tracksTransientDisposable)
-                reuse = GetTransientDisposableTrackingReuse(request);
-
-            if (reuse == DryIoc.Reuse.Transient)
-                return serviceExpr;
-
-            ThrowIfReuseHasShorterLifespanThanParent(request);
-
-            return ApplyReuse(serviceExpr, reuse, tracksTransientDisposable, request);
-        }
-
+        // todo: remove trackTransientDisposable param as it is available from Request param.
         /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access
         /// and produces another expression.</summary>
         /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
@@ -6759,20 +6932,19 @@ namespace DryIoc
 
             // Optimize: eagerly create singleton during the construction of object graph,
             // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
-            if (request.Rules.EagerCachingSingletonForFasterAccess &&
-                reuse is SingletonReuse &&
-
+            if (reuse is SingletonReuse && 
+                request.Rules.EagerCachingSingletonForFasterAccess &&
                 // except: For decorators and wrappers, when tracking tansient disposable and for lazy consumption in Func
                 FactoryType == FactoryType.Service &&
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var singletons = request.Scopes.SingletonScope;
+                var singletonScope = request.SingletonScope;
 
                 FactoryDelegate factoryDelegate = null;
 
                 if (serviceExpr.NodeType == ExpressionType.New)
-                    factoryDelegate = ActivateSingleton((NewExpression)serviceExpr, singletons);
+                    factoryDelegate = ActivateSingleton((NewExpression)serviceExpr, singletonScope);
 
                 if (factoryDelegate == null)
                 {
@@ -6790,8 +6962,8 @@ namespace DryIoc
                     }
                 }
 
-                var singletonId = singletons.GetScopedItemIdOrSelf(FactoryID);
-                var singleton = singletons.GetOrAdd(singletonId, () =>
+                var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
+                var singleton = singletonScope.GetOrAdd(singletonId, () =>
                     factoryDelegate(null, request.ContainerWeakRef, request.Scope));
 
                 serviceExpr = Expression.Constant(singleton);
@@ -6882,31 +7054,6 @@ namespace DryIoc
             return null;
         }
 
-        /// <summary>Throws if request direct or further ancestor has longer reuse lifespan,
-        /// and throws if that is true. Until there is a Func wrapper in between.</summary>
-        /// <param name="request">Request to resolve.</param>
-        protected static void ThrowIfReuseHasShorterLifespanThanParent(Request request)
-        {
-            var reuse = request.Reuse;
-
-            // Fast check: if reuse is not applied or the rule set then skip the check.
-            if (reuse.Lifespan == 0 || !request.Rules.ThrowIfDependencyHasShorterReuseLifespan)
-                return;
-
-            var parent = request.ParentOrWrapper;
-            if (parent.IsEmpty)
-                return;
-
-            var parentWithLongerLifespan = parent.Enumerate()
-                .TakeWhile(r => r.FactoryType != FactoryType.Wrapper || !r.GetActualServiceType().IsFunc())
-                .FirstOrDefault(r => r.FactoryType == FactoryType.Service
-                    && r.ReuseLifespan > reuse.Lifespan);
-
-            if (parentWithLongerLifespan != null)
-                Throw.It(Error.DependencyHasShorterReuseLifespan,
-                    request.PrintCurrent(), reuse, parentWithLongerLifespan);
-        }
-
         /// <summary>Creates factory delegate from service expression and returns it.
         /// to compile delegate from expression but could be overridden by concrete factory type: e.g. <see cref="DelegateFactory"/></summary>
         /// <param name="request">Service request.</param>
@@ -6946,22 +7093,6 @@ namespace DryIoc
         private static int _lastFactoryID;
         private IReuse _reuse;
         private Setup _setup;
-
-        private static IReuse GetTransientDisposableTrackingReuse(Request request)
-        {
-            // First, check the parent's scope
-            var parent = request.GetParentOrFuncOrEmpty(firstNonTransientParent: true);
-            if (parent.FactoryType == FactoryType.Wrapper)
-                return DryIoc.Reuse.Transient;
-
-            if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
-                return parent.Reuse;
-
-            // If no reused parent, then track in current open scope, or if not opened in singleton
-            return request.Scopes.GetCurrentScope() != null
-                ? DryIoc.Reuse.InCurrentScope
-                : DryIoc.Reuse.Singleton;
-        }
 
         #endregion
     }
@@ -7110,11 +7241,11 @@ namespace DryIoc
                   PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved), r);
             return r =>
             {
-                var properties = r.ImplementationType.GetDeclaredAndBase(_ => _.DeclaredProperties)
+                var properties = r.ImplementationType.GetMembers(_ => _.DeclaredProperties, includeBase: true)
                     .Where(p => p.IsInjectable(withNonPublic, withPrimitive))
                     .Select(m => getInfo(m, r));
                 return !withFields ? properties :
-                    properties.Concat(r.ImplementationType.GetDeclaredAndBase(_ => _.DeclaredFields)
+                    properties.Concat(r.ImplementationType.GetMembers(_ => _.DeclaredFields, includeBase: true)
                     .Where(f => f.IsInjectable(withNonPublic, withPrimitive))
                     .Select(m => getInfo(m, r)));
             };
@@ -7194,7 +7325,6 @@ namespace DryIoc
         /// <param name="ifUnresolved">(optional) By default returns default value if unresolved.</param>
         /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
         /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
-        ///
         /// <returns>Combined selector.</returns>
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null,
@@ -7306,18 +7436,20 @@ namespace DryIoc
         {
             var factoryMethod = GetFactoryMethod(request);
 
+            var container = request.Container;
+
             // If factory method is instance method, then resolve factory instance first.
             Expression factoryExpr = null;
             if (factoryMethod.FactoryServiceInfo != null)
             {
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                var factoryFactory = factoryRequest.Container.ResolveFactory(factoryRequest);
+                var factoryFactory = container.ResolveFactory(factoryRequest);
                 factoryExpr = factoryFactory == null ? null : factoryFactory.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
                     return null;
             }
 
-            var containerRules = request.Container.Rules;
+            var containerRules = container.Rules;
 
             Expression[] paramExprs = null;
             var constructorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
@@ -7369,12 +7501,11 @@ namespace DryIoc
                                 var customValue = paramInfo.Details.CustomValue;
                                 if (customValue != null)
                                     customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
-                                paramExpr = paramRequest.Container
-                                    .GetOrAddStateItemExpression(customValue, paramRequest.ServiceType);
+                                paramExpr = container.GetOrAddStateItemExpression(customValue, paramRequest.ServiceType);
                             }
                             else
                             {
-                                var paramFactory = paramRequest.Container.ResolveFactory(paramRequest);
+                                var paramFactory = container.ResolveFactory(paramRequest);
                                 paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
                                 // Meant that parent Or parameter itself allows default value,
                                 // otherwise we did not get null but exception
@@ -7387,7 +7518,7 @@ namespace DryIoc
 
                                     var defaultValue = paramInfo.Details.DefaultValue;
                                     paramExpr = defaultValue != null
-                                        ? paramRequest.Container.GetOrAddStateItemExpression(defaultValue)
+                                        ? container.GetOrAddStateItemExpression(defaultValue)
                                         : paramRequest.ServiceType.GetDefaultValueExpression();
                                 }
                             }
@@ -7398,7 +7529,8 @@ namespace DryIoc
                 }
             }
 
-            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, request);
+            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, 
+                request, container);
         }
 
         #region Implementation
@@ -7534,11 +7666,28 @@ namespace DryIoc
             _implementationType = knownImplType;
         }
 
-        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
+        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs, 
+            Request request, IContainer container)
         {
             var ctor = ctorOrMethodOrMember as ConstructorInfo;
             if (ctor != null)
-                return InitPropertiesAndFields(Expression.New(ctor, paramExprs), request);
+            {
+                var newServiceExpr = Expression.New(ctor, paramExprs);
+
+                var rules = container.Rules;
+                if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
+                    return newServiceExpr;
+
+                var selector = rules.OverrideRegistrationMade
+                    ? Made.PropertiesAndFields.OverrideWith(rules.PropertiesAndFields)
+                    : rules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
+
+                var propertiesAndFields = selector(request);
+                if (propertiesAndFields == null)
+                    return newServiceExpr;
+
+                return InitPropertiesAndFields(newServiceExpr, request, container, propertiesAndFields);
+            }
 
             var method = ctorOrMethodOrMember as MethodInfo;
             var serviceExpr = method != null
@@ -7583,17 +7732,10 @@ namespace DryIoc
             return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType, request);
         }
 
-        private Expression InitPropertiesAndFields(NewExpression newServiceExpr, Request request)
+        private Expression InitPropertiesAndFields(NewExpression newServiceExpr, 
+            Request request, IContainer container,
+            IEnumerable<PropertyOrFieldServiceInfo> members)
         {
-            var containerRules = request.Rules;
-            var selector = containerRules.OverrideRegistrationMade
-                ? Made.PropertiesAndFields.OverrideWith(containerRules.PropertiesAndFields)
-                : containerRules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
-
-            var members = selector(request);
-            if (members == null)
-                return newServiceExpr;
-
             var bindings = new List<MemberBinding>();
             foreach (var member in members)
                 if (member != null)
@@ -7605,11 +7747,11 @@ namespace DryIoc
                         var customValue = member.Details.CustomValue;
                         if (customValue != null)
                             customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                        memberExpr = memberRequest.Container.GetOrAddStateItemExpression(customValue, memberRequest.ServiceType);
+                        memberExpr = container.GetOrAddStateItemExpression(customValue, memberRequest.ServiceType);
                     }
                     else
                     {
-                        var memberFactory = memberRequest.Container.ResolveFactory(memberRequest);
+                        var memberFactory = container.ResolveFactory(memberRequest);
                         memberExpr = memberFactory == null ? null : memberFactory.GetExpressionOrDefault(memberRequest);
                         if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
                             return null;
@@ -7816,7 +7958,7 @@ namespace DryIoc
                 if (factoryMethodBase != null)
                 {
                     var factoryMethodParameters = factoryMethodBase.GetParameters();
-                    var targetMethods = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredMethods)
+                    var targetMethods = closedFactoryImplType.GetMembers(t => t.DeclaredMethods, includeBase: true)
                         .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
                         .ToArray();
 
@@ -7834,12 +7976,12 @@ namespace DryIoc
                 }
                 else if (factoryMember is FieldInfo)
                 {
-                    factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredFields)
+                    factoryMember = closedFactoryImplType.GetMembers(t => t.DeclaredFields, includeBase: true)
                         .Single(f => f.Name == factoryMember.Name);
                 }
                 else if (factoryMember is PropertyInfo)
                 {
-                    factoryMember = closedFactoryImplType.GetDeclaredAndBase(t => t.DeclaredProperties)
+                    factoryMember = closedFactoryImplType.GetMembers(t => t.DeclaredProperties, includeBase: true)
                         .Single(f => f.Name == factoryMember.Name);
                 }
             }
@@ -7935,10 +8077,9 @@ namespace DryIoc
         protected override Expression ApplyReuse(Expression _, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
         {
             var scopedReuse = reuse as CurrentScopeReuse;
-            var containerScopes = request.Scopes;
             var scope = scopedReuse != null
-                ? containerScopes.GetCurrentNamedScope(scopedReuse.Name, throwIfNotFound: true)
-                : containerScopes.SingletonScope;
+                ? request.Scopes.GetCurrentNamedScope(scopedReuse.Name, throwIfNotFound: true)
+                : request.SingletonScope;
 
             var scopedId = scope.GetScopedItemIdOrSelf(FactoryID);
             var instance = _instance;
@@ -7992,7 +8133,8 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.Container.GetOrAddStateItemExpression(_factoryDelegate);
-            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, Container.ResolverExpr), request.ServiceType);
+            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            return Expression.Convert(Expression.Invoke(factoryDelegateExpr, resolverExpr), request.ServiceType);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -8006,9 +8148,6 @@ namespace DryIoc
             if (FactoryType == FactoryType.Service &&
                 request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request); // use expression creation
-
-
-            ThrowIfReuseHasShorterLifespanThanParent(request);
 
             if (request.Reuse != DryIoc.Reuse.Transient)
                 return base.GetDelegateOrDefault(request); // use expression creation
@@ -8334,11 +8473,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static readonly object[] _lockers =
-        {
-            new object(), new object(), new object(), new object(),
-            new object(), new object(), new object(), new object()
-        };
+        private readonly object _syncRoot = new object();
 
         private ImTreeMapIntToObj _factoryIdToIndexMap;
         private int _lastItemIndex;
@@ -8381,8 +8516,7 @@ namespace DryIoc
             if (value != null)
                 return value;
 
-            var locker = _lockers[index % _lockers.Length];
-            lock (locker)
+            lock (_syncRoot)
             {
                 value = bucket[index];
                 if (value == null)
@@ -8535,6 +8669,7 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         int Lifespan { get; }
 
+        // todo: remove trackTransientDisposable param as it is available from Request param.
         /// <summary>Returns composed expression.</summary>
         /// <param name="request">info</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
@@ -8554,17 +8689,16 @@ namespace DryIoc
         public int Lifespan { get { return 1000; } }
 
         /// <summary>Returns item from singleton scope.</summary>
-        /// <param name="containerScopes">Container scopes to select from.</param>
+        /// <param name="singletonScope">Singleton scope.</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked instead of reused.</param>
         /// <param name="factoryId">ID for lookup.</param>
         /// <param name="createValue">Delegate for creating the item.</param>
         /// <returns>Reused item.</returns>
-        public static object GetOrAddItem(IScopeAccess containerScopes, bool trackTransientDisposable, int factoryId,
+        public static object GetOrAddItem(IScope singletonScope, bool trackTransientDisposable, int factoryId,
             CreateScopedValue createValue)
         {
-            var scope = containerScopes.SingletonScope;
-            var scopedItemId = trackTransientDisposable ? -1 : scope.GetScopedItemIdOrSelf(factoryId);
-            return scope.GetOrAdd(scopedItemId, createValue);
+            var scopedItemId = trackTransientDisposable ? -1 : singletonScope.GetScopedItemIdOrSelf(factoryId);
+            return singletonScope.GetOrAdd(scopedItemId, createValue);
         }
 
         private static readonly MethodInfo _getOrAddItemMethod =
@@ -8574,7 +8708,7 @@ namespace DryIoc
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
             return Expression.Call(_getOrAddItemMethod,
-                Container.ScopesExpr,
+                Container.SingletonScopeExpr,
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
@@ -8603,7 +8737,7 @@ namespace DryIoc
         /// <returns>Container singleton scope.</returns>
         public IScope GetScopeOrDefault(Request request)
         {
-            return request.Scopes.SingletonScope;
+            return request.SingletonScope;
         }
 
         /// <inheritdoc />
@@ -8618,7 +8752,7 @@ namespace DryIoc
         /// <returns>Index in scope.</returns>
         public int GetScopedItemIdOrSelf(int factoryID, Request request)
         {
-            return request.Scopes.SingletonScope.GetScopedItemIdOrSelf(factoryID);
+            return request.SingletonScope.GetScopedItemIdOrSelf(factoryID);
         }
 
         #endregion
@@ -8676,8 +8810,10 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
+            var scopesExpr = Container.GetScopesExpr(request.RequestInfo);
+
             return Expression.Call(_getOrAddItemOrDefaultMethod,
-                Container.ScopesExpr, scopeNameExpr,
+                scopesExpr, scopeNameExpr,
                 Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(trackTransientDisposable),
                 Expression.Constant(request.FactoryID),
@@ -8688,8 +8824,11 @@ namespace DryIoc
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         public bool CanApply(Request request)
         {
-            return request.IsWrappedInFunc()
-                || request.Scopes.GetCurrentNamedScope(Name, false) != null;
+            return // first is the special case whith ambient scope context, 
+                // where scope can be switched for already resolved singleton. 
+                // So it may be no valid initially but only afterwars
+                (request.Container.ScopeContext != null && request.IsWrappedInFunc()) || 
+                request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
         private static readonly Expression _inCurrentScopeReuseExpr =
@@ -8825,7 +8964,8 @@ namespace DryIoc
         /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            return Expression.Call(Container.ScopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
+            var scopesExpr = Container.GetScopesExpr(request.RequestInfo);
+            return Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
                 Container.GetResolutionScopeExpression(request),
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
@@ -8996,6 +9136,20 @@ namespace DryIoc
             }
         }
 
+        // todo: calculate once.
+        /// <summary>subj.</summary>
+        public bool IsSingletonOrDependencyOfSingleton
+        {
+            get
+            {
+                var inSingleton = Reuse is SingletonReuse;
+                if (!inSingleton)
+                    for (var p = ParentOrWrapper; !inSingleton && !p.IsEmpty; p = p.ParentOrWrapper)
+                        inSingleton = p.Reuse is SingletonReuse;
+                return inSingleton;
+            }
+        }
+
         /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
         /// <param name="condition">Condition to stop on. Should not be null.</param>
         /// <returns>Request info of found parent.</returns>
@@ -9160,6 +9314,9 @@ namespace DryIoc
         {
             if (IsEmpty)
                 return s.Append("{empty}");
+
+            if (Reuse != null && Reuse != DryIoc.Reuse.Transient)
+                s.Append(Reuse is SingletonReuse ? "singleton" : "scoped").Append(' ');
 
             if (FactoryType != FactoryType.Service)
                 s.Append(FactoryType.ToString().ToLower()).Append(' ');
@@ -9416,9 +9573,6 @@ namespace DryIoc
     /// <summary>Provides access to scopes.</summary>
     public interface IScopeAccess
     {
-        /// <summary>Scope containing container singletons.</summary>
-        IScope SingletonScope { get; }
-
         /// <summary>Current scope.</summary>
         IScope GetCurrentScope();
 
@@ -9805,13 +9959,13 @@ namespace DryIoc
             NoCurrentScope = Of(
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
             ContainerIsDisposed = Of(
-                "Container is disposed and its operations are no longer available."),
+                "Container is disposed and cannot be used anymore."),
             NotDirectScopeParent = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." +
                 Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             NoMatchedScopeFound = Of(
-                "Unable to find scope starting from {0} with matching name: {1}."),
+                "Unable to find scope starting from current opened {0} with name: {1}."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
@@ -10431,11 +10585,40 @@ namespace DryIoc
 
         /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="args">Argument types</param> <returns>Found method or null.</returns>
-        public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] args)
+        /// <param name="paramTypes">Argument types</param> <returns>Found method or null.</returns>
+        public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
-            return type.GetTypeInfo().DeclaredMethods.FirstOrDefault(m =>
-                m.Name == name && args.SequenceEqual(m.GetParameters().Select(p => p.ParameterType)));
+            var typeInfo = type.GetTypeInfo();
+            var paramCount = paramTypes.Length;
+            foreach (var method in typeInfo.DeclaredMethods)
+            {
+                if (method.Name == name)
+                {
+                    var methodParams = method.GetParameters();
+                    if (paramCount == methodParams.Length)
+                    {
+                        if (paramCount == 0)
+                            return method;
+
+                        if (paramCount == 1)
+                        {
+                            if (paramTypes[0] == methodParams[0].ParameterType)
+                                return method;
+                        }
+                        else
+                        {
+                            var i = 0;
+                            for (; i < paramCount; ++i)
+                                if (paramTypes[i] != methodParams[i].ParameterType)
+                                    break;
+                            if (i == paramCount)
+                                return method;
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
@@ -10443,7 +10626,7 @@ namespace DryIoc
         /// <returns>Found property or null.</returns>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name)
         {
-            return type.GetDeclaredAndBase(_ => _.DeclaredProperties).FirstOrDefault(p => p.Name == name);
+            return type.GetMembers(_ => _.DeclaredProperties, includeBase: true).FirstOrDefault(p => p.Name == name);
         }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
@@ -10451,7 +10634,7 @@ namespace DryIoc
         /// <returns>Found field or null.</returns>
         public static FieldInfo GetFieldOrNull(this Type type, string name)
         {
-            return type.GetDeclaredAndBase(_ => _.DeclaredFields).FirstOrDefault(p => p.Name == name);
+            return type.GetMembers(_ => _.DeclaredFields, includeBase: true).FirstOrDefault(p => p.Name == name);
         }
 
         /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>

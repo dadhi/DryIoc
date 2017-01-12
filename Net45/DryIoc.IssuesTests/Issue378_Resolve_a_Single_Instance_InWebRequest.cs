@@ -60,10 +60,10 @@ namespace DryIoc.IssuesTests
 
             using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                Assert.AreNotSame(xx, scope.Resolve<B>().X); // should Not be the same in other scope
+                var b2 = scope.Resolve<B>();
+                Assert.AreNotSame(xx, b2.X); // should Not be the same in other scope
             }
         }
-
 
         public class A { }
 
