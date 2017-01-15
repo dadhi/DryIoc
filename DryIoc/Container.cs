@@ -3707,7 +3707,11 @@ namespace DryIoc
                 .Append("::").Append(ConstructorOrMethodOrMember).ToString();
         }
 
-        private static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false)
+        // todo: may be add the @default constructor option
+        /// <summary>Easy way to specify non-public or / and most resolvable constructor.</summary>
+        /// <param name="mostResolvable"></param> <param name="includeNonPublic"></param>
+        /// <returns>Constructor or null if not found.</returns>
+        public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false)
         {
             return request =>
             {
