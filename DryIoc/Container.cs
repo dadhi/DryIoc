@@ -327,15 +327,15 @@ namespace DryIoc
                 var getOrNewScopeExpr = Expression.Call(scopesExpr, "GetOrNewResolutionScope",
                     ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
                 var parameters = new object[] { ResolutionScopeParamExpr, getOrNewScopeExpr };
-                return (Expression)_expressionAssignMethod.Invoke(null, parameters);
+                return (Expression)_expressionAssignMethod.Value.Invoke(null, parameters);
             }
 
             return Expression.Call(scopesExpr, "GetOrCreateResolutionScope",
                 ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
         }
 
-        private static readonly MethodInfo _expressionAssignMethod =
-            typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression));
+        private static readonly Lazy<MethodInfo> _expressionAssignMethod = new Lazy<MethodInfo>(() =>
+            typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression)));
 
         #endregion
 
@@ -2393,7 +2393,7 @@ namespace DryIoc
         public static Expression RequestInfoToExpression(this IContainer container, RequestInfo request)
         {
             if (request.IsEmpty)
-                return _emptyRequestInfoExpr;
+                return _emptyRequestInfoExpr.Value;
 
             // recursively ask for parent expression until it is empty
             var parentRequestInfoExpr = container.RequestInfoToExpression(request.ParentOrWrapper);
@@ -2448,7 +2448,8 @@ namespace DryIoc
                 factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr);
         }
 
-        private static readonly Expression _emptyRequestInfoExpr = ReflectionTools.ToExpression(() => RequestInfo.Empty);
+        private static readonly Lazy<Expression> _emptyRequestInfoExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(RequestInfo), "Empty"));
 
         // todo: v3: replace with more direct access
         /// <summary>Returns the current scope, or null if not opened and <paramref name="throwIfNotFound"/> is not set.</summary>
@@ -8725,13 +8726,13 @@ namespace DryIoc
             return true;
         }
 
-        private readonly Expression _singletonReuseExpr =
-            ReflectionTools.ToExpression(() => Reuse.Singleton);
+        private readonly Lazy<Expression> _singletonReuseExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(Reuse), "Singleton"));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
-            return _singletonReuseExpr;
+            return _singletonReuseExpr.Value;
         }
 
         #region Obsolete
@@ -8835,13 +8836,13 @@ namespace DryIoc
                 request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
-        private static readonly Expression _inCurrentScopeReuseExpr =
-            ReflectionTools.ToExpression(() => Reuse.InCurrentScope);
+        private readonly Lazy<Expression> _inCurrentScopeReuseExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(Reuse), "InCurrentScope"));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
-            return Name == null ? _inCurrentScopeReuseExpr
+            return Name == null ? _inCurrentScopeReuseExpr.Value
                 : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(),
                     fallbackConverter(Name));
         }
@@ -8930,14 +8931,14 @@ namespace DryIoc
             return GetScopeOrDefault(request) != null;
         }
 
-        private static readonly Expression _inResolutionScopeReuseExpr =
-            ReflectionTools.ToExpression(() => Reuse.InResolutionScope);
+        private readonly Lazy<Expression> _inResolutionScopeReuseExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(Reuse), "InCurrentScope"));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
             if (AssignableFromServiceType == null && ServiceKey == null && Outermost == false)
-                return _inResolutionScopeReuseExpr;
+                return _inResolutionScopeReuseExpr.Value;
 
             return Expression.Call(typeof(Reuse), "InResolutionScopeOf", ArrayTools.Empty<Type>(),
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
@@ -9074,11 +9075,12 @@ namespace DryIoc
                 return true;
             }
 
-            private readonly Expression _transientReuseExpr = ReflectionTools.ToExpression(() => Transient);
+            private readonly Lazy<Expression> _transientReuseExpr = new Lazy<Expression>(() =>
+                Expression.Field(null, typeof(Reuse), "Transient"));
 
             public Expression ToExpression(Func<object, Expression> fallbackConverter)
             {
-                return _transientReuseExpr;
+                return _transientReuseExpr.Value;
             }
 
             #region Obsolete
@@ -10729,15 +10731,7 @@ namespace DryIoc
         /// <returns>Default value expression.</returns>
         public static Expression GetDefaultValueExpression(this Type type)
         {
-            return Expression.Call(_getDefaultMethod.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
-        }
-
-        /// <summary>Utility to convert passed func/delegate to expression.</summary>
-        /// <typeparam name="T">Type of expression result.</typeparam> <param name="func">Delegate to convert.</param>
-        /// <returns>Delegate expression.</returns>
-        public static Expression ToExpression<T>(Expression<Func<T>> func)
-        {
-            return func.Body;
+            return Expression.Call(_getDefaultMethod.Value.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
         }
 
         #region Implementation
@@ -10788,8 +10782,9 @@ namespace DryIoc
             }
         }
 
-        private static readonly MethodInfo _getDefaultMethod =
-            typeof(ReflectionTools).GetMethodOrNull("GetDefault", ArrayTools.Empty<Type>());
+        private static readonly Lazy<MethodInfo> _getDefaultMethod = new Lazy<MethodInfo>(() =>
+            typeof(ReflectionTools).GetMethodOrNull("GetDefault", ArrayTools.Empty<Type>()));
+
         internal static T GetDefault<T>() { return default(T); }
 
         #endregion
@@ -10945,6 +10940,17 @@ namespace DryIoc
             return p.DeclaringType.GetSingleMethodOrNull("set_" + p.Name, includeNonPublic);
         }
 
+        private static readonly Lazy<Func<int>> _getEnvCurrentManagedThreadId = new Lazy<Func<int>>(() =>
+        {
+            var method = typeof(Environment).GetMethodOrNull("get_CurrentManagedThreadId", ArrayTools.Empty<Type>());
+            if (method == null)
+                return null;
+
+            return Expression.Lambda<Func<int>>(
+                Expression.Call(method, ArrayTools.Empty<Expression>()),
+                ArrayTools.Empty<ParameterExpression>()).Compile();
+        });
+
         /// <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>
         /// <returns>Managed Thread ID.</returns>
         public static int GetCurrentManagedThreadID()
@@ -10952,20 +10958,11 @@ namespace DryIoc
             var resultID = -1;
             GetCurrentManagedThreadID(ref resultID);
             if (resultID == -1)
-                resultID = _getEnvCurrentManagedThreadId();
+                resultID = _getEnvCurrentManagedThreadId.Value();
             return resultID;
         }
 
         static partial void GetCurrentManagedThreadID(ref int threadID);
-
-        private static readonly MethodInfo _getEnvCurrentManagedThreadIdMethod =
-            typeof(Environment).GetMethodOrNull("get_CurrentManagedThreadId", ArrayTools.Empty<Type>());
-
-        private static readonly Func<int> _getEnvCurrentManagedThreadId =
-            _getEnvCurrentManagedThreadIdMethod == null ? null :
-            Expression.Lambda<Func<int>>(
-                Expression.Call(_getEnvCurrentManagedThreadIdMethod, ArrayTools.Empty<Expression>()),
-                ArrayTools.Empty<ParameterExpression>()).Compile();
     }
 }
 
