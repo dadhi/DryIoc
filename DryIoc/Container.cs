@@ -7017,11 +7017,14 @@ namespace DryIoc
         {
             var argExprs = newExpr.Arguments;
             var singletonType = newExpr.Type;
+            var nonPublic = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.CreateInstance;
+
 
             CreateScopedValue createSingleton = null;
+
             if (argExprs.Count == 0)
             {
-                createSingleton = () => Activator.CreateInstance(singletonType, ArrayTools.Empty<object>());
+                createSingleton = () => Activator.CreateInstance(singletonType, nonPublic, null, ArrayTools.Empty<object>(), null, null);
             }
             else if (argExprs.Count == 1)
             {
@@ -7031,7 +7034,7 @@ namespace DryIoc
 
                 var constExpr = argExpr as ConstantExpression;
                 if (constExpr != null)
-                    createSingleton = () => Activator.CreateInstance(singletonType, constExpr.Value);
+                    createSingleton = () => Activator.CreateInstance(singletonType, nonPublic, null, new[] { constExpr.Value }, null, null);
             }
             else
             {
@@ -7050,7 +7053,7 @@ namespace DryIoc
                 }
 
                 if (i == -1) // all args are constants
-                    createSingleton = () => Activator.CreateInstance(singletonType, constantArgs);
+                    createSingleton = () => Activator.CreateInstance(singletonType, nonPublic, null, constantArgs, null, null);
             }
 
             if (createSingleton != null && !Setup.PreventDisposal && !Setup.WeaklyReferenced)

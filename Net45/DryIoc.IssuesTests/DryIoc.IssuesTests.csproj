@@ -171,6 +171,7 @@
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
+    <Compile Include="IssueSO_Open_Generics_Registration.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectingSerilogLogger.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
