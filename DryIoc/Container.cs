@@ -2449,7 +2449,7 @@ namespace DryIoc
         }
 
         private static readonly Lazy<Expression> _emptyRequestInfoExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(RequestInfo), "Empty"));
+            Expression.Field(null, typeof(RequestInfo).GetFieldOrNull("Empty")));
 
         // todo: v3: replace with more direct access
         /// <summary>Returns the current scope, or null if not opened and <paramref name="throwIfNotFound"/> is not set.</summary>
@@ -2665,8 +2665,10 @@ namespace DryIoc
 
             FactoryDelegate factoryDelegate = null;
             CompileToDelegate(expression, ref factoryDelegate);
-            // ReSharper disable once ConstantNullCoalescingCondition
-            return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
+            if (factoryDelegate != null)
+                return factoryDelegate;
+
+            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
         }
 
         // todo: v3: remove
@@ -5848,8 +5850,8 @@ namespace DryIoc
         /// <returns>True if contains, false - otherwise or if not known.</returns>
         public bool ContainsNestedResolutionCall
         {
-            get { return _requestContext.ContainsNestedResolutionCall; }
-            set { if (value) _requestContext.ContainsNestedResolutionCall = true; }
+            get { return (_flags & Flags.ContainsNestedResolutionCall) != 0; }
+            set { if (value) _flags |= Flags.ContainsNestedResolutionCall; }
         }
 
         /// <summary>Provides approximate nummber of dependencies in resolution graph (starting from Resolve method), 
@@ -6116,7 +6118,7 @@ namespace DryIoc
             if (reuse == null)
                 reuse = GetDefaultReuse(factory);
 
-            var flags = default(Flags);
+            var flags = _flags;
             if (reuse == DryIoc.Reuse.Transient)
                 reuse = GetTransientDisposableTrackingReuse(factory, ref flags);
             else
@@ -6338,10 +6340,11 @@ namespace DryIoc
         [Flags]
         private enum Flags
         {
-            TracksTransientDisposable = 1 << 1
+            TracksTransientDisposable =    1 << 1,
+            ContainsNestedResolutionCall = 1 << 2
         }
 
-        private readonly Flags _flags;
+        private Flags _flags;
 
         private readonly RequestContext _requestContext;
 
@@ -6351,9 +6354,6 @@ namespace DryIoc
             public readonly IScopeAccess Scopes;
             public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
-
-            // Mutable, supposed to be set once when dependency factory expressions are created
-            public bool ContainsNestedResolutionCall;
 
             // Mutable, incremented via IncrementDependencyCount method.
             public int DependencyCount;
@@ -8727,7 +8727,7 @@ namespace DryIoc
         }
 
         private readonly Lazy<Expression> _singletonReuseExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse), "Singleton"));
+            Expression.Field(null, typeof(Reuse).GetFieldOrNull("Singleton")));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
@@ -8837,7 +8837,7 @@ namespace DryIoc
         }
 
         private readonly Lazy<Expression> _inCurrentScopeReuseExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse), "InCurrentScope"));
+            Expression.Field(null, typeof(Reuse).GetFieldOrNull("InCurrentScope")));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
@@ -8932,7 +8932,7 @@ namespace DryIoc
         }
 
         private readonly Lazy<Expression> _inResolutionScopeReuseExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse), "InCurrentScope"));
+            Expression.Field(null, typeof(Reuse).GetFieldOrNull("InCurrentScope")));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
@@ -9076,7 +9076,7 @@ namespace DryIoc
             }
 
             private readonly Lazy<Expression> _transientReuseExpr = new Lazy<Expression>(() =>
-                Expression.Field(null, typeof(Reuse), "Transient"));
+                Expression.Field(null, typeof(Reuse).GetFieldOrNull("Transient")));
 
             public Expression ToExpression(Func<object, Expression> fallbackConverter)
             {
