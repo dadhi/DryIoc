@@ -5775,6 +5775,7 @@ namespace DryIoc
     /// Request implements <see cref="IResolver"/> interface on top of provided container, which could be use by delegate factories.</summary>
     public sealed class Request
     {
+        // todo: Replace with Create() - it is waste of space to create empty request, just provide the context for the starting request
         /// <summary>Creates empty request associated with provided <paramref name="container"/>.
         /// Every resolution will start from this request by pushing service information into, and then resolving it.</summary>
         /// <param name="container">Reference to container issued the request. Could be changed later with <see cref="WithNewContainer"/> method.</param>
@@ -5967,22 +5968,23 @@ namespace DryIoc
 
             if (IsEmpty)
             {
-                preResolveParent = preResolveParent ?? RequestInfo.Empty;
-                var resolverContext = _requestContext.With(scope).With(preResolveParent);
+                // todo: Sometimes creates new context, sometimes not (for null scope)
+                var resolverContext = _requestContext.With(scope, preResolveParent);
 
-                var requestInfo = Push(preResolveParent, info, Container);
+                var requestInfo = Push(preResolveParent, info);
 
                 return new Request(resolverContext, this, requestInfo, null, null, default(Flags));
             }
 
-            Throw.If(RequestInfo.FactoryID == 0, Error.PushingToRequestWithoutFactory, info.ThrowIfNull(), this);
+            if (RequestInfo.FactoryID == 0)
+                Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            var inheritedRequestInfo = Push(RequestInfo, info, Container);
+            var inheritedRequestInfo = Push(RequestInfo, info);
 
             return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs, default(Flags));
         }
 
-        private static RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo, IContainer container)
+        private RequestInfo Push(RequestInfo parent, IServiceInfo serviceInfo)
         {
             if (parent == null || parent.IsEmpty)
                 return RequestInfo.Empty.Push(serviceInfo);
@@ -6008,7 +6010,7 @@ namespace DryIoc
             }
 
             var newInfo = serviceInfo.InheritInfoFromDependencyOwner(parentInfo,
-                ownerType: parent.FactoryType, container: container);
+                ownerType: parent.FactoryType, container: Container);
             return parent.Push(newInfo);
         }
 
@@ -6371,16 +6373,10 @@ namespace DryIoc
                 return new RequestContext(newContainer, Scopes, Scope, PreResolveParent);
             }
 
-            public RequestContext With(IScope scope)
+            public RequestContext With(IScope scope, RequestInfo preResolveParent)
             {
-                return scope == null ? this
-                    : new RequestContext(Container, Scopes, scope, PreResolveParent);
-            }
-
-            public RequestContext With(RequestInfo preResolveParent)
-            {
-                return preResolveParent == null || preResolveParent.IsEmpty ? this
-                    : new RequestContext(Container, Scopes, Scope, preResolveParent);
+                return scope == null && (preResolveParent == null || preResolveParent.IsEmpty) ? this
+                    : new RequestContext(Container, Scopes, scope, preResolveParent ?? RequestInfo.Empty);
             }
 
             internal void IncrementDependencyCount()
