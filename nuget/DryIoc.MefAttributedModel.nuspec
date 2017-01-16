@@ -24,7 +24,7 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="[2.9,3.0)" />
+                <dependency id="DryIoc" version="[2.9.7,3.0)" />
                 <dependency id="DryIocAttributes" version="3.0.0-preview-01" />
             </group>
         </dependencies>
