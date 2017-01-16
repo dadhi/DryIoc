@@ -14,7 +14,9 @@ namespace DryIoc.AspNetCore.Sample
         // For more information on how to configure your application, visit http://go.microsoft.com/fwlink/?LinkID=398940
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc();
+            services
+                .AddMvc()
+                .AddControllersAsServices();
 
             return new Container()
                 // optional: to support MEF attributed services discovery
