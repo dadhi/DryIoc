@@ -3198,11 +3198,45 @@ namespace DryIoc
         /// <summary>No rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        // todo: v3: Rename to MaxObjectGrapthSizePerExpression
-        /// <summary>Required to handle large object graphs, by limiting the maximum graph expression size.
-        /// Number of dependencies disregarding the nesting level, when DryIoc will start inserting dependencies as Resolve calls.</summary>
-        /// <remarks>The moment the value is predefined. Not sure if it should be user-defined.</remarks>
-        public readonly int LevelToSplitObjectGraphIntoResolveCalls = 30;
+        /// <summary>Default value for <see cref="MaxObjectGraphSize"/></summary>
+        public const int DefaultMaxObjectGraphSize = 32;
+
+        /// <summary>Max number of dependencies including nested ones,
+        /// before splitting the graph with Resolve calls.</summary>
+        public int MaxObjectGraphSize { get; private set; }
+
+        /// <summary>Sets <see cref="MaxObjectGraphSize"/>. 
+        /// To disable the limit please use <see cref="WithoutMaxObjectGraphSize"/></summary>
+        /// <param name="size">New  value. Should be <c>1</c> or higher.</param>
+        /// <returns>New rules.</returns>
+        public Rules WithMaxObjectGraphSize(int size)
+        {
+            Throw.If(size < 1);
+            var newRules = (Rules)MemberwiseClone();
+            newRules.MaxObjectGraphSize = size;
+            return newRules;
+        }
+
+        /// <summary>Disables the <see cref="MaxObjectGraphSize"/> limitation, 
+        /// so that object graph won't be split due this setting.</summary>
+        /// <returns>New rules.</returns>
+        public Rules WithoutMaxObjectGraphSize()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.MaxObjectGraphSize = -1;
+            return newRules;
+        }
+
+        /// <summary>Returns true if object grapth should be split due <see cref="MaxObjectGraphSize"/> setting.</summary>
+        /// <returns>True if should be split, and false otherwise.</returns>
+        public bool ShouldSplitObjectGraph(int dependencyCount)
+        {
+            return MaxObjectGraphSize != -1 && dependencyCount > MaxObjectGraphSize;
+        }
+
+        // todo: v3: Rename to remove
+        /// <summary>Obsolete: replaced with <see cref="MaxObjectGraphSize"/></summary>
+        public int LevelToSplitObjectGraphIntoResolveCalls { get; private set; }
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -3639,6 +3673,7 @@ namespace DryIoc
             _made = Made.Default;
             _settings = DEFAULT_SETTINGS;
             DefaultReuseInsteadOfTransient = Reuse.Transient;
+            MaxObjectGraphSize = DefaultMaxObjectGraphSize;
         }
 
         private Made _made;
@@ -6842,8 +6877,7 @@ namespace DryIoc
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
             return (Setup.AsResolutionCall
-                || ((request.FactoryType == FactoryType.Service &&
-                     request.DependencyCount > request.Rules.LevelToSplitObjectGraphIntoResolveCalls)
+                || ((request.FactoryType == FactoryType.Service && request.Rules.ShouldSplitObjectGraph(request.DependencyCount))
                     || IsContextDependent(request))
                     && !request.IsWrappedInFuncWithArgs()) // the check is only applied for implicit check, and not for setup option
                 && !request.IsFirstNonWrapperInResolutionCall()

@@ -26,6 +26,24 @@ namespace DryIoc.IssuesTests
             }
         }
 
+        [Test, Explicit]
+        public void Main_negative()
+        {
+            var c = new Container(rules => rules.WithoutMaxObjectGraphSize());
+            c.Register<AggQ>(Reuse.InCurrentScope);
+            c.Register<AggP>(Reuse.InCurrentScope);
+            c.Register<Root>(Reuse.InCurrentScope);
+            RegisterIn(c);
+
+            using (var scope = c.OpenScope())
+            {
+                var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
+                var rootStr = rootExpr.ToString();
+                var resolveCallIndex = rootStr.IndexOf("Resolve(", StringComparison.Ordinal);
+                Assert.AreEqual(-1, resolveCallIndex);
+            }
+        }
+
         public interface IP { }
         public interface IQ { }
         public class AggP { public AggP(IEnumerable<IP> ps) { } }
