@@ -64,7 +64,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
             foreach (var r in serviceRegistrations)
             {
-                var request = container.EmptyRequest.Push(r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
+                var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
                 var factoryExpr = r.Factory.GetExpressionOrDefault(request);
                 if (factoryExpr != null)
                     roots = roots.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), factoryExpr);
@@ -87,7 +87,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<LazyUser>();
             container.Register<LazyDep>();
 
-            var request = container.EmptyRequest.Push(typeof(LazyUser));
+            var request = Request.Create(container, typeof(LazyUser));
             container.GetServiceFactoryOrDefault(request).GetExpressionOrDefault(request);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
@@ -117,7 +117,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
             foreach (var r in serviceRegistrations)
             {
-                var request = container.EmptyRequest.Push(r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
+                var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
                 var factoryExpr = r.Factory.GetExpressionOrDefault(request);
                 if (factoryExpr != null)
                     roots = roots.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), factoryExpr);
