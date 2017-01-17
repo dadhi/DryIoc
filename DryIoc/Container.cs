@@ -6152,15 +6152,15 @@ namespace DryIoc
         private IReuse GetDefaultReuse(Factory factory)
         {
             IReuse reuse = null;
+
             if (factory.Setup.UseParentReuse)
                 reuse = GetParentOrFuncOrEmpty().Reuse;
             else if (factory.Setup.FactoryType == FactoryType.Decorator
                 && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
-                reuse = Reuse;
-
-            // if no specified the wrapper reuse is always Transient,
-            // other container-wide default reuse is applied
-            if (reuse == null)
+                reuse = Reuse; // use reuse of resolved service factory for decorator
+            else
+                // if no specified the wrapper reuse is always Transient,
+                // other container-wide default reuse is applied
                 reuse = factory.FactoryType != FactoryType.Wrapper
                     ? Container.Rules.DefaultReuseInsteadOfTransient
                     : DryIoc.Reuse.Transient;
@@ -6184,7 +6184,7 @@ namespace DryIoc
 
             // First, check the parent's scope
             var parent = GetParentOrFuncOrEmpty(firstNonTransientParent: true);
-            if (parent.FactoryType == FactoryType.Wrapper)
+            if (parent.FactoryType == FactoryType.Wrapper) // wrapper means it is a Func
                 return DryIoc.Reuse.Transient;
 
             if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
@@ -6231,8 +6231,7 @@ namespace DryIoc
                 }
                 else
                 {
-                    if (!firstNonTransientParent ||
-                        p.Reuse != null && p.Reuse != DryIoc.Reuse.Transient)
+                    if (p.Reuse != DryIoc.Reuse.Transient)
                         return p;
                 }
             }
