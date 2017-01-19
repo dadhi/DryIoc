@@ -165,7 +165,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             switch (lifetime)
             {
                 case ServiceLifetime.Singleton:
-                    // todo: 1.1: will be converted back to Singleton when Rule.WithImplicitRootOpenScope is removed from adepter
+                    // todo: Wait until Singletons are actual singletons, then remove Rule.WithImplicitRootOpenScope from adapter
                     return Reuse.InCurrentNamedScope(Container.NonAmbientRootScopeName);
                 case ServiceLifetime.Scoped:
                     return Reuse.InCurrentScope;

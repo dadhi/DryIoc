@@ -6031,8 +6031,8 @@ namespace DryIoc
 
             var inheritedRequestInfo = Push(Container, RequestInfo, info);
 
-            return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs, _flags);
-        }
+            return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs, default(Flags));
+        } 
 
         private static RequestInfo Push(IContainer container, RequestInfo parent, IServiceInfo serviceInfo)
         {
