@@ -11,6 +11,8 @@
         <description>DryIoc extension for ASP.NET providing Web Request Reuse</description>
         <tags>Web ASP Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.1.1:
+          - More robust HttpContextScopeContext to prevent possible concurrency errors
           v2.1.0:
           - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
           - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly

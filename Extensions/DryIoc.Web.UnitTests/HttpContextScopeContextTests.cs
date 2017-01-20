@@ -22,11 +22,11 @@ namespace DryIoc.Web.UnitTests
 
                 using (contextProxy.SetCurrent(current => new Scope(current, null)))
                 {
-                    Assert.AreSame(expected, c.Resolve<Blah>());                   
+                    Assert.AreSame(expected, c.Resolve<Blah>());
                 }
             }
         }
 
-        public class Blah {}
+        public class Blah { }
     }
 }

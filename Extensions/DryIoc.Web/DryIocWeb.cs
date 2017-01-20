@@ -123,7 +123,8 @@ namespace DryIoc.Web
         public IScope GetCurrentOrDefault()
         {
             var scopes = _getContextItems();
-            return scopes == null ? null : scopes[_currentScopeEntryKey] as IScope;
+            return scopes == null || !scopes.Contains(_currentScopeEntryKey) ? null 
+                : scopes[_currentScopeEntryKey] as IScope;
         }
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
@@ -131,10 +132,18 @@ namespace DryIoc.Web
         /// <returns>New current scope.</returns>
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
-            var newCurrentScope = setCurrentScope.ThrowIfNull()(GetCurrentOrDefault());
-            var contextScopes = _getContextItems().ThrowIfNull(Error.Of("No HttpContext is available to set scope to."));
-            contextScopes[_currentScopeEntryKey] = newCurrentScope;
-            return newCurrentScope;
+            setCurrentScope.ThrowIfNull();
+
+            var scopes = _getContextItems()
+                .ThrowIfNull(Error.Of("No HttpContext is available to set scope to."));
+
+            var oldScope = !scopes.Contains(_currentScopeEntryKey) ? null : scopes[_currentScopeEntryKey] as IScope;
+
+            var newScope = setCurrentScope(oldScope);
+
+            scopes[_currentScopeEntryKey] = newScope;
+
+            return newScope;
         }
 
         /// <summary>Nothing to dispose.</summary>
