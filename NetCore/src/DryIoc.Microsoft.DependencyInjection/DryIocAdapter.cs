@@ -155,8 +155,11 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
-                // todo: v1.1: plan to specify preventDisposal for the instances
-                container.RegisterDelegate(descriptor.ServiceType, _ => descriptor.ImplementationInstance);
+                // todo: Specify preventDisposal as soon as DI decides on that 
+                // But for now register as singleton instances, which whill be disposed with container
+                container.RegisterDelegate(descriptor.ServiceType, 
+                    _ => descriptor.ImplementationInstance,
+                    Reuse.Singleton); 
             }
         }
 
