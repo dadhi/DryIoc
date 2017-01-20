@@ -2983,9 +2983,13 @@ namespace DryIoc
                 compositeParentRequiredType = parent.RequiredServiceType;
             }
 
+            // todo: add check if request IsResolutionRoot
+
             var preResolveParent = container.RequestInfoToExpression(request.RequestInfo);
 
             var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            var resolutionScopeExpr = Container.GetResolutionScopeExpression(request);
+
             var callResolveManyExpr = Expression.Call(resolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
@@ -2993,7 +2997,7 @@ namespace DryIoc
                 container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
                 preResolveParent,
-                Container.GetResolutionScopeExpression(request));
+                resolutionScopeExpr);
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemType }, callResolveManyExpr);
@@ -3225,13 +3229,6 @@ namespace DryIoc
             var newRules = (Rules)MemberwiseClone();
             newRules.MaxObjectGraphSize = -1;
             return newRules;
-        }
-
-        /// <summary>Returns true if object grapth should be split due <see cref="MaxObjectGraphSize"/> setting.</summary>
-        /// <returns>True if should be split, and false otherwise.</returns>
-        public bool ShouldSplitObjectGraph(int dependencyCount)
-        {
-            return MaxObjectGraphSize != -1 && dependencyCount > MaxObjectGraphSize;
         }
 
         // todo: v3: Rename to remove
@@ -5174,14 +5171,13 @@ namespace DryIoc
         {
             request.ContainsNestedResolutionCall = true;
 
-            if (!isRuntimeDependency)
-                PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
-
             var container = request.Container;
+
+            if (!isRuntimeDependency && container.Rules.DependencyResolutionCallExpressions != null)
+                PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
             var serviceType = request.ServiceType;
             var serviceKey = request.ServiceKey;
-            var newPreResolveParent = request.ParentOrWrapper;
 
             var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
@@ -5202,7 +5198,7 @@ namespace DryIoc
             }
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var preResolveParentExpr = container.RequestInfoToExpression(newPreResolveParent);
+            var preResolveParentExpr = container.RequestInfoToExpression(request.ParentOrWrapper);
 
             var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
 
@@ -5216,20 +5212,17 @@ namespace DryIoc
 
         private static void PopulateDependencyResolutionCallExpressions(Request request, bool openResolutionScope)
         {
-            var serviceType = request.ServiceType;
-            var serviceKey = request.ServiceKey;
-            var newPreResolveParent = request.ParentOrWrapper;
-
-            var container = request.Container;
-
             // Actually calls nested Resolution Call and stores produced expression in collection:
             // - if the collection to accumulate call expressions is defined and:
             //   - Resolve call is the first nested in chain
             //   - Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
-            if (container.Rules.DependencyResolutionCallExpressions != null &&
-                (request.PreResolveParent.IsEmpty ||
-                 !request.PreResolveParent.EqualsWithoutParent(newPreResolveParent)))
+            var preResolveParent = request.PreResolveParent;
+            if (preResolveParent.IsEmpty ||
+                !request.RawParent.IsEmpty && !preResolveParent.EqualsWithoutParent(request.RawParent))
             {
+                var serviceType = request.ServiceType;
+                var serviceKey = request.ServiceKey;
+
                 // Create scope for first nesting level or where corresponding setting is saying so
                 var scope = request.Scope;
                 if (scope == null || openResolutionScope)
@@ -5237,12 +5230,12 @@ namespace DryIoc
 
                 var newRequest = Request.Create(request.Container, serviceType, serviceKey,
                     request.IfUnresolved, request.RequiredServiceType, scope,
-                    newPreResolveParent);
+                    request.ParentOrWrapper);
 
                 var factory = request.Container.ResolveFactory(newRequest);
                 var factoryExpr = factory == null ? null : factory.GetExpressionOrDefault(newRequest);
                 if (factoryExpr != null)
-                    container.Rules.DependencyResolutionCallExpressions.Swap(it =>
+                    request.Rules.DependencyResolutionCallExpressions.Swap(it =>
                         it.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
             }
         }
@@ -5493,6 +5486,17 @@ namespace DryIoc
             return dependency.Create(serviceType, serviceDetails);
         }
 
+        /// <summary>Returns required service type if it is specified and assignable to service type,
+        /// otherwise returns service type.</summary>
+        /// <returns>The type to be used for lookup in registry.</returns>
+        public static Type GetActualServiceType(this IServiceInfo info)
+        {
+            var requiredServiceType = info.Details.RequiredServiceType;
+
+            return requiredServiceType != null && requiredServiceType.IsAssignableTo(info.ServiceType)
+                ? requiredServiceType : info.ServiceType;
+        }
+
         /// <summary>Appends info string representation into provided builder.</summary>
         /// <param name="s">String builder to print to.</param> <param name="info">Info to print.</param>
         /// <returns>String builder with appended info.</returns>
@@ -5508,6 +5512,9 @@ namespace DryIoc
     /// property and field dependencies.</summary>
     public class ServiceInfo : IServiceInfo
     {
+        /// <summary>Empty service info for convenience.</summary>
+        public static readonly IServiceInfo Empty = new ServiceInfo(null);
+
         /// <summary>Creates info out of provided settings</summary>
         /// <param name="serviceType">Service type</param>
         /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
@@ -5813,10 +5820,10 @@ namespace DryIoc
         public static Request CreateEmpty(Container container)
         {
             var resolverContext = new RequestContext(container, container, null, RequestInfo.Empty);
-            return new Request(resolverContext, null, RequestInfo.Empty, null, null, default(Flags));
+            return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(Flags));
         }
 
-        private static readonly Request _empty = new Request(null, null, RequestInfo.Empty, null, null, default(Flags));
+        private static readonly Request _empty = new Request(null, null, ServiceInfo.Empty, null, null, null, default(Flags));
 
         /// <summary>Creates empty request associated wit container. 
         /// The shared part of request is stored in request context. Pre-request info is also store once in shared context.</summary>
@@ -5840,11 +5847,13 @@ namespace DryIoc
 
             var resolverContext = new RequestContext(container, (IScopeAccess)container, scope, preResolveParent);
 
-            var serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
+            IServiceInfo serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
 
-            var requestInfo = Push(container, preResolveParent, serviceInfo);
+            if (!preResolveParent.IsEmpty)
+                serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(preResolveParent.ServiceInfo, 
+                    ownerType: preResolveParent.FactoryType, container: container);
 
-            return new Request(resolverContext, _empty, requestInfo, null, null, default(Flags));
+            return new Request(resolverContext, _empty, serviceInfo, null, null, null, default(Flags));
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
@@ -5862,25 +5871,21 @@ namespace DryIoc
         /// <summary>Request prior to Resolve call.</summary>
         public RequestInfo PreResolveParent { get { return _requestContext.PreResolveParent; } }
 
-        /// <summary>Returns true for the First Service in resolve call.</summary> <returns></returns>
-        public bool IsFirstNonWrapperInResolutionCall()
-        {
-            if (IsResolutionCall && RawParent.FactoryType != FactoryType.Wrapper)
-                return true;
-            var p = RawParent;
-            while (!p.IsEmpty && p.FactoryType == FactoryType.Wrapper)
-                p = p.RawParent;
-            return p.IsEmpty;
-        }
-
         /// <summary>Checks if request is wrapped in Func,
         ///  where Func is one of request immediate wrappers.</summary>
         /// <returns>True if has Func ancestor.</returns>
         public bool IsWrappedInFunc()
         {
-            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
-                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
-                    return true;
+            if (!RawParent.IsEmpty)
+                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                        return true;
+
+            if (!PreResolveParent.IsEmpty)
+                for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                        return true;
+
             return false;
         }
 
@@ -5890,13 +5895,15 @@ namespace DryIoc
         /// <returns>True if has Func with arguments ancestor.</returns>
         public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
         {
-            var parent = ParentOrWrapper;
-            if (immediateParent)
-                return parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFuncWithArgs();
+            if (!RawParent.IsEmpty)
+                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
+                        return true;
 
-            for (var p = parent; !p.IsEmpty; p = p.ParentOrWrapper)
-                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
-                    return true;
+            if (!PreResolveParent.IsEmpty)
+                for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
+                        return true;
 
             return false;
         }
@@ -5920,29 +5927,22 @@ namespace DryIoc
         /// excluding registered delegates, instances, and wrappers.</summary>
         public int DependencyCount { get { return _requestContext.DependencyCount; } }
 
-        /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
-        public RequestInfo Parent
+        /// <summary>Returns true if object grapth should be split due <see cref="DryIoc.Rules.MaxObjectGraphSize"/> setting.</summary>
+        /// <returns>True if should be split, and false otherwise.</returns>
+        public bool ShouldSplitObjectGraph()
         {
-            get
-            {
-                return IsEmpty ? RequestInfo.Empty
-                    : RawParent.IsEmpty ? PreResolveParent.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper)
-                    : RawParent.FactoryType != FactoryType.Wrapper ? RawParent.RequestInfo
-                    : RawParent.Parent;
-            }
+            if (FactoryType != FactoryType.Service)
+                return false;
+            var maxObjectGraphSize = Rules.MaxObjectGraphSize;
+            return maxObjectGraphSize != -1 && DependencyCount > maxObjectGraphSize;
         }
+
+        /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
+        public RequestInfo Parent { get { return RequestInfo.Parent; } }
 
         /// <summary>Returns direct parent either it service or not (wrapper).
         /// In comparison with logical <see cref="Parent"/> which returns first service parent skipping wrapper if any.</summary>
-        public RequestInfo ParentOrWrapper
-        {
-            get
-            {
-                return IsEmpty ? RequestInfo.Empty
-                  : RawParent.IsEmpty ? PreResolveParent
-                  : RawParent.RequestInfo;
-            }
-        }
+        public RequestInfo ParentOrWrapper { get { return RequestInfo.ParentOrWrapper; } }
 
         /// <summary>Provides access to container currently bound to request.
         /// By default it is container initiated request by calling resolve method,
@@ -5965,48 +5965,42 @@ namespace DryIoc
         public IScope Scope { get { return _requestContext.Scope; } }
 
         /// <summary>(optional) Made spec used for resolving request.</summary>
-        public readonly Made Made;
+        public Made Made { get { return _factory == null ? null : _factory.Made; } }
 
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
         /// <remarks>Mutable: tracks used arguments</remarks>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType { get { return RequestInfo.ServiceType; } }
+        public Type ServiceType { get { return _serviceInfo.ServiceType; } }
 
         /// <summary>Optional service key to identify service of the same type.</summary>
-        public object ServiceKey { get { return RequestInfo.ServiceKey; } }
+        public object ServiceKey { get { return _serviceInfo.Details.ServiceKey; } }
 
         /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
-        public string MetadataKey
-        {
-            get { return RequestInfo == null ? null : RequestInfo.MetadataKey; }
-        }
+        public string MetadataKey { get { return _serviceInfo.Details.MetadataKey; } }
 
         /// <summary>Metadata or the value (if key specified) to find in resolved service.</summary>
-        public object Metadata
-        {
-            get { return RequestInfo == null ? null : RequestInfo.Metadata; }
-        }
+        public object Metadata { get { return _serviceInfo.Details.Metadata; } }
 
         /// <summary>Policy to deal with unresolved service.</summary>
-        public IfUnresolved IfUnresolved { get { return RequestInfo.IfUnresolved; } }
+        public IfUnresolved IfUnresolved { get { return _serviceInfo.Details.IfUnresolved; } }
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType { get { return RequestInfo.RequiredServiceType; } }
+        public Type RequiredServiceType { get { return _serviceInfo.Details.RequiredServiceType; } }
 
         /// <summary>Implementation FactoryID.</summary>
         /// <remarks>The default unassigned value of ID is 0.</remarks>
-        public int FactoryID { get { return RequestInfo.FactoryID; } }
+        public int FactoryID { get { return _factory.ThrowIfNull().FactoryID; } }
 
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
-        public FactoryType FactoryType { get { return RequestInfo.FactoryType; } }
+        public FactoryType FactoryType { get { return _factory.ThrowIfNull().FactoryType; } }
 
         /// <summary>Service implementation type if known.</summary>
-        public Type ImplementationType { get { return RequestInfo.ImplementationType; } }
+        public Type ImplementationType { get { return _factory.ThrowIfNull().ImplementationType; } }
 
         /// <summary>Service reuse.</summary>
-        public IReuse Reuse { get { return RequestInfo.Reuse; } }
+        public IReuse Reuse { get { return _reuse; } }
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
@@ -6015,7 +6009,7 @@ namespace DryIoc
         /// <returns>The type to be used for lookup in registry.</returns>
         public Type GetActualServiceType()
         {
-            return RequestInfo.GetActualServiceType();
+            return _serviceInfo.GetActualServiceType();
         }
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
@@ -6026,43 +6020,34 @@ namespace DryIoc
         {
             info.ThrowIfNull();
 
-            if (RequestInfo.FactoryID == 0)
+            if (_factory == null)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            var inheritedRequestInfo = Push(Container, RequestInfo, info);
+            var parentInfo = ChangeIfUnresolvedForCollectionServiceDependency();
 
-            return new Request(_requestContext, this, inheritedRequestInfo, null, FuncArgs, default(Flags));
-        } 
+            var inheritedInfo = info.InheritInfoFromDependencyOwner(parentInfo, ownerType: FactoryType, container: Container);
 
-        private static RequestInfo Push(IContainer container, RequestInfo parent, IServiceInfo serviceInfo)
+            return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, default(Flags));
+        }
+
+        // todo: v3: review and remove if possible
+        // if service info is dependency of service wrapped in collection,
+        // then change policy to collection policy
+        private IServiceInfo ChangeIfUnresolvedForCollectionServiceDependency()
         {
-            if (parent.IsEmpty)
-                return RequestInfo.Empty.Push(serviceInfo);
-
-            // todo: v3: review and remove if possible
-            // if service info is dependency of service wrapped in collection,
-            // then change policy to collection policy
-            var parentInfo = parent.ServiceInfo;
-            if (parent.IfUnresolved == IfUnresolved.ReturnDefault)
+            if (IfUnresolved == IfUnresolved.ReturnDefault && FactoryType == FactoryType.Service)
             {
-                if (parent.FactoryType == FactoryType.Service)
-                {
-                    var collectionParent = parent.Enumerate().FirstOrDefault(p =>
-                        p.FactoryType == FactoryType.Wrapper &&
-                        p.GetActualServiceType().IsSupportedCollectionType());
-                    if (collectionParent != null &&
-                        collectionParent.IfUnresolved == IfUnresolved.Throw)
-                    {
-                        parentInfo = ServiceInfo.Of(parentInfo.ServiceType,
-                            parentInfo.Details.RequiredServiceType, IfUnresolved.Throw, parentInfo.Details.ServiceKey);
-                    }
-                }
+                var p = RequestInfo;
+                while (!p.IsEmpty &&
+                       !(p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsSupportedCollectionType()))
+                    p = p.ParentOrWrapper;
+
+                if (!p.IsEmpty && p.IfUnresolved == IfUnresolved.Throw)
+                    return ServiceInfo.Of(ServiceType, RequiredServiceType, IfUnresolved.Throw, ServiceKey, 
+                        MetadataKey, Metadata);
             }
 
-            var inheritedServiceInfo = serviceInfo.InheritInfoFromDependencyOwner(parentInfo,
-                ownerType: parent.FactoryType, container: container);
-
-            return parent.Push(inheritedServiceInfo);
+            return _serviceInfo;
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
@@ -6089,8 +6074,7 @@ namespace DryIoc
         /// <returns>New request with new service info but the same implementation and context.</returns>
         public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
         {
-            var newRequestInfo = RequestInfo.With(getInfo);
-            return new Request(_requestContext, RawParent, newRequestInfo, Made, FuncArgs, _flags);
+            return new Request(_requestContext, RawParent, getInfo(_serviceInfo), _factory, _reuse, FuncArgs, _flags);
         }
 
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -6098,12 +6082,10 @@ namespace DryIoc
         /// <param name="serviceKey">Key to set.</param>
         public void ChangeServiceKey(object serviceKey) // NOTE: May be removed in future versions.
         {
-            RequestInfo = RequestInfo.With(i =>
-            {
-                var details = i.Details;
-                var newDetails = ServiceDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue);
-                return i.Create(i.ServiceType, newDetails);
-            });
+            var i = _serviceInfo;
+            var d = i.Details;
+            var newDetails = ServiceDetails.Of(d.RequiredServiceType, serviceKey, d.IfUnresolved, d.DefaultValue);
+            _serviceInfo = i.Create(i.ServiceType, newDetails);
         }
 
         /// <summary>Adds input argument expression list to request. 
@@ -6113,7 +6095,7 @@ namespace DryIoc
         {
             var argsUsed = new bool[argExpressions.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
-            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo, _flags);
+            return new Request(_requestContext, RawParent, _serviceInfo, _factory, _reuse, argsInfo, _flags);
         }
 
         // todo: v3: remove
@@ -6139,7 +6121,7 @@ namespace DryIoc
 
             var argsUsed = new bool[argExprs.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExprs);
-            return new Request(_requestContext, RawParent, RequestInfo, Made, argsInfo, _flags);
+            return new Request(_requestContext, RawParent, _serviceInfo, _factory, _reuse, argsInfo, _flags);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container,
@@ -6149,7 +6131,7 @@ namespace DryIoc
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
             var newContext = _requestContext.With(newContainer.Container);
-            return new Request(newContext, RawParent, RequestInfo, Made, FuncArgs, _flags);
+            return new Request(newContext, RawParent, _serviceInfo, _factory, _reuse, FuncArgs, _flags);
         }
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -6159,14 +6141,13 @@ namespace DryIoc
         /// <returns>New request with set factory.</returns>
         public Request WithResolvedFactory(Factory factory, bool allowRecursiveDependency = false)
         {
-            var newFactoryID = factory.FactoryID;
-            if (IsEmpty || FactoryID == newFactoryID)
+            if (IsEmpty || _factory != null && _factory.FactoryID == factory.FactoryID)
                 return this; // resolving only once, no need to check recursion again.
 
             if (factory.FactoryType == FactoryType.Service && !allowRecursiveDependency)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
-                    if (p.FactoryID == newFactoryID)
-                        Throw.It(Error.RecursiveDependencyDetected, Print(newFactoryID));
+                    if (p.FactoryID == factory.FactoryID)
+                        Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
             var reuse = factory.Reuse;
             if (reuse == null)
@@ -6178,10 +6159,8 @@ namespace DryIoc
             else
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
-            var newInfo = RequestInfo.With(newFactoryID, factory.FactoryType, factory.ImplementationType, reuse);
-
             _requestContext.IncrementDependencyCount();
-            return new Request(_requestContext, RawParent, newInfo, factory.Made, FuncArgs, flags);
+            return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -6236,19 +6215,53 @@ namespace DryIoc
             if (reuseLifespan == 0 || !Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 return;
 
-            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
-            {
-                if (p.FactoryType == FactoryType.Wrapper)
+            if (!RawParent.IsEmpty)
+                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                 {
-                    if (p.GetActualServiceType().IsFunc())
-                        return; // stop on Func
+                    if (p.FactoryType == FactoryType.Wrapper)
+                    {
+                        if (p.GetActualServiceType().IsFunc())
+                            break;
+                    }
+                    else if (p.FactoryType == FactoryType.Service)
+                    {
+                        if (p.ReuseLifespan > reuseLifespan)
+                            Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
+                    }
                 }
-                else if (p.FactoryType == FactoryType.Service)
+
+            if (!PreResolveParent.IsEmpty)
+            {
+                for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
                 {
-                    if (p.ReuseLifespan > reuseLifespan)
-                        Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
+                    if (p.FactoryType == FactoryType.Wrapper)
+                    {
+                        if (p.GetActualServiceType().IsFunc())
+                            break;
+                    }
+                    else if (p.FactoryType == FactoryType.Service)
+                    {
+                        if (p.ReuseLifespan > reuseLifespan)
+                            Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
+                    }
                 }
             }
+        }
+
+        private bool HasShorterLifespanThanParent(int reuseLifespan, RequestInfo parent)
+        {
+            if (parent.FactoryType == FactoryType.Wrapper)
+            {
+                if (parent.GetActualServiceType().IsFunc())
+                    return false;
+            }
+            else if (parent.FactoryType == FactoryType.Service)
+            {
+                if (parent.ReuseLifespan > reuseLifespan)
+                    return true;
+            }
+
+            return false;
         }
 
         // todo: Improve perf.
@@ -6275,7 +6288,27 @@ namespace DryIoc
         }
 
         /// <summary>Serializable request info stripped off run-time info.</summary>
-        public RequestInfo RequestInfo { get; private set; } // note: mutable to change key in place
+        public RequestInfo RequestInfo
+        {
+            get
+            {
+                if (IsEmpty)
+                    return PreResolveParent;
+
+                RequestInfo parentRequestInfo;
+                if (RawParent.IsEmpty)
+                    parentRequestInfo = PreResolveParent;
+                else
+                    parentRequestInfo = RawParent.RequestInfo;
+
+                if (_factory == null)
+                    return parentRequestInfo.Push(_serviceInfo);
+
+                var f = _factory;
+                return parentRequestInfo.Push(_serviceInfo, 
+                    f.FactoryID, f.FactoryType, f.ImplementationType, _reuse);
+            }
+        }
 
         // todo: v3: remove
         /// <summary>Obsolete: use <see cref="RequestInfo"/> instead.</summary>
@@ -6300,7 +6333,7 @@ namespace DryIoc
             Func<PropertyInfo, TResult> property = null,
             Func<FieldInfo, TResult> field = null)
         {
-            var serviceInfo = RequestInfo.ServiceInfo;
+            var serviceInfo = _serviceInfo;
             if (serviceInfo is ParameterServiceInfo)
             {
                 if (parameter != null)
@@ -6339,9 +6372,29 @@ namespace DryIoc
         public StringBuilder PrintCurrent(StringBuilder s = null)
         {
             s = s ?? new StringBuilder();
-            s = RequestInfo.PrintCurrent(s);
+
+            if (IsEmpty)
+                return s.Append("{empty}");
+
+            if (_factory != null)
+            {
+                if (_reuse != DryIoc.Reuse.Transient)
+                    s.Append(Reuse is SingletonReuse ? "singleton" : "scoped").Append(' ');
+
+                var factoryType = _factory.FactoryType;
+                if (factoryType != FactoryType.Service)
+                    s.Append(factoryType.ToString().ToLower()).Append(' ');
+
+                var implType = _factory.ImplementationType;
+                if (implType != null && implType != ServiceType)
+                    s.Print(implType).Append(": ");
+            }
+
+            s.Append(_serviceInfo);
+
             if (FuncArgs != null)
                 s.AppendFormat(" with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
+
             return s;
         }
 
@@ -6379,17 +6432,22 @@ namespace DryIoc
 
         #region Implementation
 
-        private Request(RequestContext requestContext,
-            Request parent, RequestInfo requestInfo, Made made, KV<bool[], ParameterExpression[]> funcArgs,
-            Flags flags)
+        private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo, 
+            Factory factory, IReuse reuse,
+            KV<bool[], ParameterExpression[]> funcArgs, Flags flags)
         {
             _requestContext = requestContext;
             RawParent = parent;
-            RequestInfo = requestInfo;
-            Made = made;
+            _serviceInfo = serviceInfo;
+            _factory = factory;
+            _reuse = reuse;
             FuncArgs = funcArgs;
             _flags = flags;
         }
+
+        private IServiceInfo _serviceInfo;
+        private readonly Factory _factory;
+        private readonly IReuse _reuse;
 
         [Flags]
         private enum Flags
@@ -6876,11 +6934,10 @@ namespace DryIoc
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
-            return (Setup.AsResolutionCall
-                || ((request.FactoryType == FactoryType.Service && request.Rules.ShouldSplitObjectGraph(request.DependencyCount))
-                    || IsContextDependent(request))
-                    && !request.IsWrappedInFuncWithArgs()) // the check is only applied for implicit check, and not for setup option
-                && !request.IsFirstNonWrapperInResolutionCall()
+            return !request.IsResolutionCall && // prevents recursion on already split graph
+                (Setup.AsResolutionCall ||      // explicit aka user requested split
+                (request.ShouldSplitObjectGraph() || IsContextDependent(request)) && // implicit aka automatically detected split
+                    !request.IsWrappedInFuncWithArgs()) // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
                 && request.GetActualServiceType() != typeof(void);
         }
 
@@ -6937,7 +6994,7 @@ namespace DryIoc
                     isExpressionCacheable = false;
 
                 if (request.Reuse != DryIoc.Reuse.Transient &&
-                    request.ServiceType != typeof(void))
+                    request.GetActualServiceType() != typeof(void))
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
@@ -7761,7 +7818,7 @@ namespace DryIoc
 
         private FactoryMethod GetFactoryMethod(Request request)
         {
-            var implType = _implementationType;
+            var implType = request.ImplementationType;
             var factoryMethodSelector = Made.FactoryMethod ?? request.Rules.FactoryMethod;
             if (factoryMethodSelector == null)
             {
@@ -9187,7 +9244,13 @@ namespace DryIoc
         {
             get
             {
-                return IsEmpty ? Empty : ParentOrWrapper.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper);
+                if (IsEmpty)
+                    return Empty;
+
+                var p = ParentOrWrapper;
+                while (!p.IsEmpty && p.FactoryType == FactoryType.Wrapper)
+                    p = p.ParentOrWrapper;
+                return p;
             }
         }
 
@@ -9230,9 +9293,7 @@ namespace DryIoc
         /// <returns>The type to be used for lookup in registry.</returns>
         public Type GetActualServiceType()
         {
-            return RequiredServiceType != null
-                && RequiredServiceType.IsAssignableTo(ServiceType)
-                ? RequiredServiceType : ServiceType;
+            return ServiceInfo.GetActualServiceType();
         }
 
         /// <summary>Returns known implementation, or otherwise actual service type.</summary> <returns>The subject.</returns>
@@ -9418,6 +9479,22 @@ namespace DryIoc
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(RequestInfo other)
+        {
+            return other.ServiceType == ServiceType
+                && other.RequiredServiceType == RequiredServiceType
+                && other.IfUnresolved == IfUnresolved
+                && Equals(other.ServiceKey, ServiceKey)
+                && other.MetadataKey == MetadataKey
+                && Equals(other.Metadata, Metadata)
+
+                && other.FactoryType == FactoryType
+                && other.ImplementationType == ImplementationType
+                && other.ReuseLifespan == ReuseLifespan;
+        }
+        
+        /// <summary>Compares info's regarding properties but not their parents.</summary>
+        /// <param name="other">Info to compare for equality.</param> <returns></returns>
+        public bool EqualsWithoutParent(Request other)
         {
             return other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
