@@ -6972,7 +6972,7 @@ namespace DryIoc
                 {
                     var value = singletons.GetOrDefault(singletonID);
                     if (value != null)
-                        return Expression.Convert(Expression.Constant(value), request.ServiceType);
+                        return Expression.Constant(value, request.ServiceType);
                 }
             }
 
@@ -7031,6 +7031,12 @@ namespace DryIoc
         /// <returns>Scoped expression or originally passed expression.</returns>
         protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, bool tracksTransientDisposable, Request request)
         {
+            // optimization for already activated singleton
+            if (serviceExpr.NodeType == ExpressionType.Constant &&
+                reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
+                !Setup.PreventDisposal && !Setup.WeaklyReferenced)
+                return serviceExpr;
+
             var serviceType = serviceExpr.Type;
 
             // Optimize: eagerly create singleton during the construction of object graph,
@@ -7042,30 +7048,20 @@ namespace DryIoc
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var singletonScope = request.SingletonScope;
-
-                FactoryDelegate factoryDelegate = null;
-
-                if (serviceExpr.NodeType == ExpressionType.New &&
-                    !Setup.PreventDisposal && !Setup.WeaklyReferenced)
-                    factoryDelegate = ActivateSingleton((NewExpression)serviceExpr, singletonScope);
-
-                if (factoryDelegate == null)
+                var factoryDelegate = serviceExpr.CompileToDelegate();
+                if (Setup.PreventDisposal)
                 {
-                    factoryDelegate = serviceExpr.CompileToDelegate();
-                    if (Setup.PreventDisposal)
-                    {
-                        var factory = factoryDelegate;
-                        factoryDelegate = (_, cs, rs) => new[] { factory(null, cs, rs) };
-                    }
-
-                    if (Setup.WeaklyReferenced)
-                    {
-                        var factory = factoryDelegate;
-                        factoryDelegate = (_, cs, rs) => new WeakReference(factory(null, cs, rs));
-                    }
+                    var factory = factoryDelegate;
+                    factoryDelegate = (_, cs, rs) => new[] {factory(null, cs, rs)};
                 }
 
+                if (Setup.WeaklyReferenced)
+                {
+                    var factory = factoryDelegate;
+                    factoryDelegate = (_, cs, rs) => new WeakReference(factory(null, cs, rs));
+                }
+
+                var singletonScope = request.SingletonScope;
                 var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
                 var singleton = singletonScope.GetOrAdd(singletonId, () =>
                     factoryDelegate(null, request.ContainerWeakRef, request.Scope));
@@ -7110,58 +7106,6 @@ namespace DryIoc
                     Expression.Constant(0, typeof(int)));
 
             return serviceExpr;
-        }
-
-        private FactoryDelegate ActivateSingleton(NewExpression newExpr, IScope singletons)
-        {
-            if (!newExpr.Constructor.IsPublic)
-                return null;
-
-            var argExprs = newExpr.Arguments;
-            var singletonType = newExpr.Type;
-
-            CreateScopedValue createSingleton = null;
-
-            object[] args = null;
-            if (argExprs.Count == 0)
-            {
-                args = ArrayTools.Empty<object>();
-            }
-            else if (argExprs.Count == 1)
-            {
-                var argExpr = argExprs[0];
-                if (argExpr.NodeType == ExpressionType.Convert)
-                    argExpr = ((UnaryExpression)argExpr).Operand;
-
-                var constExpr = argExpr as ConstantExpression;
-                if (constExpr != null)
-                    args = new[] { constExpr.Value };
-            }
-            else
-            {
-                var constantArgs = new object[argExprs.Count];
-                int i = constantArgs.Length - 1;
-                for (; i >= 0; --i)
-                {
-                    var argExpr = argExprs[i];
-                    if (argExpr.NodeType == ExpressionType.Convert)
-                        argExpr = ((UnaryExpression)argExpr).Operand;
-
-                    var constExpr = argExpr as ConstantExpression;
-                    if (constExpr == null)
-                        break;
-                    constantArgs[i] = constExpr.Value;
-                }
-
-                if (i == -1) // all args are constants
-                    args = constantArgs;
-            }
-
-            if (args == null)
-                return null;
-
-            createSingleton = () => Activator.CreateInstance(singletonType, args);
-            return (_, context, scope) => createSingleton();
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.
@@ -7554,18 +7498,21 @@ namespace DryIoc
             {
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                 var factoryFactory = container.ResolveFactory(factoryRequest);
-                factoryExpr = factoryFactory == null ? null : factoryFactory.GetExpressionOrDefault(factoryRequest);
+                if (factoryFactory == null)
+                    return null;
+                factoryExpr = factoryFactory.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
                     return null;
             }
 
             var containerRules = container.Rules;
+            var allParamsAreConstants = true;
 
             Expression[] paramExprs = null;
-            var constructorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
-            if (constructorOrMethod != null)
+            var ctorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
+            if (ctorOrMethod != null)
             {
-                var parameters = constructorOrMethod.GetParameters();
+                var parameters = ctorOrMethod.GetParameters();
                 if (parameters.Length != 0)
                 {
                     paramExprs = new Expression[parameters.Length];
@@ -7634,13 +7581,18 @@ namespace DryIoc
                             }
                         }
 
+                        if (paramExpr.NodeType != ExpressionType.Constant &&
+                            !(paramExpr.NodeType == ExpressionType.Convert &&
+                              ((UnaryExpression)paramExpr).Operand.NodeType == ExpressionType.Constant))
+                            allParamsAreConstants = false;
+
                         paramExprs[i] = paramExpr;
                     }
                 }
             }
 
-            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs,
-                request, container);
+            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, request,
+                allParamsAreConstants);
         }
 
         #region Implementation
@@ -7777,14 +7729,36 @@ namespace DryIoc
         }
 
         private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs,
-            Request request, IContainer container)
+            Request request, bool allParamsAreConstants)
         {
+            var rules = request.Rules;
+
             var ctor = ctorOrMethodOrMember as ConstructorInfo;
             if (ctor != null)
             {
+                // optimize singleton creation bypassing Expression.New 
+                if (allParamsAreConstants && ctor.IsPublic &&
+                    rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
+                {
+                    if (request.Reuse is SingletonReuse &&
+                        request.Rules.EagerCachingSingletonForFasterAccess &&
+                        FactoryType == FactoryType.Service &&
+                        !Setup.PreventDisposal && !Setup.WeaklyReferenced &&
+                        !request.TracksTransientDisposable &&
+                        !request.IsWrappedInFunc())
+                    {
+                        var activateSingleton = ActivateSingleton(ctor.DeclaringType, paramExprs);
+
+                        var singletonScope = request.SingletonScope;
+                        var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
+                        var singleton = singletonScope.GetOrAdd(singletonId, activateSingleton);
+
+                        return Expression.Constant(singleton);
+                    }
+                }
+
                 var newServiceExpr = Expression.New(ctor, paramExprs);
 
-                var rules = container.Rules;
                 if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
                     return newServiceExpr;
 
@@ -7796,7 +7770,7 @@ namespace DryIoc
                 if (propertiesAndFields == null)
                     return newServiceExpr;
 
-                return InitPropertiesAndFields(newServiceExpr, request, container, propertiesAndFields);
+                return InitPropertiesAndFields(newServiceExpr, request, propertiesAndFields);
             }
 
             var method = ctorOrMethodOrMember as MethodInfo;
@@ -7814,6 +7788,49 @@ namespace DryIoc
                     Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMethodOrMember, request);
 
             return serviceExpr;
+        }
+
+        private static CreateScopedValue ActivateSingleton(Type singletonType, IList<Expression> argExprs)
+        {
+            object[] args = null;
+            if (argExprs == null || argExprs.Count == 0)
+            {
+                args = ArrayTools.Empty<object>();
+            }
+            else if (argExprs.Count == 1)
+            {
+                var argExpr = argExprs[0];
+                if (argExpr.NodeType == ExpressionType.Convert)
+                    argExpr = ((UnaryExpression)argExpr).Operand;
+
+                var constExpr = argExpr as ConstantExpression;
+                if (constExpr != null)
+                    args = new[] { constExpr.Value };
+            }
+            else
+            {
+                var constantArgs = new object[argExprs.Count];
+                int i = constantArgs.Length - 1;
+                for (; i >= 0; --i)
+                {
+                    var argExpr = argExprs[i];
+                    if (argExpr.NodeType == ExpressionType.Convert)
+                        argExpr = ((UnaryExpression)argExpr).Operand;
+
+                    var constExpr = argExpr as ConstantExpression;
+                    if (constExpr == null)
+                        break;
+                    constantArgs[i] = constExpr.Value;
+                }
+
+                if (i == -1) // all args are constants
+                    args = constantArgs;
+            }
+
+            if (args == null)
+                return null;
+
+            return () => Activator.CreateInstance(singletonType, args);
         }
 
         private FactoryMethod GetFactoryMethod(Request request)
@@ -7843,9 +7860,9 @@ namespace DryIoc
         }
 
         private Expression InitPropertiesAndFields(NewExpression newServiceExpr,
-            Request request, IContainer container,
-            IEnumerable<PropertyOrFieldServiceInfo> members)
+            Request request, IEnumerable<PropertyOrFieldServiceInfo> members)
         {
+            var container = request.Container;
             var bindings = new List<MemberBinding>();
             foreach (var member in members)
                 if (member != null)

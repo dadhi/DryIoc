@@ -15,7 +15,7 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
+            BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<BenchmarkResolution>();
             //BenchmarkRunner.Run<IfVsNullСoalesOperator>();
