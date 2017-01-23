@@ -5897,13 +5897,21 @@ namespace DryIoc
         {
             if (!RawParent.IsEmpty)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
+                {
                     if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
                         return true;
+                    if (immediateParent)
+                        return false;
+                }
 
             if (!PreResolveParent.IsEmpty)
+            {
                 for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
                     if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
                         return true;
+                if (immediateParent)
+                    return false;
+            }
 
             return false;
         }
