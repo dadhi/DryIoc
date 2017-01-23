@@ -1756,3 +1756,11 @@ namespace DryIocZero
         }
     }
 }
+
+namespace DryIoc
+{
+    static partial class Portable
+    {
+        static partial void GetCurrentManagedThreadID(ref int threadID);
+    }
+}

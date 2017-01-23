@@ -38,13 +38,18 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- A reference to the entire .NET Framework is automatically included -->
+    <Compile Include="..\..\DryIoc\ImTools.cs">
+      <Link>ImTools.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc\Ported-net45.cs">
+      <Link>Ported-net45.cs</Link>
+    </Compile>
     <Compile Include="..\..\Net45\DryIocZero\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
     <Compile Include="..\..\Net45\DryIocZero\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="Ported-net45.cs" />
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />

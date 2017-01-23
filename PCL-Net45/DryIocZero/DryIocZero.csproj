@@ -40,6 +40,9 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\DryIoc\ImTools.cs">
+      <Link>ImTools.cs</Link>
+    </Compile>
     <Compile Include="..\..\Net45\DryIocZero\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
