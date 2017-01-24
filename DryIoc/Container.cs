@@ -279,9 +279,9 @@ namespace DryIoc
             Expression.Call(typeof(ResolverContext), "RootResolver", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
 
         /// <summary>Returns <see cref="ResolverExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
-        public static Expression GetResolverExpr(RequestInfo r)
+        public static Expression GetResolverExpr(Request request)
         {
-            return r.IsSingletonOrDependencyOfSingleton ? RootResolverExpr : ResolverExpr;
+            return request.IsSingletonOrDependencyOfSingleton ? RootResolverExpr : ResolverExpr;
         }
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
@@ -297,9 +297,9 @@ namespace DryIoc
             Expression.Call(typeof(ResolverContext), "RootScopes", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
 
         /// <summary>Returns <see cref="ScopesExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
-        public static Expression GetScopesExpr(RequestInfo r)
+        public static Expression GetScopesExpr(Request request)
         {
-            return r.IsSingletonOrDependencyOfSingleton ? RootScopesExpr : ScopesExpr;
+            return request.IsSingletonOrDependencyOfSingleton ? RootScopesExpr : ScopesExpr;
         }
 
         /// <summary>Resolution scope parameter expression in FactoryDelegate.</summary>
@@ -321,7 +321,7 @@ namespace DryIoc
             var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
 
             // if assign in expression is supported then use it.
-            var scopesExpr = GetScopesExpr(request.RequestInfo);
+            var scopesExpr = GetScopesExpr(request);
             if (_expressionAssignMethod != null)
             {
                 var getOrNewScopeExpr = Expression.Call(scopesExpr, "GetOrNewResolutionScope",
@@ -2412,8 +2412,6 @@ namespace DryIoc
                 ? Expression.Constant(null, typeof(IReuse))
                 : ((IReuseV3)request.Reuse).ToExpression(it => container.GetOrAddStateItemExpression(it));
 
-            // Try simplified versions of Push first, before the Push with all arguments provided:
-
             if (ifUnresolved == IfUnresolved.Throw &&
                 requiredServiceType == null && serviceKey == null && metadataKey == null && metadata == null &&
                 factoryType == FactoryType.Service)
@@ -2806,11 +2804,10 @@ namespace DryIoc
         private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
         {
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(r => Container.GetResolverExpr(r.RequestInfo),
-                setup: Setup.Wrapper));
+                new ExpressionFactory(Container.GetResolverExpr, setup: Setup.Wrapper));
 
             var containerFactory = new ExpressionFactory(r =>
-                Expression.Convert(Container.GetResolverExpr(r.RequestInfo), r.ServiceType),
+                Expression.Convert(Container.GetResolverExpr(r), r.ServiceType),
                 setup: Setup.Wrapper);
 
             wrappers = wrappers
@@ -2983,12 +2980,9 @@ namespace DryIoc
                 compositeParentRequiredType = parent.RequiredServiceType;
             }
 
-            // todo: add check if request IsResolutionRoot
-
-            var preResolveParent = container.RequestInfoToExpression(request.RequestInfo);
-
-            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            var resolverExpr = Container.GetResolverExpr(request);
             var resolutionScopeExpr = Container.GetResolutionScopeExpression(request);
+            var preResolveParentExpr = container.RequestInfoToExpression(request.RequestInfo);
 
             var callResolveManyExpr = Expression.Call(resolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
@@ -2996,7 +2990,7 @@ namespace DryIoc
                 Expression.Constant(requiredItemType),
                 container.GetOrAddStateItemExpression(compositeParentKey),
                 Expression.Constant(compositeParentRequiredType, typeof(Type)),
-                preResolveParent,
+                preResolveParentExpr,
                 resolutionScopeExpr);
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
@@ -5176,13 +5170,10 @@ namespace DryIoc
             if (!isRuntimeDependency && container.Rules.DependencyResolutionCallExpressions != null)
                 PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
-            var serviceType = request.ServiceType;
-            var serviceKey = request.ServiceKey;
-
-            var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
+            var serviceTypeExpr = Expression.Constant(request.ServiceType, typeof(Type));
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = container.GetOrAddStateItemExpression(serviceKey, typeof(object));
+            var serviceKeyExpr = container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
             // first ensure that we have parent scope if any to propagate it across resolution call boundaries
             var scopeExpr = Container.GetResolutionScopeExpression(request);
@@ -5197,17 +5188,18 @@ namespace DryIoc
                         actualServiceTypeExpr, serviceKeyExpr));
             }
 
-            // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var preResolveParentExpr = container.RequestInfoToExpression(request.ParentOrWrapper);
+            var resolverExpr = Container.GetResolverExpr(request);
 
-            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
+            var parentRequestInfo = request.RawParent.IsEmpty ? request.PreResolveParent : request.RawParent.RequestInfo;
+            var preResolveParentExpr = container.RequestInfoToExpression(parentRequestInfo);
 
             var resolveCallExpr = Expression.Call(
                 resolverExpr, "Resolve", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
                 preResolveParentExpr, scopeExpr);
 
-            return Expression.Convert(resolveCallExpr, serviceType);
+            return Expression.Convert(resolveCallExpr, request.ServiceType);
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request, bool openResolutionScope)
@@ -5810,6 +5802,13 @@ namespace DryIoc
         #endregion
     }
 
+    [Flags]
+    internal enum RequestFlags
+    {
+        TracksTransientDisposable = 1 << 1,
+        IsSingletonOrDependencyOfSingleton = 1 << 2
+    }
+
     /// <summary>Contains resolution stack with information about resolved service and factory for it,
     /// Additionally request contain weak reference to <see cref="IContainer"/>. That the all required information for resolving services.
     /// Request implements <see cref="IResolver"/> interface on top of provided container, which could be use by delegate factories.</summary>
@@ -5820,10 +5819,10 @@ namespace DryIoc
         public static Request CreateEmpty(Container container)
         {
             var resolverContext = new RequestContext(container, container, null, RequestInfo.Empty);
-            return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(Flags));
+            return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(RequestFlags));
         }
 
-        private static readonly Request _empty = new Request(null, null, ServiceInfo.Empty, null, null, null, default(Flags));
+        private static readonly Request _empty = new Request(null, null, ServiceInfo.Empty, null, null, null, default(RequestFlags));
 
         /// <summary>Creates empty request associated wit container. 
         /// The shared part of request is stored in request context. Pre-request info is also store once in shared context.</summary>
@@ -5849,11 +5848,17 @@ namespace DryIoc
 
             IServiceInfo serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
 
+            // inherit some flags and service details from parent (if any)
+            var flags = default(RequestFlags);
             if (!preResolveParent.IsEmpty)
+            {
                 serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(preResolveParent.ServiceInfo, 
                     ownerType: preResolveParent.FactoryType, container: container);
 
-            return new Request(resolverContext, _empty, serviceInfo, null, null, null, default(Flags));
+                flags = preResolveParent._flags & ~_nonInheritedFlags;
+            }
+
+            return new Request(resolverContext, _empty, serviceInfo, null, null, null, flags);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
@@ -5919,7 +5924,13 @@ namespace DryIoc
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable
         {
-            get { return (_flags & Flags.TracksTransientDisposable) != 0; }
+            get { return (_flags & RequestFlags.TracksTransientDisposable) != 0; }
+        }
+
+        /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
+        public bool IsSingletonOrDependencyOfSingleton
+        {
+            get { return (_flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0; }
         }
 
         /// <summary>Gathers the info from resolved dependency graph. 
@@ -6034,8 +6045,9 @@ namespace DryIoc
             var parentInfo = ChangeIfUnresolvedForCollectionServiceDependency();
 
             var inheritedInfo = info.InheritInfoFromDependencyOwner(parentInfo, ownerType: FactoryType, container: Container);
+            var inheritedFlags = _flags & ~_nonInheritedFlags;
 
-            return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, default(Flags));
+            return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, inheritedFlags);
         }
 
         // todo: v3: review and remove if possible
@@ -6163,9 +6175,18 @@ namespace DryIoc
 
             var flags = _flags;
             if (reuse == DryIoc.Reuse.Transient)
-                reuse = GetTransientDisposableTrackingReuse(factory, ref flags);
+            {
+                reuse = GetTransientDisposableTrackingReuse(factory);
+                if (reuse != DryIoc.Reuse.Transient)
+                    flags |= RequestFlags.TracksTransientDisposable;
+            }
             else
+            {
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
+            }
+
+            if (reuse == DryIoc.Reuse.Singleton)
+                flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
 
             _requestContext.IncrementDependencyCount();
             return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags);
@@ -6190,7 +6211,7 @@ namespace DryIoc
             return reuse;
         }
 
-        private IReuse GetTransientDisposableTrackingReuse(Factory factory, ref Flags flags)
+        private IReuse GetTransientDisposableTrackingReuse(Factory factory)
         {
             // Track transient disposable in parent scope (if any), or open scope (if any)
             var setup = factory.Setup;
@@ -6202,9 +6223,7 @@ namespace DryIoc
             if (!tracksTransientDisposable)
                 return DryIoc.Reuse.Transient;
 
-            flags |= Flags.TracksTransientDisposable;
-
-            // First, check the parent's scope
+            // Does not track inside of Func.
             var parent = GetParentOrFuncOrEmpty(firstNonTransientParent: true);
             if (parent.FactoryType == FactoryType.Wrapper) // wrapper means it is a Func
                 return DryIoc.Reuse.Transient;
@@ -6442,7 +6461,7 @@ namespace DryIoc
 
         private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo, 
             Factory factory, IReuse reuse,
-            KV<bool[], ParameterExpression[]> funcArgs, Flags flags)
+            KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags)
         {
             _requestContext = requestContext;
             RawParent = parent;
@@ -6457,13 +6476,8 @@ namespace DryIoc
         private readonly Factory _factory;
         private readonly IReuse _reuse;
 
-        [Flags]
-        private enum Flags
-        {
-            TracksTransientDisposable = 1 << 1
-        }
-
-        private Flags _flags;
+        private static readonly RequestFlags _nonInheritedFlags = RequestFlags.TracksTransientDisposable;
+        private readonly RequestFlags _flags;
 
         private readonly RequestContext _requestContext;
 
@@ -8268,7 +8282,7 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.Container.GetOrAddStateItemExpression(_factoryDelegate);
-            var resolverExpr = Container.GetResolverExpr(request.RequestInfo);
+            var resolverExpr = Container.GetResolverExpr(request);
             return Expression.Convert(Expression.Invoke(factoryDelegateExpr, resolverExpr), request.ServiceType);
         }
 
@@ -8946,7 +8960,7 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
-            var scopesExpr = Container.GetScopesExpr(request.RequestInfo);
+            var scopesExpr = Container.GetScopesExpr(request);
 
             return Expression.Call(_getOrAddItemOrDefaultMethod,
                 scopesExpr, scopeNameExpr,
@@ -9100,7 +9114,7 @@ namespace DryIoc
         /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
         public Expression GetScopeExpression(Request request)
         {
-            var scopesExpr = Container.GetScopesExpr(request.RequestInfo);
+            var scopesExpr = Container.GetScopesExpr(request);
             return Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
                 Container.GetResolutionScopeExpression(request),
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
@@ -9250,7 +9264,7 @@ namespace DryIoc
     public sealed class RequestInfo
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, -1, FactoryType.Service, null, null, null);
+        public static readonly RequestInfo Empty = new RequestInfo(null, -1, FactoryType.Service, null, null, default(RequestFlags), null);
 
         /// <summary>Wraps the resolved service lookup details.</summary>
         public readonly IServiceInfo ServiceInfo;
@@ -9279,18 +9293,10 @@ namespace DryIoc
             }
         }
 
-        // todo: calculate once.
-        /// <summary>subj.</summary>
+        /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton
         {
-            get
-            {
-                var inSingleton = Reuse is SingletonReuse;
-                if (!inSingleton)
-                    for (var p = ParentOrWrapper; !inSingleton && !p.IsEmpty; p = p.ParentOrWrapper)
-                        inSingleton = p.Reuse is SingletonReuse;
-                return inSingleton;
-            }
+            get { return (_flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0; }
         }
 
         /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
@@ -9421,24 +9427,7 @@ namespace DryIoc
         public RequestInfo Push(IServiceInfo serviceInfo,
             int factoryID = 0, FactoryType factoryType = FactoryType.Service, Type implementationType = null, IReuse reuse = null)
         {
-            return new RequestInfo(serviceInfo, factoryID, factoryType, implementationType, reuse, this);
-        }
-
-        /// <summary>Produces new request info with specified service info.</summary>
-        /// <param name="getServiceInfo">Gets new service info from the old one.</param> <returns>New request info.</returns>
-        public RequestInfo With(Func<IServiceInfo, IServiceInfo> getServiceInfo)
-        {
-            var newServiceInfo = getServiceInfo(ServiceInfo);
-            return new RequestInfo(newServiceInfo, FactoryID, FactoryType, ImplementationType, Reuse, ParentOrWrapper);
-        }
-
-        /// <summary>Produces new info adding the implementation (factory) details to the current info.</summary>
-        /// <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param>
-        /// <returns>New request info.</returns>
-        public RequestInfo With(int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
-        {
-            return new RequestInfo(ServiceInfo, factoryID, factoryType, implementationType, reuse, ParentOrWrapper);
+            return new RequestInfo(serviceInfo, factoryID, factoryType, implementationType, reuse, default(RequestFlags), this);
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
@@ -9566,6 +9555,7 @@ namespace DryIoc
 
         private RequestInfo(IServiceInfo serviceInfo,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
+            RequestFlags flags, 
             RequestInfo parentOrWrapper)
         {
             ParentOrWrapper = parentOrWrapper;
@@ -9577,7 +9567,11 @@ namespace DryIoc
             FactoryType = factoryType;
             ImplementationType = implementationType;
             Reuse = reuse;
+
+            _flags = flags;
         }
+
+        internal readonly RequestFlags _flags;
 
         // Inspired by System.Tuple.CombineHashCodes
         private static int CombineHashCodes(int h1, int h2)
