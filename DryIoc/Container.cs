@@ -3057,6 +3057,8 @@ namespace DryIoc
             var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
             var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
+            var flags = RequestFlags.IsWrappedInFunc;
+
             var argExprs = new ParameterExpression[argCount]; // may be empty, that's OK
             if (argCount != 0)
             {
@@ -3068,9 +3070,10 @@ namespace DryIoc
                 }
 
                 request = request.WithArgs(argExprs);
+                flags |= RequestFlags.IsWrappedInFuncWithArgs;
             }
 
-            var serviceRequest = request.Push(serviceType);
+            var serviceRequest = request.Push(serviceType, flags: flags);
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
                 return null;
@@ -5816,6 +5819,10 @@ namespace DryIoc
 
         /// <summary>Inherited</summary>
         IsSingletonOrDependencyOfSingleton = 1 << 3,
+        /// <summary>Inherited</summary>
+        IsWrappedInFunc = 1 << 4,
+        /// <summary>Inherited</summary>
+        IsWrappedInFuncWithArgs = 1 << 5,
     }
 
     /// <summary>Contains resolution stack with information about resolved service and factory for it,
@@ -5825,7 +5832,8 @@ namespace DryIoc
     {
         /// <summary>Not inherited down dependency chain.</summary>
         public static readonly RequestFlags NotInheritedFlags
-            = RequestFlags.TracksTransientDisposable;
+            = RequestFlags.TracksTransientDisposable
+            | RequestFlags.IsServiceCollection;
 
         // todo: v3: remove
         /// <summary>Obsolete: replaced with <see cref="Create"/>/.</summary>
@@ -5895,17 +5903,7 @@ namespace DryIoc
         /// <returns>True if has Func ancestor.</returns>
         public bool IsWrappedInFunc()
         {
-            if (!RawParent.IsEmpty)
-                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
-                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
-                        return true;
-
-            if (!PreResolveParent.IsEmpty)
-                for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
-                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
-                        return true;
-
-            return false;
+            return (_flags & RequestFlags.IsWrappedInFunc) != 0;
         }
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
@@ -5914,22 +5912,20 @@ namespace DryIoc
         /// <returns>True if has Func with arguments ancestor.</returns>
         public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
         {
-            if (!RawParent.IsEmpty)
-                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
-                {
-                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
-                        return true;
-                    if (immediateParent)
-                        return false;
-                }
-
-            if (!PreResolveParent.IsEmpty)
+            if ((_flags & RequestFlags.IsWrappedInFuncWithArgs) != 0)
             {
-                for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
-                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFuncWithArgs())
-                        return true;
-                if (immediateParent)
-                    return false;
+                if (!immediateParent)
+                    return true; // skip other checks
+
+                // check if parent is not wrapped itself
+
+                // first run-time parent
+                if (!RawParent.IsEmpty)
+                    return (RawParent._flags & RequestFlags.IsWrappedInFuncWithArgs) == 0;
+
+                // and if run-time parent does not exist then check the preresolve parent
+                if (!PreResolveParent.IsEmpty)
+                    return (PreResolveParent.Flags & RequestFlags.IsWrappedInFuncWithArgs) != 0;
             }
 
             return false;
@@ -6047,9 +6043,10 @@ namespace DryIoc
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param>
+        /// <param name="flags">(optional) Pushed flags.</param>
         /// <returns>New request for provided info.</returns>
         /// <remarks>Existing/parent request should be resolved to factory (<see cref="WithResolvedFactory"/>), before pushing info into it.</remarks>
-        public Request Push(IServiceInfo info)
+        public Request Push(IServiceInfo info, RequestFlags flags = default(RequestFlags))
         {
             info.ThrowIfNull();
 
@@ -6059,7 +6056,7 @@ namespace DryIoc
             var parentInfo = ChangeIfUnresolvedForCollectionServiceDependency();
 
             var inheritedInfo = info.InheritInfoFromDependencyOwner(parentInfo, ownerType: FactoryType, container: Container);
-            var inheritedFlags = _flags & ~NotInheritedFlags;
+            var inheritedFlags = _flags & ~NotInheritedFlags | flags;
 
             return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, inheritedFlags);
         }
@@ -6091,16 +6088,17 @@ namespace DryIoc
         /// <param name="requiredServiceType">(optional) Registered/unwrapped service type to find.</param>
         /// <param name="scope">(optional) Resolution scope.</param>
         /// <param name="preResolveParent">(optional) Request info preceding Resolve call.</param>
+        /// <param name="flags">(optional) Sets some flags.</param>
         /// <returns>New request with provided info.</returns>
         public Request Push(Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
-            IScope scope = null, RequestInfo preResolveParent = null)
+            IScope scope = null, RequestInfo preResolveParent = null, RequestFlags flags = default(RequestFlags))
         {
             serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
 
             var serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
-            return Push(serviceInfo);
+            return Push(serviceInfo, flags);
         }
 
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
@@ -6188,15 +6186,13 @@ namespace DryIoc
                 reuse = GetDefaultReuse(factory);
 
             var flags = _flags;
-            if (reuse == DryIoc.Reuse.Transient)
+            if (reuse != DryIoc.Reuse.Transient)
+                ThrowIfReuseHasShorterLifespanThanParent(reuse);
+            else
             {
                 reuse = GetTransientDisposableTrackingReuse(factory);
                 if (reuse != DryIoc.Reuse.Transient)
                     flags |= RequestFlags.TracksTransientDisposable;
-            }
-            else
-            {
-                ThrowIfReuseHasShorterLifespanThanParent(reuse);
             }
 
             if (reuse == DryIoc.Reuse.Singleton)
@@ -6287,22 +6283,6 @@ namespace DryIoc
                     }
                 }
             }
-        }
-
-        private bool HasShorterLifespanThanParent(int reuseLifespan, RequestInfo parent)
-        {
-            if (parent.FactoryType == FactoryType.Wrapper)
-            {
-                if (parent.GetActualServiceType().IsFunc())
-                    return false;
-            }
-            else if (parent.FactoryType == FactoryType.Service)
-            {
-                if (parent.ReuseLifespan > reuseLifespan)
-                    return true;
-            }
-
-            return false;
         }
 
         // todo: Improve perf.
@@ -9314,23 +9294,6 @@ namespace DryIoc
                     p = p.ParentOrWrapper;
                 return p;
             }
-        }
-
-        /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
-        public bool IsSingletonOrDependencyOfSingleton
-        {
-            get { return (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0; }
-        }
-
-        /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
-        /// <param name="condition">Condition to stop on. Should not be null.</param>
-        /// <returns>Request info of found parent.</returns>
-        public RequestInfo FirstOrEmpty(Func<RequestInfo, bool> condition)
-        {
-            var r = this;
-            while (!r.IsEmpty && !condition(r))
-                r = r.ParentOrWrapper;
-            return r;
         }
 
         /// <summary>Requested service type.</summary>
