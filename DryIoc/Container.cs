@@ -419,6 +419,8 @@ namespace DryIoc
                     var ctors = reflectionFactory.ImplementationType.GetPublicInstanceConstructors().ToArrayOrSelf();
                     if (ctors.Length != 1)
                         Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, reflectionFactory.ImplementationType, ctors);
+                    else
+                        reflectionFactory.SetKnownSingleCtor(ctors[0]);
                 }
 
                 if (!isStaticallyChecked &&
@@ -3042,8 +3044,7 @@ namespace DryIoc
             var isAction = wrapperType == typeof(Action);
             if (!isAction)
             {
-                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull()
-                    .ThrowIfNull();
+                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull().ThrowIfNull();
                 var funcIndex = FuncTypes.IndexOf(openGenericWrapperType);
                 if (funcIndex == -1)
                 {
@@ -7478,6 +7479,15 @@ namespace DryIoc
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public override Made Made { get { return _made; } }
 
+        /// <summary>Sets single ctor in case there are no special rules or factory method. To don;t do this twice.</summary>
+        /// <param name="ctor"></param>
+        public void SetKnownSingleCtor(ConstructorInfo ctor)
+        {
+            _knownSingleCtor = ctor;
+        }
+
+        private ConstructorInfo _knownSingleCtor;
+
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
@@ -7873,8 +7883,9 @@ namespace DryIoc
             var factoryMethodSelector = Made.FactoryMethod ?? request.Rules.FactoryMethod;
             if (factoryMethodSelector == null)
             {
-                var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
-                return FactoryMethod.Of(ctors[0]);
+                // there is a guarantee of single constructor, which was checked on factory registration
+                var ctor = _knownSingleCtor ?? implType.GetPublicInstanceConstructors().First();
+                return FactoryMethod.Of(ctor);
             }
 
             var factoryMethod = factoryMethodSelector(request);
