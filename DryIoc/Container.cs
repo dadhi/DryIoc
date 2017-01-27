@@ -505,6 +505,31 @@ namespace DryIoc
 
         #endregion
 
+        #region Direct Container Resolve methods to avoid interface dispatch. 
+
+        /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
+        /// <typeparam name="TService">The type of the requested service.</typeparam>
+        /// <returns>The requested service instance.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
+        public TService Resolve<TService>()
+        {
+            return (TService)Resolve(typeof(TService));
+        }
+
+        /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
+        /// <param name="serviceType">Service type to search and to return.</param>
+        /// <returns>The requested service instance.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
+        public object Resolve(Type serviceType)
+        {
+            var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            return factoryDelegate != null
+                ? factoryDelegate(null, _thisContainerWeakRef, null)
+                : ResolveAndCacheDefaultDelegate(serviceType, false, null);
+        }
+            
+        #endregion
+
         #region IResolver
 
         [MethodImpl(MethodImplHints.AggressingInlining)]
@@ -3780,7 +3805,10 @@ namespace DryIoc
                     // For Func with arguments,
                     // match constructor should contain all input arguments and
                     // the rest should be resolvable.
-                    var funcType = request.ParentOrWrapper.ServiceType;
+                    var funcType = !request.RawParent.IsEmpty
+                        ? request.RawParent.ServiceType
+                        : request.PreResolveParent.ServiceType;
+
                     var funcArgs = funcType.GetGenericParamsAndArgs();
                     var inputArgCount = funcArgs.Length - 1;
 
@@ -6937,13 +6965,13 @@ namespace DryIoc
                 && request.FuncArgs == null
                 && !Setup.AsResolutionCall
                 && !request.IsResolutionRoot
-                && !IsContextDependent(request);
+                && Setup.Condition == null && 
+                !IsScopeDependent(request);
         }
 
-        private bool IsContextDependent(Request request)
+        private bool IsScopeDependent(Request request)
         {
-            return Setup.Condition != null
-                || Setup.UseParentReuse
+            return Setup.UseParentReuse
                 || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
@@ -6951,10 +6979,12 @@ namespace DryIoc
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
             return !request.IsResolutionCall && // prevents recursion on already split graph
-                (Setup.AsResolutionCall ||      // explicit aka user requested split
-                (request.ShouldSplitObjectGraph() || IsContextDependent(request)) && // implicit aka automatically detected split
-                    !request.IsWrappedInFuncWithArgs()) // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
-                && request.GetActualServiceType() != typeof(void);
+                // explicit aka user requested split
+                (Setup.AsResolutionCall ||
+                // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
+                (request.ShouldSplitObjectGraph() || IsScopeDependent(request)) && 
+                !request.IsWrappedInFuncWithArgs()) && 
+                request.GetActualServiceType() != typeof(void);
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
