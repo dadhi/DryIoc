@@ -6936,6 +6936,7 @@ namespace DryIoc
                 && !request.TracksTransientDisposable
                 && request.FuncArgs == null
                 && !Setup.AsResolutionCall
+                && !request.IsResolutionRoot
                 && !IsContextDependent(request);
         }
 
@@ -6992,8 +6993,8 @@ namespace DryIoc
             }
 
             // Then check the expression cache
-            var isExpressionCacheable = IsFactoryExpressionCacheable(request);
-            if (isExpressionCacheable)
+            var isCacheable = IsFactoryExpressionCacheable(request);
+            if (isCacheable)
             {
                 var cachedExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
                 if (cachedExpr != null)
@@ -7006,7 +7007,7 @@ namespace DryIoc
             {
                 // can be checked only after expression is created
                 if (request.ContainsNestedResolutionCall)
-                    isExpressionCacheable = false;
+                    isCacheable = false;
 
                 if (request.Reuse != DryIoc.Reuse.Transient &&
                     request.GetActualServiceType() != typeof(void))
@@ -7016,13 +7017,13 @@ namespace DryIoc
                     serviceExpr = ApplyReuse(serviceExpr, request.Reuse, request.TracksTransientDisposable, request);
 
                     if (serviceExpr.NodeType == ExpressionType.Constant)
-                        isExpressionCacheable = false;
+                        isCacheable = false;
 
                     if (serviceExpr.Type != originalServiceExprType)
                         serviceExpr = Expression.Convert(serviceExpr, originalServiceExprType);
                 }
 
-                if (isExpressionCacheable)
+                if (isCacheable)
                 {
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
                 }
