@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Linq.Expressions;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -42,7 +43,16 @@ namespace DryIoc.IssuesTests
             var root = container.OpenScope("Root");
             var scope1 = root.OpenScope("Scope1");
 
+            var aExpr = scope1.Resolve<LambdaExpression>(typeof(A2));
+
             var a = scope1.Resolve<A2>();
+        }
+
+        private X _x = new X();
+
+        public object GetAExpr(object[] state, IResolverContext r, IScope scope)
+        {
+            return new A2((IContainer)r.Resolver, _x);
         }
 
         public class A

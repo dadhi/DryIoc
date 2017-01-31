@@ -39,7 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Container.cs" />
-    <Compile Include="FactoryCompiler.cs" />
+    <Compile Include="FastExpressionCompiler.cs" />
     <Compile Include="ImTools.cs" />
     <Compile Include="Ported-net40.cs" />
     <Compile Include="Ported-net45.cs" />

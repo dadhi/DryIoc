@@ -1,7 +1,7 @@
 $inputFiles = @(
 	".\DryIoc\Container.cs",
 	".\DryIoc\ImTools.cs",
-	".\DryIoc\FactoryCompiler.cs",
+	".\DryIoc\FastExpressionCompiler.cs",
 	".\DryIoc\Ported-net40.cs",
 	".\DryIoc\Ported-net45.cs",
 	".\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs"
