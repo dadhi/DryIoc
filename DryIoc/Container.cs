@@ -80,7 +80,7 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed, _parent);
+            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed, RootContainer);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -90,7 +90,7 @@ namespace DryIoc
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
-            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
+            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, RootContainer);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -100,7 +100,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
+            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed, RootContainer);
         }
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -111,7 +111,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             var newSingletons = new SingletonScope();
-            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed, _parent);
+            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed, RootContainer);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -122,7 +122,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, _parent);
+            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, RootContainer);
         }
 
         /// <summary>Returns ambient scope context associated with container.</summary>
@@ -160,8 +160,7 @@ namespace DryIoc
 
             var rules = configure == null ? Rules : configure(Rules);
 
-            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed,
-                parent: this);
+            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed, RootContainer ?? this);
         }
 
         /// <summary>The default name of root scope without ambient context.</summary>
@@ -234,30 +233,10 @@ namespace DryIoc
         }
 
         /// <summary>Scope containing container singletons.</summary>
-        public IScope SingletonScope
-        {
-            get
-            {
-                ThrowIfContainerDisposed(); // todo: move to GetRootContainer
-                return _singletonScope;
-            }
-        }
+        public IScope SingletonScope { get { return _singletonScope; } }
 
-        /// <summary>Returns root for scope container or itself for non-scoped.</summary> <returns>Always not null.</returns>
-        public Container RootContainer
-        {
-            get
-            {
-                if (_parent == null)
-                    return this;
-
-                var last = _parent;
-                for (var p = last._parent; p != null; p = p._parent)
-                    last = p;
-
-                return last;
-            }
-        }
+        /// <summary>Returns root for scoped container or null for root itself.</summary>
+        public readonly Container RootContainer;
 
         #region Static state
 
@@ -1493,9 +1472,6 @@ namespace DryIoc
         // pre-created and stored for performance reasons
         private readonly ContainerWeakRef _thisContainerWeakRef;
 
-        // internal to be used by RequestContext
-        internal readonly Container _parent;
-
         private readonly SingletonScope _singletonScope;
 
         internal readonly IScope _openedScope;
@@ -2154,7 +2130,7 @@ namespace DryIoc
 
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
             IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0,
-            Container parent = null)
+            Container rootContainer = null)
         {
             _disposed = disposed;
 
@@ -2174,7 +2150,7 @@ namespace DryIoc
 
             _thisContainerWeakRef = new ContainerWeakRef(this);
 
-            _parent = parent;
+            RootContainer = rootContainer;
         }
 
         #endregion
@@ -2610,7 +2586,9 @@ namespace DryIoc
 
         private static Container RootContainer(this IResolverContext ctx)
         {
-            return ((ContainerWeakRef)ctx).GetTarget(maybeDisposed: true).RootContainer;
+            var containerRef = ((ContainerWeakRef)ctx);
+            return containerRef.GetTarget(maybeDisposed: true).RootContainer 
+                ?? containerRef.GetTarget();
         }
     }
 
@@ -2661,20 +2639,30 @@ namespace DryIoc
     public delegate object FactoryDelegate(object[] state, IResolverContext r, IScope scope);
 
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
-    public static partial class FactoryCompiler
+    public static partial class FastExpressionCompiler
     {
+        private static readonly Type[] _factoryDelegateParamTypes = 
+            { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
+
+        private static readonly ParameterExpression[] _factoryDelegateParamExprs =
+            { Container.StateParamExpr, Container.ResolverContextParamExpr, Container.ResolutionScopeParamExpr };
+
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression)
         {
-            return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamsExpr);
+            return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
         }
 
-        static partial void CompileToDelegate(Expression expression, ref FactoryDelegate result);
+        static partial void TryCompile<TDelegate>(ref TDelegate compileDelegate,
+            Expression bodyExpr,
+            ParameterExpression[] paramExprs,
+            Type[] paramTypes,
+            Type returnType) where TDelegate : class;
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        /// <param name="expression">Service expression (body) to wrap.</param>
+        /// <param name="expression">Service creation expression.</param>
         /// <returns>Compiled factory delegate to use for service resolution.</returns>
         public static FactoryDelegate CompileToDelegate(this Expression expression)
         {
@@ -2688,30 +2676,12 @@ namespace DryIoc
             }
 
             FactoryDelegate factoryDelegate = null;
-            CompileToDelegate(expression, ref factoryDelegate);
+            TryCompile(ref factoryDelegate, expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+
             if (factoryDelegate != null)
                 return factoryDelegate;
 
-            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
-        }
-
-        // todo: v3: remove
-        /// <summary>Obsolete: replace with overload without unused container parameter</summary>
-        public static FactoryDelegate CompileToDelegate(this Expression expression, IContainer container)
-        {
-            expression = OptimizeExpression(expression);
-
-            // Optimize: just extract singleton from expression without compiling
-            if (expression.NodeType == ExpressionType.Constant)
-            {
-                var value = ((ConstantExpression)expression).Value;
-                return (state, context, scope) => value;
-            }
-
-            FactoryDelegate factoryDelegate = null;
-            CompileToDelegate(expression, ref factoryDelegate);
-            // ReSharper disable once ConstantNullCoalescingCondition
-            return factoryDelegate ?? Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamsExpr).Compile();
+            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs).Compile();
         }
 
         private static Expression OptimizeExpression(Expression expression)
@@ -2722,9 +2692,6 @@ namespace DryIoc
                 expression = Expression.Convert(expression, typeof(object));
             return expression;
         }
-
-        private static readonly ParameterExpression[] _factoryDelegateParamsExpr =
-            { Container.StateParamExpr, Container.ResolverContextParamExpr, Container.ResolutionScopeParamExpr };
     }
 
     /// <summary>Adds to Container support for:
@@ -8853,6 +8820,9 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         int Lifespan { get; }
 
+        // todo: v3: add. It also mabe be interpreted as object[] Names for matching with multiple scopes
+        // object Name { get; }
+
         // todo: v3: remove trackTransientDisposable param as it is available from Request param.
         /// <summary>Returns composed expression.</summary>
         /// <param name="request">info</param>
@@ -9611,12 +9581,14 @@ namespace DryIoc
     /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
     public interface IResolver
     {
+        // todo: v3: replace bool @ifUnresolvedReturnDefault with enum type
         /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="ifUnresolvedReturnDefault">Says what to do if service is unresolved.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         object Resolve(Type serviceType, bool ifUnresolvedReturnDefault);
 
+        // todo: v3: remove @scope parameter
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="serviceKey">Optional service key used for registering service.</param>
@@ -9633,6 +9605,7 @@ namespace DryIoc
         object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType,
             RequestInfo preResolveParent, IScope scope);
 
+        // todo: v3: remove unused @compositeParentKey and @compositeParentRequiredType
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
         /// this type. Excludes for result composite parent identified by <paramref name="compositeParentKey"/>.</summary>
