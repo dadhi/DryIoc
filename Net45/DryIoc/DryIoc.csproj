@@ -37,11 +37,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\dryioc-v3\DryIoc\FastExpressionCompiler.cs">
-      <Link>FastExpressionCompiler.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
+    </Compile>
+    <Compile Include="..\..\DryIoc\FastExpressionCompiler.cs">
+      <Link>FastExpressionCompiler.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc\ImTools.cs">
       <Link>ImTools.cs</Link>

@@ -1,12 +1,11 @@
-﻿using System.Linq.Expressions;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
     public class Issue435_ReuseSingleton_prevents_the_correct_container_injection_within_explicit_resolve
     {
-        [Test, Ignore]
+        [Test]
         public void ScopesResolution()
         {
             var container = new Container();
@@ -32,29 +31,6 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(scope1, d.Container);
         }
 
-        [Test]
-        public void ScopesResolution_minimal_example()
-        {
-            var container = new Container();
-
-            container.Register<A2>();
-            container.Register<X>(Reuse.Singleton);
-
-            var root = container.OpenScope("Root");
-            var scope1 = root.OpenScope("Scope1");
-
-            var aExpr = scope1.Resolve<LambdaExpression>(typeof(A2));
-
-            var a = scope1.Resolve<A2>();
-        }
-
-        private X _x = new X();
-
-        public object GetAExpr(object[] state, IResolverContext r, IScope scope)
-        {
-            return new A2((IContainer)r.Resolver, _x);
-        }
-
         public class A
         {
             private IContainer _container;
@@ -68,20 +44,6 @@ namespace DryIoc.IssuesTests
                 B = b;
 
                 D = container.Resolve<D>();
-            }
-        }
-
-        public class X
-        {
-        }
-
-        public class A2
-        {
-            private IContainer _container;
-
-            public A2(IContainer container, X x)
-            {
-                _container = container;
             }
         }
 

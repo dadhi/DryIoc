@@ -59,7 +59,7 @@ namespace DryIoc
             Type[] paramTypes,
             Type returnType) where TDelegate : class
         {
-            var constantExprs = new List<ConstantExpression>(8);
+            var constantExprs = new List<ConstantExpression>();
 
             if (!TryCollectBoundConstants(bodyExpr, constantExprs))
                 return null;
@@ -85,7 +85,7 @@ namespace DryIoc
                 {
                     var createClosureMethod = Closure.CreateMethods[constantCount - 1];
 
-                    var constantTypes = new Type[constantExprs.Count];
+                    var constantTypes = new Type[constantCount];
                     for (var i = 0; i < constantCount; i++)
                         constantTypes[i] = constantExprs[i].Type;
 
@@ -209,7 +209,7 @@ namespace DryIoc
             }
         }
 
-        internal class Closure<T1>
+        internal sealed class Closure<T1>
         {
             public T1 V1;
 
@@ -502,7 +502,7 @@ namespace DryIoc
                 switch (expr.NodeType)
                 {
                     case ExpressionType.Parameter:
-                        return EmitParameter((ParameterExpression)expr, paramExprs, il);
+                        return EmitParameter((ParameterExpression)expr, paramExprs, il, closure);
                     case ExpressionType.Convert:
                         return EmitConvert((UnaryExpression)expr, paramExprs, il, closure);
                     case ExpressionType.ArrayIndex:
@@ -532,11 +532,14 @@ namespace DryIoc
                 }
             }
 
-            private static bool EmitParameter(ParameterExpression p, IList<ParameterExpression> ps, ILGenerator il)
+            private static bool EmitParameter(ParameterExpression p, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
                 var pIndex = ps.IndexOf(p);
                 if (pIndex == -1)
                     return false;
+
+                if (closure != null)
+                    pIndex += 1;
 
                 switch (pIndex)
                 {
