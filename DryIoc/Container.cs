@@ -226,7 +226,7 @@ namespace DryIoc
                 _singletonScope.Dispose();
 
                 _registry.Swap(Registry.Empty);
-                _defaultFactoryDelegateCache = Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty);
+                _defaultFactoryDelegateCache = Ref.Of(ImMap<Type, FactoryDelegate>.Empty);
 
                 Rules = Rules.Default;
             }
@@ -484,7 +484,7 @@ namespace DryIoc
 
         #endregion
 
-        #region Direct Container Resolve methods to avoid interface dispatch. 
+        #region Direct Container Resolve methods to avoid interface dispatch
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
@@ -1467,7 +1467,7 @@ namespace DryIoc
         private int _disposed;
 
         private readonly Ref<Registry> _registry;
-        private Ref<ImTreeMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
+        private Ref<ImMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
 
         // pre-created and stored for performance reasons
         private readonly ContainerWeakRef _thisContainerWeakRef;
@@ -1651,7 +1651,9 @@ namespace DryIoc
 
             // Cache:
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
-            public readonly Ref<ImTreeMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
+
+            public readonly Ref<ImMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
+
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and IntTreeMap<{requiredServicType+preResolvedParent}, FactoryDelegate>
             public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
@@ -1662,7 +1664,7 @@ namespace DryIoc
             public Registry WithoutCache()
             {
                 return new Registry(Services, Decorators, Wrappers,
-                    Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
+                    Ref.Of(ImMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
                     _isChangePermitted);
@@ -1672,7 +1674,7 @@ namespace DryIoc
                 : this(ImTreeMap<Type, object>.Empty,
                     ImTreeMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImTreeMap<Type, Factory>.Empty,
-                    Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
+                    Ref.Of(ImMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
                     IsChangePermitted.Permitted)
@@ -1682,7 +1684,7 @@ namespace DryIoc
                 ImTreeMap<Type, object> services,
                 ImTreeMap<Type, Factory[]> decorators,
                 ImTreeMap<Type, Factory> wrappers,
-                Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
+                Ref<ImMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
                 Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
                 Ref<ImTreeMapIntToObj> factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
