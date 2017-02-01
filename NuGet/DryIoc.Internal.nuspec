@@ -12,33 +12,13 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-            v2.9.7:
-            - fixed: #426: dead lock
-            - fixed: #423: Inner scope is injected to singleton
-            - fixed: #429: Resolve instance from named scope with Func
-            v2.9.6:
-            - fixed: #421: MissingMethodException
-            - fixed: Perf of first Resolve in some cases - now is up to ~10x faster
-            v2.9.5:
-            - fixed: #416 (now for real): Adding always true condition to decorator changes the decorated outcome - but should not
-            - fixed: #417 Performance issue with Func of singleton
-            - fixed: #418  Performance issue with resolving singletons
-            - fixed: #419 In some cases ResolveMany unable to resolve Decorator with dependency due issue with required service type
-            - fixed: #420: Singleton resolved and created via Func with arguments then may be resolved directly
-            - fixed: GetMembers did not considered base of the base class
-            v2.9.4
-            - fixed: #416: Adding always true condition to decorator changes the decorated outcome - but should not
-            v2.9.3
-            - fixed: #415: Decorators useDecorateeReuse should permit decorating disposable transient
-            v2.9.2
-            - fixed: #409: Resolution scope is created with the service type instead of actual required service type
-            - fixed: #410: ResolveMany is treated differently comparing to Resolve IEnumerable
-            v2.9.1
-            - fixed: #404: ConstructorWithResolvableArguments does not take into account parameter service key
-            v2.9.0
-            - added: #386: Support for resolving void Factory Method as Action
-            - added: Support for array decorators
-            - added: #405: Support for resolving unknown services in ResolveMany via UnknownManyServiceResolvers
+            v2.10:
+            - fixed: #440: Singleton optimazation causes exception for internal type in some cases
+            - fixed: #435: Reuse.Singleton prevents the correct container injection within explicit resolve
+            - fixed: #437: General perf degradation introduced in 2.9 due skipping fast FactoryCompiler
+            - added: #430: Add rule to change or to disable split level of large object graph
+            - changed: Moving HashTrees to ImTools namespace.
+            - changed: #254 [Performance] Remove state parameter from FactoryDelegate - use FastExpressionCompiler with closure support
         </releaseNotes>
         <contentFiles>
             <files include="cs/any/*.*" buildAction="Compile" />
