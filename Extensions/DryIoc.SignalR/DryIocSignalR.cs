@@ -83,7 +83,7 @@ namespace DryIoc.SignalR
         /// In addition the hub will be registered once using <see cref="IfAlreadyRegistered.Keep"/> policy.</remarks>
         public static void RegisterHubs(this IContainer container, params Assembly[] hubAssemblies)
         {
-            if (!hubAssemblies.IsNullOrEmpty())
+            if (hubAssemblies != null && hubAssemblies.Length != 0)
                 container.RegisterMany(hubAssemblies, IsHubType,
                     setup: Setup.With(allowDisposableTransient: true), 
                     ifAlreadyRegistered: IfAlreadyRegistered.Keep);
@@ -98,7 +98,7 @@ namespace DryIoc.SignalR
         /// This prevents possible memory leak when container will hold reference to disposable hub.</remarks>
         public static void RegisterHubs(this IContainer container, params Type[] hubTypes)
         {
-            if (!hubTypes.IsNullOrEmpty())
+            if (hubTypes != null && hubTypes.Length != 0)
                 container.RegisterMany(hubTypes, serviceTypeCondition: IsHubType, 
                     setup: Setup.With(allowDisposableTransient: true));
         }

@@ -25,7 +25,6 @@ THE SOFTWARE.
 
 
 
-
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
@@ -33,8 +32,7 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
-
-using DryIoc; // for ImTools, not for Container
+using ImTools; 
 
 namespace DryIocZero
 {

@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-namespace DryIoc
+namespace ImTools
 {
     using System;
     using System.Collections.Generic;
@@ -30,6 +30,13 @@ namespace DryIoc
     using System.Text;
     using System.Threading;
     using System.Runtime.CompilerServices; // for aggressive inlining hints
+
+    /// <summary>Portable aggressive in-lining option for MethodImpl.</summary>
+    public static class MethodImplHints
+    {
+        /// <summary>Value of MethodImplOptions.AggressingInlining</summary>
+        public const MethodImplOptions AggressingInlining = (MethodImplOptions)256;
+    }
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools

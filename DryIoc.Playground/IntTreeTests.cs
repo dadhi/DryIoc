@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using ImTools;
 
 namespace DryIoc.Playground
 {
@@ -212,7 +213,7 @@ namespace DryIoc.Playground
             var key1 = new HashConflictingKey<string>("a");
             var key2 = new HashConflictingKey<string>("b");
             var key3 = new HashConflictingKey<string>("c");
-            var tree = DryIoc.ImTreeMap<HashConflictingKey<string>, int>.Empty
+            var tree = ImTreeMap<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);

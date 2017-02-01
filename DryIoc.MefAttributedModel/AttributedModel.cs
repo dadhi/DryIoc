@@ -31,6 +31,7 @@ namespace DryIoc.MefAttributedModel
     using System.Reflection;
     using System.Text;
     using DryIocAttributes;
+    using ImTools;
 
     /// <summary>Implements MEF Attributed Programming Model.
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>

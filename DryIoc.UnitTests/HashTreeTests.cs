@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests
+namespace ImTools.UnitTests
 {
     [TestFixture]
     public class HashTreeTests

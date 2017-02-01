@@ -78,14 +78,12 @@ namespace DryIoc.Owin
             var services = registry.GetServiceRegistrations()
                 .Where(r => r.ServiceType.IsAssignableTo(typeof(OwinMiddleware)))
                 // note: ordering is important and set to registration order by default
-                .OrderBy(r => r.FactoryRegistrationOrder) 
+                .OrderBy(r => r.FactoryRegistrationOrder)
                 .Select(r => typeof(DryIocWrapperMiddleware<>)
-                    .MakeGenericType(r.Factory.ImplementationType ?? r.ServiceType))
-                .ToArray();
+                    .MakeGenericType(r.Factory.ImplementationType ?? r.ServiceType));
 
-            if (!services.IsNullOrEmpty())
-                foreach (var service in services)
-                    app.Use(service);
+            foreach (var service in services)
+                app.Use(service);
         }
     }
 

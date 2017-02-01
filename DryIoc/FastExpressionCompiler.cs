@@ -92,7 +92,11 @@ namespace DryIoc
                     var createClosure = createClosureMethod.MakeGenericMethod(constantTypes);
 
                     closure = createClosure.Invoke(null, constants);
-                    closureInfo = new ClosureInfo(constantExprs, closure.GetType().GetTypeInfo().DeclaredFields.ToArrayOrSelf());
+
+                    var fields = closure.GetType().GetTypeInfo().DeclaredFields;
+                    var fieldsArray = fields as FieldInfo[] ?? fields.ToArray();
+
+                    closureInfo = new ClosureInfo(constantExprs, fieldsArray);
                 }
                 else
                 {
@@ -147,10 +151,11 @@ namespace DryIoc
 
         #region Closures
 
+        // todo: perf: test if Activator.CreateInstance is faster than method Invoke.
         internal static class Closure
         {
             public static readonly MethodInfo[] CreateMethods =
-                typeof(Closure).GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+                typeof(Closure).GetTypeInfo().DeclaredMethods.ToArray();
 
             public static Closure<T1> CreateClosure<T1>(T1 v1)
             {

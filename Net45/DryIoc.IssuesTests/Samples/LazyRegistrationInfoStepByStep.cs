@@ -6,6 +6,7 @@ using System.Reflection;
 using DryIoc.MefAttributedModel;
 using DryIocAttributes;
 using NUnit.Framework;
+using ImTools;
 
 namespace DryIoc.IssuesTests.Samples
 {

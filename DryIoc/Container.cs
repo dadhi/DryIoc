@@ -34,6 +34,7 @@ namespace DryIoc
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;
     using System.Runtime.CompilerServices;
+    using ImTools;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -2804,6 +2805,7 @@ namespace DryIoc
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
                 new ExpressionFactory(Container.GetResolverExpr, setup: Setup.Wrapper));
 
+            // todo: replace convert with exposed Container property on ResolverContext.
             var containerFactory = new ExpressionFactory(r =>
                 Expression.Convert(Container.GetResolverExpr(r), r.ServiceType),
                 setup: Setup.Wrapper);
@@ -6184,7 +6186,9 @@ namespace DryIoc
 
             var flags = _flags;
             if (reuse != DryIoc.Reuse.Transient)
+            {
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
+            }
             else
             {
                 reuse = GetTransientDisposableTrackingReuse(factory);
@@ -6204,7 +6208,8 @@ namespace DryIoc
             IReuse reuse = null;
 
             if (factory.Setup.UseParentReuse)
-                reuse = GetParentOrFuncOrEmpty().Reuse;
+                reuse = GetFirstParentNonTransientReuseUntilFunc();
+
             else if (factory.Setup.FactoryType == FactoryType.Decorator
                 && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
                 reuse = Reuse; // use reuse of resolved service factory for decorator
@@ -6230,13 +6235,12 @@ namespace DryIoc
             if (!tracksTransientDisposable)
                 return DryIoc.Reuse.Transient;
 
-            // Does not track inside of Func.
-            var parent = GetParentOrFuncOrEmpty(firstNonTransientParent: true);
-            if (parent.FactoryType == FactoryType.Wrapper) // wrapper means it is a Func
-                return DryIoc.Reuse.Transient;
+            var parentReuse = GetFirstParentNonTransientReuseUntilFunc();
+            if (parentReuse != DryIoc.Reuse.Transient)
+                return parentReuse;
 
-            if (!parent.IsEmpty && parent.Reuse != DryIoc.Reuse.Transient)
-                return parent.Reuse;
+            if (IsWrappedInFunc())
+                return DryIoc.Reuse.Transient;
 
             // If no reused parent, then track in current open scope, or if not opened in singleton
             return Scopes.GetCurrentScope() != null ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton;
@@ -6252,57 +6256,49 @@ namespace DryIoc
             if (!RawParent.IsEmpty)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                 {
-                    if (p.FactoryType == FactoryType.Wrapper)
-                    {
-                        if (p.GetActualServiceType().IsFunc())
-                            break;
-                    }
-                    else if (p.FactoryType == FactoryType.Service)
-                    {
-                        if (p.ReuseLifespan > reuseLifespan)
-                            Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
-                    }
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                        break;
+
+                    if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuseLifespan)
+                        Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
                 }
 
             if (!PreResolveParent.IsEmpty)
             {
                 for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
                 {
-                    if (p.FactoryType == FactoryType.Wrapper)
-                    {
-                        if (p.GetActualServiceType().IsFunc())
-                            break;
-                    }
-                    else if (p.FactoryType == FactoryType.Service)
-                    {
-                        if (p.ReuseLifespan > reuseLifespan)
-                            Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
-                    }
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                        break;
+
+                    if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuseLifespan)
+                        Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
                 }
             }
         }
 
-        // todo: Improve perf.
-        /// <summary>Returns non-wrapper parent of Func wrapper if any.</summary>
-        /// <param name="firstNonTransientParent">(optional) When set specifies to search for first not transient parent.</param>
-        /// <returns>Found parent or Func parent or empty.</returns>
-        public RequestInfo GetParentOrFuncOrEmpty(bool firstNonTransientParent = false)
+        private IReuse GetFirstParentNonTransientReuseUntilFunc(bool firstNonTransientParent = false)
         {
-            for (var p = ParentOrWrapper; !p.IsEmpty; p = p.ParentOrWrapper)
-            {
-                if (p.FactoryType == FactoryType.Wrapper)
+            if (!RawParent.IsEmpty)
+                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                 {
-                    if (p.GetActualServiceType().IsFunc())
-                        return p;
-                }
-                else
-                {
-                    if (p.Reuse != DryIoc.Reuse.Transient)
-                        return p;
-                }
-            }
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                        return DryIoc.Reuse.Transient;
 
-            return RequestInfo.Empty;
+                    if (p.FactoryType != FactoryType.Wrapper && p.Reuse != DryIoc.Reuse.Transient)
+                        return p.Reuse;
+                }
+
+            if (!PreResolveParent.IsEmpty)
+                for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
+                {
+                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                        return DryIoc.Reuse.Transient;
+
+                    if (p.FactoryType != FactoryType.Wrapper && p.Reuse != DryIoc.Reuse.Transient)
+                        return p.Reuse;
+                }
+
+            return DryIoc.Reuse.Transient;
         }
 
         /// <summary>Serializable request info stripped off run-time info.</summary>
@@ -11113,6 +11109,7 @@ namespace DryIoc.Experimental
 {
     using System;
     using System.Reflection;
+    using ImTools;
 
     /// <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
     public static class DI
