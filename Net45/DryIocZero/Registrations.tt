@@ -39,7 +39,7 @@ IContainer GetContainerWithRegistrations()
 }
 
 // Specify what resolution roots should be generated
-bool IsResolutionRoot(ServiceRegistrationInfo info) 
+bool IsResolutionRoot(ServiceRegistrationInfo info)
 {
     // EXAMPLE: I am selecting the roots registered with Setup.With(asResolutionRoot: true) or AsResolutionRootAttribute.
     // You may apply any custom filter against input ServiceRegistrationInfo.

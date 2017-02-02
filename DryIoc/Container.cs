@@ -9265,8 +9265,8 @@ namespace DryIoc
     /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo
     {
-        /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty = new RequestInfo(null, -1, FactoryType.Service, null, null, default(RequestFlags), null);
+        /// <summary>Represents empty info.</summary>
+        public static readonly RequestInfo Empty = new RequestInfo();
 
         /// <summary>Wraps the resolved service lookup details.</summary>
         public readonly IServiceInfo ServiceInfo;
@@ -9312,7 +9312,8 @@ namespace DryIoc
             return ServiceInfo.GetActualServiceType();
         }
 
-        /// <summary>Returns known implementation, or otherwise actual service type.</summary> <returns>The subject.</returns>
+        /// <summary>Returns known implementation, or otherwise actual service type.</summary> 
+        /// <returns>The subject.</returns>
         public Type GetKnownImplementationOrServiceType()
         {
             return ImplementationType ?? GetActualServiceType();
@@ -9365,8 +9366,8 @@ namespace DryIoc
         /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
         {
-            var serviceInfo = DryIoc.ServiceInfo.Of(serviceType, null, IfUnresolved.Throw, null);
-            return Push(serviceInfo, factoryID, FactoryType.Service, implementationType, reuse);
+            return Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+                factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -9377,8 +9378,8 @@ namespace DryIoc
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
         {
-            var serviceInfo = DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, IfUnresolved.Throw, serviceKey);
-            return Push(serviceInfo, factoryID, factoryType, implementationType, reuse, flags);
+            return Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
+                factoryID, factoryType, implementationType, reuse, flags);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -9391,8 +9392,8 @@ namespace DryIoc
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
         {
-            var serviceInfo = DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
-            return Push(serviceInfo, factoryID, factoryType, implementationType, reuse, flags);
+            return Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
+                factoryID, factoryType, implementationType, reuse, flags);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -9546,9 +9547,13 @@ namespace DryIoc
             return hash;
         }
 
+        private RequestInfo()
+        {
+            FactoryID = -1;
+        }
+
         private RequestInfo(IServiceInfo serviceInfo,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
-            RequestFlags flags, 
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
             RequestInfo parentOrWrapper)
         {
             ParentOrWrapper = parentOrWrapper;

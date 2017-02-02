@@ -1098,23 +1098,6 @@ namespace DryIocZero
             return value;
         }
 
-        private object GetItemOrDefault(int index)
-        {
-            if (index < BucketSize)
-                return Items[index];
-
-            var bucketIndex = index / BucketSize - 1;
-            var buckets = Items[0] as object[][];
-            if (buckets != null && buckets.Length > bucketIndex)
-            {
-                var bucket = buckets[bucketIndex];
-                if (bucket != null)
-                    return bucket[index % BucketSize];
-            }
-
-            return null;
-        }
-
         // find if bucket already created starting from 0
         // if not - create new buckets array and copy old buckets into it
         private object[] GetOrAddBucket(int index)
@@ -1187,10 +1170,10 @@ namespace DryIocZero
     public static class Error
     {
         /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public readonly static int FirstErrorCode = 0;
+        public static readonly int FirstErrorCode = 0;
 
         /// <summary>List of error messages indexed with code.</summary>
-        public readonly static List<string> Messages = new List<string>(100);
+        public static readonly List<string> Messages = new List<string>(100);
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
@@ -1433,6 +1416,23 @@ namespace DryIocZero
         }
     }
 
+    /// <summary>Memoized checks and conditions of two kinds: inherited down dependency chain and not.</summary>
+    [Flags]
+    public enum RequestFlags
+    {
+        /// <summary>Not inherited</summary>
+        TracksTransientDisposable = 1 << 1,
+        /// <summary>Not inherited</summary>
+        IsServiceCollection = 1 << 2,
+
+        /// <summary>Inherited</summary>
+        IsSingletonOrDependencyOfSingleton = 1 << 3,
+        /// <summary>Inherited</summary>
+        IsWrappedInFunc = 1 << 4,
+        /// <summary>Inherited</summary>
+        IsWrappedInFuncWithArgs = 1 << 5,
+    }
+
     /// <summary>Type of services supported by Container.</summary>
     public enum FactoryType
     {
@@ -1459,9 +1459,8 @@ namespace DryIocZero
     /// <summary>Dependency request path information.</summary>
     public sealed class RequestInfo
     {
-        /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty =
-            new RequestInfo(null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, null, null);
+        /// <summary>Represents empty info.</summary>
+        public static readonly RequestInfo Empty = new RequestInfo();
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty
@@ -1481,18 +1480,16 @@ namespace DryIocZero
         /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
         public RequestInfo Parent
         {
-            get { return IsEmpty ? Empty : ParentOrWrapper.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper); }
-        }
+            get
+            {
+                if (IsEmpty)
+                    return Empty;
 
-        /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
-        /// <param name="condition">Condition to stop on. Should not be null.</param>
-        /// <returns>Request info of found parent.</returns>
-        public RequestInfo FirstOrEmpty(Func<RequestInfo, bool> condition)
-        {
-            var r = this;
-            while (!r.IsEmpty && !condition(r))
-                r = r.ParentOrWrapper;
-            return r;
+                var p = ParentOrWrapper;
+                while (!p.IsEmpty && p.FactoryType == FactoryType.Wrapper)
+                    p = p.ParentOrWrapper;
+                return p;
+            }
         }
 
         /// <summary>Asked service type.</summary>
@@ -1503,6 +1500,12 @@ namespace DryIocZero
 
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
+
+        /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
+        public readonly string MetadataKey;
+
+        /// <summary>Metadata value to find in resolved service.</summary>
+        public readonly object Metadata;
 
         /// <summary>Policy to deal with unresolved request.</summary>
         public readonly IfUnresolved IfUnresolved;
@@ -1516,33 +1519,37 @@ namespace DryIocZero
         /// <summary>Implementation type.</summary>
         public readonly Type ImplementationType;
 
+        /// <summary>Service reuse.</summary>
+        public readonly IReuse Reuse;
+
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan
         {
             get { return Reuse == null ? 0 : Reuse.Lifespan; }
         }
 
-        /// <summary>Service reuse.</summary>
-        public readonly IReuse Reuse;
+        /// <summary><see cref="RequestFlags"/>.</summary>
+        public readonly RequestFlags Flags;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
         /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
         /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
         {
-            return Push(serviceType, null, null, factoryID, FactoryType.Service, implementationType, reuse);
+            return Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+                factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
         /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param><param name="flags"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
         {
-            return Push(serviceType, requiredServiceType, serviceKey, IfUnresolved.Throw,
-                factoryID, factoryType, implementationType, reuse);
+            return Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
+                factoryID, factoryType, implementationType, reuse, flags);
         }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -1550,12 +1557,28 @@ namespace DryIocZero
         /// <param name="serviceKey"></param> <param name="ifUnresolved"></param>
         /// <param name="factoryType"></param> <param name="factoryID"></param>
         /// <param name="implementationType"></param> <param name="reuse"></param>
+        /// <param name="flags"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse)
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey, ifUnresolved,
-                factoryID, factoryType, implementationType, reuse, this);
+            return Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
+                factoryID, factoryType, implementationType, reuse, flags);
+        }
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
+        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param>
+        /// <param name="ifUnresolved"></param>
+        /// <param name="factoryType"></param> <param name="factoryID"></param>
+        /// <param name="implementationType"></param> <param name="reuse"></param>
+        /// <param name="flags"></param>
+        /// <returns>Created info chain to current (parent) info.</returns>
+        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
+        {
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
+                factoryID, factoryType, implementationType, reuse, flags, this);
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
@@ -1663,9 +1686,16 @@ namespace DryIocZero
             return hash;
         }
 
+        private RequestInfo()
+        {
+            FactoryID = -1;
+        }
+
         private RequestInfo(
-            Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
+            Type serviceType, Type requiredServiceType, object serviceKey, 
+            string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
+            RequestFlags flags,
             RequestInfo parentOrWrapper)
         {
             ParentOrWrapper = parentOrWrapper;
@@ -1674,6 +1704,8 @@ namespace DryIocZero
             ServiceType = serviceType;
             RequiredServiceType = requiredServiceType;
             ServiceKey = serviceKey;
+            MetadataKey = metadataKey;
+            Metadata = metadata;
             IfUnresolved = ifUnresolved;
 
             // Implementation info:
@@ -1681,6 +1713,8 @@ namespace DryIocZero
             FactoryType = factoryType;
             ImplementationType = implementationType;
             Reuse = reuse;
+
+            Flags = flags;
         }
 
         // Inspired by System.Tuple.CombineHashCodes
@@ -1805,6 +1839,7 @@ namespace DryIoc
 {
     static partial class Portable
     {
+        // ReSharper disable once UnusedMember.Local
         static partial void GetCurrentManagedThreadID(ref int threadID);
     }
 }
