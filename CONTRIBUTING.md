@@ -42,16 +42,17 @@ __Note:__ For .NET Core DependencyInjection adapter please run _NetCore\build.ba
 
 ### Develop in Visual Studio
 
-Open _DryIoc.sln_ located in the root folder to develop in Visual Studio 2015. 
+There are 3 solutions:
 
-Solution combines projects for all supported platforms starting from .NET 3.5 (may be changed in future).
+- _DryIoc.sln_ includes every project except for .Net Core for every target plantform.
+- _DryIoc.start.sln_ includes only .NET 4.5 projects of DryIoc and companions (MEF, DIZero). 
+- _NetCore/DryIoc.Microsoft.DependencyInjection.sln_ for [.NET Core and DryIoc.Microsoft.DependencyInjection](https://github.com/aspnet/dependencyinjection).
 
-__Note:__ At the moment there is a separate solution for [.NET Core DependencyInjection adapter](https://github.com/aspnet/dependencyinjection) in NetCore sub-folder.
+__DryIoc.start.sln__ is a good start and may be all that you need.
 
-To simplify development, you may unload projects under solution root and platform folders except the platform you are working with.  
-Usually, I am unloading everything except projects in _Net45_ and _Extensions_ folders. But before commit, I do run _build.bat_ which builds all the platforms (__Except the .Net Core at the moment__).
+Before commit please run _build.bat_ to check that every platform and tests are fine.
 
-__Hint:__ Main solution is configured to build and run Unit Tests continuously with [NCrunch](http://www.ncrunch.net/).
+__Hint:__ Usually I am enabling [NCrunch](http://www.ncrunch.net/) to build and run Unit Tests continuously, saves me a lot of time.
 
 
 

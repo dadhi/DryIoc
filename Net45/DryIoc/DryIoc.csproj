@@ -40,8 +40,8 @@
     <Compile Include="..\..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc\FactoryCompiler.cs">
-      <Link>FactoryCompiler.cs</Link>
+    <Compile Include="..\..\DryIoc\FastExpressionCompiler.cs">
+      <Link>FastExpressionCompiler.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc\ImTools.cs">
       <Link>ImTools.cs</Link>

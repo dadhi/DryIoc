@@ -1,4 +1,6 @@
-﻿namespace DryIoc.Playground
+﻿using ImTools;
+
+namespace DryIoc.Playground
 {
     public abstract class AppendStore<T>
     {

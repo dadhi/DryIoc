@@ -349,6 +349,77 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Transient_disposable_should_be_resolved_from_root_and_next_two_scopes()
+        {
+            var container = new Container(rules => rules
+            .WithTrackingDisposableTransients()
+            .WithImplicitRootOpenScope());
+
+            container.Register<Blah>();
+
+            var b = container.Resolve<Blah>();
+
+            Blah b1;
+            using (var scope = container.OpenScope())
+            {
+                b1 = scope.Resolve<Blah>();
+                Assert.AreNotSame(b1, b);
+            }
+            
+            Assert.IsTrue(b1.IsDisposed);
+
+            Blah b2;
+            using (var scope = container.OpenScope())
+            {
+                b2 = scope.Resolve<Blah>();
+                Assert.AreNotSame(b2, b);
+            }
+
+            Assert.IsTrue(b2.IsDisposed);
+        }
+
+        [Test]
+        public void Injected_into_scoped_service_transient_disposable_should_be_resolved_from_root_and_next_two_scopes()
+        {
+            var container = new Container(rules => rules
+            .WithTrackingDisposableTransients()
+            .WithImplicitRootOpenScope());
+
+            container.Register<Blah>();
+            container.Register<BlahConsumer>(Reuse.InCurrentScope);
+
+            var b = container.Resolve<BlahConsumer>().Blah;
+
+            Blah b1;
+            using (var scope = container.OpenScope())
+            {
+                b1 = scope.Resolve<BlahConsumer>().Blah;
+                Assert.AreNotSame(b1, b);
+            }
+
+            Assert.IsTrue(b1.IsDisposed);
+
+            Blah b2;
+            using (var scope = container.OpenScope())
+            {
+                b2 = scope.Resolve<BlahConsumer>().Blah;
+                Assert.AreNotSame(b2, b);
+            }
+
+            Assert.IsTrue(b2.IsDisposed);
+        }
+
+        public class BlahConsumer
+        {
+            public Blah Blah { get; }
+
+            public BlahConsumer(Blah blah)
+            {
+                Blah = blah;
+            }
+        }
+
+        [Test]
         public void Rule_to_open_implicit_scope_with_container_Will_not_work_with_ambient_scope_context()
         {
             var container = new Container(rules => rules.WithImplicitRootOpenScope(), new ThreadScopeContext());
@@ -414,7 +485,7 @@ namespace DryIoc.UnitTests
         internal class DepScoped : IDep { }
         internal class Serv : IServ { }
 
-        internal class Blah : IDisposable
+        public class Blah : IDisposable
         {
             public void Dispose()
             {

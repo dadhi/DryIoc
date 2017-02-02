@@ -31,7 +31,7 @@ namespace DryIocZero
     using System.Reflection;
     using System.Text;
     using System.Threading;
-    using DryIoc;
+    using ImTools;
 
     /// <summary>Minimal container to register service factory delegates and then resolve service from them.</summary>
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
@@ -1754,5 +1754,13 @@ namespace DryIocZero
         {
             return type.Members(t => t.DeclaredProperties, includeBase: true);
         }
+    }
+}
+
+namespace DryIoc
+{
+    static partial class Portable
+    {
+        static partial void GetCurrentManagedThreadID(ref int threadID);
     }
 }

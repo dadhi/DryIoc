@@ -118,7 +118,7 @@
     <Compile Include="Issue168_RegisterInstanceWithIfAlreadyRegisteredReplaceReplacesWrongRegistration.cs" />
     <Compile Include="Issue169_FalseAlarmCheckingScopeLifetimeConsistencyForFuncWrapper.cs" />
     <Compile Include="Issue178_FallbackContainerDisposesInstanceRegisteredInParent.cs" />
-    <Compile Include="Issue181_ RegisterInstanceUnregister.cs" />
+    <Compile Include="Issue181_RegisterInstanceUnregister.cs" />
     <Compile Include="Issue200_MultipleInstancesForSingletonCreatedWhenContainerIsSharedAmongMultipleThreads.cs" />
     <Compile Include="Issue201_MutithreadingIssueWhenRegisterInstanceUsedWithinOpenScope.cs" />
     <Compile Include="Issue212_ResolveManyOfObjectWithGenericRequiredServiceTypeIsFailingWithArgumentException.cs" />
@@ -160,6 +160,7 @@
     <Compile Include="Issue422_Unable_to_resolve_decorator_with_named_dependency.cs" />
     <Compile Include="Issue423_InnerScopeIsInjectedIntoSingleton.cs" />
     <Compile Include="Issue429_Resolve_instance_from_named_scope_with_Func.cs" />
+    <Compile Include="Issue435_ReuseSingleton_prevents_the_correct_container_injection_within_explicit_resolve.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -171,6 +172,7 @@
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
+    <Compile Include="IssueSO_Open_Generics_Registration.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectingSerilogLogger.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />

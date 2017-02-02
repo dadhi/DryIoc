@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-namespace DryIoc
+namespace ImTools
 {
     using System;
     using System.Collections.Generic;
@@ -30,6 +30,13 @@ namespace DryIoc
     using System.Text;
     using System.Threading;
     using System.Runtime.CompilerServices; // for aggressive inlining hints
+
+    /// <summary>Portable aggressive in-lining option for MethodImpl.</summary>
+    public static class MethodImplHints
+    {
+        /// <summary>Value of MethodImplOptions.AggressingInlining</summary>
+        public const MethodImplOptions AggressingInlining = (MethodImplOptions)256;
+    }
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools
@@ -357,7 +364,7 @@ namespace DryIoc
     /// <returns>Changed value.</returns>
     public delegate V Update<V>(V oldValue, V newValue);
 
-    // todo: V3: Rename to ImTree
+    // todo: V3: Rename to ImMap
     /// <summary>Simple immutable AVL tree with integer keys and object values.</summary>
     public sealed class ImTreeMapIntToObj
     {
@@ -498,7 +505,7 @@ namespace DryIoc
         #endregion
     }
 
-    // todo: V3: Rename to ImHashTree
+    // todo: V3: Rename to ImMap
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree where actual node key is hash code of <typeparamref name="K"/>.</summary>
     public sealed class ImTreeMap<K, V>
     {
@@ -613,7 +620,7 @@ namespace DryIoc
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private ImTreeMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, bool updateOnly)
+        internal ImTreeMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, bool updateOnly)
         {
             return Height == 0 ? (updateOnly ? this : new ImTreeMap<K, V>(hash, key, value, null, Empty, Empty))
                 : (hash == Hash ? UpdateValueAndResolveConflicts(key, value, update, updateOnly)
@@ -648,7 +655,7 @@ namespace DryIoc
             return new ImTreeMap<K, V>(Hash, Key, Value, conflicts, Left, Right);
         }
 
-        private V GetConflictedValueOrDefault(K key, V defaultValue)
+        internal V GetConflictedValueOrDefault(K key, V defaultValue)
         {
             if (Conflicts != null)
                 for (var i = 0; i < Conflicts.Length; i++)
@@ -682,4 +689,103 @@ namespace DryIoc
 
         #endregion
     }
+
+    /// <summary>Avl trees forest - uses last hash bits to quickly find target tree, more performant Lookup but no traversal.</summary>
+    /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type.</typeparam>
+    public sealed class ImMap<K, V>
+    {
+        private const int NumberOfTrees = 32;
+        private const int HashBitsToTree = NumberOfTrees - 1;  // get last 4 bits, fast (hash % NumberOfTrees)
+
+        /// <summary>Empty tree to start with.</summary>
+        public static readonly ImMap<K, V> Empty = new ImMap<K, V>(new ImTreeMap<K, V>[NumberOfTrees], 0);
+
+        /// <summary>Count in items stored.</summary>
+        public readonly int Count;
+
+        /// <summary>Truw if contain no items</summary>
+        public bool IsEmpty { get { return Count == 0; } }
+
+        /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
+        /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
+        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
+        public V GetValueOrDefault(K key, V defaultValue = default(V))
+        {
+            var hash = key.GetHashCode();
+
+            var t = _trees[hash & HashBitsToTree];
+            if (t == null)
+                return defaultValue;
+
+            while (t.Height != 0 && t.Hash != hash)
+                t = hash < t.Hash ? t.Left : t.Right;
+
+            if (t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)))
+                return t.Value;
+
+            return t.GetConflictedValueOrDefault(key, defaultValue);
+        }
+
+        /// <summary>Returns new tree with added key-value. 
+        /// If value with the same key is exist then the value is replaced.</summary>
+        /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
+        /// <returns>New tree with added or updated key-value.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
+        public ImMap<K, V> AddOrUpdate(K key, V value)
+        {
+            var hash = key.GetHashCode();
+
+            var treeIndex = hash & HashBitsToTree;
+
+            var trees = _trees;
+            var tree = trees[treeIndex];
+            if (tree == null)
+                tree = ImTreeMap<K, V>.Empty;
+
+            tree = tree.AddOrUpdate(hash, key, value, null, false);
+
+            var newTrees = new ImTreeMap<K, V>[NumberOfTrees];
+            Array.Copy(trees, 0, newTrees, 0, NumberOfTrees);
+            newTrees[treeIndex] = tree;
+
+            return new ImMap<K, V>(newTrees, Count + 1);
+        }
+
+        /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/></summary>
+        /// <param name="key">Key to look for.</param>
+        /// <param name="value">New value to replace key value with.</param>
+        /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
+        [MethodImpl(MethodImplHints.AggressingInlining)]
+        public ImMap<K, V> Update(K key, V value)
+        {
+            var hash = key.GetHashCode();
+
+            var treeIndex = hash & HashBitsToTree;
+
+            var trees = _trees;
+            var tree = trees[treeIndex];
+            if (tree == null)
+                return this;
+
+            var newTree = tree.AddOrUpdate(hash, key, value, null, true);
+            if (newTree == tree)
+                return this;
+
+            var newTrees = new ImTreeMap<K, V>[NumberOfTrees];
+            Array.Copy(trees, 0, newTrees, 0, NumberOfTrees);
+            newTrees[treeIndex] = newTree;
+
+            return new ImMap<K, V>(newTrees, Count);
+        }
+
+        private readonly ImTreeMap<K, V>[] _trees;
+
+        private ImMap(ImTreeMap<K, V>[] newTrees, int count)
+        {
+            _trees = newTrees;
+            Count = count;
+        }
+    }
+
 }

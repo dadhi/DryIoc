@@ -8,10 +8,6 @@
 // GetContainerWithRegistrations implementation below is just an EXAMPLE!
 //=======================================================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.3.0.0-preview-01\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.3.0.0-preview-02\lib\net45\DryIoc.MefAttributedModel.dll" #>
-<#@ import Namespace="DryIoc.MefAttributedModel" #>
-
 <#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.9.3\lib\net45\DryIoc.dll" #>
 <#@ import Namespace="DryIoc" #>
 
@@ -22,12 +18,6 @@
 <#@ import Namespace="System.Reflection" #>
 
 <#+
-class ControllerResolver : DefaultHttpControllerTypeResolver
-{
-    public static readonly ControllerResolver Default = new ControllerResolver();
-    public bool IsController(Type type) { return IsControllerTypePredicate(type); }
-}
-
 // Specify your container and registrations
 IContainer GetContainerWithRegistrations()
 {
@@ -35,7 +25,7 @@ IContainer GetContainerWithRegistrations()
 
     // TODO: Replace with your assemblies and types
     //Assembly[] assemblies = ...
-    //container.RegisterMany(assemblies.SelectMany(a => GetLoadedTypes(a).Where(ControllerResolver.Default.IsController)));
+    //container.RegisterMany(assemblies);
 
     // NOTE: RegisterDelegate and RegisterInstance are not supported because of runtime state usage. 
     // Instead you can use Register(Made.Of(() => GetSomething())) registrations which generally are preferred over Delegate/Instance
@@ -49,8 +39,14 @@ IContainer GetContainerWithRegistrations()
 // Specify what resolution roots should be generated
 bool IsResolutionRoot(ServiceRegistrationInfo info) 
 {
-    // EXAMPLE: I am selecting the roots registered with Setup.With(asResolutionRoot: true) or AsResolutionRootAttribute.
-    // You may apply any custom filter against input ServiceRegistrationInfo.
-    return ContainerTools.SetupAsResolutionRoots(info);
+    // TODO: By default the resolution roots set to container. You may asjust the condition to your need.
+    return ControllerResolver.Default.IsController(info.ServiceType);
+}
+
+// Helps to recognize controller types
+class ControllerResolver : DefaultHttpControllerTypeResolver
+{
+    public static readonly ControllerResolver Default = new ControllerResolver();
+    public bool IsController(Type type) { return IsControllerTypePredicate(type); }
 }
 #>

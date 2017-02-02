@@ -155,8 +155,11 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
-                // todo: v1.1: plan to specify preventDisposal for the instances
-                container.RegisterDelegate(descriptor.ServiceType, _ => descriptor.ImplementationInstance);
+                // todo: Specify preventDisposal as soon as DI decides on that 
+                // But for now register as singleton instances, which whill be disposed with container
+                container.RegisterDelegate(descriptor.ServiceType, 
+                    _ => descriptor.ImplementationInstance,
+                    Reuse.Singleton); 
             }
         }
 
@@ -165,7 +168,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             switch (lifetime)
             {
                 case ServiceLifetime.Singleton:
-                    // todo: 1.1: will be converted back to Singleton when Rule.WithImplicitRootOpenScope is removed from adepter
+                    // todo: Wait until Singletons are actual singletons, then remove Rule.WithImplicitRootOpenScope from adapter
                     return Reuse.InCurrentNamedScope(Container.NonAmbientRootScopeName);
                 case ServiceLifetime.Scoped:
                     return Reuse.InCurrentScope;

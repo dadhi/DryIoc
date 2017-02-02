@@ -2,7 +2,7 @@
 using System.Threading;
 using NUnit.Framework;
 
-namespace DryIoc.UnitTests
+namespace ImTools.UnitTests
 {
     [TestFixture]
     public class RefTests

@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 using ExpressionToCodeLib.Unstable_v2_Api;
 using NUnit.Framework;
+using ImTools;
 
 namespace DryIoc.MefAttributedModel.UnitTests
 {
@@ -64,7 +65,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
             foreach (var r in serviceRegistrations)
             {
-                var request = container.EmptyRequest.Push(r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
+                var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
                 var factoryExpr = r.Factory.GetExpressionOrDefault(request);
                 if (factoryExpr != null)
                     roots = roots.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), factoryExpr);
@@ -74,7 +75,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(3, rootList.Length);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
-            Assert.AreEqual(3, depList.Length);
+            Assert.AreEqual(2, depList.Length);
         }
 
         [Test]
@@ -87,7 +88,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<LazyUser>();
             container.Register<LazyDep>();
 
-            var request = container.EmptyRequest.Push(typeof(LazyUser));
+            var request = Request.Create(container, typeof(LazyUser));
             container.GetServiceFactoryOrDefault(request).GetExpressionOrDefault(request);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
@@ -117,7 +118,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
             foreach (var r in serviceRegistrations)
             {
-                var request = container.EmptyRequest.Push(r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
+                var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
                 var factoryExpr = r.Factory.GetExpressionOrDefault(request);
                 if (factoryExpr != null)
                     roots = roots.AddOrUpdate(new KV<Type, object>(r.ServiceType, r.OptionalServiceKey), factoryExpr);
@@ -127,7 +128,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(3, rootList.Length);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
-            Assert.AreEqual(3, depList.Length);
+            Assert.AreEqual(2, depList.Length);
         }
 
         [Test]
@@ -148,7 +149,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, ContainerTools.SetupAsResolutionRoots);
 
             Assert.AreEqual(3, resolutionsRoots.Length);
-            Assert.AreEqual(3, resolutionCallDependencies.Length);
+            Assert.AreEqual(2, resolutionCallDependencies.Length);
         }
 
         [Test]

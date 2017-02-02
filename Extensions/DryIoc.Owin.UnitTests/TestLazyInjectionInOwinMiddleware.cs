@@ -34,7 +34,7 @@ namespace DryIoc.Owin.UnitTests
             using (var server = TestServer.Create<Startup>())
             {
                 System.Net.Http.HttpResponseMessage response = await server.HttpClient.GetAsync("dummy");
-                Assert.IsTrue(MyOwinMiddleware.OwinMidCalled);
+                Assert.IsTrue(MyOwinMiddleware.IsCalled);
             }
         }
 
@@ -44,14 +44,15 @@ namespace DryIoc.Owin.UnitTests
 
         public class MyOwinMiddleware : OwinMiddleware
         {
-            public static bool OwinMidCalled { get; private set; }
+            public static bool IsCalled { get; private set; }
+
             public MyOwinMiddleware(OwinMiddleware next, Lazy<MyService> service)
                 : base(next)
             {
             }
             public override Task Invoke(IOwinContext context)
             {
-                OwinMidCalled = true;
+                IsCalled = true;
                 return Next.Invoke(context);
             }
         }

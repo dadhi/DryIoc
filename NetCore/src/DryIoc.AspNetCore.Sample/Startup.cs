@@ -14,16 +14,32 @@ namespace DryIoc.AspNetCore.Sample
         // For more information on how to configure your application, visit http://go.microsoft.com/fwlink/?LinkID=398940
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc();
+            services
+                .AddMvc()
+
+                // Enables constrollers to be resolved by DryIoc, otherwise resolved by infrastructure
+                .AddControllersAsServices();
 
             return new Container()
-                // optional: to support MEF attributed services discovery
-                .WithMef()
+                // optional: support for MEF service discovery
+                //.WithMef()
                 // setup DI adapter
                 .WithDependencyInjectionAdapter(services,
-                // optional: propagate exception if specified types are not resolved, and prevent fallback to default Asp resolution
-                    throwIfUnresolved: type => type.Name.EndsWith("Controller"))
-                // add registrations from CompositionRoot classs
+                    // optional: get original DryIoc exception if specified type is not resolved, 
+                    // and prevent fallback to default resolution by infrastructure
+                    throwIfUnresolved: type => type.Name.EndsWith("Controller"),
+
+                    // optional: You may Log or Customize the infrastructure components registrations
+                    registerDescriptor: (registrator, descriptor) =>
+                    {
+#if DEBUG
+                        if (descriptor.ServiceType == typeof(ILoggerFactory))
+                            Console.WriteLine($"Logger factory is regsitered as instance: {descriptor.ImplementationInstance != null}");
+#endif                         
+                        return false; // fallback to default registration logic
+                    })
+
+                // Your registrations are defined in CompositionRoot class
                 .ConfigureServiceProvider<CompositionRoot>();
         }
 

@@ -5,6 +5,7 @@ using System.ComponentModel.Composition.Hosting;
 using System.ComponentModel.Composition.Primitives;
 using System.Linq;
 using System.Reflection;
+using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.MefAttributedModel.UnitTests

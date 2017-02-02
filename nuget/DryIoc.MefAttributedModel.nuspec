@@ -11,7 +11,9 @@
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v3.0.0
+          v3.0.0-preview-04
+          - changed: Updated to DryIoc 2.10
+          v3.0.0-preview-01
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
           - added: #323: Support multiple WithMetadataAttribute(key, value)
@@ -24,7 +26,7 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="[2.9,3.0)" />
+                <dependency id="DryIoc" version="[2.10,3.0)" />
                 <dependency id="DryIocAttributes" version="3.0.0-preview-01" />
             </group>
         </dependencies>

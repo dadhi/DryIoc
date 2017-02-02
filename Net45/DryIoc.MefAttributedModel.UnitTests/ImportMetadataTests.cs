@@ -29,7 +29,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var service = container.Resolve<FooConsumer>();
 
-            Assert.That(service.Foo.Value, Is.InstanceOf<FooBlah>());
+            Assert.IsInstanceOf<FooBlah>(service.Foo.Value);
         }
 
         [Test]

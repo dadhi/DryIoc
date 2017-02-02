@@ -79,7 +79,7 @@ namespace DryIoc.WebApi
         {
             var assembliesResolver = assemblies == null
                  ? config.Services.GetAssembliesResolver()
-                 : new GivenAssembliesResolver(assemblies.ToArrayOrSelf());
+                 : new GivenAssembliesResolver(assemblies.ToList());
 
             var controllerTypeResolver = config.Services.GetHttpControllerTypeResolver();
             var controllerTypes = controllerTypeResolver.GetControllerTypes(assembliesResolver);

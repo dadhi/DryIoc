@@ -31,6 +31,7 @@ namespace DryIoc.MefAttributedModel
     using System.Reflection;
     using System.Text;
     using DryIocAttributes;
+    using ImTools;
 
     /// <summary>Implements MEF Attributed Programming Model.
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
@@ -286,6 +287,7 @@ namespace DryIoc.MefAttributedModel
         private static readonly Made _filterCollectionByMultiKey = Made.Of(
             typeof(AttributedModel).GetSingleMethodOrNull("FilterCollectionByMultiKey", includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.ServiceKey));
+
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
         {
             return serviceKey == null
@@ -1303,6 +1305,12 @@ namespace DryIoc.MefAttributedModel
             if (newInfo.FactoryMethodInfo != null)
                 newInfo.FactoryMethodInfo = newInfo.FactoryMethodInfo.MakeLazy();
             return newInfo;
+        }
+
+        /// <summary>Sugar on top of <see cref="CreateFactory(Lazy{Assembly})"/>.</summary>
+        public ReflectionFactory CreateFactory(Lazy<Assembly> assembly)
+        {
+            return CreateFactory(typeName => assembly.Value.GetType(typeName));
         }
 
         /// <summary>Creates factory from registration info.</summary>

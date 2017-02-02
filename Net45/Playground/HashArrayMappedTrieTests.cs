@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using DryIoc;
+using ImTools;
 using NUnit.Framework;
 
 namespace Playground

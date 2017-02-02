@@ -12,7 +12,7 @@ namespace DryIoc.AspNetCore.Sample.Controllers
         public ITransientService Transient { get; }
         public IExportedService Imported { get; }
 
-        public HomeController(IScopedService scoped, ITransientService transient, IExportedService imported)
+        public HomeController(IScopedService scoped, ITransientService transient, IExportedService imported = null)
         {
             Scoped = scoped;
             Transient = transient;
