@@ -8,7 +8,7 @@
     "Microsoft.AspNetCore.Mvc": "1.1.0",
 
     "DryIoc.Microsoft.DependencyInjection": { "target": "project" },
-    "DryIoc.MefAttributedModel.dll": "3.0.0-preview-03" 
+    "DryIoc.MefAttributedModel.dll": "3.0.0-preview-04" 
   },
 
   "tools": {
