@@ -44,7 +44,7 @@ namespace DryIocZero
         public Container(IScopeContext scopeContext = null)
             : this(Ref.Of(ImTreeMap<Type, FactoryDelegate>.Empty),
                 Ref.Of(ImTreeMap<Type, ImTreeMap<object, FactoryDelegate>>.Empty),
-                new SingletonScope(), scopeContext, null, 0)
+                new SingletonScope(), scopeContext, null, 0, null)
         { }
 
         /// <summary>Full constructor - all state included.</summary>
@@ -54,10 +54,11 @@ namespace DryIocZero
         /// <param name="scopeContext">Ambient scope context.</param>
         /// <param name="openedScope">Container bound opened scope.</param>
         /// <param name="disposed"></param>
+        /// <param name="rootContainer"></param>
         public Container(Ref<ImTreeMap<Type, FactoryDelegate>> defaultFactories,
             Ref<ImTreeMap<Type, ImTreeMap<object, FactoryDelegate>>> keyedFactories,
             IScope singletonScope, IScopeContext scopeContext, IScope openedScope,
-            int disposed)
+            int disposed, Container rootContainer = null)
         {
             _defaultFactories = defaultFactories;
             _keyedFactories = keyedFactories;
@@ -67,6 +68,8 @@ namespace DryIocZero
             _openedScope = openedScope;
 
             _disposed = disposed;
+
+            _rootContainer = rootContainer;
         }
 
         /// <summary>Provides access to resolver.</summary>
@@ -79,6 +82,12 @@ namespace DryIocZero
         public IScopeAccess Scopes
         {
             get { return this; }
+        }
+
+        /// <summary>Returns root for scoped container or null for root itself.</summary>
+        public Container RootContainer
+        {
+            get { return _rootContainer; }
         }
 
         #region IResolver
@@ -327,8 +336,11 @@ namespace DryIocZero
                     return nestedOpenedScope;
                 });
 
+            // Propagate root container deep down the nested scopes. null is for first scope.
+            var rootContainer = RootContainer ?? this;
+
             return new Container(_defaultFactories, _keyedFactories,
-                SingletonScope, ScopeContext, nestedOpenedScope, _disposed);
+                SingletonScope, ScopeContext, nestedOpenedScope, _disposed, rootContainer);
         }
 
         private readonly IScope _openedScope;
@@ -446,10 +458,13 @@ namespace DryIocZero
                 SingletonScope.Dispose();
                 if (ScopeContext != null)
                     ScopeContext.Dispose();
+                _rootContainer = null;
             }
         }
 
         private int _disposed;
+
+        private Container _rootContainer;
 
         private void ThrowIfContainerDisposed()
         {
@@ -584,6 +599,37 @@ namespace DryIocZero
 
         /// <summary>Scopes access.</summary>
         IScopeAccess Scopes { get; }
+    }
+
+    /// <summary>Extends APIs used by resolution generated factory delegates.</summary>
+    public static class ResolverContext
+    {
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IResolver RootResolver(this IResolverContext ctx)
+        {
+            return ctx.RootContainer();
+        }
+
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IScopeAccess RootScopes(this IResolverContext ctx)
+        {
+            return ctx.RootContainer();
+        }
+
+        /// <summary>Returns subj.</summary>
+        /// <param name="ctx"></param> <returns></returns>
+        public static IScope SingletonScope(this IResolverContext ctx)
+        {
+            return ctx.RootContainer().SingletonScope;
+        }
+
+        private static Container RootContainer(this IResolverContext ctx)
+        {
+            var container = (Container)ctx;
+            return container.RootContainer ?? container;
+        }
     }
 
     /// <summary>Service factory delegate which accepts resolver and resolution scope as parameters and should return service object.
@@ -1052,7 +1098,6 @@ namespace DryIocZero
             return value;
         }
 
-
         private object GetItemOrDefault(int index)
         {
             if (index < BucketSize)
@@ -1305,17 +1350,16 @@ namespace DryIocZero
         }
 
         /// <summary>Returns item from singleton scope.</summary>
-        /// <param name="containerScopes">Container scopes to select from.</param>
+        /// <param name="singletonScope">Singleton scope.</param>
         /// <param name="trackTransientDisposable">Indicates that item should be tracked instead of reused.</param>
         /// <param name="factoryId">ID for lookup.</param>
         /// <param name="createValue">Delegate for creating the item.</param>
         /// <returns>Reused item.</returns>
-        public static object GetOrAddItem(IScopeAccess containerScopes, bool trackTransientDisposable, int factoryId,
+        public static object GetOrAddItem(IScope singletonScope, bool trackTransientDisposable, int factoryId,
             CreateScopedValue createValue)
         {
-            var scope = containerScopes.SingletonScope;
-            var scopedItemId = trackTransientDisposable ? -1 : scope.GetScopedItemIdOrSelf(factoryId);
-            return scope.GetOrAdd(scopedItemId, createValue);
+            var scopedItemId = trackTransientDisposable ? -1 : singletonScope.GetScopedItemIdOrSelf(factoryId);
+            return singletonScope.GetOrAdd(scopedItemId, createValue);
         }
     }
 

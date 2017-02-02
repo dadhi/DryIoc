@@ -25,12 +25,13 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.9.3\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.10.0\lib\net45\DryIoc.dll" #>
 <#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
+<#@ import Namespace="ImTools" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 
 <#@ include File="Registrations.tt" #><#
@@ -76,8 +77,7 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
-
-using DryIoc; // for ImTools, not for Container
+using ImTools;
 
 namespace DryIocZero
 {

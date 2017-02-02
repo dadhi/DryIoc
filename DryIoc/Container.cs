@@ -2562,8 +2562,7 @@ namespace DryIoc
         IScopeAccess Scopes { get; }
     }
 
-    /// <summary>Provides the shortcuts and sugar based onto <see cref="IResolverContext"/> 
-    /// to be consumed in <see cref="FactoryDelegate"/></summary>
+    /// <summary>Extends APIs used by resolution generated factory delegates.</summary>
     public static class ResolverContext
     {
         /// <summary>Returns subj.</summary>
@@ -8933,6 +8932,7 @@ namespace DryIoc
             Name = name;
         }
 
+        // todo: Replace @containerScopes with just @scope - relates to IResolverContext refactoring
         /// <summary>Returns item from current scope with specified name.</summary>
         /// <param name="containerScopes">Container scopes to select from.</param>
         /// <param name="scopeName">scope name to look up.</param>
