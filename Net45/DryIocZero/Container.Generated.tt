@@ -74,7 +74,7 @@ var deps = resolutionCallDependencies.Select((r, i) =>
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
 using System;
-using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
+using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
 using ImTools;

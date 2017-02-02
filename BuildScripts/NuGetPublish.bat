@@ -6,23 +6,23 @@ set PACKAGEDIR="bin\NuGetPackages"
 set /p APIKEY=<ApiKey.txt
 
 rem DryIoc
-%NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.2.10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Internal.2.10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.dll.2.10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.2.10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Internal.2.10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Microsoft.DependencyInjection
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
-rem %NUGET% push "%PACKAGEDIR%\DryIocZero.2.5.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocZero.2.7.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocAttributes
 rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.dll.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.MefAttributedModel
-%NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.3.0.0-preview-04.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.3.0.0-preview-04.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.3.0.0-preview-04.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.3.0.0-preview-04.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Web
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.2.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
@@ -33,20 +33,20 @@ rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.0.nupkg" -Source https://nuget.org
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi
-%NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.dll.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.dll.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.SignalR
-%NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Owin
-%NUGET% push "%PACKAGEDIR%\DryIoc.Owin.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Owin.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi.Owin
-%NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.CommonServiceLocator
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%

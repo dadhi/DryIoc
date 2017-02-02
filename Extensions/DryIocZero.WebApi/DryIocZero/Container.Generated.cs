@@ -32,7 +32,7 @@ using System;
 using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
-using ImTools; 
+using ImTools;
 
 namespace DryIocZero
 {

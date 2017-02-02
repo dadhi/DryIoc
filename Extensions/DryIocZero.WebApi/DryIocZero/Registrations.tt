@@ -8,7 +8,7 @@
 // GetContainerWithRegistrations implementation below is just an EXAMPLE!
 //=======================================================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.9.3\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.10.0\lib\net45\DryIoc.dll" #>
 <#@ import Namespace="DryIoc" #>
 
 <#@ assembly Name="$(SolutionDir)packages\Microsoft.AspNet.WebApi.Core.5.2.3\lib\net45\System.Web.Http.dll" #>
