@@ -4,31 +4,19 @@
         <id>DryIocZero</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014-2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
         <releaseNotes>
-          v2.7.0-preview-03
-          - Simplified and clean Registrations.tt
-          - fixed: package install.ps1 to set CustomTool to "" on Registrations.tt
-          - fixed: package install.ps1 to correctly remove DryIoc reference from project
-          v2.7.0-preview-01
+          v2.7.0
+          - added: Package install.ps1 to correctly remove compile-time references from project
+          - added: Package install.ps1 to set CustomTool to "" on Registrations.tt
+          - changed: Simplified and clean Registrations.tt
           - changed: Updated to use of DryIoc 2.10
           - renamed: YourServiceRegistrations.tt.include to Registrations.tt to enable intellisense and highlighting.
-          v2.6.0
-          - changed: Remove "optional" package dependency on MefAttibutedModel. TODO: Include readme how to utilize MefAttibutedModel
-          v2.5.1
-          - fixed: Package dependency to correct version of DryIoc and DryIoc.MefAttributedModel
-          v2.5.0
-          - changed: Compatible with DryIoc 2.5
-          - changed: Switched to use DryIoc ImTools.cs
-          - added: Optional Name parameter into OpenScope
-          v2.1.0
-          - fixed: #238: DryIocZero generation should notify about runtime state used: RegisterDelegate and RegisterInstance
-          - fixed: #235: DryIocZero generates non compiling file when using RegisterDelegate
         </releaseNotes>
         <dependencies>
             <dependency id="DryIoc.dll" version="2.10" />
