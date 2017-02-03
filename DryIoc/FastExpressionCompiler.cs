@@ -436,7 +436,7 @@ namespace DryIoc
                 case ExpressionType.Constant:
                     var constantExpr = (ConstantExpression)expr;
                     var constantValue = constantExpr.Value;
-                    if (constantValue is Delegate) // Note: skip Delegate constant as it is required complex il emitting
+                    if (constantValue is Delegate) // Note: skip Delegate constant as it requires complex il emitting
                         return false;
                     if (IsBoundConstant(constantValue))
                         constants.Add(constantExpr);

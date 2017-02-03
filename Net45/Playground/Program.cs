@@ -16,9 +16,7 @@ namespace Playground
     {
         static void Main()
         {
-            var kv = KV.Of(1, "a");
-
-            var right = (kv.GetType().GetGenericTypeDefinition() ?? kv.GetType()).Name == "KV`2";
+            BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
