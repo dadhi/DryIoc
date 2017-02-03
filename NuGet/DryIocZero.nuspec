@@ -10,7 +10,11 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
-        <releaseNotes>
+        <releaseNotes>          
+          v2.7.0-preview-02
+          - Simplified and clean Registrations.tt
+          - fixed: package install.ps1 to set CustomTool to "" on Registrations.tt
+          - fixed: package install.ps1 to correctly remove DryIoc reference from project
           v2.7.0-preview-01
           - changed: Updated to use of DryIoc 2.10
           - renamed: YourServiceRegistrations.tt.include to Registrations.tt to enable intellisense and highlighting.

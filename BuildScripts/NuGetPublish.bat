@@ -14,7 +14,7 @@ rem DryIoc.Microsoft.DependencyInjection
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
-%NUGET% push "%PACKAGEDIR%\DryIocZero.2.7.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocZero.2.7.0-preview-02.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocAttributes
 rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.3.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
@@ -25,12 +25,12 @@ rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.3.0.0-preview-04.nupkg"
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.3.0.0-preview-04.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Web
-%NUGET% push "%PACKAGEDIR%\DryIoc.Web.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Web.dll.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.dll.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Mvc
-%NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%

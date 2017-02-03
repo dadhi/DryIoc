@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 using System.Threading;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using ImTools;
 using PerformanceTests;
 
 namespace Playground
@@ -15,8 +16,12 @@ namespace Playground
     {
         static void Main()
         {
+            var kv = KV.Of(1, "a");
+
+            var right = (kv.GetType().GetGenericTypeDefinition() ?? kv.GetType()).Name == "KV`2";
+
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
-            BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<BenchmarkResolution>();
             //BenchmarkRunner.Run<IfVsNullСoalesOperator>();
             //BenchmarkRunner.Run<IfVsTernaryOperator>();
