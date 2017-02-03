@@ -48,7 +48,7 @@ var objectToCode = ObjectStringify.WithFullTypeNames;
 Func<object, string> code = null;
     code = x => x == null ? "null"
         : x is DefaultKey ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")"
-        : x.GetType().GetGenericDefinitionOrNull() == typeof(KV<,>) 
+        : (x.GetType().GetGenericDefinitionOrNull() ?? x.GetType()).Name == "KV`2"
             ? "KV.Of(" + code(x.GetType().GetFieldOrNull("Key").GetValue(x)) 
             + ", " + code(x.GetType().GetFieldOrNull("Value").GetValue(x)) +")"
         : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
@@ -74,7 +74,7 @@ var deps = resolutionCallDependencies.Select((r, i) =>
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
 using System;
-using System.Linq; // for Enumerable.Cast method required for LazyEnumerable<T>
+using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
 using ImTools;
