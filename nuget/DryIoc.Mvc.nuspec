@@ -11,6 +11,8 @@
         <description>DryIoc extension for ASP.NET MVC</description>
         <tags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.2.1:
+          - More robust HttpContextScopeContext to prevent possible concurrency errors
           v2.2.0:
           - fixed: #398: How to enable clear error messages when DryIoc is not able to resolve a service?
           - added: WithMvc option to propagate DryIoc errors to the client
@@ -24,7 +26,7 @@
         <dependencies>
           <group>
               <dependency id="DryIoc" version="[2.8.3,3.0.0)" />
-              <dependency id="DryIoc.Web" version="[2.1.0,3.0.0)" />
+              <dependency id="DryIoc.Web" version="[2.1.1,3.0.0)" />
             
               <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />
           </group>
