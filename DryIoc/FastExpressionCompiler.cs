@@ -443,8 +443,11 @@ namespace DryIoc
                     break;
 
                 case ExpressionType.Call:
-                    return TryCollectBoundConstants(((MethodCallExpression)expr).Object, constants) 
-                        && TryCollectBoundConstants(((MethodCallExpression)expr).Arguments, constants);
+                    var methodCallExpr = (MethodCallExpression)expr;
+                    var methodOwnerExpr = methodCallExpr.Object;
+
+                    return (methodOwnerExpr == null || TryCollectBoundConstants(methodOwnerExpr, constants)) 
+                        && TryCollectBoundConstants(methodCallExpr.Arguments, constants);
 
                 case ExpressionType.MemberAccess:
                     return TryCollectBoundConstants(((MemberExpression)expr).Expression, constants);
