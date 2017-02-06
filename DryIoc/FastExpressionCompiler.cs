@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using ImTools;
+
 namespace DryIoc
 {
     using System;
@@ -42,7 +44,7 @@ namespace DryIoc
             Type[] paramTypes,
             Type returnType) where TDelegate : class
         {
-            compileDelegate = TryCompile<TDelegate>(bodyExpr, paramExprs, paramTypes, returnType);
+            compileDelegate = (TDelegate)TryCompile(typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
         }
 
         /// <summary>Compiles expression to delegate by emitting the IL. 
@@ -59,52 +61,36 @@ namespace DryIoc
             Type[] paramTypes,
             Type returnType) where TDelegate : class
         {
-            var constantExprs = new List<ConstantExpression>();
+            return (TDelegate)TryCompile(typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
+        }
 
-            if (!TryCollectBoundConstants(bodyExpr, constantExprs))
-                return null;
-
-            object closure = null;
-            ClosureInfo closureInfo = null;
-
-            DynamicMethod method;
-            if (constantExprs.Count == 0)
+        private static object TryCompile(
+            Type delegateType, Type[] paramTypes, Type returnType,
+            Expression bodyExpr, ParameterExpression[] paramExprs,
+            ClosureInfo closureInfo = null)
+        {
+            if (closureInfo == null)
             {
+                var constantExprs = new List<ConstantExpression>();
+
+                if (!TryCollectBoundConstants(bodyExpr, constantExprs))
+                    return null;
+
+                if (constantExprs.Count != 0)
+                    closureInfo = ConstructClosure(constantExprs);
+            }
+
+            object closure;
+            DynamicMethod method;
+            if (closureInfo == null)
+            {
+                closure = null;
                 method = new DynamicMethod(string.Empty, returnType, paramTypes,
                     typeof(FastExpressionCompiler).Module, skipVisibility: true);
             }
             else
             {
-                var constants = new object[constantExprs.Count];
-                var constantCount = constants.Length;
-
-                for (var i = constantCount - 1; i >= 0; i--)
-                    constants[i] = constantExprs[i].Value;
-
-                if (constantCount <= Closure.CreateMethods.Length)
-                {
-                    var createClosureMethod = Closure.CreateMethods[constantCount - 1];
-
-                    var constantTypes = new Type[constantCount];
-                    for (var i = 0; i < constantCount; i++)
-                        constantTypes[i] = constantExprs[i].Type;
-
-                    var createClosure = createClosureMethod.MakeGenericMethod(constantTypes);
-
-                    closure = createClosure.Invoke(null, constants);
-
-                    var fields = closure.GetType().GetTypeInfo().DeclaredFields;
-                    var fieldsArray = fields as FieldInfo[] ?? fields.ToArray();
-
-                    closureInfo = new ClosureInfo(constantExprs, fieldsArray);
-                }
-                else
-                {
-                    var arrayClosure = new ArrayClosure(constants);
-                    closure = arrayClosure;
-                    closureInfo = new ClosureInfo(constantExprs);
-                }
-
+                closure = closureInfo.Closure;
                 var closureType = closure.GetType();
                 var closureAndParamTypes = GetClosureAndParamTypes(paramTypes, closureType);
 
@@ -116,10 +102,45 @@ namespace DryIoc
             if (emitted)
             {
                 il.Emit(OpCodes.Ret);
-                return (TDelegate)(object)method.CreateDelegate(typeof(TDelegate), closure);
+                return method.CreateDelegate(delegateType, closure);
             }
 
             return null;
+        }
+
+        private static ClosureInfo ConstructClosure(List<ConstantExpression> constantExprs)
+        {
+            ClosureInfo closureInfo;
+            var constants = new object[constantExprs.Count];
+            var constantCount = constants.Length;
+
+            for (var i = constantCount - 1; i >= 0; i--)
+                constants[i] = constantExprs[i].Value;
+
+            if (constantCount <= Closure.CreateMethods.Length)
+            {
+                var createClosureMethod = Closure.CreateMethods[constantCount - 1];
+
+                var constantTypes = new Type[constantCount];
+                for (var i = 0; i < constantCount; i++)
+                    constantTypes[i] = constantExprs[i].Type;
+
+                var createClosure = createClosureMethod.MakeGenericMethod(constantTypes);
+
+                var closure = createClosure.Invoke(null, constants);
+
+                var fields = closure.GetType().GetTypeInfo().DeclaredFields;
+                var fieldsArray = fields as FieldInfo[] ?? fields.ToArray();
+
+                closureInfo = new ClosureInfo(closure, constantExprs, fieldsArray);
+            }
+            else
+            {
+                var arrayClosure = new ArrayClosure(constants);
+                closureInfo = new ClosureInfo(arrayClosure, constantExprs);
+            }
+
+            return closureInfo;
         }
 
         private static Type[] GetClosureAndParamTypes(Type[] paramTypes, Type closureType)
@@ -136,13 +157,14 @@ namespace DryIoc
 
         private sealed class ClosureInfo
         {
+            public readonly object Closure;
             public readonly IList<ConstantExpression> ConstantExpressions;
-
             public readonly FieldInfo[] ConstantClosureFields;
             public readonly bool IsClosureArray;
 
-            public ClosureInfo(IList<ConstantExpression> constantExpressions, FieldInfo[] constantClosureFields = null)
+            public ClosureInfo(object closure, IList<ConstantExpression> constantExpressions, FieldInfo[] constantClosureFields = null)
             {
+                Closure = closure;
                 ConstantExpressions = constantExpressions;
                 ConstantClosureFields = constantClosureFields;
                 IsClosureArray = constantClosureFields == null;
@@ -151,7 +173,6 @@ namespace DryIoc
 
         #region Closures
 
-        // todo: perf: test if Activator.CreateInstance is faster than method Invoke.
         internal static class Closure
         {
             public static readonly MethodInfo[] CreateMethods =
@@ -474,6 +495,10 @@ namespace DryIoc
                     }
                     break;
 
+                // nested lambda
+                case ExpressionType.Lambda:
+                    return TryCollectBoundConstants(((LambdaExpression)expr).Body, constants);
+
                 default:
                     var unaryExpr = expr as UnaryExpression;
                     if (unaryExpr != null)
@@ -483,6 +508,8 @@ namespace DryIoc
                     if (binaryExpr != null)
                         return TryCollectBoundConstants(binaryExpr.Left, constants)
                             && TryCollectBoundConstants(binaryExpr.Right, constants);
+
+
                     break;
             }
 
@@ -505,7 +532,7 @@ namespace DryIoc
         /// to normal and slow Expression.Compile.</summary>
         private static class EmittingVisitor 
         {
-            public static bool TryEmit(Expression expr, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
+            public static bool TryEmit(Expression expr, ParameterExpression[] paramExprs, ILGenerator il, ClosureInfo closure)
             {
                 switch (expr.NodeType)
                 {
@@ -527,6 +554,10 @@ namespace DryIoc
                         return EmitMethodCall((MethodCallExpression)expr, paramExprs, il, closure);
                     case ExpressionType.MemberAccess:
                         return EmitMemberAccess((MemberExpression)expr, paramExprs, il, closure);
+
+                    case ExpressionType.Lambda:
+                        return EmitNestedLambda((LambdaExpression)expr, paramExprs, il, closure);
+
                     case ExpressionType.GreaterThan:
                     case ExpressionType.GreaterThanOrEqual:
                     case ExpressionType.LessThan:
@@ -574,7 +605,7 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool EmitBinary(BinaryExpression b, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitBinary(BinaryExpression b, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = TryEmit(b.Left, ps, il, closure);
                 if (ok)
@@ -583,7 +614,7 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool EmitMany(IList<Expression> es, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitMany(IList<Expression> es, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 for (int i = 0, n = es.Count; i < n; i++)
                     if (!TryEmit(es[i], ps, il, closure))
@@ -591,7 +622,7 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool EmitConvert(UnaryExpression node, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitConvert(UnaryExpression node, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = TryEmit(node.Operand, ps, il, closure);
                 if (ok)
@@ -677,7 +708,7 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool EmitNew(NewExpression n, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitNew(NewExpression n, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = EmitMany(n.Arguments, ps, il, closure);
                 if (ok)
@@ -685,7 +716,7 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool EmitNewArray(NewArrayExpression na, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitNewArray(NewArrayExpression na, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var elems = na.Expressions;
                 var arrType = na.Type;
@@ -722,7 +753,7 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool EmitArrayIndex(BinaryExpression ai, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitArrayIndex(BinaryExpression ai, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = EmitBinary(ai, ps, il, closure);
                 if (ok)
@@ -730,7 +761,7 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool EmitMemberInit(MemberInitExpression mi, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitMemberInit(MemberInitExpression mi, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = EmitNew(mi.NewExpression, ps, il, closure);
                 if (!ok) return false;
@@ -770,7 +801,7 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool EmitMethodCall(MethodCallExpression m, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitMethodCall(MethodCallExpression m, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = true;
                 if (m.Object != null)
@@ -785,7 +816,7 @@ namespace DryIoc
                 return ok;
             }
 
-            private static bool EmitMemberAccess(MemberExpression m, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitMemberAccess(MemberExpression m, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 if (m.Expression != null)
                 {
@@ -812,7 +843,38 @@ namespace DryIoc
                 return true;
             }
 
-            private static bool EmitComparison(BinaryExpression c, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitNestedLambda(LambdaExpression lambdaExpr, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
+            {
+                //var lambda = TryCompile<Action>(lambdaExpr.Body, ps, ArrayTools.Empty<Type>(), 
+                //    lambdaExpr.Body.Type);
+
+                //if (m.Expression != null)
+                //{
+                //    var ok = TryEmit(m.Expression, ps, il, closure);
+                //    if (!ok) return false;
+                //}
+
+                //var field = m.Member as FieldInfo;
+                //if (field != null)
+                //{
+                //    il.Emit(field.IsStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, field);
+                //    return true;
+                //}
+
+                //var property = m.Member as PropertyInfo;
+                //if (property != null)
+                //{
+                //    var getMethod = property.GetGetMethod();
+                //    if (getMethod == null)
+                //        return false;
+                //    EmitMethodCall(getMethod, il);
+                //}
+
+                return false;
+            }
+
+
+            private static bool EmitComparison(BinaryExpression c, ParameterExpression[] ps, ILGenerator il, ClosureInfo closure)
             {
                 var ok = EmitBinary(c, ps, il, closure);
                 if (ok)
