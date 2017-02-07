@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Linq.Expressions;
+using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -6,10 +8,31 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class FastExpressionCompilerTests
     {
-        public static Func<X123> Examine_nested_lambda_il()
+        public static object CreateLambdaParamAndPassIt()
         {
             var y = new Y123();
-            return () => new X123(y);
+            return AcceptLambdaParam(() => new X123(y));
+        }
+
+        public static object AcceptLambdaParam(Func<object> lambda)
+        {
+            return lambda();
+        }
+
+        public static Func<X123> CompileDelegate()
+        {
+            var y = new Y123();
+            var expr = Expression.New(typeof(X123).GetConstructors()[0], new Expression[] { Expression.Constant(y) });
+            var delgate = FastExpressionCompiler.TryCompile<Func<X123>>(expr, ArrayTools.Empty<ParameterExpression>(),
+                ArrayTools.Empty<Type>(), typeof(X123));
+
+            return delgate;
+        }
+
+        public static Func<X123> Use_compiled_delegate()
+        {
+            var delgate = CompileDelegate();
+            return () => delgate();
         }
 
         [Test]
@@ -21,17 +44,20 @@ namespace DryIoc.UnitTests
             container.Register<Y123>();
 
             using (var scope = container.OpenScope())
-                scope.Resolve<X123>();
+            {
+                var x = scope.Resolve<X123>();
+                Assert.IsInstanceOf<Y123>(x.Y);
+            }
         }
     }
 
     public class X123
     {
-        private Y123 y;
+        public readonly Y123 Y;
 
         public X123(Y123 y)
         {
-            this.y = y;
+            Y = y;
         }
     }
 
