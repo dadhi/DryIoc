@@ -2656,7 +2656,7 @@ namespace DryIoc
             return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
         }
 
-        static partial void TryCompile<TDelegate>(ref TDelegate compileDelegate,
+        static partial void TryCompile<TDelegate>(ref TDelegate compiledDelegate,
             Expression bodyExpr,
             ParameterExpression[] paramExprs,
             Type[] paramTypes,
@@ -2693,6 +2693,17 @@ namespace DryIoc
             else if (expression.Type.IsValueType())
                 expression = Expression.Convert(expression, typeof(object));
             return expression;
+        }
+
+        static partial void TryCompile<TDelegate>(ref TDelegate compiledDelegate,
+            Expression bodyExpr,
+            ParameterExpression[] paramExprs,
+            Type[] paramTypes,
+            Type returnType) where TDelegate : class
+        {
+            ClosureInfo ignored = null;
+            compiledDelegate = (TDelegate)TryCompile(ref ignored, 
+                typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
         }
     }
 
@@ -5375,7 +5386,7 @@ namespace DryIoc
         /// <typeparam name="T">Type of <see cref="IServiceInfo"/>.</typeparam>
         /// <param name="serviceInfo">Source info.</param> <param name="details">Details to combine with info.</param>
         /// <param name="request">Owner request.</param> <returns>Original source or new combined info.</returns>
-        public static T WithDetails<T>(this T serviceInfo, ServiceDetails details, Request request)
+        public static T WithDetails<T>(this T serviceInfo, ServiceDetails details, Request request = null)
             where T : IServiceInfo
         {
             details = details ?? ServiceDetails.Default;
@@ -7246,6 +7257,7 @@ namespace DryIoc
             return source.Details((r, p) => p.Name.Equals(name) ? ServiceDetails.Of(getCustomValue(r)) : null);
         }
 
+        // todo: add oveload with input ParameterInfo so that doing convention as in #443 would be more easy.
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
         /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>

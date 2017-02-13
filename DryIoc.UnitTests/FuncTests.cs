@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             var first = container.Resolve<Func<IService>>();
             var second = container.Resolve<Func<IService>>();
 
-            Assert.That(first, Is.Not.SameAs(second));
+            Assert.AreNotSame(first, second);
         }
 
         [Test]
