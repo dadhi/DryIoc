@@ -46,8 +46,8 @@ namespace DryIoc
         /// <param name="returnType">The return type.</param>
         /// <returns>Result delegate or null, if unable to compile.</returns>
         public static TDelegate TryCompile<TDelegate>(
-            Expression bodyExpr, 
-            ParameterExpression[] paramExprs, 
+            Expression bodyExpr,
+            ParameterExpression[] paramExprs,
             Type[] paramTypes,
             Type returnType) where TDelegate : class
         {
@@ -122,6 +122,10 @@ namespace DryIoc
 
             public int ConstantCount { get { return ConstantExpressions == null ? 0 : ConstantExpressions.Count; } }
 
+            public int UsedParamCount { get { return UsedParamExpressions == null ? 0 : UsedParamExpressions.Count; } }
+
+            public int NestedLambdaCount { get { return NestedLambdas == null ? 0 : NestedLambdas.Count; } }
+
             public void Add(ConstantExpression expr)
             {
                 if (ConstantExpressions == null)
@@ -145,15 +149,13 @@ namespace DryIoc
 
             public void ConstructClosure()
             {
-                var constantCount = ConstantExpressions == null ? 0 : ConstantExpressions.Count;
-                var paramCount = UsedParamExpressions == null ? 0 : UsedParamExpressions.Count;
+                var constantCount = ConstantCount;
+                var constantPlusParamCount = constantCount + UsedParamCount;
+                var totalItemCount = constantPlusParamCount + NestedLambdaCount;
 
-                var itemCount = constantCount + paramCount +
-                    (NestedLambdas == null ? 0 : NestedLambdas.Count);
+                var items = new object[totalItemCount];
 
-                var items = new object[itemCount];
-
-                var constantTypes = itemCount <= Closure.CreateMethods.Length ? new Type[itemCount] : null;
+                var constantTypes = totalItemCount <= Closure.CreateMethods.Length ? new Type[totalItemCount] : null;
 
                 if (ConstantExpressions != null)
                     for (var i = 0; i < ConstantExpressions.Count; i++)
@@ -176,9 +178,9 @@ namespace DryIoc
                     for (var i = 0; i < NestedLambdas.Count; i++)
                     {
                         var lambda = NestedLambdas[i].Lambda;
-                        items[constantCount + paramCount + i] = lambda;
+                        items[constantPlusParamCount + i] = lambda;
                         if (constantTypes != null)
-                            constantTypes[constantCount + paramCount + i] = lambda.GetType();
+                            constantTypes[constantPlusParamCount + i] = lambda.GetType();
                     }
 
                 if (constantTypes == null)
@@ -188,7 +190,7 @@ namespace DryIoc
                 }
                 else
                 {
-                    var createClosureMethod = Closure.CreateMethods[itemCount - 1];
+                    var createClosureMethod = Closure.CreateMethods[totalItemCount - 1];
 
                     var createClosure = createClosureMethod.MakeGenericMethod(constantTypes);
 
@@ -488,8 +490,8 @@ namespace DryIoc
 
         private static bool IsBoundConstant(object value)
         {
-            return value != null && 
-                !(value is int || value is double || value is bool || 
+            return value != null &&
+                !(value is int || value is double || value is bool ||
                 value is string || value is Type || value.GetType().IsEnum);
         }
 
@@ -622,7 +624,7 @@ namespace DryIoc
         /// <summary>Supports emitting of selected expressions, e.g. lambdaExpr are not supported yet.
         /// When emitter find not supported expression it will return false from <see cref="TryEmit"/>, so I could fallback
         /// to normal and slow Expression.Compile.</summary>
-        private static class EmittingVisitor 
+        private static class EmittingVisitor
         {
             private static readonly MethodInfo _getDelegateTargetProperty = typeof(Delegate).GetProperty("Target").GetGetMethod();
 
@@ -671,7 +673,7 @@ namespace DryIoc
             private static bool EmitParameter(ParameterExpression p, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
                 var paramIndex = ps.IndexOf(p);
-                if (paramIndex == -1) 
+                if (paramIndex == -1)
                 {
                     // means that parameter isn't passed, and probably part of outer scope,
                     // so it should be loaded from closure
@@ -789,12 +791,9 @@ namespace DryIoc
                         return false;
 
                     LoadClosureFieldOrItem(il, closure, constantIndex, constantType);
-                    return true;
                 }
                 else
-                {
                     return false;
-                }
 
                 // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
                 if (constantType == typeof(object) &&
@@ -806,7 +805,7 @@ namespace DryIoc
 
             private static void LoadClosureFieldOrItem(ILGenerator il, ClosureInfo closure, int constantIndex, Type constantType)
             {
-                // load closure argument: Closure or Closure Array
+                // load closure argument: Closure object or Closure array
                 il.Emit(OpCodes.Ldarg_0);
 
                 if (!closure.IsArray)
@@ -980,8 +979,7 @@ namespace DryIoc
                 var lambda = lambdaInfo.Lambda;
                 var lambdaType = lambda.GetType();
 
-                var closureItemIndex = lambdaIndex + closure.ConstantCount +
-                    (closure.UsedParamExpressions == null ? 0 : closure.UsedParamExpressions.Count);
+                var closureItemIndex = lambdaIndex + closure.ConstantCount + closure.UsedParamCount;
 
                 LoadClosureFieldOrItem(il, closure, closureItemIndex, lambdaType);
 
@@ -1008,18 +1006,34 @@ namespace DryIoc
                         // load lambda.Target property
                         EmitMethodCall(_getDelegateTargetProperty, il);
 
-                        // load param value to set. +1 cause of added first closure argument
-                        LoadParamArg(il, paramIndex + 1);
+                        // params go after constants
+                        var closedParamIndex = i + lambdaClosure.ConstantCount;
 
-                        if (lambdaClosure.IsArray)
+                        if (!lambdaClosure.IsArray)
                         {
-                            ;// todo: set either field or array item
+                            // load param value to set. +1 cause of added first closure argument
+                            LoadParamArg(il, paramIndex + 1);
+
+                            var closedParamField = lambdaClosure.Fields[closedParamIndex];
+                            il.Emit(OpCodes.Stfld, closedParamField);
                         }
                         else
                         {
-                            var paramClosureItemIndex = i + lambdaClosure.ConstantCount;
-                            var closedParamField = lambdaClosure.Fields[paramClosureItemIndex];
-                            il.Emit(OpCodes.Stfld, closedParamField);
+                            // load array field
+                            il.Emit(OpCodes.Ldfld, ArrayClosure.ArrayField);
+
+                            // load array item index
+                            EmitLoadConstantInt(il, closedParamIndex);
+
+                            // load param value to set. +1 cause of added first closure argument
+                            LoadParamArg(il, paramIndex + 1);
+
+                            // box value types before setting the object array item
+                            if (closedParamExpr.Type.IsValueType())
+                                il.Emit(OpCodes.Box, closedParamExpr.Type);
+
+                            // load item from index
+                            il.Emit(OpCodes.Stelem_Ref);
                         }
                     }
                 }
