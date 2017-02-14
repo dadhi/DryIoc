@@ -8389,7 +8389,8 @@ namespace DryIoc
 
         private object TryGetOrAdd(int id, CreateScopedValue createValue)
         {
-            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed);
 
             if (id == -1) // disposable transient
             {
@@ -8411,6 +8412,7 @@ namespace DryIoc
 
             var items = _items;
             var newItems = items.AddOrUpdate(id, item);
+
             // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
             if (Interlocked.CompareExchange(ref _items, newItems, items) != items)
                 Ref.Swap(ref _items, _ => _.AddOrUpdate(id, item));
