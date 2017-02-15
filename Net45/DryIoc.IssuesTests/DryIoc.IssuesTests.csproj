@@ -172,7 +172,7 @@
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
-    <Compile Include="IssueSO_Open_Generics_Registration.cs" />
+    <Compile Include="SO_Open_Generics_Registration.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectingSerilogLogger.cs" />
     <Compile Include="Issue_InjectPrimitiveValueBasedOnRequest.cs" />
@@ -189,6 +189,7 @@
     <Compile Include="Samples\ResolveMocksForNonRegisteredServices.cs" />
     <Compile Include="Samples\SelectConstructorWithAllResolvableArguments.cs" />
     <Compile Include="Issue313_Support_non_public_constructors_with_ConstructorWithResolvableArguments.cs" />
+    <Compile Include="SO_MediatR_gets_multiple_handlers_instances_when_expected_single.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
