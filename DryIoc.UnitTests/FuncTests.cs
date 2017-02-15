@@ -28,7 +28,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Func_itself_is_transient()
+        public void Resolve_will_return_the_same_func_cause_the_compiled_delegate_stores_the_same_nested_lambda()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
             var first = container.Resolve<Func<IService>>();
             var second = container.Resolve<Func<IService>>();
 
-            Assert.AreNotSame(first, second);
+            Assert.AreSame(first, second);
         }
 
         [Test]

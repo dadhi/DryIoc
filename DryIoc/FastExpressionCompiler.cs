@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+// todo: change namespace to FastExpressionCompiler or similar, to separate from DryIoc explicitly
 namespace DryIoc
 {
     using System;
@@ -671,7 +672,7 @@ namespace DryIoc
                         return EmitNestedLambda((LambdaExpression)expr, paramExprs, il, closure);
 
                     case ExpressionType.Invoke:
-                        // Not supported yet: lambda invocation
+                        // todo: Not supported yet: lambda invocation
                         return false;
 
                     case ExpressionType.GreaterThan:
