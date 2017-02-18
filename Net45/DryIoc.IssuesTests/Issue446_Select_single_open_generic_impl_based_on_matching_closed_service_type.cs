@@ -6,25 +6,37 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class SO_MediatR_gets_multiple_handlers_instances_when_expected_single
+    public class Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type
     {
         [Test]
         public void Main_test()
         {
             var container = new Container();
 
-            container.RegisterDelegate<SingleInstanceFactory>(r => serviceType => r.Resolve(serviceType));
-            container.RegisterDelegate<MultiInstanceFactory>(r => serviceType => r.ResolveMany(serviceType));
-            container.Register<IMediator, Mediator>();
+            container.RegisterDelegate<SingleInstanceFactory>(r =>
+            {
+                return serviceType => r.Resolve(serviceType);
+            });
 
-            container.RegisterMany(new[] { typeof(Controller).GetAssembly() },
-                type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IAsyncRequestHandler<,>));
+            container.RegisterDelegate<MultiInstanceFactory>(r =>
+            {
+                return serviceType => r.ResolveMany(serviceType);
+            });
+
+            container.Register<IMediator, Mediator>();
+            container.RegisterMany(new[] { typeof(HelloRequestHandler<>), typeof(GoodMorningRequestHandler<>) });
+
+            //container.RegisterMany(new[] { typeof(Controller).GetAssembly() },
+            //    type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IAsyncRequestHandler<,>));
 
             container.Register<Controller>();
 
             var controller = container.Resolve<Controller>();
 
             Assert.IsNotNull(controller);
+
+            var hello = controller.Hello("World").Result;
+            var gm = controller.GoodMorning("World").Result;
         }
 
         public class HelloRequest<T> : IAsyncRequest<string> where T : class

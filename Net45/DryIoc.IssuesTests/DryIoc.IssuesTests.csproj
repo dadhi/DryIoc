@@ -51,8 +51,8 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="MediatR, Version=2.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\packages\MediatR.2.1.0\lib\net45\MediatR.dll</HintPath>
-      <Private>True</Private>
     </Reference>
     <Reference Include="NSubstitute">
       <HintPath>..\..\packages\NSubstitute.1.8.1.0\lib\net45\NSubstitute.dll</HintPath>
@@ -189,7 +189,7 @@
     <Compile Include="Samples\ResolveMocksForNonRegisteredServices.cs" />
     <Compile Include="Samples\SelectConstructorWithAllResolvableArguments.cs" />
     <Compile Include="Issue313_Support_non_public_constructors_with_ConstructorWithResolvableArguments.cs" />
-    <Compile Include="SO_MediatR_gets_multiple_handlers_instances_when_expected_single.cs" />
+    <Compile Include="Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
