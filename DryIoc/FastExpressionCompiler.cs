@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-// todo: change namespace to FastExpressionCompiler or similar, to separate from DryIoc explicitly
 namespace DryIoc
 {
     using System;
@@ -510,10 +509,8 @@ namespace DryIoc
                     var constantExpr = (ConstantExpression)expr;
                     var constantValue = constantExpr.Value;
 
-                    if (constantValue is Delegate) // todo: store in constants
-                        return false;
-
-                    if (IsBoundConstant(constantValue))
+                    if (constantValue is Delegate ||
+                        IsBoundConstant(constantValue))
                     {
                         closure = closure ?? new ClosureInfo();
                         closure.Add(constantExpr);
@@ -536,8 +533,8 @@ namespace DryIoc
                     var methodOwnerExpr = methodCallExpr.Object;
 
                     return (methodOwnerExpr == null
-                        || TryCollectBoundConstants(ref closure, methodOwnerExpr, paramExprs))
-                        && TryCollectBoundConstants(ref closure, methodCallExpr.Arguments, paramExprs);
+                            || TryCollectBoundConstants(ref closure, methodOwnerExpr, paramExprs))
+                           && TryCollectBoundConstants(ref closure, methodCallExpr.Arguments, paramExprs);
 
                 case ExpressionType.MemberAccess:
                     return TryCollectBoundConstants(ref closure, ((MemberExpression)expr).Expression, paramExprs);
@@ -608,8 +605,9 @@ namespace DryIoc
                     break;
 
                 case ExpressionType.Invoke:
-                    // todo: Add invoked lambda to closure, that's it
-                    return false;
+                    var invocationExpr = (InvocationExpression)expr;
+                    return TryCollectBoundConstants(ref closure, invocationExpr.Expression, paramExprs)
+                        && TryCollectBoundConstants(ref closure, invocationExpr.Arguments, paramExprs);
 
                 default:
                     var unaryExpr = expr as UnaryExpression;
@@ -672,8 +670,7 @@ namespace DryIoc
                         return EmitNestedLambda((LambdaExpression)expr, paramExprs, il, closure);
 
                     case ExpressionType.Invoke:
-                        // todo: Not supported yet: lambda invocation
-                        return false;
+                        return EmitInvokeLambda((InvocationExpression)expr, paramExprs, il, closure);
 
                     case ExpressionType.GreaterThan:
                     case ExpressionType.GreaterThanOrEqual:
@@ -1065,6 +1062,19 @@ namespace DryIoc
                 }
 
                 return true;
+            }
+
+            private static bool EmitInvokeLambda(InvocationExpression expr, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
+            {
+                if (TryEmit(expr.Expression, paramExprs, il, closure) && 
+                    EmitMany(expr.Arguments, paramExprs, il, closure))
+                {
+                    var invokeMethod = expr.Expression.Type.GetMethod("Invoke");
+                    EmitMethodCall(invokeMethod, il);
+                    return true;
+                }
+
+                return false;
             }
 
             private static bool EmitComparison(BinaryExpression c, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
