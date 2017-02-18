@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class IssueSO_Open_Generics_Registration
+    public class SO_Open_Generics_Registration
     {
         [Test]
         public void Main()
