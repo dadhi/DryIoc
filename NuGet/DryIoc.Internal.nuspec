@@ -12,6 +12,8 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+            v2.10.1:
+            - fixed: #446 Select single open generic impl based on matching closed service type
             v2.10:
             - fixed: #440: Singleton optimazation causes exception for internal type in some cases
             - fixed: #435: Reuse.Singleton prevents the correct container injection within explicit resolve
