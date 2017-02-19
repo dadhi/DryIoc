@@ -39,6 +39,26 @@ namespace DryIoc
 
         /// <summary>Compiles expression to delegate by emitting the IL. 
         /// If sub-expressions are not supported by emitter, then the method returns null.
+        /// The usage should be calling the method, if result is null then calling the Expression.Compile.
+        /// Making it partial makes possibly to coditionally rely FastExpressionCompiler availability on different platforms.</summary>
+        /// <param name="compiledDelegate">Result delegate or null,if unable to compile.</param>
+        /// <param name="bodyExpr">Lambda body.</param>
+        /// <param name="paramExprs">Lambda parameter expressions.</param>
+        /// <param name="paramTypes">The types of parameters.</param>
+        /// <param name="returnType">The return type.</param>
+        static partial void TryCompile<TDelegate>(ref TDelegate compiledDelegate,
+            Expression bodyExpr,
+            ParameterExpression[] paramExprs,
+            Type[] paramTypes,
+            Type returnType) where TDelegate : class
+        {
+            ClosureInfo ignored = null;
+            compiledDelegate = (TDelegate)TryCompile(ref ignored,
+                typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
+        }
+
+        /// <summary>Compiles expression to delegate by emitting the IL. 
+        /// If sub-expressions are not supported by emitter, then the method returns null.
         /// The usage should be calling the method, if result is null then calling the Expression.Compile.</summary>
         /// <param name="bodyExpr">Lambda body.</param>
         /// <param name="paramExprs">Lambda parameter expressions.</param>

@@ -2702,17 +2702,6 @@ namespace DryIoc
                 expression = Expression.Convert(expression, typeof(object));
             return expression;
         }
-
-        static partial void TryCompile<TDelegate>(ref TDelegate compiledDelegate,
-            Expression bodyExpr,
-            ParameterExpression[] paramExprs,
-            Type[] paramTypes,
-            Type returnType) where TDelegate : class
-        {
-            ClosureInfo ignored = null;
-            compiledDelegate = (TDelegate)TryCompile(ref ignored, 
-                typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
-        }
     }
 
     /// <summary>Adds to Container support for:
