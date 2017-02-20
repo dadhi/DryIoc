@@ -967,6 +967,7 @@ namespace DryIoc
                 {
                     var provider = dynamicRegistrationProviders[i];
                     var dynamicFactories = provider(serviceType, null, FactoryType.Service);
+
                     // todo: Do I need to filter for FactoryType.Service?
                     if (dynamicFactories != null)
                         factories = factories.Concat(dynamicFactories);
@@ -1407,40 +1408,9 @@ namespace DryIoc
 
         private object GetServiceFactoryOrFactoriesOrNull(Request request)
         {
-            var serviceKey = request.ServiceKey;
+            var actualServiceType = GetActualServiceTypeForFactoryLookup(request);
+
             var serviceFactories = _registry.Value.Services;
-
-            var requiredServiceType = request.RequiredServiceType;
-            Type actualServiceType;
-            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
-            {
-                actualServiceType = requiredServiceType;
-            }
-            else
-            {
-                actualServiceType = request.GetActualServiceType();
-                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServType, ServKey }
-                // presumes that required service type is closed generic
-                if (actualServiceType.IsClosedGeneric())
-                {
-                    var serviceKeyWithOpenGenericRequiredType = serviceKey as object[];
-                    if (serviceKeyWithOpenGenericRequiredType != null &&
-                        serviceKeyWithOpenGenericRequiredType.Length == 2)
-                    {
-                        var openGenericType = serviceKeyWithOpenGenericRequiredType[0] as Type;
-                        if (openGenericType != null &&
-                            openGenericType == actualServiceType.GetGenericDefinitionOrNull())
-                        {
-                            actualServiceType = openGenericType;
-                            serviceKey = serviceKeyWithOpenGenericRequiredType[1];
-
-                            // Later on proceed with an actual key.
-                            request.ChangeServiceKey(serviceKey);
-                        }
-                    }
-                }
-            }
-
             var entry = serviceFactories.GetValueOrDefault(actualServiceType);
 
             // For closed-generic lookup type:
@@ -1449,6 +1419,7 @@ namespace DryIoc
             // Then go to the open-generic services
             if (actualServiceType.IsClosedGeneric())
             {
+                var serviceKey = request.ServiceKey;
                 if (entry == null ||
                     serviceKey != null && (
                         entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
@@ -1467,6 +1438,38 @@ namespace DryIoc
                 return null;
 
             return (object)(entry as Factory) ?? ((FactoriesEntry)entry).Factories.Enumerate();
+        }
+
+        private static Type GetActualServiceTypeForFactoryLookup(Request request)
+        {
+            var requiredServiceType = request.RequiredServiceType;
+            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
+                return requiredServiceType;
+
+            // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServType, ServKey }
+            // presumes that required service type is closed generic
+            var actualServiceType = request.GetActualServiceType();
+            if (actualServiceType.IsClosedGeneric())
+            {
+                var serviceKey = request.ServiceKey;
+                var serviceKeyWithOpenGenericRequiredType = serviceKey as object[];
+                if (serviceKeyWithOpenGenericRequiredType != null &&
+                    serviceKeyWithOpenGenericRequiredType.Length == 2)
+                {
+                    var openGenericType = serviceKeyWithOpenGenericRequiredType[0] as Type;
+                    if (openGenericType != null &&
+                        openGenericType == actualServiceType.GetGenericDefinitionOrNull())
+                    {
+                        actualServiceType = openGenericType;
+                        serviceKey = serviceKeyWithOpenGenericRequiredType[1];
+
+                        // note: Mutates the request
+                        request.ChangeServiceKey(serviceKey);
+                    }
+                }
+            }
+
+            return actualServiceType;
         }
 
         #endregion

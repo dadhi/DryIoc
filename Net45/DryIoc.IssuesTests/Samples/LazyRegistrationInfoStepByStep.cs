@@ -340,7 +340,7 @@ namespace DryIoc.IssuesTests.Samples
             public IEnumerable<Lazy<ICommand, ICommandMetadata>> Commands { get; set; }
         }
 
-        [Test, Ignore("fails to distinguish between imported Actions")]
+        [Test]//, Ignore("fails to distinguish between imported Actions")]
         public void Lazy_import_of_Actions()
         {
             // the same registration code as in the lazy sample
@@ -456,7 +456,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.IsNotNull(importer.Actions);
             Assert.AreEqual(2, importer.Actions.Length);
 
-            // fails here: "One, One" instead of "One, Two"
+            // todo: fails here with "One, One" instead of "One, Two"
             Assert.AreEqual("One, Two", string.Join(", ", importer.Actions.Select(a => a.Metadata["Name"].ToString()).OrderBy(n => n)));
             Assert.IsFalse(assemblyLoaded);
 
