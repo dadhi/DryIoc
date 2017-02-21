@@ -509,7 +509,7 @@ namespace DryIoc
                 ? factoryDelegate(null, _thisContainerWeakRef, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, false, null);
         }
-            
+
         #endregion
 
         #region IResolver
@@ -1326,83 +1326,112 @@ namespace DryIoc
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
         {
             var factoryOrFactories = GetServiceFactoryOrFactoriesOrNull(request);
-            if (factoryOrFactories == null)
+
+            // In case of single default factory:
+            var defaultFactory = factoryOrFactories as Factory;
+            if (defaultFactory != null)
+            {
+                if (factorySelector != null)
+                {
+                    if (defaultFactory.CheckCondition(request))
+                        return factorySelector(request, new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, defaultFactory) });
+
+                    return null;
+                }
+
+                var serviceKey = request.ServiceKey;
+                if (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
+                {
+                    if (defaultFactory.CheckCondition(request))
+                        return defaultFactory;
+
+                    return null;
+                }
+
                 return null;
-
-            var factory = factoryOrFactories as Factory;
-            if (factorySelector != null)
-            {
-                if (factory != null)
-                    return !factory.CheckCondition(request) ? null
-                        : factorySelector(request, new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, factory) });
-
-                var selectedFactories = ((IEnumerable<KV<object, Factory>>)factoryOrFactories)
-                    .Where(f => f.Value.CheckCondition(request))
-                    .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
-                    .ToArray();
-                return factorySelector(request, selectedFactories);
             }
 
-            var serviceKey = request.ServiceKey;
-            if (factory != null)
+            // In case of multiple keyed, or default, or both factories:
+            var factories = factoryOrFactories as IEnumerable<KV<object, Factory>>;
+            if (factories != null)
             {
-                return (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                    && factory.CheckCondition(request)
-                    ? factory : null;
-            }
-
-            var factories = (IEnumerable<KV<object, Factory>>)factoryOrFactories;
-            if (serviceKey != null)
-            {
-                var keyFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
-                return keyFactory != null
-                    && keyFactory.Value.CheckCondition(request) ? keyFactory.Value : null;
-            }
-
-            var metadataKey = request.MetadataKey;
-            var metadata = request.Metadata;
-            if (metadataKey != null || metadata != null)
-                factories = factories.Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
-
-            var defaultFactories = factories
-                .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
-                .ToArrayOrSelf();
-
-            // Select single scoped factory if any
-            if (defaultFactories.Length > 1)
-            {
-                if (Rules.ImplicitCheckForReuseMatchingScope && this.GetCurrentScope() != null)
+                if (factorySelector != null)
                 {
-                    var scopedFactories = defaultFactories.Where(f => f.Value.Reuse is CurrentScopeReuse).ToArray();
-                    if (scopedFactories.Length == 1)
-                        defaultFactories = scopedFactories;
+                    var validFactories = factories
+                        .Where(f => f.Value.CheckCondition(request))
+                        .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
+                        .ToArray();
+                    return factorySelector(request, validFactories);
                 }
 
-                // check that impl generic definition is matched to service type, and selected matched only factories.
-                // the generated factories are cached - so there should not be repeating of the check, and not match of perf decrease.
-                if (defaultFactories.Length != 0)
+                var serviceKey = request.ServiceKey;
+                if (serviceKey != null)
                 {
-                    defaultFactories = defaultFactories.Where(f => 
-                        f.Value.FactoryGenerator == null ||
-                        f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null)
+                    var keyedFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
+                    if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
+                        return keyedFactory.Value;
+
+                    return null;
+                }
+
+                // In case of single default factory is requested
+                // 1. Filter out non default factories based matching the condition:
+                var defaultFactories = factories
+                    .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
+                    .ToArrayOrSelf();
+
+                // 2. Filter out non matched by metadata
+                var metadataKey = request.MetadataKey;
+                var metadata = request.Metadata;
+                if (metadataKey != null || metadata != null)
+                    defaultFactories = defaultFactories
+                        .Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata))
                         .ToArrayOrSelf();
+
+                if (defaultFactories.Length > 1)
+                {
+                    // 3. Match further by reuse
+                    if (Rules.ImplicitCheckForReuseMatchingScope && this.GetCurrentScope() != null)
+                    {
+                        var scopedFactories = defaultFactories
+                            .Where(f => f.Value.Reuse is CurrentScopeReuse)
+                            .ToArrayOrSelf();
+
+                        // keep all the factories to provide more information at the end if whole match have failed
+                        if (scopedFactories.Length == 1)
+                            defaultFactories = scopedFactories;
+                    }
+
+                    // 4. Check that impl generic definition is matched to service type, and selected matched only factories.
+                    // the generated factories are cached - so there should not be repeating of the check, and not match of perf decrease.
+                    if (defaultFactories.Length != 0)
+                    {
+                        defaultFactories = defaultFactories
+                            .Where(f =>
+                                f.Value.FactoryGenerator == null ||
+                                f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null)
+                            .ToArrayOrSelf();
+                    }
                 }
+
+                // Huraah! Single default factory was matched.
+                if (defaultFactories.Length == 1)
+                {
+                    var singleDefaultFactory = defaultFactories[0];
+
+                    // NOTE: For resolution root sets correct default key to be used in delegate cache.
+                    if (request.IsResolutionCall)
+                        request.ChangeServiceKey(singleDefaultFactory.Key);
+
+                    return singleDefaultFactory.Value;
+                }
+
+
+                if (defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
+                    Throw.It(Error.ExpectedSingleDefaultFactory, defaultFactories, request);
             }
 
-            if (defaultFactories.Length == 1)
-            {
-                var defaultFactory = defaultFactories[0];
-
-                // NOTE: For resolution root sets correct default key to be used in delegate cache.
-                if (request.IsResolutionCall)
-                    request.ChangeServiceKey(defaultFactory.Key);
-
-                return defaultFactory.Value;
-            }
-
-            if (defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
-                Throw.It(Error.ExpectedSingleDefaultFactory, defaultFactories, request);
-
+            // Return null to allow fallback strategies
             return null;
         }
 
@@ -1428,9 +1457,7 @@ namespace DryIoc
                     var lookupOpenGenericType = actualServiceType.GetGenericTypeDefinition();
                     var openGenericEntry = serviceFactories.GetValueOrDefault(lookupOpenGenericType);
                     if (openGenericEntry != null)
-                    {
                         entry = openGenericEntry;
-                    }
                 }
             }
 
@@ -2600,7 +2627,7 @@ namespace DryIoc
         private static Container RootContainer(this IResolverContext ctx)
         {
             var containerRef = ((ContainerWeakRef)ctx);
-            return containerRef.GetTarget(maybeDisposed: true).RootContainer 
+            return containerRef.GetTarget(maybeDisposed: true).RootContainer
                 ?? containerRef.GetTarget();
         }
     }
@@ -2654,7 +2681,7 @@ namespace DryIoc
     /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
     public static partial class FastExpressionCompiler
     {
-        private static readonly Type[] _factoryDelegateParamTypes = 
+        private static readonly Type[] _factoryDelegateParamTypes =
             { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
 
         private static readonly ParameterExpression[] _factoryDelegateParamExprs =
@@ -3185,7 +3212,10 @@ namespace DryIoc
 
             var serviceRequest = request.Push(serviceType, serviceKey);
             var serviceFactory = container.ResolveFactory(serviceRequest);
-            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
+            if (serviceFactory == null)
+                return null;
+
+            var serviceExpr = serviceFactory.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
@@ -5823,7 +5853,7 @@ namespace DryIoc
     /// <summary>Memoized checks and conditions of two kinds: inherited down dependency chain and not.</summary>
     [Flags]
     public enum RequestFlags
-    {   
+    {
         /// <summary>Not inherited</summary>
         TracksTransientDisposable = 1 << 1,
         /// <summary>Not inherited</summary>
@@ -5885,7 +5915,7 @@ namespace DryIoc
             var flags = default(RequestFlags);
             if (!preResolveParent.IsEmpty)
             {
-                serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(preResolveParent.ServiceInfo, 
+                serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(preResolveParent.ServiceInfo,
                     ownerType: preResolveParent.FactoryType, container: container);
 
                 // filter out not propagated flags
@@ -6086,7 +6116,7 @@ namespace DryIoc
                     p = p.ParentOrWrapper;
 
                 if (!p.IsEmpty && p.IfUnresolved == IfUnresolved.Throw)
-                    return ServiceInfo.Of(ServiceType, RequiredServiceType, IfUnresolved.Throw, ServiceKey, 
+                    return ServiceInfo.Of(ServiceType, RequiredServiceType, IfUnresolved.Throw, ServiceKey,
                         MetadataKey, Metadata);
             }
 
@@ -6184,8 +6214,8 @@ namespace DryIoc
         /// Use with caution. Make sense for Resolution expression.</param>
         /// <param name="skipCaptiveDependencyCheck">(optional) allows to skip captive dependency check.</param>
         /// <returns>New request with set factory.</returns>
-        public Request WithResolvedFactory(Factory factory, 
-            bool skipRecursiveDependencyCheck = false, 
+        public Request WithResolvedFactory(Factory factory,
+            bool skipRecursiveDependencyCheck = false,
             bool skipCaptiveDependencyCheck = false)
         {
             if (IsEmpty || _factory != null && _factory.FactoryID == factory.FactoryID)
@@ -6202,7 +6232,7 @@ namespace DryIoc
 
             var flags = _flags;
 
-            if (!skipCaptiveDependencyCheck && reuse.Lifespan != 0 && 
+            if (!skipCaptiveDependencyCheck && reuse.Lifespan != 0 &&
                 Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
@@ -6331,7 +6361,7 @@ namespace DryIoc
                     return parentRequestInfo.Push(_serviceInfo);
 
                 var f = _factory;
-                return parentRequestInfo.Push(_serviceInfo, 
+                return parentRequestInfo.Push(_serviceInfo,
                     f.FactoryID, f.FactoryType, f.ImplementationType, _reuse);
             }
         }
@@ -6458,7 +6488,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo, 
+        private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo,
             Factory factory, IReuse reuse,
             KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags)
         {
@@ -6945,7 +6975,7 @@ namespace DryIoc
                 && request.FuncArgs == null
                 && !Setup.AsResolutionCall
                 && !request.IsResolutionRoot
-                && Setup.Condition == null && 
+                && Setup.Condition == null &&
                 !IsScopeDependent(request);
         }
 
@@ -6959,11 +6989,11 @@ namespace DryIoc
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
             return !request.IsResolutionCall && // prevents recursion on already split graph
-                // explicit aka user requested split
+                                                // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
-                (request.ShouldSplitObjectGraph() || IsScopeDependent(request)) && 
-                !request.IsWrappedInFuncWithArgs()) && 
+                (request.ShouldSplitObjectGraph() || IsScopeDependent(request)) &&
+                !request.IsWrappedInFuncWithArgs()) &&
                 request.GetActualServiceType() != typeof(void);
         }
 
@@ -7078,7 +7108,7 @@ namespace DryIoc
                 if (Setup.PreventDisposal)
                 {
                     var factory = factoryDelegate;
-                    factoryDelegate = (_, cs, rs) => new[] {factory(null, cs, rs)};
+                    factoryDelegate = (_, cs, rs) => new[] { factory(null, cs, rs) };
                 }
 
                 if (Setup.WeaklyReferenced)
@@ -7665,7 +7695,7 @@ namespace DryIoc
                 }
 
                 var openFactory = _openGenericFactory;
-                request = request.WithResolvedFactory(openFactory, 
+                request = request.WithResolvedFactory(openFactory,
                     skipRecursiveDependencyCheck: ifErrorReturnDefault, skipCaptiveDependencyCheck: ifErrorReturnDefault);
 
                 var implType = openFactory._implementationType;
@@ -7683,7 +7713,7 @@ namespace DryIoc
                 {
                     var factoryMethod = made.FactoryMethod(request);
                     if (factoryMethod == null)
-                        return ifErrorReturnDefault ? null 
+                        return ifErrorReturnDefault ? null
                             : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
 
                     var checkMatchingType = implType != null && implType.IsGenericParameter;
@@ -9522,7 +9552,7 @@ namespace DryIoc
                 && other.ImplementationType == ImplementationType
                 && other.ReuseLifespan == ReuseLifespan;
         }
-        
+
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(Request other)
