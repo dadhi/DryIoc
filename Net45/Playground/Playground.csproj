@@ -37,15 +37,15 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="BenchmarkDotNet, Version=0.10.1.0, Culture=neutral, PublicKeyToken=aa0ca2f9092cefc4, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\BenchmarkDotNet.0.10.1\lib\net45\BenchmarkDotNet.dll</HintPath>
+      <HintPath>..\..\packages\BenchmarkDotNet.0.10.2\lib\net45\BenchmarkDotNet.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="BenchmarkDotNet.Core, Version=0.10.1.0, Culture=neutral, PublicKeyToken=aa0ca2f9092cefc4, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\BenchmarkDotNet.Core.0.10.1\lib\net45\BenchmarkDotNet.Core.dll</HintPath>
+      <HintPath>..\..\packages\BenchmarkDotNet.Core.0.10.2\lib\net45\BenchmarkDotNet.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="BenchmarkDotNet.Toolchains.Roslyn, Version=0.10.1.0, Culture=neutral, PublicKeyToken=aa0ca2f9092cefc4, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\BenchmarkDotNet.Toolchains.Roslyn.0.10.1\lib\net45\BenchmarkDotNet.Toolchains.Roslyn.dll</HintPath>
+      <HintPath>..\..\packages\BenchmarkDotNet.Toolchains.Roslyn.0.10.2\lib\net45\BenchmarkDotNet.Toolchains.Roslyn.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis, Version=1.3.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">

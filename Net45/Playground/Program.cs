@@ -5,11 +5,11 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.Serialization;
 using System.Threading;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using ImTools;
-using PerformanceTests;
 
 namespace Playground
 {
@@ -17,7 +17,10 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
+            BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
+
+            //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
+            //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_all_matches>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
@@ -34,6 +37,31 @@ namespace Playground
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
+        }
+
+        public class M { }
+
+        public class K
+        {
+            public K(M m) { }
+        }
+
+        public class ActivatorCreateInstance_vs_CtorInvoke
+        {
+            private readonly M _m = new M();
+
+            [Benchmark]
+            public K ActivatorCreateInstance()
+            {
+                return (K)Activator.CreateInstance(typeof(K), _m);
+            }
+
+            [Benchmark]
+            public K CtorInvoke()
+            {
+                var uninitializedX = FormatterServices.GetUninitializedObject(typeof(K));
+                return (K)typeof(K).GetConstructors()[0].Invoke(uninitializedX, new object[]{ _m });
+            }
         }
 
         public class EnumerableWhere_vs_ArrayMatch_Have_some_matches
