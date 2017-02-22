@@ -411,20 +411,6 @@ namespace DryIoc.IssuesTests.Samples
                 return factories;
             };
 
-            // Step 2 - Add resolution rule for creating factory on resolve.
-            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!registrationByServiceTypeName.TryGetValue(request.ServiceType.FullName, out regs))
-                    return null;
-
-                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
-                if (regIndex == -1)
-                    return null;
-
-                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
-            };
-
             // Test that resolve works fine with the non-lazy scenario
             //========================
             var cnt = new Container().WithMef();
@@ -444,7 +430,6 @@ namespace DryIoc.IssuesTests.Samples
             // Test that resolve works with the lazy scenario
             //========================
             var container = new Container().WithMef()
-              .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
               .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
 
             // make sure that ActionImporter itself is available without loading the lazy assembly

@@ -1348,11 +1348,40 @@ namespace DryIoc
                     return null;
                 }
 
+                // todo: Potential bug: what about metadata check and matched scope check??
+
                 return null;
             }
 
             // In case of multiple keyed, or default, or both factories:
             var factories = factoryOrFactories as IEnumerable<KV<object, Factory>>;
+            if (factories != null)
+            {
+                var fs = factories.ToArray();
+            }
+
+            // todo: naive approach - if nothing is found get the dynamic registrations
+            if (factories == null)
+            {
+                var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
+                if (!dynamicRegistrationProviders.IsNullOrEmpty())
+                {
+                    var serviceType = GetActualServiceTypeForFactoryLookup(request);
+                    for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
+                    {
+                        var provider = dynamicRegistrationProviders[i];
+                        var dynamicFactories = provider(serviceType, null, FactoryType.Service);
+                        if (dynamicFactories != null)
+                        {
+                            if (factories == null)
+                                factories = dynamicFactories;
+                            else
+                                factories = factories.Concat(dynamicFactories);
+                        }
+                    }
+                }
+            }
+
             if (factories != null)
             {
                 if (factorySelector != null)

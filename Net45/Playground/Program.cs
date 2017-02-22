@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -16,8 +17,10 @@ namespace Playground
     {
         static void Main()
         {
+            BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
+
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
@@ -31,6 +34,40 @@ namespace Playground
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
             Console.ReadKey();
+        }
+
+        public class EnumerableWhere_vs_ArrayMatch_Have_some_matches
+        {
+            private int[] _arr = { 1, 2, 3 };
+
+            [Benchmark]
+            public int[] EnumerableWhere()
+            {
+                return _arr.Where(it => it % 2 == 0).ToArray();
+            }
+
+            [Benchmark]
+            public int[] ArrayMatch()
+            {
+                return _arr.Match(it => it % 2 == 0);
+            }
+        }
+
+        public class EnumerableWhere_vs_ArrayMatch_Have_all_matches
+        {
+            private int[] _arr = { 1, 2, 3 };
+
+            [Benchmark]
+            public int[] EnumerableWhere()
+            {
+                return _arr.Where(it => it > 0).ToArray();
+            }
+
+            [Benchmark]
+            public int[] ArrayMatch()
+            {
+                return _arr.Match(it => it > 0);
+            }
         }
 
         public class IfVsNullСoalesOperator

@@ -138,6 +138,79 @@ namespace ImTools
             return -1;
         }
 
+        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
+        /// It returns source array and does Not create new one if all items match the condition.</summary>
+        /// <typeparam name="T">Type of array items.</typeparam>
+        /// <param name="source">Source array: If null the null will be returned.</param>
+        /// <param name="condition">Condition to filter.</param>
+        /// <returns>New array if some items are filter out. Empty array if all items are filtered out. Original array otherwise.</returns>
+        public static T[] Match<T>(this T[] source, Func<T, bool> condition)
+        {
+            if (source == null || source.Length == 0)
+                return source;
+
+            var matchStart = 0;
+            T[] matches = null;
+            var matchFound = false;
+
+            var i = 0;
+            while (i < source.Length)
+            {
+                matchFound = condition(source[i]);
+                if (!matchFound)
+                {
+                    // when we have some matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendMatches(matches, source, matchStart, i - matchStart);
+
+                    // guess the next match start will be after the non-matched item
+                    matchStart = i + 1;
+                }
+                ++i;
+            }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendMatches(matches, source, matchStart, i - matchStart);
+
+            if (matches != null)
+                return matches;
+
+            if (matchStart != 0)
+                return Empty<T>();
+
+            return source;
+        }
+
+        private static T[] AppendMatches<T>(T[] matches, T[] source, int sourcePos, int count)
+        {
+            if (matches == null)
+            {
+                var newMatches = new T[count];
+                if (count == 1)
+                    newMatches[0] = source[sourcePos];
+                else
+                    Array.Copy(source, sourcePos, newMatches, 0, count);
+                return newMatches;
+            }
+
+            var matchCount = matches.Length;
+            var appendedMatches = new T[matchCount + count];
+            if (matchCount == 1)
+                appendedMatches[0] = matches[0];
+            else
+                Array.Copy(matches, 0, appendedMatches, 0, matchCount);
+
+            if (count == 1)
+                appendedMatches[matchCount] = source[sourcePos];
+            else
+                Array.Copy(source, sourcePos, appendedMatches, matchCount, count);
+
+            return appendedMatches;
+        }
+
+        // todo: Add WhereNotNull with the same impl as replacement for Select(blah).Where(it => it != null)
+
         /// <summary>Produces new array without item at specified <paramref name="index"/>. 
         /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
         /// <typeparam name="T">Type of array item.</typeparam>
