@@ -140,13 +140,15 @@ namespace DryIoc.IssuesTests.Samples
                     // multiple services workaround: generate missing service keys
                     var serviceKey = export.ServiceKey;
                     if (serviceKey == null)
+                    {
                         serviceKey = Guid.NewGuid().ToString();
+                    }
 
                     regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
                 }
             }
 
-            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey, factoryType) =>
+            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey, _) =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
                 if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
@@ -189,8 +191,8 @@ namespace DryIoc.IssuesTests.Samples
             // Test that resolve works
             //========================
             var container = new Container().WithMef()
-                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations))
-                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
+                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
+                //.With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
 
             // the same resolution code as in previous test
             //========================
