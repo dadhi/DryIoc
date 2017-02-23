@@ -8,7 +8,7 @@ namespace DryIoc.UnitTests
     public class ArrayToolsTest
     {
         [Test]
-        public void Where_should_filter_some_items_with_first_non_matching_item()
+        public void For_first_not_matching_item_it_should_exclude_the_item_from_result_array()
         {
             var a = new[] { 1, 2, 3, 4, 5 };
 
@@ -20,7 +20,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Where_should_filter_some_items_with_last_matching_item()
+        public void For_last_matching_item_it_should_include_the_item_into_result_array()
         {
             var a = new[] { 1, 2, 3, 4, 5 };
 
@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Where_should_filter_all_items()
+        public void For_all_not_matched_items_it_should_return_empty_array()
         {
             var a = new[] { 1, 2, 3, 4, 5 };
 
@@ -40,7 +40,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Where_should_filter_none_items_and_return_original_array()
+        public void For_all_matched_items_it_should_return_original_array()
         {
             var a = new[] { 1, 2, 3, 4, 5 };
 
@@ -50,7 +50,27 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Where_should_return_the_original_empty_array()
+        public void Matched_iten_in_one_item_array_should_return_original_array()
+        {
+            var a = new[] { 1 };
+
+            var b = a.Match(n => n > 0);
+
+            Assert.AreSame(a, b);
+        }
+
+        [Test]
+        public void Not_matched_item_in_one_item_array_should_return_original_array()
+        {
+            var a = new[] { 1 };
+
+            var b = a.Match(n => n < 0);
+
+            Assert.IsEmpty(b);
+        }
+
+        [Test]
+        public void Match_of_empty_array_should_return_the_original_array()
         {
             var a = new int[0];
 
@@ -60,7 +80,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Where_should_return_the_original_null_array()
+        public void Match_of_null_array_should_return_null()
         {
             int[] a = null;
 

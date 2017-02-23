@@ -1325,146 +1325,104 @@ namespace DryIoc
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
         {
-            var factoryOrFactories = GetServiceFactoryOrFactoriesOrNull(request);
+            var factories = GetRegisteredServiceFactoriesOrNull(request);
 
-            // In case of single default factory:
-            var defaultFactory = factoryOrFactories as Factory;
-            if (defaultFactory != null)
+            //IEnumerable<KV<object, Factory>> dynamicFactories = null;
+            //var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
+            //if (!dynamicRegistrationProviders.IsNullOrEmpty())
+            //{
+            //    var serviceType = GetActualServiceTypeForFactoryLookup(request);
+            //    for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
+            //    {
+            //        var provider = dynamicRegistrationProviders[i];
+            //        var providedFactories = provider(serviceType, null, FactoryType.Service);
+            //        if (providedFactories != null)
+            //        {
+            //            if (dynamicFactories == null)
+            //                dynamicFactories = providedFactories;
+            //            else
+            //                dynamicFactories = dynamicFactories.Concat(providedFactories);
+            //        }
+            //    }
+            //}
+
+            if (factories == null)
+                return null;
+
+            if (factorySelector != null)
             {
-                if (factorySelector != null)
-                {
-                    if (defaultFactory.CheckCondition(request))
-                        return factorySelector(request, new[] { new KeyValuePair<object, Factory>(DefaultKey.Value, defaultFactory) });
+                var validFactories = factories
+                    .Where(f => f.Value.CheckCondition(request))
+                    .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
+                    .ToArray();
+                return factorySelector(request, validFactories);
+            }
 
-                    return null;
-                }
-
-                var serviceKey = request.ServiceKey;
-                if (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                {
-                    if (defaultFactory.CheckCondition(request))
-                        return defaultFactory;
-
-                    return null;
-                }
-
-                // todo: Potential bug: what about metadata check and matched scope check??
-
+            // For requested keyed service just lookup for key and return anyway
+            var serviceKey = request.ServiceKey;
+            if (serviceKey != null)
+            {
+                var keyedFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
+                if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
+                    return keyedFactory.Value;
                 return null;
             }
 
-            // In case of multiple keyed, or default, or both factories:
-            var factories = factoryOrFactories as IEnumerable<KV<object, Factory>>;
-            if (factories != null)
+            // Filter out non default factories
+            var defaultFactories = factories.Where(f => f.Key is DefaultKey).ToArray();
+            if (defaultFactories.Length == 0)
+                return null;
+
+            // Match default factories by condition and reuse
+            var matchedFactories = defaultFactories.Where(f => f.Value.CheckCondition(request)).ToArray();
+            if (matchedFactories.Length == 0)
+                return null;
+
+            // Match by metadata if requested
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+            if (metadataKey != null || metadata != null)
             {
-                var fs = factories.ToArray();
-            }
-
-            // todo: naive approach - if nothing is found get the dynamic registrations
-            if (factories == null)
-            {
-                var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
-                if (!dynamicRegistrationProviders.IsNullOrEmpty())
-                {
-                    var serviceType = GetActualServiceTypeForFactoryLookup(request);
-                    for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
-                    {
-                        var provider = dynamicRegistrationProviders[i];
-                        var dynamicFactories = provider(serviceType, null, FactoryType.Service);
-                        if (dynamicFactories != null)
-                        {
-                            if (factories == null)
-                                factories = dynamicFactories;
-                            else
-                                factories = factories.Concat(dynamicFactories);
-                        }
-                    }
-                }
-            }
-
-            if (factories != null)
-            {
-                if (factorySelector != null)
-                {
-                    var validFactories = factories
-                        .Where(f => f.Value.CheckCondition(request))
-                        .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
-                        .ToArray();
-                    return factorySelector(request, validFactories);
-                }
-
-                var serviceKey = request.ServiceKey;
-                if (serviceKey != null)
-                {
-                    var keyedFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
-                    if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
-                        return keyedFactory.Value;
-
+                matchedFactories = matchedFactories
+                    .Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata))
+                    .ToArray();
+                if (matchedFactories.Length == 0)
                     return null;
-                }
-
-                // In case of single default factory is requested
-                // 1. Filter out non default factories based matching the condition:
-                var defaultFactories = factories
-                    .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
-                    .ToArrayOrSelf();
-
-                // 2. Filter out non matched by metadata
-                var metadataKey = request.MetadataKey;
-                var metadata = request.Metadata;
-                if (metadataKey != null || metadata != null)
-                    defaultFactories = defaultFactories
-                        .Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata))
-                        .ToArrayOrSelf();
-
-                if (defaultFactories.Length > 1)
-                {
-                    // 3. Match further by reuse
-                    if (Rules.ImplicitCheckForReuseMatchingScope && this.GetCurrentScope() != null)
-                    {
-                        var scopedFactories = defaultFactories
-                            .Where(f => f.Value.Reuse is CurrentScopeReuse)
-                            .ToArrayOrSelf();
-
-                        // keep all the factories to provide more information at the end if whole match have failed
-                        if (scopedFactories.Length == 1)
-                            defaultFactories = scopedFactories;
-                    }
-
-                    // 4. Check that impl generic definition is matched to service type, and selected matched only factories.
-                    // the generated factories are cached - so there should not be repeating of the check, and not match of perf decrease.
-                    if (defaultFactories.Length != 0)
-                    {
-                        defaultFactories = defaultFactories
-                            .Where(f =>
-                                f.Value.FactoryGenerator == null ||
-                                f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null)
-                            .ToArrayOrSelf();
-                    }
-                }
-
-                // Huraah! Single default factory was matched.
-                if (defaultFactories.Length == 1)
-                {
-                    var singleDefaultFactory = defaultFactories[0];
-
-                    // NOTE: For resolution root sets correct default key to be used in delegate cache.
-                    if (request.IsResolutionCall)
-                        request.ChangeServiceKey(singleDefaultFactory.Key);
-
-                    return singleDefaultFactory.Value;
-                }
-
-
-                if (defaultFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
-                    Throw.It(Error.ExpectedSingleDefaultFactory, defaultFactories, request);
             }
+
+            // todo: May be a bug to match for more than 1 factory. Works with ResolveFactory, but may not work in other call sites.
+            // Match open-generic implementation with closed service type. Perf is OK because the generated factories are cached - 
+            // so there should not be repeating of the check, and not match of perf decrease.
+            if (matchedFactories.Length > 1)
+            {
+                matchedFactories = matchedFactories.Where(f =>
+                    f.Value.FactoryGenerator == null ||
+                    f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null)
+                    .ToArrayOrSelf();
+                if (matchedFactories.Length == 0)
+                    return null;
+            }
+
+            // Huraah! The result is single matched factory
+            if (matchedFactories.Length == 1)
+            {
+                var factory = matchedFactories[0];
+
+                // note: For resolution root sets correct default key to be used in delegate cache.
+                if (request.IsResolutionCall && defaultFactories.Length > 1)
+                    request.ChangeServiceKey(factory.Key);
+
+                return factory.Value;
+            }
+
+            if (matchedFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
+                Throw.It(Error.ExpectedSingleDefaultFactory, matchedFactories, request);
 
             // Return null to allow fallback strategies
             return null;
         }
 
-        private object GetServiceFactoryOrFactoriesOrNull(Request request)
+        private IEnumerable<KV<object, Factory>> GetRegisteredServiceFactoriesOrNull(Request request)
         {
             var actualServiceType = GetActualServiceTypeForFactoryLookup(request);
 
@@ -1493,7 +1451,11 @@ namespace DryIoc
             if (entry == null)
                 return null;
 
-            return (object)(entry as Factory) ?? ((FactoriesEntry)entry).Factories.Enumerate();
+            var factory = entry as Factory;
+            if (factory != null)
+                return new[] { new KV<object, Factory>(DefaultKey.Value, factory) };
+
+            return ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
         private static Type GetActualServiceTypeForFactoryLookup(Request request)
@@ -3341,6 +3303,7 @@ namespace DryIoc
             return newRules;
         }
 
+        // todo: Replace KeyValuePair with KV for consistency, or vice versa.
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="request">Provides service request leading to factory selection.</param>
         /// <param name="factories">Registered factories with corresponding key to select from.</param>

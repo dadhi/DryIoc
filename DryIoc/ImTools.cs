@@ -149,6 +149,9 @@ namespace ImTools
             if (source == null || source.Length == 0)
                 return source;
 
+            if (source.Length == 1)
+                return condition(source[0]) ? source : Empty<T>();
+
             var matchStart = 0;
             T[] matches = null;
             var matchFound = false;
@@ -159,12 +162,11 @@ namespace ImTools
                 matchFound = condition(source[i]);
                 if (!matchFound)
                 {
-                    // when we have some matched items
+                    // for accumulated matched items
                     if (i != 0 && i > matchStart)
                         matches = AppendMatches(matches, source, matchStart, i - matchStart);
 
-                    // guess the next match start will be after the non-matched item
-                    matchStart = i + 1;
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
                 ++i;
             }
@@ -176,7 +178,7 @@ namespace ImTools
             if (matches != null)
                 return matches;
 
-            if (matchStart != 0)
+            if (matchStart != 0) // no matches
                 return Empty<T>();
 
             return source;

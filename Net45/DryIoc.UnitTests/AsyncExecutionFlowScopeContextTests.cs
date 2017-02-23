@@ -103,7 +103,9 @@ namespace DryIoc.UnitTests
                     scope.Resolve<Blah>();
                     await Task.Delay(100).ConfigureAwait(false);
                     var ex = Assert.Throws<ContainerException>(() => scope.Resolve<Blah>());
-                    Assert.AreEqual(Error.NoCurrentScope, ex.Error);
+                    Assert.AreEqual(
+                        Error.NameOf(Error.NoCurrentScope), 
+                        Error.NameOf(ex.Error));
                 }
             }
         }

@@ -715,13 +715,14 @@ namespace DryIoc.MefAttributedModel
 
             IDictionary<string, object> setupMetadata = null;
 
-            // will be used for resolution and for resgitration setup, if service is not registered
-            var metadata = new KeyValuePair<string, object>(
-                import.MetadataKey ?? Constants.ExportMetadataDefaultKey,
-                import.Metadata);
+            // will be used for resolution and for registration setup, if service is not registered
+            var metadataValue = import.Metadata;
+            var metadataKey = import.MetadataKey;
+            if (metadataKey == null && metadataValue != null) // set default key if absent
+                metadataKey = Constants.ExportMetadataDefaultKey;
 
-            if (metadata.Value != null)
-                setupMetadata = new Dictionary<string, object> { { metadata.Key, metadata.Value } };
+            if (metadataKey != null || metadataValue != null)
+                setupMetadata = new Dictionary<string, object> { { metadataKey, metadataValue } };
 
             if (serviceKey != null)
             {
@@ -730,8 +731,11 @@ namespace DryIoc.MefAttributedModel
                 setupMetadata = setupMetadata ?? new Dictionary<string, object>();
                 setupMetadata.Add(serviceKeyMetadata.Key, serviceKeyMetadata.Value);
 
-                if (metadata.Value == null)
-                    metadata = serviceKeyMetadata;
+                if (metadataValue == null && metadataKey == null)
+                {
+                    metadataKey = serviceKeyMetadata.Key;
+                    metadataValue = serviceKeyMetadata.Value;
+                }
             }
 
             if (!container.IsRegistered(serviceType, serviceKey))
@@ -752,7 +756,7 @@ namespace DryIoc.MefAttributedModel
             // the default because we intentionally register the service and expect it to be avaliable
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
 
-            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
+            return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadataKey, metadataValue);
         }
 
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
