@@ -186,6 +186,7 @@
     </Compile>
     <Compile Include="ArrayToolsTest.cs" />
     <Compile Include="AsyncExecutionFlowScopeContextTests.cs" />
+    <Compile Include="DynamicRegistrationsTests.cs" />
     <Compile Include="FastExpressionCompilerTests.cs" />
   </ItemGroup>
   <ItemGroup>

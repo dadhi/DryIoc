@@ -962,7 +962,7 @@ namespace DryIoc
 
             var dynamicFactories = GetDynamicFactoriesOrNull(FactoryType.Service, serviceType, null);
             if (dynamicFactories != null)
-                factories.Concat(dynamicFactories);
+                factories = factories.Concat(dynamicFactories);
 
             return factories;
         }
@@ -1389,14 +1389,9 @@ namespace DryIoc
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
                 var provider = dynamicRegistrationProviders[i];
-                var factories = provider(serviceType, serviceKey, factoryType);
+                var factories = provider(factoryType, serviceType, serviceKey);
                 if (factories != null)
-                {
-                    if (dynamicFactories == null)
-                        dynamicFactories = factories;
-                    else
-                        dynamicFactories = dynamicFactories.Concat(factories);
-                }
+                    dynamicFactories = dynamicFactories == null ? factories : dynamicFactories.Concat(factories);
             }
 
             return dynamicFactories;
@@ -1412,15 +1407,7 @@ namespace DryIoc
             if (registeredFactories == null && dynamicFactories == null)
                 return null;
 
-            var factories = registeredFactories;
-            if (dynamicFactories != null)
-            {
-                if (factories == null)
-                    factories = dynamicFactories;
-                else
-                    factories = factories.Concat(dynamicFactories);
-            }
-
+            var factories = registeredFactories.ConcatToArray(dynamicFactories);
             if (factorySelector != null)
             {
                 var validFactories = factories
@@ -1440,12 +1427,12 @@ namespace DryIoc
             }
 
             // Filter out non default factories
-            var defaultFactories = factories.Where(f => f.Key is DefaultKey).ToArray();
+            var defaultFactories = factories.Match(f => f.Key == null || f.Key is DefaultKey);
             if (defaultFactories.Length == 0)
                 return null;
 
             // Match default factories by condition and reuse
-            var matchedFactories = defaultFactories.Where(f => f.Value.CheckCondition(request)).ToArray();
+            var matchedFactories = defaultFactories.Match(f => f.Value.CheckCondition(request));
             if (matchedFactories.Length == 0)
                 return null;
 
@@ -1454,9 +1441,7 @@ namespace DryIoc
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
             {
-                matchedFactories = matchedFactories
-                    .Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata))
-                    .ToArray();
+                matchedFactories = matchedFactories.Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
                 if (matchedFactories.Length == 0)
                     return null;
             }
@@ -1466,10 +1451,9 @@ namespace DryIoc
             // so there should not be repeating of the check, and not match of perf decrease.
             if (matchedFactories.Length > 1)
             {
-                matchedFactories = matchedFactories.Where(f =>
+                matchedFactories = matchedFactories.Match(f =>
                     f.Value.FactoryGenerator == null ||
-                    f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null)
-                    .ToArrayOrSelf();
+                    f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null);
                 if (matchedFactories.Length == 0)
                     return null;
             }
@@ -3350,14 +3334,14 @@ namespace DryIoc
         }
 
         /// <summary>Specify the method signature for returning mutiple keyed factories. This is dynamic analog to the normal Container Registry.</summary>
-        /// <param name="serviceType"></param> 
-        /// <param name="serviceKey">(optional) If <c>null</c> will request all factories of <paramref name="serviceType"/></param> 
         /// <param name="requiredFactoryType">Specifies what kind of service is requested.</param>
+        /// <param name="serviceType">Requested service type.</param>
+        /// <param name="serviceKey">(optional) If <c>null</c> will request all factories of <paramref name="serviceType"/></param> 
         /// <returns>Key-Factory pairs.</returns>
         public delegate IEnumerable<KV<object, Factory>> DynamicRegistrationProvider(
+            FactoryType requiredFactoryType,
             Type serviceType,
-            object serviceKey,
-            FactoryType requiredFactoryType
+            object serviceKey
             // todo: other options like IfAlreadyRegistered?
             );
 
@@ -5574,6 +5558,11 @@ namespace DryIoc
             string metadataKey = null, object metadata = null)
         {
             serviceType.ThrowIfNull();
+
+            // remove unnecessary details if service and required type are the same
+            if (serviceType == requiredServiceType)
+                requiredServiceType = null;
+
             return serviceKey == null && requiredServiceType == null
                 && metadataKey == null && metadata == null
                 ? (ifUnresolved == IfUnresolved.Throw

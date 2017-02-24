@@ -52,7 +52,7 @@ namespace ImTools
         /// <param name="source">Source array.</param> <returns>Empty array or source.</returns>
         public static T[] EmptyIfNull<T>(this T[] source)
         {
-            return source ?? Empty<T>();
+            return source != null ? source : Empty<T>();
         }
 
         /// <summary>Returns source enumerable if it is array, otherwise converts source to array.</summary>
@@ -61,7 +61,10 @@ namespace ImTools
         /// <returns>Source enumerable or its array copy.</returns>
         public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source)
         {
-            return source is T[] ? (T[])source : source.ToArray();
+            if (source == null)
+                return Empty<T>();
+            var self = source as T[];
+            return self == null ? source.ToArray() : self;
         }
 
         /// <summary>Returns new array consisting from all items from source array then all items from added array.
@@ -77,13 +80,31 @@ namespace ImTools
                 return source;
             if (source == null || source.Length == 0)
                 return added;
-            var result = new T[source.Length + added.Length];
-            Array.Copy(source, 0, result, 0, source.Length);
-            if (added.Length == 1)
-                result[source.Length] = added[0];
+
+            var sourceCount = source.Length;
+            var addedCount = added.Length;
+
+            var result = new T[sourceCount + addedCount];
+            Array.Copy(source, 0, result, 0, sourceCount);
+            if (addedCount == 1)
+                result[sourceCount] = added[0];
             else
-                Array.Copy(added, 0, result, source.Length, added.Length);
+                Array.Copy(added, 0, result, sourceCount, addedCount);
+
             return result;
+        }
+
+        /// <summary>Perfomant concat of enumerables in case they are arrays. 
+        /// But perf will degrade if you use Concat().Where().</summary>
+        /// <typeparam name="T">Type of item.</typeparam>
+        /// <param name="source">goes first.</param>
+        /// <param name="other">appended to source.</param>
+        /// <returns>empty array or concat of source and other.</returns>
+        public static T[] ConcatToArray<T>(this IEnumerable<T> source, IEnumerable<T> other)
+        {
+            var sourceArr = source.ToArrayOrSelf();
+            var otherArr = other.ToArrayOrSelf();
+            return sourceArr.Append(otherArr);
         }
 
         /// <summary>Returns new array with <paramref name="value"/> appended, 
@@ -98,10 +119,10 @@ namespace ImTools
         {
             if (source == null || source.Length == 0)
                 return new[] { value };
-            var sourceLength = source.Length;
-            index = index < 0 ? sourceLength : index;
-            var result = new T[index < sourceLength ? sourceLength : sourceLength + 1];
-            Array.Copy(source, result, sourceLength);
+            var sourceCount = source.Length;
+            index = index < 0 ? sourceCount : index;
+            var result = new T[index < sourceCount ? sourceCount : sourceCount + 1];
+            Array.Copy(source, result, sourceCount);
             result[index] = value;
             return result;
         }
@@ -138,50 +159,21 @@ namespace ImTools
             return -1;
         }
 
-        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
-        /// It returns source array and does Not create new one if all items match the condition.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array: If null the null will be returned.</param>
-        /// <param name="condition">Condition to filter.</param>
-        /// <returns>New array if some items are filter out. Empty array if all items are filtered out. Original array otherwise.</returns>
-        public static T[] Match<T>(this T[] source, Func<T, bool> condition)
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+        /// <typeparam name="T">item type</typeparam>
+        /// <param name="source">items collection to search</param>
+        /// <param name="predicate">condition to evaluate for each item.</param>
+        /// <returns>First item matching condition or default value.</returns>
+        public static T FirstOrDefault<T>(this T[] source, Func<T, bool> predicate)
         {
-            if (source == null || source.Length == 0)
-                return source;
-
-            if (source.Length == 1)
-                return condition(source[0]) ? source : Empty<T>();
-
-            var matchStart = 0;
-            T[] matches = null;
-            var matchFound = false;
-
-            var i = 0;
-            while (i < source.Length)
-            {
-                matchFound = condition(source[i]);
-                if (!matchFound)
+            if (source != null && source.Length != 0)
+                for (var i = 0; i < source.Length; ++i)
                 {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = AppendMatches(matches, source, matchStart, i - matchStart);
-
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                    var item = source[i];
+                    if (predicate(item))
+                        return item;
                 }
-                ++i;
-            }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return AppendMatches(matches, source, matchStart, i - matchStart);
-
-            if (matches != null)
-                return matches;
-
-            if (matchStart != 0) // no matches
-                return Empty<T>();
-
-            return source;
+            return default(T);
         }
 
         private static T[] AppendMatches<T>(T[] matches, T[] source, int sourcePos, int count)
@@ -209,6 +201,51 @@ namespace ImTools
                 Array.Copy(source, sourcePos, appendedMatches, matchCount, count);
 
             return appendedMatches;
+        }
+
+        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
+        /// It returns source array and does Not create new one if all items match the condition.</summary>
+        /// <typeparam name="T">Type of array items.</typeparam>
+        /// <param name="source">Source array: If null the null will be returned.</param>
+        /// <param name="condition">Condition to filter.</param>
+        /// <returns>New array if some items are filter out. Empty array if all items are filtered out. Original array otherwise.</returns>
+        public static T[] Match<T>(this T[] source, Func<T, bool> condition)
+        {
+            if (source == null || source.Length == 0)
+                return source;
+
+            if (source.Length == 1)
+                return condition(source[0]) ? source : Empty<T>();
+
+            var matchStart = 0;
+            T[] matches = null;
+            var matchFound = false;
+
+            var i = 0;
+            while (i < source.Length)
+            {
+                matchFound = condition(source[i]);
+                if (!matchFound)
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendMatches(matches, source, matchStart, i - matchStart);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+                ++i;
+            }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendMatches(matches, source, matchStart, i - matchStart);
+
+            if (matches != null)
+                return matches;
+
+            if (matchStart != 0) // no matches
+                return Empty<T>();
+
+            return source;
         }
 
         // todo: Add WhereNotNull with the same impl as replacement for Select(blah).Where(it => it != null)
