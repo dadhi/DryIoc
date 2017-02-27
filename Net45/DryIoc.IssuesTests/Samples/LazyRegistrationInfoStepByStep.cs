@@ -152,16 +152,6 @@ namespace DryIoc.IssuesTests.Samples
                 if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
                     return null;
 
-                if (serviceKey != null)
-                {
-                    var regIndex = serviceTypeRegistrations.FindIndex(pair => serviceKey.Equals(pair.Key));
-                    if (regIndex == -1)
-                        return null;
-
-                    Factory factory = serviceTypeRegistrations[regIndex].Value.CreateFactory(lazyLoadedAssembly);
-                    return new[] { KV.Of(serviceKey, factory) };
-                }
-
                 var factories = new List<KV<object, Factory>>();
                 foreach (var r in serviceTypeRegistrations)
                     factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
@@ -169,35 +159,14 @@ namespace DryIoc.IssuesTests.Samples
                 return factories;
             };
 
-            // Step 2 - Add resolution rule for creating factory on resolve.
-            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
-            {
-                var serviceType = request.ServiceType;
-                var serviceKey = request.ServiceKey;
-
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out regs))
-                    return null;
-
-                var regIndex = regs.FindIndex(pair => serviceKey == null || Equals(pair.Key, serviceKey));
-                if (regIndex == -1)
-                    return null;
-
-                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
-            };
-
             // Test that resolve works
             //========================
             var container = new Container().WithMef()
                 .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
-                //.With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
 
-            // the same resolution code as in previous test
-            //========================
             var cmds = container.Resolve<CommandImporter>();
-            Assert.IsNotNull(cmds.Commands);
 
-            var lazies = cmds.Commands.ToArray();
+            Assert.IsNotNull(cmds.Commands);
             Assert.AreEqual(2, cmds.Commands.Count());
             Assert.AreEqual("Sample command, Another command", 
                 string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));

@@ -1265,6 +1265,10 @@ namespace DryIoc
                 return elemExprs;
             }
 
+            var convertibleToExpression = item as IConvertibleToExpression;
+            if (convertibleToExpression != null)
+                return convertibleToExpression.ToExpression(it => GetOrAddStateItemExpression(it));
+
             if (Rules.ItemToExpressionConverter != null)
             {
                 var itemExpr = Rules.ItemToExpressionConverter(item, itemType);
@@ -1392,19 +1396,21 @@ namespace DryIoc
                 var provider = dynamicRegistrationProviders[i];
                 var factories = provider(factoryType, serviceType, serviceKey);
                 if (factories != null)
-                    dynamicFactories = dynamicFactories == null ? factories : dynamicFactories.Concat(factories);
+                {
+                    var key = DynamicKey.Empty;
+                    var validFactories = factories.Select(it =>
+                    {
+                        if (it.Key != null)
+                            return it;
+                        return new KV<object, Factory>(key = key.Next(), it.Value);
+                    })
+                    .ToArray();
+
+                    dynamicFactories = dynamicFactories == null ? validFactories : dynamicFactories.Concat(validFactories);
+                }
             }
 
-            if (dynamicFactories == null)
-                return null;
-
-            var dynamicKey = DynamicKey.Empty;
-            return dynamicFactories.Select(it =>
-            {
-                if (it.Key != null)
-                    return it;
-                return new KV<object, Factory>(dynamicKey.Next(), it.Value);
-            });
+            return dynamicFactories;
         }
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
@@ -2579,44 +2585,56 @@ namespace DryIoc
     }
 
     /// <summary>Represents default key for dymamic registations</summary>
-    public sealed class DynamicKey
+    public sealed class DynamicKey : IConvertibleToExpression
     {
-        /// <summary>Empty key, to get first valid key use <c>DynamicKey.Empty.Next()</c></summary>
+        /// <summary>Default value.</summary>
         public static readonly DynamicKey Empty = new DynamicKey(0);
 
-        /// <summary>Allows to determine service registration order.</summary>
-        public readonly int Index;
+        /// <summary>Associated ID.</summary>
+        public readonly int ID;
 
-        /// <summary>Returns the next dynamic key.</summary><returns>New key</returns>
-        public DynamicKey Next()
+        /// <summary>Returns dynamic key with specified ID. The key itself may be non unique, and requested from pool.</summary>
+        /// <param name="id"Associated ID.></param> <returns>The key.</returns>
+        public static DynamicKey Of(int id)
         {
-            return new DynamicKey(Index + 1);
+            return new DynamicKey(id);
         }
 
-        /// <summary>Compares keys based on registration order.</summary>
-        /// <param name="key">Key to compare with.</param>
-        /// <returns>True if keys have the same order.</returns>
+        /// <summary>Returns next dynamic key with increased <see cref="ID"/>.</summary> <returns>Next key.</returns>
+        public DynamicKey Next()
+        {
+            return Of(ID + 1);
+        }
+
+        /// <summary>Compares key's IDs.</summary> <param name="key">Key to compare with.</param>
+        /// <returns>True if keys have the same IDs.</returns>
         public override bool Equals(object key)
         {
             var other = key as DynamicKey;
-            return other != null && other.Index == Index;
+            return other != null && other.ID == ID;
         }
 
         /// <summary>Returns key index as hash.</summary> <returns>Hash code.</returns>
         public override int GetHashCode()
         {
-            return Index;
+            return ID;
         }
 
         /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return "DynamicKey(" + Index + ")";
+            return "DynamicKey(" + ID + ")";
         }
 
-        private DynamicKey(int index)
+        /// <inheritdoc />
+        public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
-            Index = index;
+            return Expression.Call(typeof(DynamicKey), "Of", ArrayTools.Empty<Type>(), Expression.Constant(ID));
+        }
+
+        private DynamicKey(int id)
+        {
+            ID = id;
         }
     }
 
@@ -3189,14 +3207,13 @@ namespace DryIoc
             return pairExpr;
         }
 
-        /// <summary> Universal expression factory to wrap service with metadata.
+        /// <summary> niversal expression factory to combine service with its setup metadata.
         /// Works with any generic type with first Type arg - Service type and second Type arg - Metadata type,
         /// and constructor with Service and Metadata arguments respectively.
         /// - if service key is not specified in request then method will search for all
         /// registered factories with the same metadata type ignoring keys.
         /// - if metadata is IDictionary{string, object},
-        ///  then the First value matching the TMetadata type will be returned
-        /// </summary>
+        ///  then the First value matching the TMetadata type will be returned.</summary>
         /// <param name="request">Requested service.</param>
         /// <returns>Wrapper creation expression.</returns>
         public static Expression GetMetaExpressionOrDefault(Request request)
@@ -3212,11 +3229,13 @@ namespace DryIoc
 
             var container = request.Container;
             var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
-            var serviceKey = request.ServiceKey;
 
-            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
+            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true)
+                .ToArrayOrSelf();
+
+            var serviceKey = request.ServiceKey;
             if (serviceKey != null)
-                factories = factories.Where(f => serviceKey.Equals(f.Key));
+                factories = factories.Match(f => serviceKey.Equals(f.Key));
 
             // todo: potential issue of selecting only the first factory 
             // if the service keys for some reason are not unique
