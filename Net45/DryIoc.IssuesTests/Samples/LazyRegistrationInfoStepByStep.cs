@@ -104,7 +104,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore]
+        [Test]
         public void Lazy_import_of_commands()
         {
             // the same registration code as in the lazy sample
@@ -139,8 +139,8 @@ namespace DryIoc.IssuesTests.Samples
 
                     // multiple services workaround: generate missing service keys
                     var serviceKey = export.ServiceKey;
-                    if (serviceKey == null)
-                        serviceKey = Guid.NewGuid().ToString();
+                    //if (serviceKey == null)
+                    //    serviceKey = Guid.NewGuid().ToString();
 
                     regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
                 }
@@ -196,8 +196,11 @@ namespace DryIoc.IssuesTests.Samples
             //========================
             var cmds = container.Resolve<CommandImporter>();
             Assert.IsNotNull(cmds.Commands);
+
+            var lazies = cmds.Commands.ToArray();
             Assert.AreEqual(2, cmds.Commands.Count());
-            Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+            Assert.AreEqual("Sample command, Another command", 
+                string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
         [Test, Ignore]

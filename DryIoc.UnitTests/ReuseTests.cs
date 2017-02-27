@@ -343,7 +343,9 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Service>());
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve DryIoc.UnitTests.CUT.Service"));
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToResolveFromRegisteredServices),
+                Error.NameOf(ex.Error));
         }
 
         [Test]

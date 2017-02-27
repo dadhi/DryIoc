@@ -90,7 +90,6 @@ namespace ImTools
                 result[sourceCount] = added[0];
             else
                 Array.Copy(added, 0, result, sourceCount, addedCount);
-
             return result;
         }
 

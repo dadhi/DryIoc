@@ -629,6 +629,7 @@ namespace DryIoc
         }
 
         // todo: v3: remove unused composite key and required type parameters
+        // todo: perf: optimize for speed
         IEnumerable<object> IResolver.ResolveMany(
             Type serviceType, object serviceKey, Type requiredServiceType,
             object compositeParentKey, Type compositeParentRequiredType,
@@ -1394,7 +1395,16 @@ namespace DryIoc
                     dynamicFactories = dynamicFactories == null ? factories : dynamicFactories.Concat(factories);
             }
 
-            return dynamicFactories;
+            if (dynamicFactories == null)
+                return null;
+
+            var dynamicKey = DynamicKey.Empty;
+            return dynamicFactories.Select(it =>
+            {
+                if (it.Key != null)
+                    return it;
+                return new KV<object, Factory>(dynamicKey.Next(), it.Value);
+            });
         }
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
@@ -1427,7 +1437,7 @@ namespace DryIoc
             }
 
             // Filter out non default factories
-            var defaultFactories = factories.Match(f => f.Key == null || f.Key is DefaultKey);
+            var defaultFactories = factories.Match(f => f.Key is DefaultKey || f.Key is DynamicKey);
             if (defaultFactories.Length == 0)
                 return null;
 
@@ -2559,7 +2569,7 @@ namespace DryIoc
         /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return "DefaultKey.Of(" + RegistrationOrder + ")";
+            return "DefaultKey(" + RegistrationOrder + ")";
         }
 
         private DefaultKey(int registrationOrder)
@@ -2567,6 +2577,49 @@ namespace DryIoc
             RegistrationOrder = registrationOrder;
         }
     }
+
+    /// <summary>Represents default key for dymamic registations</summary>
+    public sealed class DynamicKey
+    {
+        /// <summary>Empty key, to get first valid key use <c>DynamicKey.Empty.Next()</c></summary>
+        public static readonly DynamicKey Empty = new DynamicKey(0);
+
+        /// <summary>Allows to determine service registration order.</summary>
+        public readonly int Index;
+
+        /// <summary>Returns the next dynamic key.</summary><returns>New key</returns>
+        public DynamicKey Next()
+        {
+            return new DynamicKey(Index + 1);
+        }
+
+        /// <summary>Compares keys based on registration order.</summary>
+        /// <param name="key">Key to compare with.</param>
+        /// <returns>True if keys have the same order.</returns>
+        public override bool Equals(object key)
+        {
+            var other = key as DynamicKey;
+            return other != null && other.Index == Index;
+        }
+
+        /// <summary>Returns key index as hash.</summary> <returns>Hash code.</returns>
+        public override int GetHashCode()
+        {
+            return Index;
+        }
+
+        /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
+        public override string ToString()
+        {
+            return "DynamicKey(" + Index + ")";
+        }
+
+        private DynamicKey(int index)
+        {
+            Index = index;
+        }
+    }
+
 
     /// <summary>Holds all required info by <see cref="FactoryDelegate"/>.</summary>
     public interface IResolverContext
@@ -3030,9 +3083,11 @@ namespace DryIoc
 
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
-                return request.IfUnresolved == IfUnresolved.ReturnDefault
-                    ? Expression.Constant(null, lazyType)
-                    : null;
+            {
+                if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                    return Expression.Constant(null, lazyType);
+                return null;
+            }
 
             serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
 
@@ -3163,7 +3218,7 @@ namespace DryIoc
             if (serviceKey != null)
                 factories = factories.Where(f => serviceKey.Equals(f.Key));
 
-            // note: this may be issue potential of selecting only the first factory 
+            // todo: potential issue of selecting only the first factory 
             // if the service keys for some reason are not unique
             var result = factories
                 .FirstOrDefault(factory =>
@@ -10040,7 +10095,7 @@ namespace DryIoc
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
             UnableToResolveUnknownService = Of(
-                "Unable to resolve {0}." + Environment.NewLine +
+                "Unable to resolve {0}" + Environment.NewLine +
                 "Where no service registrations found" + Environment.NewLine +
                 "  and number of Rules.FallbackContainers: {1}" + Environment.NewLine +
                 "  and number of Rules.UnknownServiceResolvers: {2}"),
@@ -11026,7 +11081,11 @@ namespace DryIoc
         /// <summary>Default delegate to print Type details: by default prints Type FullName and
         /// skips namespace if it start with "System."</summary>
         public static Func<Type, string> GetTypeNameDefault = t =>
+#if DEBUG
+            t.Name;
+#else
             t.FullName != null && t.Namespace != null && !t.Namespace.StartsWith("System") ? t.FullName : t.Name;
+#endif
 
         /// <summary>Appends type details to string builder.</summary>
         /// <param name="s">String builder to append output to.</param>

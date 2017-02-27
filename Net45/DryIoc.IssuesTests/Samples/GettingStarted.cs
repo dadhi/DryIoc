@@ -55,12 +55,22 @@ namespace DryIoc.IssuesTests.Samples
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IClient>());
 
-            Assert.That(ex.Message, Is.EqualTo(
-@"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
-  in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient.
+            var expected =
+#if DEBUG
+@"Unable to resolve IService as parameter ""service""
+  in SomeClient: IClient
 Where no service registrations found
   and number of Rules.FallbackContainers: 0
-  and number of Rules.UnknownServiceResolvers: 0"));
+  and number of Rules.UnknownServiceResolvers: 0";
+#else
+@"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
+  in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient
+Where no service registrations found
+  and number of Rules.FallbackContainers: 0
+  and number of Rules.UnknownServiceResolvers: 0";
+#endif
+
+            Assert.AreEqual(expected, ex.Message);
         }
 
         [Test]
