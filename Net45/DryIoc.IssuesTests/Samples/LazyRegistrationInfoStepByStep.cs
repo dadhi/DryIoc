@@ -123,33 +123,12 @@ namespace DryIoc.IssuesTests.Samples
             var lazyLoadedAssembly = new Lazy<Assembly>(() => assembly);
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
-            foreach (var lazyRegistration in lazyRegistrations)
-            {
-                var exports = lazyRegistration.Exports;
-                for (var i = 0; i < exports.Length; i++)
-                {
-                    var export = exports[i];
-                    var serviceTypeFullName = export.ServiceTypeFullName;
-
-                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
-                        registrationByServiceTypeName.Add(serviceTypeFullName,
-                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-
-                    // multiple services workaround: generate missing service keys
-                    var serviceKey = export.ServiceKey;
-                    //if (serviceKey == null)
-                    //    serviceKey = Guid.NewGuid().ToString();
-
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
-                }
-            }
+            var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
 
             Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
-                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
                     return null;
 
                 var factories = new List<KV<object, Factory>>();
@@ -172,7 +151,31 @@ namespace DryIoc.IssuesTests.Samples
                 string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        [Test, Ignore]
+        private static Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>> 
+            CollectRegistrationsByServiceTypeName(IEnumerable<ExportedRegistrationInfo> lazyRegistrations)
+        {
+            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            foreach (var lazyRegistration in lazyRegistrations)
+            {
+                var exports = lazyRegistration.Exports;
+                for (var i = 0; i < exports.Length; i++)
+                {
+                    var export = exports[i];
+                    var serviceTypeFullName = export.ServiceTypeFullName;
+
+                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
+                        registrationByServiceTypeName.Add(serviceTypeFullName,
+                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
+
+                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
+                }
+            }
+
+            return registrationByServiceTypeName;
+        }
+
+        [Test]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
             // the same registration code as in the lazy sample
@@ -197,44 +200,16 @@ namespace DryIoc.IssuesTests.Samples
             });
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
-            foreach (var lazyRegistration in lazyRegistrations)
-            {
-                var exports = lazyRegistration.Exports;
-                for (var i = 0; i < exports.Length; i++)
-                {
-                    var export = exports[i];
-                    var serviceTypeFullName = export.ServiceTypeFullName;
-
-                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
-                        registrationByServiceTypeName.Add(serviceTypeFullName,
-                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-
-                    // multiple services workaround: generate missing service keys
-                    var serviceKey = export.ServiceKey;
-                    if (serviceKey == null)
-                        serviceKey = Guid.NewGuid().ToString();
-
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
-                }
-            }
+            var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
 
             Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
             {
+                if (serviceType == typeof(CommandImporter))
+                    return null; // todo: add rules
+
                 List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
-                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
                     return null;
-
-                if (serviceKey != null)
-                {
-                    var regIndex = serviceTypeRegistrations.FindIndex(pair => serviceKey.Equals(pair.Key));
-                    if (regIndex == -1)
-                        return null;
-
-                    Factory factory = serviceTypeRegistrations[regIndex].Value.CreateFactory(lazyLoadedAssembly);
-                    return new[] { KV.Of(serviceKey, factory) };
-                }
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var r in serviceTypeRegistrations)
@@ -243,24 +218,9 @@ namespace DryIoc.IssuesTests.Samples
                 return factories;
             };
 
-            // Step 2 - Add resolution rule for creating factory on resolve.
-            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!registrationByServiceTypeName.TryGetValue(request.ServiceType.FullName, out regs))
-                    return null;
-
-                var regIndex = regs.FindIndex(pair => request.ServiceKey == null || Equals(pair.Key, request.ServiceKey));
-                if (regIndex == -1)
-                    return null;
-
-                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
-            };
-
             // Test that resolve works
             //========================
             var container = new Container().WithMef()
-                .With(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly))
                 .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
 
             // make sure that CommandImporter itself is available without loading the lazy assembly

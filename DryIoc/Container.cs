@@ -1402,7 +1402,8 @@ namespace DryIoc
                     {
                         if (it.Key != null)
                             return it;
-                        return new KV<object, Factory>(key = key.Next(), it.Value);
+                        key = key.Next();
+                        return new KV<object, Factory>(key, it.Value);
                     })
                     .ToArray();
 
@@ -1423,7 +1424,9 @@ namespace DryIoc
             if (registeredFactories == null && dynamicFactories == null)
                 return null;
 
+            // todo: Add option how to combine with dynamic registrations: Override, Keep, etc.. May be use IfAlreadyRegistered? 
             var factories = registeredFactories.ConcatToArray(dynamicFactories);
+
             if (factorySelector != null)
             {
                 var validFactories = factories
