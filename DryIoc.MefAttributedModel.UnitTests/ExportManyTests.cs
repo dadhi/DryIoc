@@ -11,12 +11,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance()
         {
             var container = new Container().WithMef();
-            container.RegisterExports(new [] { typeof(ISomeDb).GetAssembly() });
+            container.RegisterExports(typeof(DbMan));
 
             var someDb = container.Resolve<ISomeDb>();
             var anotherDb = container.Resolve<IAnotherDb>();
 
-            Assert.That(someDb, Is.SameAs(anotherDb));
+            Assert.AreSame(someDb, anotherDb);
         }
 
         [Test]

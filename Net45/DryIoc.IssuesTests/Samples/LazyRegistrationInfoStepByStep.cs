@@ -205,7 +205,7 @@ namespace DryIoc.IssuesTests.Samples
             Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
             {
                 if (serviceType == typeof(CommandImporter))
-                    return null; // todo: add rules
+                    return null; // todo: exclude with IfAlreadyRegistered when implemented
 
                 List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
                 if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
@@ -272,7 +272,7 @@ namespace DryIoc.IssuesTests.Samples
             public IEnumerable<Lazy<ICommand, ICommandMetadata>> Commands { get; set; }
         }
 
-        [Test, Ignore("fails to distinguish between imported Actions")]
+        [Test]//, Ignore("fails to distinguish between imported Actions")]
         public void Lazy_import_of_Actions()
         {
             // the same registration code as in the lazy sample
@@ -283,8 +283,10 @@ namespace DryIoc.IssuesTests.Samples
             var registrations = AttributedModel.Scan(new[] { assembly });
 
             // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info => info.MakeLazy())
-                .ToArray(); // NOTE: This is required to materialized DTOs to be seriliazed.
+            var serviceKeyStore = new ServiceKeyStore();
+            var lazyRegistrations = registrations
+                .Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore))
+                .ToArray();  // this is required to materialized DTOs to be seriliazed.
 
             // In run-time deserialize registrations and register them as rule for unresolved services
             //=========================================================================================
@@ -297,44 +299,16 @@ namespace DryIoc.IssuesTests.Samples
             });
 
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
-            foreach (var lazyRegistration in lazyRegistrations)
-            {
-                var exports = lazyRegistration.Exports;
-                for (var i = 0; i < exports.Length; i++)
-                {
-                    var export = exports[i];
-                    var serviceTypeFullName = export.ServiceTypeFullName;
-
-                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
-                        registrationByServiceTypeName.Add(serviceTypeFullName,
-                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-
-                    // multiple services workaround: generate missing service keys
-                    var serviceKey = export.ServiceKey;
-                    if (serviceKey == null)
-                        serviceKey = Guid.NewGuid().ToString();
-
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(serviceKey, lazyRegistration));
-                }
-            }
+            var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
 
             Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
             {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
-                if (!registrationByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                if (serviceType == typeof(ActionImporter))
                     return null;
 
-                if (serviceKey != null)
-                {
-                    var regIndex = serviceTypeRegistrations.FindIndex(pair => serviceKey.Equals(pair.Key));
-                    if (regIndex == -1)
-                        return null;
-
-                    Factory factory = serviceTypeRegistrations[regIndex].Value.CreateFactory(lazyLoadedAssembly);
-                    return new[] { KV.Of(serviceKey, factory) };
-                }
+                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
+                if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
+                    return null;
 
                 var factories = new List<KV<object, Factory>>();
                 foreach (var r in serviceTypeRegistrations)
@@ -346,7 +320,7 @@ namespace DryIoc.IssuesTests.Samples
             // Test that resolve works fine with the non-lazy scenario
             //========================
             var cnt = new Container().WithMef();
-            cnt.RegisterExports(typeof(ActionImporter), typeof(ActionExporter));
+            cnt.RegisterExports(typeof(ActionExporter), typeof(ActionImporter));
 
             // validate imported metadata
             var importer = cnt.Resolve<ActionImporter>();
@@ -381,6 +355,7 @@ namespace DryIoc.IssuesTests.Samples
             action1 = importer.Actions.First(m => m.Metadata["Name"].Equals("One")).Value;
             Assert.IsTrue(assemblyLoaded);
             Assert.DoesNotThrow(() => action1());
+
             action2 = importer.Actions.First(m => m.Metadata["Name"].Equals("Two")).Value;
             Assert.Throws<NotImplementedException>(() => action2());
         }

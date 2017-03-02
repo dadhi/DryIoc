@@ -2597,10 +2597,10 @@ namespace DryIoc
         public readonly int ID;
 
         /// <summary>Returns dynamic key with specified ID. The key itself may be non unique, and requested from pool.</summary>
-        /// <param name="id"Associated ID.></param> <returns>The key.</returns>
+        /// <param name="id">Associated ID.</param> <returns>The key.</returns>
         public static DynamicKey Of(int id)
         {
-            return new DynamicKey(id);
+            return id == 0 ? Empty : new DynamicKey(id);
         }
 
         /// <summary>Returns next dynamic key with increased <see cref="ID"/>.</summary> <returns>Next key.</returns>
@@ -3210,7 +3210,7 @@ namespace DryIoc
             return pairExpr;
         }
 
-        /// <summary> niversal expression factory to combine service with its setup metadata.
+        /// <summary>Discovers and combines service with its setup metadata.
         /// Works with any generic type with first Type arg - Service type and second Type arg - Metadata type,
         /// and constructor with Service and Metadata arguments respectively.
         /// - if service key is not specified in request then method will search for all
@@ -3236,9 +3236,21 @@ namespace DryIoc
             var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true)
                 .ToArrayOrSelf();
 
+            if (factories.Length == 0)
+                return null;
+
             var serviceKey = request.ServiceKey;
             if (serviceKey != null)
+            {
                 factories = factories.Match(f => serviceKey.Equals(f.Key));
+                if (factories.Length == 0)
+                    return null;
+
+                if (factories.Length != 1)
+                {
+                    ; // todo:
+                }
+            }
 
             // todo: potential issue of selecting only the first factory 
             // if the service keys for some reason are not unique
@@ -5549,6 +5561,7 @@ namespace DryIoc
             if (ownerType == FactoryType.Wrapper ||
                 // for decorated dependency, but not for other decorator dependencies
                 ownerType == FactoryType.Decorator &&
+                container != null &&
                 container.GetWrappedType(serviceType, requiredServiceType).IsAssignableTo(owner.ServiceType))
             {
                 if (serviceKey == null)
@@ -6313,22 +6326,18 @@ namespace DryIoc
 
         private IReuse GetDefaultReuse(Factory factory)
         {
-            IReuse reuse = null;
-
             if (factory.Setup.UseParentReuse)
-                reuse = GetFirstParentNonTransientReuseUntilFunc();
+                return GetFirstParentNonTransientReuseUntilFunc();
 
-            else if (factory.Setup.FactoryType == FactoryType.Decorator
+            if (factory.Setup.FactoryType == FactoryType.Decorator
                 && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
-                reuse = Reuse; // use reuse of resolved service factory for decorator
-            else
-                // if no specified the wrapper reuse is always Transient,
-                // other container-wide default reuse is applied
-                reuse = factory.FactoryType != FactoryType.Wrapper
-                    ? Container.Rules.DefaultReuseInsteadOfTransient
-                    : DryIoc.Reuse.Transient;
+                return Reuse; // use reuse of resolved service factory for decorator
 
-            return reuse;
+            // if no specified the wrapper reuse is always Transient,
+            // other container-wide default reuse is applied
+            return factory.FactoryType != FactoryType.Wrapper
+                ? Container.Rules.DefaultReuseInsteadOfTransient
+                : DryIoc.Reuse.Transient;
         }
 
         private IReuse GetTransientDisposableTrackingReuse(Factory factory)
@@ -6379,7 +6388,7 @@ namespace DryIoc
             }
         }
 
-        private IReuse GetFirstParentNonTransientReuseUntilFunc(bool firstNonTransientParent = false)
+        private IReuse GetFirstParentNonTransientReuseUntilFunc()
         {
             if (!RawParent.IsEmpty)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
@@ -6412,12 +6421,7 @@ namespace DryIoc
                 if (IsEmpty)
                     return PreResolveParent;
 
-                RequestInfo parentRequestInfo;
-                if (RawParent.IsEmpty)
-                    parentRequestInfo = PreResolveParent;
-                else
-                    parentRequestInfo = RawParent.RequestInfo;
-
+                var parentRequestInfo = RawParent.IsEmpty ? PreResolveParent : RawParent.RequestInfo;
                 if (_factory == null)
                     return parentRequestInfo.Push(_serviceInfo);
 
@@ -7153,8 +7157,6 @@ namespace DryIoc
                 reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
                 !Setup.PreventDisposal && !Setup.WeaklyReferenced)
                 return serviceExpr;
-
-            var serviceType = serviceExpr.Type;
 
             // Optimize: eagerly create singleton during the construction of object graph,
             // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
@@ -10109,10 +10111,10 @@ namespace DryIoc
     public static class Error
     {
         /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public readonly static int FirstErrorCode = 0;
+        public static readonly int FirstErrorCode = 0;
 
         /// <summary>List of error messages indexed with code.</summary>
-        public readonly static List<string> Messages = new List<string>(100);
+        public static readonly List<string> Messages = new List<string>(100);
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int

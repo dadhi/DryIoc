@@ -274,7 +274,7 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
         {
             // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
-            container.UseInstance(Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty));
+            container.UseInstance(new ServiceKeyStore());
 
             // decorator to filter in a presence of multiple same keys
             // note: it explicitly set to Transient to produce new results for new filtered collection,
@@ -341,61 +341,42 @@ namespace DryIoc.MefAttributedModel
         /// <param name="infos">Registrations to register.</param>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> infos)
         {
+            var serviceKeyStore = new Lazy<ServiceKeyStore>(() =>
+                ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault));
+
             foreach (var info in infos)
-                RegisterInfo(registrator, info);
+                RegisterInfo(registrator, info, serviceKeyStore);
         }
 
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
         /// <param name="registrator">Container to register into.</param>
         /// <param name="info">Registration information provided.</param>
-        public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
+        /// <param name="serviceKeyStore">Multi key contract name store.</param>
+        public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info, Lazy<ServiceKeyStore> serviceKeyStore = null)
         {
+            serviceKeyStore = serviceKeyStore ?? new Lazy<ServiceKeyStore>(() =>
+                ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault));
+
+            // factory is used for all exports of implementation
             var factory = info.CreateFactory();
 
             var exports = info.Exports;
-            Ref<ImTreeMap<object, KV<Type, int>[]>> contractNameLookup = null;
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
-                var serviceKey = export.ServiceKey;
+
                 var serviceType = export.ServiceType;
+                var serviceKey = export.ServiceKey;
                 if (serviceKey != null)
                 {
-                    if (contractNameLookup == null)
-                    {
-                        var resolver = (IResolver)registrator; // todo: hack for initial implementation
-                        contractNameLookup = resolver.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(DryIoc.IfUnresolved.ReturnDefault);
-                        if (contractNameLookup == null)
-                        {
-                            // stop the resolution for the next iterations
-                            contractNameLookup = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
-                        }
-                        else
-                        {
-                            contractNameLookup.Swap(it => it
-                                .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
-                                {
-                                    var newType = newTypes[0].Key;
-                                    var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
-                                    if (typeAndCountIndex != -1)
-                                    {
-                                        var typeAndCount = types[typeAndCountIndex];
-
-                                        // Change the serviceKey only when multiple same types are registered with the same key
-                                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
-
-                                        return types.AppendOrUpdate(typeAndCount.WithValue(typeAndCount.Value + 1), typeAndCountIndex);
-                                    }
-
-                                    return types.Append(newTypes);
-                                }));
-                        }
-                    }
+                    var store = serviceKeyStore.Value;
+                    if (store != null)
+                        serviceKey = store.EnsureUniqueServiceKey(serviceType, serviceKey);
                 }
 
                 registrator.Register(factory, serviceType, serviceKey, export.IfAlreadyRegistered,
-                    isStaticallyChecked: true); // note: may be set to true, cause we reflecting from the compiler checked code
+                    isStaticallyChecked: true); // may be set to true, cause we reflecting from the compiler checked code
             }
         }
 
@@ -650,13 +631,12 @@ namespace DryIoc.MefAttributedModel
 
         private static Type FindRequiredServiceTypeByServiceKey(Type type, Request request, object serviceKey)
         {
-            var contractNameLookup = request.Container.Resolve<Ref<ImTreeMap<object, KV<Type, int>[]>>>(
-                DryIoc.IfUnresolved.ReturnDefault);
-            if (contractNameLookup == null)
+            var contractNameStore = request.Container.Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault);
+            if (contractNameStore == null)
                 return null;
 
             // may be null if service key is rigistered at all Or registered not through MEF
-            var types = contractNameLookup.Value.GetValueOrDefault(serviceKey);
+            var types = contractNameStore.GetServiceTypesOrDefault(serviceKey);
             if (types == null)
                 return null;
 
@@ -998,6 +978,51 @@ namespace DryIoc.MefAttributedModel
         #endregion
     }
 
+    /// <summary>Enables de-duplication of service key by putting key into the pair with index. </summary>
+    public sealed class ServiceKeyStore
+    {
+        // Mapping of ServiceKey/ContractName to { ContractType, count }[]
+        private readonly Ref<ImTreeMap<object, KV<Type, int>[]>> 
+            _store = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
+
+        /// <summary>Stores the key with respective type, 
+        /// incrementing type count for multiple registrations with same key  and type.</summary>
+        /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param>
+        /// <returns>The key combined with index, if the key has same type more than once,
+        /// otherwise (for single or nu types) returns passed key as-is..</returns>
+        public object EnsureUniqueServiceKey(Type serviceType, object serviceKey)
+        {
+            _store.Swap(it => it
+                .AddOrUpdate(serviceKey, new[] {KV.Of(serviceType, 1)}, (types, newTypes) =>
+                {
+                    var newType = newTypes[0].Key;
+                    var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
+                    if (typeAndCountIndex != -1)
+                    {
+                        var typeAndCount = types[typeAndCountIndex];
+
+                        // Change the serviceKey only when multiple same types are registered with the same key
+                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+
+                        typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
+                        return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
+                    }
+
+                    return types.Append(newTypes);
+                }));
+
+            return serviceKey;
+        }
+
+        /// <summary>Retrieves types and their count used with specified <paramref name="serviceKey"/>.</summary>
+        /// <param name="serviceKey">Service key to get info.</param>
+        /// <returns>Types and their count for the specified key, if key is not stored - returns null.</returns>
+        public KV<Type, int>[] GetServiceTypesOrDefault(object serviceKey)
+        {
+            return _store.Value.GetValueOrDefault(serviceKey);
+        }
+    }
+
     /// <summary>Names used by Attributed Model to mark the special exports.</summary>
     public static class Constants
     {
@@ -1013,10 +1038,10 @@ namespace DryIoc.MefAttributedModel
     public static class Error
     {
         /// <summary>Error messages for corresponding codes.</summary>
-        public readonly static IList<string> Messages = new List<string>(20);
+        public static readonly IList<string> Messages = new List<string>(20);
 
         /// <summary>Codes are starting from this value.</summary>
-        public readonly static int FirstErrorCode = DryIoc.Error.FirstErrorCode + DryIoc.Error.Messages.Count;
+        public static readonly int FirstErrorCode = DryIoc.Error.FirstErrorCode + DryIoc.Error.Messages.Count;
 
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
@@ -1311,6 +1336,22 @@ namespace DryIoc.MefAttributedModel
             return newInfo;
         }
 
+        /// <summary>De-duplicates service keys in export via tracking they uniqueness in passed store.
+        /// The result key would be a pair of original key and index. If key is already unique it will be returned as-is.</summary>
+        /// <param name="keyStore">Place to track and check the key uniqueness.</param>
+        /// <returns>Modifies this, and return this just for fluency.</returns>
+        public ExportedRegistrationInfo EnsureUniqueExportServiceKeys(ServiceKeyStore keyStore)
+        {
+            for (var i = 0; i < Exports.Length; i++)
+            {
+                var e = Exports[i];
+                if (e.ServiceKey != null)
+                    e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, e.ServiceKey);
+            }
+
+            return this;
+        }
+
         /// <summary>Sugar on top of <see cref="CreateFactory(Lazy{Assembly})"/>.</summary>
         public ReflectionFactory CreateFactory(Lazy<Assembly> assembly)
         {
@@ -1370,7 +1411,6 @@ namespace DryIoc.MefAttributedModel
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
 
-            // collect metadata
             object metadata = Metadata;
             if (metadata == null && HasMetadataAttribute)
                 metadata = IsLazy
@@ -1412,6 +1452,11 @@ namespace DryIoc.MefAttributedModel
             var ifUnresolved =
                 source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
 
+            if (source.Metadata != null || source.MetadataKey != null)
+            {
+                // todo: Migrate metadata value and key
+            }
+            
             return ConvertRequestInfo(source.ParentOrWrapper).Push(
                 source.ServiceType,
                 source.RequiredServiceType,
