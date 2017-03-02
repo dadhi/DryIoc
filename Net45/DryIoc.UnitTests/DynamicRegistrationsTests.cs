@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -9,10 +8,10 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class DynamicRegistrationsTests
     {
-        private IEnumerable<KV<object, Factory>> GetX(FactoryType factoryType, Type serviceType, object key)
+        private IEnumerable<DynamicRegistration> GetX(FactoryType factoryType, Type serviceType, object key)
         {
             if (serviceType == typeof(X))
-                return new[] {KV.Of<object, Factory>(null, new ReflectionFactory(typeof(A)))};
+                return new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) };
             return null;
         }
 
@@ -46,18 +45,16 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(x[0]);
         }
 
-        private IEnumerable<KV<object, Factory>> GetManyX(FactoryType factoryType, Type serviceType, object serviceKey)
+        private IEnumerable<DynamicRegistration> GetManyX(FactoryType factoryType, Type serviceType, object serviceKey)
         {
             if (serviceType == typeof(X))
                 return new[]
                 {
-                    // the keys should be unique
-                    KV.Of<object, Factory>(1, new ReflectionFactory(typeof(A))),
-                    KV.Of<object, Factory>(2, new ReflectionFactory(typeof(B))),
+                    new DynamicRegistration(new ReflectionFactory(typeof(A))), 
+                    new DynamicRegistration(new ReflectionFactory(typeof(B))),
                 };
             return null;
         }
-
 
         [Test]
         public void Can_resolve_multi_service_array()
@@ -69,6 +66,23 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(2, xs.Length);
             Assert.IsInstanceOf<A>(xs[0]);
             Assert.IsInstanceOf<B>(xs[1]);
+        }
+
+        [Test] public void Can_specify_to_exclude_dynamic_registration_if_there_is_a_normal()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) =>
+                {
+                    if (serviceType == typeof(X))
+                        return new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Keep) };
+                    return null;
+                }));
+
+            container.Register<X, B>();
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<B>(x);
         }
 
         public class X { }

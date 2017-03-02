@@ -6,7 +6,6 @@ using System.Reflection;
 using DryIoc.MefAttributedModel;
 using DryIocAttributes;
 using NUnit.Framework;
-using ImTools;
 
 namespace DryIoc.IssuesTests.Samples
 {
@@ -35,57 +34,18 @@ namespace DryIoc.IssuesTests.Samples
         {
             const string assemblyFile = "DryIoc.Samples.CUT.dll";
 
-            // In compile time prepare registrations for Serialization
-            //========================================================
-
             var assembly = Assembly.LoadFrom(assemblyFile);
-
-            // Step 1 - Scan assembly and find exported type, create DTOs for them.
             var registrations = AttributedModel.Scan(new[] { assembly });
 
-            // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
+            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
+            var dynamicRegistrations = CreateDynamicRegistrationProvider(
+                lazyRegistrations, 
+                IfAlreadyRegistered.Keep, 
+                new Lazy<Assembly>(() => assembly));
 
-            // In run-time deserialize registrations and register them as rule for unresolved services
-            //=========================================================================================
+            var container = new Container().WithMef()
+                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
 
-            var lazyLoadedAssembly = new Lazy<Assembly>(() => Assembly.LoadFrom(assemblyFile));
-
-            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var regInfoByServiceTypeNameIndex = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
-            foreach (var lazyRegistration in lazyRegistrations)
-            {
-                var exports = lazyRegistration.Exports;
-                for (var i = 0; i < exports.Length; i++)
-                {
-                    var export = exports[i];
-                    var serviceTypeFullName = export.ServiceTypeFullName;
-
-                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!regInfoByServiceTypeNameIndex.TryGetValue(serviceTypeFullName, out regs))
-                        regInfoByServiceTypeNameIndex.Add(serviceTypeFullName,
-                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
-                }
-            }
-
-            // Step 2 - Add resolution rule for creating factory on resolve.
-            Rules.UnknownServiceResolver createFactoryFromAssembly = request =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                if (!regInfoByServiceTypeNameIndex.TryGetValue(request.ServiceType.FullName, out regs))
-                    return null;
-
-                var regIndex = regs.FindIndex(pair => Equals(pair.Key, request.ServiceKey));
-                if (regIndex == -1)
-                    return null;
-
-                return regs[regIndex].Value.CreateFactory(typeName => lazyLoadedAssembly.Value.GetType(typeName));
-            };
-
-            // Test that resolve works
-            //========================
-            var container = new Container(rules => rules.WithUnknownServiceResolvers(createFactoryFromAssembly));
             var thing = container.Resolve<IThing>();
             Assert.IsNotNull(thing);
         }
@@ -107,21 +67,28 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Lazy_import_of_commands()
         {
-            // the same registration code as in the lazy sample
-            //========================
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
-
-            // Step 1 - Scan assembly and find exported type, create DTOs for them.
             var registrations = AttributedModel.Scan(new[] { assembly });
+            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
+            var dynamicRegistrations = CreateDynamicRegistrationProvider(
+                lazyRegistrations, IfAlreadyRegistered.Keep, new Lazy<Assembly>(() => assembly));
 
-            // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info => info.MakeLazy());
+            var container = new Container().WithMef()
+                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
 
-            // In run-time deserialize registrations and register them as rule for unresolved services
-            //=========================================================================================
+            var cmds = container.Resolve<CommandImporter>();
 
-            var lazyLoadedAssembly = new Lazy<Assembly>(() => assembly);
+            Assert.IsNotNull(cmds.Commands);
+            Assert.AreEqual(2, cmds.Commands.Count());
+            Assert.AreEqual("Sample command, Another command",
+                string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+        }
 
+        private static Rules.DynamicRegistrationProvider CreateDynamicRegistrationProvider(
+            IEnumerable<ExportedRegistrationInfo> lazyRegistrations,
+            IfAlreadyRegistered ifAlreadyRegistered, 
+            Lazy<Assembly> assembly)
+        {
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
             var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
 
@@ -131,27 +98,26 @@ namespace DryIoc.IssuesTests.Samples
                 if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
                     return null;
 
-                var factories = new List<KV<object, Factory>>();
+                var factories = new List<DynamicRegistration>();
                 foreach (var r in serviceTypeRegistrations)
-                    factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
+                {
+                    var factory = r.Value.CreateFactory(assembly);
+                    factories.Add(new DynamicRegistration(factory, ifAlreadyRegistered, r.Key));
+                }
 
                 return factories;
             };
 
-            // Test that resolve works
-            //========================
-            var container = new Container().WithMef()
-                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
-
-            var cmds = container.Resolve<CommandImporter>();
-
-            Assert.IsNotNull(cmds.Commands);
-            Assert.AreEqual(2, cmds.Commands.Count());
-            Assert.AreEqual("Sample command, Another command", 
-                string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+            return dynamicRegistrations;
         }
 
-        private static Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>> 
+        private static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(IEnumerable<ExportedRegistrationInfo> registrations)
+        {
+            var store = new ServiceKeyStore();
+            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(store));
+        }
+
+        private static Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>
             CollectRegistrationsByServiceTypeName(IEnumerable<ExportedRegistrationInfo> lazyRegistrations)
         {
             var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
@@ -178,45 +144,19 @@ namespace DryIoc.IssuesTests.Samples
         [Test]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
-            // the same registration code as in the lazy sample
-            //========================
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
-
-            // Step 1 - Scan assembly and find exported type, create DTOs for them.
             var registrations = AttributedModel.Scan(new[] { assembly });
-
-            // Step 2 - Make DTOs lazy.
-            var lazyRegistrations = registrations.Select(info => info.MakeLazy())
-                .ToArray(); // NOTE: This is required to materialized DTOs to be seriliazed.
-
-            // In run-time deserialize registrations and register them as rule for unresolved services
-            //=========================================================================================
+            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
 
             var assemblyLoaded = false;
-            var lazyLoadedAssembly = new Lazy<Assembly>(() =>
-            {
-                assemblyLoaded = true;
-                return assembly;
-            });
-
-            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
-
-            Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
-            {
-                if (serviceType == typeof(CommandImporter))
-                    return null; // todo: exclude with IfAlreadyRegistered when implemented
-
-                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
-                if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
-                    return null;
-
-                var factories = new List<KV<object, Factory>>();
-                foreach (var r in serviceTypeRegistrations)
-                    factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
-
-                return factories;
-            };
+            var dynamicRegistrations = CreateDynamicRegistrationProvider(
+                lazyRegistrations,
+                IfAlreadyRegistered.Keep,
+                new Lazy<Assembly>(() =>
+                {
+                    assemblyLoaded = true;
+                    return assembly;
+                }));
 
             // Test that resolve works
             //========================
@@ -272,51 +212,23 @@ namespace DryIoc.IssuesTests.Samples
             public IEnumerable<Lazy<ICommand, ICommandMetadata>> Commands { get; set; }
         }
 
-        [Test]//, Ignore("fails to distinguish between imported Actions")]
+        [Test]
         public void Lazy_import_of_Actions()
         {
-            // the same registration code as in the lazy sample
-            //========================
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
-
-            // Step 1 - Scan assembly and find exported type, create DTOs for them.
             var registrations = AttributedModel.Scan(new[] { assembly });
-
-            // Step 2 - Make DTOs lazy.
-            var serviceKeyStore = new ServiceKeyStore();
-            var lazyRegistrations = registrations
-                .Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore))
-                .ToArray();  // this is required to materialized DTOs to be seriliazed.
-
-            // In run-time deserialize registrations and register them as rule for unresolved services
-            //=========================================================================================
+            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
 
             var assemblyLoaded = false;
-            var lazyLoadedAssembly = new Lazy<Assembly>(() =>
-            {
-                assemblyLoaded = true;
-                return assembly;
-            });
-
-            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
-
-            Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
-            {
-                if (serviceType == typeof(ActionImporter))
-                    return null;
-
-                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
-                if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
-                    return null;
-
-                var factories = new List<KV<object, Factory>>();
-                foreach (var r in serviceTypeRegistrations)
-                    factories.Add(KV.Of<object, Factory>(r.Key, r.Value.CreateFactory(lazyLoadedAssembly)));
-
-                return factories;
-            };
-
+            var dynamicRegistrations = CreateDynamicRegistrationProvider(
+                lazyRegistrations,
+                IfAlreadyRegistered.Keep,
+                new Lazy<Assembly>(() =>
+                {
+                    assemblyLoaded = true;
+                    return assembly;
+                }));
+            
             // Test that resolve works fine with the non-lazy scenario
             //========================
             var cnt = new Container().WithMef();
@@ -386,7 +298,7 @@ namespace DryIoc.IssuesTests.Samples
 
     public interface IThing { }
 
-    public interface IFrog {}
+    public interface IFrog { }
 
     [ExportMany]
     class Frog : IFrog { }

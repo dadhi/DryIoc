@@ -963,8 +963,8 @@ namespace DryIoc
 
             var dynamicFactories = GetDynamicFactoriesOrNull(FactoryType.Service, serviceType, null);
             if (dynamicFactories != null)
-                factories = factories.Concat(dynamicFactories);
-
+                factories = CombineRegisteredAndDynamicFactories(factories, dynamicFactories);
+            
             return factories;
         }
 
@@ -1383,13 +1383,13 @@ namespace DryIoc
             return ((FactoriesEntry)entry).Factories.Enumerate();
         }
 
-        private IEnumerable<KV<object, Factory>> GetDynamicFactoriesOrNull(FactoryType factoryType, Type serviceType, object serviceKey)
+        private IEnumerable<DynamicRegistration> GetDynamicFactoriesOrNull(FactoryType factoryType, Type serviceType, object serviceKey)
         {
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
             if (dynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
-            IEnumerable<KV<object, Factory>> dynamicFactories = null;
+            IEnumerable<DynamicRegistration> dynamicFactories = null;
 
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
@@ -1400,18 +1400,61 @@ namespace DryIoc
                     var key = DynamicKey.Empty;
                     var validFactories = factories.Select(it =>
                     {
-                        if (it.Key != null)
+                        if (it.ServiceKey != null)
                             return it;
                         key = key.Next();
-                        return new KV<object, Factory>(key, it.Value);
+                        return it.WithKey(key);
                     })
                     .ToArray();
 
-                    dynamicFactories = dynamicFactories == null ? validFactories : dynamicFactories.Concat(validFactories);
+                    dynamicFactories = dynamicFactories == null 
+                        ? validFactories 
+                        : dynamicFactories.Concat(validFactories);
                 }
             }
 
             return dynamicFactories;
+        }
+
+        private KV<object, Factory>[] CombineRegisteredAndDynamicFactories(
+            IEnumerable<KV<object, Factory>> registeredFactories,
+            IEnumerable<DynamicRegistration> dynamicFactories)
+        {
+            if (dynamicFactories == null)
+                return registeredFactories.ToArrayOrSelf();
+             
+            if (registeredFactories == null)
+                return dynamicFactories.Select(it => KV.Of(it.ServiceKey, it.Factory)).ToArray();
+
+            var remainingDynamicFactories = dynamicFactories
+                .Where(it =>
+                {
+                    var isNotKeyed = it.ServiceKey is DynamicKey;
+                    switch (it.IfAlreadyRegistered)
+                    {
+                        case IfAlreadyRegistered.Keep:
+                        case IfAlreadyRegistered.Throw: // throw will behave the same as keep
+                            return isNotKeyed
+                                ? !registeredFactories.Any(_ => _.Key is DefaultKey)
+                                : !registeredFactories.Any(_ => _.Key.Equals(it.ServiceKey));
+
+                        case IfAlreadyRegistered.Replace:
+                            registeredFactories = isNotKeyed
+                                ? registeredFactories.Where(_ => !(_.Key is DefaultKey))
+                                : registeredFactories.Where(_ => !_.Key.Equals(it.ServiceKey));
+                            return true;
+
+                        case IfAlreadyRegistered.AppendNotKeyed:
+                            return isNotKeyed
+                                ? true
+                                : !registeredFactories.Any(_ => _.Key.Equals(it.ServiceKey));
+                    }
+
+                    return true;
+                })
+                .Select(it => KV.Of(it.ServiceKey, it.Factory));
+
+            return registeredFactories.ConcatToArray(remainingDynamicFactories);
         }
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
@@ -1425,7 +1468,7 @@ namespace DryIoc
                 return null;
 
             // todo: Add option how to combine with dynamic registrations: Override, Keep, etc.. May be use IfAlreadyRegistered? 
-            var factories = registeredFactories.ConcatToArray(dynamicFactories);
+            var factories = CombineRegisteredAndDynamicFactories(registeredFactories, dynamicFactories);
 
             if (factorySelector != null)
             {
@@ -3305,6 +3348,39 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Represents info required for dynamic registration: service key, factory, 
+    /// and <see cref="IfAlreadyRegistered"/> option how to combine dynamic with normal registrations.</summary>
+    public sealed class DynamicRegistration
+    {
+        /// <summary>Factory</summary>
+        public readonly Factory Factory;
+
+        /// <summary>Optional: will be <see cref="IfAlreadyRegistered.AppendNotKeyed"/> by default.</summary>
+        public readonly IfAlreadyRegistered IfAlreadyRegistered;
+
+        /// <summary>Optional service key: if null the default <see cref="DynamicKey"/> will be used. </summary>
+        public readonly object ServiceKey;
+
+        /// <summary>Constructs the info</summary>
+        /// <param name="factory"></param>
+        /// <param name="ifAlreadyRegistered">(optional) Defines how to combine with normal registrations.
+        /// Will use <see cref="IfAlreadyRegistered.AppendNotKeyed"/> by default.</param>
+        /// <param name="serviceKey">(optional) If not specified then <see cref="DynamicKey"/> will be used instead.</param>
+        public DynamicRegistration(Factory factory,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
+        {
+            Factory = factory.ThrowIfNull();
+            ServiceKey = serviceKey;
+            IfAlreadyRegistered = ifAlreadyRegistered;
+        }
+
+        /// <summary>Return info with new specified key.</summary> <param name="serviceKey"></param> <returns>New info.</returns>
+        public DynamicRegistration WithKey(object serviceKey)
+        {
+            return new DynamicRegistration(Factory, IfAlreadyRegistered, serviceKey);
+        }
+    }
+
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
@@ -3433,12 +3509,10 @@ namespace DryIoc
         /// <param name="serviceType">Requested service type.</param>
         /// <param name="serviceKey">(optional) If <c>null</c> will request all factories of <paramref name="serviceType"/></param> 
         /// <returns>Key-Factory pairs.</returns>
-        public delegate IEnumerable<KV<object, Factory>> DynamicRegistrationProvider(
+        public delegate IEnumerable<DynamicRegistration> DynamicRegistrationProvider(
             FactoryType requiredFactoryType,
             Type serviceType,
-            object serviceKey
-            // todo: other options like IfAlreadyRegistered?
-            );
+            object serviceKey);
 
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
@@ -10137,7 +10211,7 @@ namespace DryIoc
                 "  and Found registrations:" + Environment.NewLine + "{3}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration but found many:" + Environment.NewLine + "{0}." + Environment.NewLine +
+                "Expecting single default registration but found many:" + Environment.NewLine + "{0}" + Environment.NewLine +
                 "When resolving {1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
