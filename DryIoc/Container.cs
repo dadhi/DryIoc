@@ -3245,19 +3245,13 @@ namespace DryIoc
                 factories = factories.Match(f => serviceKey.Equals(f.Key));
                 if (factories.Length == 0)
                     return null;
-
-                if (factories.Length != 1)
-                {
-                    ; // todo:
-                }
             }
 
-            // todo: potential issue of selecting only the first factory 
             // if the service keys for some reason are not unique
-            var result = factories
-                .FirstOrDefault(factory =>
+            factories = factories
+                .Match(f =>
                 {
-                    var metadata = factory.Value.Setup.Metadata;
+                    var metadata = f.Value.Setup.Metadata;
                     if (metadata == null)
                         return false;
 
@@ -3272,10 +3266,22 @@ namespace DryIoc
                     return metadataType.IsTypeOf(metadata);
                 });
 
-            if (result == null)
+            if (factories.Length == 0)
                 return null;
 
-            serviceKey = result.Key;
+            // Prevent non-determinism when more than 1 factory is matching the metadata
+            if (factories.Length > 1)
+            {
+                if (request.IfUnresolved == IfUnresolved.Throw)
+                    Throw.It(Error.UnableToSelectFromManyRegistrationsWithMatchingMetadata, metadataType, factories, request);
+                return null;
+            }
+
+            var factory = factories[0];
+            if (factory == null)
+                return null;
+
+            serviceKey = factory.Key;
 
             var serviceRequest = request.Push(serviceType, serviceKey);
             var serviceFactory = container.ResolveFactory(serviceRequest);
@@ -3286,7 +3292,7 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            var resultMetadata = result.Value.Setup.Metadata;
+            var resultMetadata = factory.Value.Setup.Metadata;
             if (metadataType != typeof(object))
             {
                 var resultMetadataDict = resultMetadata as IDictionary<string, object>;
@@ -7249,7 +7255,7 @@ namespace DryIoc
             if (Setup.FactoryType != Setup.Default.FactoryType)
                 s.Append(", FactoryType=").Append(Setup.FactoryType);
             if (Setup.Metadata != null)
-                s.Append(", Metadata=").Print(Setup.Metadata);
+                s.Append(", Metadata=").Print(Setup.Metadata, quote: "\"");
             if (Setup.Condition != null)
                 s.Append(", HasCondition");
 
@@ -10288,7 +10294,11 @@ namespace DryIoc
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
                 "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
             NotFoundMetaCtorWithTwoArgs = Of(
-                "Expecting Meta wrapper public constructor with two args {0} but not found when resolving: {1}");
+                "Expecting Meta wrapper public constructor with two args {0} but not found when resolving: {1}"),
+            UnableToSelectFromManyRegistrationsWithMatchingMetadata = Of(
+                "Unable to select from multiple registrations matching the Metadata type {0}:" + Environment.NewLine + 
+                "{1}" + Environment.NewLine + 
+                "When resolving: {2}" + Environment.NewLine);
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

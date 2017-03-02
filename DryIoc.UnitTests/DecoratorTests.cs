@@ -267,14 +267,13 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadataOrFuncOfMetadata: "blah"));
-            container.Register(typeof(IOperation<>), typeof(SomeOperation<>), setup: Setup.With(metadataOrFuncOfMetadata: "blah"));
             container.Register(typeof(IOperation<>), typeof(MeasureExecutionTimeOperationDecorator<>), setup: Setup.Decorator);
             container.RegisterMany(new[] { typeof(OperationUser<>) });
 
             var user = container.Resolve<OperationUser<object>>();
 
-            Assert.That(user.GetOperation.Metadata, Is.EqualTo("blah"));
-            Assert.That(user.GetOperation.Value(), Is.InstanceOf<MeasureExecutionTimeOperationDecorator<object>>());
+            Assert.AreEqual("blah", user.GetOperation.Metadata);
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator<object>>(user.GetOperation.Value());
         }
 
         [Test]
