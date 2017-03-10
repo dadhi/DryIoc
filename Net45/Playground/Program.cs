@@ -10,6 +10,7 @@ using System.Threading;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using ImTools;
+using PerformanceTests;
 
 namespace Playground
 {
@@ -17,10 +18,13 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
+            //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
 
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_all_matches>();
+
+            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkRegistrationAndResolution>();
+            BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
