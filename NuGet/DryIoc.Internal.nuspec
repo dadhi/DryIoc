@@ -12,6 +12,9 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+            v2.11.0-preview-01:
+            - fixed: #451: DryIoc should know about static members
+            - added: #445: Perf: Enable fast expression compiling of nested lambda expression
             v2.10.1:
             - fixed: #446 Select single open generic impl based on matching closed service type
             v2.10:

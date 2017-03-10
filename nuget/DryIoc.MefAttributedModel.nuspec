@@ -11,6 +11,10 @@
         <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
         <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+          v3.0.0-preview-05
+          - changed: To work with DryIoc v2.11.0-preview-01 and DryIocAttributes v3.0.0-preview-01
+          - fixed: #399: Combining multiple Action exports with Lazy scenario
+          - fixed: #451: DryIoc should know about static members
           v3.0.0-preview-04
           - changed: Updated to DryIoc 2.10
           v3.0.0-preview-01
@@ -26,7 +30,7 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="[2.10,3.0)" />
+                <dependency id="DryIoc" version="2.11.0-preview-01" />
                 <dependency id="DryIocAttributes" version="3.0.0-preview-01" />
             </group>
         </dependencies>
