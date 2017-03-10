@@ -572,7 +572,7 @@ namespace DryIoc.MefAttributedModel
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {
-            var attributes = member.GetAttributes().ToArray();
+            var attributes = member.GetAttributes().ToArrayOrSelf();
             var details = attributes.Length == 0 ? null
                 : GetFirstImportDetailsOrNull(member.GetReturnTypeOrDefault(), attributes, request);
             return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
@@ -646,7 +646,7 @@ namespace DryIoc.MefAttributedModel
             // first filter out non compatible / assignable types
             if (types.Length != 1)
             {
-                types = types.Where(t => t.Key.IsAssignableTo(unwrappedType)).ToArray();
+                types = types.Match(t => t.Key.IsAssignableTo(unwrappedType));
                 if (types.Length > 1)
                     Throw.It(Error.UnableToSelectFromMultipleTypes, types, KV.Of(serviceKey, type));
             }

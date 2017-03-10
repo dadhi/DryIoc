@@ -7605,7 +7605,9 @@ namespace DryIoc
         /// <returns>True if property is matched and false otherwise.</returns>
         public static bool IsInjectable(this PropertyInfo property, bool withNonPublic = false, bool withPrimitive = false)
         {
-            return property.CanWrite && !property.IsIndexer() // first checks that property is assignable in general and not an indexer
+            return property.CanWrite
+                && !property.IsStatic()
+                && !property.IsIndexer() // first checks that property is assignable in general and not an indexer
                 && (withNonPublic || property.GetSetMethodOrNull() != null)
                 && (withPrimitive || !property.PropertyType.IsPrimitive(orArrayOfPrimitives: true));
         }
