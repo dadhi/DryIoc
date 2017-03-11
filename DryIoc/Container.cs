@@ -7127,8 +7127,8 @@ namespace DryIoc
         private bool IsScopeDependent(Request request)
         {
             return Setup.UseParentReuse
-                || request.Reuse is ResolutionScopeReuse
-                || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
+            || request.Reuse is ResolutionScopeReuse
+            || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
@@ -7137,7 +7137,8 @@ namespace DryIoc
                                                 // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
-                (request.ShouldSplitObjectGraph() || IsScopeDependent(request)) &&
+                (request.ShouldSplitObjectGraph() || 
+                Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) &&
                 !request.IsWrappedInFuncWithArgs()) &&
                 request.GetActualServiceType() != typeof(void);
         }
@@ -10313,7 +10314,7 @@ namespace DryIoc
                 Environment.NewLine +
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             NoMatchedScopeFound = Of(
-                "Unable to find scope starting from current opened {0} with name: {1}."),
+                "Unable to find matching scope with name {1} starting from the current scope {0}."),
             NoMatchingScopeWhenRegisteringInstance = Of(
                 "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
                 "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
