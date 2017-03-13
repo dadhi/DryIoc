@@ -1454,7 +1454,7 @@ namespace DryIoc
                 })
                 .Select(it => KV.Of(it.ServiceKey, it.Factory));
 
-            return registeredFactories.ConcatToArray(remainingDynamicFactories);
+            return registeredFactories.Then(remainingDynamicFactories);
         }
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
@@ -1472,10 +1472,9 @@ namespace DryIoc
 
             if (factorySelector != null)
             {
-                var validFactories = factories
-                    .Where(f => f.Value.CheckCondition(request))
-                    .Select(f => new KeyValuePair<object, Factory>(f.Key, f.Value))
-                    .ToArray();
+                var validFactories = factories.Match(
+                    f => f.Value.CheckCondition(request),
+                    f => new KeyValuePair<object, Factory>(f.Key, f.Value));
                 return factorySelector(request, validFactories);
             }
 
@@ -1497,6 +1496,18 @@ namespace DryIoc
             var matchedFactories = defaultFactories.Match(f => f.Value.CheckCondition(request));
             if (matchedFactories.Length == 0)
                 return null;
+
+            // Adds asResolutionCall for the factory to prevent caching of inlined expression in context with not matching condition
+            // issues: #382, #429
+            if (matchedFactories.Length != defaultFactories.Length)
+            {
+                for (var i = 0; i < matchedFactories.Length; i++)
+                {
+                    var factory = matchedFactories[i].Value;
+                    if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
+                        factory.Setup = factory.Setup.WithAsResolutionCall();
+                }
+            }
 
             // Match by metadata if requested
             var metadataKey = request.MetadataKey;
@@ -6716,6 +6727,13 @@ namespace DryIoc
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
 
+        internal Setup WithAsResolutionCall()
+        {
+            var copy = (Setup)MemberwiseClone();
+            copy._settings |= Settings.AsResolutionCall;
+            return copy;
+        }
+
         /// <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
         public bool AsResolutionRoot { get { return (_settings & Settings.AsResolutionRoot) != 0; } }
 
@@ -6806,7 +6824,7 @@ namespace DryIoc
             UseParentReuse = 1 << 8
         }
 
-        private readonly Settings _settings;
+        private Settings _settings; // mutable because of setting: AsResolutionCall
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> 
@@ -7056,7 +7074,7 @@ namespace DryIoc
         public virtual Setup Setup
         {
             get { return _setup; }
-            protected internal set { _setup = value ?? Setup.Default; }
+            internal set { _setup = value ?? Setup.Default; }
         }
 
         /// <summary>Checks that condition is met for request or there is no condition setup.

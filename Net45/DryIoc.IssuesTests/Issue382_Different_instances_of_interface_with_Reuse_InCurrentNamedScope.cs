@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope
     {
-        [Test, Ignore]
+        [Test]
         public void Should_work_as_is()
         {
             var container = new Container();

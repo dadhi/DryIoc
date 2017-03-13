@@ -99,7 +99,7 @@ namespace ImTools
         /// <param name="source">goes first.</param>
         /// <param name="other">appended to source.</param>
         /// <returns>empty array or concat of source and other.</returns>
-        public static T[] ConcatToArray<T>(this IEnumerable<T> source, IEnumerable<T> other)
+        public static T[] Then<T>(this IEnumerable<T> source, IEnumerable<T> other)
         {
             var sourceArr = source.ToArrayOrSelf();
             var otherArr = other.ToArrayOrSelf();
@@ -175,38 +175,67 @@ namespace ImTools
             return default(T);
         }
 
-        private static T[] AppendMatches<T>(T[] matches, T[] source, int sourcePos, int count)
+        private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
         {
-            if (matches == null)
+            if (results == null)
             {
-                var newMatches = new T[count];
+                var newResults = new T[count];
                 if (count == 1)
-                    newMatches[0] = source[sourcePos];
+                    newResults[0] = source[sourcePos];
                 else
-                    Array.Copy(source, sourcePos, newMatches, 0, count);
-                return newMatches;
+                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                        newResults[i] = source[j];
+                return newResults;
             }
 
-            var matchCount = matches.Length;
-            var appendedMatches = new T[matchCount + count];
+            var matchCount = results.Length;
+            var appendedResults = new T[matchCount + count];
             if (matchCount == 1)
-                appendedMatches[0] = matches[0];
+                appendedResults[0] = results[0];
             else
-                Array.Copy(matches, 0, appendedMatches, 0, matchCount);
+                Array.Copy(results, 0, appendedResults, 0, matchCount);
 
             if (count == 1)
-                appendedMatches[matchCount] = source[sourcePos];
+                appendedResults[matchCount] = source[sourcePos];
             else
-                Array.Copy(source, sourcePos, appendedMatches, matchCount, count);
+                Array.Copy(source, sourcePos, appendedResults, matchCount, count);
 
-            return appendedMatches;
+            return appendedResults;
+        }
+
+        private static R[] AppendTo<T, R>(T[] source, int sourcePos, int count, Func<T, R> map, R[] results = null)
+        {
+            if (results == null || results.Length == 0)
+            {
+                var newResults = new R[count];
+                if (count == 1)
+                    newResults[0] = map(source[sourcePos]);
+                else
+                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                        newResults[i] = map(source[j]);
+                return newResults;
+            }
+
+            var oldResultsCount = results.Length;
+            var appendedResults = new R[oldResultsCount + count];
+            if (oldResultsCount == 1)
+                appendedResults[0] = results[0];
+            else
+                Array.Copy(results, 0, appendedResults, 0, oldResultsCount);
+
+            if (count == 1)
+                appendedResults[oldResultsCount] = map(source[sourcePos]);
+            else
+                Array.Copy(source, sourcePos, appendedResults, oldResultsCount, count);
+
+            return appendedResults;
         }
 
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
         /// It returns source array and does Not create new one if all items match the condition.</summary>
         /// <typeparam name="T">Type of array items.</typeparam>
         /// <param name="source">Source array: If null the null will be returned.</param>
-        /// <param name="condition">Condition to filter.</param>
+        /// <param name="condition">Keep items matching the condition, and skip non-matching.</param>
         /// <returns>New array if some items are filter out. Empty array if all items are filtered out. Original array otherwise.</returns>
         public static T[] Match<T>(this T[] source, Func<T, bool> condition)
         {
@@ -228,7 +257,7 @@ namespace ImTools
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendMatches(matches, source, matchStart, i - matchStart);
+                        matches = AppendTo(source, matchStart, i - matchStart, matches);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
                 ++i;
@@ -236,7 +265,7 @@ namespace ImTools
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendMatches(matches, source, matchStart, i - matchStart);
+                return AppendTo(source, matchStart, i - matchStart, matches);
 
             if (matches != null)
                 return matches;
@@ -247,7 +276,58 @@ namespace ImTools
             return source;
         }
 
-        // todo: Add WhereNotNull with the same impl as replacement for Select(blah).Where(it => it != null)
+        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
+        /// It returns source array and does Not create new one if all items match the condition.</summary>
+        /// <typeparam name="T">Type of array items.</typeparam>
+        /// <typeparam name="R">Type of result array items.</typeparam>
+        /// <param name="source">Source array: If null the null will be returned.</param>
+        /// <param name="condition">Keep items matching the condition, and skip non-matching.</param>
+        /// <param name="map">Maps source item to result item.</param>
+        /// <returns>New array of result items.</returns>
+        public static R[] Match<T, R>(this T[] source, Func<T, bool> condition, Func<T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            if (source.Length == 0)
+                return Empty<R>();
+
+            if (source.Length == 1)
+            {
+                var item = source[0];
+                return condition(item) ? new[] { map(item) } : Empty<R>();
+            }
+
+            var matchStart = 0;
+            R[] matches = null;
+            var matchFound = false;
+
+            var i = 0;
+            while (i < source.Length)
+            {
+                matchFound = condition(source[i]);
+                if (!matchFound)
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendTo(source, matchStart, i - matchStart, map, matches);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+                ++i;
+            }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendTo(source, matchStart, i - matchStart, map, matches);
+
+            if (matches != null)
+                return matches;
+
+            if (matchStart != 0) // no matches
+                return Empty<R>();
+
+            return AppendTo(source, 0, source.Length, map);
+        }
 
         /// <summary>Produces new array without item at specified <paramref name="index"/>. 
         /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>

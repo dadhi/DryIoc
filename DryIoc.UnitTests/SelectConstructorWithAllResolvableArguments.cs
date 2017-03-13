@@ -63,7 +63,7 @@ namespace DryIoc.UnitTests
 
             var func = container.Resolve<Func<int, SomeService, SomeClient>>();
 
-            Assert.That(func(3, null).Seed, Is.EqualTo(3));
+            Assert.AreEqual(3, func(3, null).Seed);
         }
 
         [Test]

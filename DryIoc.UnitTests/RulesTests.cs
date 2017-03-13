@@ -197,7 +197,7 @@ namespace DryIoc.UnitTests
             var singleton = container.Resolve<LambdaExpression>(typeof(FooHey));
 
             // expression contains item creation delegate / lambda
-            Assert.That(singleton.ToString(), Is.StringContaining("() =>")); 
+            StringAssert.Contains("() =>", singleton.ToString()); 
         }
 
         internal class XX { }

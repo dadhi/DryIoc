@@ -83,7 +83,7 @@ namespace DryIoc.UnitTests
 
             var factory = container.Resolve<Func<int, Soose>>();
 
-            Assert.That(factory(1).Scopes, Is.EqualTo(1));
+            Assert.AreEqual(1, factory(1).Scopes);
         }
 
         [Test]
