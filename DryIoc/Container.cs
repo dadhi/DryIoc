@@ -1363,34 +1363,48 @@ namespace DryIoc
             if (metadataKey != null || metadata != null)
                 factories = factories.Where(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
 
-            var defaultFactories = factories
-                .Where(f => f.Key is DefaultKey && f.Value.CheckCondition(request))
-                .ToArrayOrSelf();
+            var defaultFactories = factories.Where(f => f.Key is DefaultKey).ToArrayOrSelf();
+            if (defaultFactories.Length == 0)
+                return null;
+
+            var matchedFactories = defaultFactories.Where(f => f.Value.CheckCondition(request)).ToArrayOrSelf();
+            if (matchedFactories.Length == 0)
+                return null;
+
+            if (matchedFactories.Length != defaultFactories.Length)
+            {
+                for (var i = 0; i < matchedFactories.Length; i++)
+                {
+                    var matchedFactory = matchedFactories[i].Value;
+                    if (matchedFactory.Reuse is CurrentScopeReuse && !matchedFactory.Setup.AsResolutionCall)
+                        matchedFactory.Setup = matchedFactory.Setup.WithAsResolutionCall();
+                }
+            }
 
             // Select single scoped factory if any
-            if (defaultFactories.Length > 1)
+            if (matchedFactories.Length > 1)
             {
                 if (Rules.ImplicitCheckForReuseMatchingScope && this.GetCurrentScope() != null)
                 {
-                    var scopedFactories = defaultFactories.Where(f => f.Value.Reuse is CurrentScopeReuse).ToArray();
+                    var scopedFactories = matchedFactories.Where(f => f.Value.Reuse is CurrentScopeReuse).ToArrayOrSelf();
                     if (scopedFactories.Length == 1)
-                        defaultFactories = scopedFactories;
+                        matchedFactories = scopedFactories;
                 }
 
                 // check that impl generic definition is matched to service type, and selected matched only factories.
                 // the generated factories are cached - so there should not be repeating of the check, and not match of perf decrease.
-                if (defaultFactories.Length != 0)
+                if (matchedFactories.Length != 0)
                 {
-                    defaultFactories = defaultFactories.Where(f => 
+                    matchedFactories = matchedFactories.Where(f => 
                         f.Value.FactoryGenerator == null ||
                         f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null)
                         .ToArrayOrSelf();
                 }
             }
 
-            if (defaultFactories.Length == 1)
+            if (matchedFactories.Length == 1)
             {
-                var defaultFactory = defaultFactories[0];
+                var defaultFactory = matchedFactories[0];
 
                 // NOTE: For resolution root sets correct default key to be used in delegate cache.
                 if (request.IsResolutionCall)
@@ -6539,6 +6553,13 @@ namespace DryIoc
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
 
+        internal Setup WithAsResolutionCall()
+        {
+            var copy = (Setup)MemberwiseClone();
+            copy._settings |= Settings.AsResolutionCall;
+            return copy;
+        }
+
         /// <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
         public bool AsResolutionRoot { get { return (_settings & Settings.AsResolutionRoot) != 0; } }
 
@@ -6629,7 +6650,7 @@ namespace DryIoc
             UseParentReuse = 1 << 8
         }
 
-        private readonly Settings _settings;
+        private Settings _settings;
 
         /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
         /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param> 
@@ -6949,7 +6970,7 @@ namespace DryIoc
 
         private bool IsScopeDependent(Request request)
         {
-            return Setup.UseParentReuse
+            return Setup.UseParentReuse 
                 || request.Reuse is ResolutionScopeReuse
                 || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
@@ -6960,7 +6981,7 @@ namespace DryIoc
                 // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
-                (request.ShouldSplitObjectGraph() || IsScopeDependent(request)) && 
+                (request.ShouldSplitObjectGraph() || Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) && 
                 !request.IsWrappedInFuncWithArgs()) && 
                 request.GetActualServiceType() != typeof(void);
         }
