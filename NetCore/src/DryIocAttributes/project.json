@@ -1,5 +1,5 @@
 ﻿{
-  "version": "2.6.0-*",
+  "version": "3.0.0-preview-02",
 
   "buildOptions": {
     "compile": [
@@ -9,21 +9,14 @@
     ]
   },
 
-  "dependencies": {
-    "NETStandard.Library": "1.6.1"
-  },
-
   "frameworks": {
-    
-    "netstandard1.0": { },
 
-    "netcoreapp1.1": {
-          "dependencies": {
-            "Microsoft.NETCore.App": {
-                "type": "platform",
-                "version": "1.1.0"
-            }
-          }
+    "netstandard1.0": {
+      "dependencies": {
+        "System.Runtime": "4.3.0",
+        "System.Runtime.Extensions": "4.3.0",
+        "System.Diagnostics.Tools": "4.3.0"
       }
-   }
+    }
+  }
 }

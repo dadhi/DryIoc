@@ -10157,7 +10157,8 @@ namespace DryIoc
 
     /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
     /// filtering or catching container relevant exceptions from client code.</summary>
-    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", Justification = "Not available in PCL.")]
+    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", 
+        Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException
     {
         /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>

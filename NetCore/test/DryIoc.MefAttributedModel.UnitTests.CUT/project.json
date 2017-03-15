@@ -1,21 +1,13 @@
 ﻿{
   "buildOptions": {
     "compile": [
-      "../../../DryIoc.UnitTests/*.cs"
-    ],
-    "exclude": [
-      "../../../DryIoc.UnitTests/ThrowTests.cs"
-    ],
-    "nowarn": [ "CS0618" ]
+      "../../../DryIoc.MefAttributedModel.UnitTests.CUT/*.cs"
+    ]
   },
 
   "dependencies": {
-    "DryIoc": { "target": "project" },
-    "NUnit": "3.6.0",
-    "dotnet-test-nunit": "3.4.0-beta-3"
+    "DryIocAttributes": { "target": "project" }
   },
-
-  "testRunner": "nunit",
 
   "frameworks": {
     "netcoreapp1.1": {
@@ -28,7 +20,6 @@
           "type": "platform"
         }
       }
-    },
-    "net461": {}
+    }
   }
 }

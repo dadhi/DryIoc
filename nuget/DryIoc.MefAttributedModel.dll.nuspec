@@ -38,13 +38,13 @@
             <dependency id="DryIoc.dll" version="2.11.0-preview-01" />
             <dependency id="DryIocAttributes.dll" version="3.0.0-preview-01" />
 
+            <dependency id="System.Runtime" version="4.1.0" />
+            <dependency id="System.Runtime.Extensions" version="4.1.0" />
             <dependency id="System.Collections" version="4.0.11" />
-            <dependency id="System.Diagnostics.Debug" version="4.0.11" />
             <dependency id="System.Linq" version="4.1.0" />
             <dependency id="System.Linq.Expressions" version="4.1.0" />
             <dependency id="System.Reflection" version="4.1.0" />
-            <dependency id="System.Runtime" version="4.1.0" />
-            <dependency id="System.Runtime.Extensions" version="4.1.0" />
+            <dependency id="System.Diagnostics.Debug" version="4.0.11" />
           </group>
         </dependencies>
         <frameworkAssemblies>

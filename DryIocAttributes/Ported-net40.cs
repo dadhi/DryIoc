@@ -32,7 +32,7 @@ namespace System
         /// <summary>Initializes a new instance of the <see cref="Lazy{T, TMetadata}"/> class.</summary>
         /// <param name="valueFactory">The value factory.</param>
         /// <param name="metadata">The metadata.</param>
-        /// <exception cref="System.ArgumentNullException">valueFactory</exception>
+        /// <exception cref="ArgumentNullException">valueFactory</exception>
         public Lazy(Func<T> valueFactory, TMetadata metadata)
         {
             if (valueFactory == null) throw new ArgumentNullException("valueFactory");
