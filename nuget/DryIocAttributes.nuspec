@@ -11,7 +11,9 @@
         <description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
         <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v3.0.0-preview-01
+          v3.0.0-preview-02:
+          - changed: Updated netstandard package dependencies to v4.3
+          v3.0.0-preview-01:
           - added: #292: Add ImportManyAttribute support for full MEF compatibility
           - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
           - added: #323: Support multiple WithMetadataAttribute(key, value)
