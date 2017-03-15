@@ -28,18 +28,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolve_will_return_the_same_func_cause_the_compiled_delegate_stores_the_same_nested_lambda()
-        {
-            var container = new Container();
-            container.Register(typeof(IService), typeof(Service));
-
-            var first = container.Resolve<Func<IService>>();
-            var second = container.Resolve<Func<IService>>();
-
-            Assert.AreSame(first, second);
-        }
-
-        [Test]
         public void Given_registered_transient_Resolved_Func_should_create_new_instances()
         {
             var container = new Container();
