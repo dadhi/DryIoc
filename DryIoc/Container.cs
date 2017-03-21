@@ -33,7 +33,6 @@ namespace DryIoc
     using System.Text;
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;
-    using System.Runtime.CompilerServices;
     using ImTools;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
@@ -492,7 +491,6 @@ namespace DryIoc
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <returns>The requested service instance.</returns>
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         public TService Resolve<TService>()
         {
             return (TService)Resolve(typeof(TService));
@@ -501,12 +499,11 @@ namespace DryIoc
         /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <returns>The requested service instance.</returns>
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         public object Resolve(Type serviceType)
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(null, _thisContainerWeakRef, null)
+                ? factoryDelegate(null, _resolverContext, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, false, null);
         }
             
@@ -514,12 +511,11 @@ namespace DryIoc
 
         #region IResolver
 
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             return factoryDelegate != null
-                ? factoryDelegate(null, _thisContainerWeakRef, null)
+                ? factoryDelegate(null, _resolverContext, null)
                 : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
         }
 
@@ -549,7 +545,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(null, _thisContainerWeakRef, scope);
+                    return cachedFactoryDelegate(null, _resolverContext, scope);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -571,7 +567,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(null, _thisContainerWeakRef, scope);
+            var service = factoryDelegate(null, _resolverContext, scope);
 
             if (registry.Services.IsEmpty)
                 return service;
@@ -613,7 +609,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(null, _thisContainerWeakRef, scope);
+            var service = factoryDelegate(null, _resolverContext, scope);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
@@ -871,7 +867,7 @@ namespace DryIoc
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef IContainer.ContainerWeakRef
         {
-            get { return _thisContainerWeakRef; }
+            get { return _resolverContext; }
         }
 
         Factory IContainer.ResolveFactory(Request request)
@@ -1492,8 +1488,7 @@ namespace DryIoc
         private readonly Ref<Registry> _registry;
         private Ref<ImMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
 
-        // pre-created and stored for performance reasons
-        private readonly ContainerWeakRef _thisContainerWeakRef;
+        private readonly ContainerWeakRef _resolverContext;
 
         private readonly SingletonScope _singletonScope;
 
@@ -2173,8 +2168,8 @@ namespace DryIoc
             else if (scopeContext == null && rules.ImplicitOpenedRootScope) // only valid for non ambient context
                 _openedScope = new Scope(null, NonAmbientRootScopeName);
 
-            _thisContainerWeakRef = new ContainerWeakRef(this);
-
+            _resolverContext = new ContainerWeakRef(this, useStrongReference: true);
+            
             RootContainer = rootContainer;
         }
 
@@ -2634,7 +2629,11 @@ namespace DryIoc
         /// <returns>Target container.</returns>
         public Container GetTarget(bool maybeDisposed = false)
         {
-            var container = _ref.Target as Container;
+            if (_strongRef != null)
+                return (maybeDisposed || !_strongRef.IsDisposed) ? _strongRef
+                    : Throw.For<Container>(Error.ContainerIsDisposed);
+
+            var container = _weakRef.Target as Container;
             return container != null && (maybeDisposed || !container.IsDisposed)
                 ? container
                 : container == null
@@ -2644,12 +2643,17 @@ namespace DryIoc
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> 
         /// <param name="container">Container to reference.</param>
-        public ContainerWeakRef(IContainer container)
+        /// <param name="useStrongReference">(optional) Allows to use string reference instead of weak one.</param>
+        public ContainerWeakRef(Container container, bool useStrongReference = false)
         {
-            _ref = new WeakReference(container);
+            if (useStrongReference)
+                _strongRef = container;
+            else
+                _weakRef =  new WeakReference(container);
         }
 
-        private readonly WeakReference _ref;
+        private readonly WeakReference _weakRef;
+        private readonly Container _strongRef;
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
@@ -5055,13 +5059,6 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Portable aggressive in-lining option for MethodImpl.</summary>
-    public static class MethodImplHints
-    {
-        /// <summary>Value of MethodImplOptions.AggressingInlining</summary>
-        public const MethodImplOptions AggressingInlining = (MethodImplOptions)256;
-    }
-
     /// <summary>Defines convenient extension methods for <see cref="IResolver"/>.</summary>
     public static class Resolver
     {
@@ -5069,7 +5066,6 @@ namespace DryIoc
         /// <param name="serviceType">The type of the requested service.</param>
         /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
         /// <returns>The requested service instance.</returns>
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         public static object Resolve(this IResolver resolver, Type serviceType)
         {
             return resolver.Resolve(serviceType, false);
@@ -9794,6 +9790,7 @@ namespace DryIoc
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
     public interface IContainer : IRegistrator, IResolver, IDisposable
     {
+        // todo: v3: change type from impl. specific to IResolverContext
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }
 
