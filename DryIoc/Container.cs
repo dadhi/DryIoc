@@ -2630,9 +2630,12 @@ namespace DryIoc
         public Container GetTarget(bool maybeDisposed = false)
         {
             if (_strongRef != null)
-                return (maybeDisposed || !_strongRef.IsDisposed) ? _strongRef
-                    : Throw.For<Container>(Error.ContainerIsDisposed);
+                return (maybeDisposed || !_strongRef.IsDisposed) ? _strongRef : Throw.For<Container>(Error.ContainerIsDisposed);
+            return GetWeakTarget(maybeDisposed);
+        }
 
+        private Container GetWeakTarget(bool maybeDisposed)
+        {
             var container = _weakRef.Target as Container;
             return container != null && (maybeDisposed || !container.IsDisposed)
                 ? container
