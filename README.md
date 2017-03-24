@@ -33,6 +33,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 - [Documentation][WikiHome]
 - [How to contribute](CONTRIBUTING.md)
+- License: [MIT](LICENSE.txt)
 
 
 ## Benchmarks
