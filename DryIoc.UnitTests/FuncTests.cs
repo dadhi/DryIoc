@@ -28,18 +28,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Func_itself_is_transient()
-        {
-            var container = new Container();
-            container.Register(typeof(IService), typeof(Service));
-
-            var first = container.Resolve<Func<IService>>();
-            var second = container.Resolve<Func<IService>>();
-
-            Assert.That(first, Is.Not.SameAs(second));
-        }
-
-        [Test]
         public void Given_registered_transient_Resolved_Func_should_create_new_instances()
         {
             var container = new Container();

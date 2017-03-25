@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2016 Maksim Volkau
+Copyright (c) 2013-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -315,6 +315,51 @@ namespace DryIoc
 
         private static readonly Lazy<MethodInfo> _expressionAssignMethod = new Lazy<MethodInfo>(() =>
             typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression)));
+
+        private static readonly Type[] _factoryDelegateParamTypes =
+            { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
+
+        private static readonly ParameterExpression[] _factoryDelegateParamExprs =
+            { StateParamExpr, ResolverContextParamExpr, ResolutionScopeParamExpr };
+
+        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
+        /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
+        public static Expression<FactoryDelegate> WrapInFactoryExpression(Expression expression)
+        {
+            return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
+        }
+
+        /// <summary>First wraps the input service expression into lambda expression and
+        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
+        /// <param name="expression">Service creation expression.</param>
+        /// <returns>Compiled factory delegate to use for service resolution.</returns>
+        public static FactoryDelegate CompileToDelegate(Expression expression)
+        {
+            expression = OptimizeExpression(expression);
+
+            // Optimize: just extract singleton from expression without compiling
+            if (expression.NodeType == ExpressionType.Constant)
+            {
+                var value = ((ConstantExpression)expression).Value;
+                return (state, context, scope) => value;
+            }
+
+            var factoryDelegate = FastExpressionCompiler.ExpressionCompiler.DoCompile<FactoryDelegate>(
+                expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+            if (factoryDelegate != null)
+                return factoryDelegate;
+
+            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs).Compile();
+        }
+
+        private static Expression OptimizeExpression(Expression expression)
+        {
+            if (expression.NodeType == ExpressionType.Convert)
+                expression = ((UnaryExpression)expression).Operand;
+            else if (expression.Type.IsValueType())
+                expression = Expression.Convert(expression, typeof(object));
+            return expression;
+        }
 
         #endregion
 
@@ -1601,7 +1646,7 @@ namespace DryIoc
                 {
                     var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                     if (decoratedExpr != null)
-                        return decoratedExpr.CompileToDelegate();
+                        return CompileToDelegate(decoratedExpr);
                 }
 
                 return GetInstanceFromScopeChainOrSingletons;
@@ -2353,7 +2398,7 @@ namespace DryIoc
                 try
                 {
                     var request = Request.Create(generatingContainer, r.ServiceType, r.OptionalServiceKey);
-                    var factoryExpr = r.Factory.GetExpressionOrDefault(request).WrapInFactoryExpression();
+                    var factoryExpr = Container.WrapInFactoryExpression(r.Factory.GetExpressionOrDefault(request));
                     resolutionExprList.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(r, factoryExpr));
                 }
                 catch (ContainerException ex)
@@ -2669,62 +2714,6 @@ namespace DryIoc
     /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
     public delegate object FactoryDelegate(object[] state, IResolverContext r, IScope scope);
-
-    /// <summary>Handles default conversation of expression into <see cref="FactoryDelegate"/>.</summary>
-    public static partial class FastExpressionCompiler
-    {
-        private static readonly Type[] _factoryDelegateParamTypes = 
-            { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
-
-        private static readonly ParameterExpression[] _factoryDelegateParamExprs =
-            { Container.StateParamExpr, Container.ResolverContextParamExpr, Container.ResolutionScopeParamExpr };
-
-        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
-        /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
-        public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression)
-        {
-            return Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
-        }
-
-        static partial void TryCompile<TDelegate>(ref TDelegate compileDelegate,
-            Expression bodyExpr,
-            ParameterExpression[] paramExprs,
-            Type[] paramTypes,
-            Type returnType) where TDelegate : class;
-
-        /// <summary>First wraps the input service expression into lambda expression and
-        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        /// <param name="expression">Service creation expression.</param>
-        /// <returns>Compiled factory delegate to use for service resolution.</returns>
-        public static FactoryDelegate CompileToDelegate(this Expression expression)
-        {
-            expression = OptimizeExpression(expression);
-
-            // Optimize: just extract singleton from expression without compiling
-            if (expression.NodeType == ExpressionType.Constant)
-            {
-                var value = ((ConstantExpression)expression).Value;
-                return (state, context, scope) => value;
-            }
-
-            FactoryDelegate factoryDelegate = null;
-            TryCompile(ref factoryDelegate, expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
-
-            if (factoryDelegate != null)
-                return factoryDelegate;
-
-            return Expression.Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs).Compile();
-        }
-
-        private static Expression OptimizeExpression(Expression expression)
-        {
-            if (expression.NodeType == ExpressionType.Convert)
-                expression = ((UnaryExpression)expression).Operand;
-            else if (expression.Type.IsValueType())
-                expression = Expression.Convert(expression, typeof(object));
-            return expression;
-        }
-    }
 
     /// <summary>Adds to Container support for:
     /// <list type="bullet">
@@ -3122,7 +3111,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType);
             var factory = request.Container.ResolveFactory(serviceRequest);
             var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest);
-            return expr == null ? null : Expression.Constant(expr.WrapInFactoryExpression(), typeof(LambdaExpression));
+            return expr == null ? null : Expression.Constant(Container.WrapInFactoryExpression(expr), typeof(LambdaExpression));
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request)
@@ -7092,7 +7081,7 @@ namespace DryIoc
                 !tracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var factoryDelegate = serviceExpr.CompileToDelegate();
+                var factoryDelegate = Container.CompileToDelegate(serviceExpr);
                 if (Setup.PreventDisposal)
                 {
                     var factory = factoryDelegate;
@@ -7159,7 +7148,7 @@ namespace DryIoc
         public virtual FactoryDelegate GetDelegateOrDefault(Request request)
         {
             var expression = GetExpressionOrDefault(request);
-            return expression == null ? null : expression.CompileToDelegate();
+            return expression == null ? null : Container.CompileToDelegate(expression);
         }
 
         /// <summary>Returns nice string representation of factory.</summary>
@@ -11140,6 +11129,32 @@ namespace DryIoc
         }
 
         static partial void GetCurrentManagedThreadID(ref int threadID);
+    }
+}
+
+namespace FastExpressionCompiler
+{
+    using System;
+    using System.Linq.Expressions;
+    using System.Collections.Generic;
+
+    /// <summary>Compiles to delegate using FastExpressionCompiler.</summary>
+    public static partial class ExpressionCompiler
+    {
+        internal static TDelegate DoCompile<TDelegate>(Expression bodyExpr, 
+            ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class
+        {
+            TDelegate compiledDelegate = null;
+            TryCompile(ref compiledDelegate, bodyExpr, paramExprs, paramTypes, returnType);
+            return compiledDelegate;
+        }
+
+        static partial void TryCompile<TDelegate>(
+            ref TDelegate compileDelegate,
+            Expression bodyExpr,
+            IList<ParameterExpression> paramExprs,
+            Type[] paramTypes,
+            Type returnType) where TDelegate : class;
     }
 }
 
