@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class SelectConstructorWithAllResolvableArguments
+    public class SelectConstructorWithAllResolvableArgumentTests
     {
         [Test]
         public void Container_is_providing_method_for_that_Test_default_constructor()
@@ -111,7 +111,6 @@ namespace DryIoc.UnitTests
 
             var blah = container.Resolve<Blah>();
             Assert.IsNotNull(blah.R);
-            //Assert.AreEqual(3, blah.I);
         }
 
         [Test]
@@ -124,6 +123,43 @@ namespace DryIoc.UnitTests
 
             var blah = container.Resolve<Blah>();
             Assert.AreEqual("a", blah.S);
+        }
+
+        [Test]
+        public void Can_specify_to_use_default_ctor()
+        {
+            var container = new Container();
+
+            container.Register<Ab>(made: FactoryMethod.DefaultConstructor());
+
+            var ab = container.Resolve<Ab>();
+            Assert.IsNotNull(ab);
+        }
+
+        [Test]
+        public void Can_specify_to_use_default_ctor_and_throw_correct_error_if_no_default_ctor()
+        {
+            var container = new Container();
+
+            container.Register<Ac>(made: FactoryMethod.DefaultConstructor());
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<Ac>());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToGetConstructorFromSelector), 
+                Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void For_consitency_I_can_specify_FactoryMethod_to_be_a_constructor()
+        {
+            var container = new Container();
+
+            container.Register<Ac>(made: Made.Of(FactoryMethod.Constructor()));
+
+            var ac = container.WithDependencies(Parameters.Of.Type(_ => "x")).Resolve<Ac>();
+            Assert.IsNotNull(ac);
         }
 
         #region CUT
@@ -227,6 +263,17 @@ namespace DryIoc.UnitTests
         public class InternalClient
         {
             internal InternalClient() { }
+        }
+
+        public class Ab
+        {
+            public Ab() {}
+            public Ab(string x) {}
+        }
+
+        public class Ac
+        {
+            public Ac(string x) { }
         }
 
         #endregion
