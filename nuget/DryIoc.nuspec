@@ -12,6 +12,10 @@
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
+            v2.10.4:
+            - fixed: #456: Abstract service type is not supported with AutoConcreteTypeResolution and required service type
+            - fixed: #431: Make AutoConcreteTypeResolution rule to check if type is resolvable and fallback to next rule
+            - added: FactoryMethod.DefaultConstructor
             v2.10.3:
             - fixed: #438: Remove self WeakReference from Container to make it more simple
             - changed: Using the latest FastExpressionCompiler with nested lambda compilation support
