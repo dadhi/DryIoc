@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-namespace DryIoc
+namespace FastExpressionCompiler
 {
     using System;
     using System.Collections.Generic;
@@ -32,29 +32,56 @@ namespace DryIoc
     using System.Reflection.Emit;
 
     /// <summary>Compiles expression to delegate by emitting the IL directly.
-    /// The emitter is ~10 times faster than Expression.Compile.</summary>
-    public static partial class FastExpressionCompiler
+    /// The emitter is ~20 times faster than Expression.Compile.</summary>
+    public static partial class ExpressionCompiler
     {
         // ReSharper disable once RedundantAssignment
-
-        /// <summary>Compiles expression to delegate by emitting the IL. 
-        /// If sub-expressions are not supported by emitter, then the method returns null.
-        /// The usage should be calling the method, if result is null then calling the Expression.Compile.
-        /// Making it partial makes possibly to coditionally rely FastExpressionCompiler availability on different platforms.</summary>
-        /// <param name="compiledDelegate">Result delegate or null,if unable to compile.</param>
-        /// <param name="bodyExpr">Lambda body.</param>
-        /// <param name="paramExprs">Lambda parameter expressions.</param>
-        /// <param name="paramTypes">The types of parameters.</param>
-        /// <param name="returnType">The return type.</param>
-        static partial void TryCompile<TDelegate>(ref TDelegate compiledDelegate,
+        static partial void TryCompile<TDelegate>(ref TDelegate compileDelegate,
             Expression bodyExpr,
-            ParameterExpression[] paramExprs,
+            IList<ParameterExpression> paramExprs,
             Type[] paramTypes,
             Type returnType) where TDelegate : class
         {
-            ClosureInfo ignored = null;
-            compiledDelegate = (TDelegate)TryCompile(ref ignored,
-                typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
+            compileDelegate = TryCompile<TDelegate>(bodyExpr, paramExprs, paramTypes, returnType);
+        }
+
+        /// <summary>First tries to compile fast and if failed (null result), then falls back to Expression.Compile.</summary>
+        /// <typeparam name="T">Type of compiled delegate return result.</typeparam>
+        /// <param name="lambdaExpr">Expr to compile.</param>
+        /// <returns>Compiled delegate.</returns>
+        public static Func<T> Compile<T>(Expression<Func<T>> lambdaExpr)
+        {
+            return TryCompile<Func<T>>(lambdaExpr.Body, lambdaExpr.Parameters, EmptyTypes, typeof(T)) 
+                ?? lambdaExpr.Compile();
+        }
+
+        /// <summary>Compiles arbitrary lambda expression to <typeparamref name="TDelegate"/>.</summary>
+        /// <typeparam name="TDelegate">Should be the compatible type of delegate, otherwise case will throw.</typeparam>
+        /// <param name="lambdaExpr">Lambda expression to compile.</param>
+        /// <returns>compiled delegate.</returns>
+        public static TDelegate Compile<TDelegate>(LambdaExpression lambdaExpr)
+            where TDelegate : class
+        {
+            var paramExprs = lambdaExpr.Parameters;
+            var paramTypes = GetParamExprTypes(paramExprs);
+            var expr = lambdaExpr.Body;
+            return TryCompile<TDelegate>(expr, paramExprs, paramTypes, expr.Type)
+                ?? (TDelegate)(object)lambdaExpr.Compile();
+        }
+
+        private static Type[] GetParamExprTypes(IList<ParameterExpression> paramExprs)
+        {
+            var paramsCount = paramExprs.Count;
+            if (paramsCount == 0)
+                return EmptyTypes;
+
+            if (paramsCount == 1)
+                return new[] { paramExprs[0].Type };
+
+            var paramTypes = new Type[paramsCount];
+            for (var i = 0; i < paramTypes.Length; i++)
+                paramTypes[i] = paramExprs[i].Type;
+            return paramTypes;
         }
 
         /// <summary>Compiles expression to delegate by emitting the IL. 
@@ -67,7 +94,7 @@ namespace DryIoc
         /// <returns>Result delegate or null, if unable to compile.</returns>
         public static TDelegate TryCompile<TDelegate>(
             Expression bodyExpr,
-            ParameterExpression[] paramExprs,
+            IList<ParameterExpression> paramExprs,
             Type[] paramTypes,
             Type returnType) where TDelegate : class
         {
@@ -107,7 +134,7 @@ namespace DryIoc
             if (closureInfo == null)
             {
                 return new DynamicMethod(string.Empty, returnType, paramTypes,
-                    typeof(FastExpressionCompiler).Module, skipVisibility: true);
+                    typeof(ExpressionCompiler), skipVisibility: true);
             }
 
             var closureType = closureInfo.ClosureObject.GetType();
@@ -119,12 +146,16 @@ namespace DryIoc
         private static Type[] GetClosureAndParamTypes(Type[] paramTypes, Type closureType)
         {
             var paramCount = paramTypes.Length;
+            if (paramCount == 0)
+                return new[] { closureType };
+
             var closureAndParamTypes = new Type[paramCount + 1];
             closureAndParamTypes[0] = closureType;
             if (paramCount == 1)
                 closureAndParamTypes[1] = paramTypes[0];
             else if (paramCount > 1)
                 Array.Copy(paramTypes, 0, closureAndParamTypes, 1, paramCount);
+
             return closureAndParamTypes;
         }
 
@@ -511,8 +542,8 @@ namespace DryIoc
         private static bool IsBoundConstant(object value)
         {
             return value != null &&
-                !(value is int || value is double || value is bool ||
-                value is string || value is Type || value.GetType().IsEnum);
+                   !(value is int || value is double || value is bool ||
+                     value is string || value is Type || value.GetType().GetTypeInfo().IsEnum);
         }
 
         private static readonly Type[] EmptyTypes = new Type[0];
@@ -587,17 +618,12 @@ namespace DryIoc
                 case ExpressionType.Lambda:
 
                     var lambdaExpr = (LambdaExpression)expr;
-
                     var lambdaParamExprs = lambdaExpr.Parameters;
-                    var paramTypes = lambdaParamExprs.Count == 0
-                        ? EmptyTypes
-                        : lambdaParamExprs.Select(p => p.Type).ToArray();
-
-                    var returnType = lambdaExpr.Body.Type;
+                    var paramTypes = GetParamExprTypes(lambdaParamExprs);
 
                     ClosureInfo nestedClosure = null;
                     var nestedLambda = TryCompile(ref nestedClosure,
-                        lambdaExpr.Type, paramTypes, returnType, lambdaExpr.Body, lambdaParamExprs);
+                        lambdaExpr.Type, paramTypes, lambdaExpr.Body.Type, lambdaExpr.Body, lambdaParamExprs);
 
                     if (nestedLambda == null)
                         return false;
@@ -627,7 +653,7 @@ namespace DryIoc
                 case ExpressionType.Invoke:
                     var invocationExpr = (InvocationExpression)expr;
                     return TryCollectBoundConstants(ref closure, invocationExpr.Expression, paramExprs)
-                        && TryCollectBoundConstants(ref closure, invocationExpr.Arguments, paramExprs);
+                           && TryCollectBoundConstants(ref closure, invocationExpr.Arguments, paramExprs);
 
                 default:
                     var unaryExpr = expr as UnaryExpression;
@@ -637,7 +663,7 @@ namespace DryIoc
                     var binaryExpr = expr as BinaryExpression;
                     if (binaryExpr != null)
                         return TryCollectBoundConstants(ref closure, binaryExpr.Left, paramExprs)
-                            && TryCollectBoundConstants(ref closure, binaryExpr.Right, paramExprs);
+                               && TryCollectBoundConstants(ref closure, binaryExpr.Right, paramExprs);
 
                     break;
             }
@@ -661,7 +687,8 @@ namespace DryIoc
         /// to normal and slow Expression.Compile.</summary>
         private static class EmittingVisitor
         {
-            private static readonly MethodInfo _getDelegateTargetProperty = typeof(Delegate).GetProperty("Target").GetGetMethod();
+            private static readonly MethodInfo _getDelegateTargetProperty =
+                typeof(Delegate).GetTypeInfo().DeclaredMethods.First(p => p.Name == "get_Target");
 
             public static bool TryEmit(Expression expr, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
             {
@@ -796,7 +823,7 @@ namespace DryIoc
                 {
                     il.Emit(OpCodes.Ldnull);
                 }
-                else if (constant is int || constant.GetType().IsEnum)
+                else if (constant is int || constant.GetType().GetTypeInfo().IsEnum)
                 {
                     EmitLoadConstantInt(il, (int)constant);
                 }
@@ -815,7 +842,7 @@ namespace DryIoc
                 else if (constant is Type)
                 {
                     il.Emit(OpCodes.Ldtoken, (Type)constant);
-                    var getTypeFromHandle = typeof(Type).GetMethod("GetTypeFromHandle");
+                    var getTypeFromHandle = typeof(Type).GetTypeInfo().DeclaredMethods.First(m => m.Name == "GetTypeFromHandle");
                     il.Emit(OpCodes.Call, getTypeFromHandle);
                 }
                 else if (closure != null)
@@ -831,7 +858,7 @@ namespace DryIoc
 
                 // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
                 if (constantType == typeof(object) &&
-                    constant != null && constant.GetType().IsValueType())
+                    constant != null && constant.GetType().GetTypeInfo().IsValueType)
                     il.Emit(OpCodes.Box, constant.GetType());
 
                 return true;
@@ -877,7 +904,7 @@ namespace DryIoc
                 var elems = na.Expressions;
                 var arrType = na.Type;
                 var elemType = arrType.GetElementType();
-                var isElemOfValueType = elemType.IsValueType;
+                var isElemOfValueType = elemType.GetTypeInfo().IsValueType;
 
                 var arrVar = il.DeclareLocal(arrType);
 
@@ -939,7 +966,9 @@ namespace DryIoc
                     var prop = binding.Member as PropertyInfo;
                     if (prop != null)
                     {
-                        var setMethod = prop.GetSetMethod();
+                        var propSetMethodName = "set_" + prop.Name;
+                        var setMethod = prop.DeclaringType.GetTypeInfo()
+                            .DeclaredMethods.FirstOrDefault(m => m.Name == propSetMethodName);
                         if (setMethod == null)
                             return false;
                         EmitMethodCall(setMethod, il);
@@ -987,10 +1016,12 @@ namespace DryIoc
                     return true;
                 }
 
-                var property = m.Member as PropertyInfo;
-                if (property != null)
+                var prop = m.Member as PropertyInfo;
+                if (prop != null)
                 {
-                    var getMethod = property.GetGetMethod();
+                    var propGetMethodName = "get_" + prop.Name;
+                    var getMethod = prop.DeclaringType.GetTypeInfo()
+                        .DeclaredMethods.FirstOrDefault(_ => _.Name == propGetMethodName);
                     if (getMethod == null)
                         return false;
                     EmitMethodCall(getMethod, il);
@@ -1068,7 +1099,7 @@ namespace DryIoc
                     if (lambdaClosure.IsArray)
                     {
                         // box value types before setting the object array item
-                        if (closedParamExpr.Type.IsValueType())
+                        if (closedParamExpr.Type.GetTypeInfo().IsValueType)
                             il.Emit(OpCodes.Box, closedParamExpr.Type);
 
                         // load item from index
@@ -1086,10 +1117,10 @@ namespace DryIoc
 
             private static bool EmitInvokeLambda(InvocationExpression expr, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
             {
-                if (TryEmit(expr.Expression, paramExprs, il, closure) && 
+                if (TryEmit(expr.Expression, paramExprs, il, closure) &&
                     EmitMany(expr.Arguments, paramExprs, il, closure))
                 {
-                    var invokeMethod = expr.Expression.Type.GetMethod("Invoke");
+                    var invokeMethod = expr.Expression.Type.GetTypeInfo().DeclaredMethods.First(m => m.Name == "Invoke");
                     EmitMethodCall(invokeMethod, il);
                     return true;
                 }

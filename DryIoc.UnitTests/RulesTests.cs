@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -90,6 +91,51 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<Y>(x.Dep);
         }
 
+        [Test]
+        public void Can_resolve_unknown_concrete_type_as_Func_with_required_type()
+        {
+            var container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+
+            var getX = container.Resolve<Func<Y, object>>(typeof(X));
+
+            var x = getX(new Y());
+            Assert.IsNotNull(x);
+        }
+
+        [Test]
+        public void Will_throw_if_concrete_type_dependency_is_missing()
+        {
+            var unresolvedTypes = new List<Type>();
+
+            var container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution()
+                .WithUnknownServiceResolvers(_ =>
+                {
+                    unresolvedTypes.Add(_.ServiceType);
+                    return null;
+                }));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Xx>());
+
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), Error.NameOf(ex.Error));
+
+            CollectionAssert.AreEqual(new[] { typeof(IMissing), typeof(Xx) }, unresolvedTypes);
+        }
+
+        [Test]
+        public void Can_fallback_to_next_rule_if_AutoConcreteResolution_is_unable_to_resolve_concrete_type()
+        {
+            var container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution()
+                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ? 
+                    new DelegateFactory(_ => new Xx(null)) : null));
+
+            var xx = container.Resolve<Xx>();
+
+            Assert.IsInstanceOf<Xx>(xx);
+        }
+
         public class X
         {
             public Y Dep { get; private set; }
@@ -98,6 +144,12 @@ namespace DryIoc.UnitTests
             {
                 Dep = dep;
             }
+        }
+
+        public interface IMissing { }
+        public class Xx
+        {
+            public Xx(IMissing dep) { }
         }
 
         public class Y {}

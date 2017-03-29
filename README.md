@@ -10,24 +10,28 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 [Autofac]: https://code.google.com/p/autofac/
 [MEF]: http://mef.codeplex.com/
-[DryIoc]: https://www.nuget.org/packages/DryIoc/
-[DryIoc.MefAttributedModel]: https://www.nuget.org/packages/DryIoc.MefAttributedModel/
 [DryIoc.dll]: https://www.nuget.org/packages/DryIoc.dll/
+[DryIoc]: https://www.nuget.org/packages/DryIoc/
+[DryIoc.Internal]: https://www.nuget.org/packages/DryIoc.Internal/
+[DryIoc.MefAttributedModel]: https://www.nuget.org/packages/DryIoc.MefAttributedModel/
+
 [DryIoc.MefAttributedModel.dll]: https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll/
 [WikiHome]: https://bitbucket.org/dadhi/dryioc/wiki/Home
 [MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 
 - Designed for low-ceremony use, performance, and extensibility.
+- [MIT License](LICENSE.txt)
 - Supported platforms: 
     - .NET 3.5+, PCL Profiles 259, 328
-    - .Net Core via [Net Standard 1.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
+    - .Net Core / [Net Standard 1.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
+- NuGet packages:
+ 
+    - [DryIoc.dll] - `PM> Install-Package DryIoc.dll`
+    - [DryIoc] (source code): `PM> Install-Package DryIoc`
+    - [DryIoc.Internal] (source code hiding DryIoc public types): `PM> Install-Package DryIoc.Internal`
 
-- NuGet packages 
-    - [DryIoc.dll]: `PM> Install-Package DryIoc.dll`
-    - [DryIoc] source code: `PM> Install-Package DryIoc`
-
-- Latest stable DryIoc version is __2.10.2__
+- Latest stable DryIoc version is __2.10.4__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
