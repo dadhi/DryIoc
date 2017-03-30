@@ -68,7 +68,8 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<B>(xs[1]);
         }
 
-        [Test] public void Can_specify_to_exclude_dynamic_registration_if_there_is_a_normal()
+        [Test]
+        public void Can_specify_to_exclude_dynamic_registration_if_there_is_a_normal()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
                 (_, serviceType, serviceKey) =>

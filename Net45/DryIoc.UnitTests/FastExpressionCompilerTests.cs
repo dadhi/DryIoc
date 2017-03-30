@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq.Expressions;
+using FastExpressionCompiler;
 using ImTools;
 using NUnit.Framework;
 
@@ -22,8 +23,8 @@ namespace DryIoc.UnitTests
         public static Func<X123> CompileDelegate()
         {
             var y = new Y123();
-            var expr = Expression.New(typeof(X123).GetConstructors()[0], new Expression[] { Expression.Constant(y) });
-            var delgate = FastExpressionCompiler.TryCompile<Func<X123>>(expr, ArrayTools.Empty<ParameterExpression>(),
+            var expr = Expression.New(typeof(X123).GetConstructors()[0], Expression.Constant(y));
+            var delgate = ExpressionCompiler.TryCompile<Func<X123>>(expr, ArrayTools.Empty<ParameterExpression>(),
                 ArrayTools.Empty<Type>(), typeof(X123));
 
             return delgate;
