@@ -81,6 +81,9 @@
     <Compile Include="..\..\DryIoc.UnitTests\EnumerableAndArrayTests.cs">
       <Link>EnumerableAndArrayTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs">
+      <Link>FastExpressionCompilerTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\FuncTests.cs">
       <Link>FuncTests.cs</Link>
     </Compile>
