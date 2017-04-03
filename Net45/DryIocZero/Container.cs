@@ -453,6 +453,7 @@ namespace DryIocZero
 
         private void ThrowIfContainerDisposed()
         {
+            // todo: add stack trace and info about container into the message
             Throw.If(_disposed == 1, Error.ContainerIsDisposed);
         }
 

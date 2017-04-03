@@ -32,7 +32,8 @@ namespace DryIoc
     using System.Reflection;
     using System.Text;
     using System.Threading;
-    using System.Diagnostics.CodeAnalysis;
+    using System.Diagnostics.CodeAnalysis;  // for SupressMessage
+    using System.Diagnostics;               // for StackTrace
     using ImTools;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
@@ -62,11 +63,11 @@ namespace DryIoc
         {
             var scope = ((IScopeAccess)this).GetCurrentScope();
             var scopeStr
-                = scope == null ? "Container"
-                : _scopeContext != null ? "Ambiently scoped container: " + scope
-                : "Scoped container: " + scope;
+                = scope == null ? "container"
+                : _scopeContext != null ? "ambiently scoped container: " + scope
+                : "scoped container: " + scope;
             if (IsDisposed)
-                scopeStr = "Disposed (!) " + scopeStr;
+                scopeStr = "disposed " + scopeStr + Environment.NewLine + _disposeStackTrace;
             return scopeStr;
         }
 
@@ -80,7 +81,9 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(rules, registryWithoutCache, _singletonScope, scopeContext, _openedScope, _disposed, RootContainer);
+            return new Container(rules, registryWithoutCache, 
+                _singletonScope, scopeContext, _openedScope, 
+                _disposed, _disposeStackTrace, RootContainer);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -90,7 +93,9 @@ namespace DryIoc
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
-            return new Container(Rules, readonlyRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, RootContainer);
+            return new Container(Rules, readonlyRegistry, 
+                _singletonScope, _scopeContext, _openedScope, 
+                _disposed, _disposeStackTrace, RootContainer);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -100,7 +105,9 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, registryWithoutCache, _singletonScope, _scopeContext, _openedScope, _disposed, RootContainer);
+            return new Container(Rules, registryWithoutCache, 
+                _singletonScope, _scopeContext, _openedScope, 
+                _disposed, _disposeStackTrace, RootContainer);
         }
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -111,7 +118,9 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             var newSingletons = new SingletonScope();
-            return new Container(Rules, registryWithoutCache, newSingletons, _scopeContext, _openedScope, _disposed, RootContainer);
+            return new Container(Rules, registryWithoutCache, 
+                newSingletons, _scopeContext, _openedScope, 
+                _disposed, _disposeStackTrace, RootContainer);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -122,7 +131,9 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, newRegistry, _singletonScope, _scopeContext, _openedScope, _disposed, RootContainer);
+            return new Container(Rules, newRegistry, 
+                _singletonScope, _scopeContext, _openedScope, 
+                _disposed, _disposeStackTrace, RootContainer);
         }
 
         /// <summary>Returns ambient scope context associated with container.</summary>
@@ -160,7 +171,9 @@ namespace DryIoc
 
             var rules = configure == null ? Rules : configure(Rules);
 
-            return new Container(rules, _registry, _singletonScope, _scopeContext, nestedOpenedScope, _disposed, RootContainer ?? this);
+            return new Container(rules, _registry, 
+                _singletonScope, _scopeContext, nestedOpenedScope, 
+                _disposed, _disposeStackTrace, RootContainer ?? this);
         }
 
         /// <summary>The default name of root scope without ambient context.</summary>
@@ -203,6 +216,8 @@ namespace DryIoc
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
+
+            _disposeStackTrace = new StackTrace();
 
             // for container created with OpenScope
             if (_openedScope != null &&
@@ -789,7 +804,7 @@ namespace DryIoc
         private void ThrowIfContainerDisposed()
         {
             if (IsDisposed)
-                Throw.It(Error.ContainerIsDisposed);
+                Throw.It(Error.ContainerIsDisposed, this.ToString());
         }
 
         #endregion
@@ -1527,6 +1542,7 @@ namespace DryIoc
         #region Implementation
 
         private int _disposed;
+        private StackTrace _disposeStackTrace;
 
         private readonly Ref<Registry> _registry;
         private Ref<ImMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
@@ -2192,10 +2208,12 @@ namespace DryIoc
         }
 
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
-            IScopeContext scopeContext = null, IScope openedScope = null, int disposed = 0,
+            IScopeContext scopeContext = null, IScope openedScope = null, 
+            int disposed = 0, StackTrace disposeStackTrace = null,
             Container rootContainer = null)
         {
             _disposed = disposed;
+            _disposeStackTrace = disposeStackTrace;
 
             Rules = rules;
 
@@ -2672,8 +2690,10 @@ namespace DryIoc
         /// <returns>Target container.</returns>
         public Container GetTarget(bool maybeDisposed = false)
         {
-            if (_strongRef != null)
-                return (maybeDisposed || !_strongRef.IsDisposed) ? _strongRef : Throw.For<Container>(Error.ContainerIsDisposed);
+            var container = _container;
+            if (container != null)
+                return (maybeDisposed || !container.IsDisposed) ? container 
+                    : Throw.For<Container>(Error.ContainerIsDisposed, container);
             return GetWeakTarget(maybeDisposed);
         }
 
@@ -2684,7 +2704,7 @@ namespace DryIoc
                 ? container
                 : container == null
                     ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
-                    : Throw.For<Container>(Error.ContainerIsDisposed);
+                    : Throw.For<Container>(Error.ContainerIsDisposed, container);
         }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> 
@@ -2693,13 +2713,13 @@ namespace DryIoc
         public ContainerWeakRef(Container container, bool useStrongReference = false)
         {
             if (useStrongReference)
-                _strongRef = container;
+                _container = container;
             else
                 _weakRef =  new WeakReference(container);
         }
 
         private readonly WeakReference _weakRef;
-        private readonly Container _strongRef;
+        private readonly Container _container;
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
@@ -10192,7 +10212,7 @@ namespace DryIoc
             NoCurrentScope = Of(
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
             ContainerIsDisposed = Of(
-                "Container is disposed and cannot be used anymore."),
+                "Container is disposed and should not be used: {0}"),
             NotDirectScopeParent = Of(
                 "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." +
                 Environment.NewLine +
