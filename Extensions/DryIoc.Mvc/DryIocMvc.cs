@@ -43,7 +43,14 @@ namespace DryIoc.Mvc
     ///     var container = new Container();
     /// 
     ///     // Enable basic MVC support. 
-    ///     container = container.WithMvc();
+    ///     container = container.WithMvc(
+    /// 
+    ///         // optional: enable original DryIoc exceptions when resolving controllers - provides more info if resolve is failed
+    ///         throwIfUnresolved: type => type.IsController(),
+    /// 
+    ///         // optional: provide the scope context with User error handler to find why request scope is not created / disposed
+    ///         scopeContext: new HttpContextScopeContext(ex => MyLogger.LogError(ex))
+    ///     );
     ///     
     ///     // Optionally enable support for MEF Export/ImportAttribute with DryIoc.MefAttributedModel package. 
     ///     // container = container.WithMefAttributedModel();
@@ -66,7 +73,8 @@ namespace DryIoc.Mvc
         /// for unresolved type instead of fallback to default Resolver.</param>
         /// <returns>New container with applied Web context.</returns>
         public static IContainer WithMvc(this IContainer container,
-            IEnumerable<Assembly> controllerAssemblies = null, IScopeContext scopeContext = null,
+            IEnumerable<Assembly> controllerAssemblies = null, 
+            IScopeContext scopeContext = null,
             Func<Type, bool> throwIfUnresolved = null)
         {
             container.ThrowIfNull();

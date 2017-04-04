@@ -64,8 +64,9 @@ namespace DryIoc
             var scope = ((IScopeAccess)this).GetCurrentScope();
             var scopeStr
                 = scope == null ? "container"
-                : _scopeContext != null ? "ambiently scoped container: " + scope
-                : "scoped container: " + scope;
+                : _scopeContext != null 
+                ? "ambiently scoped container with scope " + scope
+                : "scoped container with scope " + scope;
             if (IsDisposed)
                 scopeStr = "disposed " + scopeStr + Environment.NewLine + _disposeStackTrace;
             return scopeStr;
@@ -217,7 +218,8 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
-            _disposeStackTrace = new StackTrace();
+            // nice to have but we can leave without it if failed
+            try { _disposeStackTrace = new StackTrace(); } catch { }
 
             // for container created with OpenScope
             if (_openedScope != null &&
@@ -226,6 +228,7 @@ namespace DryIoc
                 if (_openedScope != null)
                 {
                     _openedScope.Dispose();
+
                     if (_scopeContext != null)
                         _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
                 }
@@ -8542,7 +8545,7 @@ namespace DryIoc
         /// <returns>String representation.</returns>
         public override string ToString()
         {
-            return "{Name=" + (Name ?? "{empty}")
+            return "{Name=" + (Name ?? "<no-name>")
                 + (Parent == null ? string.Empty : ", Parent=" + Parent)
                 + "}";
         }

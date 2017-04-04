@@ -82,6 +82,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FECvsManualEmit.cs" />
     <Compile Include="HashArrayMappedTrieTests.cs" />
     <Compile Include="ResolveInstancePerDependencyWith2ParametersOncePerContainer.cs" />
     <Compile Include="ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.cs" />
