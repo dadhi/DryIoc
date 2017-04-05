@@ -201,6 +201,7 @@ namespace DryIoc
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
+            // todo: Add disposed stack info an display in ThrowIfContainerDisposed exception
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
@@ -790,7 +791,7 @@ namespace DryIoc
         private void ThrowIfContainerDisposed()
         {
             if (IsDisposed)
-                Throw.It(Error.ContainerIsDisposed);
+                Throw.It(Error.ContainerIsDisposed); // todo: add stack trace
         }
 
         #endregion
@@ -1428,31 +1429,37 @@ namespace DryIoc
             if (dynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
-            IEnumerable<DynamicRegistration> dynamicFactories = null;
+            IEnumerable<DynamicRegistration> resultFactories = null;
 
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
-                var provider = dynamicRegistrationProviders[i];
-                var factories = provider(factoryType, serviceType, serviceKey);
-                if (factories != null)
+                var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
+                var dynamicFactories = dynamicRegistrationProvider(factoryType, serviceType, serviceKey);
+                if (dynamicFactories != null)
                 {
                     var key = DynamicKey.Empty;
-                    var validFactories = factories.Select(it =>
-                    {
-                        if (it.ServiceKey != null)
-                            return it;
-                        key = key.Next();
-                        return it.WithKey(key);
-                    })
-                    .ToArray();
+                    var validFactories = dynamicFactories
+                        .Select(it =>
+                        {
+                            if (it.ServiceKey != null)
+                                return it;
+                            key = key.Next();
+                            return it.WithKey(key);
+                        })
+                        //.Where(it =>
+                        //{
+                        //    ThrowIfInvalidRegistration(it.Factory, serviceType, serviceKey, isStaticallyChecked: false);
+                        //    return true;
+                        //})
+                        .ToArray();
 
-                    dynamicFactories = dynamicFactories == null 
+                    resultFactories = resultFactories == null
                         ? validFactories 
-                        : dynamicFactories.Concat(validFactories);
+                        : resultFactories.Concat(validFactories);
                 }
             }
 
-            return dynamicFactories;
+            return resultFactories;
         }
 
         private KV<object, Factory>[] CombineRegisteredAndDynamicFactories(
@@ -1506,9 +1513,7 @@ namespace DryIoc
             if (registeredFactories == null && dynamicFactories == null)
                 return null;
 
-            // todo: Add option how to combine with dynamic registrations: Override, Keep, etc.. May be use IfAlreadyRegistered? 
             var factories = CombineRegisteredAndDynamicFactories(registeredFactories, dynamicFactories);
-
             if (factorySelector != null)
             {
                 var validFactories = factories.Match(
@@ -3036,23 +3041,20 @@ namespace DryIoc
                 parent = parent.Enumerate().FirstOrDefault(p => p.FactoryType == FactoryType.Service) ?? RequestInfo.Empty;
 
             if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType) // check fast for the parent of the same type
-            {
-                items = items.Where(x => x.Factory.FactoryID != parent.FactoryID &&
+                items = items.Match(x => x.Factory.FactoryID != parent.FactoryID &&
                     (x.Factory.FactoryGenerator == null || !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().Any(f =>
                         f.Value.FactoryID == parent.FactoryID &&
-                        f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey)))
-                    .ToArray();
-            }
+                        f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey)));
 
             // Return collection of single matched item if key is specified.
             var serviceKey = request.ServiceKey;
             if (serviceKey != null)
-                items = items.Where(it => serviceKey.Equals(it.OptionalServiceKey)).ToArray();
+                items = items.Match(it => serviceKey.Equals(it.OptionalServiceKey));
 
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
-                items = items.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata)).ToArray();
+                items = items.Match(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
 
             List<Expression> itemExprList = null;
             if (!items.IsNullOrEmpty())
@@ -10288,7 +10290,7 @@ namespace DryIoc
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
             RegisterImplementationNotAssignableToServiceType = Of(
-                "Registering implementation type {0} not assignable to service type {1}."),
+                "Registering implementation type {0} is not assignable to service type {1}."),
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(

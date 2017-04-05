@@ -69,7 +69,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_exclude_dynamic_registration_if_there_is_a_normal()
+        public void Can_specify_to_exclude_dynamic_registration_if_there_is_a_normal_one()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
                 (_, serviceType, serviceKey) =>
@@ -86,8 +86,25 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<B>(x);
         }
 
+        [Test, Ignore]
+        public void Can_validate_dynamic_registration()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) =>
+                {
+                    if (serviceType == typeof(X))
+                        return new[] { new DynamicRegistration(new ReflectionFactory(typeof(C))) };
+                    return null;
+                }));
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<A>(x);
+        }
+
         public class X { }
         public class A : X { }
         public class B : X { }
+        public class C { }
     }
 }
