@@ -47,7 +47,7 @@ namespace DryIocZero
                 new SingletonScope(), scopeContext, null, 0)
         { }
 
-        /// <summary>Full constructor - all state included.</summary>
+        /// <summary>Full constructor with all state included.</summary>
         /// <param name="defaultFactories"></param>
         /// <param name="keyedFactories"></param>
         /// <param name="singletonScope"></param>
@@ -576,8 +576,7 @@ namespace DryIocZero
             bool outermost, bool throwIfNotFound);
     }
 
-    /// <summary>Returns reference to actual resolver implementation. 
-    /// Minimizes dependency to Factory Delegate on container.</summary>
+    /// <summary>Provides access to Container for compiled factory delegate.</summary>
     public interface IResolverContext
     {
         /// <summary>Provides access to resolver implementation.</summary>
@@ -1143,10 +1142,10 @@ namespace DryIocZero
     public static class Error
     {
         /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public readonly static int FirstErrorCode = 0;
+        public static readonly int FirstErrorCode = 0;
 
         /// <summary>List of error messages indexed with code.</summary>
-        public readonly static List<string> Messages = new List<string>(100);
+        public static readonly List<string> Messages = new List<string>(100);
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int

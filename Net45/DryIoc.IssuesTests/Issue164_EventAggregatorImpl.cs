@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue164_EventAggregatorImpl
     {
-        [Test, Explicit]
+        [Test]
         public void Able_to_handle_multiple_events_being_singleton()
         {
             var container = new Container();

@@ -91,7 +91,7 @@ namespace DryIoc
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             return new Container(rules, registryWithoutCache, 
                 _singletonScope, scopeContext, _openedScope, 
-                _disposed, _disposeStackTrace, RootContainer);
+                _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -103,7 +103,7 @@ namespace DryIoc
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
             return new Container(Rules, readonlyRegistry, 
                 _singletonScope, _scopeContext, _openedScope, 
-                _disposed, _disposeStackTrace, RootContainer);
+                _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
@@ -115,7 +115,7 @@ namespace DryIoc
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             return new Container(Rules, registryWithoutCache, 
                 _singletonScope, _scopeContext, _openedScope, 
-                _disposed, _disposeStackTrace, RootContainer);
+                _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -128,7 +128,7 @@ namespace DryIoc
             var newSingletons = new SingletonScope();
             return new Container(Rules, registryWithoutCache, 
                 newSingletons, _scopeContext, _openedScope, 
-                _disposed, _disposeStackTrace, RootContainer);
+                _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -141,7 +141,7 @@ namespace DryIoc
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
             return new Container(Rules, newRegistry, 
                 _singletonScope, _scopeContext, _openedScope, 
-                _disposed, _disposeStackTrace, RootContainer);
+                _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
         /// <summary>Returns ambient scope context associated with container.</summary>
@@ -181,7 +181,7 @@ namespace DryIoc
 
             return new Container(rules, _registry, 
                 _singletonScope, _scopeContext, nestedOpenedScope, 
-                _disposed, _disposeStackTrace, RootContainer ?? this);
+                _disposed, _disposeStackTrace, _resolverContext._rootContainer ?? this);
         }
 
         /// <summary>The default name of root scope without ambient context.</summary>
@@ -233,7 +233,7 @@ namespace DryIoc
                 _openedScope.Dispose();
 
             // for container created with OpenScope
-            if (RootContainer != null)
+            if (_resolverContext._rootContainer != null)
             {
                 if (_scopeContext != null)
                     _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
@@ -246,15 +246,17 @@ namespace DryIoc
                 _singletonScope.Dispose();
                 _registry.Swap(Registry.Empty);
                 _defaultFactoryDelegateCache = Ref.Of(ImMap<Type, FactoryDelegate>.Empty);
+
                 Rules = Rules.Default;
+
+                // remove reference to context container(s) to prevent memory leaks
+                // from now on the holder will be resolved factory delegates using the context
+                _resolverContext = null;
             }
         }
 
         /// <summary>Scope containing container singletons.</summary>
         public IScope SingletonScope { get { return _singletonScope; } }
-
-        /// <summary>Returns root for scoped container or null for root itself.</summary>
-        public readonly Container RootContainer;
 
         #region Static state
 
@@ -1527,12 +1529,12 @@ namespace DryIoc
         private readonly Ref<Registry> _registry;
         private Ref<ImMap<Type, FactoryDelegate>> _defaultFactoryDelegateCache;
 
-        private readonly ContainerWeakRef _resolverContext;
-
         private readonly SingletonScope _singletonScope;
 
         internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
+
+        private ContainerWeakRef _resolverContext; // mutable in order to be removed the reference on Dispose
 
         internal void UseInstanceInternal(Type serviceType, object instance, object serviceKey)
         {
@@ -2188,7 +2190,7 @@ namespace DryIoc
         }
 
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
-            IScopeContext scopeContext = null, IScope openedScope = null, 
+            IScopeContext scopeContext = null, IScope openedScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
             Container rootContainer = null)
         {
@@ -2206,12 +2208,12 @@ namespace DryIoc
 
             if (openedScope != null)
                 _openedScope = openedScope;
-            else if (scopeContext == null && rules.ImplicitOpenedRootScope) // only valid for non ambient context
+
+            // creating scope in a root container (its own root is null) is valid only for non-ambient scopes
+            else if (rootContainer == null && rules.ImplicitOpenedRootScope && scopeContext == null)
                 _openedScope = new Scope(null, NonAmbientRootScopeName);
 
-            _resolverContext = new ContainerWeakRef(this, useStrongReference: true);
-            
-            RootContainer = rootContainer;
+            _resolverContext = new ContainerWeakRef(this, rootContainer);
         }
 
         #endregion
@@ -2610,7 +2612,7 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Holds all required info by <see cref="FactoryDelegate"/>.</summary>
+    /// <summary>Provides access to Container for compiled factory delegate.</summary>
     public interface IResolverContext
     {
         /// <summary>Provides access to current / scoped resolver.</summary>
@@ -2620,86 +2622,69 @@ namespace DryIoc
         IScopeAccess Scopes { get; }
     }
 
-    /// <summary>Provides the shortcuts and sugar based onto <see cref="IResolverContext"/> 
-    /// to be consumed in <see cref="FactoryDelegate"/></summary>
+    // todo: v3: Remove dependency on  ContainerWeakRef impl. of IResolver context.
+    /// <summary>Provides the shortcuts to <see cref="IResolverContext"/></summary>
     public static class ResolverContext
     {
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
         public static IResolver RootResolver(this IResolverContext ctx)
         {
-            return ctx.RootContainer();
+            return ((ContainerWeakRef)ctx).RootContainerOrSelf();
         }
 
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
         public static IScopeAccess RootScopes(this IResolverContext ctx)
         {
-            return ctx.RootContainer();
+            return ((ContainerWeakRef)ctx).RootContainerOrSelf();
         }
 
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
         public static IScope SingletonScope(this IResolverContext ctx)
         {
-            return ctx.RootContainer().SingletonScope;
-        }
-
-        private static Container RootContainer(this IResolverContext ctx)
-        {
-            var containerRef = ((ContainerWeakRef)ctx);
-            return containerRef.GetTarget(maybeDisposed: true).RootContainer 
-                ?? containerRef.GetTarget();
+            return ((ContainerWeakRef)ctx).RootContainerOrSelf().SingletonScope;
         }
     }
 
-    /// <summary>Wraps access to <see cref="Container"/> WeakReference target with DryIoc specific exceptions.</summary>
+    /// <summary>Provides access to Container from compiled factory delegate.</summary>
     public sealed class ContainerWeakRef : IResolverContext
     {
         /// <summary>Provides access to current / scoped resolver.</summary>
-        public IResolver Resolver { get { return GetTarget(); } }
+        public IResolver Resolver { get { return EnsureNotDisposed(_container); } }
 
         /// <summary>Access to the singleton and current scopes.</summary>
-        public IScopeAccess Scopes { get { return GetTarget(); } }
+        public IScopeAccess Scopes { get { return EnsureNotDisposed(_container); } }
 
         /// <summary>Container access.</summary>
-        public IContainer Container { get { return GetTarget(); } }
+        public IContainer Container { get { return EnsureNotDisposed(_container); } }
 
-        /// <summary>Returns target container when it is not null and not disposed. Otherwise throws exception.</summary>
-        /// <param name="maybeDisposed">(optional) If set will return even disposed container.</param>
-        /// <returns>Target container.</returns>
-        public Container GetTarget(bool maybeDisposed = false)
+        /// <summary>Returns root container (the same as container if its already the root). 
+        /// Throws exception if root is disposed.</summary> 
+        /// <returns>Subj.</returns>
+        public Container RootContainerOrSelf()
         {
-            var container = _container;
-            if (container != null)
-                return (maybeDisposed || !container.IsDisposed) ? container 
-                    : Throw.For<Container>(Error.ContainerIsDisposed, container);
-            return GetWeakTarget(maybeDisposed);
-        }
-
-        private Container GetWeakTarget(bool maybeDisposed)
-        {
-            var container = _weakRef.Target as Container;
-            return container != null && (maybeDisposed || !container.IsDisposed)
-                ? container
-                : container == null
-                    ? Throw.For<Container>(Error.ContainerIsGarbageCollected)
-                    : Throw.For<Container>(Error.ContainerIsDisposed, container);
+            return EnsureNotDisposed(_rootContainer ?? _container);
         }
 
         /// <summary>Creates weak reference wrapper over passed container object.</summary> 
         /// <param name="container">Container to reference.</param>
-        /// <param name="useStrongReference">(optional) Allows to use string reference instead of weak one.</param>
-        public ContainerWeakRef(Container container, bool useStrongReference = false)
+        /// <param name="rootContainer">(optional) Root container - the same as <paramref name="container"/> for root container.</param>
+        public ContainerWeakRef(Container container, Container rootContainer)
         {
-            if (useStrongReference)
-                _container = container;
-            else
-                _weakRef =  new WeakReference(container);
+            _container = container;
+            _rootContainer = rootContainer;
         }
 
-        private readonly WeakReference _weakRef;
-        private readonly Container _container;
+        internal readonly Container _container;
+        internal readonly Container _rootContainer;
+
+        internal Container EnsureNotDisposed(Container container)
+        {
+            return !container.IsDisposed ? container
+                : Throw.For<Container>(Error.ContainerIsDisposed, container);
+        }
     }
 
     /// <summary>The delegate type which is actually used to create service instance by container.
@@ -10198,8 +10183,6 @@ namespace DryIoc
                 "Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
             GotNullConstructorFromFactoryMethod = Of(
                 "Got null constructor when resolving {0}"),
-            ContainerIsGarbageCollected = Of(
-                "Container is no longer available (has been garbage-collected)."),
             UnableToRegisterDuplicateDefault = Of(
                 "Service {0} without key is already registered as {1}."),
             UnableToRegisterDuplicateKey = Of(
