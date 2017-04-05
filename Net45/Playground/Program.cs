@@ -15,6 +15,9 @@ namespace Playground
     {
         static void Main()
         {
+            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
+
             BenchmarkRunner.Run<FECvsManualEmit>();
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();

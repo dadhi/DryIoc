@@ -219,7 +219,8 @@ namespace DryIoc
                 return;
 
             // nice to have but we can leave without it if failed
-            try { _disposeStackTrace = new StackTrace(); } catch { }
+            if (Rules.CaptureContainerDisposeStackTrace)
+                try { _disposeStackTrace = new StackTrace(); } catch { }
 
             // for container created with OpenScope
             if (_openedScope != null &&
@@ -3717,6 +3718,21 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary><see cref="WithCaptureContainerDisposeStackTrace"/>.</summary>
+        public bool CaptureContainerDisposeStackTrace
+        {
+            get { return (_settings & Settings.CaptureContainerDisposeStackTrace) != 0; }
+        }
+
+        /// <summary>Instructs to capture Dispose stack-trace to include it later into <see cref="Error.ContainerIsDisposed"/>
+        /// exception for easy diagnostics.</summary> <returns>New rules with option set.</returns>
+        public Rules WithCaptureContainerDisposeStackTrace()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings |= Settings.CaptureContainerDisposeStackTrace;
+            return newRules;
+        }
+
         #region Implementation
 
         private Rules()
@@ -3740,11 +3756,12 @@ namespace DryIoc
             ResolveIEnumerableAsLazyEnumerable = 1 << 6,
             EagerCachingSingletonForFasterAccess = 1 << 7,
             ImplicitRootOpenScope = 1 << 8,
-            ThrowIfRuntimeStateRequired = 1 << 9
+            ThrowIfRuntimeStateRequired = 1 << 9,
+            CaptureContainerDisposeStackTrace = 1 << 10
         }
 
-        private const Settings DEFAULT_SETTINGS =
-            Settings.ThrowIfDependencyHasShorterReuseLifespan
+        private const Settings DEFAULT_SETTINGS 
+            = Settings.ThrowIfDependencyHasShorterReuseLifespan
             | Settings.ThrowOnRegisteringDisposableTransient
             | Settings.ImplicitCheckForReuseMatchingScope
             | Settings.VariantGenericTypesInResolvedCollection
