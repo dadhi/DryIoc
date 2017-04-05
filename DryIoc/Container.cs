@@ -549,29 +549,6 @@ namespace DryIoc
 
         #endregion
 
-        #region Direct Container Resolve methods to avoid interface dispatch
-
-        /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
-        /// <typeparam name="TService">The type of the requested service.</typeparam>
-        /// <returns>The requested service instance.</returns>
-        public TService Resolve<TService>()
-        {
-            return (TService)Resolve(typeof(TService));
-        }
-
-        /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
-        /// <param name="serviceType">Service type to search and to return.</param>
-        /// <returns>The requested service instance.</returns>
-        public object Resolve(Type serviceType)
-        {
-            var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return factoryDelegate != null
-                ? factoryDelegate(null, _resolverContext, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, false, null);
-        }
-            
-        #endregion
-
         #region IResolver
 
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
@@ -2240,7 +2217,7 @@ namespace DryIoc
         #endregion
     }
 
-    /// <summary>Convenient methods that require container.</summary>
+    /// <summary>Container extended features.</summary>
     public static class ContainerTools
     {
         /// <summary>For given instance resolves and sets properties and fields.
