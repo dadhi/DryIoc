@@ -68,7 +68,14 @@ namespace DryIoc
                 ? "ambiently scoped container with scope " + scope
                 : "scoped container with scope " + scope;
             if (IsDisposed)
-                scopeStr = "disposed " + scopeStr + Environment.NewLine + _disposeStackTrace;
+            {
+                scopeStr = "disposed " + scopeStr + Environment.NewLine;
+                if (_disposeStackTrace != null)
+                    scopeStr += "Dispose stack-trace " + _disposeStackTrace;
+                else
+                    scopeStr += "You may include Dispose stack-trace into the message via:" + Environment.NewLine
+                        + "container.With(rules => rules.WithCaptureContainerDisposeStackTrace())";
+            }
             return scopeStr;
         }
 
@@ -206,10 +213,10 @@ namespace DryIoc
             var registry = _registry.Value;
 
             var clearedServices = registry.ClearCache(serviceType, serviceKey, FactoryType.Service);
-            var clearWrapper = registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper);
-            var clearDecorator = registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
+            var clearedWrapper = registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper);
+            var clearedDecorator = registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
 
-            return clearedServices || clearWrapper || clearDecorator;
+            return clearedServices || clearedWrapper || clearedDecorator;
         }
 
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
@@ -222,31 +229,23 @@ namespace DryIoc
             if (Rules.CaptureContainerDisposeStackTrace)
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
-            // for container created with OpenScope
-            if (_openedScope != null &&
-                !(Rules.ImplicitOpenedRootScope && _openedScope.Parent == null && _scopeContext == null))
-            {
-                if (_openedScope != null)
-                {
-                    _openedScope.Dispose();
+            if (_openedScope != null)
+                _openedScope.Dispose();
 
-                    if (_scopeContext != null)
-                        _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
-                }
+            // for container created with OpenScope
+            if (RootContainer != null)
+            {
+                if (_scopeContext != null)
+                    _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
             }
             else // whole Container with singletons.
             {
-                if (_openedScope != null)
-                    _openedScope.Dispose();
-
                 if (_scopeContext != null)
                     _scopeContext.Dispose();
 
                 _singletonScope.Dispose();
-
                 _registry.Swap(Registry.Empty);
                 _defaultFactoryDelegateCache = Ref.Of(ImMap<Type, FactoryDelegate>.Empty);
-
                 Rules = Rules.Default;
             }
         }

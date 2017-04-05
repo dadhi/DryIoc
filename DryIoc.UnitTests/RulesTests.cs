@@ -489,7 +489,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_track_transient_service_in_nested_open_scope_if_present()
         {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope().WithTrackingDisposableTransients());
+            var container = new Container(rules => rules
+                .WithImplicitRootOpenScope()
+                .WithTrackingDisposableTransients());
+
             container.Register<AD>();
 
             AD ad;
@@ -502,7 +505,10 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_prevent_tracking_for_registration_with_prevent_disposal_option()
         {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope().WithTrackingDisposableTransients());
+            var container = new Container(rules => rules
+                .WithImplicitRootOpenScope()
+                .WithTrackingDisposableTransients());
+
             container.Register<AD>(setup: Setup.With(preventDisposal: true));
 
             AD ad;
@@ -527,6 +533,23 @@ namespace DryIoc.UnitTests
             Assert.IsFalse(ad.IsDisposed);
         }
 
+        [Test]
+        public void Disposing_the_open_scope_should_not_dispose_the_implictly_open_root_scope()
+        {
+            var container = new Container(rules => rules.WithImplicitRootOpenScope());
+
+            container.Register<AD>(Reuse.InCurrentScope);
+
+            AD ad;
+            using (var scope = container.OpenScope())
+                ad = scope.Resolve<AD>();
+
+            Assert.IsTrue(ad.IsDisposed);
+
+            ad = container.Resolve<AD>();
+            container.Dispose();
+            Assert.IsTrue(ad.IsDisposed);
+        }
 
         [Test]
         public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
@@ -663,13 +686,43 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(i);
         }
 
+        [Test]
+        public void Can_specify_to_capture_stack_trace_and_display_it_disposed_exception()
+        {
+            var container = new Container(rules => rules
+                .WithCaptureContainerDisposeStackTrace());
+
+            var scope = container.OpenScope();
+            scope.Dispose();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                scope.Resolve<string>());
+
+            Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));
+
+            StringAssert.Contains("stack-trace", ex.Message);
+        }
+
+        [Test]
+        public void DisposedContainer_error_message_should_include_tip_how_to_enable_stack_trace()
+        {
+            var container = new Container();
+            container.Dispose();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<string>());
+
+            Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));
+            StringAssert.Contains("WithCaptureContainerDisposeStackTrace", ex.Message);
+        }
+
+        #region CUT
+
         public interface I { }
 
         public class A : I { }
 
         public class B : I { }
-
-        #region CUT
 
         public class SomeService { }
 
