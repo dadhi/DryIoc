@@ -1,11 +1,13 @@
 ﻿{
   "buildOptions": {
-    "compile": [
-      "../../../DryIoc.UnitTests/*.cs"
-    ],
-    "exclude": [
-      "../../../DryIoc.UnitTests/ThrowTests.cs"
-    ],
+    "compile": {
+      "include": [ "../../../DryIoc.UnitTests/*.cs" ],
+      "excludeFiles": [
+        "../../../DryIoc.UnitTests/ThrowTests.cs",
+        "../../../DryIoc.UnitTests/FastExpressionCompilerTests.cs"
+      ]
+    },
+
     "nowarn": [ "CS0618" ]
   },
 
@@ -18,16 +20,12 @@
 
   "frameworks": {
     "netcoreapp1.1": {
-      "imports": [
-        "portable-net45+win8"
-      ],
       "dependencies": {
         "Microsoft.NETCore.App": {
           "version": "1.1.0",
           "type": "platform"
         }
       }
-    },
-    "net451": {}
+    }
   }
 }
