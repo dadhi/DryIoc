@@ -1,5 +1,5 @@
 ﻿using System;
-using DryIoc.MefAttributedModel;
+//using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -17,7 +17,7 @@ namespace DryIoc.AspNetCore.Sample
             services
                 .AddMvc()
 
-                // Enables constrollers to be resolved by DryIoc, otherwise resolved by infrastructure
+                // Enables constrollers to be resolved by DryIoc, OTHERWISE resolved by infrastructure
                 .AddControllersAsServices();
 
             return new Container()
@@ -25,7 +25,7 @@ namespace DryIoc.AspNetCore.Sample
                 //.WithMef()
                 // setup DI adapter
                 .WithDependencyInjectionAdapter(services,
-                    // optional: get original DryIoc exception if specified type is not resolved, 
+                    // optional: get original DryIoc.ContainerException if specified type is not resolved, 
                     // and prevent fallback to default resolution by infrastructure
                     throwIfUnresolved: type => type.Name.EndsWith("Controller"),
 
@@ -35,7 +35,7 @@ namespace DryIoc.AspNetCore.Sample
 #if DEBUG
                         if (descriptor.ServiceType == typeof(ILoggerFactory))
                             Console.WriteLine($"Logger factory is regsitered as instance: {descriptor.ImplementationInstance != null}");
-#endif                         
+#endif
                         return false; // fallback to default registration logic
                     })
 

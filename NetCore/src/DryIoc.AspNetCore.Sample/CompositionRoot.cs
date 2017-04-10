@@ -1,5 +1,5 @@
 ﻿using DryIoc.AspNetCore.Sample.Services;
-using DryIoc.MefAttributedModel;
+//using DryIoc.MefAttributedModel;
 
 namespace DryIoc.AspNetCore.Sample
 {
