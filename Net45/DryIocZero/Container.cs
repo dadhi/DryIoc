@@ -586,6 +586,8 @@ namespace DryIocZero
         IScopeAccess Scopes { get; }
     }
 
+    // todo: Add ResolverContext with RootContainer and SingletonScope
+
     /// <summary>Service factory delegate which accepts resolver and resolution scope as parameters and should return service object.
     /// It is stateless because does not include state parameter as <c>DryIoc.FactoryDelegate</c>.</summary>
     /// <param name="r">Provides access to <see cref="IResolver"/> to enable dynamic dependency resolution inside factory delegate.</param>

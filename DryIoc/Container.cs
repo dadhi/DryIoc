@@ -8646,18 +8646,21 @@ namespace DryIoc
         /// <returns>Already mapped index, or newly created.</returns>
         public int GetScopedItemIdOrSelf(int externalId)
         {
-            var index = _factoryIdToIndexMap.GetValueOrDefault(externalId);
-            if (index != null)
-                return (int)index;
+            return (int)(_factoryIdToIndexMap.GetValueOrDefault(externalId) ?? MapExternalId(externalId));
+        }
 
+        private object MapExternalId(int externalId)
+        {
+            object index = null;
             Ref.Swap(ref _factoryIdToIndexMap, map =>
             {
                 index = map.GetValueOrDefault(externalId);
-                return index != null ? map
-                    : map.AddOrUpdate(externalId, index = Interlocked.Increment(ref _lastItemIndex));
+                return index == null 
+                    ? map.AddOrUpdate(externalId, index = Interlocked.Increment(ref _lastItemIndex))
+                    : map;
             });
 
-            return (int)index;
+            return index;
         }
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
@@ -8928,30 +8931,16 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 1000; } }
 
-        /// <summary>Returns item from singleton scope.</summary>
-        /// <param name="singletonScope">Singleton scope.</param>
-        /// <param name="trackTransientDisposable">Indicates that item should be tracked instead of reused.</param>
-        /// <param name="factoryId">ID for lookup.</param>
-        /// <param name="createValue">Delegate for creating the item.</param>
-        /// <returns>Reused item.</returns>
-        public static object GetOrAddItem(IScope singletonScope, bool trackTransientDisposable, int factoryId,
-            CreateScopedValue createValue)
-        {
-            var scopedItemId = trackTransientDisposable ? -1 : singletonScope.GetScopedItemIdOrSelf(factoryId);
-            return singletonScope.GetOrAdd(scopedItemId, createValue);
-        }
-
         private static readonly MethodInfo _getOrAddItemMethod =
             typeof(SingletonReuse).GetSingleMethodOrNull("GetOrAddItem");
 
-        /// <summary>Returns expression call to <see cref="GetOrAddItem"/>.</summary>
+        /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
-            return Expression.Call(_getOrAddItemMethod,
-                Container.SingletonScopeExpr,
-                Expression.Constant(trackTransientDisposable),
-                Expression.Constant(request.FactoryID),
-                Expression.Lambda<CreateScopedValue>(createItemExpr));
+            var itemId = trackTransientDisposable ? -1 
+                : request.SingletonScope.GetScopedItemIdOrSelf(request.FactoryID);
+            return Expression.Call(Container.SingletonScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+                Expression.Constant(itemId), Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
 
         /// <summary>Returns true because singleton is always available.</summary>
@@ -9022,22 +9011,17 @@ namespace DryIoc
         }
 
         /// <summary>Returns item from current scope with specified name.</summary>
-        /// <param name="containerScopes">Container scopes to select from.</param>
+        /// <param name="scopes">Container scopes to select from.</param>
         /// <param name="scopeName">scope name to look up.</param>
         /// <param name="throwIfNoScopeFound">Specifies to throw if scope with the <paramref name="scopeName"/> is not found.</param>
-        /// <param name="trackTransientDisposable"></param>
-        /// <param name="factoryId">ID for lookup.</param>
+        /// <param name="itemId">Scoped item ID for lookup.</param>
         /// <param name="createValue">Delegate for creating the item.</param>
         /// <returns>Reused item.</returns>
-        public static object GetOrAddItemOrDefault(
-            IScopeAccess containerScopes, object scopeName, bool throwIfNoScopeFound,
-            bool trackTransientDisposable, int factoryId, CreateScopedValue createValue)
+        public static object GetOrAddItemOrDefault(IScopeAccess scopes, object scopeName, 
+            bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue)
         {
-            var scope = containerScopes.GetCurrentNamedScope(scopeName, throwIfNoScopeFound);
-            if (scope == null)
-                return null;
-            var scopedItemId = trackTransientDisposable ? -1 : scope.GetScopedItemIdOrSelf(factoryId);
-            return scope.GetOrAdd(scopedItemId, createValue);
+            var scope = scopes.GetCurrentNamedScope(scopeName, throwIfNoScopeFound);
+            return scope == null ? null : scope.GetOrAdd(itemId, createValue);
         }
 
         private static readonly MethodInfo _getOrAddItemOrDefaultMethod =
@@ -9051,12 +9035,11 @@ namespace DryIoc
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
             var scopesExpr = Container.GetScopesExpr(request);
+            var throwIfNoScopeFound = request.IfUnresolved == IfUnresolved.Throw;
+            var itemId = trackTransientDisposable ? -1 : request.FactoryID;
 
-            return Expression.Call(_getOrAddItemOrDefaultMethod,
-                scopesExpr, scopeNameExpr,
-                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
-                Expression.Constant(trackTransientDisposable),
-                Expression.Constant(request.FactoryID),
+            return Expression.Call(_getOrAddItemOrDefaultMethod, scopesExpr, scopeNameExpr,
+                Expression.Constant(throwIfNoScopeFound), Expression.Constant(itemId),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
 
