@@ -113,5 +113,29 @@ namespace DryIoc.UnitTests
 
             container.Resolve<LambdaExpression[]>(typeof(A));
         }
+
+        [Test]
+        public void Injected_container_wrapper_should_NOT_be_tracked_as_transient_disposable()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<Blah>();
+
+            var blah = container.Resolve<Blah>();
+
+            Assert.IsNotNull(blah);
+
+            container.Dispose();
+        }
+
+        public class Blah
+        {
+            public IContainer Container { get; private set; }
+
+            public Blah(IContainer container)
+            {
+                Container = container;
+            }
+        }
     }
 }

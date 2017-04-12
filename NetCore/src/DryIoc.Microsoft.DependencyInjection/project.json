@@ -15,7 +15,7 @@
     "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "AspNet", "vNext", "AspNetCore", "NetCore", "DNX" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
-    "releaseNotes": "fixed: Instance registrations were not singleton; fixed: #432: LoggingFactory disposed on second call;"
+    "releaseNotes": "fixed: Sometimes happening _Container is already disposed_ exception. Cleanup."
   },
 
   "dependencies": {

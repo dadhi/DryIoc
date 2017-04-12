@@ -230,7 +230,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolution_scope_can_be_automatically_tracked_in_open_scope_and_removed()
+        public void Resolution_scope_can_be_tracked_as_disposable_transient_when_injected_as_IDisposable()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());
 

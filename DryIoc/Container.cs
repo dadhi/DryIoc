@@ -225,18 +225,29 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
                 return;
 
-            // nice to have but we can leave without it if failed
+            // nice to have, but we can leave without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
             if (_openedScope != null)
                 _openedScope.Dispose();
 
-            // for container created with OpenScope
-            if (_resolverContext._rootContainer != null)
+            // for container created with OpenScope, 
+            // BUT not WithImplicitOpenedRootScope rules
+            var isScopedContainer = _resolverContext._rootContainer != null;
+
+            // remove reference to context container(s) to prevent memory leak
+            _resolverContext = null;
+
+            if (isScopedContainer)
             {
                 if (_scopeContext != null)
-                    _scopeContext.SetCurrent(scope => scope == _openedScope ? scope.Parent : scope);
+                    _scopeContext.SetCurrent(scope =>
+                    {
+                        if (scope == _openedScope)
+                            return scope.Parent;
+                        return scope;
+                    });
             }
             else // whole Container with singletons.
             {
@@ -248,10 +259,6 @@ namespace DryIoc
                 _defaultFactoryDelegateCache = Ref.Of(ImMap<Type, FactoryDelegate>.Empty);
 
                 Rules = Rules.Default;
-
-                // remove reference to context container(s) to prevent memory leaks
-                // from now on the holder will be resolved factory delegates using the context
-                _resolverContext = null;
             }
         }
 
@@ -1534,7 +1541,7 @@ namespace DryIoc
         internal readonly IScope _openedScope;
         private readonly IScopeContext _scopeContext;
 
-        private ContainerWeakRef _resolverContext; // mutable in order to be removed the reference on Dispose
+        private ContainerWeakRef _resolverContext; // mutable in order the reference to be removed on Dispose
 
         internal void UseInstanceInternal(Type serviceType, object instance, object serviceKey)
         {
@@ -2210,7 +2217,7 @@ namespace DryIoc
                 _openedScope = openedScope;
 
             // creating scope in a root container (its own root is null) is valid only for non-ambient scopes
-            else if (rootContainer == null && rules.ImplicitOpenedRootScope && scopeContext == null)
+            else if (rules.ImplicitOpenedRootScope && rootContainer == null && scopeContext == null)
                 _openedScope = new Scope(null, NonAmbientRootScopeName);
 
             _resolverContext = new ContainerWeakRef(this, rootContainer);
@@ -2748,6 +2755,7 @@ namespace DryIoc
             return genericDefinition != null && FuncTypes.Contains(genericDefinition);
         }
 
+        // todo: v3: remove as not used
         /// <summary>Returns true if type is func with 1 or more input arguments.</summary>
         /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
         public static bool IsFuncWithArgs(this Type type)
@@ -2803,13 +2811,19 @@ namespace DryIoc
 
         private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
         {
+            // Using @preventDisposal to not apply tracking disposable transient
+            var asContainerWrapper = Setup.WrapperWith(preventDisposal: true);
+
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(Container.GetResolverExpr, setup: Setup.Wrapper));
+                new ExpressionFactory(Container.GetResolverExpr, 
+                Reuse.Transient,
+                setup: asContainerWrapper));
 
             // todo: replace convert with exposed Container property on ResolverContext.
             var containerFactory = new ExpressionFactory(r =>
                 Expression.Convert(Container.GetResolverExpr(r), r.ServiceType),
-                setup: Setup.Wrapper);
+                Reuse.Transient,
+                setup: asContainerWrapper);
 
             wrappers = wrappers
                 .AddOrUpdate(typeof(IRegistrator), containerFactory)
@@ -8931,9 +8945,6 @@ namespace DryIoc
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 1000; } }
 
-        private static readonly MethodInfo _getOrAddItemMethod =
-            typeof(SingletonReuse).GetSingleMethodOrNull("GetOrAddItem");
-
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
@@ -8997,6 +9008,7 @@ namespace DryIoc
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
     public sealed class CurrentScopeReuse : IReuse, IReuseV3
     {
+        // todo: v3: move to IReuse interface + plus add ability to be an array of names
         /// <summary>Name to find current scope or parent with equal name.</summary>
         public readonly object Name;
 
@@ -9024,22 +9036,24 @@ namespace DryIoc
             return scope == null ? null : scope.GetOrAdd(itemId, createValue);
         }
 
-        private static readonly MethodInfo _getOrAddItemOrDefaultMethod =
+        private static readonly MethodInfo _getOrAddOrDefaultMethod =
             typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetOrAddItemOrDefault");
 
         /// <summary>Returns expression call to <see cref="GetOrAddItemOrDefault"/>.</summary>
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
+            var scopesExpr = Container.GetScopesExpr(request);
+
             var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
-            var scopesExpr = Container.GetScopesExpr(request);
-            var throwIfNoScopeFound = request.IfUnresolved == IfUnresolved.Throw;
             var itemId = trackTransientDisposable ? -1 : request.FactoryID;
 
-            return Expression.Call(_getOrAddItemOrDefaultMethod, scopesExpr, scopeNameExpr,
-                Expression.Constant(throwIfNoScopeFound), Expression.Constant(itemId),
+            return Expression.Call(_getOrAddOrDefaultMethod, 
+                scopesExpr, scopeNameExpr,
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                Expression.Constant(itemId),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
 
@@ -9786,6 +9800,7 @@ namespace DryIoc
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
+    // todo: v3: Replace with the single Scope and move the rest to extension methods.
     /// <summary>Provides access to scopes.</summary>
     public interface IScopeAccess
     {
