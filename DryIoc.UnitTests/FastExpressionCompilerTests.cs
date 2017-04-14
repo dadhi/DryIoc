@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using FastExpressionCompiler;
 using NUnit.Framework;
 
@@ -89,6 +90,28 @@ namespace DryIoc.UnitTests
         public void Expressions_with_char_and_short()
         {
             Assert.IsTrue(ExpressionCompiler.Compile(() => 'z' != (ushort)0)());
+        }
+
+        [Test]
+        public void Closure_over_parameters_in_nested_lambda_should_work()
+        {
+            //Func<object, object> func = a => new Func<object>(() => a)();
+            Expression<Func<object, object>> funcExpr = a => 
+                new Func<object>(() =>
+                new Func<object>(() => a)())();
+
+            var func = funcExpr.Compile();
+
+            var arg1 = new object();
+            Assert.AreSame(arg1, func(arg1));
+
+            var arg2 = new object();
+            Assert.AreSame(arg2, func(arg2));
+
+            var funcFec = ExpressionCompiler.Compile<Func<object, object>>(funcExpr);
+
+            Assert.AreSame(arg1, funcFec(arg1));
+            Assert.AreSame(arg2, funcFec(arg2));
         }
     }
 }

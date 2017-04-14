@@ -229,9 +229,6 @@ namespace DryIoc
             if (Rules.CaptureContainerDisposeStackTrace)
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
-            if (_openedScope != null)
-                _openedScope.Dispose();
-
             // for container created with OpenScope, 
             // BUT not WithImplicitOpenedRootScope rules
             var isScopedContainer = _resolverContext._rootContainer != null;
@@ -251,15 +248,18 @@ namespace DryIoc
             }
             else // whole Container with singletons.
             {
-                if (_scopeContext != null)
-                    _scopeContext.Dispose();
+                _defaultFactoryDelegateCache = Ref.Of(ImMap<Type, FactoryDelegate>.Empty);
+                _registry.Swap(Registry.Empty);
+                Rules = Rules.Default;
 
                 _singletonScope.Dispose();
-                _registry.Swap(Registry.Empty);
-                _defaultFactoryDelegateCache = Ref.Of(ImMap<Type, FactoryDelegate>.Empty);
 
-                Rules = Rules.Default;
+                if (_scopeContext != null)
+                    _scopeContext.Dispose();
             }
+
+            if (_openedScope != null)
+                _openedScope.Dispose();
         }
 
         /// <summary>Scope containing container singletons.</summary>
@@ -563,9 +563,24 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return factoryDelegate != null
-                ? factoryDelegate(null, _resolverContext, null)
-                : ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault, null);
+            if (factoryDelegate != null)
+                return factoryDelegate(null, _resolverContext, null);
+            return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault);
+        }
+
+        object ResolveAndCaptureErrors(Type serviceType, bool ifUnresolvedReturnDefault)
+        {
+            try
+            {
+                var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+                if (factoryDelegate != null)
+                    return factoryDelegate(null, _resolverContext, null);
+                return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault);
+            }
+            catch (ContainerException ex)
+            {
+                throw new InvalidOperationException("Resolving: " + serviceType, ex);
+            }
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent,
@@ -641,24 +656,24 @@ namespace DryIoc
             return service;
         }
 
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, bool ifUnresolvedReturnDefault, IScope scope)
+        private object ResolveAndCacheDefaultDelegate(Type serviceType, bool ifUnresolvedReturnDefault)
         {
             ThrowIfContainerDisposed();
 
             var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
-            var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved, scope: scope);
+            var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, null, scope);
+                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, null, null);
 
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(null, _resolverContext, scope);
+            var service = factoryDelegate(null, _resolverContext, null);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
