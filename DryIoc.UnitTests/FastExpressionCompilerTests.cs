@@ -93,9 +93,8 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Closure_over_parameters_in_nested_lambda_should_work()
+        public void Given_hoisted_expr_Closure_over_parameters_in_nested_lambda_should_work()
         {
-            //Func<object, object> func = a => new Func<object>(() => a)();
             Expression<Func<object, object>> funcExpr = a => 
                 new Func<object>(() =>
                 new Func<object>(() => a)())();
@@ -108,9 +107,27 @@ namespace DryIoc.UnitTests
             var arg2 = new object();
             Assert.AreSame(arg2, func(arg2));
 
-            var funcFec = ExpressionCompiler.Compile<Func<object, object>>(funcExpr);
+            var funcFec = ExpressionCompiler.TryCompile<Func<object, object>>(funcExpr);
 
             Assert.AreSame(arg1, funcFec(arg1));
+            Assert.AreSame(arg2, funcFec(arg2));
+        }
+
+        [Test]
+        public void Given_composed_expr_Closure_over_parameters_in_nested_lambda_should_work()
+        {
+            var argExpr = Expression.Parameter(typeof(object));
+            var funcExpr = Expression.Lambda(
+                Expression.Invoke(Expression.Lambda(
+                    Expression.Invoke(Expression.Lambda(argExpr)))),
+                argExpr);
+
+            var funcFec = ExpressionCompiler.TryCompile<Func<object, object>>(funcExpr);
+
+            var arg1 = new object();
+            Assert.AreSame(arg1, funcFec(arg1));
+
+            var arg2 = new object();
             Assert.AreSame(arg2, funcFec(arg2));
         }
     }
