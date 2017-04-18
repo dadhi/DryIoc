@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Linq.Expressions;
-using FastExpressionCompiler;
 using NUnit.Framework;
 
 // ReSharper disable CompareOfFloatsByEqualityOperator
 
-namespace DryIoc.UnitTests
+namespace FastExpressionCompiler.UnitTests
 {
     [TestFixture]
-    public class FastExpressionCompilerTests
+    public class ConstantAndConversionTests
     {
         [Test]
         public void Expressions_with_small_long_casts_should_not_crash()
@@ -93,13 +92,17 @@ namespace DryIoc.UnitTests
         {
             Assert.IsTrue(ExpressionCompiler.Compile(() => 'z' != (ushort)0)());
         }
+    }
 
+    [TestFixture]
+    public class NestedLambdaTests
+    {
         [Test]
         public void Given_hoisted_expr_with_closure_over_parameters_in_nested_lambda_should_work()
         {
             Expression<Func<object, object>> funcExpr = a =>
                 new Func<object>(() =>
-                new Func<object>(() => a)())();
+                    new Func<object>(() => a)())();
 
             var func = funcExpr.Compile();
 
@@ -207,6 +210,45 @@ namespace DryIoc.UnitTests
             var a2 = new A();
             var b2 = new A();
             Assert.AreSame(a2, func(a2, b2));
+        }
+
+        [Test]
+        public void Given_composed_expr_with_closure_over_2_same_parameters_used_in_2_levels_of_nested_lambda()
+        {
+            Func<A, A, A> funcEthalon = (a, b) => a.Increment(b, () => a.Increment(b, () => a.Increment(b, null)));
+            var aa = new A();
+            funcEthalon(aa, aa);
+            Assert.AreEqual(0, aa.X);
+
+            var aExpr = Expression.Parameter(typeof(A));
+            var bExpr = Expression.Parameter(typeof(A));
+
+            var funcExpr = Expression.Lambda(
+                Expression.Call(aExpr, "Increment", new Type[0],
+                    aExpr,
+                    Expression.Lambda(
+                        Expression.Call(aExpr, "Increment", new Type[0],
+                            aExpr,
+                            Expression.Lambda(
+                                Expression.Call(aExpr, "Increment", new Type[0],
+                                    aExpr,
+                                    Expression.Constant(null, typeof(Func<A>))
+                                )
+                            )
+                        )
+                    )
+                ),
+                aExpr, bExpr);
+
+            var func = ExpressionCompiler.TryCompile<Func<A, A, A>>(funcExpr);
+
+            var a1 = new A();
+            var result1 = func(a1, a1);
+            Assert.AreEqual(0, result1.X);
+            Assert.AreSame(a1, result1);
+
+            var a2 = new A();
+            Assert.AreSame(a2, func(a2, a2));
         }
 
         public class A

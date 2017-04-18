@@ -130,9 +130,9 @@ namespace DryIoc.UnitTests
             var one = func(true, "one");
             var another = func(false, "another");
 
-            Assert.That(one, Is.SameAs(another));
-            Assert.That(another.Flag, Is.True);
-            Assert.That(another.Message, Is.EqualTo("one"));
+            Assert.AreSame(one, another);
+            Assert.IsTrue(another.Flag);
+            Assert.AreEqual("one", another.Message);
         }
 
         [Test]

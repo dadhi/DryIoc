@@ -76,14 +76,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Scopes_parameter_with_the_same_name_as_Container_scope_wont_collide()
+        public void Int32_parameter_with_the_same_name_as_Container_scope_wont_collide()
         {
             var container = new Container();
             container.Register<Soose>(Reuse.Singleton);
 
             var factory = container.Resolve<Func<int, Soose>>();
 
-            Assert.That(factory(1).Scopes, Is.EqualTo(1));
+            Assert.AreEqual(1, factory(1).Scopes);
         }
 
         [Test]

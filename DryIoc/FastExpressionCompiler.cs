@@ -213,7 +213,10 @@ namespace FastExpressionCompiler
 
                 var items = new object[totalItemCount];
 
-                var constantTypes = totalItemCount <= Closure.CreateMethods.Length ? new Type[totalItemCount] : null;
+                // Deciding to create typed or array based closure, based on number of closed constants
+                // Not null array of contstant types means a typed closure can be created
+                var typedClosureCreateMethods = Closure.TypedClosureCreateMethods;
+                var constantTypes = totalItemCount <= typedClosureCreateMethods.Length ? new Type[totalItemCount] : null;
 
                 if (ConstantExpressions != null)
                     for (var i = 0; i < ConstantExpressions.Count; i++)
@@ -243,8 +246,7 @@ namespace FastExpressionCompiler
 
                 if (constantTypes != null)
                 {
-                    var createClosureMethod = Closure.CreateMethods[totalItemCount - 1];
-
+                    var createClosureMethod = typedClosureCreateMethods[totalItemCount - 1];
                     var createClosure = createClosureMethod.MakeGenericMethod(constantTypes);
 
                     var closure = createClosure.Invoke(null, items);
@@ -267,7 +269,7 @@ namespace FastExpressionCompiler
 
         internal static class Closure
         {
-            public static readonly MethodInfo[] CreateMethods =
+            public static readonly MethodInfo[] TypedClosureCreateMethods =
                 typeof(Closure).GetTypeInfo().DeclaredMethods.ToArray();
 
             public static Closure<T1> CreateClosure<T1>(T1 v1)
@@ -582,7 +584,8 @@ namespace FastExpressionCompiler
                     break;
 
                 case ExpressionType.Parameter:
-                    // if parameter is used but no passed we assume that it should be in closure and set by outer lambda
+                    // if parameter is used But no passed (not in param expressions)
+                    // it means param is provided by outer lambda and should be put in closure for current lambda
                     var paramExpr = (ParameterExpression)expr;
                     if (paramExprs.IndexOf(paramExpr) == -1)
                     {
@@ -600,7 +603,6 @@ namespace FastExpressionCompiler
                         && TryCollectBoundConstants(ref closure, methodCallExpr.Arguments, paramExprs);
 
                 case ExpressionType.MemberAccess:
-
                     var memberExpr = ((MemberExpression)expr).Expression;
                     return memberExpr == null 
                         || TryCollectBoundConstants(ref closure, memberExpr, paramExprs);
@@ -765,27 +767,27 @@ namespace FastExpressionCompiler
             private static bool EmitParameter(ParameterExpression p, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
                 var paramIndex = ps.IndexOf(p);
-                if (paramIndex == -1)
+
+                // if parameter is passed, then just load it on stack
+                if (paramIndex != -1)
                 {
-                    // means that parameter isn't passed, and probably part of outer scope,
-                    // so it should be loaded from closure
-                    if (closure == null)
-                        return false;
-
-                    var usedParamIndex = closure.UsedParamExpressions.IndexOf(p);
-                    if (usedParamIndex == -1)
-                        return false;  // what??? no chance
-
-                    var closureItemIndex = usedParamIndex + closure.ConstantCount;
-
-                    LoadClosureFieldOrItem(il, closure, closureItemIndex, p.Type);
+                    if (closure != null)
+                        paramIndex += 1; // shift parameter indeces by one, because the first one will be closure
+                    LoadParamArg(il, paramIndex);
                     return true;
                 }
 
-                if (closure != null)
-                    paramIndex += 1; // shift parameter indeces by one, because the first one will be closure
+                // Otherwise (parameter isn't passed) then it is probably passed into outer lambda,
+                // so it should be loaded from closure
+                if (closure == null)
+                    return false;
 
-                LoadParamArg(il, paramIndex);
+                var usedParamIndex = closure.UsedParamExpressions.IndexOf(p);
+                if (usedParamIndex == -1)
+                    return false;  // what??? no chance
+
+                var closureItemIndex = usedParamIndex + closure.ConstantCount;
+                LoadClosureFieldOrItem(il, closure, closureItemIndex, p.Type);
                 return true;
             }
 
@@ -945,20 +947,24 @@ namespace FastExpressionCompiler
                 {
                     // load closure field
                     il.Emit(OpCodes.Ldfld, closure.Fields[constantIndex]);
+                    return;
                 }
-                else
+                
+                // load array field
+                il.Emit(OpCodes.Ldfld, ArrayClosure.ArrayField);
+
+                // load array item index
+                EmitLoadConstantInt(il, constantIndex);
+
+                // load item from index
+                il.Emit(OpCodes.Ldelem_Ref);
+
+                // Cast or unbox the object item depending if it is a class or value type
+                if (constantType != typeof(object))
                 {
-                    // load array field
-                    il.Emit(OpCodes.Ldfld, ArrayClosure.ArrayField);
-
-                    // load array item index
-                    EmitLoadConstantInt(il, constantIndex);
-
-                    // load item from index
-                    il.Emit(OpCodes.Ldelem_Ref);
-
-                    // cast if needed
-                    if (constantType != typeof(object))
+                    if (constantType.GetTypeInfo().IsValueType)
+                        il.Emit(OpCodes.Unbox_Any, constantType);
+                    else
                         il.Emit(OpCodes.Castclass, constantType);
                 }
             }

@@ -56,12 +56,10 @@ namespace DryIoc.IssuesTests
         {
             public void Handle(ZoneDestroyedEventArgs args)
             {
-                Console.WriteLine("Scoring Service Handled ZoneDestroyed Event");
             }
 
             public void Handle(ZoneCreatedEventArgs args)
             {
-                Console.WriteLine("Scoring Service Handled ZoneCreated Event");
             }
         }
 
@@ -69,12 +67,10 @@ namespace DryIoc.IssuesTests
         {
             public void Handle(ZoneDestroyedEventArgs args)
             {
-                Console.WriteLine("Rendering Service Handled ZoneDestroyed Event");
             }
 
             public void Handle(ZoneCreatedEventArgs args)
             {
-                Console.WriteLine("Rendering Service Handled ZoneCreated Event");
             }
         }
     }
