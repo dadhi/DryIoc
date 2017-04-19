@@ -121,7 +121,7 @@ namespace FastExpressionCompiler.UnitTests
         [Test]
         public void Given_composed_expr_with_closure_over_parameters_in_nested_lambda_should_work()
         {
-            var argExpr = Expression.Parameter(typeof(object));
+            var argExpr = Expression.Parameter(typeof(object), string.Empty);
             var funcExpr = Expression.Lambda(
                 Expression.Invoke(Expression.Lambda(
                     Expression.Invoke(Expression.Lambda(argExpr)))),
@@ -143,7 +143,7 @@ namespace FastExpressionCompiler.UnitTests
         {
             //Func<A, A> funcEthalon = a => a.Increment(() => a.Increment(() => a.Increment(null)));
 
-            var aExpr = Expression.Parameter(typeof(A));
+            var aExpr = Expression.Parameter(typeof(A), string.Empty);
             var funcExpr = Expression.Lambda(
                 Expression.Call(aExpr, "Increment", new Type[0],
                     Expression.Lambda(
@@ -179,8 +179,8 @@ namespace FastExpressionCompiler.UnitTests
             Assert.AreEqual(3, aa.X);
             Assert.AreEqual(-3, bb.X);
 
-            var aExpr = Expression.Parameter(typeof(A));
-            var bExpr = Expression.Parameter(typeof(A));
+            var aExpr = Expression.Parameter(typeof(A), string.Empty);
+            var bExpr = Expression.Parameter(typeof(A), string.Empty);
 
             var funcExpr = Expression.Lambda(
                 Expression.Call(aExpr, "Increment", new Type[0],
@@ -220,8 +220,8 @@ namespace FastExpressionCompiler.UnitTests
             funcEthalon(aa, aa);
             Assert.AreEqual(0, aa.X);
 
-            var aExpr = Expression.Parameter(typeof(A));
-            var bExpr = Expression.Parameter(typeof(A));
+            var aExpr = Expression.Parameter(typeof(A), string.Empty);
+            var bExpr = Expression.Parameter(typeof(A), string.Empty);
 
             var funcExpr = Expression.Lambda(
                 Expression.Call(aExpr, "Increment", new Type[0],

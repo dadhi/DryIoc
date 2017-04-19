@@ -70,6 +70,24 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_inject_scoped_or_singleton_service_from_fallback_container()
+        {
+            var parent = new Container();
+            parent.Register<IFruit, Mango>(Reuse.ScopedOrSingleton);
+
+            var child = parent.CreateFacade();
+            child.Register<IJuice, FruitJuice>();
+
+            using (var childScope = child.OpenScope())
+            {
+                var juice = childScope.Resolve<IJuice>();
+                Assert.IsInstanceOf<Mango>(juice.Fruit);
+            }
+
+            Assert.IsNotNull(child.Resolve<IJuice>());
+        }
+
+        [Test]
         public void Can_fallback_to_parent_and_return_back_to_child()
         {
             var container = new Container();

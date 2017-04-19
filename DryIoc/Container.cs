@@ -9037,6 +9037,25 @@ namespace DryIoc
             Name = name;
         }
 
+        internal bool ScopedOrSingleton;
+        internal CurrentScopeReuse(bool scopedOrSingleton)
+        {
+            ScopedOrSingleton = scopedOrSingleton;
+        }
+
+        internal static object GetScopedOrSingleton(IScopeAccess scopes, IScope singleton,
+            int itemId, CreateScopedValue createValue)
+        {
+            var scope = scopes.GetCurrentNamedScope(null, throwIfNotFound: false);
+            if (scope != null)
+                return scope.GetOrAdd(itemId, createValue);
+            var singetonId = itemId == -1 ? -1 : singleton.GetScopedItemIdOrSelf(itemId);
+            return singleton.GetOrAdd(singetonId, createValue);
+        }
+
+        private static readonly MethodInfo _getScopedOrSingletonMethod =
+            typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetScopedOrSingleton", includeNonPublic: true);
+
         /// <summary>Returns item from current scope with specified name.</summary>
         /// <param name="scopes">Container scopes to select from.</param>
         /// <param name="scopeName">scope name to look up.</param>
@@ -9058,12 +9077,18 @@ namespace DryIoc
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
             var scopesExpr = Container.GetScopesExpr(request);
+            var itemId = trackTransientDisposable ? -1 : request.FactoryID;
 
+            if (ScopedOrSingleton)
+                return Expression.Call(_getScopedOrSingletonMethod,
+                    scopesExpr, Container.SingletonScopeExpr,
+                    Expression.Constant(itemId),
+                    Expression.Lambda<CreateScopedValue>(createItemExpr));
+
+            // todo: add the ValueType check to GetOrAddStateItemExpression
             var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
-
-            var itemId = trackTransientDisposable ? -1 : request.FactoryID;
 
             return Expression.Call(_getOrAddOrDefaultMethod, 
                 scopesExpr, scopeNameExpr,
@@ -9076,22 +9101,28 @@ namespace DryIoc
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         public bool CanApply(Request request)
         {
-            return // first is the special case whith ambient scope context, 
-                   // where scope can be switched for already resolved singleton. 
-                   // So it may be no valid initially but only afterwars
-                (request.Container.ScopeContext != null && request.IsWrappedInFunc()) ||
+            if (ScopedOrSingleton)
+                return true;
+
+            // A special case whith ambient scope context, 
+            // where scope can be switched for already resolved singleton. 
+            // So it may be no valid initially but only afterwars
+            return (request.Container.ScopeContext != null && request.IsWrappedInFunc()) ||
                 request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
         private readonly Lazy<Expression> _inCurrentScopeReuseExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(Reuse).GetFieldOrNull("InCurrentScope")));
 
+        private readonly Lazy<Expression> _scopedOrSingletonExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(Reuse).GetFieldOrNull("ScopedOrSingleton")));
+
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
-            return Name == null ? _inCurrentScopeReuseExpr.Value
-                : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(),
-                    fallbackConverter(Name));
+            return Name == null && !ScopedOrSingleton ? _inCurrentScopeReuseExpr.Value
+                : ScopedOrSingleton ? _scopedOrSingletonExpr.Value
+                : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(), fallbackConverter(Name));
         }
 
         #region Obsolete
@@ -9261,6 +9292,10 @@ namespace DryIoc
 
         /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
+
+        /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Reuse.Singleton"/></summary>
+        /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
+        public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
         /// <summary>Returns current scope reuse with specific name to match with scope.
         /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
