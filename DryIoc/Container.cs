@@ -6297,15 +6297,15 @@ namespace DryIoc
                 Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
-            if (reuse == DryIoc.Reuse.Transient)
+            if (reuse == DryIoc.Reuse.Singleton)
+                flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
+            // check for disposable transient
+            else if (reuse == DryIoc.Reuse.Transient)
             {
                 reuse = GetTransientDisposableTrackingReuse(factory);
                 if (reuse != DryIoc.Reuse.Transient)
                     flags |= RequestFlags.TracksTransientDisposable;
             }
-
-            if (reuse == DryIoc.Reuse.Singleton)
-                flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
 
             _requestContext.IncrementDependencyCount();
             return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags);
@@ -6350,8 +6350,8 @@ namespace DryIoc
             if (IsWrappedInFunc())
                 return DryIoc.Reuse.Transient;
 
-            // If no reused parent, then track in current open scope, or if not opened in singleton
-            return Scopes.GetCurrentScope() != null ? DryIoc.Reuse.InCurrentScope : DryIoc.Reuse.Singleton;
+            // If no parent with reuse found, then track in current open scope or in singletons scope
+            return DryIoc.Reuse.ScopedOrSingleton;
         }
 
         private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
