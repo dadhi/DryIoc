@@ -72,6 +72,11 @@
     <file src="..\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\PCL\DryIoc\Ported-net.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
 
+    <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
+    <file src="..\DryIoc\Container.cs" target="content\xamarinmac20\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\xamarinmac20\DryIoc" />
+    <file src="..\PCL\DryIoc\Ported-net.cs" target="content\xamarinmac20\DryIoc" />
+
     <!--uap10.0: Universal Windows Platform-->
     <file src="..\DryIoc\Container.cs" target="contentFiles\cs\any" />
     <file src="..\DryIoc\ImTools.cs" target="contentFiles\cs\any" />
