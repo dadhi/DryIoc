@@ -1,5 +1,5 @@
 ﻿{
-  "version": "1.2.0",
+  "version": "1.2.1",
 
   "description": "DryIoc adapter for Microsoft.Extensions.DependencyInjection",
   "authors": [ "Maksim Volkau" ],
@@ -15,7 +15,7 @@
     "tags": [ "DryIoc", "Dependency Injection", "DI", "IoC", "Asp", "AspNet", "vNext", "AspNetCore", "NetCore", "DNX" ],
     "projectUrl": "https://bitbucket.org/dadhi/dryioc",
     "licenseUrl": "http://opensource.org/licenses/MIT",
-    "releaseNotes": "simplified: Using new Reuse.ScopedOrSingleton for scoped services instead of Rules.WithImplicitRootOpenScope(); Made DIServiceProvider a non-disposable;"
+    "releaseNotes": "In v1.2.1: fixed: DIServiceProvider reuse; In v1.2.0 simplified: Using new Reuse.ScopedOrSingleton for scoped services instead of Rules.WithImplicitRootOpenScope(); Made DIServiceProvider a non-disposable;"
   },
 
   "dependencies": {

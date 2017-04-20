@@ -70,7 +70,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 .WithTrackingDisposableTransients());
 
             adapter.Register<IServiceProvider, DryIocServiceProvider>(
-                Reuse.ScopedOrSingleton, Parameters.Of.Type(_ => throwIfUnresolved));
+                Reuse.Transient, Parameters.Of.Type(_ => throwIfUnresolved));
 
             adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(
                 Reuse.ScopedOrSingleton);
