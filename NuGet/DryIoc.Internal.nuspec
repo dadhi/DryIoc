@@ -12,6 +12,13 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.10.6:
+      - added: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 using xamarinmac2.0 TFM
+      - added: Reuse.ScopedOrSingleton to simplify scenarios which currently use Rules.WithImplicitRootOpenScope, and simplify MS.DI adapter
+      - fixed: Performance issue with #459 (Container.Dispose stack trace) and made it turned Off by default
+      - fixed: Updated to FEC v1.0.0+ with fix for #6
+      - changed: More cache agnostic and flexible disposable transient tracking with Reuse.ScopedOrSingleton
+      - changed: Improved perf around resolution of scoped services
       v2.10.5:
       - fixed: #459: Add Container.Dispose stack trace to ContainerIsDisposed error message
       - changed: Updated to FastExpressionCompiler v1.0.0
