@@ -11,8 +11,7 @@ namespace DryIoc.IssuesTests
         {
             var implTypes = new[] { typeof(CustomRegistrationA), typeof(CustomRegistrationB) };
 
-            var container = new Container()
-                .WithAutoFallbackResolution(implTypes);
+            var container = new Container().WithAutoFallbackResolution(implTypes);
 
             var xs = container.ResolveMany<ICustomRegistration>();
 

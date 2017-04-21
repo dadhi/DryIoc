@@ -64,8 +64,8 @@ namespace DryIoc
             var scope = ((IScopeAccess)this).GetCurrentScope();
             var scopeStr
                 = scope == null ? "container"
-                : _scopeContext != null 
-                ? "ambiently scoped container with scope " + scope
+                : _scopeContext != null
+                ? "ambient scoped container with scope " + scope
                 : "scoped container with scope " + scope;
             if (IsDisposed)
             {
@@ -89,8 +89,8 @@ namespace DryIoc
             var rules = configure == null ? Rules : configure(Rules);
             scopeContext = scopeContext ?? _scopeContext;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(rules, registryWithoutCache, 
-                _singletonScope, scopeContext, _openedScope, 
+            return new Container(rules, registryWithoutCache,
+                _singletonScope, scopeContext, _openedScope,
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
@@ -101,8 +101,8 @@ namespace DryIoc
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
-            return new Container(Rules, readonlyRegistry, 
-                _singletonScope, _scopeContext, _openedScope, 
+            return new Container(Rules, readonlyRegistry,
+                _singletonScope, _scopeContext, _openedScope,
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
@@ -113,8 +113,8 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, registryWithoutCache, 
-                _singletonScope, _scopeContext, _openedScope, 
+            return new Container(Rules, registryWithoutCache,
+                _singletonScope, _scopeContext, _openedScope,
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
@@ -126,8 +126,8 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             var newSingletons = new SingletonScope();
-            return new Container(Rules, registryWithoutCache, 
-                newSingletons, _scopeContext, _openedScope, 
+            return new Container(Rules, registryWithoutCache,
+                newSingletons, _scopeContext, _openedScope,
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
@@ -139,8 +139,8 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, newRegistry, 
-                _singletonScope, _scopeContext, _openedScope, 
+            return new Container(Rules, newRegistry,
+                _singletonScope, _scopeContext, _openedScope,
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer);
         }
 
@@ -179,8 +179,8 @@ namespace DryIoc
 
             var rules = configure == null ? Rules : configure(Rules);
 
-            return new Container(rules, _registry, 
-                _singletonScope, _scopeContext, nestedOpenedScope, 
+            return new Container(rules, _registry,
+                _singletonScope, _scopeContext, nestedOpenedScope,
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer ?? this);
         }
 
@@ -203,7 +203,7 @@ namespace DryIoc
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
         /// <param name="serviceType">Target service type.</param>
         /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
-        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all resgitrations of <paramref name="serviceType"/>.</param>
+        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all registrations of <paramref name="serviceType"/>.</param>
         /// <returns>True if target service was found, false - otherwise.</returns>
         public bool ClearCache(Type serviceType, FactoryType? factoryType = null, object serviceKey = null)
         {
@@ -910,7 +910,7 @@ namespace DryIoc
             var dynamicFactories = GetDynamicFactoriesOrNull(FactoryType.Service, serviceType, null);
             if (dynamicFactories != null)
                 factories = CombineRegisteredAndDynamicFactories(factories, dynamicFactories);
-            
+
             return factories;
         }
 
@@ -1361,7 +1361,7 @@ namespace DryIoc
                         .ToArray();
 
                     resultFactories = resultFactories == null
-                        ? validFactories 
+                        ? validFactories
                         : resultFactories.Concat(validFactories);
                 }
             }
@@ -1375,7 +1375,7 @@ namespace DryIoc
         {
             if (dynamicFactories == null)
                 return registeredFactories.ToArrayOrSelf();
-             
+
             if (registeredFactories == null)
                 return dynamicFactories.Select(it => KV.Of(it.ServiceKey, it.Factory)).ToArray();
 
@@ -1435,7 +1435,7 @@ namespace DryIoc
                 var keyedFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
                 if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
                     return keyedFactory.Value; // todo: skip further checks, really?
-                return null; 
+                return null;
             }
 
             // Filter out non default factories
@@ -2299,30 +2299,8 @@ namespace DryIoc
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
             Func<Request, bool> condition = null)
         {
-            return container.With(rules => rules.WithDynamicRegistrations(
-                (factoryType, serviceType, serviceKey) =>
-                {
-                    return implTypes.Where(implType =>
-                    {
-                        var serviceTypes = implType.GetImplementedServiceTypes(nonPublicServiceTypes: true);
-                        if (serviceTypes.Length == 0)
-                            return false;
-
-                        if (!implType.IsOpenGeneric())
-                            return serviceTypes.IndexOf(serviceType) != -1;
-
-                        if (!serviceType.IsGeneric()) // should be genmeric to supply args to implType
-                            return false;
-
-                        return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
-                    })
-                    .Select(implType => new DynamicRegistration(new ReflectionFactory(implType)));
-
-                }));
-
-            //return container.ThrowIfNull().With(rules =>
-            //    rules.WithUnknownServiceResolvers(
-            //        Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
+            var rule = Rules.AutoFallbackResolutionRule(implTypes, changeDefaultReuse, condition);
+            return container.With(rules => rules.WithDynamicRegistrations(rule));
         }
 
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
@@ -2866,7 +2844,7 @@ namespace DryIoc
             var asContainerWrapper = Setup.WrapperWith(preventDisposal: true);
 
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(Container.GetResolverExpr, 
+                new ExpressionFactory(Container.GetResolverExpr,
                 Reuse.Transient,
                 setup: asContainerWrapper));
 
@@ -3207,7 +3185,8 @@ namespace DryIoc
             var container = request.Container;
             var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
 
-            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true)
+            var factories = container
+                .GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true)
                 .ToArrayOrSelf();
 
             if (factories.Length == 0)
@@ -3524,11 +3503,43 @@ namespace DryIoc
             return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
         }
 
-        /// <summary>Fallback rule to automatically register requested service with Reuse based on resolution source.</summary>
-        /// <param name="implTypes">Assemblies to look for implementation types.</param>
-        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
-        /// <param name="condition">(optional) Selects when to apply the rule.</param>
-        /// <returns>New rule.</returns>
+        /// <summary>Creates dynamic fallback registrations for the requested service type
+        /// with provided <paramref name="implementationTypes"/>. Fallback means that no
+        /// The dynamic registrations will be applied Only if no normal registrations
+        /// exist for the requested service type, hence the "fallback".</summary>
+        /// <param name="implementationTypes">Types to use for registrations.</param>
+        /// <param name="changeDefaultReuse"></param>
+        /// <param name="condition"></param>
+        /// <returns>Registration provider.</returns>
+        public static DynamicRegistrationProvider AutoFallbackResolutionRule(
+            IEnumerable<Type> implementationTypes,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
+            Func<Request, bool> condition = null)
+        {
+            return (ignoredFactoryType, serviceType, ignoredServiceKey) =>
+            {
+                return implementationTypes.Match(
+                    implType =>
+                    {
+                        var serviceTypes = implType.GetImplementedServiceTypes(nonPublicServiceTypes: true);
+                        if (serviceTypes.Length == 0)
+                            return false;
+
+                        if (!implType.IsOpenGeneric())
+                            return serviceTypes.IndexOf(serviceType) != -1;
+
+                        if (!serviceType.IsGeneric()) // should be generic to supply arguments to implType
+                            return false;
+
+                        return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
+                    },
+                    implType => new DynamicRegistration(
+                        new ReflectionFactory(implType), IfAlreadyRegistered.Keep));
+            };
+        }
+
+        // todo: v3: Remove
+        /// <summary>Obsolete: replaced by <see cref="AutoFallbackResolutionRule"/></summary>
         public static UnknownServiceResolver AutoRegisterUnknownServiceRule(
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
@@ -3839,7 +3850,7 @@ namespace DryIoc
             CaptureContainerDisposeStackTrace = 1 << 10
         }
 
-        private const Settings DEFAULT_SETTINGS 
+        private const Settings DEFAULT_SETTINGS
             = Settings.ThrowIfDependencyHasShorterReuseLifespan
             | Settings.ThrowOnRegisteringDisposableTransient
             | Settings.ImplicitCheckForReuseMatchingScope
@@ -6310,7 +6321,7 @@ namespace DryIoc
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
         /// actual <see cref="DefaultKey"/></summary>
         /// <param name="serviceKey">Key to set.</param>
-        public void ChangeServiceKey(object serviceKey) 
+        public void ChangeServiceKey(object serviceKey)
         {
             var i = _serviceInfo;
             var d = i.Details;
@@ -6417,9 +6428,9 @@ namespace DryIoc
 
             // if no specified the wrapper reuse is always Transient,
             // other container-wide default reuse is applied
-            return factory.FactoryType != FactoryType.Wrapper
-                ? Container.Rules.DefaultReuseInsteadOfTransient
-                : DryIoc.Reuse.Transient;
+            return factory.FactoryType == FactoryType.Wrapper
+                ? DryIoc.Reuse.Transient
+                : Container.Rules.DefaultReuseInsteadOfTransient;
         }
 
         private IReuse GetTransientDisposableTrackingReuse(Factory factory)
@@ -7167,7 +7178,7 @@ namespace DryIoc
                                                 // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
-                (request.ShouldSplitObjectGraph() || 
+                (request.ShouldSplitObjectGraph() ||
                 Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) &&
                 !request.IsWrappedInFuncWithArgs()) &&
                 request.GetActualServiceType() != typeof(void);
@@ -7926,7 +7937,7 @@ namespace DryIoc
             {
                 var implementedType = implementedTypes[i];
                 implementedTypeFound = implementedType.GetGenericDefinitionOrNull() == serviceType;
-                containsAllTypeParams = implementedTypeFound 
+                containsAllTypeParams = implementedTypeFound
                     && implementedType.ContainsAllGenericTypeParameters(implTypeParams);
             }
 
@@ -8899,7 +8910,7 @@ namespace DryIoc
             Ref.Swap(ref _factoryIdToIndexMap, map =>
             {
                 index = map.GetValueOrDefault(externalId);
-                return index == null 
+                return index == null
                     ? map.AddOrUpdate(externalId, index = Interlocked.Increment(ref _lastItemIndex))
                     : map;
             });
@@ -9178,7 +9189,7 @@ namespace DryIoc
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
-            var itemId = trackTransientDisposable ? -1 
+            var itemId = trackTransientDisposable ? -1
                 : request.SingletonScope.GetScopedItemIdOrSelf(request.FactoryID);
             return Expression.Call(Container.SingletonScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                 Expression.Constant(itemId), Expression.Lambda<CreateScopedValue>(createItemExpr));
@@ -9278,7 +9289,7 @@ namespace DryIoc
         /// <param name="itemId">Scoped item ID for lookup.</param>
         /// <param name="createValue">Delegate for creating the item.</param>
         /// <returns>Reused item.</returns>
-        public static object GetOrAddItemOrDefault(IScopeAccess scopes, object scopeName, 
+        public static object GetOrAddItemOrDefault(IScopeAccess scopes, object scopeName,
             bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue)
         {
             var scope = scopes.GetCurrentNamedScope(scopeName, throwIfNoScopeFound);
@@ -9305,9 +9316,9 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
-            return Expression.Call(_getOrAddOrDefaultMethod, 
+            return Expression.Call(_getOrAddOrDefaultMethod,
                 scopesExpr, scopeNameExpr,
-                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(itemId),
                 Expression.Lambda<CreateScopedValue>(createItemExpr));
         }
@@ -10292,7 +10303,7 @@ namespace DryIoc
 
     /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
     /// filtering or catching container relevant exceptions from client code.</summary>
-    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", 
+    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable",
         Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException
     {
@@ -10525,8 +10536,8 @@ namespace DryIoc
             NotFoundMetaCtorWithTwoArgs = Of(
                 "Expecting Meta wrapper public constructor with two args {0} but not found when resolving: {1}"),
             UnableToSelectFromManyRegistrationsWithMatchingMetadata = Of(
-                "Unable to select from multiple registrations matching the Metadata type {0}:" + Environment.NewLine + 
-                "{1}" + Environment.NewLine + 
+                "Unable to select from multiple registrations matching the Metadata type {0}:" + Environment.NewLine +
+                "{1}" + Environment.NewLine +
                 "When resolving: {2}" + Environment.NewLine),
             ImplementationTypeIsNotSpecifiedInAutoConcreteTypeResolution = Of(
                 "Implementation type is not specified when using `AutoConcreteTypeResolution` rule to resolve: {0}");
@@ -11480,7 +11491,7 @@ namespace FastExpressionCompiler
     /// <summary>Compiles to delegate using FastExpressionCompiler.</summary>
     public static partial class ExpressionCompiler
     {
-        internal static TDelegate DoCompile<TDelegate>(Expression bodyExpr, 
+        internal static TDelegate DoCompile<TDelegate>(Expression bodyExpr,
             ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class
         {
             TDelegate compiledDelegate = null;

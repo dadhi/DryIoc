@@ -29,14 +29,6 @@ namespace ImTools
     using System.Linq;
     using System.Text;
     using System.Threading;
-    using System.Runtime.CompilerServices; // for aggressive inlining hints
-
-    /// <summary>Portable aggressive in-lining option for MethodImpl.</summary>
-    public static class MethodImplHints
-    {
-        /// <summary>Value of MethodImplOptions.AggressingInlining</summary>
-        public const MethodImplOptions AggressingInlining = (MethodImplOptions)256;
-    }
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools
@@ -93,8 +85,8 @@ namespace ImTools
             return result;
         }
 
-        /// <summary>Perfomant concat of enumerables in case they are arrays. 
-        /// But perf will degrade if you use Concat().Where().</summary>
+        /// <summary>Performant concat of enumerables in case they are arrays. 
+        /// But performance will degrade if you use Concat().Where().</summary>
         /// <typeparam name="T">Type of item.</typeparam>
         /// <param name="source">goes first.</param>
         /// <param name="other">appended to source.</param>
@@ -175,6 +167,7 @@ namespace ImTools
             return default(T);
         }
 
+        // todo: review do we need this
         private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
         {
             if (results == null)
@@ -231,11 +224,11 @@ namespace ImTools
             return appendedResults;
         }
 
-        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
+        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
         /// It returns source array and does Not create new one if all items match the condition.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array: If null the null will be returned.</param>
-        /// <param name="condition">Keep items matching the condition, and skip non-matching.</param>
+        /// <typeparam name="T">Type of source items.</typeparam>
+        /// <param name="source">If null, the null will be returned.</param>
+        /// <param name="condition">Condition to keep items.</param>
         /// <returns>New array if some items are filter out. Empty array if all items are filtered out. Original array otherwise.</returns>
         public static T[] Match<T>(this T[] source, Func<T, bool> condition)
         {
@@ -276,13 +269,11 @@ namespace ImTools
             return source;
         }
 
-        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allcating.
+        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
         /// It returns source array and does Not create new one if all items match the condition.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <typeparam name="R">Type of result array items.</typeparam>
-        /// <param name="source">Source array: If null the null will be returned.</param>
-        /// <param name="condition">Keep items matching the condition, and skip non-matching.</param>
-        /// <param name="map">Maps source item to result item.</param>
+        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
+        /// <param name="source">If null, the null will be returned.</param>
+        /// <param name="condition">Condition to keep items.</param> <param name="map">Converter from source to result item.</param>
         /// <returns>New array of result items.</returns>
         public static R[] Match<T, R>(this T[] source, Func<T, bool> condition, Func<T, R> map)
         {
@@ -327,6 +318,20 @@ namespace ImTools
                 return Empty<R>();
 
             return AppendTo(source, 0, source.Length, map);
+        }
+
+        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
+        /// otherwise just calls Where, Select</summary>
+        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
+        /// <param name="source">If null, the null will be returned.</param>
+        /// <param name="condition">Condition to keep items.</param> <param name="map">Converter from source to result item.</param>
+        /// <returns>Result items, may be an array.</returns>
+        public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map)
+        {
+            var arr = source as T[];
+            if (arr != null)
+                return arr.Match(condition, map);
+            return source.Where(condition).Select(map);
         }
 
         /// <summary>Produces new array without item at specified <paramref name="index"/>. 
@@ -523,7 +528,6 @@ namespace ImTools
         /// <summary>Creates the key value pair.</summary>
         /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
         /// <param name="key">Key</param> <param name="value">Value</param> <returns>New pair.</returns>
-        [MethodImpl((MethodImplOptions)256)] // AggressiveInlining
         public static KV<K, V> Of<K, V>(K key, V value)
         {
             return new KV<K, V>(key, value);
@@ -532,7 +536,6 @@ namespace ImTools
         /// <summary>Creates the new pair with new key and old value.</summary>
         /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
         /// <param name="source">Source value</param> <param name="key">New key</param> <returns>New pair</returns>
-        [MethodImpl((MethodImplOptions)256)] // AggressiveInlining
         public static KV<K, V> WithKey<K, V>(this KV<K, V> source, K key)
         {
             return new KV<K, V>(key, source.Value);
@@ -541,7 +544,6 @@ namespace ImTools
         /// <summary>Creates the new pair with old key and new value.</summary>
         /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
         /// <param name="source">Source value</param> <param name="value">New value.</param> <returns>New pair</returns>
-        [MethodImpl((MethodImplOptions)256)] // AggressiveInlining
         public static KV<K, V> WithValue<K, V>(this KV<K, V> source, V value)
         {
             return new KV<K, V>(source.Key, value);
@@ -879,7 +881,7 @@ namespace ImTools
         #endregion
     }
 
-    /// <summary>Avl trees forest - uses last hash bits to quickly find target tree, more performant Lookup but no traversal.</summary>
+    /// <summary>AVL trees forest - uses last hash bits to quickly find target tree, more performant Lookup but no traversal.</summary>
     /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type.</typeparam>
     public sealed class ImMap<K, V>
     {
@@ -892,13 +894,12 @@ namespace ImTools
         /// <summary>Count in items stored.</summary>
         public readonly int Count;
 
-        /// <summary>Truw if contain no items</summary>
+        /// <summary>True if contains no items</summary>
         public bool IsEmpty { get { return Count == 0; } }
 
         /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
         /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
         /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         public V GetValueOrDefault(K key, V defaultValue = default(V))
         {
             var hash = key.GetHashCode();
@@ -920,7 +921,6 @@ namespace ImTools
         /// If value with the same key is exist then the value is replaced.</summary>
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <returns>New tree with added or updated key-value.</returns>
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         public ImMap<K, V> AddOrUpdate(K key, V value)
         {
             var hash = key.GetHashCode();
@@ -945,7 +945,6 @@ namespace ImTools
         /// <param name="key">Key to look for.</param>
         /// <param name="value">New value to replace key value with.</param>
         /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
-        [MethodImpl(MethodImplHints.AggressingInlining)]
         public ImMap<K, V> Update(K key, V value)
         {
             var hash = key.GetHashCode();
