@@ -101,11 +101,32 @@ namespace DryIoc.UnitTests
                 using (var scope = container.OpenScope())
                 {
                     scope.Resolve<Blah>();
+
                     await Task.Delay(100).ConfigureAwait(false);
+
                     var ex = Assert.Throws<ContainerException>(() => scope.Resolve<Blah>());
                     Assert.AreEqual(
                         Error.NameOf(Error.NoCurrentScope), 
                         Error.NameOf(ex.Error));
+                }
+            }
+        }
+
+        [Test]
+        public async void Given_thread_context_the_ScopedOrSingleton_service_may_be_resolved_outside_of_context()
+        {
+            using (var container = new Container(scopeContext: new ThreadScopeContext()))
+            {
+                container.Register<Blah>(Reuse.ScopedOrSingleton);
+
+                using (var scope = container.OpenScope())
+                {
+                    var scoped = scope.Resolve<Blah>();
+
+                    await Task.Delay(100).ConfigureAwait(false);
+
+                    var singleton = scope.Resolve<Blah>();
+                    Assert.AreNotSame(scoped, singleton);
                 }
             }
         }

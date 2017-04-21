@@ -25,12 +25,12 @@ rem DryIoc.MefAttributedModel
 %NUGET% push "%PACKAGEDIR%\DryIoc.MefAttributedModel.dll.3.0.0-preview-05.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Web
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.dll.2.1.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Web.dll.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
-rem DryIoc.Mvc
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem rem DryIoc.Mvc
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.2.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Mvc.dll.2.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.2.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
@@ -41,8 +41,8 @@ rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.2.1.nupkg" -Source https://nuget.o
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.SignalR.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Owin
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.dll.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIoc.Owin.dll.2.2.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.WebApi.Owin
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.WebApi.Owin.2.1.nupkg" -Source https://nuget.org -ApiKey %APIKEY%

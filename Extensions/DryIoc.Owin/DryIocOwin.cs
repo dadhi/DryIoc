@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+using System.Collections.Generic;
+
 namespace DryIoc.Owin
 {
     using System;
@@ -36,21 +38,44 @@ namespace DryIoc.Owin
         /// <summary>Key of scoped container stored in <see cref="IOwinContext"/>.</summary>
         public static readonly string ScopedContainerKeyInContext = typeof(DryIocOwin).FullName;
 
-        /// <summary>Inserts scoped container into pipeline and stores scoped container in context.
-        /// 
-        /// Optionally registers instances in scope with provided action.</summary>
-        /// <param name="app">App builder</param> <param name="container">Container</param>
-        /// <param name="registerInScope">(optional) Action for registering something in scope before setting scope into context.</param>
-        /// <param name="scopeContext">(optional) Specific scope context to use. 
-        /// If not specified using current container context. <see cref="AsyncExecutionFlowScopeContext"/> is default in .NET 4.5.</param>
-        public static void UseDryIocOwinMiddleware(
+        /// <summary>First, inserts request scope into pipeline via <see cref="InsertOpenScope"/>.
+        /// Then adds to application builder the registered OWIN middlewares
+        /// wrapped in <see cref="DryIocWrapperMiddleware{TServiceMiddleware}"/> via <see cref="UseRegisteredMiddlewares"/>.</summary>
+        /// <param name="app">App builder</param> 
+        /// <param name="container">Container</param>
+        /// <param name="registerInScope">(optional) Action for using/registering instances in scope before setting scope into context.</param>
+        /// <param name="scopeContext">(optional) Scope context to use. By default sets the <see cref="AsyncExecutionFlowScopeContext"/>.</param>
+        /// <returns>App builder to enable method chaining.</returns>
+        /// <remarks>IMPORTANT: if passed <paramref name="container"/> did not have a scope context set,
+        /// then the new container with context will be created and used. If you want to hold on this new container,
+        /// you may first call <see cref="InsertOpenScope"/>, store the result container, 
+        /// then call <see cref="UseRegisteredMiddlewares"/>.</remarks>
+        public static IAppBuilder UseDryIocOwinMiddleware(
             this IAppBuilder app, IContainer container,
             Action<IContainer> registerInScope = null,
             IScopeContext scopeContext = null)
         {
+            var containerWithAmbientContext = container.InsertOpenScope(app, registerInScope, scopeContext);
+            return app.UseRegisteredMiddlewares(containerWithAmbientContext);
+        }
+
+        /// <summary>Inserts `container.OpenScope()` into pipeline 
+        /// and stores the scope in context to be used by the rest of pipeline.
+        /// Additionally may register external instance into open scope.</summary>
+        /// <param name="app">App builder to use.</param>
+        /// <param name="container">DryIoc container for opening scope.</param>
+        /// <param name="registerInScope">(optional) e.g. `container => container.UseInstance(someSettings)`</param>
+        /// <param name="scopeContext">(optional) Scope context to use. By default sets the <see cref="AsyncExecutionFlowScopeContext"/>.</param>
+        /// <returns>IMPORTANT: if passed <paramref name="container"/> did not have a scope context,
+        /// then the method will return NEW container with scope context set. 
+        /// Use the returned container to pass to <see cref="UseRegisteredMiddlewares"/>.</returns>
+        public static IContainer InsertOpenScope(this IContainer container, IAppBuilder app, 
+            Action<IContainer> registerInScope = null, 
+            IScopeContext scopeContext = null)
+        {
             if (container.ScopeContext == null)
                 container = container.With(scopeContext: scopeContext ?? new AsyncExecutionFlowScopeContext());
-            
+
             app.Use(async (context, next) =>
             {
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
@@ -63,7 +88,19 @@ namespace DryIoc.Owin
                 }
             });
 
-            app.UseRegisteredMiddlewares(container);
+            return container;
+        }
+
+        /// <summary>Adds to application builder the registered OWIN middlewares 
+        /// wrapped in <see cref="DryIocWrapperMiddleware{TServiceMiddleware}"/>.</summary>
+        /// <param name="app">App builder to use.</param>
+        /// <param name="registry">Container registry to find registered <see cref="OwinMiddleware"/>.</param>
+        /// <returns>App builder to enable method chaining.</returns>
+        public static IAppBuilder UseRegisteredMiddlewares(this IAppBuilder app, IRegistrator registry)
+        {
+            foreach (var middlewareType in registry.DiscoverRegisteredMiddlewares())
+                app = app.Use(middlewareType);
+            return app;
         }
 
         /// <summary>Retrieves scope container stored in OWIN context.</summary>
@@ -73,24 +110,21 @@ namespace DryIoc.Owin
             return context.Get<IContainer>(ScopedContainerKeyInContext);
         }
 
-        private static void UseRegisteredMiddlewares(this IAppBuilder app, IRegistrator registry)
+        private static IEnumerable<Type> DiscoverRegisteredMiddlewares(this IRegistrator registry)
         {
-            var services = registry.GetServiceRegistrations()
+            return registry.GetServiceRegistrations()
                 .Where(r => r.ServiceType.IsAssignableTo(typeof(OwinMiddleware)))
                 // note: ordering is important and set to registration order by default
                 .OrderBy(r => r.FactoryRegistrationOrder)
                 .Select(r => typeof(DryIocWrapperMiddleware<>)
                     .MakeGenericType(r.Factory.ImplementationType ?? r.ServiceType));
-
-            foreach (var service in services)
-                app.Use(service);
         }
     }
 
-    internal sealed class DryIocWrapperMiddleware<TServiceMiddleware> : OwinMiddleware 
+    internal sealed class DryIocWrapperMiddleware<TServiceMiddleware> : OwinMiddleware
         where TServiceMiddleware : OwinMiddleware
     {
-        public DryIocWrapperMiddleware(OwinMiddleware next) : base(next) {}
+        public DryIocWrapperMiddleware(OwinMiddleware next) : base(next) { }
 
         public override Task Invoke(IOwinContext context)
         {
@@ -99,7 +133,7 @@ namespace DryIoc.Owin
             var middleware = scopedContainer.Resolve<Func<OwinMiddleware, TServiceMiddleware>>(IfUnresolved.ReturnDefault);
             if (middleware == null)
                 return Next.Invoke(context);
-            
+
             return middleware(Next).Invoke(context);
         }
     }

@@ -2,7 +2,6 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 ===========================================================
 
 [![Build status](https://ci.appveyor.com/api/projects/status/jfq01d9wcs4vcwpf/branch/default)](https://ci.appveyor.com/project/MaksimVolkau/dryioc/branch/default)
-[![TestCoverage](http://dadhi.bitbucket.org/dryioc-coverage/badge_linecoverage.svg)](http://dadhi.bitbucket.org/dryioc-coverage)
 [![FollowInTwitter](https://img.shields.io/badge/Follow-%40DryIoc-blue.svg)](https://twitter.com/DryIoc) 
 [![SOQnA](https://img.shields.io/badge/StackOverflow-QnA-green.svg)](http://stackoverflow.com/questions/tagged/dryioc)
 [![Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg)](https://gitter.im/dadhi/DryIoc)
@@ -27,11 +26,11 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - .Net Core / [Net Standard 1.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
 - NuGet packages:
  
-    - [DryIoc.dll] - `PM> Install-Package DryIoc.dll`
-    - [DryIoc] (source code): `PM> Install-Package DryIoc`
-    - [DryIoc.Internal] (source code hiding DryIoc public types): `PM> Install-Package DryIoc.Internal`
+    - __DryIoc.dll__ [![NuGet Badge](https://buildstats.info/nuget/DryIoc.dll)](https://www.nuget.org/packages/DryIoc.dll)
+    - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
+    - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- Latest stable DryIoc version is __2.10.4__
+- Latest stable DryIoc version is __2.10.6__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
@@ -122,7 +121,9 @@ Slim IoC Container based on service factory delegates __generated at compile-tim
 ## Extensions
 
 - [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) 
-for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx)
+for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) 
+[![NuGet Badge](https://buildstats.info/nuget/DryIoc.MefAttributedModel.dll?includePreReleases=true)](https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll)
+
 
 - ASP.NET: 
 
@@ -130,7 +131,7 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
     - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.SignalR](Extensions\SignalR)
-    - [DryIoc.Microsoft.DependencyInjection](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection) adapter for Asp.NET Core
+    - [DryIoc.Microsoft.DependencyInjection](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection)
 
 - OWIN:
 

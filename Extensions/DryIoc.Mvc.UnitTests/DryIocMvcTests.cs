@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Web.Mvc;
 using DryIoc.Web;
@@ -27,11 +28,53 @@ namespace DryIoc.Mvc.UnitTests
             var root = new Container(scopeContext: new HttpContextScopeContext(() => fakeItems))
                 .WithMvc(new[] { typeof(DryIocMvcTests).Assembly }, throwIfUnresolved: type => type.IsController());
 
-            using (var scoped = root.OpenScope(Reuse.WebRequestScopeName))
+            using (root.OpenScope(Reuse.WebRequestScopeName))
             {
                 var ex = Assert.Throws<ContainerException>(() =>
                     DependencyResolver.Current.GetService(typeof(MissingDependencyController)));
+
+                Assert.AreEqual(
+                    Error.NameOf(Error.UnableToResolveUnknownService), 
+                    Error.NameOf(ex.Error));
             }
+        }
+
+        [Test]
+        public void Can_specify_scope_context_scope_error_handler()
+        {
+            var contextItems = new Dictionary<object, object>();
+            Exception scopeContextEx = null;
+            var container = new Container(
+                scopeContext: new HttpContextScopeContext(ex => scopeContextEx = ex, () => contextItems))
+                .WithMvc(new[] { typeof(DryIocMvcTests).Assembly });
+
+            container.Register<Blah>(Reuse.InWebRequest);
+
+            contextItems = null; // let's wrack the context!
+
+            using (container.OpenScope(Reuse.WebRequestScopeName))
+            {
+                Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
+                Assert.IsInstanceOf<NullReferenceException>(scopeContextEx);
+            }
+        }
+
+        [Test]
+        public void Without_specyfuing_scope_context_error_handler_the_error_should_be_rethrown()
+        {
+            var contextItems = new Dictionary<object, object>();
+            var container = new Container(
+                    scopeContext: new HttpContextScopeContext(() => contextItems))
+                .WithMvc(new[] { typeof(DryIocMvcTests).Assembly });
+
+            container.Register<Blah>(Reuse.InWebRequest);
+
+            var scope = container.OpenScope(Reuse.WebRequestScopeName);
+            {
+                contextItems = null; // let's wrack the context!
+                Assert.Throws<ContainerException>(() => container.Resolve<Blah>());
+            }
+            Assert.Throws<NullReferenceException>(() => scope.Dispose());
         }
 
         [Test]

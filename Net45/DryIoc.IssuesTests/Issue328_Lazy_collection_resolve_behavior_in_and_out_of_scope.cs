@@ -15,9 +15,9 @@ namespace DryIoc.IssuesTests
             container.Register<IAction, ActionOne>(Reuse.InCurrentNamedScope("A"));
             container.Register<IAction, ActionTwo>(Reuse.InCurrentNamedScope("B"));
 
-            using (var aScope = container.OpenScope("A"))
+            using (var scopeA = container.OpenScope("A"))
             {
-                var scopedActions = aScope.Resolve<IEnumerable<IAction>>().ToArray();
+                var scopedActions = scopeA.Resolve<IEnumerable<IAction>>().ToArray();
                 Assert.AreEqual(1, scopedActions.Length);
                 Assert.IsInstanceOf<ActionOne>(scopedActions[0]);
             }

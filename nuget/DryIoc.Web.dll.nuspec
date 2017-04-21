@@ -4,13 +4,15 @@
         <id>DryIoc.Web.dll</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014-2016 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2017 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET providing Web Request Reuse</description>
         <tags>Web ASP Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v2.2.0:
+          - added: Ablity to handle HttpContextScopeContext errors via User handler to find reason for #433
           v2.1.1:
           - More robust HttpContextScopeContext to prevent possible concurrency errors
           v2.1.0:

@@ -47,7 +47,7 @@ namespace DryIocZero
                 new SingletonScope(), scopeContext, null, 0, null)
         { }
 
-        /// <summary>Full constructor - all state included.</summary>
+        /// <summary>Full constructor with all state included.</summary>
         /// <param name="defaultFactories"></param>
         /// <param name="keyedFactories"></param>
         /// <param name="singletonScope"></param>
@@ -468,6 +468,7 @@ namespace DryIocZero
 
         private void ThrowIfContainerDisposed()
         {
+            // todo: add stack trace and info about container into the message
             Throw.If(_disposed == 1, Error.ContainerIsDisposed);
         }
 
@@ -590,8 +591,7 @@ namespace DryIocZero
             bool outermost, bool throwIfNotFound);
     }
 
-    /// <summary>Returns reference to actual resolver implementation. 
-    /// Minimizes dependency to Factory Delegate on container.</summary>
+    /// <summary>Provides access to Container for compiled factory delegate.</summary>
     public interface IResolverContext
     {
         /// <summary>Provides access to resolver implementation.</summary>

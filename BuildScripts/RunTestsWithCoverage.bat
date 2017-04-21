@@ -23,7 +23,7 @@ echo:from assemblies: %TESTLIBS%
 echo: 
 
 %OPENCOVER%^
- -register:user^
+ -register:path64^
  -target:%NUNIT%^
  -targetargs:"%TESTLIBS%"^
  -filter:"+[*]* -[*Test*]* -[Microsoft*]* -[xunit*]* -[NetCore*]*"^

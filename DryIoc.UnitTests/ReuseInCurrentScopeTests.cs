@@ -190,7 +190,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_many_filtering_out_not_scoped_services()
+        public void Can_ResolveMany_and_filter_out_scoped_services()
         {
             var container = new Container();
             container.Register<IDep, Dep>();
@@ -198,6 +198,24 @@ namespace DryIoc.UnitTests
 
             var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
             Assert.AreEqual(1, deps.Length);
+            Assert.IsInstanceOf<Dep>(deps[0]);
+
+            using (var scope = container.OpenScope())
+            {
+                var scopedDeps = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
+                Assert.AreEqual(2, scopedDeps.Length);
+            }
+        }
+
+        [Test]
+        public void Can_ResolveMany_without_filtering_out_scoped_services_with_ScopedOrSingleton_reuse()
+        {
+            var container = new Container();
+            container.Register<IDep, Dep>();
+            container.Register<IDep, DepScoped>(Reuse.ScopedOrSingleton);
+
+            var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
+            Assert.AreEqual(2, deps.Length);
             Assert.IsInstanceOf<Dep>(deps[0]);
 
             using (var scope = container.OpenScope())
@@ -311,6 +329,32 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_resolve_service_as_scoped_or_singleton_depending_on_scope_availibility()
+        {
+            var container = new Container();
+            container.Register<Blah>(Reuse.ScopedOrSingleton);
+
+            var singleton = container.Resolve<Blah>();
+
+            using (var scope = container.OpenScope())
+            {
+                var scoped = scope.Resolve<Blah>();
+                Assert.AreNotSame(singleton, scoped);
+                Assert.AreSame(scoped, scope.Resolve<Blah>());
+
+                using (var nestedScope = scope.OpenScope())
+                    Assert.AreNotSame(scoped, nestedScope.Resolve<Blah>());
+
+                Assert.AreSame(scoped, scope.Resolve<Blah>());
+            }
+
+            Assert.AreSame(singleton, container.Resolve<Blah>());
+
+            container.Dispose();
+            Assert.IsTrue(singleton.IsDisposed);
+        }
+
+        [Test]
         public void Exist_rule_to_open_scope_with_container()
         {
             var container = new Container(rules => rules.WithImplicitRootOpenScope());
@@ -343,7 +387,6 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(blah.IsDisposed);
 
             blah = container.Resolve<Blah>();
-            var blahExpr = container.Resolve<LambdaExpression>(typeof(Blah));
             container.Dispose();
             Assert.IsTrue(blah.IsDisposed);
         }

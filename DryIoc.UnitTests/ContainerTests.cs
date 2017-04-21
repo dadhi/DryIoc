@@ -535,7 +535,9 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.UseInstance("a"));
 
-            Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));
+            Assert.AreEqual(
+                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(ex.Error));
         }
 
         [Test]
@@ -589,7 +591,7 @@ namespace DryIoc.UnitTests
         public void Container_ToString_should_output_scope_info_for_open_scope()
         {
             var container = new Container();
-            StringAssert.Contains("Container", container.ToString());
+            StringAssert.Contains("container", container.ToString());
 
             using (var scope = container.OpenScope("a-a-a"))
                 StringAssert.Contains("a-a-a", scope.ToString());

@@ -1,11 +1,13 @@
 ﻿{
   "buildOptions": {
-    "compile": [
-      "../../../DryIoc.UnitTests/*.cs"
-    ],
-    "exclude": [
-      "../../../DryIoc.UnitTests/ThrowTests.cs"
-    ],
+    "compile": {
+      "include": [ "../../../DryIoc.UnitTests/*.cs" ],
+      "excludeFiles": [
+        "../../../DryIoc.UnitTests/ThrowTests.cs",
+        "../../../DryIoc.UnitTests/FastExpressionCompilerTests.cs"
+      ]
+    },
+
     "nowarn": [ "CS0618" ]
   },
 
@@ -25,7 +27,6 @@
           "type": "platform"
         }
       }
-    },
-    "net461": {}
+    }
   }
 }

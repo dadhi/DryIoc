@@ -5,7 +5,7 @@
     <version>0.0.0</version>
     <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013-2017 Maksim Volkau</copyright>
     <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
     <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -13,11 +13,19 @@
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
       v2.11.0-preview-02:
-      - changed: Updated netstandard package dependencies to v4.3
       - fixed: DryIocAttributes dep to System.Diagnostics.Tools from ..Debug
       v2.11.0-preview-01:
       - fixed: #451: DryIoc should know about static members
-      - added: #445: Perf: Enable fast expression compiling of nested lambda expression
+      v2.10.6:
+      - added: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 using xamarinmac2.0 TFM
+      - added: Reuse.ScopedOrSingleton to simplify scenarios which currently use Rules.WithImplicitRootOpenScope, and simplify MS.DI adapter
+      - fixed: Performance issue with #459 (Container.Dispose stack trace) and made it turned Off by default
+      - fixed: Updated to FEC v1.0.0+ with fix for #6
+      - changed: More cache agnostic and flexible disposable transient tracking with Reuse.ScopedOrSingleton
+      - changed: Improved perf around resolution of scoped services
+      v2.10.5:
+      - fixed: #459: Add Container.Dispose stack trace to ContainerIsDisposed error message
+      - changed: Updated to FastExpressionCompiler v1.0.0
       v2.10.4:
       - fixed: #456: Abstract service type is not supported with AutoConcreteTypeResolution and required service type
       - fixed: #431: Make AutoConcreteTypeResolution rule to check if type is resolvable and fallback to next rule
@@ -31,7 +39,7 @@
       v2.10.1:
       - fixed: #446 Select single open generic impl based on matching closed service type
       v2.10:
-      - fixed: #440: Singleton optimazation causes exception for internal type in some cases
+      - fixed: #440: Singleton optimization causes exception for internal type in some cases
       - fixed: #435: Reuse.Singleton prevents the correct container injection within explicit resolve
       - fixed: #437: General perf degradation introduced in 2.9 due skipping fast FactoryCompiler
       - added: #430: Add rule to change or to disable split level of large object graph
@@ -68,13 +76,21 @@
     <file src="..\DryIoc\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\PCL\DryIoc\Ported-net.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
 
     <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
     <file src="..\DryIoc\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\PCL\DryIoc\Ported-net.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+
+    <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
+    <file src="..\DryIoc\Container.cs" target="content\xamarinmac20\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="content\xamarinmac20\DryIoc" />
+    <file src="..\PCL\DryIoc\Ported-net.cs" target="content\xamarinmac20\DryIoc" />
 
     <!--uap10.0: Universal Windows Platform-->
     <file src="..\DryIoc\Container.cs" target="contentFiles\cs\any" />
     <file src="..\DryIoc\ImTools.cs" target="contentFiles\cs\any" />
+    <file src="..\PCL\DryIoc\Ported-net.cs" target="contentFiles\cs\any" />
   </files>
 </package>

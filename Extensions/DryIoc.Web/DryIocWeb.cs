@@ -41,7 +41,8 @@ namespace DryIoc.Web
         /// <returns>New container with the same rules and registrations/cache but with new ambient context.</returns>
         public static IContainer WithHttpContextScopeContext(this IContainer container, Func<IDictionary> getContextItems = null)
         {
-            return container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext(getContextItems));
+            return container.ThrowIfNull()
+                .With(scopeContext: new HttpContextScopeContext(getContextItems));
         }
     }
 
@@ -65,28 +66,33 @@ namespace DryIoc.Web
         /// <param name="context">An <see cref="T:System.Web.HttpApplication"/> that provides access to the methods, properties, and events common to all application objects within an ASP.NET application </param>
         void IHttpModule.Init(HttpApplication context)
         {
-            var scopeName = Reuse.WebRequestScopeName;
-
             context.BeginRequest += (sender, _) =>
             {
-                var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
+                var httpContext = ((HttpApplication)sender).Context;
                 var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
 
-                // If current scope does not have WebRequestScopeName then create new scope with this name, 
-                // otherwise - use current.
-                scopeContext.SetCurrent(current => 
-                    current != null && scopeName.Equals(current.Name) ? current : new Scope(current, scopeName));
+                scopeContext.SetCurrent(SetOrKeepCurrentRequestScope);
             };
 
             context.EndRequest += (sender, _) =>
             {
-                var httpContext = (sender as HttpApplication).ThrowIfNull().Context;
+                var httpContext = ((HttpApplication)sender).Context;
                 var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
-                
+
                 var currentScope = scopeContext.GetCurrentOrDefault();
-                if (currentScope != null && scopeName.Equals(currentScope.Name))
+                if (currentScope != null && Reuse.WebRequestScopeName.Equals(currentScope.Name))
                     currentScope.Dispose();
             };
+        }
+
+        // If current scope does not have WebRequestScopeName 
+        // then create new scope with this name, 
+        // otherwise - use current.
+        private static IScope SetOrKeepCurrentRequestScope(IScope current)
+        {
+            return current != null && Reuse.WebRequestScopeName.Equals(current.Name)
+                ? current
+                : new Scope(current, Reuse.WebRequestScopeName);
         }
 
         /// <summary>Disposes of the resources (other than memory) used by the module  that implements <see cref="IHttpModule"/>.</summary>
@@ -106,11 +112,20 @@ namespace DryIoc.Web
         };
 
         /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
-        /// <param name="getContextItems">(optional) Arbitrary/test items storage.</param>
+        /// <param name="getContextItems">(optional) Context items to use.</param>
         public HttpContextScopeContext(Func<IDictionary> getContextItems = null)
         {
-            _currentScopeEntryKey = RootScopeName;
             _getContextItems = getContextItems ?? GetContextItems;
+        }
+
+        /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
+        /// <param name="catchScopeContextErrors">Enable User handling of scope get/set. 
+        /// When specified the result Get scope will be null, the result Set scope will remain the old scope (null if was not set before).</param>
+        /// <param name="getContextItems">(optional) Context items to use.</param>
+        public HttpContextScopeContext(Action<Exception> catchScopeContextErrors, Func<IDictionary> getContextItems = null)
+        {
+            _getContextItems = getContextItems ?? GetContextItems;
+            _catchScopeContextErrors = catchScopeContextErrors;
         }
 
         /// <summary>Fixed root scope name for the context.</summary>
@@ -122,9 +137,20 @@ namespace DryIoc.Web
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
         public IScope GetCurrentOrDefault()
         {
-            var scopes = _getContextItems();
-            return scopes == null || !scopes.Contains(_currentScopeEntryKey) ? null 
-                : scopes[_currentScopeEntryKey] as IScope;
+            try
+            {
+                var contextItems = _getContextItems();
+                return contextItems == null || !contextItems.Contains(RootScopeName)
+                    ? null
+                    : contextItems[RootScopeName] as IScope;
+            }
+            catch (Exception ex)
+            {
+                if (_catchScopeContextErrors == null)
+                    throw;
+                _catchScopeContextErrors(ex);
+                return null;
+            }
         }
 
         /// <summary>Sets the new scope as current using existing current as input.</summary>
@@ -132,25 +158,26 @@ namespace DryIoc.Web
         /// <returns>New current scope.</returns>
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
         {
-            setCurrentScope.ThrowIfNull();
-
-            var scopes = _getContextItems()
-                .ThrowIfNull(Error.Of("No HttpContext is available to set scope to."));
-
-            var oldScope = !scopes.Contains(_currentScopeEntryKey) ? null : scopes[_currentScopeEntryKey] as IScope;
-
+            var oldScope = GetCurrentOrDefault();
             var newScope = setCurrentScope(oldScope);
-
-            scopes[_currentScopeEntryKey] = newScope;
-
-            return newScope;
+            try
+            {
+                _getContextItems()[RootScopeName] = newScope;
+                return newScope;
+            }
+            catch (Exception ex)
+            {
+                if (_catchScopeContextErrors == null)
+                    throw;
+                _catchScopeContextErrors(ex);
+                return oldScope;
+            }
         }
 
         /// <summary>Nothing to dispose.</summary>
         public void Dispose() { }
 
-        private readonly string _currentScopeEntryKey;
         private readonly Func<IDictionary> _getContextItems;
+        private readonly Action<Exception> _catchScopeContextErrors;
     }
 }
- 
