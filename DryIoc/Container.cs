@@ -2299,9 +2299,30 @@ namespace DryIoc
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
             Func<Request, bool> condition = null)
         {
-            return container.ThrowIfNull().With(rules =>
-                rules.WithUnknownServiceResolvers(
-                    Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
+            return container.With(rules => rules.WithDynamicRegistrations(
+                (factoryType, serviceType, serviceKey) =>
+                {
+                    return implTypes.Where(implType =>
+                    {
+                        var serviceTypes = implType.GetImplementedServiceTypes(nonPublicServiceTypes: true);
+                        if (serviceTypes.Length == 0)
+                            return false;
+
+                        if (!implType.IsOpenGeneric())
+                            return serviceTypes.IndexOf(serviceType) != -1;
+
+                        if (!serviceType.IsGeneric()) // should be genmeric to supply args to implType
+                            return false;
+
+                        return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
+                    })
+                    .Select(implType => new DynamicRegistration(new ReflectionFactory(implType)));
+
+                }));
+
+            //return container.ThrowIfNull().With(rules =>
+            //    rules.WithUnknownServiceResolvers(
+            //        Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
         }
 
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
@@ -4667,19 +4688,19 @@ namespace DryIoc
         /// <returns>Array of types or empty.</returns>
         public static Type[] GetImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false)
         {
-            var serviceTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
+            var implementedTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
 
-            var selectedServiceTypes = serviceTypes.Where(t =>
+            var serviceTypes = implementedTypes.Match(t =>
                 (nonPublicServiceTypes || t.IsPublicOrNestedPublic()) &&
                 // using Namespace+Name instead of FullName because latter is null for generic type definitions
                 ExcludedGeneralPurposeServiceTypes.IndexOf((t.Namespace + "." + t.Name).Split('`')[0]) == -1);
 
             if (type.IsGenericDefinition())
-                selectedServiceTypes = selectedServiceTypes
-                    .Where(t => t.ContainsAllGenericTypeParameters(type.GetGenericParamsAndArgs()))
-                    .Select(t => t.GetGenericDefinitionOrNull());
+                serviceTypes = serviceTypes.Match(
+                    t => t.ContainsAllGenericTypeParameters(type.GetGenericParamsAndArgs()),
+                    t => t.GetGenericDefinitionOrNull());
 
-            return selectedServiceTypes.ToArrayOrSelf();
+            return serviceTypes;
         }
 
         /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
@@ -7875,7 +7896,7 @@ namespace DryIoc
 
                 else if (implType != serviceType && serviceType != typeof(object) &&
                     implType.GetImplementedTypes().IndexOf(t => t == serviceType) == -1)
-                    Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
+                    Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
             else if (implType != serviceType)
             {
@@ -7884,9 +7905,13 @@ namespace DryIoc
 
                 else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
                     Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
-                        serviceType, serviceType.GetGenericDefinitionOrNull());
-                else
+                        serviceType, serviceType.GetGenericTypeDefinition());
+
+                else if (!serviceType.IsGeneric())
                     Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
+
+                else if (implType.GetImplementedServiceTypes().IndexOf(serviceType.GetGenericTypeDefinition()) == -1)
+                    Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
         }
 
@@ -7906,7 +7931,7 @@ namespace DryIoc
             }
 
             if (!implementedTypeFound)
-                Throw.It(Error.RegisterImplementationNotAssignableToServiceType, implType, serviceType);
+                Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
 
             if (!containsAllTypeParams)
                 Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
@@ -10347,7 +10372,7 @@ namespace DryIoc
                 "When resolving {1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
-            RegisterImplementationNotAssignableToServiceType = Of(
+            RegisteringImplementationNotAssignableToServiceType = Of(
                 "Registering implementation type {0} is not assignable to service type {1}."),
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),

@@ -487,7 +487,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(IService), typeof(Beh)));
 
-            Assert.AreEqual(Error.RegisterImplementationNotAssignableToServiceType, ex.Error);
+            Assert.AreEqual(Error.RegisteringImplementationNotAssignableToServiceType, ex.Error);
         }
 
         public class Beh

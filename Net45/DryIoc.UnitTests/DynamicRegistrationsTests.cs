@@ -101,7 +101,7 @@ namespace DryIoc.UnitTests
                 container.Resolve<X>());
 
             Assert.AreEqual(
-                Error.NameOf(Error.RegisterImplementationNotAssignableToServiceType), 
+                Error.NameOf(Error.RegisteringImplementationNotAssignableToServiceType), 
                 Error.NameOf(ex.Error));
         }
 

@@ -152,6 +152,7 @@
     <Compile Include="Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope.cs" />
     <Compile Include="Issue387_ArgumentException_with_initiliazer.cs" />
     <Compile Include="Issue394_Reimporting_services.cs" />
+    <Compile Include="Issue396_ResolveMany_appears_not_to_use_UnknownServiceResolver.cs" />
     <Compile Include="Issue397_ActionExportsTypeConversion.cs" />
     <Compile Include="Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter service_key.cs" />
     <Compile Include="Issue407_Cannot_resolve_MadeOf_params_explicitly.cs" />
