@@ -86,7 +86,7 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<B>(x);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Can_validate_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
@@ -97,9 +97,12 @@ namespace DryIoc.UnitTests
                     return null;
                 }));
 
-            var x = container.Resolve<X>();
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<X>());
 
-            Assert.IsInstanceOf<A>(x);
+            Assert.AreEqual(
+                Error.NameOf(Error.RegisterImplementationNotAssignableToServiceType), 
+                Error.NameOf(ex.Error));
         }
 
         public class X { }

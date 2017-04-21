@@ -1331,7 +1331,8 @@ namespace DryIoc
 
         private IEnumerable<DynamicRegistration> GetDynamicFactoriesOrNull(FactoryType factoryType, Type serviceType, object serviceKey)
         {
-            var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
+            var containerRules = Rules;
+            var dynamicRegistrationProviders = containerRules.DynamicRegistrationProviders;
             if (dynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
@@ -1352,11 +1353,11 @@ namespace DryIoc
                             key = key.Next();
                             return it.WithKey(key);
                         })
-                        //.Where(it =>
-                        //{
-                        //    ThrowIfInvalidRegistration(it.Factory, serviceType, serviceKey, isStaticallyChecked: false);
-                        //    return true;
-                        //})
+                        .Where(it =>
+                        {
+                            it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, containerRules);
+                            return true;
+                        })
                         .ToArray();
 
                     resultFactories = resultFactories == null
@@ -6943,6 +6944,24 @@ namespace DryIoc
                 Unwrap = unwrap;
             }
 
+            internal void ThrowIfInvalidRegistration(Type serviceType)
+            {
+                if (AlwaysWrapsRequiredServiceType || Unwrap != null)
+                    return;
+
+                if (!serviceType.IsGeneric())
+                    return;
+
+                var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
+                var typeArgIndex = WrappedServiceTypeArgIndex;
+                Throw.If(typeArgCount > 1 && typeArgIndex == -1,
+                    Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex, serviceType);
+
+                var index = typeArgIndex != -1 ? typeArgIndex : 0;
+                Throw.If(index > typeArgCount - 1,
+                    Error.GenericWrapperTypeArgIndexOutOfBounds, serviceType, index);
+            }
+
             /// <summary>Unwraps service type or returns its.</summary>
             /// <param name="serviceType"></param> <returns>Wrapped type or self.</returns>
             public Type GetWrappedTypeOrNullIfWrapsRequired(Type serviceType)
@@ -7064,6 +7083,9 @@ namespace DryIoc
 
         /// <summary>Non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="DelegateFactory"/>.</summary>
         public virtual Type ImplementationType { get { return null; } }
+
+        /// <summary>Allow inheritors to implemenet lazy implementation type</summary>
+        public virtual bool CanAccessImplementationType { get { return true; } }
 
         /// <summary>Indicates that Factory is factory provider and
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/>  to get concrete factory.</summary>
@@ -7307,42 +7329,35 @@ namespace DryIoc
             return Container.CompileToDelegate(expression);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="serviceType"></param>
-        /// <param name="serviceKey"></param>
-        /// <param name="isStaticallyChecked"></param>
-        /// <param name="containerRules"></param>
         internal virtual void ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
         {
             if (!isStaticallyChecked)
                 serviceType.ThrowIfNull();
 
             var setup = Setup;
-            if (setup.FactoryType != FactoryType.Wrapper)
+            if (setup.FactoryType == FactoryType.Wrapper)
             {
-                if ((Reuse ?? containerRules.DefaultReuseInsteadOfTransient) == DryIoc.Reuse.Transient &&
-                    !setup.UseParentReuse &&
-                    !(setup.FactoryType == FactoryType.Decorator && ((Setup.DecoratorSetup)setup).UseDecorateeReuse) &&
-                    (ImplementationType ?? serviceType).IsAssignableTo(typeof(IDisposable)) &&
-                    !setup.AllowDisposableTransient && containerRules.ThrowOnRegisteringDisposableTransient)
-                {
+                ((Setup.WrapperSetup)setup).ThrowIfInvalidRegistration(serviceType);
+            }
+            else
+            {
+                // Warn about registering disposable transient
+                var reuse = Reuse ?? containerRules.DefaultReuseInsteadOfTransient;
+                if (reuse != DryIoc.Reuse.Transient)
+                    return;
+
+                if (setup.AllowDisposableTransient ||
+                    !containerRules.ThrowOnRegisteringDisposableTransient)
+                    return;
+
+                if (setup.UseParentReuse ||
+                    setup.FactoryType == FactoryType.Decorator && ((Setup.DecoratorSetup)setup).UseDecorateeReuse)
+                    return;
+
+                var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
+                if (knownImplOrServiceType.IsAssignableTo(typeof(IDisposable)))
                     Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer,
                         serviceType, serviceKey ?? "{no key}", this);
-                }
-            }
-            else if (serviceType.IsGeneric() 
-                && !((Setup.WrapperSetup)setup).AlwaysWrapsRequiredServiceType && ((Setup.WrapperSetup)setup).Unwrap == null)
-            {
-                var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
-                var typeArgIndex = ((Setup.WrapperSetup)setup).WrappedServiceTypeArgIndex;
-                Throw.If(typeArgCount > 1 && typeArgIndex == -1,
-                    Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex, serviceType);
-
-                var index = typeArgIndex != -1 ? typeArgIndex : 0;
-                Throw.If(index > typeArgCount - 1,
-                    Error.GenericWrapperTypeArgIndexOutOfBounds, serviceType, index);
             }
         }
 
@@ -7669,6 +7684,12 @@ namespace DryIoc
             }
         }
 
+        /// <summary>False for lazy implementation type, to prevent its early materialization.</summary>
+        public override bool CanAccessImplementationType
+        {
+            get { return _implementationType != null || _implementationTypeProvider == null; }
+        }
+
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         public override IConcreteFactoryGenerator FactoryGenerator { get { return _factoryGenerator; } }
 
@@ -7829,6 +7850,9 @@ namespace DryIoc
         internal override void ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
         {
             base.ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, containerRules);
+
+            if (!CanAccessImplementationType)
+                return;
 
             var implType = ImplementationType;
             if (Made.FactoryMethod == null && containerRules.FactoryMethod == null)
