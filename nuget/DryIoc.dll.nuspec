@@ -16,6 +16,9 @@
       - fixed: DryIocAttributes dep to System.Diagnostics.Tools from ..Debug
       v2.11.0-preview-01:
       - fixed: #451: DryIoc should know about static members
+      v2.10.7:
+      - fixed: #465 Installing DryIoc.dll for desktop/4.5 installs tons of .NEt Standard packages
+      - changed: Attempt to fix InvalidCastException found in scope of #433
       v2.10.6:
       - added: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 using xamarinmac2.0 TFM
       - added: Reuse.ScopedOrSingleton to simplify scenarios which currently use Rules.WithImplicitRootOpenScope, and simplify MS.DI adapter
@@ -47,6 +50,14 @@
       - changed: #254 [Performance] Remove state parameter from FactoryDelegate - use FastExpressionCompiler with closure support
     </releaseNotes>
     <dependencies>
+      <!--Explicitly specify no dependencies for full .NET -->
+      <group targetFramework="net35"></group>
+      <group targetFramework="net40"></group>
+      <group targetFramework="net45"></group>
+      <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL328--></group>
+      <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL259--></group>
+      <group targetFramework="xamarinmac20"></group>
+      
       <group targetFramework="netstandard1.0">
         <dependency id="System.Runtime" version="4.3.0" />
         <dependency id="System.Runtime.Extensions" version="4.3.0" />
