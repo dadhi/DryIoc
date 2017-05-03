@@ -17,7 +17,7 @@ namespace DryIoc.AspNetCore.Sample
             services
                 .AddMvc()
 
-                // Enables constrollers to be resolved by DryIoc, OTHERWISE resolved by infrastructure
+                // Enables controllers to be resolved by DryIoc, OTHERWISE resolved by infrastructure
                 .AddControllersAsServices();
 
             return new Container()
@@ -34,7 +34,7 @@ namespace DryIoc.AspNetCore.Sample
                     {
 #if DEBUG
                         if (descriptor.ServiceType == typeof(ILoggerFactory))
-                            Console.WriteLine($"Logger factory is regsitered as instance: {descriptor.ImplementationInstance != null}");
+                            Console.WriteLine($"Logger factory is registered as instance: {descriptor.ImplementationInstance != null}");
 #endif
                         return false; // fallback to default registration logic
                     })
