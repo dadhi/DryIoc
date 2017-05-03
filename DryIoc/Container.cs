@@ -568,21 +568,6 @@ namespace DryIoc
             return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault);
         }
 
-        object ResolveAndCaptureErrors(Type serviceType, bool ifUnresolvedReturnDefault)
-        {
-            try
-            {
-                var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-                if (factoryDelegate != null)
-                    return factoryDelegate(null, _resolverContext, null);
-                return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault);
-            }
-            catch (ContainerException ex)
-            {
-                throw new InvalidOperationException("Resolving: " + serviceType, ex);
-            }
-        }
-
         object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent,
             IScope scope)
         {
