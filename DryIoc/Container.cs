@@ -1380,7 +1380,7 @@ namespace DryIoc
                 return dynamicFactories.Select(it => KV.Of(it.ServiceKey, it.Factory)).ToArray();
 
             var remainingDynamicFactories = dynamicFactories
-                .Where(it =>
+                .Match(it =>
                 {
                     var isNotKeyed = it.ServiceKey is DynamicKey;
                     switch (it.IfAlreadyRegistered)
@@ -1404,10 +1404,10 @@ namespace DryIoc
                     }
 
                     return true;
-                })
-                .Select(it => KV.Of(it.ServiceKey, it.Factory));
+                },
+                it => KV.Of(it.ServiceKey, it.Factory));
 
-            return registeredFactories.Then(remainingDynamicFactories);
+            return registeredFactories.Append(remainingDynamicFactories);
         }
 
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
@@ -2287,20 +2287,36 @@ namespace DryIoc
             container.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
         }
 
-        /// <summary>Adds rule to register unknown service when it is resolved.</summary>
-        /// <param name="container">Container to add rule to.</param>
-        /// <param name="implTypes">Provider of implementation types.</param>
-        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
-        /// <param name="condition">(optional) condition.</param>
-        /// <returns>Container with new rule.</returns>
-        /// <remarks>Types provider will be asked on each rule evaluation.</remarks>
+        // todo: v3: Mark with ObsoleteAttribute
+        /// <summary>Obsolete: please use <see cref="WithAutoFallbackDynamicRegistrations"/></summary>
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
             Func<Request, bool> condition = null)
         {
-            var rule = Rules.AutoFallbackResolutionRule(implTypes, changeDefaultReuse, condition);
-            return container.With(rules => rules.WithDynamicRegistrations(rule));
+            return container.ThrowIfNull().With(rules =>
+                rules.WithUnknownServiceResolvers(
+                    Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
+        }
+
+        /// <summary>Provides automatic fallback resolution mechanism for not normally registered 
+        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// <param name="container">Container to use.</param>
+        /// <param name="implTypes">Type to get implementations from.</param>
+        /// <param name="condition">(optional) Condition to include or exclude resolution 
+        /// based of service type, key and implementation type.</param>
+        /// <param name="factory">(optional) Handler to customize the factory, e.g.
+        /// specify reuse or setup. If handler returns <c>null</c> then the service implementation
+        /// will be excluded.</param>
+        /// <returns>New container with corresponding rule set.</returns>
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            IEnumerable<Type> implTypes,
+            Func<Type, object, Type, bool> condition = null,
+            Func<Type, object, Type, Factory> factory = null)
+        {
+            return container.ThrowIfNull()
+                .With(rules => rules.WithDynamicRegistrations(
+                    Rules.AutoFallbackDynamicRegistrationsRule(implTypes, condition, factory)));
         }
 
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
@@ -3507,39 +3523,57 @@ namespace DryIoc
         /// with provided <paramref name="implementationTypes"/>. Fallback means that no
         /// The dynamic registrations will be applied Only if no normal registrations
         /// exist for the requested service type, hence the "fallback".</summary>
-        /// <param name="implementationTypes">Types to use for registrations.</param>
-        /// <param name="changeDefaultReuse"></param>
-        /// <param name="condition"></param>
+        /// <param name="implementationTypes">Implementation types to select for service.</param>
+        /// <param name="condition">(optional) Condition to include or exclude resolution 
+        /// based of service type, key and implementation type.</param>
+        /// <param name="factory">(optional) Handler to customize the factory, e.g.
+        /// specify reuse or setup. If handler returns <c>null</c> then the service implementation
+        /// will be excluded.</param>
         /// <returns>Registration provider.</returns>
-        public static DynamicRegistrationProvider AutoFallbackResolutionRule(
+        public static DynamicRegistrationProvider AutoFallbackDynamicRegistrationsRule(
             IEnumerable<Type> implementationTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null)
+            Func<Type, object, Type, bool> condition = null,
+            Func<Type, object, Type, Factory> factory = null)
         {
-            return (ignoredFactoryType, serviceType, ignoredServiceKey) =>
+            var factories = Ref.Of(ImTreeMap<Type, Factory>.Empty);
+
+            return (ignoredFactoryType, serviceType, serviceKey) =>
             {
                 return implementationTypes.Match(
                     implType =>
                     {
-                        var serviceTypes = implType.GetImplementedServiceTypes(nonPublicServiceTypes: true);
-                        if (serviceTypes.Length == 0)
+                        if (!implType.ImplementsServiceType(serviceType))
                             return false;
-
-                        if (!implType.IsOpenGeneric())
-                            return serviceTypes.IndexOf(serviceType) != -1;
-
-                        if (!serviceType.IsGeneric()) // should be generic to supply arguments to implType
-                            return false;
-
-                        return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
+                        if (condition == null)
+                            return true;
+                        return condition(serviceType, serviceKey, implType);
                     },
-                    implType => new DynamicRegistration(
-                        new ReflectionFactory(implType), IfAlreadyRegistered.Keep));
+                    implType =>
+                    {
+                        var implFactory = factories.Value.GetValueOrDefault(implType);
+                        if (implFactory == null)
+                        {
+                            factories.Swap(it =>
+                            {
+                                implFactory = it.GetValueOrDefault(implType);
+                                if (implFactory != null)
+                                    return it;
+
+                                implFactory = factory != null
+                                    ? factory(serviceType, serviceKey, implType)
+                                    : new ReflectionFactory(implType);
+
+                                return it.AddOrUpdate(implType, implFactory);
+                            });
+                        }
+
+                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep);
+                    });
             };
         }
 
         // todo: v3: Remove
-        /// <summary>Obsolete: replaced by <see cref="AutoFallbackResolutionRule"/></summary>
+        /// <summary>Obsolete: replaced by <see cref="AutoFallbackDynamicRegistrationsRule"/></summary>
         public static UnknownServiceResolver AutoRegisterUnknownServiceRule(
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
@@ -4729,6 +4763,30 @@ namespace DryIoc
         public static bool IsImplementationType(this Type type)
         {
             return type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
+        }
+
+        /// <summary>Checks if <paramref name="type"/> implements the <paramref name="serviceType"/>,
+        /// along the line checking if <paramref name="type"/> and <paramref name="serviceType"/>
+        /// are valid implementation and service types.</summary>
+        /// <param name="type">Implementation type.</param>
+        /// <param name="serviceType">Service type.</param>
+        /// <returns>Check result.</returns>
+        public static bool ImplementsServiceType(this Type type, Type serviceType)
+        {
+            if (!type.IsImplementationType())
+                return false;
+
+            var serviceTypes = type.GetImplementedServiceTypes(nonPublicServiceTypes: true);
+            if (serviceTypes.Length == 0)
+                return false;
+
+            if (!type.IsOpenGeneric())
+                return serviceTypes.IndexOf(serviceType) != -1;
+
+            if (!serviceType.IsGeneric()) // should be generic to supply arguments to implType
+                return false;
+
+            return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
         }
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>

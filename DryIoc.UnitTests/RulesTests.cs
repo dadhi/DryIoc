@@ -281,7 +281,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void You_may_specify_condition_to_exclude_unwanted_services_from_AutoFallback_resolution_rule()
+        public void Can_specify_condition_to_exclude_unwanted_services_from_AutoFallback_resolution_rule()
         {
             var container = new Container()
                 .WithAutoFallbackResolution(new[] { typeof(Me) }, 
@@ -289,7 +289,8 @@ namespace DryIoc.UnitTests
 
             container.Register<RedMe>();
 
-            Assert.IsNull(container.Resolve<RedMe>(IfUnresolved.ReturnDefault));
+            var redMe = container.Resolve<RedMe>(IfUnresolved.ReturnDefault);
+            Assert.IsNull(redMe);
         }
 
         public interface IMe {}

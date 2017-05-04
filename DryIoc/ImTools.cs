@@ -91,7 +91,7 @@ namespace ImTools
         /// <param name="source">goes first.</param>
         /// <param name="other">appended to source.</param>
         /// <returns>empty array or concat of source and other.</returns>
-        public static T[] Then<T>(this IEnumerable<T> source, IEnumerable<T> other)
+        public static T[] Append<T>(this IEnumerable<T> source, IEnumerable<T> other)
         {
             var sourceArr = source.ToArrayOrSelf();
             var otherArr = other.ToArrayOrSelf();
