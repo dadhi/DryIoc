@@ -54,7 +54,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///     adaptedContainer.Register<IMyService, MyService>(Reuse.InCurrentScope)
         ///]]></code>
         /// </example>
-        /// <remarks>You still need to Dispose adapted container at the end / application shotdown.</remarks>
+        /// <remarks>You still need to Dispose adapted container at the end / application shutdown.</remarks>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
@@ -69,8 +69,9 @@ namespace DryIoc.Microsoft.DependencyInjection
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .WithTrackingDisposableTransients());
 
-            adapter.Register<IServiceProvider, DryIocServiceProvider>(
-                Reuse.Transient, Parameters.Of.Type(_ => throwIfUnresolved));
+            adapter.RegisterMany<DryIocServiceProvider>(
+                setup: Setup.With(useParentReuse: true),
+                made: Parameters.Of.Type(_ => throwIfUnresolved));
 
             adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(
                 Reuse.ScopedOrSingleton);
@@ -169,7 +170,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 case ServiceLifetime.Singleton:
                     return Reuse.Singleton;
                 case ServiceLifetime.Scoped:
-                    return Reuse.ScopedOrSingleton; // note: because the infrastucture services may be resolved w/out scope
+                    return Reuse.ScopedOrSingleton; // note: because the infrastructure services may be resolved w/out scope
                 case ServiceLifetime.Transient:
                     return Reuse.Transient;
                 default:
@@ -179,13 +180,13 @@ namespace DryIoc.Microsoft.DependencyInjection
     }
 
     /// <summary>Wraps DryIoc scoped container.</summary>
-    public sealed class DryIocServiceProvider : IServiceProvider, ISupportRequiredService
+    public sealed class DryIocServiceProvider : IServiceProvider, ISupportRequiredService, IServiceScope
     {
         private readonly IContainer _scopedContainer;
         private readonly Func<Type, bool> _throwIfUnresolved;
 
         /// <summary>Uses passed container for scoped resolutions.</summary> 
-        /// <param name="scopedContainer">subj.</param>
+        /// <param name="scopedContainer">Scoped container to wrap</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
         public DryIocServiceProvider(IContainer scopedContainer, Func<Type, bool> throwIfUnresolved)
@@ -194,34 +195,33 @@ namespace DryIoc.Microsoft.DependencyInjection
             _throwIfUnresolved = throwIfUnresolved;
         }
 
-        /// <summary>Delegates resolution to scoped container. 
-        /// Uses <see cref="IfUnresolved.ReturnDefault"/> policy to return default value in case of resolution error.</summary>
+        /// <summary>This!</summary>
+        public IServiceProvider ServiceProvider => this;
+
+        /// <summary>Delegates resolution to scoped container. In case the service is unresolved
+        /// depending on provided policy it will either fallback to default DI resolver, 
+        /// or will throw the original DryIoc exception (cause it good to know the reason).</summary>
         /// <param name="serviceType">Service type to resolve.</param>
         /// <returns>Resolved service object.</returns>
-        public object GetService(Type serviceType)
-        {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return _scopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault);
-        }
+        public object GetService(Type serviceType) => 
+            _scopedContainer.Resolve(serviceType, _throwIfUnresolved == null || !_throwIfUnresolved(serviceType));
 
         /// <summary> Gets service of type <paramref name="serviceType" /> from the <see cref="T:System.IServiceProvider" /> implementing
         /// this interface. </summary>
         /// <param name="serviceType">An object that specifies the type of service object to get.</param>
         /// <returns>A service object of type <paramref name="serviceType" />.
         /// Throws an exception if the <see cref="T:System.IServiceProvider" /> cannot create the object.</returns>
-        public object GetRequiredService(Type serviceType)
-        {
-            return _scopedContainer.Resolve(serviceType);
-        }
+        public object GetRequiredService(Type serviceType) => 
+            _scopedContainer.Resolve(serviceType);
+
+        /// <summary>Disposes underlying container.</summary>
+        public void Dispose() => 
+            _scopedContainer.Dispose();
     }
 
     /// <summary>Creates/opens new scope in passed scoped container.</summary>
     public sealed class DryIocServiceScopeFactory: IServiceScopeFactory
     {
-        /// <summary>Using <see cref="Reuse.WebRequestScopeName"/> allows registration with both
-        /// <see cref="Reuse.InCurrentScope"/> and <see cref="Reuse.InWebRequest"/>.</summary>
-        public static readonly string DefaultScopeName = Reuse.WebRequestScopeName;
-
         /// <summary>Stores passed scoped container to open nested scope.</summary>
         /// <param name="scopedContainer">Scoped container to be used to create nested scope.</param>
         public DryIocServiceScopeFactory(IContainer scopedContainer)
@@ -232,25 +232,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
         /// <remarks>The scope name is defaulted to <see cref="Reuse.WebRequestScopeName"/>.</remarks>
-        public IServiceScope CreateScope()
-        {
-            return new DryIocServiceScope(_scopedContainer.OpenScope(DefaultScopeName));
-        }
+        public IServiceScope CreateScope() => 
+            _scopedContainer.OpenScope(Reuse.WebRequestScopeName).Resolve<IServiceScope>();
 
         private readonly IContainer _scopedContainer;
-
-        private sealed class DryIocServiceScope : IServiceScope
-        {
-            private readonly IContainer _scopedContainer;
-            public IServiceProvider ServiceProvider { get; }
-
-            public DryIocServiceScope(IContainer scopedContainer)
-            {
-                _scopedContainer = scopedContainer;
-                ServiceProvider = scopedContainer.Resolve<IServiceProvider>();
-            }
-
-            public void Dispose() => _scopedContainer.Dispose();
-        }
     }
 }
