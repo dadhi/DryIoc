@@ -4101,7 +4101,7 @@ namespace DryIoc
         }
 
         /// <summary>Easy way to specify non-public or / and most resolvable constructor.</summary>
-        /// <param name="mostResolvable">(optional) Instructs to select ctor with max number of params which all are resolvable.</param> 
+        /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param> 
         /// <param name="includeNonPublic">(optional) Consider the non-public constructors.</param>
         /// <returns>Constructor or null if not found.</returns>
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false)
@@ -4548,13 +4548,13 @@ namespace DryIoc
 
         private static Func<RequestInfo, object> GetArgCustomValueProvider(MethodCallExpression methodCallExpr, Func<RequestInfo, object>[] argValues)
         {
-            Throw.If(argValues.IsNullOrEmpty(), Error.ArgOfValueIsProvidedButNoArgValues);
+            Throw.If(argValues.IsNullOrEmpty(), Error.ArgValueIndexIsProvidedButNoArgValues);
 
             var argIndexExpr = methodCallExpr.Arguments[0];
             var argIndex = (int)GetArgExpressionValueOrThrow(argIndexExpr);
 
             Throw.If(argIndex < 0 || argIndex >= argValues.Length,
-                Error.ArgOfValueIndesIsOutOfProvidedArgValues, argIndex, argValues);
+                Error.ArgValueIndexIsOutOfProvidedArgValues, argIndex, argValues);
 
             var getArgValue = argValues[argIndex];
             return getArgValue;
@@ -5053,7 +5053,7 @@ namespace DryIoc
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypeAssemblies">Assemblies with implementation/service types to register.</param>
         /// <param name="action">(optional) User specified registration action:
-        /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc.</param>
+        /// may be used to filter registrations or specify non-default registration options, e.g. Reuse or ServiceKey, etc..</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Assembly> implTypeAssemblies,
             RegisterManyAction action = null, bool nonPublicServiceTypes = false)
@@ -5062,7 +5062,7 @@ namespace DryIoc
             registrator.RegisterMany(implTypes, action, nonPublicServiceTypes);
         }
 
-        // todo: Add overload to specify list of service types to support case when I know contracts (service types) and provide impl locations (assemblies)
+        // todo: Add overload to specify list of service types to support case when I know contracts (service types) and provide implementation locations (assemblies)
         // and do not care about concrete implementation which is good principle.
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
@@ -6387,11 +6387,11 @@ namespace DryIoc
             set { if (value) _requestContext.ContainsNestedResolutionCall = true; }
         }
 
-        /// <summary>Provides approximate nummber of dependencies in resolution graph (starting from Resolve method), 
+        /// <summary>Provides approximate number of dependencies in resolution graph (starting from Resolve method), 
         /// excluding registered delegates, instances, and wrappers.</summary>
         public int DependencyCount { get { return _requestContext.DependencyCount; } }
 
-        /// <summary>Returns true if object grapth should be split due <see cref="DryIoc.Rules.MaxObjectGraphSize"/> setting.</summary>
+        /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.MaxObjectGraphSize"/> setting.</summary>
         /// <returns>True if should be split, and false otherwise.</returns>
         public bool ShouldSplitObjectGraph()
         {
@@ -7346,7 +7346,7 @@ namespace DryIoc
         /// <summary>Non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="DelegateFactory"/>.</summary>
         public virtual Type ImplementationType { get { return null; } }
 
-        /// <summary>Allow inheritors to implemenet lazy implementation type</summary>
+        /// <summary>Allow inheritors to define lazy implementation type</summary>
         public virtual bool CanAccessImplementationType { get { return true; } }
 
         /// <summary>Indicates that Factory is factory provider and
@@ -7407,7 +7407,8 @@ namespace DryIoc
             return !request.IsResolutionCall && // prevents recursion on already split graph
                                                 // explicit aka user requested split
                 (Setup.AsResolutionCall ||
-                // implicit split only when not inside func with args, cause until v3 args are not propagated through resolve call.
+                // implicit split only when not inside Func with arguments, 
+                // cause for now arguments are not propagated through resolve call
                 (request.ShouldSplitObjectGraph() ||
                 Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) &&
                 !request.IsWrappedInFuncWithArgs()) &&
@@ -8122,8 +8123,10 @@ namespace DryIoc
                 var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
                 if (ctors.Length == 1)
                     _knownSingleCtor = ctors[0];
+                else if (ctors.Length == 0)
+                    Throw.It(Error.UnableToSelectSinglePublicConstructorFromNone, implType);
                 else
-                    Throw.It(Error.NoDefinedMethodToSelectFromMultipleConstructors, implType, ctors);
+                    Throw.It(Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
             }
 
             if (isStaticallyChecked || implType == null)
@@ -10636,10 +10639,10 @@ namespace DryIoc
                 "Registering without implementation type and without FactoryMethod to use instead."),
             RegisteringAbstractImplementationTypeAndNoFactoryMethod = Of(
                 "Registering abstract implementation type {0} when it is should be concrete. Also there is not FactoryMethod to use instead."),
-            NoDefinedMethodToSelectFromMultipleConstructors = Of(
-                "Unspecified how to select single constructor from type {0} with multiple public constructors:" +
-                Environment.NewLine +
-                "{1}"),
+            UnableToSelectSinglePublicConstructorFromMultiple = Of(
+                "Unable to select single public constructor from implementation type {0}:" + Environment.NewLine + "{1}"),
+            UnableToSelectSinglePublicConstructorFromNone = Of(
+                "Unable to select single public constructor from implementation type {0} because it does not have one."),
             NoMatchedImplementedTypesWithServiceType = Of(
                 "Unable to match service with open-generic {0} implementing {1} when resolving {2}."),
             NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs = Of(
@@ -10677,7 +10680,7 @@ namespace DryIoc
             NoMatchedGenericParamConstraints = Of(
                 "Open-generic service does not match with registered open-generic implementation constraints {0} when resolving: {1}."),
             GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex = Of(
-                "Generic wrapper type {0} should specify what type arg is wrapped, but it does not."),
+                "Generic wrapper type {0} should specify what type argument is wrapped, but it does not."),
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
             DependencyHasShorterReuseLifespan = Of(
@@ -10727,10 +10730,10 @@ namespace DryIoc
                 "Runtime state is required to inject (or use) the: {0}. " + Environment.NewLine +
                 "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + Environment.NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
-            ArgOfValueIsProvidedButNoArgValues = Of(
-                "Arg.OfValue index is provided but no arg values specified."),
-            ArgOfValueIndesIsOutOfProvidedArgValues = Of(
-                "Arg.OfValue index {0} is outside of provided value factories: {1}"),
+            ArgValueIndexIsProvidedButNoArgValues = Of(
+                "Arg.Index of value is used but no values are passed"),
+            ArgValueIndexIsOutOfProvidedArgValues = Of(
+                "Arg.Index {0} is outside of provided values: {1}"),
             ResolutionNeedsRequiredServiceType = Of(
                 "Expecting required service type but it is not specified when resolving: {0}"),
             RegisterMappingNotFoundRegisteredService = Of(
@@ -10764,7 +10767,7 @@ namespace DryIoc
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
                 "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
             NotFoundMetaCtorWithTwoArgs = Of(
-                "Expecting Meta wrapper public constructor with two args {0} but not found when resolving: {1}"),
+                "Expecting Meta wrapper public constructor with two arguments {0} but not found when resolving: {1}"),
             UnableToSelectFromManyRegistrationsWithMatchingMetadata = Of(
                 "Unable to select from multiple registrations matching the Metadata type {0}:" + Environment.NewLine +
                 "{1}" + Environment.NewLine +

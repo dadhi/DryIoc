@@ -337,7 +337,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Register<IA, A>(Made.Of(() => new A { ImplType = Arg.Index<Type>(0) })));
 
-            Assert.AreEqual(Error.ArgOfValueIsProvidedButNoArgValues, ex.Error);
+            Assert.AreEqual(Error.ArgValueIndexIsProvidedButNoArgValues, ex.Error);
         }
 
         [Test]
