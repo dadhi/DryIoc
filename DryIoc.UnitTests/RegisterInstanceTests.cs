@@ -224,6 +224,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Instance_should_replace_previous_typed_resgitration()
+        {
+            var container = new Container();
+            container.Register<AA>();
+
+            var aa = new AA();
+            container.UseInstance(aa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+
+            var aas = container.ResolveMany<AA>();
+            Assert.AreEqual(2, aas.Count());
+        }
+
+        [Test]
         public void Can_reuse_the_default_factory()
         {
             var container = new Container();
@@ -269,7 +282,6 @@ namespace DryIoc.UnitTests
 
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
         }
-
 
         [Test]
         public void Should_use_correct_instance_in_lazy_collection_in_and_out_of_scope()
