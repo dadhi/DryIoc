@@ -2400,17 +2400,42 @@ namespace DryIoc
         /// <returns>New container with corresponding rule set.</returns>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IEnumerable<Type> implTypes,
-            Func<Type, object, Type, bool> condition = null,
-            Func<Type, object, Type, Factory> factory = null)
+            Rules.AutoFallbackDynamicRegistrationsCondition condition = null,
+            Rules.AutoFallbackDynamicRegistrationsFactory factory = null)
         {
             return container.ThrowIfNull()
                 .With(rules => rules.WithDynamicRegistrations(
-                    Rules.AutoFallbackDynamicRegistrationsRule(implTypes, condition, factory)));
+                    Rules.AutoFallbackDynamicRegistrations(implTypes, condition, factory)));
+        }
+
+        /// <summary>Provides automatic fallback resolution mechanism for not normally registered 
+        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// <param name="container">Container to use.</param>
+        /// <param name="implTypeAssemblies">Provides assemblies with implementation types.</param>
+        /// <param name="condition">(optional) Condition to include or exclude resolution 
+        /// based of service type, key and implementation type.</param>
+        /// <param name="factory">(optional) Handler to customize the factory, e.g.
+        /// specify reuse or setup. If handler returns <c>null</c> then the service implementation
+        /// will be excluded.</param>
+        /// <returns>New container with corresponding rule set.</returns>
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            IEnumerable<Assembly> implTypeAssemblies,
+            Rules.AutoFallbackDynamicRegistrationsCondition condition = null,
+            Rules.AutoFallbackDynamicRegistrationsFactory factory = null)
+        {
+            var implTypes = implTypeAssemblies.ThrowIfNull()
+                .SelectMany(assembly => assembly.GetLoadedTypes())
+                .Where(Registrator.IsImplementationType)
+                .ToArray();
+
+            return container.ThrowIfNull()
+                .With(rules => rules.WithDynamicRegistrations(
+                    Rules.AutoFallbackDynamicRegistrations(implTypes, condition, factory)));
         }
 
         /// <summary>Adds rule to register unknown service when it is resolved.</summary>
         /// <param name="container">Container to add rule to.</param>
-        /// <param name="implTypeAssemblies">Provides assembly with implementation types.</param>
+        /// <param name="implTypeAssemblies">Provides assemblies with implementation types.</param>
         /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
         /// <param name="condition">(optional) condition.</param>
         /// <returns>Container with new rule.</returns>
@@ -3569,6 +3594,7 @@ namespace DryIoc
             return newRules;
         }
 
+        // todo: Use AutoFallbackDynamicRegistrations???
         /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
         /// The resolution creates transient services.</summary>
@@ -3608,9 +3634,23 @@ namespace DryIoc
             return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
         }
 
+        /// <summary>To give a parameter names. Used in <see cref="AutoFallbackDynamicRegistrations"/>.</summary>
+        public delegate bool AutoFallbackDynamicRegistrationsCondition(Type serviceType, object serviceKey, Type implType);
+
+        /// <summary>To give a parameter names. Used in <see cref="AutoFallbackDynamicRegistrations"/>.</summary>
+        /// <remarks>Should return not null Factory.</remarks>
+        /// <example><code lang="cs"><![CDATA[
+        /// var container = new Container(rules => rules.
+        ///    .WithAutoFallbackDynamicRegistrations(new[] { typeof(SomeService) },
+        ///     factory: (serviceType, serviceKey, implType) => new ReflectionFactory(implType,
+        ///         reuse: Reuse.Singleton,
+        ///         setup: Setup.With(condition: request => request.Parent.ImplementationType.Name.Contains("Green"))));
+        /// ]]></code></example>
+        public delegate Factory AutoFallbackDynamicRegistrationsFactory(Type serviceType, object serviceKey, Type implType);
+
         /// <summary>Creates dynamic fallback registrations for the requested service type
-        /// with provided <paramref name="implementationTypes"/>. Fallback means that no
-        /// The dynamic registrations will be applied Only if no normal registrations
+        /// with provided <paramref name="implementationTypes"/>. 
+        /// Fallback means that the dynamic registrations will be applied Only if no normal registrations
         /// exist for the requested service type, hence the "fallback".</summary>
         /// <param name="implementationTypes">Implementation types to select for service.</param>
         /// <param name="condition">(optional) Condition to include or exclude resolution 
@@ -3619,10 +3659,10 @@ namespace DryIoc
         /// specify reuse or setup. If handler returns <c>null</c> then the service implementation
         /// will be excluded.</param>
         /// <returns>Registration provider.</returns>
-        public static DynamicRegistrationProvider AutoFallbackDynamicRegistrationsRule(
+        public static DynamicRegistrationProvider AutoFallbackDynamicRegistrations(
             IEnumerable<Type> implementationTypes,
-            Func<Type, object, Type, bool> condition = null,
-            Func<Type, object, Type, Factory> factory = null)
+            AutoFallbackDynamicRegistrationsCondition condition = null,
+            AutoFallbackDynamicRegistrationsFactory factory = null)
         {
             var factories = Ref.Of(ImTreeMap<Type, Factory>.Empty);
 
@@ -3662,7 +3702,7 @@ namespace DryIoc
         }
 
         // todo: v3: Remove
-        /// <summary>Obsolete: replaced by <see cref="AutoFallbackDynamicRegistrationsRule"/></summary>
+        /// <summary>Obsolete: replaced by <see cref="AutoFallbackDynamicRegistrations"/></summary>
         public static UnknownServiceResolver AutoRegisterUnknownServiceRule(
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
@@ -5233,13 +5273,6 @@ namespace DryIoc
         /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and
         /// <see cref="IResolver"/> to resolve additional services required by initializer.</param>
         /// <param name="condition">(optional) Additional condition to select required target.</param>
-        /// <example><code lang="cs"><![CDATA[
-        ///     container.Register<EventAggregator>(Reuse.Singleton);
-        ///     container.Register<ISubscriber, SomeSubscriber>();
-        ///
-        ///     // Registers initializer for all subscribers implementing ISubscriber.
-        ///     container.RegisterInitiliazer<ISubscriber>((s, r) => r.Resolve<EventAggregator>().Subscribe(s));
-        /// ]]></code></example>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, IResolver> initialize, Func<RequestInfo, bool> condition = null)
         {

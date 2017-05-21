@@ -46,7 +46,7 @@ namespace DryIoc.UnitTests
                 !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
                     ? new ReflectionFactory(request.ServiceType)
                     : null;
-            
+
             IContainer container = new Container(Rules.Default.WithUnknownServiceResolvers(unknownServiceResolver));
             Assert.IsNotNull(container.Resolve<NotRegisteredService>());
 
@@ -74,7 +74,7 @@ namespace DryIoc.UnitTests
             IContainer container = new Container(rules => rules
                 .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<X>());
         }
 
@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests
                     return null;
                 }));
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Xx>());
 
             Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), Error.NameOf(ex.Error));
@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules
                 .WithAutoConcreteTypeResolution()
-                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ? 
+                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ?
                     new DelegateFactory(_ => new Xx(null)) : null));
 
             var xx = container.Resolve<Xx>();
@@ -152,7 +152,7 @@ namespace DryIoc.UnitTests
             public Xx(IMissing dep) { }
         }
 
-        public class Y {}
+        public class Y { }
 
         [Test]
         public void When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute()
@@ -249,7 +249,7 @@ namespace DryIoc.UnitTests
             var singleton = container.Resolve<LambdaExpression>(typeof(FooHey));
 
             // expression contains item creation delegate / lambda
-            StringAssert.Contains("() =>", singleton.ToString()); 
+            StringAssert.Contains("() =>", singleton.ToString());
         }
 
         internal class XX { }
@@ -260,20 +260,18 @@ namespace DryIoc.UnitTests
         public void AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations()
         {
             var container = new Container()
-                .WithAutoFallbackResolution(new[] { typeof(Me), typeof(MiniMe) }, 
-                (reuse, request) => reuse == Reuse.Singleton ? null : reuse);
+                .WithAutoFallbackDynamicRegistrations(new[] { typeof(Me), typeof(MiniMe) });
 
             var me = container.Resolve<IMe>(IfUnresolved.ReturnDefault);
 
             Assert.IsNull(me);
         }
 
-        [Test] 
+        [Test]
         public void AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations_from_assemblies()
         {
             var container = new Container()
-                .WithAutoFallbackResolution(new[] { typeof(Me).GetAssembly() },
-                (reuse, request) => reuse == Reuse.Singleton ? null : reuse);
+                .WithAutoFallbackDynamicRegistrations(new[] { typeof(Me).GetAssembly() });
 
             var me = container.Resolve<IMe>(IfUnresolved.ReturnDefault);
 
@@ -284,8 +282,9 @@ namespace DryIoc.UnitTests
         public void Can_specify_condition_to_exclude_unwanted_services_from_AutoFallback_resolution_rule()
         {
             var container = new Container()
-                .WithAutoFallbackResolution(new[] { typeof(Me) }, 
-                condition: request => request.Parent.ImplementationType.Name.Contains("Green"));
+                .WithAutoFallbackDynamicRegistrations(new[] { typeof(Me) },
+                factory: (type, key, implType) => new ReflectionFactory(implType,
+                    setup: Setup.With(condition: req => req.Parent.ImplementationType.Name.Contains("Green"))));
 
             container.Register<RedMe>();
 
@@ -293,10 +292,10 @@ namespace DryIoc.UnitTests
             Assert.IsNull(redMe);
         }
 
-        public interface IMe {}
-        internal class Me : IMe {}
-        internal class MiniMe : IMe {}
-        internal class GreenMe { public GreenMe(IMe me) {} }
+        public interface IMe { }
+        internal class Me : IMe { }
+        internal class MiniMe : IMe { }
+        internal class GreenMe { public GreenMe(IMe me) { } }
         internal class RedMe { public RedMe(IMe me) { } }
 
         [Test]
@@ -336,7 +335,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class ConStrUser 
+        public class ConStrUser
         {
             public ConnectionString S { get; set; }
             public ConStrUser(ConnectionString s)
@@ -350,7 +349,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Register<AD>());
 
             Assert.AreEqual(Error.RegisteredDisposableTransientWontBeDisposedByContainer, ex.Error);
@@ -361,7 +360,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            Assert.DoesNotThrow(() => 
+            Assert.DoesNotThrow(() =>
             container.Register<AD>(setup: Setup.With(allowDisposableTransient: true)));
         }
 
@@ -370,7 +369,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
 
-            Assert.DoesNotThrow(() => 
+            Assert.DoesNotThrow(() =>
             container.Register<AD>());
         }
 
@@ -680,7 +679,7 @@ namespace DryIoc.UnitTests
             var container = new Container(rules => rules
                 .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
 
-            container.RegisterMany(new[] { typeof(A), typeof(B)});
+            container.RegisterMany(new[] { typeof(A), typeof(B) });
 
             var i = container.Resolve<I>();
 
@@ -696,7 +695,7 @@ namespace DryIoc.UnitTests
             var scope = container.OpenScope();
             scope.Dispose();
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 scope.Resolve<string>());
 
             Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));

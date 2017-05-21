@@ -64,7 +64,7 @@ namespace DryIoc.IssuesTests
 
             var container = new Container().WithAutoFallbackDynamicRegistrations(
                 implTypes,
-                factory: (serviceType, key, implType) =>
+                factory: (serviceType, _, implType) =>
                 {
                     if (serviceType == typeof(ICustomRegistration<string>))
                         return new ReflectionFactory(implType, Reuse.Singleton);
