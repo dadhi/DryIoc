@@ -12,10 +12,10 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v2.11.0-preview-02:
-      - fixed: DryIocAttributes dep to System.Diagnostics.Tools from ..Debug
-      v2.11.0-preview-01:
+      v2.11.0:
+      - added: #463 Make UseInstance support IfAlreadyRegistered options
       - fixed: #451: DryIoc should know about static members
+      - fixed: DryIocAttributes dependency to System.Diagnostics.Tools from ..Debug
       v2.10.7:
       - fixed: #465 Installing DryIoc.dll for desktop/4.5 installs tons of .NEt Standard packages
       - changed: Attempt to fix InvalidCastException found in scope of #433

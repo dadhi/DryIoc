@@ -1435,7 +1435,7 @@ namespace DryIoc
             // For requested keyed service just lookup for key and return anyway
             if (serviceKey != null)
             {
-                var keyedFactory = factories.FirstOrDefault(f => serviceKey.Equals(f.Key));
+                var keyedFactory = factories.MatchFirst(f => serviceKey.Equals(f.Key));
                 if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
                     return keyedFactory.Value; // todo: skip further checks, really?
                 return null;
@@ -1521,99 +1521,6 @@ namespace DryIoc
 
         private ContainerWeakRef _resolverContext; // mutable in order the reference to be removed on Dispose
 
-        internal void UseInstanceInternal2(Type serviceType, object instance,
-            IfAlreadyRegistered IfAlreadyRegistered, object serviceKey)
-        {
-            ThrowIfContainerDisposed();
-
-            var scope = _openedScope ?? _singletonScope;
-            var instanceType = instance == null ? typeof(object) : instance.GetType();
-
-            _registry.Swap(r =>
-            {
-                UsedInstanceFactory newInstanceFactory;
-                var entry = r.Services.GetValueOrDefault(serviceType);
-                if (entry == null)
-                {
-                    newInstanceFactory = new UsedInstanceFactory(instanceType);
-                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
-
-                    var newEntry = serviceKey == null
-                        ? (object)newInstanceFactory
-                        : FactoriesEntry.Empty.With(newInstanceFactory, serviceKey);
-
-                    return r.WithServices(r.Services.AddOrUpdate(serviceType, newEntry));
-                }
-
-                var defaultFactory = entry as Factory;
-                if (defaultFactory != null)
-                {
-                    // new factory is also a default one, check if we can reuse the old factory
-                    if (serviceKey == null)
-                    {
-                        // The condition for reusing the factory:
-                        var defaultInstanceFactory = defaultFactory as UsedInstanceFactory;
-                        if (defaultInstanceFactory != null)
-                        {
-                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultInstanceFactory.FactoryID), instance);
-                            return r;
-                        }
-                    }
-
-                    // otherwise register a new factory
-                    newInstanceFactory = new UsedInstanceFactory(instanceType);
-                    scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
-
-                    var newEntry = FactoriesEntry.Empty
-                        .With(defaultFactory)
-                        .With(newInstanceFactory, serviceKey);
-
-                    return r.WithServices(r.Services.AddOrUpdate(serviceType, newEntry));
-                }
-
-                // the only remaining option is multiple factories entry
-                var factoriesEntry = (FactoriesEntry)entry;
-                if (serviceKey == null)
-                {
-                    // if any default factories, find the instance factory to reuse. Throw if multiple.
-                    if (factoriesEntry.LastDefaultKey != null)
-                    {
-                        // As we always permit / re-use the Single factory only, so we cannot have more than one
-                        var defaultInstanceFactory = factoriesEntry.Factories.Enumerate()
-                            .FirstOrDefault(it => it.Key is DefaultKey && it.Value is UsedInstanceFactory);
-
-                        if (defaultInstanceFactory != null)
-                        {
-                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultInstanceFactory.Value.FactoryID), instance);
-                            return r;
-                        }
-                    }
-                }
-                else // for multiple factories check for existing service key
-                {
-                    var keyedFactory = factoriesEntry.Factories.GetValueOrDefault(serviceKey);
-                    if (keyedFactory != null)
-                    {
-                        var keyedInstanceFactory = keyedFactory as UsedInstanceFactory;
-                        if (keyedInstanceFactory != null)
-                        {
-                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(keyedInstanceFactory.FactoryID), instance);
-                            return r;
-                        }
-
-                        Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
-                            KV.Of(serviceKey, instance), keyedFactory);
-                    }
-                }
-
-                newInstanceFactory = new UsedInstanceFactory(instanceType);
-                scope.SetOrAdd(scope.GetScopedItemIdOrSelf(newInstanceFactory.FactoryID), instance);
-                return r.WithServices(r.Services.AddOrUpdate(serviceType,
-                    factoriesEntry.With(newInstanceFactory, serviceKey)));
-            });
-        }
-
-
         internal void UseInstanceInternal(Type serviceType, object instance,
             IfAlreadyRegistered IfAlreadyRegistered, object serviceKey)
         {
@@ -1624,31 +1531,30 @@ namespace DryIoc
 
             _registry.Swap(r =>
             {
-                var instanceEntry = r.Services.GetValueOrDefault(serviceType);
+                var entry = r.Services.GetValueOrDefault(serviceType);
 
                 // no entries, first registration, usual/hot path
-                if (instanceEntry == null)
+                if (entry == null)
                 {
-                    var instanceFactory = GetInstanceFactory(instance, instanceType, scope);
-
                     // add new entry with instance factory
-                    instanceEntry = serviceKey == null
+                    var instanceFactory = GetInstanceFactory(instance, instanceType, scope);
+                    entry = serviceKey == null
                         ? (object)instanceFactory
                         : FactoriesEntry.Empty.With(instanceFactory, serviceKey);
                 }
                 else
                 {
                     // have some registrations of instance, find if we should replace, add, or throw
-                    var singleDefaultFactory = instanceEntry as Factory;
+                    var singleDefaultFactory = entry as Factory;
                     if (singleDefaultFactory != null)
                     {
                         if (serviceKey != null)
                         {
                             // @ifAlreadyRegistered doe no make sense for keyed, because there are no other keyed
-                            instanceEntry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                            entry = FactoriesEntry.Empty.With(singleDefaultFactory)
                                 .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
                         }
-                        else
+                        else // for default instance
                         {
                             switch (IfAlreadyRegistered)
                             {
@@ -1659,10 +1565,10 @@ namespace DryIoc
                                     if (reusedFactory != null)
                                         scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID), instance);
                                     else
-                                        instanceEntry = GetInstanceFactory(instance, instanceType, scope);
+                                        entry = GetInstanceFactory(instance, instanceType, scope);
                                     break;
                                 case IfAlreadyRegistered.AppendNotKeyed:
-                                    instanceEntry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                                    entry = FactoriesEntry.Empty.With(singleDefaultFactory)
                                         .With(GetInstanceFactory(instance, instanceType, scope));
                                     break;
                                 case IfAlreadyRegistered.Throw:
@@ -1671,7 +1577,7 @@ namespace DryIoc
                                 case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
                                     if (singleDefaultFactory.CanAccessImplementationType &&
                                         singleDefaultFactory.ImplementationType != instanceType)
-                                        instanceEntry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                                        entry = FactoriesEntry.Empty.With(singleDefaultFactory)
                                             .With(GetInstanceFactory(instance, instanceType, scope));
                                     break;
                                 default:
@@ -1679,18 +1585,18 @@ namespace DryIoc
                             }
                         }
                     }
-                    else
+                    else // for multiple existing or single keyed factory
                     {
-                        var singleKeyedOrManyFactories = (FactoriesEntry)instanceEntry;
+                        var singleKeyedOrManyFactories = (FactoriesEntry)entry;
                         if (serviceKey != null)
                         {
                             var keyedFactory = singleKeyedOrManyFactories.Factories.GetValueOrDefault(serviceKey);
                             if (keyedFactory == null)
                             {
-                                instanceEntry = singleKeyedOrManyFactories
+                                entry = singleKeyedOrManyFactories
                                     .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
                             }
-                            else
+                            else // when keyed instance is found
                             {
                                 switch (IfAlreadyRegistered)
                                 {
@@ -1713,44 +1619,61 @@ namespace DryIoc
                                 }
                             }
                         }
-                        else
+                        else // for default instance
                         {
-                            var defaultFactory = singleKeyedOrManyFactories.LastDefaultKey == null ? null
-                                : singleKeyedOrManyFactories.Factories.Enumerate().FirstOrDefault(it => it.Key is DefaultKey);
-    
-                            if (defaultFactory == null)
+                            var defaultFactories = singleKeyedOrManyFactories.LastDefaultKey == null
+                                ? ArrayTools.Empty<Factory>()
+                                : singleKeyedOrManyFactories.Factories.Enumerate()
+                                    .Match(it => it.Key is DefaultKey, it => it.Value)
+                                    .ToArrayOrSelf();
+
+                            if (defaultFactories.Length == 0) // no default factories among the multiple existing keyed factories
                             {
-                                instanceEntry = singleKeyedOrManyFactories
+                                entry = singleKeyedOrManyFactories
                                     .With(GetInstanceFactory(instance, instanceType, scope));
                             }
-                            else
+                            else // there are existing default factories
                             {
-                                singleDefaultFactory = defaultFactory.Value;
                                 switch (IfAlreadyRegistered)
                                 {
                                     case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                        // the special case for re-use of existing factory,
+                                        // the special case for reusing of existing factory,
                                         // we can just update scope with the new instance
-                                        var reusedFactory = singleDefaultFactory as UsedInstanceFactory;
-                                        if (reusedFactory != null)
-                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID),
+                                        if (defaultFactories.Length == 1 && defaultFactories[0] is UsedInstanceFactory)
+                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultFactories[0].FactoryID),
                                                 instance);
                                         else
-                                            instanceEntry = GetInstanceFactory(instance, instanceType, scope);
+                                        {
+                                            var keyedFactories = singleKeyedOrManyFactories.Factories.Enumerate()
+                                                .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
+                                            if (keyedFactories.Length == 0)
+                                                entry = GetInstanceFactory(instance, instanceType, scope);
+                                            else
+                                            {
+                                                var factoriesEntry = FactoriesEntry.Empty;
+                                                for (int i = 0; i < keyedFactories.Length; i++)
+                                                    factoriesEntry = factoriesEntry
+                                                        .With(keyedFactories[i].Value, keyedFactories[i].Key);
+                                                entry = factoriesEntry.With(GetInstanceFactory(instance, instanceType, scope));
+                                            }
+                                        }
+
                                         break;
                                     case IfAlreadyRegistered.AppendNotKeyed:
-                                        instanceEntry = singleKeyedOrManyFactories
+                                        entry = singleKeyedOrManyFactories
                                             .With(GetInstanceFactory(instance, instanceType, scope));
                                         break;
                                     case IfAlreadyRegistered.Throw:
-                                        Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType,
-                                            singleDefaultFactory);
+                                        Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, defaultFactories);
                                         break;
                                     case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
-                                        if (singleDefaultFactory.CanAccessImplementationType &&
-                                            singleDefaultFactory.ImplementationType != instanceType)
-                                            instanceEntry = singleKeyedOrManyFactories
+                                        var duplicateImplIndex = defaultFactories.IndexOf(
+                                            it => it.CanAccessImplementationType &&
+                                            it.ImplementationType == instanceType);
+                                        if (duplicateImplIndex == -1) // add new implementation
+                                            entry = singleKeyedOrManyFactories
                                                 .With(GetInstanceFactory(instance, instanceType, scope));
+                                        // otherwise do nothing - keep the old entry
                                         break;
                                     default: // IfAlreadyRegistered.Keep
                                         break;
@@ -1761,7 +1684,7 @@ namespace DryIoc
                 }
 
                 // add instance entry to service registrations
-                return r.WithServices(r.Services.AddOrUpdate(serviceType, instanceEntry));
+                return r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
             });
         }
 
@@ -3590,10 +3513,10 @@ namespace DryIoc
         {
             return (request, factories) => request.ServiceKey != null
                 // if service key is not default, then look for it
-                ? factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey)).Value
+                ? factories.MatchFirst(f => f.Key.Equals(request.ServiceKey)).Value
                 // otherwise look for specified service key, and if no found look for default.
-                : factories.FirstOrDefault(f => f.Key.Equals(serviceKey)).Value
-                ?? factories.FirstOrDefault(f => f.Key.Equals(null)).Value;
+                : factories.MatchFirst(f => f.Key.Equals(serviceKey)).Value
+                ?? factories.MatchFirst(f => f.Key.Equals(null)).Value;
         }
 
         /// <summary>Specify the method signature for returning mutiple keyed factories. This is dynamic analog to the normal Container Registry.</summary>
@@ -10230,8 +10153,8 @@ namespace DryIoc
         Keep,
         /// <summary>Replaces old registration with new one.</summary>
         Replace,
-        /// <summary>Adds new implementation or null (Made.Of),
-        /// skips registration if the implementation is already registered.</summary>
+        /// <summary>Adds the new implementation or null (Made.Of), 
+        /// otherwise keeps the previous registration of the same implementation type.</summary>
         AppendNewImplementation
     }
 

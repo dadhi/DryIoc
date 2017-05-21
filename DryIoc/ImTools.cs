@@ -155,7 +155,7 @@ namespace ImTools
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>
         /// <returns>First item matching condition or default value.</returns>
-        public static T FirstOrDefault<T>(this T[] source, Func<T, bool> predicate)
+        public static T MatchFirst<T>(this T[] source, Func<T, bool> predicate)
         {
             if (source != null && source.Length != 0)
                 for (var i = 0; i < source.Length; ++i)
@@ -320,18 +320,27 @@ namespace ImTools
             return AppendTo(source, 0, source.Length, map);
         }
 
+        /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
+        /// <typeparam name="T">Type of source items.</typeparam>
+        /// <param name="source">If null, the null will be returned.</param>
+        /// <param name="condition">Condition to keep items.</param>
+        /// <returns>Result items, may be an array.</returns>
+        public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition)
+        {
+            var arr = source as T[];
+            return arr != null ? arr.Match(condition) : source.Where(condition);
+        }
+
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
         /// otherwise just calls Where, Select</summary>
         /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
         /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param> <param name="map">Converter from source to result item.</param>
+        /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
         /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map)
         {
             var arr = source as T[];
-            if (arr != null)
-                return arr.Match(condition, map);
-            return source.Where(condition).Select(map);
+            return arr != null ? arr.Match(condition, map) : source.Where(condition).Select(map);
         }
 
         /// <summary>Produces new array without item at specified <paramref name="index"/>. 

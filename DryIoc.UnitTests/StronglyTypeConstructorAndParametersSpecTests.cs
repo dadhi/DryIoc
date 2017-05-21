@@ -125,7 +125,6 @@ namespace DryIoc.UnitTests
             container.UseInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
-
         }
 
         [Test]
