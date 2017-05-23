@@ -164,6 +164,7 @@
     <Compile Include="Issue435_ReuseSingleton_prevents_the_correct_container_injection_within_explicit_resolve.cs" />
     <Compile Include="Issue443_ConventionBasedOnParameterName.cs" />
     <Compile Include="Issue451_Should_forbid_static_imports.cs" />
+    <Compile Include="Issue473_Unable_to_match_service_with_open_generic.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
