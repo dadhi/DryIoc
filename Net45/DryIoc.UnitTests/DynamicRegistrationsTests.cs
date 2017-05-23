@@ -69,7 +69,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_exclude_dynamic_registration_if_there_is_a_normal_one()
+        public void Can_exclude_dynamic_registration_if_there_is_a_normal_one()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
                 (_, serviceType, serviceKey) =>
@@ -84,6 +84,42 @@ namespace DryIoc.UnitTests
             var x = container.Resolve<X>();
 
             Assert.IsInstanceOf<B>(x);
+        }
+
+        [Test]
+        public void Can_replace_normal_by_dynamic_registration()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) =>
+                {
+                    if (serviceType == typeof(X))
+                        return new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) };
+                    return null;
+                }));
+
+            container.Register<X, B>();
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<A>(x);
+        }
+
+        [Test, Ignore("WIP")]
+        public void Can_replace_normal_with_dynamic_and_dynamic_with_dynamic_registration()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) => serviceType == typeof(X) 
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) } 
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) }
+                    : null));
+
+            container.Register<X, B>();
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<A>(x);
         }
 
         [Test]

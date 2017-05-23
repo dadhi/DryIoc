@@ -320,6 +320,49 @@ namespace ImTools
             return AppendTo(source, 0, source.Length, map);
         }
 
+        /// <summary>Maps all items from source to result array.</summary>
+        /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
+        /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
+        /// <returns>Converted items</returns>
+        public static R[] Map<T, R>(this T[] source, Func<T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            var sourceCount = source.Length;
+            if (sourceCount == 0)
+                return Empty<R>();
+
+            if (sourceCount == 1)
+                return new[] {map(source[0])};
+
+            if (sourceCount == 2)
+                return new[] { map(source[0]), map(source[1]) };
+
+            if (sourceCount == 3)
+                return new[] { map(source[0]), map(source[1]), map(source[2]) };
+
+            var results = new R[sourceCount];
+            for (var i = 0; i < source.Length; i++)
+                results[i] = map(source[i]);
+            return results;
+        }
+
+        /// <summary>Maps all items from source to result collection. 
+        /// If possible uses fast array Map otherwise Enumerable.Select.</summary>
+        /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
+        /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
+        /// <returns>Converted items</returns>
+        public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map)
+        {
+            if (source == null)
+                return null;
+            var arr = source as T[];
+            if (arr != null)
+                return arr.Map(map);
+            return source.Select(map);
+        }
+
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
         /// <typeparam name="T">Type of source items.</typeparam>
         /// <param name="source">If null, the null will be returned.</param>
@@ -327,8 +370,12 @@ namespace ImTools
         /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition)
         {
+            if (source == null)
+                return null;
             var arr = source as T[];
-            return arr != null ? arr.Match(condition) : source.Where(condition);
+            if (arr != null)
+                return arr.Match(condition);
+            return source.Where(condition);
         }
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
@@ -339,8 +386,12 @@ namespace ImTools
         /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map)
         {
+            if (source == null)
+                return null;
             var arr = source as T[];
-            return arr != null ? arr.Match(condition, map) : source.Where(condition).Select(map);
+            if (arr != null)
+                return arr.Match(condition, map);
+            return source.Where(condition).Select(map);
         }
 
         /// <summary>Produces new array without item at specified <paramref name="index"/>. 

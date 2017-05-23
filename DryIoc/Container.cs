@@ -950,8 +950,7 @@ namespace DryIoc
             {
                 appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
-                    decorators = decorators.Where(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1)
-                        .ToArrayOrSelf();
+                    decorators = decorators.Match(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1);
             }
 
             // Append open-generic decorators
@@ -972,9 +971,8 @@ namespace DryIoc
             // Note: the condition for type arguments should be checked before generating the closed generic version
             var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!typeArgDecorators.IsNullOrEmpty())
-                genericDecorators = genericDecorators.Append(typeArgDecorators
-                    .Where(d => d.CheckCondition(request))
-                    .ToArrayOrSelf());
+                genericDecorators = genericDecorators.Append(
+                    typeArgDecorators.Match(d => d.CheckCondition(request)));
 
             // Filter out already applied generic decorators
             // And combine with rest of decorators
@@ -983,20 +981,17 @@ namespace DryIoc
                 appliedDecoratorIDs = appliedDecoratorIDs ?? GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
                     genericDecorators = genericDecorators
-                        .Where(d => d.FactoryGenerator == null
+                        .Match(d => d.FactoryGenerator == null
                             ? appliedDecoratorIDs.IndexOf(d.FactoryID) == -1
                             : d.FactoryGenerator.GeneratedFactories.Enumerate()
-                                .All(f => appliedDecoratorIDs.IndexOf(f.Value.FactoryID) == -1))
-                        .ToArrayOrSelf();
+                                .All(f => appliedDecoratorIDs.IndexOf(f.Value.FactoryID) == -1));
 
                 // Generate closed-generic versions
                 if (!genericDecorators.IsNullOrEmpty())
                 {
                     genericDecorators = genericDecorators
-                        .Select(d => d.FactoryGenerator == null ? d
-                            : d.FactoryGenerator.GetGeneratedFactory(request))
-                        .Where(d => d != null)
-                        .ToArrayOrSelf();
+                        .Map(d => d.FactoryGenerator == null ? d : d.FactoryGenerator.GetGeneratedFactory(request))
+                        .Match(d => d != null);
                     decorators = decorators.Append(genericDecorators);
                 }
             }
@@ -1008,10 +1003,8 @@ namespace DryIoc
                 var parent = request.ParentOrWrapper;
                 if (!parent.IsEmpty)
                 {
-                    var ids = parent.Enumerate().Select(p => p.FactoryID).ToArray();
-                    decorators = decorators
-                        .Where(d => ids.IndexOf(d.FactoryID) == -1)
-                        .ToArrayOrSelf();
+                    var ids = parent.Enumerate().Map(p => p.FactoryID).ToArrayOrSelf();
+                    decorators = decorators.Match(d => ids.IndexOf(d.FactoryID) == -1);
                 }
             }
 
@@ -1349,19 +1342,19 @@ namespace DryIoc
                 {
                     var key = DynamicKey.Empty;
                     var validFactories = dynamicFactories
-                        .Select(it =>
+                        .Map(it =>
                         {
                             if (it.ServiceKey != null)
                                 return it;
                             key = key.Next();
                             return it.WithKey(key);
                         })
-                        .Where(it =>
+                        .Match(it =>
                         {
                             it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, containerRules);
                             return true;
                         })
-                        .ToArray();
+                        .ToArrayOrSelf();
 
                     resultFactories = resultFactories == null
                         ? validFactories
@@ -1380,7 +1373,7 @@ namespace DryIoc
                 return registeredFactories.ToArrayOrSelf();
 
             if (registeredFactories == null)
-                return dynamicFactories.Select(it => KV.Of(it.ServiceKey, it.Factory)).ToArray();
+                return dynamicFactories.Map(it => KV.Of(it.ServiceKey, it.Factory)).ToArrayOrSelf();
 
             var remainingDynamicFactories = dynamicFactories
                 .Match(it =>
@@ -1424,6 +1417,7 @@ namespace DryIoc
                 return null;
 
             var factories = CombineRegisteredAndDynamicFactories(registeredFactories, dynamicFactories);
+
             if (factorySelector != null)
             {
                 var validFactories = factories.Match(
@@ -1911,7 +1905,7 @@ namespace DryIoc
                         if (decorators != null && decorators.Length != 0)
                             return condition == null
                                 ? decorators
-                                : decorators.Where(condition).ToArray();
+                                : decorators.Match(condition);
                         return null;
 
                     default:
@@ -1931,12 +1925,9 @@ namespace DryIoc
 
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null)
-                        {
-                            var selectedFactories = condition == null
-                                ? factories.Enumerate()
-                                : factories.Enumerate().Where(f => condition(f.Value));
-                            return selectedFactories.Select(f => f.Value).ToArray();
-                        }
+                            return condition == null
+                                ? factories.Enumerate().Map(f => f.Value).ToArrayOrSelf()
+                                : factories.Enumerate().Match(f => condition(f.Value), f => f.Value).ToArrayOrSelf();
 
                         factory = factories.GetValueOrDefault(serviceKey);
                         return factory != null && (condition == null || condition(factory))
@@ -2121,7 +2112,7 @@ namespace DryIoc
                         Factory[] removedDecorators = null;
                         registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _null) =>
                         {
-                            var remaining = condition == null ? null : factories.Where(f => !condition(f)).ToArray();
+                            var remaining = condition == null ? null : factories.Match(f => !condition(f));
                             removedDecorators = remaining == null || remaining.Length == 0 ? factories : factories.Except(remaining).ToArray();
                             return remaining;
                         }));
@@ -2377,7 +2368,7 @@ namespace DryIoc
         }
 
         // todo: v3: Mark with ObsoleteAttribute
-        /// <summary>Obsolete: please use <see cref="WithAutoFallbackDynamicRegistrations"/></summary>
+        /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
@@ -2386,6 +2377,20 @@ namespace DryIoc
             return container.ThrowIfNull().With(rules =>
                 rules.WithUnknownServiceResolvers(
                     Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
+        }
+
+        // todo: v3: Mark with ObsoleteAttribute
+        /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
+        public static IContainer WithAutoFallbackResolution(this IContainer container,
+            IEnumerable<Assembly> implTypeAssemblies,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
+            Func<Request, bool> condition = null)
+        {
+            var types = implTypeAssemblies.ThrowIfNull()
+                .SelectMany(assembly => assembly.GetLoadedTypes())
+                .Where(Registrator.IsImplementationType)
+                .ToArray();
+            return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
         }
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered 
@@ -2431,25 +2436,6 @@ namespace DryIoc
             return container.ThrowIfNull()
                 .With(rules => rules.WithDynamicRegistrations(
                     Rules.AutoFallbackDynamicRegistrations(implTypes, condition, factory)));
-        }
-
-        /// <summary>Adds rule to register unknown service when it is resolved.</summary>
-        /// <param name="container">Container to add rule to.</param>
-        /// <param name="implTypeAssemblies">Provides assemblies with implementation types.</param>
-        /// <param name="changeDefaultReuse">(optional) Delegate to change auto-detected (Singleton or Current) scope reuse to another reuse.</param>
-        /// <param name="condition">(optional) condition.</param>
-        /// <returns>Container with new rule.</returns>
-        /// <remarks>Implementation types will be requested from assemblies only once, in this method call.</remarks>
-        public static IContainer WithAutoFallbackResolution(this IContainer container,
-            IEnumerable<Assembly> implTypeAssemblies,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null)
-        {
-            var types = implTypeAssemblies.ThrowIfNull()
-                .SelectMany(assembly => assembly.GetLoadedTypes())
-                .Where(Registrator.IsImplementationType)
-                .ToArray();
-            return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
         }
 
         /// <summary>Creates new container with provided parameters and properties
@@ -2889,11 +2875,8 @@ namespace DryIoc
         };
 
         /// <summary>Supported open-generic collection types.</summary>
-        public static readonly IEnumerable<Type> ArrayInterfaces =
-            typeof(object[]).GetImplementedInterfaces()
-                .Where(t => t.IsGeneric())
-                .Select(t => t.GetGenericTypeDefinition())
-                .ToArray();
+        public static readonly IEnumerable<Type> ArrayInterfaces = 
+            typeof(object[]).GetImplementedInterfaces().Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
 
         /// <summary>Checks if passed type represents supported collection types.</summary>
         /// <param name="type">Type to examine.</param> <returns>Check result.</returns>
@@ -3037,18 +3020,18 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
             var items = container.GetAllServiceFactories(requiredItemType)
-                .Select(kv => new ServiceRegistrationInfo(kv.Value, requiredItemType, kv.Key))
-                .ToArray();
+                .Map(kv => new ServiceRegistrationInfo(kv.Value, requiredItemType, kv.Key))
+                .ToArrayOrSelf();
 
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Select(f => new ServiceRegistrationInfo(f.Value,
+                    .Map(f => new ServiceRegistrationInfo(f.Value,
                             requiredItemType,
                             // NOTE: Special service key with info about open-generic factory service type
                             new[] { requiredItemOpenGenericType, f.Key }))
-                    .ToArray();
+                    .ToArrayOrSelf();
                 items = items.Append(openGenericItems);
             }
 
@@ -3058,12 +3041,12 @@ namespace DryIoc
             if (includeVariantGenericItems)
             {
                 var variantGenericItems = container.GetServiceRegistrations()
-                    .Where(x =>
+                    .Match(x =>
                         x.ServiceType.IsGeneric() &&
                         x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
                         x.ServiceType != requiredItemType &&
                         x.ServiceType.IsAssignableTo(requiredItemType))
-                    .ToArray();
+                    .ToArrayOrSelf();
                 items = items.Append(variantGenericItems);
             }
 
@@ -4959,7 +4942,7 @@ namespace DryIoc
             registrator.RegisterMany(implTypes, (r, serviceTypes, implType) =>
             {
                 if (serviceTypeCondition != null)
-                    serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
+                    serviceTypes = serviceTypes.Match(serviceTypeCondition);
                 if (serviceTypes.Length != 0)
                     r.RegisterMany(serviceTypes, implType, reuse, made, setup, ifAlreadyRegistered, serviceKey);
             },
@@ -4985,7 +4968,7 @@ namespace DryIoc
             registrator.RegisterMany(new[] { typeof(TImplementation) }, (r, serviceTypes, implType) =>
             {
                 if (serviceTypeCondition != null)
-                    serviceTypes = serviceTypes.Where(serviceTypeCondition).ToArrayOrSelf();
+                    serviceTypes = serviceTypes.Match(serviceTypeCondition);
                 if (serviceTypes.Length != 0)
                     r.RegisterMany(serviceTypes, implType, reuse, made, setup, ifAlreadyRegistered, serviceKey);
             },
@@ -7782,8 +7765,9 @@ namespace DryIoc
                     var otherMembers = other(r).ToArrayOrSelf();
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
-                        : otherMembers.Concat(sourceMembers.Where(s => s != null &&
-                            otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
+                        : otherMembers.Append(
+                            sourceMembers.Match(s => s != null &&
+                                otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
                 };
         }
 
@@ -7800,8 +7784,9 @@ namespace DryIoc
                     var otherMembers = other(r).ToArrayOrSelf();
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
-                        : otherMembers.Concat(sourceMembers.Where(s => s != null &&
-                            otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
+                        : otherMembers.Append(
+                            sourceMembers.Match(s => s != null &&
+                                otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
                 };
         }
 
@@ -8587,7 +8572,8 @@ namespace DryIoc
                     // because we need identical type arguments to match.
                     if (factoryServiceType != factoryImplType)
                         factoryServiceType = factoryImplType.GetImplementedTypes()
-                            .First(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType);
+                            .MatchFirst(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType)
+                            .ThrowIfNull();
 
                     var factoryServiceTypeParams = factoryServiceType.GetGenericParamsAndArgs();
                     var resultFactoryServiceTypeArgs = new Type[factoryServiceTypeParams.Length];
@@ -8634,8 +8620,8 @@ namespace DryIoc
                 {
                     var factoryMethodParameters = factoryMethodBase.GetParameters();
                     var targetMethods = closedFactoryImplType.GetMembers(t => t.DeclaredMethods, includeBase: true)
-                        .Where(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
-                        .ToArray();
+                        .Match(m => m.Name == factoryMember.Name && m.GetParameters().Length == factoryMethodParameters.Length)
+                        .ToArrayOrSelf();
 
                     if (targetMethods.Length == 1)
                         factoryMember = targetMethods[0];
@@ -11495,7 +11481,7 @@ namespace DryIoc
     public static class PrintTools
     {
         /// <summary>Default separator used for printing enumerable.</summary>
-        public static string DefaultItemSeparator = ";" + Environment.NewLine;
+        public static string DefaultItemSeparator = ", " + Environment.NewLine;
 
         /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
         /// <param name="s">Builder to append output to.</param>
@@ -11707,7 +11693,7 @@ namespace DryIoc.Experimental
     public static class DI
     {
         /// <summary>Pre-configured auto-magic rules.</summary>
-        public static readonly Rules AutoRules = Rules.Default
+        public static readonly Rules Relaxed = Rules.Default
             .With(FactoryMethod.ConstructorWithResolvableArguments)
             .WithFactorySelector(Rules.SelectLastRegisteredFactory())
             .WithTrackingDisposableTransients()
@@ -11718,7 +11704,7 @@ namespace DryIoc.Experimental
         /// <returns>New configured container.</returns>
         public static IContainer New(Func<Rules, Rules> configure = null)
         {
-            var rules = configure == null ? AutoRules : configure(AutoRules);
+            var rules = configure == null ? Relaxed : configure(Relaxed);
             return new Container(rules);
         }
 
@@ -11740,7 +11726,7 @@ namespace DryIoc.Experimental
         {
             if (assemblies.IsNullOrEmpty())
                 assemblies = new[] { typeof(T).GetAssembly() };
-            return container.WithAutoFallbackResolution(assemblies).Resolve<T>();
+            return container.WithAutoFallbackDynamicRegistrations(assemblies).Resolve<T>();
         }
     }
 }

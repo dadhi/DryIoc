@@ -9,7 +9,7 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container()
-                .WithAutoFallbackResolution(new[] { GetType().Assembly });
+                .WithAutoFallbackDynamicRegistrations(new[] { GetType().Assembly });
 
             var repo = container.Resolve<IRepository<string>>();
 
