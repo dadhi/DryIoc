@@ -392,18 +392,6 @@ namespace DryIoc.MefAttributedModel
                 .SelectMany(GetExportedRegistrations);
         }
 
-        // todo: v3: remove
-        /// <remarks>Obsolete: use <see cref="GetExportedRegistrations"/> instead.</remarks>
-        public static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type)
-        {
-            if (!CanBeExported(type))
-                return null;
-
-            var attributes = GetAllExportAttributes(type);
-            return !IsExportDefined(attributes) ? null
-                : GetRegistrationInfoOrDefault(type, attributes);
-        }
-
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
         /// <param name="type">Type to convert into registration infos.</param>
@@ -610,11 +598,6 @@ namespace DryIoc.MefAttributedModel
                     var importEx = import as ImportExAttribute;
                     if (importEx != null)
                         serviceKey = importEx.ContractKey;
-                    else
-#pragma warning disable 618 // ImportWithKeyAttribute is Obsolete.
-                        // todo: v3: remove
-                        serviceKey = import is ImportWithKeyAttribute ? ((ImportWithKeyAttribute)import).ContractKey : null;
-#pragma warning restore 618
                 }
 
                 requiredServiceType = import.ContractType;
@@ -1046,7 +1029,7 @@ namespace DryIoc.MefAttributedModel
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
                 "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) +
-                " nor default contructor in {0} when resolving: {1}"),
+                " nor default constructor in {0} when resolving: {1}"),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
             DuplicateMetadataKey = Of(
@@ -1196,7 +1179,7 @@ namespace DryIoc.MefAttributedModel
             return code.AppendDictionary(dictionary, (c, k, v) => c.AppendString(v));
         }
 
-        /// <summary>Determines whether the type is nullable.</summary>
+        /// <summary>Determines whether the type is null-able.</summary>
         /// <param name="type">The type to check.</param>
         public static bool IsNullable(this Type type)
         {
@@ -1250,7 +1233,7 @@ namespace DryIoc.MefAttributedModel
     #region Registration Info DTOs
 #pragma warning disable 659
 
-    // todo: v3: combine the bool fields into one with bit flags
+    // todo: v3: combine the Boolean fields into one with bit flags
     /// <summary>Serializable DTO of all registration information.</summary>
     public sealed class ExportedRegistrationInfo
     {
@@ -1264,7 +1247,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Full name of exported type. Enables type lazy-loading scenario.</summary>
         public string ImplementationTypeFullName;
 
-        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        /// <summary>Indicate the lazy info with the type defined by its name instead of Runtime Type.</summary>
         public bool IsLazy { get { return ImplementationTypeFullName != null; } }
 
         /// <summary>Specifies the reuse information</summary>
@@ -1302,10 +1285,6 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Factory type to specify <see cref="Setup"/>.</summary>
         public DryIoc.FactoryType FactoryType;
-
-        // todo: v3: remove
-        /// <summary>Obsolete: Does not required.</summary>
-        public bool IsFactory;
 
         /// <summary>Type consisting of single method compatible with <see cref="Setup.Condition"/> type.</summary>
         public Type ConditionType;
@@ -1450,16 +1429,12 @@ namespace DryIoc.MefAttributedModel
 
             var ifUnresolved =
                 source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
-
-            if (source.Metadata != null || source.MetadataKey != null)
-            {
-                // todo: Migrate metadata value and key
-            }
             
             return ConvertRequestInfo(source.ParentOrWrapper).Push(
                 source.ServiceType,
                 source.RequiredServiceType,
                 source.ServiceKey,
+                source.MetadataKey, source.Metadata,
                 ifUnresolved,
                 source.FactoryID,
                 factoryType,
@@ -1553,9 +1528,9 @@ namespace DryIoc.MefAttributedModel
                     Key = item.Constructor.DeclaringType.FullName,
                     Value = string.Format("new {0}({1})",
                         item.Constructor.DeclaringType.FullName,
-                        string.Join(", ", item.ConstructorArguments.Select(a => a.ToString()).ToArray())) +
+                        string.Join(", ", item.ConstructorArguments.Map(a => a.ToString()).ToArrayOrSelf())) +
                         (item.NamedArguments.Any() ?
-                            " { " + string.Join(", ", item.NamedArguments.Select(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArray()) + " }" :
+                            " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
                             string.Empty)
                     // ReSharper restore AssignNullToNotNullAttribute
                     // ReSharper restore PossibleNullReferenceException
@@ -1658,7 +1633,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>(optional) Not null for exported instance member which requires factory object, null for static members.</summary>
         public ExportInfo InstanceFactory;
 
-        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        /// <summary>Indicate the lazy info with the type defined by its name instead of Runtime Type.</summary>
         public bool IsLazy { get { return DeclaringTypeFullName != null; } }
 
         /// <summary>Returns new export info with type representation as type full name string, instead of
@@ -1802,10 +1777,10 @@ namespace DryIoc.MefAttributedModel
         /// <summary>If already registered option to pass to container registration.</summary>
         public IfAlreadyRegistered IfAlreadyRegistered;
 
-        /// <summary>Indicate the lazy info with type repsentation as a string instead of Runtime Type.</summary>
+        /// <summary>Indicate the lazy info with type defined by its name instead of Runtime Type.</summary>
         public bool IsLazy { get { return ServiceTypeFullName != null; } }
 
-        /// <summary>Default constructor is usually required by deserializer.</summary>
+        /// <summary>Default constructor is usually required by de-serializer.</summary>
         public ExportInfo() { }
 
         /// <summary>Creates exported info out of type and optional key.</summary>

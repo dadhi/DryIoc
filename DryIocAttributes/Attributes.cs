@@ -370,7 +370,7 @@ namespace DryIocAttributes
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
         public static readonly RequestInfo Empty =
-            new RequestInfo(null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, 0, null);
+            new RequestInfo(null, null, null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty { get { return ServiceType == null; } }
@@ -410,6 +410,12 @@ namespace DryIocAttributes
         /// <summary>Optional service key.</summary>
         public readonly object ServiceKey;
 
+        /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
+        public readonly string MetadataKey;
+
+        /// <summary>Metadata or the value (if key specified) to find in resolved service.</summary>
+        public readonly object Metadata;
+
         /// <summary>Policy to deal with unresolved request.</summary>
         public readonly IfUnresolved IfUnresolved;
 
@@ -427,20 +433,20 @@ namespace DryIocAttributes
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="ifUnresolved"></param>
+        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param>  <param name="ifUnresolved"></param>
         ///  <param name="factoryID"></param><param name="factoryType"></param>
         /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(
-            Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
+            Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey, ifUnresolved,
+            return new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
                 factoryID, factoryType, implementationType, reuseLifespan, this);
         }
 
         private RequestInfo(
-            Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
+            Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
             RequestInfo parentOrWrapper)
         {
@@ -450,6 +456,8 @@ namespace DryIocAttributes
             ServiceType = serviceType;
             RequiredServiceType = requiredServiceType;
             ServiceKey = serviceKey;
+            MetadataKey = metadataKey;
+            Metadata = metadata;
             IfUnresolved = ifUnresolved;
 
             // Implementation info:
@@ -488,6 +496,9 @@ namespace DryIocAttributes
 
             if (ServiceKey != null)
                 s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
+
+            if (MetadataKey != null || Metadata != null)
+                s.Append(" with Metadata=").Append(new KeyValuePair<string, object>(MetadataKey, Metadata));
 
             if (IfUnresolved != IfUnresolved.Throw)
                 s.Append(" if unresolved ").Append(Enum.GetName(typeof(IfUnresolved), IfUnresolved));
@@ -583,35 +594,6 @@ namespace DryIocAttributes
         /// <summary>Returns true to use exported service for request.</summary>
         /// <param name="request"></param> <returns>True to use exported service for request.</returns>
         public abstract bool Evaluate(RequestInfo request);
-    }
-
-    /// <summary>OBSOLETE: Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
-    //[Obsolete("Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.")]
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
-    [AttributeUsage(AttributeTargets.Parameter
-        | AttributeTargets.Field
-        | AttributeTargets.Property)]
-    public class ImportWithKeyAttribute : ImportAttribute
-    {
-        /// <summary>Arbitrary object to match with service key.</summary>
-        public object ContractKey { get; set; }
-
-        /// <summary>Creates attribute object service key.</summary> <param name="contractKey"></param>
-        /// <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
-        public ImportWithKeyAttribute(object contractKey, Type contractType = null)
-            : base(contractType)
-        {
-            ContractKey = contractKey;
-        }
-
-        /// <summary>Creates attribute with string service name.</summary> <param name="contractKey"></param>
-        /// <param name="contractType">(optional) If missing then imported member type will be used as service type.</param>
-        public ImportWithKeyAttribute(string contractKey, Type contractType = null)
-            : base(contractKey, contractType)
-        {
-            ContractKey = contractKey;
-        }
     }
 
     /// <summary>Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
