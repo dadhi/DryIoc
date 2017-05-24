@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -9,13 +10,12 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Can_ResolveMany_of_not_registered_service_interface()
         {
-            var implTypes = new[] { typeof(CustomRegistrationA), typeof(CustomRegistrationB) };
-
-            var container = new Container().WithAutoFallbackDynamicRegistrations(implTypes);
+            var container = new Container()
+                .WithAutoFallbackDynamicRegistrations(typeof(CustomRegistrationA), typeof(CustomRegistrationB));
 
             var xs = container.ResolveMany<ICustomRegistration>();
 
-            CollectionAssert.AreEquivalent(implTypes, xs.Select(_ => _.GetType()));
+            CollectionAssert.AreEquivalent(new[] { typeof(CustomRegistrationA), typeof(CustomRegistrationB) }, xs.Select(_ => _.GetType()));
         }
 
         public interface ICustomRegistration { }
@@ -60,16 +60,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void I_should_be_able_to_specify_reuse()
         {
-            var implTypes = new[] { typeof(CustomRegistrationA<>), typeof(CustomRegistrationB<>) };
-
             var container = new Container().WithAutoFallbackDynamicRegistrations(
-                implTypes,
-                factory: (serviceType, _, implType) =>
-                {
-                    if (serviceType == typeof(ICustomRegistration<string>))
-                        return new ReflectionFactory(implType, Reuse.Singleton);
-                    return new ReflectionFactory(implType);
-                });
+                Reuse.Singleton, typeof(CustomRegistrationA<>), typeof(CustomRegistrationB<>));
 
             var x1 = container.ResolveMany<ICustomRegistration<string>>().ToArray();
             var x2 = container.ResolveMany<ICustomRegistration<string>>().ToArray();

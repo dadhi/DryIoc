@@ -149,7 +149,11 @@ namespace DryIoc.UnitTests
         public interface IMissing { }
         public class Xx
         {
-            public Xx(IMissing dep) { }
+            public IMissing Dep { get; set; }
+            public Xx(IMissing dep)
+            {
+                Dep = dep;
+            }
         }
 
         public class Y { }
@@ -260,7 +264,7 @@ namespace DryIoc.UnitTests
         public void AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations()
         {
             var container = new Container()
-                .WithAutoFallbackDynamicRegistrations(new[] { typeof(Me), typeof(MiniMe) });
+                .WithAutoFallbackDynamicRegistrations(typeof(Me), typeof(MiniMe));
 
             var me = container.Resolve<IMe>(IfUnresolved.ReturnDefault);
 
@@ -271,7 +275,7 @@ namespace DryIoc.UnitTests
         public void AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations_from_assemblies()
         {
             var container = new Container()
-                .WithAutoFallbackDynamicRegistrations(new[] { typeof(Me).GetAssembly() });
+                .WithAutoFallbackDynamicRegistrations(typeof(Me).GetAssembly());
 
             var me = container.Resolve<IMe>(IfUnresolved.ReturnDefault);
 
@@ -282,9 +286,9 @@ namespace DryIoc.UnitTests
         public void Can_specify_condition_to_exclude_unwanted_services_from_AutoFallback_resolution_rule()
         {
             var container = new Container()
-                .WithAutoFallbackDynamicRegistrations(new[] { typeof(Me) },
-                factory: (type, key, implType) => new ReflectionFactory(implType,
-                    setup: Setup.With(condition: req => req.Parent.ImplementationType.Name.Contains("Green"))));
+                .WithAutoFallbackDynamicRegistrations(Reuse.Singleton,
+                    Setup.With(condition: req => req.Parent.ImplementationType.Name.Contains("Green")),
+                    typeof(Me));
 
             container.Register<RedMe>();
 
@@ -295,8 +299,23 @@ namespace DryIoc.UnitTests
         public interface IMe { }
         internal class Me : IMe { }
         internal class MiniMe : IMe { }
-        internal class GreenMe { public GreenMe(IMe me) { } }
-        internal class RedMe { public RedMe(IMe me) { } }
+        internal class GreenMe
+        {
+            public IMe Me { get; set; }
+            public GreenMe(IMe me)
+            {
+                Me = me;
+            }
+        }
+
+        internal class RedMe
+        {
+            public IMe Me { get; set; }
+            public RedMe(IMe me)
+            {
+                Me = me;
+            }
+        }
 
         [Test]
         public void Exist_support_for_non_primitive_value_injection_via_container_rule()
