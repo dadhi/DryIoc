@@ -897,21 +897,19 @@ namespace DryIoc
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
         {
             var serviceFactories = _registry.Value.Services;
+
             var entry = serviceFactories.GetValueOrDefault(serviceType);
-            var factories = GetRegistryEntryKeyFactoryPairs(entry);
+
+            var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
 
             if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
                 var openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
                 if (openGenericEntry != null)
-                    factories = factories.Concat(GetRegistryEntryKeyFactoryPairs(openGenericEntry));
+                    factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
 
-            var dynamicFactories = GetDynamicFactoriesOrNull(FactoryType.Service, serviceType, null);
-            if (dynamicFactories != null)
-                factories = CombineRegisteredAndDynamicFactories(factories, dynamicFactories);
-
-            return factories;
+            return GetCombinedRegisteredAndDynamicFactories(factories, FactoryType.Service, serviceType, null);
         }
 
         private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry)
@@ -1292,7 +1290,7 @@ namespace DryIoc
             return actualServiceType;
         }
 
-        private IEnumerable<KV<object, Factory>> GetRegisteredServiceFactoriesOrNull(Type serviceType, object serviceKey)
+        private KV<object, Factory>[] GetRegisteredServiceFactoriesOrNull(Type serviceType, object serviceKey)
         {
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -1322,81 +1320,76 @@ namespace DryIoc
             if (factory != null)
                 return new[] { new KV<object, Factory>(DefaultKey.Value, factory) };
 
-            return ((FactoriesEntry)entry).Factories.Enumerate();
+            return ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
         }
 
-        private IEnumerable<DynamicRegistration> GetDynamicFactoriesOrNull(FactoryType factoryType, Type serviceType, object serviceKey)
+        private KV<object, Factory>[] GetCombinedRegisteredAndDynamicFactories(
+            KV<object, Factory>[] registeredFactories,
+            FactoryType factoryType, Type serviceType, object serviceKey)
         {
-            var containerRules = Rules;
-            var dynamicRegistrationProviders = containerRules.DynamicRegistrationProviders;
+            var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
             if (dynamicRegistrationProviders.IsNullOrEmpty())
-                return null;
+                return registeredFactories;
 
-            IEnumerable<DynamicRegistration> resultFactories = null;
+            var combinedFactories = registeredFactories;
 
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
-                var dynamicFactories = dynamicRegistrationProvider(factoryType, serviceType, serviceKey);
-                if (dynamicFactories != null)
+                var dynamicRegistrations = dynamicRegistrationProvider(factoryType, serviceType, serviceKey);
+                if (dynamicRegistrations != null)
                 {
-                    var key = DynamicKey.Empty;
-                    var validFactories = dynamicFactories
+                    var key = DefaultDynamicKey.Empty;
+                    var validDynamicRegistrations = dynamicRegistrations
                         .Map(it =>
                         {
+                            it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules);
                             if (it.ServiceKey != null)
                                 return it;
-                            key = key.Next();
-                            return it.WithKey(key);
-                        })
-                        .Match(it =>
-                        {
-                            it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, containerRules);
-                            return true;
-                        })
-                        .ToArrayOrSelf();
+                            return it.WithKey(key = key.Next());
+                        });
 
-                    resultFactories = resultFactories == null
-                        ? validFactories
-                        : resultFactories.Concat(validFactories);
+                    combinedFactories = combinedFactories.IsNullOrEmpty()
+                        ? validDynamicRegistrations.Map(it => KV.Of(it.ServiceKey, it.Factory)).ToArrayOrSelf()
+                        : CombineFactoriesWithIfAlreadyRegisteredOption(combinedFactories, validDynamicRegistrations);
                 }
             }
 
-            return resultFactories;
+            return combinedFactories;
         }
 
-        private KV<object, Factory>[] CombineRegisteredAndDynamicFactories(
-            IEnumerable<KV<object, Factory>> registeredFactories,
+        private KV<object, Factory>[] CombineFactoriesWithIfAlreadyRegisteredOption(
+            KV<object, Factory>[] registeredFactories,
             IEnumerable<DynamicRegistration> dynamicFactories)
         {
-            if (dynamicFactories == null)
-                return registeredFactories.ToArrayOrSelf();
-
-            if (registeredFactories == null)
-                return dynamicFactories.Map(it => KV.Of(it.ServiceKey, it.Factory)).ToArrayOrSelf();
-
             var remainingDynamicFactories = dynamicFactories
                 .Match(it =>
                 {
-                    var isNotKeyed = it.ServiceKey is DynamicKey;
+                    var isDefault = it.ServiceKey is DefaultDynamicKey;
                     switch (it.IfAlreadyRegistered)
                     {
                         case IfAlreadyRegistered.Keep:
                         case IfAlreadyRegistered.Throw: // throw will behave the same as keep
-                            return isNotKeyed
-                                ? !registeredFactories.Any(_ => _.Key is DefaultKey)
-                                : !registeredFactories.Any(_ => _.Key.Equals(it.ServiceKey));
+                            if (isDefault)
+                                return registeredFactories.IndexOf(_ => _.Key is DefaultKey || _.Key is DefaultDynamicKey) == -1;
+                            return registeredFactories.IndexOf(_ => _.Key.Equals(it.ServiceKey)) == -1;
 
                         case IfAlreadyRegistered.Replace:
-                            registeredFactories = isNotKeyed
-                                ? registeredFactories.Where(_ => !(_.Key is DefaultKey))
-                                : registeredFactories.Where(_ => !_.Key.Equals(it.ServiceKey));
+                            if (isDefault)
+                                registeredFactories = registeredFactories
+                                    .Match(_ => !(_.Key is DefaultKey) && !(_.Key is DefaultDynamicKey));
+                            registeredFactories = registeredFactories
+                                .Match(_ => !_.Key.Equals(it.ServiceKey));
                             return true;
 
                         case IfAlreadyRegistered.AppendNotKeyed:
-                            return isNotKeyed
-                                ? true
-                                : !registeredFactories.Any(_ => _.Key.Equals(it.ServiceKey));
+                            if (isDefault)
+                                return true;
+                            return registeredFactories.IndexOf(_ => _.Key.Equals(it.ServiceKey)) == -1;
+                        
+                        case IfAlreadyRegistered.AppendNewImplementation:
+                            // todo:
+                            break;
                     }
 
                     return true;
@@ -1412,11 +1405,13 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
 
             var registeredFactories = GetRegisteredServiceFactoriesOrNull(registeredServiceType, serviceKey);
-            var dynamicFactories = GetDynamicFactoriesOrNull(FactoryType.Service, registeredServiceType, serviceKey);
-            if (registeredFactories == null && dynamicFactories == null)
-                return null;
 
-            var factories = CombineRegisteredAndDynamicFactories(registeredFactories, dynamicFactories);
+            var factories = GetCombinedRegisteredAndDynamicFactories(
+                registeredFactories,
+                FactoryType.Service, registeredServiceType, serviceKey);
+
+            if (factories.IsNullOrEmpty())
+                return null;
 
             if (factorySelector != null)
             {
@@ -1436,7 +1431,7 @@ namespace DryIoc
             }
 
             // Filter out non default factories
-            var defaultFactories = factories.Match(f => f.Key is DefaultKey || f.Key is DynamicKey);
+            var defaultFactories = factories.Match(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey);
             if (defaultFactories.Length == 0)
                 return null;
 
@@ -2710,23 +2705,23 @@ namespace DryIoc
     }
 
     /// <summary>Represents default key for dymamic registations</summary>
-    public sealed class DynamicKey : IConvertibleToExpression
+    public sealed class DefaultDynamicKey : IConvertibleToExpression
     {
         /// <summary>Default value.</summary>
-        public static readonly DynamicKey Empty = new DynamicKey(0);
+        public static readonly DefaultDynamicKey Empty = new DefaultDynamicKey(0);
 
         /// <summary>Associated ID.</summary>
         public readonly int ID;
 
         /// <summary>Returns dynamic key with specified ID. The key itself may be non unique, and requested from pool.</summary>
         /// <param name="id">Associated ID.</param> <returns>The key.</returns>
-        public static DynamicKey Of(int id)
+        public static DefaultDynamicKey Of(int id)
         {
-            return id == 0 ? Empty : new DynamicKey(id);
+            return id == 0 ? Empty : new DefaultDynamicKey(id);
         }
 
         /// <summary>Returns next dynamic key with increased <see cref="ID"/>.</summary> <returns>Next key.</returns>
-        public DynamicKey Next()
+        public DefaultDynamicKey Next()
         {
             return Of(ID + 1);
         }
@@ -2735,7 +2730,7 @@ namespace DryIoc
         /// <returns>True if keys have the same IDs.</returns>
         public override bool Equals(object key)
         {
-            var other = key as DynamicKey;
+            var other = key as DefaultDynamicKey;
             return other != null && other.ID == ID;
         }
 
@@ -2754,10 +2749,10 @@ namespace DryIoc
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
-            return Expression.Call(typeof(DynamicKey), "Of", ArrayTools.Empty<Type>(), Expression.Constant(ID));
+            return Expression.Call(typeof(DefaultDynamicKey), "Of", ArrayTools.Empty<Type>(), Expression.Constant(ID));
         }
 
-        private DynamicKey(int id)
+        private DefaultDynamicKey(int id)
         {
             ID = id;
         }
@@ -2875,7 +2870,7 @@ namespace DryIoc
         };
 
         /// <summary>Supported open-generic collection types.</summary>
-        public static readonly IEnumerable<Type> ArrayInterfaces = 
+        public static readonly Type[] ArrayInterfaces = 
             typeof(object[]).GetImplementedInterfaces().Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
 
         /// <summary>Checks if passed type represents supported collection types.</summary>
@@ -2898,8 +2893,8 @@ namespace DryIoc
         }
 
         // todo: v3: remove as not used
-        /// <summary>Returns true if type is func with 1 or more input arguments.</summary>
-        /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
+        /// <summary>Returns true if type is Func with 1 or more input arguments.</summary>
+        /// <param name="type">Type to check.</param><returns>True for Func type, false otherwise.</returns>
         public static bool IsFuncWithArgs(this Type type)
         {
             return type.IsFunc() && type.GetGenericTypeDefinition() != typeof(Func<>);
@@ -2913,8 +2908,10 @@ namespace DryIoc
             var wrappers = ImTreeMap<Type, Factory>.Empty;
 
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
-            foreach (var arrayInterface in ArrayInterfaces)
-                wrappers = wrappers.AddOrUpdate(arrayInterface, arrayExpr);
+
+            var arrayInterfaces = ArrayInterfaces;
+            for (var i = 0; i < arrayInterfaces.Length; i++)
+                wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
 
             wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
@@ -3381,14 +3378,14 @@ namespace DryIoc
         /// <summary>Optional: will be <see cref="IfAlreadyRegistered.AppendNotKeyed"/> by default.</summary>
         public readonly IfAlreadyRegistered IfAlreadyRegistered;
 
-        /// <summary>Optional service key: if null the default <see cref="DynamicKey"/> will be used. </summary>
+        /// <summary>Optional service key: if null the default <see cref="DefaultDynamicKey"/> will be used. </summary>
         public readonly object ServiceKey;
 
         /// <summary>Constructs the info</summary>
         /// <param name="factory"></param>
         /// <param name="ifAlreadyRegistered">(optional) Defines how to combine with normal registrations.
         /// Will use <see cref="IfAlreadyRegistered.AppendNotKeyed"/> by default.</param>
-        /// <param name="serviceKey">(optional) If not specified then <see cref="DynamicKey"/> will be used instead.</param>
+        /// <param name="serviceKey">(optional) If not specified then <see cref="DefaultDynamicKey"/> will be used instead.</param>
         public DynamicRegistration(Factory factory,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
         {
@@ -4801,7 +4798,7 @@ namespace DryIoc
         /// <param name="implType">Concrete or open-generic implementation type.</param>
         public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType);
 
-        // todo: perf: Add optional @isStaticallyChecked to skip check for implemented types.
+        // todo: Perf: Add optional @isStaticallyChecked to skip check for implemented types.
         /// <summary>Registers many service types with the same implementation.</summary>
         /// <param name="registrator">Registrator/Container</param>
         /// <param name="serviceTypes">1 or more service types.</param>
@@ -4838,8 +4835,7 @@ namespace DryIoc
         };
 
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
-        /// for open-generic <paramref name="type"/> its service type should supply all type arguments
-        /// Used by RegisterMany method.</summary>
+        /// for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
         /// <param name="type">Source type: may be concrete, abstract or generic definition.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <returns>Array of types or empty.</returns>
@@ -4858,6 +4854,18 @@ namespace DryIoc
                     t => t.GetGenericDefinitionOrNull());
 
             return serviceTypes;
+        }
+
+
+        /// <summary>Returns the sensible services automatically discovered for RegisterMany implementation type.
+        /// Excludes the collection wrapper interfaces.</summary>
+        /// <param name="type">Source type, may be concrete, abstract or generic definition.</param>
+        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
+        /// <returns>Array of types or empty.</returns>
+        public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false)
+        {
+            return GetImplementedServiceTypes(type, nonPublicServiceTypes)
+                .Match(t => !t.IsGenericDefinition() || WrappersSupport.ArrayInterfaces.IndexOf(t) == -1);
         }
 
         /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
@@ -4901,7 +4909,7 @@ namespace DryIoc
             return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
         }
 
-        /// <summary>Registers many implementations with their auto-figured service types.</summary>
+        /// <summary>Registers many implementations with the auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
         /// <param name="implTypes">Implementation type provider.</param>
         /// <param name="action">(optional) User specified registration action:
@@ -4912,7 +4920,7 @@ namespace DryIoc
         {
             foreach (var implType in implTypes)
             {
-                var serviceTypes = GetImplementedServiceTypes(implType, nonPublicServiceTypes);
+                var serviceTypes = implType.GetRegisterManyImplementedServiceTypes(nonPublicServiceTypes);
                 if (serviceTypes.IsNullOrEmpty())
                     continue;
 

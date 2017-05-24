@@ -71,7 +71,7 @@ namespace DryIoc.MefAttributedModel
                 .WithMultipleSameContractNamesSupport();
         }
 
-        /// <summary>The basic rules to support Mef/DryIoc Attributes for
+        /// <summary>The basic rules to support MEF/DryIoc Attributes for
         /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
         /// and for specifying injected dependencies via Import attributes.</summary>
         /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
@@ -540,7 +540,7 @@ namespace DryIoc.MefAttributedModel
 
             if (ctor == null)
             {
-                // next try fallback defined ctor, it may be defined as ConstructorWithResolvableArguments
+                // next try to fallback defined constructor, it may be defined as ConstructorWithResolvableArguments
                 if (fallbackSelector != null)
                 {
                     var fallbackCtor = fallbackSelector(request);
@@ -635,7 +635,7 @@ namespace DryIoc.MefAttributedModel
             if (contractNameStore == null)
                 return null;
 
-            // may be null if service key is rigistered at all Or registered not through MEF
+            // may be null if service key is registered at all Or registered not through MEF
             var types = contractNameStore.GetServiceTypesOrDefault(serviceKey);
             if (types == null)
                 return null;
@@ -733,7 +733,7 @@ namespace DryIoc.MefAttributedModel
                     Setup.With(setupMetadata), IfAlreadyRegistered.Keep, serviceKey);
             }
 
-            // the default because we intentionally register the service and expect it to be avaliable
+            // the default because we intentionally register the service and expect it to be available
             var ifUnresolved = DryIoc.IfUnresolved.Throw;
 
             return ServiceDetails.Of(serviceType, serviceKey, ifUnresolved, null, metadataKey, metadataValue);
@@ -890,14 +890,13 @@ namespace DryIoc.MefAttributedModel
         private static ExportInfo[] GetExportsFromExportManyAttribute(ExportManyAttribute attribute,
             ExportedRegistrationInfo info, Type implementationType)
         {
-            var contractTypes = implementationType.GetImplementedServiceTypes(attribute.NonPublic);
+            var contractTypes = implementationType.GetRegisterManyImplementedServiceTypes(attribute.NonPublic);
             if (!attribute.Except.IsNullOrEmpty())
                 contractTypes = contractTypes.Except(attribute.Except).ToArrayOrSelf();
 
             var manyExports = contractTypes
-                .Select(contractType => new ExportInfo(contractType,
-                    attribute.ContractName ?? attribute.ContractKey, GetIfAlreadyRegistered(attribute.IfAlreadyExported)))
-                .ToArray();
+                .Map(contractType => new ExportInfo(contractType,
+                    attribute.ContractName ?? attribute.ContractKey, GetIfAlreadyRegistered(attribute.IfAlreadyExported)));
 
             Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 

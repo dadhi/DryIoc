@@ -239,13 +239,13 @@ namespace DryIoc.UnitTests
         [Test]
         public void Lazy_enumerable_should_throw_on_missing_dependency()
         {
-            var container = new Container(rules => 
+            var container = new Container(rules =>
                 rules.WithResolveIEnumerableAsLazyEnumerable());
             container.Register<A>();
 
             var items = container.Resolve<IEnumerable<A>>();
 
-            
+
             var ex = Assert.Throws<ContainerException>(
                 () => items.Count());
 
@@ -273,11 +273,11 @@ namespace DryIoc.UnitTests
             container.Register<A>();
             container.Register(Made.Of(() => new AA(Arg.Of<IEnumerable<A>>(IfUnresolved.Throw))));
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IEnumerable<AA>>().ToArray());
 
             Assert.AreEqual(
-                Error.NameOf(Error.UnableToResolveUnknownService), 
+                Error.NameOf(Error.UnableToResolveUnknownService),
                 Error.NameOf(ex.Error));
         }
 
@@ -310,6 +310,23 @@ namespace DryIoc.UnitTests
             var aes = container.Resolve<IEnumerable<AD>>().ToArray();
         }
 
+        [Test]
+        public void Should_include_closed_and_open_generic_version_of_service()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IFoo<>), typeof(OpenFoo<>));
+            container.Register(typeof(IFoo<int>), typeof(ClosedFoo));
+
+            var fooTypes = container.Resolve<IFoo<int>[]>().Select(f => f.GetType());
+            CollectionAssert.AreEqual(new[] { typeof(ClosedFoo), typeof(OpenFoo<int>) }, fooTypes);
+        }
+
+        public interface IFoo<T> { }
+
+        public class ClosedFoo : IFoo<int> { }
+        public class OpenFoo<T> : IFoo<T> { }
+
         public class B { }
 
         public class A
@@ -332,7 +349,7 @@ namespace DryIoc.UnitTests
 
         public class AD
         {
-            public AD (IEnumerable<D> dds)
+            public AD(IEnumerable<D> dds)
             {
                 dds.ToArray();
             }

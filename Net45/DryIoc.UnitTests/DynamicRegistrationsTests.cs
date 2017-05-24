@@ -104,7 +104,7 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(x);
         }
 
-        [Test, Ignore("WIP")]
+        [Test]
         public void Can_replace_normal_with_dynamic_and_dynamic_with_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(

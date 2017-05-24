@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -8,14 +10,31 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue473_Unable_to_match_service_with_open_generic
     {
-        [Test, Ignore("open issue, not sure does it need to be fixed")]
-        public void Unable_to_match_in_ResolveMany_of_array()
+        [Test]
+        public void Unable_to_match_in_ResolveMany()
         {
             var container = new Container();
             container.RegisterMany(new[] { typeof(MyDictionary<>) });
 
             var array = container.ResolveMany(typeof(IMyInterface), ResolveManyBehavior.AsFixedArray);
             Assert.IsEmpty(array);
+
+            array = container.ResolveMany(typeof(IMyInterface)).ToArray();
+            Assert.IsEmpty(array);
+        }
+
+        [Test]
+        public void Able_to_match_in_ResolveMany()
+        {
+            var container = new Container();
+            container.RegisterMany(new[] { typeof(MyDictionary<>) });
+            container.RegisterMany<MyClass>();
+
+            var array = container.ResolveMany(typeof(IMyInterface), ResolveManyBehavior.AsFixedArray).ToArrayOrSelf();
+            Assert.IsInstanceOf<MyClass>(array[0]);
+
+            array = container.ResolveMany(typeof(IMyInterface)).ToArray();
+            Assert.IsInstanceOf<MyClass>(array[0]);
         }
 
         public class MyDictionary<T> : IEnumerable<KeyValuePair<string, T>>
@@ -32,5 +51,7 @@ namespace DryIoc.IssuesTests
         }
 
         public interface IMyInterface {}
+
+        public class MyClass : IMyInterface { }
     }
 }
