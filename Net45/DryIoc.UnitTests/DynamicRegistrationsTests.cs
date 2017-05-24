@@ -123,6 +123,87 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_append_new_implementation_via_dynamic_registration()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.AppendNewImplementation) }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.AppendNewImplementation) }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), IfAlreadyRegistered.AppendNewImplementation) }
+                    : null));
+
+            container.Register<X>();
+
+            var xs = container.ResolveMany<X>().Select(x => x.GetType());
+
+            CollectionAssert.AreEquivalent(new[] { typeof(X), typeof(A), typeof(B) }, xs);
+        }
+
+        [Test]
+        public void Can_append_non_keyed_via_dynamic_registration()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B))) }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), serviceKey: "b") }
+                    : null));
+
+            container.Register<X>();
+
+            var xs = container.ResolveMany<X>().Select(x => x.GetType());
+
+            CollectionAssert.AreEquivalent(new[] { typeof(X), typeof(A), typeof(A), typeof(B), typeof(B) }, xs);
+        }
+
+        [Test]
+        public void Will_keep_first_keyed_registration_by_default()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), serviceKey: "a") }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), serviceKey: "a") }
+                    : null));
+
+            container.Register<X>(serviceKey: "a");
+
+            var a = container.Resolve<X>("a");
+
+            Assert.IsInstanceOf<X>(a);
+        }
+
+        [Test]
+        public void Can_replace_keyed_registration()
+        {
+            var container = new Container(rules => rules.WithDynamicRegistrations(
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace, "a") }
+                    : null,
+                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), IfAlreadyRegistered.Replace, "a") }
+                    : null));
+
+            container.Register<X>(serviceKey: "a");
+
+            var a = container.Resolve<X>("a");
+
+            Assert.IsInstanceOf<B>(a);
+        }
+
+        [Test]
         public void Can_validate_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(

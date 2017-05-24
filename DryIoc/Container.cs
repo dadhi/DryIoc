@@ -1333,13 +1333,16 @@ namespace DryIoc
 
             var combinedFactories = registeredFactories;
 
+            // assign unique continious keys accross all of dynamic providers, 
+            // to prevent duplicate keys and peeking the wrong factory
+            var key = DefaultDynamicKey.Empty;
+
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
                 var dynamicRegistrations = dynamicRegistrationProvider(factoryType, serviceType, serviceKey);
                 if (dynamicRegistrations != null)
                 {
-                    var key = DefaultDynamicKey.Empty;
                     var validDynamicRegistrations = dynamicRegistrations
                         .Map(it =>
                         {
@@ -1365,31 +1368,47 @@ namespace DryIoc
             var remainingDynamicFactories = dynamicFactories
                 .Match(it =>
                 {
-                    var isDefault = it.ServiceKey is DefaultDynamicKey;
-                    switch (it.IfAlreadyRegistered)
+                    if (it.ServiceKey is DefaultDynamicKey) // for the default dynamic factory
                     {
-                        case IfAlreadyRegistered.Keep:
-                        case IfAlreadyRegistered.Throw: // throw will behave the same as keep
-                            if (isDefault)
-                                return registeredFactories.IndexOf(_ => _.Key is DefaultKey || _.Key is DefaultDynamicKey) == -1;
-                            return registeredFactories.IndexOf(_ => _.Key.Equals(it.ServiceKey)) == -1;
+                        switch (it.IfAlreadyRegistered)
+                        {
+                            // accept the default if registered factories don't contain it already
+                            case IfAlreadyRegistered.Keep:
+                            case IfAlreadyRegistered.Throw:
+                                return registeredFactories.IndexOf(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey) == -1;
 
-                        case IfAlreadyRegistered.Replace:
-                            if (isDefault)
-                                registeredFactories = registeredFactories
-                                    .Match(_ => !(_.Key is DefaultKey) && !(_.Key is DefaultDynamicKey));
-                            registeredFactories = registeredFactories
-                                .Match(_ => !_.Key.Equals(it.ServiceKey));
-                            return true;
-
-                        case IfAlreadyRegistered.AppendNotKeyed:
-                            if (isDefault)
+                            // remove the default from the registered factories 
+                            case IfAlreadyRegistered.Replace:
+                                registeredFactories = registeredFactories.Match(f => !(f.Key is DefaultKey) && !(f.Key is DefaultDynamicKey));
                                 return true;
-                            return registeredFactories.IndexOf(_ => _.Key.Equals(it.ServiceKey)) == -1;
-                        
-                        case IfAlreadyRegistered.AppendNewImplementation:
-                            // todo:
-                            break;
+
+                            case IfAlreadyRegistered.AppendNotKeyed:
+                                return true;
+
+                            case IfAlreadyRegistered.AppendNewImplementation:
+                                // if we cannot access to dynamic implementation type, assume that the type is new
+                                if (!it.Factory.CanAccessImplementationType)
+                                    return true;
+
+                                // keep dynamic factory if there is no registered factory with the same implementation type
+                                return registeredFactories.IndexOf(f =>
+                                    f.Value.CanAccessImplementationType &&
+                                    f.Value.ImplementationType == it.Factory.ImplementationType) == -1;
+                        }
+                    }
+                    else // for the keyed dynamic factory 
+                    {
+                        switch (it.IfAlreadyRegistered)
+                        {
+                            // remove the registered factory with the same key
+                            case IfAlreadyRegistered.Replace:
+                                registeredFactories = registeredFactories.Match(f => !f.Key.Equals(it.ServiceKey));
+                                return true;
+
+                            // keep the dynamic factory with the new service key, otherwise skip it
+                            default:
+                                return registeredFactories.IndexOf(f => f.Key.Equals(it.ServiceKey)) == -1;
+                        }
                     }
 
                     return true;
@@ -1402,8 +1421,8 @@ namespace DryIoc
         private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
         {
             var registeredServiceType = GetRegisteredServiceType(request);
-            var serviceKey = request.ServiceKey;
 
+            var serviceKey = request.ServiceKey;
             var registeredFactories = GetRegisteredServiceFactoriesOrNull(registeredServiceType, serviceKey);
 
             var factories = GetCombinedRegisteredAndDynamicFactories(
