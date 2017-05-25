@@ -3651,7 +3651,7 @@ namespace DryIoc
                     return null;
 
                 var factory = new ReflectionFactory(concreteServiceType, 
-                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
+                    made: DryIoc.FactoryMethod.Constructor(true, true));
 
                 // try resolve expression first and return null, 
                 // to enable fallback to other rules if unresolved
@@ -3666,40 +3666,37 @@ namespace DryIoc
             };
         }
 
-        ///// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
-        ///// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
-        ///// The resolution creates transient services.</summary>
-        ///// <returns>New rule.</returns>
-        //public static DynamicRegistrationProvider AutoResolveConcreteType()
-        //{
-        //    return AutoFallbackDynamicRegistrations();
-
-
-        //    return  =>
-        //    {
-        //        var concreteServiceType = request.GetActualServiceType();
-        //        if (concreteServiceType.IsAbstract() || condition != null && !condition(request))
-        //            return null;
-
-        //        var factory = new ReflectionFactory(concreteServiceType,
-        //            made: DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
-
-        //        // try resolve expression first and return null, 
-        //        // to enable fallback to other rules if unresolved
-        //        var requestOrDefault = request
-        //            .WithChangedServiceInfo(_ => _.WithIfUnresolved(IfUnresolved.ReturnDefault));
-
-        //        var factoryExpr = factory.GetExpressionOrDefault(requestOrDefault);
-        //        if (factoryExpr == null)
-        //            return null;
-
-        //        return factory;
-        //    };
-        //}
-
-        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
         /// The resolution creates transient services.</summary>
+        /// <param name="condition">(optional) Condition for requested service type and key.</param>
+        /// <param name="reuse">(optional) Reuse.</param> <param name="setup">(optional) Setup</param>
+        /// <returns>New rule.</returns>
+        public static DynamicRegistrationProvider ConcreteTypeResolutionFallback(
+            Func<Type, object, bool> condition = null,
+            IReuse reuse = null, Setup setup = null)
+        {
+            return AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
+            {
+                if (serviceType.IsAbstract() || 
+                    condition != null && !condition(serviceType, serviceKey))
+                    return null;
+
+                var factory = new ReflectionFactory(serviceType,
+                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
+
+                // try resolve expression first and return null, 
+                // to enable fallback to other rules if unresolved
+                var factoryExpr = factory.GetExpressionOrDefault(requestOrDefault);
+                if (factoryExpr == null)
+                    return null;
+
+                return new[] {serviceType};
+            });
+        }
+
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// The resolution creates Transient services.</summary>
         /// <param name="condition">(optional) Selects resolution path to apply the rule.</param>
         /// <returns>New rules.</returns>
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
@@ -4113,25 +4110,17 @@ namespace DryIoc
                 .Append("::").Append(ConstructorOrMethodOrMember).ToString();
         }
 
-        /// <summary>Easy way to specify non-public or / and most resolvable constructor.</summary>
+        /// <summary>Easy way to specify non-public and most resolvable constructor.</summary>
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param> 
         /// <param name="includeNonPublic">(optional) Consider the non-public constructors.</param>
         /// <returns>Constructor or null if not found.</returns>
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false)
         {
-            if (!mostResolvable)
-                return request =>
-                {
-                    var implType = request.ImplementationType
-                        .ThrowIfNull(Error.ImplementationTypeIsNotSpecifiedInAutoConcreteTypeResolution, request);
-                    var ctors = implType.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
-                    return ctors.Length == 1 ? Of(ctors[0]) : null;
-                };
-
             return request =>
             {
                 var implType = request.ImplementationType
-                    .ThrowIfNull(Error.ImplementationTypeIsNotSpecifiedInAutoConcreteTypeResolution, request);
+                    .ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+
                 var ctors = implType.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
                 if (ctors.Length == 0)
                     return null;
@@ -4139,6 +4128,10 @@ namespace DryIoc
                 // If the only one constructor then skip the resplution check.
                 if (ctors.Length == 1)
                     return Of(ctors[0]);
+
+                // stop here for non-auto selection
+                if (!mostResolvable)
+                    return null;
 
                 var ctorsWithMaxParamsFirst = ctors
                     .Select(c => new { Ctor = c, Params = c.GetParameters() })
@@ -4200,20 +4193,23 @@ namespace DryIoc
         {
             return request =>
             {
-                var defaultCtor = request.ImplementationType
-                    .ThrowIfNull(Error.ImplementationTypeIsNotSpecifiedInAutoConcreteTypeResolution, request)
-                    .GetConstructorOrNull(includeNonPublic, args: ArrayTools.Empty<Type>());
+                var implType = request.ImplementationType
+                    .ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+                var defaultCtor = implType.GetConstructorOrNull(includeNonPublic, args: ArrayTools.Empty<Type>());
                 return defaultCtor != null ? Of(defaultCtor) : null;
             };
         }
 
         /// <summary>Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
-        public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = Constructor(mostResolvable: true);
+        public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = 
+            Constructor(mostResolvable: true);
 
-        /// <summary>Searches for constructor (including non public ones) with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
+        /// <summary>Searches for constructor (including non public ones) with most 
+        /// resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
-        public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic = Constructor(mostResolvable: true, includeNonPublic: true);
+        public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic = 
+            Constructor(mostResolvable: true, includeNonPublic: true);
 
         /// <summary>Checks that parameter is selected on requested path and with provided parameter selector.</summary>
         /// <param name="parameter"></param> <param name="parameterSelector"></param> <param name="request"></param>
@@ -4232,7 +4228,6 @@ namespace DryIoc
             var factory = parameterRequest.Container.ResolveFactory(parameterRequest);
             return factory != null && factory.GetExpressionOrDefault(parameterRequest) != null;
         }
-
 
         private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
         {
@@ -8204,7 +8199,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private Type _implementationType; // non-readonly to be set by provider
+        private Type _implementationType; // non-readonly to be set by lazy type provider
         private readonly Func<Type> _implementationTypeProvider;
         private readonly Made _made;
         private ClosedGenericFactoryGenerator _factoryGenerator;
@@ -10791,9 +10786,9 @@ namespace DryIoc
             UnableToSelectFromManyRegistrationsWithMatchingMetadata = Of(
                 "Unable to select from multiple registrations matching the Metadata type {0}:" + Environment.NewLine +
                 "{1}" + Environment.NewLine +
-                "When resolving: {2}" + Environment.NewLine),
-            ImplementationTypeIsNotSpecifiedInAutoConcreteTypeResolution = Of(
-                "Implementation type is not specified when using `AutoConcreteTypeResolution` rule to resolve: {0}");
+                "When resolving: {2}"),
+            ImplTypeIsNotSpecifiedForAutoCtorSelection = Of(
+                "Implementation type is not specified when using automatic constructor selection: {0}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

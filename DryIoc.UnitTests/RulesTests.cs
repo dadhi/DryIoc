@@ -99,7 +99,18 @@ namespace DryIoc.UnitTests
             var getX = container.Resolve<Func<Y, object>>(typeof(X));
 
             var x = getX(new Y());
-            Assert.IsNotNull(x);
+            Assert.IsInstanceOf<X>(x);
+        }
+
+        [Test]
+        public void Cannot_resolve_unknown_concrete_type_as_Func_with_required_type()
+        {
+            var container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+
+            var getX = container.Resolve<Func<Y, object>>(typeof(A));
+
+            var x = getX(new Y());
+            Assert.IsInstanceOf<A>(x);
         }
 
         [Test]

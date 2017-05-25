@@ -152,7 +152,22 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void For_consitency_I_can_specify_FactoryMethod_to_be_a_constructor()
+        public void Can_specify_to_use_default_ctor_and_throw_correct_error_if_no_impl_type()
+        {
+            var container = new Container();
+
+            container.Register<BaseA>(made: FactoryMethod.DefaultConstructor());
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<BaseA>());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection),
+                Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void For_consistency_I_can_specify_FactoryMethod_to_be_a_constructor()
         {
             var container = new Container();
 
@@ -160,6 +175,37 @@ namespace DryIoc.UnitTests
 
             var ac = container.WithDependencies(Parameters.Of.Type(_ => "x")).Resolve<Ac>();
             Assert.IsNotNull(ac);
+        }
+
+        [Test]
+        public void Constructor_FactoryMethod_will_throw_for_not_defined_impl_type()
+        {
+            var container = new Container();
+
+            container.Register<BaseA>(made: FactoryMethod.Constructor());
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<BaseA>());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection),
+                Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void AutoConstructoSelection_will_throw_for_not_defined_impl_type()
+        {
+            var container = new Container();
+
+            container.Register<BaseA>(
+                made: FactoryMethod.Constructor(mostResolvable: true, includeNonPublic: true));
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<BaseA>());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection),
+                Error.NameOf(ex.Error));
         }
 
         #region CUT
@@ -275,6 +321,8 @@ namespace DryIoc.UnitTests
         {
             public Ac(string x) { }
         }
+
+        public abstract class BaseA { }
 
         #endregion
     }
