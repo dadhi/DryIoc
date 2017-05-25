@@ -26,6 +26,7 @@ namespace DryIoc
 {
     using System.Threading;
 
+    /// <summary>Poly-fill</summary>
     public static partial class Portable
     {
         // ReSharper disable once RedundantAssignment

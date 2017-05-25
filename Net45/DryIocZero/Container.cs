@@ -1611,6 +1611,9 @@ namespace DryIocZero
             if (ServiceKey != null)
                 s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
 
+            if (MetadataKey != null || Metadata != null)
+                s.Append(" with Metadata=").Append(new KeyValuePair<string, object>(MetadataKey, Metadata));
+
             if (IfUnresolved != IfUnresolved.Throw)
                 s.Append(" if unresolved ").Append(Enum.GetName(typeof(IfUnresolved), IfUnresolved));
 
