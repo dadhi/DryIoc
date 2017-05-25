@@ -11,9 +11,8 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
-                .WithAutoFallbackDynamicRegistrations(new[] { Assembly.GetExecutingAssembly() });
+                .WithAutoFallbackDynamicRegistrations(Assembly.GetExecutingAssembly());
 
             container.Register<Log>(
                 Made.Of(_ => ServiceInfo.Of<LogService>(),

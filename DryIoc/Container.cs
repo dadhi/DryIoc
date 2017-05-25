@@ -828,8 +828,8 @@ namespace DryIoc
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory == null)
             {
+                // resolve the wrappers only After we try to resolve as a normal service
                 factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
-
                 if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
                     factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
 
@@ -1055,7 +1055,8 @@ namespace DryIoc
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
         {
-            return _registry.Value.Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
+            serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
+            return _registry.Value.Wrappers.GetValueOrDefault(serviceType);
         }
 
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
@@ -2481,7 +2482,7 @@ namespace DryIoc
                             .SelectMany(ReflectionTools.GetLoadedTypes)
                             .Where(Registrator.IsImplementationType)
                             .ToArray();
-                    }, 
+                    },
                     factory)));
         }
 
@@ -2932,8 +2933,9 @@ namespace DryIoc
         };
 
         /// <summary>Supported open-generic collection types.</summary>
-        public static readonly Type[] ArrayInterfaces = 
-            typeof(object[]).GetImplementedInterfaces().Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
+        public static readonly Type[] ArrayInterfaces =
+            typeof(object[]).GetImplementedInterfaces()
+                .Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
 
         /// <summary>Checks if passed type represents supported collection types.</summary>
         /// <param name="type">Type to examine.</param> <returns>Check result.</returns>
@@ -3053,8 +3055,11 @@ namespace DryIoc
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactory(request);
 
-            if (factory != null && factory.Setup.Condition != null &&
-                !factory.Setup.Condition(request.RequestInfo))
+            if (factory == null)
+                return null;
+
+            var condition = factory.Setup.Condition;
+            if (condition != null && !condition(request))
                 return null;
 
             return factory;
@@ -3650,7 +3655,12 @@ namespace DryIoc
                 if (concreteServiceType.IsAbstract() || condition != null && !condition(request))
                     return null;
 
-                var factory = new ReflectionFactory(concreteServiceType, 
+                var openGenericServiceType = concreteServiceType.GetGenericDefinitionOrNull();
+                if (openGenericServiceType != null &&
+                    WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
+                    return null;
+
+                var factory = new ReflectionFactory(concreteServiceType,
                     made: DryIoc.FactoryMethod.Constructor(true, true));
 
                 // try resolve expression first and return null, 
@@ -3676,23 +3686,42 @@ namespace DryIoc
             Func<Type, object, bool> condition = null,
             IReuse reuse = null, Setup setup = null)
         {
+            Factory factory = null;
             return AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
             {
-                if (serviceType.IsAbstract() || 
+                if (serviceType.IsAbstract() ||
                     condition != null && !condition(serviceType, serviceKey))
                     return null;
 
-                var factory = new ReflectionFactory(serviceType,
-                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
-
-                // try resolve expression first and return null, 
-                // to enable fallback to other rules if unresolved
-                var factoryExpr = factory.GetExpressionOrDefault(requestOrDefault);
-                if (factoryExpr == null)
+                var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
+                if (openGenericServiceType != null &&
+                    WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
                     return null;
 
-                return new[] {serviceType};
-            });
+                factory = new ReflectionFactory(serviceType,
+                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+
+                //// try resolve expression first and return null, 
+                //// to enable fallback to other rules if unresolved
+                //var factoryExpr = factory.GetExpressionOrDefault(requestOrDefault);
+                //if (factoryExpr == null)
+                //    return null;
+
+                return new[] { serviceType };
+            },
+            _ => factory);
+        }
+
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// The resolution creates Transient services.</summary>
+        /// <param name="condition">(optional) Condition for requested service type and key.</param>
+        /// <param name="reuse">(optional) Reuse.</param> <param name="setup">(optional) Setup</param>
+        /// <returns>New rules.</returns>
+        public Rules WithConcreteTypeResolutionFallback(
+            Func<Type, object, bool> condition = null,
+            IReuse reuse = null, Setup setup = null)
+        {
+            return WithDynamicRegistrations(ConcreteTypeResolutionFallback(condition, reuse, setup));
         }
 
         /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
@@ -3713,7 +3742,7 @@ namespace DryIoc
         /// specify reuse or setup. Handler should not return <c>null</c>.</param>
         /// <returns>Registration provider.</returns>
         public static DynamicRegistrationProvider AutoFallbackDynamicRegistrations(
-            Func<Type, object, IEnumerable<Type>> getImplementationTypes, 
+            Func<Type, object, IEnumerable<Type>> getImplementationTypes,
             Func<Type, Factory> factory = null)
         {
             var factories = Ref.Of(ImTreeMap<Type, Factory>.Empty);
@@ -3735,8 +3764,8 @@ namespace DryIoc
                                 if (implFactory != null)
                                     return existingFactories;
 
-                                implFactory = factory != null 
-                                    ? factory(implType).ThrowIfNull() 
+                                implFactory = factory != null
+                                    ? factory(implType).ThrowIfNull()
                                     : new ReflectionFactory(implType);
 
                                 return existingFactories.AddOrUpdate(implType, implFactory);
@@ -4202,13 +4231,13 @@ namespace DryIoc
 
         /// <summary>Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
-        public static readonly FactoryMethodSelector ConstructorWithResolvableArguments = 
+        public static readonly FactoryMethodSelector ConstructorWithResolvableArguments =
             Constructor(mostResolvable: true);
 
         /// <summary>Searches for constructor (including non public ones) with most 
         /// resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
-        public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic = 
+        public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic =
             Constructor(mostResolvable: true, includeNonPublic: true);
 
         /// <summary>Checks that parameter is selected on requested path and with provided parameter selector.</summary>
@@ -5163,7 +5192,7 @@ namespace DryIoc
         /// <param name="getDecorator">Delegate returning decorating function.</param>
         /// <param name="condition">(optional) Condition for decorator application.</param>
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
-            Func<IResolver, Func<TService, TService>> getDecorator, Func<RequestInfo, bool> condition = null)
+            Func<IResolver, Func<TService, TService>> getDecorator, Func<Request, bool> condition = null)
         {
             getDecorator.ThrowIfNull();
 
@@ -5330,14 +5359,15 @@ namespace DryIoc
         /// <see cref="IResolver"/> to resolve additional services required by initializer.</param>
         /// <param name="condition">(optional) Additional condition to select required target.</param>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
-            Action<TTarget, IResolver> initialize, Func<RequestInfo, bool> condition = null)
+            Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
         {
             initialize.ThrowIfNull();
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                 parameters: Parameters.Of.Type(_ => initialize)),
                 setup: Setup.DecoratorWith(useDecorateeReuse: true,
-                condition: r => r.ServiceType.IsAssignableTo(typeof(TTarget)) && (condition == null || condition(r))));
+                condition: r => r.ServiceType.IsAssignableTo(typeof(TTarget)) && 
+                    (condition == null || condition(r))));
         }
 
         private static readonly MethodInfo _initializerMethod =
@@ -5356,7 +5386,7 @@ namespace DryIoc
         /// <param name="dispose">Actual dispose action to be invoke when scope is disposed.</param>
         /// <param name="condition">(optional) Additional way to identify the service.</param>
         public static void RegisterDisposer<TService>(this IRegistrator registrator,
-            Action<TService> dispose, Func<RequestInfo, bool> condition = null)
+            Action<TService> dispose, Func<Request, bool> condition = null)
         {
             dispose.ThrowIfNull();
 
@@ -6292,7 +6322,7 @@ namespace DryIoc
 
         private static readonly Request _empty = new Request(null, null, ServiceInfo.Empty, null, null, null, default(RequestFlags));
 
-        /// <summary>Creates empty request associated wit container. 
+        /// <summary>Creates empty request associated with container. 
         /// The shared part of request is stored in request context. Pre-request info is also store once in shared context.</summary>
         /// <param name="container">Associated container - part of request context.</param>
         /// <param name="serviceType">Service type to resolve.</param>
@@ -6486,6 +6516,13 @@ namespace DryIoc
         public Type GetActualServiceType()
         {
             return _serviceInfo.GetActualServiceType();
+        }
+
+        /// <summary>Returns known implementation, or otherwise actual service type.</summary> 
+        /// <returns>The subject.</returns>
+        public Type GetKnownImplementationOrServiceType()
+        {
+            return ImplementationType ?? GetActualServiceType();
         }
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
@@ -6961,7 +6998,7 @@ namespace DryIoc
         public abstract FactoryType FactoryType { get; }
 
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
-        public virtual Func<RequestInfo, bool> Condition { get; private set; }
+        public virtual Func<Request, bool> Condition { get; private set; }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
         public virtual object Metadata { get { return null; } }
@@ -7023,7 +7060,7 @@ namespace DryIoc
         /// <param name="asResolutionRoot"></param> <param name="preventDisposal"></param>
         /// <param name="weaklyReferenced"></param> <param name="allowDisposableTransient"></param>
         /// <param name="trackDisposableTransient"></param> <param name="useParentReuse"></param>
-        private Setup(Func<RequestInfo, bool> condition = null,
+        private Setup(Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
@@ -7083,7 +7120,7 @@ namespace DryIoc
         /// <param name="useParentReuse">(optional) Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</param>
         /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
         public static Setup With(
-            object metadataOrFuncOfMetadata = null, Func<RequestInfo, bool> condition = null,
+            object metadataOrFuncOfMetadata = null, Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
@@ -7117,7 +7154,7 @@ namespace DryIoc
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
-            Func<RequestInfo, bool> condition = null)
+            Func<Request, bool> condition = null)
         {
             return wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
                 && !openResolutionScope && !preventDisposal && condition == null
@@ -7137,7 +7174,7 @@ namespace DryIoc
         /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0,
+        public static Setup DecoratorWith(Func<Request, bool> condition = null, int order = 0,
             bool useDecorateeReuse = false)
         {
             return condition == null && order == 0 && !useDecorateeReuse ? Decorator
@@ -7163,7 +7200,7 @@ namespace DryIoc
 
             public ServiceSetup() { }
 
-            public ServiceSetup(Func<RequestInfo, bool> condition, object metadataOrFuncOfMetadata,
+            public ServiceSetup(Func<Request, bool> condition, object metadataOrFuncOfMetadata,
                 bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
                 bool preventDisposal, bool weaklyReferenced,
                 bool allowDisposableTransient, bool trackDisposableTransient,
@@ -7210,7 +7247,7 @@ namespace DryIoc
             /// <param name="preventDisposal">Prevents disposal of reused instance if it is disposable.</param>
             /// <param name="condition">Predicate to check if factory could be used for resolved request.</param>
             public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
-                Func<RequestInfo, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal)
+                Func<Request, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal)
                 : base(condition, openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall, preventDisposal: preventDisposal)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
@@ -7285,7 +7322,7 @@ namespace DryIoc
             /// - first registered are closer decoratee.</param>
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
-            public DecoratorSetup(Func<RequestInfo, bool> condition, int order, bool useDecorateeReuse)
+            public DecoratorSetup(Func<Request, bool> condition, int order, bool useDecorateeReuse)
                 : base(condition)
             {
                 Order = order;
@@ -7345,7 +7382,7 @@ namespace DryIoc
         /// <returns>True if condition met or no condition setup.</returns>
         public bool CheckCondition(Request request)
         {
-            return (Setup.Condition == null || Setup.Condition(request.RequestInfo))
+            return (Setup.Condition == null || Setup.Condition(request))
                 && HasMatchingReuseScope(request);
         }
 

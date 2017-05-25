@@ -94,7 +94,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_unknown_concrete_type_as_Func_with_required_type()
         {
-            var container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+            var container = new Container(rules => rules.WithConcreteTypeResolutionFallback());
 
             var getX = container.Resolve<Func<Y, object>>(typeof(X));
 
@@ -105,7 +105,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Cannot_resolve_unknown_concrete_type_as_Func_with_required_type()
         {
-            var container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+            var container = new Container(rules => rules.WithConcreteTypeResolutionFallback());
 
             var getX = container.Resolve<Func<Y, object>>(typeof(A));
 
@@ -138,7 +138,7 @@ namespace DryIoc.UnitTests
         public void Can_fallback_to_next_rule_if_AutoConcreteResolution_is_unable_to_resolve_concrete_type()
         {
             var container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution()
+                .WithConcreteTypeResolutionFallback()
                 .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ?
                     new DelegateFactory(_ => new Xx(null)) : null));
 
