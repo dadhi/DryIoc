@@ -155,7 +155,7 @@ namespace ImTools
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>
         /// <returns>First item matching condition or default value.</returns>
-        public static T MatchFirst<T>(this T[] source, Func<T, bool> predicate)
+        public static T FindFirst<T>(this T[] source, Func<T, bool> predicate)
         {
             if (source != null && source.Length != 0)
                 for (var i = 0; i < source.Length; ++i)
@@ -167,7 +167,6 @@ namespace ImTools
             return default(T);
         }
 
-        // todo: review do we need this
         private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
         {
             if (results == null)

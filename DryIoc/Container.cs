@@ -184,6 +184,7 @@ namespace DryIoc
                 _disposed, _disposeStackTrace, _resolverContext._rootContainer ?? this);
         }
 
+        // todo: v3: Review do we need this name at all, probably not and it is decreasing performance.
         /// <summary>The default name of root scope without ambient context.</summary>
         public static readonly object NonAmbientRootScopeName = "NonAmbientRootScope";
 
@@ -232,7 +233,7 @@ namespace DryIoc
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
             // for container created with OpenScope, 
-            // BUT not WithImplicitOpenedRootScope rules
+            // But not WithImplicitOpenedRootScope rules
             var isScopedContainer = _resolverContext._rootContainer != null;
 
             // remove reference to context container(s) to prevent memory leak
@@ -829,9 +830,11 @@ namespace DryIoc
             var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
             if (factory == null)
             {
-                // resolve the wrappers only After we try to resolve as a normal service
-                factory = WrappersSupport.ResolveWrapperOrGetDefault(request);
-                if (factory == null && !Rules.FallbackContainers.IsNullOrEmpty())
+                factory = GetWrapperFactoryOrDefault(request);
+                if (factory != null)
+                    return factory;
+
+                if (!Rules.FallbackContainers.IsNullOrEmpty())
                     factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
 
                 if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
@@ -907,7 +910,10 @@ namespace DryIoc
             {
                 var openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
                 if (openGenericEntry != null)
-                    factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
+                {
+                    var openGenericFactories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
+                    factories = factories.Append(openGenericFactories);
+                }
             }
 
             return GetCombinedRegisteredAndDynamicFactories(factories, FactoryType.Service, serviceType, null);
@@ -1045,17 +1051,19 @@ namespace DryIoc
         private static int[] GetAppliedDecoratorIDs(Request request)
         {
             var parent = request.ParentOrWrapper;
-            return parent.IsEmpty
-                ? ArrayTools.Empty<int>()
-                : parent.Enumerate()
-                    .TakeWhile(p => p.FactoryType != FactoryType.Service) // until the another service
-                    .Where(p => p.FactoryType == FactoryType.Decorator)
-                    .Select(d => d.FactoryID)
-                    .ToArray();
+            if (parent.IsEmpty)
+                return ArrayTools.Empty<int>();
+            return parent.Enumerate()
+                .TakeWhile(p => p.FactoryType != FactoryType.Service) // until the normal service
+                .Where(p => p.FactoryType == FactoryType.Decorator)
+                .Select(d => d.FactoryID)
+                .ToArray();
         }
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
         {
+            // searches for open-generic wrapper, otherwise for concrete one
+            // note: currently impossible to have both open and closed generic wrapper of the same generic type
             serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
             return _registry.Value.Wrappers.GetValueOrDefault(serviceType);
         }
@@ -1337,7 +1345,7 @@ namespace DryIoc
 
             // assign unique continuous keys across all of dynamic providers, 
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
-            var key = DefaultDynamicKey.Empty;
+            var dynamicKey = DefaultDynamicKey.Empty;
 
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
@@ -1351,7 +1359,7 @@ namespace DryIoc
                             it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules);
                             if (it.ServiceKey != null)
                                 return it;
-                            return it.WithKey(key = key.Next());
+                            return it.WithKey(dynamicKey = dynamicKey.Next());
                         });
 
                     combinedFactories = combinedFactories.IsNullOrEmpty()
@@ -1420,16 +1428,18 @@ namespace DryIoc
             return registeredFactories.Append(remainingDynamicFactories);
         }
 
-        private Factory GetServiceFactoryOrDefault(Request request, Rules.FactorySelectorRule factorySelector)
+        private Factory GetServiceFactoryOrDefault(Request request, 
+            Rules.FactorySelectorRule factorySelector,
+            bool fromDynamicRegistrations = false)
         {
-            var registeredServiceType = GetRegisteredServiceType(request);
-
+            var serviceType = GetRegisteredServiceType(request);
             var serviceKey = request.ServiceKey;
-            var registeredFactories = GetRegisteredServiceFactoriesOrNull(registeredServiceType, serviceKey);
+
+            var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
 
             var factories = GetCombinedRegisteredAndDynamicFactories(
                 registeredFactories,
-                FactoryType.Service, registeredServiceType, serviceKey);
+                FactoryType.Service, serviceType, serviceKey);
 
             if (factories.IsNullOrEmpty())
                 return null;
@@ -1439,13 +1449,14 @@ namespace DryIoc
                 var validFactories = factories.Match(
                     f => f.Value.CheckCondition(request),
                     f => new KeyValuePair<object, Factory>(f.Key, f.Value));
-                return factorySelector(request, validFactories);
+                var selectedFactory = factorySelector(request, validFactories);
+                return selectedFactory;
             }
 
             // For requested keyed service just lookup for key and return anyway
             if (serviceKey != null)
             {
-                var keyedFactory = factories.MatchFirst(f => serviceKey.Equals(f.Key));
+                var keyedFactory = factories.FindFirst(f => serviceKey.Equals(f.Key));
                 if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
                     return keyedFactory.Value; // todo: skip further checks, really?
                 return null;
@@ -1512,6 +1523,34 @@ namespace DryIoc
 
             // Return null to allow fallback strategies
             return null;
+        }
+
+        private Factory GetWrapperFactoryOrDefault(Request request)
+        {
+            var serviceType = request.GetActualServiceType();
+            // note: wrapper ignores the service key, and propagate service key to wrapped service
+
+            var itemType = serviceType.GetArrayElementTypeOrNull();
+            if (itemType != null)
+                serviceType = typeof(IEnumerable<>).MakeGenericType(itemType);
+
+            var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
+            if (factory == null)
+                return null;
+
+            // tries to generate the factory to match the request
+            if (factory.FactoryGenerator != null)
+            {
+                factory = factory.FactoryGenerator.GetGeneratedFactory(request);
+                if (factory == null)
+                    return null;
+            }
+
+            var condition = factory.Setup.Condition;
+            if (condition != null && !condition(request))
+                return null;
+
+            return factory;
         }
 
         #endregion
@@ -2913,7 +2952,7 @@ namespace DryIoc
     /// <item>Open-generic services</item>
     /// <item>Service generics wrappers and arrays using <see cref="Rules.UnknownServiceResolvers"/> extension point.
     /// Supported wrappers include: Func of <see cref="FuncTypes"/>, Lazy, Many, IEnumerable, arrays, Meta, KeyValuePair, DebugExpression.
-    /// All wrapper factories are added into collection <see cref="Wrappers"/> and searched by <see cref="ResolveWrapperOrGetDefault"/>
+    /// All wrapper factories are added into collection of <see cref="Wrappers"/>.
     /// unregistered resolution rule.</item>
     /// </list></summary>
     public static class WrappersSupport
@@ -2953,7 +2992,7 @@ namespace DryIoc
         public static bool IsFunc(this Type type)
         {
             var genericDefinition = type.GetGenericDefinitionOrNull();
-            return genericDefinition != null && FuncTypes.Contains(genericDefinition);
+            return genericDefinition != null && FuncTypes.IndexOf(genericDefinition) != -1;
         }
 
         // todo: v3: remove as not used
@@ -3037,32 +3076,6 @@ namespace DryIoc
                 setup: Setup.Wrapper));
 
             return wrappers;
-        }
-
-        // todo: Probably move to container to consolidate work with factories.
-        /// <summary>Returns wrapper factory. For open-generic wrapper - generated closed factory first.</summary>
-        /// <param name="request">Wrapper request.</param>
-        /// <returns>Found wrapper factory or default null otherwise.</returns>
-        public static Factory ResolveWrapperOrGetDefault(Request request)
-        {
-            var actualServiceType = request.GetActualServiceType();
-
-            var itemType = actualServiceType.GetArrayElementTypeOrNull();
-            if (itemType != null)
-                actualServiceType = typeof(IEnumerable<>).MakeGenericType(itemType);
-
-            var factory = request.Container.GetWrapperFactoryOrDefault(actualServiceType);
-            if (factory != null && factory.FactoryGenerator != null)
-                factory = factory.FactoryGenerator.GetGeneratedFactory(request);
-
-            if (factory == null)
-                return null;
-
-            var condition = factory.Setup.Condition;
-            if (condition != null && !condition(request))
-                return null;
-
-            return factory;
         }
 
         private static Expression GetArrayExpression(Request request)
@@ -3586,10 +3599,10 @@ namespace DryIoc
         {
             return (request, factories) => request.ServiceKey != null
                 // if service key is not default, then look for it
-                ? factories.MatchFirst(f => f.Key.Equals(request.ServiceKey)).Value
+                ? factories.FindFirst(f => f.Key.Equals(request.ServiceKey)).Value
                 // otherwise look for specified service key, and if no found look for default.
-                : factories.MatchFirst(f => f.Key.Equals(serviceKey)).Value
-                ?? factories.MatchFirst(f => f.Key.Equals(null)).Value;
+                : factories.FindFirst(f => f.Key.Equals(serviceKey)).Value
+                ?? factories.FindFirst(f => f.Key.Equals(null)).Value;
         }
 
         /// <summary>Specify the method signature for returning multiple keyed factories. 
@@ -4158,7 +4171,7 @@ namespace DryIoc
                 if (ctors.Length == 0)
                     return null;
 
-                // If the only one constructor then skip the resplution check.
+                // if there is only one constructor then use it
                 if (ctors.Length == 1)
                     return Of(ctors[0]);
 
@@ -6803,9 +6816,8 @@ namespace DryIoc
                 if (Factory == null)
                     return parentRequestInfo.Push(_serviceInfo);
 
-                var f = Factory;
                 return parentRequestInfo.Push(_serviceInfo,
-                    f.FactoryID, f.FactoryType, f.ImplementationType, _reuse);
+                    Factory.FactoryID, Factory.FactoryType, Factory.ImplementationType, _reuse);
             }
         }
 
@@ -8108,7 +8120,7 @@ namespace DryIoc
                             for (var fa = 0; fa < funcArgs.Value.Length && paramExpr == null; ++fa)
                             {
                                 var funcArg = funcArgs.Value[fa];
-                                if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
+                                if ((funcArgsUsedMask & 1 << fa) == 0 &&              // not yet used func argument
                                     funcArg.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
                                 {
                                     paramExpr = funcArg;
@@ -8687,7 +8699,7 @@ namespace DryIoc
                     // because we need identical type arguments to match.
                     if (factoryServiceType != factoryImplType)
                         factoryServiceType = factoryImplType.GetImplementedTypes()
-                            .MatchFirst(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType)
+                            .FindFirst(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType)
                             .ThrowIfNull();
 
                     var factoryServiceTypeParams = factoryServiceType.GetGenericParamsAndArgs();
@@ -10794,7 +10806,7 @@ namespace DryIoc
             ResolutionNeedsRequiredServiceType = Of(
                 "Expecting required service type but it is not specified when resolving: {0}"),
             RegisterMappingNotFoundRegisteredService = Of(
-                "When registering mapping unable to find factory of registered service type {0} and key {1}."),
+                "When registering mapping, Container is unable to find factory of registered service type {0} and key {1}."),
             RegisteringInstanceNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
             RegisteringWithNotSupportedDepedendencyCustomValueType = Of(
