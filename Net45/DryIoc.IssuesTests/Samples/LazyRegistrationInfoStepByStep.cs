@@ -113,8 +113,8 @@ namespace DryIoc.IssuesTests.Samples
 
         private static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(IEnumerable<ExportedRegistrationInfo> registrations)
         {
-            var store = new ServiceKeyStore();
-            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(store));
+            var serviceKeyStore = new ServiceKeyStore();
+            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore));
         }
 
         private static Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>
@@ -221,8 +221,7 @@ namespace DryIoc.IssuesTests.Samples
 
             var assemblyLoaded = false;
             var dynamicRegistrations = CreateDynamicRegistrationProvider(
-                lazyRegistrations,
-                IfAlreadyRegistered.Keep,
+                lazyRegistrations, IfAlreadyRegistered.Keep,
                 new Lazy<Assembly>(() =>
                 {
                     assemblyLoaded = true;

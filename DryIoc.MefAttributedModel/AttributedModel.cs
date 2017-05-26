@@ -1352,17 +1352,6 @@ namespace DryIoc.MefAttributedModel
             return new ReflectionFactory(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
         }
 
-        /// <summary>Returns already created or creating and storing the factory.</summary>
-        /// <param name="typeProvider">(optional) But required for <see cref="IsLazy"/> info.</param>
-        /// <returns>Created factory.</returns>
-        public ReflectionFactory GetOrCreateFactory(Func<string, Type> typeProvider = null)
-        {
-            return CreatedFactory ?? (CreatedFactory = CreateFactory(typeProvider));
-        }
-
-        /// <summary>Factory created and stored via <see cref="GetOrCreateFactory"/></summary>
-        public ReflectionFactory CreatedFactory { get; private set; }
-
         private Made GetMade(Func<string, Type> typeProvider = null)
         {
             return FactoryMethodInfo == null
