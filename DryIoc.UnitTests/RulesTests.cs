@@ -60,7 +60,8 @@ namespace DryIoc.UnitTests
         [Test]
         public void I_can_add_rule_to_resolve_any_unknown_concrete_type()
         {
-            IContainer container = new Container(rules => rules.WithAutoConcreteTypeResolution());
+            IContainer container = new Container(
+                rules => rules.WithConcreteTypeDynamicRegistrations());
 
             var x = container.Resolve<X>();
 
@@ -72,7 +73,7 @@ namespace DryIoc.UnitTests
         public void I_can_Not_resolve_unknown_concrete_type_on_specific_condition()
         {
             IContainer container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
+                .WithConcreteTypeDynamicRegistrations((serviceType, _) => serviceType != typeof(X)));
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<X>());
@@ -82,7 +83,7 @@ namespace DryIoc.UnitTests
         public void I_can_resolve_unknown_concrete_type_on_specific_condition()
         {
             IContainer container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution(r => r.ServiceType != typeof(X)));
+                .WithConcreteTypeDynamicRegistrations((serviceType, _) => serviceType != typeof(X)));
 
             container.Register<X>(Reuse.Singleton);
             var x = container.Resolve<X>();
@@ -94,7 +95,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_unknown_concrete_type_as_Func_with_required_type()
         {
-            var container = new Container(rules => rules.WithConcreteTypeResolutionFallback());
+            var container = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
 
             var getX = container.Resolve<Func<Y, object>>(typeof(X));
 
@@ -105,7 +106,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Cannot_resolve_unknown_concrete_type_as_Func_with_required_type()
         {
-            var container = new Container(rules => rules.WithConcreteTypeResolutionFallback());
+            var container = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
 
             var getX = container.Resolve<Func<Y, object>>(typeof(A));
 
@@ -114,12 +115,12 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Will_throw_if_concrete_type_dependency_is_missing()
+        public void Can_collect_unresolved_concrete_type_dependency()
         {
             var unresolvedTypes = new List<Type>();
 
             var container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution()
+                .WithConcreteTypeDynamicRegistrations()
                 .WithUnknownServiceResolvers(_ =>
                 {
                     unresolvedTypes.Add(_.ServiceType);
@@ -129,7 +130,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Xx>());
 
-            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), Error.NameOf(ex.Error));
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveFromRegisteredServices), Error.NameOf(ex.Error));
 
             CollectionAssert.AreEqual(new[] { typeof(IMissing), typeof(Xx) }, unresolvedTypes);
         }
@@ -138,7 +139,7 @@ namespace DryIoc.UnitTests
         public void Can_fallback_to_next_rule_if_AutoConcreteResolution_is_unable_to_resolve_concrete_type()
         {
             var container = new Container(rules => rules
-                .WithConcreteTypeResolutionFallback()
+                .WithConcreteTypeDynamicRegistrations()
                 .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ?
                     new DelegateFactory(_ => new Xx(null)) : null));
 
@@ -312,19 +313,19 @@ namespace DryIoc.UnitTests
         internal class MiniMe : IMe { }
         internal class GreenMe
         {
-            public IMe Me { get; set; }
-            public GreenMe(IMe me)
+            public IMe Mee { get; set; }
+            public GreenMe(IMe mee)
             {
-                Me = me;
+                Mee = mee;
             }
         }
 
         internal class RedMe
         {
-            public IMe Me { get; set; }
-            public RedMe(IMe me)
+            public IMe Mee { get; set; }
+            public RedMe(IMe mee)
             {
-                Me = me;
+                Mee = mee;
             }
         }
 

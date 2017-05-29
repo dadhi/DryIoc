@@ -16,7 +16,9 @@ namespace DryIoc.IssuesTests
 
             di.UseInstance("a", serviceKey: "x");
             di.UseInstance("b", serviceKey: "y");
-            di.Register(Made.Of(() => GetBs(Arg.Of<Func<string, B>>(), Arg.Of<KeyValuePair<string, string>[]>())));
+
+            di.Register(Made.Of(() => 
+                GetBs(Arg.Of<Func<string, B>>(), Arg.Of<KeyValuePair<string, string>[]>())));
 
             var a = di.Get<A>();
             Assert.AreEqual(2, a.Bs.Count);

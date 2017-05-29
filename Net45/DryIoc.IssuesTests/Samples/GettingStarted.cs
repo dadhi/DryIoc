@@ -60,14 +60,14 @@ namespace DryIoc.IssuesTests.Samples
 @"Unable to resolve IService as parameter ""service""
   in SomeClient: IClient
 Where no service registrations found
-  and number of Rules.FallbackContainers: 0
-  and number of Rules.UnknownServiceResolvers: 0";
+  and no dynamic registrations found in 0 Rules.DynamicServiceProviders
+  and nothing in 0 Rules.UnknownServiceResolvers";
 #else
 @"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
   in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient
 Where no service registrations found
-  and number of Rules.FallbackContainers: 0
-  and number of Rules.UnknownServiceResolvers: 0";
+  and no dynamic registrations found in 0 Rules.DynamicServiceProviders
+  and nothing in 0 Rules.UnknownServiceResolvers";
 #endif
 
             Assert.AreEqual(expected, ex.Message);
@@ -104,7 +104,11 @@ Where no service registrations found
 
         class X
         {
-            public X(Y y) { }
+            public Y Y { get; private set; }
+            public X(Y y)
+            {
+                Y = y;
+            }
         }
         
         class Y {}

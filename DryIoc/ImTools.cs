@@ -572,7 +572,7 @@ namespace ImTools
             var s = new StringBuilder('{');
             if (Key != null)
                 s.Append(Key);
-            s.Append(',');
+            s.Append(',').Append(' ');
             if (Value != null)
                 s.Append(Value);
             s.Append('}');

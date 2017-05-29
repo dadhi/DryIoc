@@ -885,11 +885,11 @@ namespace DryIoc
                         .AppendLine(f.ToString()));
 
             if (registrations.Length != 0)
-                Throw.It(Error.UnableToResolveFromRegisteredServices, request,
-                    request.Scopes.GetCurrentScope(), request.Scope, registrations);
+                Throw.It(Error.UnableToResolveFromRegisteredServices, 
+                    request, container, registrations);
             else
                 Throw.It(Error.UnableToResolveUnknownService, request,
-                    container.Rules.FallbackContainers.EmptyIfNull().Length,
+                    container.Rules.DynamicRegistrationProviders.EmptyIfNull().Length,
                     container.Rules.UnknownServiceResolvers.EmptyIfNull().Length);
         }
 
@@ -2862,7 +2862,8 @@ namespace DryIoc
         public override bool Equals(object key)
         {
             var defaultKey = key as DefaultKey;
-            return key == null || defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
+            return key == null // to enable comparison with null (unspecified)
+                || defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
         }
 
         /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>
@@ -2909,6 +2910,8 @@ namespace DryIoc
         /// <returns>True if keys have the same IDs.</returns>
         public override bool Equals(object key)
         {
+            if (key == null)
+                return true;
             var other = key as DefaultDynamicKey;
             return other != null && other.ID == ID;
         }
@@ -2922,7 +2925,7 @@ namespace DryIoc
         /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
-            return "DynamicKey(" + ID + ")";
+            return "DefaultDynamicKey(" + ID + ")";
         }
 
         /// <inheritdoc />
@@ -3722,12 +3725,8 @@ namespace DryIoc
             return newRules;
         }
 
-        // todo: Use AutoFallbackDynamicRegistrations???
-        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
-        /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
-        /// The resolution creates transient services.</summary>
-        /// <param name="condition">(optional) Selects resolution path to apply the rule.</param>
-        /// <returns>New rule.</returns>
+        // todo: v3: Mark with ObsoleteAttribute
+        /// <summary>Replaced by ConcreteTypeDynamicRegistrations</summary>
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null)
         {
             return request =>
@@ -3763,7 +3762,7 @@ namespace DryIoc
         /// <param name="condition">(optional) Condition for requested service type and key.</param>
         /// <param name="reuse">(optional) Reuse.</param>
         /// <returns>New rule.</returns>
-        public static DynamicRegistrationProvider ConcreteTypeResolutionFallback(
+        public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null)
         {
             return AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
@@ -3801,16 +3800,14 @@ namespace DryIoc
         /// <param name="condition">(optional) Condition for requested service type and key.</param>
         /// <param name="reuse">(optional) Reuse.</param>
         /// <returns>New rules.</returns>
-        public Rules WithConcreteTypeResolutionFallback(
+        public Rules WithConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null)
         {
-            return WithDynamicRegistrations(ConcreteTypeResolutionFallback(condition, reuse));
+            return WithDynamicRegistrations(ConcreteTypeDynamicRegistrations(condition, reuse));
         }
 
-        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
-        /// The resolution creates Transient services.</summary>
-        /// <param name="condition">(optional) Selects resolution path to apply the rule.</param>
-        /// <returns>New rules.</returns>
+        // todo: v3: Mark with ObsoleteAttribute
+        /// <summary>Replaced with WithConcreteTypeDynamicRegistrations</summary>
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
         {
             return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
@@ -3828,6 +3825,7 @@ namespace DryIoc
             Func<Type, object, IEnumerable<Type>> getImplementationTypes,
             Func<Type, Factory> factory = null)
         {
+            // cache factory for implementation type to enable reuse semantics
             var factories = Ref.Of(ImTreeMap<Type, Factory>.Empty);
 
             return (serviceType, serviceKey) =>
@@ -5011,6 +5009,13 @@ namespace DryIoc
             "System.Collections.ICollection",
         };
 
+        /// <summary>Checks that type is not in the list of <see cref="ExcludedGeneralPurposeServiceTypes"/>.</summary>
+        /// <param name="type">Type to check</param> <returns>True if not in the list.</returns>
+        public static bool IsExcludedGeneralPurposeServiceType(this Type type)
+        {
+            return ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
+        }
+
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
         /// for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
         /// <param name="type">Source type: may be concrete, abstract or generic definition.</param>
@@ -5022,8 +5027,8 @@ namespace DryIoc
 
             var serviceTypes = implementedTypes.Match(t =>
                 (nonPublicServiceTypes || t.IsPublicOrNestedPublic()) &&
-                // using Namespace+Name instead of FullName because latter is null for generic type definitions
-                ExcludedGeneralPurposeServiceTypes.IndexOf((t.Namespace + "." + t.Name).Split('`')[0]) == -1);
+                !t.IsPrimitive() &&
+                !t.IsExcludedGeneralPurposeServiceType());
 
             if (type.IsGenericDefinition())
                 serviceTypes = serviceTypes.Match(
@@ -5032,7 +5037,6 @@ namespace DryIoc
 
             return serviceTypes;
         }
-
 
         /// <summary>Returns the sensible services automatically discovered for RegisterMany implementation type.
         /// Excludes the collection wrapper interfaces.</summary>
@@ -10742,14 +10746,13 @@ namespace DryIoc
             UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
                 "Where no service registrations found" + Environment.NewLine +
-                "  and number of Rules.FallbackContainers: {1}" + Environment.NewLine +
-                "  and number of Rules.UnknownServiceResolvers: {2}"),
+                "  and no dynamic registrations found in {1} Rules.DynamicServiceProviders" + Environment.NewLine +
+                "  and nothing in {2} Rules.UnknownServiceResolvers" ),
 
             UnableToResolveFromRegisteredServices = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
-                "Where CurrentScope: {1}" + Environment.NewLine +
-                "  and ResolutionScope: {2}" + Environment.NewLine +
-                "  and Found registrations:" + Environment.NewLine + "{3}"),
+                "  from {1}" + Environment.NewLine +
+                "  with normal and dynamic registrations:" + Environment.NewLine + "{2}"),
 
             ExpectedSingleDefaultFactory = Of(
                 "Expecting single default registration but found many:" + Environment.NewLine + "{0}" + Environment.NewLine +
@@ -11895,7 +11898,7 @@ namespace DryIoc.Experimental
             .With(FactoryMethod.ConstructorWithResolvableArguments)
             .WithFactorySelector(Rules.SelectLastRegisteredFactory())
             .WithTrackingDisposableTransients()
-            .WithAutoConcreteTypeResolution();
+            .WithConcreteTypeDynamicRegistrations();
 
         /// <summary>Creates new default configured container</summary>
         /// <param name="configure">(optional) Additional rules.</param>

@@ -548,7 +548,7 @@ namespace DryIoc.UnitTests
             container.Resolve<Abc>(); // creates and stores singleton
 
             var containerWithConcreteTypes = container.With(rules => rules
-                .WithConcreteTypeResolutionFallback());
+                .WithConcreteTypeDynamicRegistrations());
 
             containerWithConcreteTypes.Dispose();
             Assert.IsTrue(((Container)containerWithConcreteTypes).IsDisposed);
