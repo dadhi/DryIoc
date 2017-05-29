@@ -47,7 +47,6 @@
     <Compile Include="ConstructionTests.cs" />
     <Compile Include="FastExpressionCompilerTests.cs" />
     <Compile Include="IfUnresolvedTests.cs" />
-    <Compile Include="ImTools_ImArray.cs" />
     <Compile Include="InitializerTests.cs" />
     <Compile Include="NewTests.cs" />
     <Compile Include="PrimitiveValueInjectionTests.cs" />

@@ -165,6 +165,7 @@
     <Compile Include="Issue443_ConventionBasedOnParameterName.cs" />
     <Compile Include="Issue451_Should_forbid_static_imports.cs" />
     <Compile Include="Issue473_Unable_to_match_service_with_open_generic.cs" />
+    <Compile Include="Issue477_ArgumentException_while_resolving.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
