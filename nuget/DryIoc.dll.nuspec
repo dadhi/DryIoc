@@ -13,7 +13,9 @@
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
       v2.11.0:
-      - added: #463 Make UseInstance support IfAlreadyRegistered options
+      - added: #463: Add IfAlreadyRegistered option for UseInstance
+      - added: #475: Dynamic Registration Providers to enable lazy and on-demand registrations
+      - fixed: #477: ArgumentException while resolving
       - fixed: #451: DryIoc should know about static members
       - fixed: #396: Enable ResolveMany to use auto fallback resolution via dynamic registrations
       - fixed: DryIocAttributes dependency to System.Diagnostics.Tools from ..Debug

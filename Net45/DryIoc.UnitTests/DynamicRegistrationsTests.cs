@@ -8,7 +8,7 @@ namespace DryIoc.UnitTests
     [TestFixture]
     public class DynamicRegistrationsTests
     {
-        private IEnumerable<DynamicRegistration> GetX(FactoryType factoryType, Type serviceType, object key)
+        private IEnumerable<DynamicRegistration> GetX(Type serviceType, object key)
         {
             if (serviceType == typeof(X))
                 return new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) };
@@ -45,12 +45,12 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<A>(x[0]);
         }
 
-        private IEnumerable<DynamicRegistration> GetManyX(FactoryType factoryType, Type serviceType, object serviceKey)
+        private IEnumerable<DynamicRegistration> GetManyX(Type serviceType, object serviceKey)
         {
             if (serviceType == typeof(X))
                 return new[]
                 {
-                    new DynamicRegistration(new ReflectionFactory(typeof(A))), 
+                    new DynamicRegistration(new ReflectionFactory(typeof(A))),
                     new DynamicRegistration(new ReflectionFactory(typeof(B))),
                 };
             return null;
@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
         public void Can_exclude_dynamic_registration_if_there_is_a_normal_one()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) =>
+                (serviceType, serviceKey) =>
                 {
                     if (serviceType == typeof(X))
                         return new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Keep) };
@@ -90,7 +90,7 @@ namespace DryIoc.UnitTests
         public void Can_replace_normal_by_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) =>
+                (serviceType, serviceKey) =>
                 {
                     if (serviceType == typeof(X))
                         return new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) };
@@ -108,10 +108,10 @@ namespace DryIoc.UnitTests
         public void Can_replace_normal_with_dynamic_and_dynamic_with_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) => serviceType == typeof(X) 
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) } 
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) }
                     : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                (serviceType, serviceKey) => serviceType == typeof(X)
                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace) }
                     : null));
 
@@ -126,13 +126,13 @@ namespace DryIoc.UnitTests
         public void Can_append_new_implementation_via_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.AppendNewImplementation) }
-                    : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.AppendNewImplementation) }
-                    : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.AppendNewImplementation) }
+                     : null,
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.AppendNewImplementation) }
+                     : null,
+                (serviceType, serviceKey) => serviceType == typeof(X)
                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), IfAlreadyRegistered.AppendNewImplementation) }
                     : null));
 
@@ -147,16 +147,16 @@ namespace DryIoc.UnitTests
         public void Can_append_non_keyed_via_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) }
-                    : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) }
-                    : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B))) }
-                    : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) }
+                     : null,
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A))) }
+                     : null,
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B))) }
+                     : null,
+                (serviceType, serviceKey) => serviceType == typeof(X)
                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), serviceKey: "b") }
                     : null));
 
@@ -171,10 +171,10 @@ namespace DryIoc.UnitTests
         public void Will_keep_first_keyed_registration_by_default()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                (serviceType, serviceKey) => serviceType == typeof(X)
                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), serviceKey: "a") }
                     : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                (serviceType, serviceKey) => serviceType == typeof(X)
                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), serviceKey: "a") }
                     : null));
 
@@ -189,10 +189,10 @@ namespace DryIoc.UnitTests
         public void Can_replace_keyed_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
-                    ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace, "a") }
-                    : null,
-                (_, serviceType, serviceKey) => serviceType == typeof(X)
+                (serviceType, serviceKey) => serviceType == typeof(X)
+                 ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(A)), IfAlreadyRegistered.Replace, "a") }
+                 : null,
+                (serviceType, serviceKey) => serviceType == typeof(X)
                     ? new[] { new DynamicRegistration(new ReflectionFactory(typeof(B)), IfAlreadyRegistered.Replace, "a") }
                     : null));
 
@@ -207,24 +207,65 @@ namespace DryIoc.UnitTests
         public void Can_validate_dynamic_registration()
         {
             var container = new Container(rules => rules.WithDynamicRegistrations(
-                (_, serviceType, serviceKey) =>
+                (serviceType, serviceKey) =>
                 {
                     if (serviceType == typeof(X))
                         return new[] { new DynamicRegistration(new ReflectionFactory(typeof(C))) };
                     return null;
                 }));
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<X>());
 
             Assert.AreEqual(
-                Error.NameOf(Error.RegisteringImplementationNotAssignableToServiceType), 
+                Error.NameOf(Error.RegisteringImplementationNotAssignableToServiceType),
                 Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void Should_exclude_decorators_from_dynamic_services()
+        {
+            var container = new Container()
+                .WithAutoFallbackDynamicRegistrations(
+                    (t, k) => new[] { typeof(D) },
+                    type => new ReflectionFactory(type, setup: Setup.Decorator));
+
+            container.Register<X>();
+
+            var d = container.Resolve<D>(IfUnresolved.ReturnDefault);
+
+            Assert.IsNull(d);
+        }
+
+        [Test]
+        public void Can_register_dynamic_decorator()
+        {
+            var container = new Container()
+                .WithAutoFallbackDynamicRegistrations(
+                    (t, k) => new[] { typeof(D) },
+                    type => new ReflectionFactory(type, setup: Setup.Decorator));
+
+            container.Register<X, A>();
+
+            var x = container.Resolve<X>();
+
+            Assert.IsInstanceOf<D>(x);
+            Assert.IsInstanceOf<A>(((D)x).X);
         }
 
         public class X { }
         public class A : X { }
         public class B : X { }
         public class C { }
+
+        public class D : X
+        {
+            public X X { get; private set; }
+
+            public D(X x)
+            {
+                X = x;
+            }
+        }
     }
 }

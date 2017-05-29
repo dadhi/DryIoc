@@ -92,7 +92,7 @@ namespace DryIoc.IssuesTests.Samples
             // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
             var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
 
-            Rules.DynamicRegistrationProvider dynamicRegistrations = (_, serviceType, serviceKey) =>
+            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey) =>
             {
                 List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
                 if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))

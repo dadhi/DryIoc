@@ -930,6 +930,7 @@ namespace DryIoc
         {
             // return early if no decorators registered and no fallback containers to provide them
             if (_registry.Value.Decorators.IsEmpty &&
+                request.Rules.DynamicRegistrationProviders.IsNullOrEmpty() &&
                 request.Rules.FallbackContainers.IsNullOrEmpty())
                 return null;
 
@@ -1075,6 +1076,11 @@ namespace DryIoc
             var allDecorators = _registry.Value.Decorators;
             if (!allDecorators.IsEmpty)
                 decorators = allDecorators.GetValueOrDefault(serviceType) ?? ArrayTools.Empty<Factory>();
+
+            decorators = GetCombinedRegisteredAndDynamicFactories(
+                    decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)),
+                    FactoryType.Decorator, serviceType, null)
+                .Map(it => it.Value);
 
             if (!Rules.FallbackContainers.IsNullOrEmpty())
             {
@@ -1334,8 +1340,7 @@ namespace DryIoc
         }
 
         private KV<object, Factory>[] GetCombinedRegisteredAndDynamicFactories(
-            KV<object, Factory>[] registeredFactories,
-            FactoryType factoryType, Type serviceType, object serviceKey)
+            KV<object, Factory>[] registeredFactories, FactoryType factoryType, Type serviceType, object serviceKey)
         {
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
             if (dynamicRegistrationProviders.IsNullOrEmpty())
@@ -1350,16 +1355,15 @@ namespace DryIoc
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
-                var dynamicRegistrations = dynamicRegistrationProvider(factoryType, serviceType, serviceKey);
+                var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey);
                 if (dynamicRegistrations != null)
                 {
                     if (factories.IsNullOrEmpty())
                     {
-                        factories = dynamicRegistrations.Map(it =>
-                        {
-                            it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules);
-                            return KV.Of(it.ServiceKey ?? (dynamicKey = dynamicKey.Next()), it.Factory);
-                        })
+                        factories = dynamicRegistrations.Match(it => 
+                            it.Factory.FactoryType == factoryType &&
+                            it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules),
+                            it => KV.Of(it.ServiceKey ?? (dynamicKey = dynamicKey.Next()), it.Factory))
                         .ToArrayOrSelf();
                         continue;
                     }
@@ -1367,7 +1371,10 @@ namespace DryIoc
                     var remainingDynamicFactories = dynamicRegistrations
                         .Match(it =>
                         {
-                            it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules);
+                            if (it.Factory.FactoryType != factoryType ||
+                                !it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules))
+                                return false;
+
                             if (it.ServiceKey == null) // for the default dynamic factory
                             {
                                 switch (it.IfAlreadyRegistered)
@@ -1413,7 +1420,7 @@ namespace DryIoc
 
                             return true;
                         },
-                            it => KV.Of(it.ServiceKey ?? (dynamicKey = dynamicKey.Next()), it.Factory));
+                        it => KV.Of(it.ServiceKey ?? (dynamicKey = dynamicKey.Next()), it.Factory));
 
                     factories = factories.Append(remainingDynamicFactories);
                 }
@@ -1432,8 +1439,7 @@ namespace DryIoc
             var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
 
             var factories = GetCombinedRegisteredAndDynamicFactories(
-                registeredFactories,
-                FactoryType.Service, serviceType, serviceKey);
+                registeredFactories, FactoryType.Service, serviceType, serviceKey);
 
             if (factories.IsNullOrEmpty())
                 return null;
@@ -2529,7 +2535,8 @@ namespace DryIoc
             Func<Type, Factory> factory = null)
         {
             return container.ThrowIfNull()
-                .With(rules => rules.WithDynamicRegistrations(Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
+                .With(rules => rules.WithDynamicRegistrations(
+                    Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
         }
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered 
@@ -3670,14 +3677,10 @@ namespace DryIoc
 
         /// <summary>Specify the method signature for returning multiple keyed factories. 
         /// This is dynamic analog to the normal Container Registry.</summary>
-        /// <param name="requiredFactoryType">Specifies what kind of service is requested.</param>
         /// <param name="serviceType">Requested service type.</param>
         /// <param name="serviceKey">(optional) If <c>null</c> will request all factories of <paramref name="serviceType"/></param> 
         /// <returns>Key-Factory pairs.</returns>
-        public delegate IEnumerable<DynamicRegistration> DynamicRegistrationProvider(
-            FactoryType requiredFactoryType,
-            Type serviceType,
-            object serviceKey);
+        public delegate IEnumerable<DynamicRegistration> DynamicRegistrationProvider(Type serviceType, object serviceKey);
 
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
@@ -3827,7 +3830,7 @@ namespace DryIoc
         {
             var factories = Ref.Of(ImTreeMap<Type, Factory>.Empty);
 
-            return (ignoredFactoryType, serviceType, serviceKey) =>
+            return (serviceType, serviceKey) =>
             {
                 var implementationTypes = getImplementationTypes(serviceType, serviceKey);
 
@@ -7721,7 +7724,7 @@ namespace DryIoc
             return Container.CompileToDelegate(expression);
         }
 
-        internal virtual void ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
+        internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
         {
             if (!isStaticallyChecked)
                 serviceType.ThrowIfNull();
@@ -7736,21 +7739,23 @@ namespace DryIoc
                 // Warn about registering disposable transient
                 var reuse = Reuse ?? containerRules.DefaultReuseInsteadOfTransient;
                 if (reuse != DryIoc.Reuse.Transient)
-                    return;
+                    return true;
 
                 if (setup.AllowDisposableTransient ||
                     !containerRules.ThrowOnRegisteringDisposableTransient)
-                    return;
+                    return true;
 
                 if (setup.UseParentReuse ||
                     setup.FactoryType == FactoryType.Decorator && ((Setup.DecoratorSetup)setup).UseDecorateeReuse)
-                    return;
+                    return true;
 
                 var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
                 if (knownImplOrServiceType.IsAssignableTo(typeof(IDisposable)))
                     Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer,
                         serviceType, serviceKey ?? "{no key}", this);
             }
+
+            return true;
         }
 
         /// <summary>Returns nice string representation of factory.</summary>
@@ -8241,12 +8246,12 @@ namespace DryIoc
                 allParamsAreConstants);
         }
 
-        internal override void ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
+        internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
         {
             base.ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, containerRules);
 
             if (!CanAccessImplementationType)
-                return;
+                return true;
 
             var implType = ImplementationType;
             if (Made.FactoryMethod == null && containerRules.FactoryMethod == null)
@@ -8261,7 +8266,7 @@ namespace DryIoc
             }
 
             if (isStaticallyChecked || implType == null)
-                return;
+                return true;
 
             if (!implType.IsGenericDefinition())
             {
@@ -8288,6 +8293,8 @@ namespace DryIoc
                 else if (implType.GetImplementedServiceTypes().IndexOf(serviceType.GetGenericTypeDefinition()) == -1)
                     Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
+
+            return true;
         }
 
         private static void ThrowIfImplementationAndServiceTypeParamsDontMatch(Type implType, Type serviceType)
