@@ -37,7 +37,10 @@ namespace DryIoc.IssuesTests.Samples
             var assembly = Assembly.LoadFrom(assemblyFile);
             var registrations = AttributedModel.Scan(new[] { assembly });
 
-            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
+            // create serializable registrations
+            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
+
+            // load the registrations and provide a way dynamically register them in container
             var dynamicRegistrations = CreateDynamicRegistrationProvider(
                 lazyRegistrations, 
                 IfAlreadyRegistered.Keep, 
@@ -69,7 +72,7 @@ namespace DryIoc.IssuesTests.Samples
         {
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
             var registrations = AttributedModel.Scan(new[] { assembly });
-            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
+            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
             var dynamicRegistrations = CreateDynamicRegistrationProvider(
                 lazyRegistrations, IfAlreadyRegistered.Keep, new Lazy<Assembly>(() => assembly));
 
@@ -111,12 +114,6 @@ namespace DryIoc.IssuesTests.Samples
             return dynamicRegistrations;
         }
 
-        private static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(IEnumerable<ExportedRegistrationInfo> registrations)
-        {
-            var serviceKeyStore = new ServiceKeyStore();
-            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore));
-        }
-
         private static Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>
             CollectRegistrationsByServiceTypeName(IEnumerable<ExportedRegistrationInfo> lazyRegistrations)
         {
@@ -146,7 +143,7 @@ namespace DryIoc.IssuesTests.Samples
         {
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
             var registrations = AttributedModel.Scan(new[] { assembly });
-            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
+            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
 
             var assemblyLoaded = false;
             var dynamicRegistrations = CreateDynamicRegistrationProvider(
@@ -217,7 +214,7 @@ namespace DryIoc.IssuesTests.Samples
         {
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
             var registrations = AttributedModel.Scan(new[] { assembly });
-            var lazyRegistrations = MakeLazyAndEnsureUniqueServiceKeys(registrations);
+            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
 
             var assemblyLoaded = false;
             var dynamicRegistrations = CreateDynamicRegistrationProvider(

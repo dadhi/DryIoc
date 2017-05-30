@@ -20,7 +20,8 @@ namespace DryIoc.AspNetCore.Sample
                 // Enables controllers to be resolved by DryIoc, OTHERWISE resolved by infrastructure
                 .AddControllersAsServices();
 
-            return new Container()
+            return new Container(rules => rules.With(
+                propertiesAndFields: PropertiesAndFields.Auto))
                 // optional: support for MEF service discovery
                 //.WithMef()
                 // setup DI adapter

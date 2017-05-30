@@ -339,14 +339,24 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers new factories into registrator/container based on provided registration info's, which
         /// is serializable DTO for registration.</summary>
         /// <param name="registrator">Container to register into.</param>
-        /// <param name="infos">Registrations to register.</param>
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> infos)
+        /// <param name="registrations">Registrations to register.</param>
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> registrations)
         {
             var serviceKeyStore = new Lazy<ServiceKeyStore>(() =>
                 ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault));
 
-            foreach (var info in infos)
+            foreach (var info in registrations)
                 RegisterInfo(registrator, info, serviceKeyStore);
+        }
+
+        /// <summary>Helper to apply lazyness to provided registrations.</summary>
+        /// <param name="registrations">The registrations to transform to lazy from</param>
+        /// <returns>Transformed registrations.</returns>
+        public static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(
+            this IEnumerable<ExportedRegistrationInfo> registrations)
+        {
+            var serviceKeyStore = new ServiceKeyStore();
+            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore));
         }
 
         /// <summary>Registers factories into registrator/container based on single provided info, which could

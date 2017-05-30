@@ -12,7 +12,7 @@ namespace DryIoc.AspNetCore.Sample
             r.Register<ITransientService, TransientService>(Reuse.Transient);
             r.Register<IScopedService, ScopedService>(Reuse.InCurrentScope);
 
-            // optional: Mef based autowiring
+            // optional: MEF based auto-wiring
             //var assemblies = new[] { typeof(ExportedService).GetAssembly() };
             //r.RegisterExports(assemblies);
         }
