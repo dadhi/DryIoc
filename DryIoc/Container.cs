@@ -3725,6 +3725,20 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
+        /// Does not guard you from action throwing an exception. Actually can be used to throw your custom exception
+        /// instead of <see cref="ContainerException"/>.</summary>
+        /// <param name="handler">May be a Logger action or any other diagnostic handler.</param> 
+        /// <returns>Rules with unknown resolver.</returns>
+        public Rules WithUnknownServiceHandler(Action<Request> handler)
+        {
+            return WithUnknownServiceResolvers(request =>
+            {
+                handler(request);
+                return null;
+            });
+        }
+
         // todo: v3: Mark with ObsoleteAttribute
         /// <summary>Replaced by ConcreteTypeDynamicRegistrations</summary>
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null)

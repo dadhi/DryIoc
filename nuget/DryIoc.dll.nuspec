@@ -13,11 +13,14 @@
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
       v2.11.0:
+      - added: #449: Provide a way to log unresolved dependencies via Rules.WithUnknownServiceHandler
       - added: #463: Add IfAlreadyRegistered option for UseInstance
       - added: #475: Dynamic Registration Providers to enable lazy and on-demand registrations
-      - fixed: #477: ArgumentException while resolving
-      - fixed: #451: DryIoc should know about static members
+      - added: #476: AutoFallback and AutoConcreteType resolution based on Dynamic Registration providers
       - fixed: #396: Enable ResolveMany to use auto fallback resolution via dynamic registrations
+      - fixed: #451: DryIoc should know about static members
+      - fixed: #474: Exclude supported collection wrapper interfaces from RegisterMany / ExportMany
+      - fixed: #477: ArgumentException while resolving
       - fixed: DryIocAttributes dependency to System.Diagnostics.Tools from ..Debug
       v2.10.7:
       - fixed: #465 Installing DryIoc.dll for desktop/4.5 installs tons of .NEt Standard packages

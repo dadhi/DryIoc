@@ -121,11 +121,7 @@ namespace DryIoc.UnitTests
 
             var container = new Container(rules => rules
                 .WithConcreteTypeDynamicRegistrations()
-                .WithUnknownServiceResolvers(_ =>
-                {
-                    unresolvedTypes.Add(_.ServiceType);
-                    return null;
-                }));
+                .WithUnknownServiceHandler(req => unresolvedTypes.Add(req.ServiceType)));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Xx>());
