@@ -235,7 +235,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.RegisterMapping(typeof(IDisposable), typeof(Y)));
 
-            Assert.AreEqual(Error.RegisterImplementationNotAssignableToServiceType, ex.Error);
+            Assert.AreEqual(Error.RegisteringImplementationNotAssignableToServiceType, ex.Error);
         }
 
         public interface I {}

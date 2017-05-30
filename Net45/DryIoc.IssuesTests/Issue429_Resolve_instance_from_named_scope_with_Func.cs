@@ -20,6 +20,7 @@ namespace DryIoc.IssuesTests
             {
                 var factory = scope.Resolve<Func<int, Service>>();
                 var service = factory(1);
+                Assert.AreEqual(1, service.I);
             }
         }
 
@@ -84,11 +85,13 @@ namespace DryIoc.IssuesTests
 
         public class Service
         {
-            private readonly IAction _action;
+            public readonly IAction Action;
+            public readonly int I;
 
             public Service(IAction action, int i)
             {
-                _action = action;
+                I = i;
+                Action = action;
             }
         }
     }

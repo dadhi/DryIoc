@@ -249,12 +249,22 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_open_generic_implementation_with_closed_generic_service_should_Throw()
+        public void Registering_open_generic_implementation_with_matched_closed_generic_service_should_be_OK()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IceCream<int>), typeof(IceCreamSource<>));
+
+            Assert.IsInstanceOf<IceCreamSource<int>>(container.Resolve<IceCream<int>>());
+        }
+
+        [Test]
+        public void Registering_open_generic_implementation_with_not_implemented_closed_generic_service_should_Throw()
         {
             var container = new Container();
 
             Assert.Throws<ContainerException>(() =>
-                container.Register(typeof(IceCream<int>), typeof(IceCreamSource<>)));
+                container.Register(typeof(Banana<int>), typeof(IceCreamSource<>)));
         }
 
         [Test]
@@ -347,7 +357,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(X<>), typeof(Y<>)));
 
-            Assert.AreEqual(ex.Error, Error.RegisterImplementationNotAssignableToServiceType);
+            Assert.AreEqual(ex.Error, Error.RegisteringImplementationNotAssignableToServiceType);
         }
 
         [Test]

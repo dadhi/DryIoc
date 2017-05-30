@@ -49,6 +49,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{34781A51
 		NuGet\DryIocAttributes.dll.nuspec = NuGet\DryIocAttributes.dll.nuspec
 		NuGet\DryIocAttributes.nuspec = NuGet\DryIocAttributes.nuspec
 		NuGet\DryIocZero.nuspec = NuGet\DryIocZero.nuspec
+		Net45\DryIocZero\install.ps1 = Net45\DryIocZero\install.ps1
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel", "DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj", "{13516F3C-E48D-43DC-89D4-5FE00DE3C7D2}"
@@ -188,6 +189,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "PCL-Net45\DryIocZero\DryIocZero.csproj", "{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "PCL\DryIocZero\DryIocZero.csproj", "{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIocZero", "DryIocZero", "{B334E813-FDF3-4EBC-9E80-2130109E272A}"
+	ProjectSection(SolutionItems) = preProject
+		NuGet\DryIocZero\install.ps1 = NuGet\DryIocZero\install.ps1
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -494,5 +500,6 @@ Global
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469} = {C8C71EEF-0C64-4A33-96F8-D22C6E429741}
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA} = {CE5E598E-5A34-40EA-9110-AD2663BAD177}
+		{B334E813-FDF3-4EBC-9E80-2130109E272A} = {34781A51-76A9-479E-8FF2-66C903C5856E}
 	EndGlobalSection
 EndGlobal

@@ -487,7 +487,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Register(typeof(IService), typeof(Beh)));
 
-            Assert.AreEqual(Error.RegisterImplementationNotAssignableToServiceType, ex.Error);
+            Assert.AreEqual(Error.RegisteringImplementationNotAssignableToServiceType, ex.Error);
         }
 
         public class Beh
@@ -548,7 +548,7 @@ namespace DryIoc.UnitTests
             container.Resolve<Abc>(); // creates and stores singleton
 
             var containerWithConcreteTypes = container.With(rules => rules
-                .WithAutoConcreteTypeResolution());
+                .WithConcreteTypeDynamicRegistrations());
 
             containerWithConcreteTypes.Dispose();
             Assert.IsTrue(((Container)containerWithConcreteTypes).IsDisposed);

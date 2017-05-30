@@ -4,6 +4,6 @@
 [assembly: AssemblyDescription("DryIoc is fast, small, full-featured IoC Container for .NET")]
 [assembly: AssemblyCopyright("Copyright © 2013-2017 Maksim Volkau")]
 
-[assembly: AssemblyVersion(             "2.10.7")]
-[assembly: AssemblyFileVersion(         "2.10.7")]
-[assembly: AssemblyInformationalVersion("2.10.7")]
+[assembly: AssemblyVersion(             "2.11.0")]
+[assembly: AssemblyFileVersion(         "2.11.0")]
+[assembly: AssemblyInformationalVersion("2.11.0")]

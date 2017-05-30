@@ -11,9 +11,8 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
-                .WithAutoFallbackResolution(new[] { Assembly.GetExecutingAssembly() });
+                .WithAutoFallbackDynamicRegistrations(Assembly.GetExecutingAssembly());
 
             container.Register<Log>(
                 Made.Of(_ => ServiceInfo.Of<LogService>(),
@@ -38,15 +37,21 @@ namespace DryIoc.IssuesTests
 
         public class ALog : Log
         {
+            public Type Type { get; }
+
             public ALog(Type type)
             {
+                Type = type;
             }
         }
 
         class TestClass
         {
+            public Log Log { get; }
+
             public TestClass(Log log)
             {
+                Log = log;
             }
         }
     }

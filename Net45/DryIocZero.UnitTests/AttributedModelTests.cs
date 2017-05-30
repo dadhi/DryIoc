@@ -101,7 +101,7 @@
         }
 
         [Test]
-        public void I_can_check_existinse_of_open_scope()
+        public void I_can_check_existense_of_open_scope()
         {
             using (var s = _container.OpenScope("a"))
             {

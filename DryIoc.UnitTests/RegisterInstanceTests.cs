@@ -68,17 +68,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Register_instance_in_resolution_scope_does_not_make_sense_and_should_throw()
-        {
-            var container = new Container();
-
-            var ex = Assert.Throws<ContainerException>(() => 
-            container.RegisterInstance("xxx", Reuse.InResolutionScope));
-        
-            Assert.AreEqual(Error.ResolutionScopeIsNotSupportedForRegisterInstance, ex.Error);
-        }
-
-        [Test]
         public void Register_instance_with_replace_option_will_replace_registered_instance_in_place()
         {
             var container = new Container();
@@ -92,51 +81,13 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(regBefore.Factory.FactoryID, regAfter.Factory.FactoryID);
         }
 
-        interface I { }
-        class C : I { }
-        class D { public D(I i) { } }
-
-        [Test]
-        public void Should_throw_on_reuse_mismatch()
-        {
-            var c = new Container();
-
-            c.RegisterInstance<I>(new C(), new ShortReuse());
-            c.Register<D>(Reuse.Singleton);
-
-            var ex = Assert.Throws<ContainerException>(() =>
-                c.Resolve<D>());
-
-            Assert.AreEqual(Error.DependencyHasShorterReuseLifespan, ex.Error);
-        }
-
-        class ShortReuse : IReuse
-        {
-            public int Lifespan { get { return 50; } }
-
-            public IScope GetScopeOrDefault(Request request)
-            {
-                return request.SingletonScope;
-            }
-
-            public Expression GetScopeExpression(Request request)
-            {
-                return Expression.Property(Container.GetScopesExpr(request), "SingletonScope");
-            }
-
-            public int GetScopedItemIdOrSelf(int factoryID, Request request)
-            {
-                return request.SingletonScope.GetScopedItemIdOrSelf(factoryID);
-            }
-        }
-
         [Test]
         public void Can_register_instance_with_keep_option()
         {
             var container = new Container();
             container.UseInstance("a");
 
-            container.RegisterInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.UseInstance("x", IfAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var s = container.Resolve<string>();
             Assert.AreEqual("a", s);
@@ -224,6 +175,167 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void UseInstance_by_default_should_replace_previous_typed_registration()
+        {
+            var container = new Container();
+            container.Register<AA>();
+
+            var aa = new AA();
+            container.UseInstance(aa);
+
+            var x = container.Resolve<AA>();
+            Assert.AreSame(aa, x);
+        }
+
+        [Test]
+        public void Can_append_to_previous_typed_registration()
+        {
+            var container = new Container();
+            container.Register<AA>();
+
+            var aa = new AA();
+            container.UseInstance(aa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+
+            var aas = container.ResolveMany<AA>();
+            Assert.AreEqual(2, aas.Count());
+        }
+
+        [Test]
+        public void Can_append_multiple_and_then_replace_all()
+        {
+            var container = new Container();
+            container.Register<AA>();
+
+            var aa = new AA();
+            container.UseInstance(aa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance<AA>(new AAA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            var aas = container.ResolveMany<AA>();
+            Assert.AreEqual(3, aas.Count());
+
+            container.UseInstance<AA>(new AAAA());
+            var aaaa = container.Resolve<AA>();
+            Assert.IsInstanceOf<AAAA>(aaaa);
+        }
+
+        [Test]
+        public void Can_append_multiple_and_then_replace_all_in_presence_of_keyed()
+        {
+            var container = new Container();
+
+            container.UseInstance<AA>(new AAA(), serviceKey: "aaa");
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+
+            container.UseInstance<AA>(new AAAA());
+            Assert.IsInstanceOf<AAAA>(container.Resolve<AA>());
+            Assert.IsInstanceOf<AAA>(container.Resolve<AA>("aaa"));
+        }
+
+        [Test]
+        public void Can_have_both_default_and_keyed_instances_and_keyed_ifAlreadyRegistered_does_not_apply()
+        {
+            var container = new Container();
+
+            container.UseInstance(new AA());
+            container.UseInstance(new AA(), serviceKey: "keyed", IfAlreadyRegistered: IfAlreadyRegistered.Throw);
+
+            var aas = container.ResolveMany<AA>();
+            Assert.AreEqual(2, aas.Count());
+        }
+
+        [Test]
+        public void Can_append_new_default_with_presence_of_keyyed()
+        {
+            var container = new Container();
+
+            container.UseInstance(new AA(), serviceKey: "aa");
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+
+            var aas = container.ResolveMany<AA>();
+            Assert.AreEqual(3, aas.Count());
+        }
+
+        [Test]
+        public void Can_keep_previous_default()
+        {
+            var container = new Container();
+
+            var aa = new AA();
+            container.UseInstance(aa);
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var x = container.Resolve<AA>();
+            Assert.AreSame(aa, x);
+        }
+
+        [Test]
+        public void Can_keep_previous_default_with_presence_of_keyed()
+        {
+            var container = new Container();
+
+            var aa = new AA();
+            container.UseInstance(aa);
+            container.UseInstance(aa, serviceKey: "aa");
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.Keep);
+
+            var x = container.Resolve<AA>();
+            Assert.AreSame(aa, x);
+        }
+
+        [Test]
+        public void Can_throw_on_previous_default()
+        {
+            var container = new Container();
+
+            var aa = new AA();
+            container.UseInstance(aa);
+
+            var ex = Assert.Throws<ContainerException>(() => 
+            container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.Throw));
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToRegisterDuplicateDefault),
+                Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void Can_throw_on_previous_default_with_presence_of_keyed()
+        {
+            var container = new Container();
+
+            var aa = new AA();
+            container.UseInstance(aa);
+            container.UseInstance(aa, serviceKey: "aa");
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.UseInstance(new AA(), IfAlreadyRegistered: IfAlreadyRegistered.Throw));
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToRegisterDuplicateDefault),
+                Error.NameOf(ex.Error));
+        }
+
+
+        [Test]
+        public void Can_append_new_default_implementation_And_ignore_the_duplicate_implementation()
+        {
+            var container = new Container();
+
+            var aa = new AA();
+            container.UseInstance(aa);
+            container.UseInstance<AA>(new AAA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+
+            Assert.AreEqual(2, container.ResolveMany<AA>().Count());
+
+            var newaaa = new AAA();
+            container.UseInstance<AA>(newaaa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+
+            container.UseInstance<AA>(new AAAA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            Assert.AreEqual(3, container.ResolveMany<AA>().Count());
+        }
+
+        [Test]
         public void Can_reuse_the_default_factory()
         {
             var container = new Container();
@@ -270,7 +382,6 @@ namespace DryIoc.UnitTests
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
         }
 
-
         [Test]
         public void Should_use_correct_instance_in_lazy_collection_in_and_out_of_scope()
         {
@@ -310,6 +421,9 @@ namespace DryIoc.UnitTests
         }
 
         public class AA { }
+
+        public class AAA : AA { }
+        public class AAAA : AA { }
 
         public class BB
         {

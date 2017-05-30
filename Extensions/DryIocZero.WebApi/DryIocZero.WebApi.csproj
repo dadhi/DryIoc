@@ -64,9 +64,9 @@
     </Compile>
     <Compile Include="DryIocWebApi.cs" />
     <Compile Include="DryIocZero\Container.Generated.cs">
+      <DependentUpon>Container.Generated.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
-      <DependentUpon>Container.Generated.tt</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

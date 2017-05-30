@@ -88,7 +88,6 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var importer = Container.Resolve<ImportUntypedService>();
 
             Assert.IsNotNull(importer);
-            Assert.IsNotNull(importer);
             Assert.IsNotNull(importer.UntypedService);
             Assert.AreEqual(typeof(UntypedService), importer.UntypedService.GetType());
         }

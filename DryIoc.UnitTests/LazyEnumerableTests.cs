@@ -151,20 +151,18 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_resolving_meta_of_many_only_first_matched_item_will_be_resolved()
+        public void Resolving_from_many_services_with_matched_meta_should_throw()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), setup: Setup.With(metadataOrFuncOfMetadata: "a"));
             container.Register(typeof(IService), typeof(AnotherService), setup: Setup.With(metadataOrFuncOfMetadata: "b"));
 
-            var result = container.Resolve<Meta<LazyEnumerable<IService>, string>>();
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<Meta<LazyEnumerable<IService>, string>>());
 
-            Assert.That(result, Is.InstanceOf<Meta<LazyEnumerable<IService>, string>>());
-            Assert.That(result.Metadata, Is.EqualTo("a"));
-
-            var services = result.Value.Items.ToArray();
-            Assert.That(services.Length, Is.EqualTo(1));
-            Assert.That(services[0], Is.InstanceOf<Service>());
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToSelectFromManyRegistrationsWithMatchingMetadata),
+                Error.NameOf(ex.Error));
         }
 
         [Test]

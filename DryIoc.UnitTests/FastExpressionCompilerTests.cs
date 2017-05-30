@@ -92,6 +92,19 @@ namespace FastExpressionCompiler.UnitTests
         {
             Assert.IsTrue(ExpressionCompiler.Compile(() => 'z' != (ushort)0)());
         }
+
+        [Test]
+        public void Can_use_constant_of_byte_Enum_type()
+        {
+            object obj = XByte.A;
+            var e = Expression.Lambda(Expression.Constant(obj));
+
+            var f = ExpressionCompiler.TryCompile<Func<XByte>>(e);
+
+            Assert.AreEqual(XByte.A, f());
+        }
+
+        public enum XByte : byte { A }
     }
 
     [TestFixture]
@@ -272,18 +285,5 @@ namespace FastExpressionCompiler.UnitTests
                 return then();
             }
         }
-
-        [Test]
-        public void Can_use_constant_of_byte_Enum_type()
-        {
-            object obj = XByte.A;
-            var e = Expression.Lambda(Expression.Constant(obj));
-
-            var f = ExpressionCompiler.TryCompile<Func<XByte>>(e);
-
-            Assert.AreEqual(XByte.A, f());
-        }
-
-        public enum XByte : byte { A }
     }
 }

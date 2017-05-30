@@ -21,7 +21,7 @@
   "dependencies": {
     "NETStandard.Library": "1.6.1",
     "Microsoft.Extensions.DependencyInjection.Abstractions": "1.1.0",
-    "DryIoc.dll": "2.10.*"
+    "DryIoc": { "target": "project" }
   },
 
   "frameworks": {

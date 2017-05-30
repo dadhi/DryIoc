@@ -12,38 +12,16 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v2.10.7:
-      - fixed: #465 Installing DryIoc.dll for desktop/4.5 installs tons of .NEt Standard packages
-      - changed: Attempt to fix InvalidCastException found in scope of #433
-      v2.10.6:
-      - added: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 using xamarinmac2.0 TFM
-      - added: Reuse.ScopedOrSingleton to simplify scenarios which currently use Rules.WithImplicitRootOpenScope, and simplify MS.DI adapter
-      - fixed: Performance issue with #459 (Container.Dispose stack trace) and made it turned Off by default
-      - fixed: Updated to FEC v1.0.0+ with fix for #6
-      - changed: More cache agnostic and flexible disposable transient tracking with Reuse.ScopedOrSingleton
-      - changed: Improved perf around resolution of scoped services
-      v2.10.5:
-      - fixed: #459: Add Container.Dispose stack trace to ContainerIsDisposed error message
-      - changed: Updated to FastExpressionCompiler v1.0.0
-      v2.10.4:
-      - fixed: #456: Abstract service type is not supported with AutoConcreteTypeResolution and required service type
-      - fixed: #431: Make AutoConcreteTypeResolution rule to check if type is resolvable and fallback to next rule
-      - added: FactoryMethod.DefaultConstructor
-      v2.10.3:
-      - fixed: #438: Remove self WeakReference from Container to make it more simple
-      - changed: Using the latest FastExpressionCompiler with nested lambda compilation support
-      - removed: AggressiveInlining
-      v2.10.2:
-      - fixed: #454: Performance degradation for resolution of InWebRequest and generally named scope services
-      v2.10.1:
-      - fixed: #446 Select single open generic impl based on matching closed service type
-      v2.10:
-      - fixed: #440: Singleton optimazation causes exception for internal type in some cases
-      - fixed: #435: Reuse.Singleton prevents the correct container injection within explicit resolve
-      - fixed: #437: General perf degradation introduced in 2.9 due skipping fast FactoryCompiler
-      - added: #430: Add rule to change or to disable split level of large object graph
-      - changed: Moving HashTrees to ImTools namespace.
-      - changed: #254 [Performance] Remove state parameter from FactoryDelegate - use FastExpressionCompiler with closure support
+      v2.11.0:
+      - added: #449: Provide a way to log unresolved dependencies via Rules.WithUnknownServiceHandler
+      - added: #463: Add IfAlreadyRegistered option for UseInstance
+      - added: #475: Dynamic Registration Providers to enable lazy and on-demand registrations
+      - added: #476: AutoFallback and AutoConcreteType resolution based on Dynamic Registration providers
+      - fixed: #396: Enable ResolveMany to use auto fallback resolution via dynamic registrations
+      - fixed: #451: DryIoc should know about static members
+      - fixed: #474: Exclude supported collection wrapper interfaces from RegisterMany / ExportMany
+      - fixed: #477: ArgumentException while resolving
+      - fixed: DryIocAttributes dependency to System.Diagnostics.Tools from ..Debug
     </releaseNotes>
     <dependencies>
       <!--Explicitly specify no dependencies for full .NET -->
