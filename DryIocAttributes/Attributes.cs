@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013-2016 Maksim Volkau
+Copyright (c) 2013-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -262,8 +262,8 @@ namespace DryIocAttributes
         public IfAlreadyExported IfAlreadyExported { get; set; }
     }
 
-    // todo: V3: remove
     /// <summary>Obsolete: Is not required anymore, you can just put Export on member without marking the containing type with AsFactory.</summary>
+    [Obsolete("Is not required anymore, you can just put Export on member without marking the containing type with AsFactory.", error: false)]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Property
@@ -706,7 +706,7 @@ namespace DryIocAttributes
     public class OpenResolutionScopeAttribute : Attribute { }
 
     /// <summary>Specifies that export should be imported as dynamic resolution call,
-    /// instead of inlined creation expression.</summary>
+    /// instead of in-lined creation expression.</summary>
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Interface
         | AttributeTargets.Method

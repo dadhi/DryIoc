@@ -8,7 +8,7 @@
 // 1. Configure DryIoc.container with your rules and conventions.
 // 2. Register your services and implementations. 
 // Please ensure to include assemblies and namespaces where they reside.
-// 3. Identify the resolution roots: the services to be Resovled, rather then injected.
+// 3. Identify the resolution roots: the services to be Resolved, rather then injected.
 //
 //=======================================================================
 #>

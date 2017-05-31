@@ -30,7 +30,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- Latest stable DryIoc version is __2.11.0__
+- Latest stable DryIoc version is __2.11.1__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
@@ -99,7 +99,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ### __DryIocAttributes__
 
-NuGet: `PM> Install-Package DryIocAttributes.dll`
+__DryIocAttributes.dll__ [![NuGet Badge](https://buildstats.info/nuget/DryIocAttributes.dll)](https://www.nuget.org/packages/DryIocAttributes.dll)  
+__DryIocAttributes__ (sources) [![NuGet Badge](https://buildstats.info/nuget/DryIocAttributes)](https://www.nuget.org/packages/DryIocAttributes)
 
 - Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
 - Does not depend on DryIoc and may be used by other IoC libraries. 
@@ -107,7 +108,7 @@ NuGet: `PM> Install-Package DryIocAttributes.dll`
 
 ### DryIocZero
 
-NuGet: `PM> Install-Package DryIocZero`
+__DryIocZero__ [![NuGet Badge](https://buildstats.info/nuget/DryIocZero)](https://www.nuget.org/packages/DryIocZero)
 
 Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc.
 

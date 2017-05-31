@@ -12,6 +12,9 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.11.1:
+      - fixed: UseInstance is not backward compatible with v2.10
+      - fixed: #478: DryIoc.Owin.dll 2.2.0 not compatible with DryIoc.dll 2.11.0
       v2.11.0:
       - added: #449: Provide a way to log unresolved dependencies via Rules.WithUnknownServiceHandler
       - added: #463: Add IfAlreadyRegistered option for UseInstance
