@@ -41,10 +41,7 @@ namespace DryIoc.IssuesTests.Samples
             var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
 
             // load the registrations and provide a way dynamically register them in container
-            var dynamicRegistrations = CreateDynamicRegistrationProvider(
-                lazyRegistrations, 
-                IfAlreadyRegistered.Keep, 
-                new Lazy<Assembly>(() => assembly));
+            var dynamicRegistrations = lazyRegistrations.GetLazyTypeRegistrationProvider(() => assembly);
 
             var container = new Container().WithMef()
                 .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
@@ -73,8 +70,7 @@ namespace DryIoc.IssuesTests.Samples
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
             var registrations = AttributedModel.Scan(new[] { assembly });
             var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
-            var dynamicRegistrations = CreateDynamicRegistrationProvider(
-                lazyRegistrations, IfAlreadyRegistered.Keep, new Lazy<Assembly>(() => assembly));
+            var dynamicRegistrations = lazyRegistrations.GetLazyTypeRegistrationProvider(() => assembly);
 
             var container = new Container().WithMef()
                 .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
@@ -87,57 +83,6 @@ namespace DryIoc.IssuesTests.Samples
                 string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
-        private static Rules.DynamicRegistrationProvider CreateDynamicRegistrationProvider(
-            IEnumerable<ExportedRegistrationInfo> lazyRegistrations,
-            IfAlreadyRegistered ifAlreadyRegistered, 
-            Lazy<Assembly> assembly)
-        {
-            // Step 1 - Create Index for fast search by ExportInfo.ServiceTypeFullName.
-            var registrationsByServiceTypeName = CollectRegistrationsByServiceTypeName(lazyRegistrations);
-
-            Rules.DynamicRegistrationProvider dynamicRegistrations = (serviceType, serviceKey) =>
-            {
-                List<KeyValuePair<object, ExportedRegistrationInfo>> serviceTypeRegistrations;
-                if (!registrationsByServiceTypeName.TryGetValue(serviceType.FullName, out serviceTypeRegistrations))
-                    return null;
-
-                var factories = new List<DynamicRegistration>();
-                foreach (var r in serviceTypeRegistrations)
-                {
-                    var factory = r.Value.CreateFactory(assembly);
-                    factories.Add(new DynamicRegistration(factory, ifAlreadyRegistered, r.Key));
-                }
-
-                return factories;
-            };
-
-            return dynamicRegistrations;
-        }
-
-        private static Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>
-            CollectRegistrationsByServiceTypeName(IEnumerable<ExportedRegistrationInfo> lazyRegistrations)
-        {
-            var registrationByServiceTypeName = new Dictionary<string, List<KeyValuePair<object, ExportedRegistrationInfo>>>();
-            foreach (var lazyRegistration in lazyRegistrations)
-            {
-                var exports = lazyRegistration.Exports;
-                for (var i = 0; i < exports.Length; i++)
-                {
-                    var export = exports[i];
-                    var serviceTypeFullName = export.ServiceTypeFullName;
-
-                    List<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                    if (!registrationByServiceTypeName.TryGetValue(serviceTypeFullName, out regs))
-                        registrationByServiceTypeName.Add(serviceTypeFullName,
-                            regs = new List<KeyValuePair<object, ExportedRegistrationInfo>>());
-
-                    regs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(export.ServiceKey, lazyRegistration));
-                }
-            }
-
-            return registrationByServiceTypeName;
-        }
-
         [Test]
         public void Lazy_import_of_commands_using_LazyFactory()
         {
@@ -146,14 +91,11 @@ namespace DryIoc.IssuesTests.Samples
             var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
 
             var assemblyLoaded = false;
-            var dynamicRegistrations = CreateDynamicRegistrationProvider(
-                lazyRegistrations,
-                IfAlreadyRegistered.Keep,
-                new Lazy<Assembly>(() =>
-                {
-                    assemblyLoaded = true;
-                    return assembly;
-                }));
+            var dynamicRegistrations = lazyRegistrations.GetLazyTypeRegistrationProvider(() =>
+            {
+                assemblyLoaded = true;
+                return assembly;
+            });
 
             // Test that resolve works
             //========================
@@ -217,14 +159,12 @@ namespace DryIoc.IssuesTests.Samples
             var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
 
             var assemblyLoaded = false;
-            var dynamicRegistrations = CreateDynamicRegistrationProvider(
-                lazyRegistrations, IfAlreadyRegistered.Keep,
-                new Lazy<Assembly>(() =>
-                {
-                    assemblyLoaded = true;
-                    return assembly;
-                }));
-            
+            var dynamicRegistrations = lazyRegistrations.GetLazyTypeRegistrationProvider(() =>
+            {
+                assemblyLoaded = true;
+                return assembly;
+            });
+
             // Test that resolve works fine with the non-lazy scenario
             //========================
             var cnt = new Container().WithMef();
