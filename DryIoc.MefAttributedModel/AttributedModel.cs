@@ -349,7 +349,7 @@ namespace DryIoc.MefAttributedModel
                 RegisterInfo(registrator, info, serviceKeyStore);
         }
 
-        /// <summary>Helper to apply lazyness to provided registrations.</summary>
+        /// <summary>Helper to apply laziness to provided registrations.</summary>
         /// <param name="registrations">The registrations to transform to lazy from</param>
         /// <returns>Transformed registrations.</returns>
         public static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(
@@ -496,6 +496,58 @@ namespace DryIoc.MefAttributedModel
 
                 yield return memberRegistrationInfo;
             }
+        }
+
+        /// <summary>Creates and index by service type name. 
+        /// Then returns the factory provider which uses index for fast registration discovery.</summary>
+        /// <param name="lazyRegistrations">Registrations with <see cref="ExportedRegistrationInfo.IsLazy"/> set to true.
+        /// Consider to call <see cref="MakeLazyAndEnsureUniqueServiceKeys"/> on registrations before passing them here.</param>
+        /// <param name="getAssembly">Assembly to load type by name from.</param>
+        /// <param name="ifAlreadyRegistered">(optional) Keep existing registrations by default.</param>
+        /// <returns><see cref="Rules.DynamicRegistrationProvider"/></returns>
+        public static Rules.DynamicRegistrationProvider GetLazyTypeRegistrationProvider(
+            this IEnumerable<ExportedRegistrationInfo> lazyRegistrations, Func<Assembly> getAssembly,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep)
+        {
+            var assembly = new Lazy<Assembly>(getAssembly);
+            return lazyRegistrations.GetLazyTypeRegistrationProvider(t => assembly.Value.GetType(t), ifAlreadyRegistered);
+        }
+
+        /// <summary>Creates and index by service type name. 
+        /// Then returns the factory provider which uses index for fast registration discovery.</summary>
+        /// <param name="lazyRegistrations">Registrations with <see cref="ExportedRegistrationInfo.IsLazy"/> set to true.
+        /// Consider to call <see cref="MakeLazyAndEnsureUniqueServiceKeys"/> on registrations before passing them here.</param>
+        /// <param name="typeProvider">Required for Lazy registration info to create actual Type from type name.</param>
+        /// <param name="ifAlreadyRegistered">(optional) Keep existing registrations by default.</param>
+        /// <returns><see cref="Rules.DynamicRegistrationProvider"/></returns>
+        public static Rules.DynamicRegistrationProvider GetLazyTypeRegistrationProvider(
+            this IEnumerable<ExportedRegistrationInfo> lazyRegistrations, Func<string, Type> typeProvider,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep)
+        {
+            var serviceTypeNameToKeyedRegistrations =
+                ImTreeMap<string, KeyValuePair<object, ExportedRegistrationInfo>[]>.Empty;
+
+            foreach (var registration in lazyRegistrations)
+            {
+                var exports = registration.Exports;
+                for (var i = 0; i < exports.Length; i++)
+                {
+                    var e = exports[i];
+                    serviceTypeNameToKeyedRegistrations = serviceTypeNameToKeyedRegistrations
+                        .AddOrUpdate(e.ServiceTypeFullName,
+                            new[] { new KeyValuePair<object, ExportedRegistrationInfo>(e.ServiceKey, registration) },
+                            ArrayTools.Append);
+                }
+            }
+
+            return (serviceType, serviceKey) =>
+            {
+                var keyedRegistrations = serviceTypeNameToKeyedRegistrations.GetValueOrDefault(serviceType.FullName);
+                if (keyedRegistrations == null)
+                    return null;
+                return keyedRegistrations.Map(it =>
+                    new DynamicRegistration(it.Value.CreateFactory(typeProvider), ifAlreadyRegistered, it.Key));
+            };
         }
 
         private static bool CanBeExported(Type type)
@@ -1342,14 +1394,8 @@ namespace DryIoc.MefAttributedModel
             return this;
         }
 
-        /// <summary>Sugar on top of <see cref="CreateFactory(Lazy{Assembly})"/>.</summary>
-        public ReflectionFactory CreateFactory(Lazy<Assembly> assembly)
-        {
-            return CreateFactory(typeName => assembly.Value.GetType(typeName));
-        }
-
         /// <summary>Creates factory from registration info.</summary>
-        /// <param name="typeProvider">(optional) But required for <see cref="IsLazy"/> info.</param>
+        /// <param name="typeProvider">(optional) Required for Lazy registration info to create actual Type from type name.</param>
         /// <returns>Created factory.</returns>
         public ReflectionFactory CreateFactory(Func<string, Type> typeProvider = null)
         {
@@ -1364,9 +1410,9 @@ namespace DryIoc.MefAttributedModel
 
         private Made GetMade(Func<string, Type> typeProvider = null)
         {
-            return FactoryMethodInfo == null
-                ? Made.Default
-                : FactoryMethodInfo.CreateMade(typeProvider);
+            if (FactoryMethodInfo == null)
+                return Made.Default;
+            return FactoryMethodInfo.CreateMade(typeProvider);
         }
 
         /// <summary>Gets the <see cref="IReuse"/> instance.</summary>
@@ -1412,7 +1458,7 @@ namespace DryIoc.MefAttributedModel
             IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
             if (made != null && made.FactoryMethodKnownResultType != null)
             {
-                var member = made.FactoryMethod(null).ConstructorOrMethodOrMember;
+                var member = made.FactoryMethod(request: null).ConstructorOrMethodOrMember;
                 if (member != null)
                     metaAttrs = metaAttrs.Concat(member.GetAttributes());
             }
@@ -1501,9 +1547,7 @@ namespace DryIoc.MefAttributedModel
             object metadataCode;
             if (Metadata != null &&
                 Metadata.TryGetValue(key + ToCodeKeySuffix, out metadataCode))
-            {
                 return code.Append(metadataCode);
-            }
 
             return code.AppendCode(value);
         }
@@ -1540,12 +1584,8 @@ namespace DryIoc.MefAttributedModel
                 .OrderBy(item => item.Key);
 
             foreach (var attr in attributes)
-            {
                 if (metadata.ContainsKey(attr.Key))
-                {
                     metadata[attr.Key + ToCodeKeySuffix] = attr.Value;
-                }
-            }
         }
 
         private static IDictionary<string, object> CollectExportedMetadata(IEnumerable<Attribute> attributes)
@@ -1687,8 +1727,8 @@ namespace DryIoc.MefAttributedModel
                         return false;
 
                     return parameters.Length == 0
-                           || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                               .SequenceEqual(factoryMethodParameterTypeNames);
+                        || parameters.Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
+                            .SequenceEqual(factoryMethodParameterTypeNames);
                 })
                 .ThrowIfNull();
         }

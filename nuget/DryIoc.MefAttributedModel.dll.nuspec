@@ -1,91 +1,94 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-    <metadata>
-        <id>DryIoc.MefAttributedModel.dll</id>
-        <!-- just a placeholder for "nuget pack -Version" flag -->
-        <version>0.0.0</version>
-        <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2016 Maksim Volkau</copyright>
-        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
-        <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
-        <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
-        <releaseNotes>
-          v3.0.0-preview-06:
-          - changed: Updated netstandard package dependencies to v4.3
-          v3.0.0-preview-05
-          - changed: To work with DryIoc v2.11.0-preview-01 and DryIocAttributes v3.0.0-preview-01
-          - fixed: #399: Combining multiple Action exports with Lazy scenario
-          - fixed: #451: DryIoc should know about static members
-          v3.0.0-preview-04
-          - changed: Updated to DryIoc 2.10
-          v3.0.0-preview-01
-          - added: #292: Add ImportManyAttribute support for full MEF compatibility
-          - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
-          - added: #323: Support multiple WithMetadataAttribute(key, value)
-          - added: #343: Specifying the default Reuse in MefAttributedModel
-          - added: #352: Mef should fallback to default constructor for types without ImportingConstructor
-          - added: #371: MEF: multiple metadata attributes
-          - added: Support for ImportEx as a future replacement in V3 for ImportWithKey, similar to what was done with ExportEx/WithKey
-          - fixed: #350: Metadata provided via ExportMetadata attribute is missing
-          - fixed: #361: Class shared part creation policy should be applied to all member exports
-        </releaseNotes>
-        <dependencies>
-          <group>
-            <dependency id="DryIoc.dll" version="2.11.0-preview-02" />
-            <dependency id="DryIocAttributes.dll" version="3.0.0-preview-02" />
-          </group>
-          <group targetFramework="netstandard1.0">
-            <dependency id="DryIoc.dll" version="2.11.0-preview-02" />
-            <dependency id="DryIocAttributes.dll" version="3.0.0-preview-02" />
+  <metadata>
+    <id>DryIoc.MefAttributedModel.dll</id>
+    <!-- just a placeholder for "nuget pack -Version" flag -->
+    <version>0.0.0</version>
+    <authors>Maksim Volkau</authors>
+    <copyright>Copyright © 2013-2017 Maksim Volkau</copyright>
+    <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
+    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
+    <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+    <releaseNotes>
+      v3.0.0:
+      - added: WithMef() for maximum MEF compatibility in addition to WithMefAttributedModel() for only the attributes
+      - added: #292: Add ImportManyAttribute support for full MEF compatibility
+      - added: #293: Integrate lazy part discovery into MefAttributedModel API
+      - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
+      - added: #323: Support multiple WithMetadataAttribute(key, value)
+      - added: #343: Specifying the default Reuse in MefAttributedModel
+      - added: #352: Mef should fallback to default constructor for types without ImportingConstructor
+      - added: #371: MEF: multiple metadata attributes
+      - added: Xamarin MacOS support
+      - fixed: #350: Metadata provided via ExportMetadata attribute is missing
+      - fixed: #361: Class shared part creation policy should be applied to all member exports
+      - fixed: #369: LazyRegistrationInfoStepByStep sample doesn't work with ImportMany
+      - fixed: #392: Lazy workflow is broken again
+      - fixed: #399: Combining multiple Action exports with Lazy scenario
+      - fixed: #451: DryIoc should know about static members
+    </releaseNotes>
+    <dependencies>
+      <group>
+        <dependency id="DryIoc.dll" version="2.11.1" />
+        <dependency id="DryIocAttributes.dll" version="3.0.0" />
+      </group>
+      <group targetFramework="netstandard1.0">
+        <dependency id="DryIoc.dll" version="2.11.1" />
+        <dependency id="DryIocAttributes.dll" version="3.0.0" />
 
-            <dependency id="System.Runtime" version="4.3.0" />
-            <dependency id="System.Runtime.Extensions" version="4.3.0" />
-            <dependency id="System.Collections" version="4.3.0" />
-            <dependency id="System.Linq" version="4.3.0" />
-            <dependency id="System.Linq.Expressions" version="4.3.0" />
-            <dependency id="System.Reflection" version="4.3.0" />
-            <dependency id="System.Diagnostics.Debug" version="4.3.0" />
-          </group>
-        </dependencies>
-        <frameworkAssemblies>
-          <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
-        </frameworkAssemblies>
-    </metadata>
-    <files>
-        <file src="..\LICENSE.txt" />
-        <file src="..\NuGet\DryIoc.snk" />
+        <dependency id="System.Runtime" version="4.3.0" />
+        <dependency id="System.Runtime.Extensions" version="4.3.0" />
+        <dependency id="System.Collections" version="4.3.0" />
+        <dependency id="System.Linq" version="4.3.0" />
+        <dependency id="System.Linq.Expressions" version="4.3.0" />
+        <dependency id="System.Reflection" version="4.3.0" />
+        <dependency id="System.Diagnostics.Debug" version="4.3.0" />
+      </group>
+    </dependencies>
+    <frameworkAssemblies>
+      <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
+    </frameworkAssemblies>
+  </metadata>
+  <files>
+    <file src="..\LICENSE.txt" />
+    <file src="..\NuGet\DryIoc.snk" />
 
-        <!-- net35 -->
-        <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />
-        <file src="..\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net35" />
-        <file src="..\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net35" />
+    <!-- net35 -->
+    <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />
+    <file src="..\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net35" />
+    <file src="..\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net35" />
 
-        <!-- net40 -->
-        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net40" />
-        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net40" />
-        <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net40" />
+    <!-- net40 -->
+    <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net40" />
+    <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net40" />
+    <file src="..\Net40\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net40" />
 
-        <!-- net45 -->
-        <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net45" />
-        <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net45" />
-        <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net45" />
+    <!-- net45 -->
+    <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net45" />
+    <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\net45" />
+    <file src="..\Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\net45" />
 
-        <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-        <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-        <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+    <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-        <!-- NetStandard1.0 created from PCL Profile259 -->
-        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\netstandard1.0" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\netstandard1.0" />
-        <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\netstandard1.0" />
+    <!-- NetStandard1.0 created from PCL Profile259 -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\netstandard1.0" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\netstandard1.0" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\netstandard1.0" />
 
-    </files>
+    <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\xamarinmac20" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.pdb" target="lib\xamarinmac20" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.MefAttributedModel.xml" target="lib\xamarinmac20" />
+
+  </files>
 </package>

@@ -5326,7 +5326,7 @@ namespace DryIoc
         }
 
         // todo: v3: remove
-        /// <summary>Obsolete: use <see cref="UseInstance{TService}"/></summary>
+        /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -5396,7 +5396,7 @@ namespace DryIoc
             Setup.With(weaklyReferenced: true, preventDisposal: true, asResolutionCall: true);
 
         // todo: v3: remove
-        /// <summary>Obsolete: use <see cref="UseInstance{TService}"/></summary>
+        /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
@@ -5412,14 +5412,12 @@ namespace DryIoc
         /// <param name="instance">Instance to register</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
-        /// <param name="IfAlreadyRegistered">(optional) The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance<TService>(this IContainer container, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false,
-            IfAlreadyRegistered IfAlreadyRegistered = IfAlreadyRegistered.Replace,
             object serviceKey = null)
         {
-            container.UseInstance(typeof(TService), instance, preventDisposal, weaklyReferenced, IfAlreadyRegistered, serviceKey);
+            container.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
         }
 
         /// <summary>Stores the externally created instance into open scope or singleton,
@@ -5427,13 +5425,45 @@ namespace DryIoc
         /// <param name="container">Container to register</param>
         /// <param name="serviceType">Runtime service type to register instance with</param>
         /// <param name="instance">Instance to register</param>
-        /// <param name="IfAlreadyRegistered">(optional) The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance(this IContainer container, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false,
-            IfAlreadyRegistered IfAlreadyRegistered = IfAlreadyRegistered.Replace,
+            object serviceKey = null)
+        {
+            container.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+        }
+
+        /// <summary>Stores the externally created instance into open scope or singleton,
+        /// replacing the existing registration and instance if any.</summary>
+        /// <typeparam name="TService">Specified instance type. May be a base type or interface of instance actual type.</typeparam>
+        /// <param name="container">Container to register</param>
+        /// <param name="instance">Instance to register</param>
+        /// <param name="IfAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
+        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
+        /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
+        public static void UseInstance<TService>(this IContainer container, TService instance,
+            IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false,
+            object serviceKey = null)
+        {
+            container.UseInstance(typeof(TService), instance, IfAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+        }
+
+        /// <summary>Stores the externally created instance into open scope or singleton,
+        /// replacing the existing registration and instance if any.</summary>
+        /// <param name="container">Container to register</param>
+        /// <param name="serviceType">Runtime service type to register instance with</param>
+        /// <param name="instance">Instance to register</param>
+        /// <param name="IfAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
+        /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
+        /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
+        public static void UseInstance(this IContainer container, Type serviceType, object instance,
+            IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false,
             object serviceKey = null)
         {
             if (instance != null)
