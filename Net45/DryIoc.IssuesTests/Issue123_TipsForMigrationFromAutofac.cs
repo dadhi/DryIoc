@@ -256,7 +256,11 @@ namespace DryIoc.IssuesTests
 
         public class NoDep
         {
-            public NoDep(ISomeDep dep) {}
+            public ISomeDep Dep { get; private set; }
+            public NoDep(ISomeDep dep)
+            {
+                Dep = dep;
+            }
         }
 
         public interface ISomeDep { }
@@ -545,16 +549,20 @@ namespace DryIoc.IssuesTests
 
         public class A
         {
+            public B B { get; private set; }
+            public C C { get; private set; }
             public bool IsCreatedWithB { get; private set; }
             public bool IsCreatedWithC { get; private set; }
 
             public A(B b)
             {
+                B = b;
                 IsCreatedWithB = true;
             }
 
             public A(C c)
             {
+                C = c;
                 IsCreatedWithC = true;
             }
         }

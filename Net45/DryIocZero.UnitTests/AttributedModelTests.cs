@@ -60,7 +60,7 @@
             var ex = Assert.Throws<ContainerException>(
                 () => _container.Resolve<ServiceWithMultipleCostructors>());
 
-            Assert.AreEqual(DryIocZero.Error.UnableToResolveDefaultService, ex.Error);
+            Assert.AreEqual(Error.UnableToResolveDefaultService, ex.Error);
         }
 
         [Test]
@@ -77,7 +77,7 @@
         [Test]
         public void Can_specify_all_Register_options_for_export()
         {
-            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+            var container = new Container(new AsyncExecutionFlowScopeContext());
 
             IAllOpts opts;
             using (var s = container.OpenScope("b"))
