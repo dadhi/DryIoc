@@ -1,5 +1,4 @@
 ﻿using System.Linq;
-using DryIoc;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
 
@@ -31,6 +30,19 @@ namespace DryIocZero.UnitTests
         }
 
         [Test]
+        public void Should_throw_on_incompatible_service_produced_by_delegate_and_required_service_type()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(typeof(Cabbage), _ => new Potato());
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Cabbage>());
+
+            Assert.AreEqual(Error.ProducedServiceIsNotAssignableToRequiredServiceType, ex.Error);
+        }
+
+        [Test]
         public void Should_throw_if_null_keyed_service_is_nor_registered_nor_generated()
         {
             var container = new Container();
@@ -53,11 +65,11 @@ namespace DryIocZero.UnitTests
         }
 
         [Test]
-        public void Can_Register_Instance()
+        public void Can_use_instance()
         {
             var container = new Container();
             var potato = new Potato();
-            container.RegisterInstance(potato);
+            container.UseInstance(potato);
 
             var resolvedPotato = container.Resolve(typeof(Potato), false);
 
@@ -65,6 +77,7 @@ namespace DryIocZero.UnitTests
         }
 
         internal class Potato {}
+        internal class Cabbage {}
 
         [Test]
         public void Can_open_scope()
@@ -133,7 +146,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var handlers = container.ResolveMany(typeof(ISomeDb)).Cast<ISomeDb>().ToArray<ISomeDb>();
+            var handlers = container.ResolveMany(typeof(ISomeDb)).Cast<ISomeDb>().ToArray();
 
             Assert.AreEqual(1, handlers.Length);
         }
@@ -201,8 +214,8 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var ms = container.ResolveMany(typeof(IMultiExported), compositeParentKey: "c").Cast<IMultiExported>().ToArray();
-            Assert.AreEqual(2, ms.Length);
+            var ms = container.ResolveMany(typeof(IMultiExported)).Cast<IMultiExported>().ToArray();
+            Assert.AreEqual(3, ms.Length);
         }
 
         [Test]

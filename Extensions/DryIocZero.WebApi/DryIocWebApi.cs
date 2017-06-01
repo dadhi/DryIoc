@@ -68,7 +68,7 @@ namespace DryIocZero.WebApi
             var filterProvider = new DryIocFilterProvider(container, providers);
             services.Add(typeof(IFilterProvider), filterProvider);
 
-            container.RegisterInstance<IFilterProvider>(filterProvider);
+            container.UseInstance<IFilterProvider>(filterProvider);
         }
 
         /// <summary>Inserts DryIoc delegating request handler into message handlers.</summary>
@@ -131,7 +131,8 @@ namespace DryIocZero.WebApi
         private readonly Func<Type, bool> _throwIfUnresolved;
     }
 
-    /// <summary>Dependency scope adapter to scoped DryIoc container (created by <see cref="Container.OpenScope"/>).</summary>
+    /// <summary>Dependency scope adapter to scoped DryIoc container 
+    /// (created by <see cref="Container.OpenScope"/>).</summary>
     public sealed class DryIocDependencyScope : IDependencyScope
     {
         /// <summary>Wrapped DryIoc container.</summary>
@@ -218,7 +219,7 @@ namespace DryIocZero.WebApi
         {
             var dependencyScope = request.GetDependencyScope();
             var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
-            container.RegisterInstance(request);
+            container.UseInstance(request);
         }
     }
 }
