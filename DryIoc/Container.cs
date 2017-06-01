@@ -7304,6 +7304,27 @@ namespace DryIoc
         public static readonly Setup Wrapper = new WrapperSetup();
 
         /// <summary>Returns generic wrapper setup.</summary>
+        /// <param name="condition">(optional)</param>
+        /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
+        /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
+        /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
+        /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
+        /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
+        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
+        /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
+        public static Setup WrapperWith(Func<Request, bool> condition, 
+            int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
+            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false)
+        {
+            if (wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
+                && !openResolutionScope && !preventDisposal && condition == null)
+                return Wrapper;
+
+            return new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+                condition, openResolutionScope, asResolutionCall, preventDisposal);
+        }
+
+        /// <summary>Returns generic wrapper setup.</summary>
         /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
         /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
         /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
@@ -7317,13 +7338,9 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
             Func<RequestInfo, bool> condition = null)
         {
-            if (wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-                && !openResolutionScope && !preventDisposal && condition == null)
-                return Wrapper;
-
-            var requestCondition = condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo));
-            return new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
-                requestCondition, openResolutionScope, asResolutionCall, preventDisposal);
+            return WrapperWith(condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)), 
+                wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+                openResolutionScope, asResolutionCall, preventDisposal);
         }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>

@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.11.3:
+      - fixed: Backward compatibility of DryIoc 2.11 WrapperSetup.Condition with 2.10
       v2.11.2:
       - fixed: Backward compatibility of DryIoc 2.11 Setup.Condition with 2.10
       - fixed: #480: DryIoc.Microsoft.DependencyInjection - WithDependencyInjectionAdapter() exception
