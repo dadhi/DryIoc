@@ -2865,9 +2865,10 @@ namespace DryIoc
         /// <returns>True if keys have the same order.</returns>
         public override bool Equals(object key)
         {
+            if (key == null) // to enable comparison with null (unspecified)
+                return true;
             var defaultKey = key as DefaultKey;
-            return key == null // to enable comparison with null (unspecified)
-                || defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
+            return defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
         }
 
         /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>
@@ -3931,11 +3932,20 @@ namespace DryIoc
         /// <summary>See <see cref="WithDefaultReuseInsteadOfTransient"/></summary>
         public IReuse DefaultReuseInsteadOfTransient { get; private set; }
 
+        // todo: v3: Obsolete("Replaced by WithDefaultReuse because for some cases IsteadOfTransient does not make sense.", error: false) 
+        /// <summary>Replaced by WithDefaultReuse because for some cases IsteadOfTransient does not make sense.</summary>
+        public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules.DefaultReuseInsteadOfTransient = reuse ?? Reuse.Transient;
+            return newRules;
+        }
+
         // todo: v3: Rename to WithDefaultReuse, because using rules.WithDefaultReuseInsteadOfTransient(Reuse.Transient)) seems off.
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         /// <param name="reuse">Reuse to set. If null the <see cref="Reuse.Transient"/> will be used</param>
         /// <returns>New rules.</returns>
-        public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse)
+        public Rules WithDefaultReuse(IReuse reuse)
         {
             var newRules = (Rules)MemberwiseClone();
             newRules.DefaultReuseInsteadOfTransient = reuse ?? Reuse.Transient;

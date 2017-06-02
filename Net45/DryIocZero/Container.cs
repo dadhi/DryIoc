@@ -36,8 +36,7 @@ namespace DryIocZero
     /// <summary>Minimal container to register service factory delegates and then resolve service from them.</summary>
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly",
          Justification = "Does not contain any unmanaged resources.")]
-    public sealed partial class Container : IFactoryDelegateRegistrator, IResolverContext, IResolver, IScopeAccess,
-        IDisposable
+    public sealed partial class Container : IRegistrator, IResolverContext, IResolver, IScopeAccess, IDisposable
     {
         /// <summary>Creates container.</summary>
         /// <param name="scopeContext">(optional) Ambient scope context.</param>
@@ -70,6 +69,17 @@ namespace DryIocZero
             _disposed = disposed;
 
             _rootContainer = rootContainer;
+
+            GetNextFactoryID(ref _lastFactoryID);
+        }
+
+        private int _lastFactoryID;
+
+        /// <summary>The unique factory ID, which may be used for runtime scoped registrations.</summary>
+        /// <returns>New factory ID.</returns>
+        public int GetNextFactoryID()
+        {
+            return Interlocked.Increment(ref _lastFactoryID);
         }
 
         /// <summary>Provides access to resolver.</summary>
@@ -91,6 +101,8 @@ namespace DryIocZero
         }
 
         #region IResolver
+
+        partial void GetNextFactoryID(ref int lastGeneratedFactoryID);
 
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope);
 
@@ -273,32 +285,22 @@ namespace DryIocZero
 
         #endregion
 
-        #region IFactoryDelegateRegistrator
-
-        /// <summary>Registers factory delegate with corresponding service type.</summary>
-        /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
-        public void Register(Type serviceType, FactoryDelegate factoryDelegate)
-        {
-            ThrowIfContainerDisposed();
-            _defaultFactories.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
-        }
+        #region IRegistrator
 
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
-        /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> 
-        /// <param name="factoryDelegate">Delegate</param>
-        public void Register(Type serviceType, object serviceKey, FactoryDelegate factoryDelegate)
+        public void Register(Type serviceType, FactoryDelegate factoryDelegate, IReuse reuse, object serviceKey)
         {
-            if (serviceKey == null)
-            {
-                Register(serviceType, factoryDelegate);
-                return;
-            }
-
             ThrowIfContainerDisposed();
 
-            _keyedFactories.Swap(it => it.AddOrUpdate(serviceType,
-                (it.GetValueOrDefault(serviceType) ??
-                ImTreeMap<object, FactoryDelegate>.Empty).AddOrUpdate(serviceKey, factoryDelegate)));
+            if (reuse != null)
+                factoryDelegate = reuse.Apply(GetNextFactoryID(), factoryDelegate);
+
+            if (serviceKey == null)
+                _defaultFactories.Swap(it => it.AddOrUpdate(serviceType, factoryDelegate));
+            else
+                _keyedFactories.Swap(it => it.AddOrUpdate(serviceType,
+                    (it.GetValueOrDefault(serviceType) ??
+                     ImTreeMap<object, FactoryDelegate>.Empty).AddOrUpdate(serviceKey, factoryDelegate)));
         }
 
         private Ref<ImTreeMap<Type, FactoryDelegate>> _defaultFactories;
@@ -355,7 +357,7 @@ namespace DryIocZero
         {
             var currentScope = ScopeContext == null ? _openedScope : ScopeContext.GetCurrentOrDefault();
             if (currentScope == null)
-                return (IScope)Throw.If(throwIfNotFound, Error.NoCurrentScope);
+                return (IScope)Throw.If(throwIfNotFound, Error.NoCurrentScope, this);
 
             var matchingScope = GetMatchingScopeOrDefault(currentScope, name);
             if (matchingScope == null)
@@ -661,15 +663,12 @@ namespace DryIocZero
     public delegate object FactoryDelegate(IResolverContext r, IScope scope);
 
     /// <summary>Provides methods to register default or keyed factory delegates.</summary>
-    public interface IFactoryDelegateRegistrator
+    public interface IRegistrator
     {
-        /// <summary>Registers factory delegate with corresponding service type.</summary>
-        /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
-        void Register(Type serviceType, FactoryDelegate factoryDelegate);
-
         /// <summary>Registers factory delegate with corresponding service type and service key.</summary>
-        /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param> <param name="factoryDelegate">Delegate</param>
-        void Register(Type serviceType, object serviceKey, FactoryDelegate factoryDelegate);
+        /// <param name="serviceType">Type</param> <param name="factoryDelegate">Delegate</param>
+        /// <param name="reuse">(optional)</param> <param name="serviceKey">(optional)</param>
+        void Register(Type serviceType, FactoryDelegate factoryDelegate, IReuse reuse, object serviceKey);
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -704,19 +703,33 @@ namespace DryIocZero
         /// <param name="registrator">Registrator to register with.</param>
         /// <param name="serviceType">Service type.</param>
         /// <param name="factoryDelegate">Delegate to produce service instance.</param>
-        /// <param name="serviceKey">(optional) Service key.</param>
-        public static void RegisterDelegate(this IFactoryDelegateRegistrator registrator,
-            Type serviceType, Func<IResolver, object> factoryDelegate, object serviceKey = null)
+        /// <param name="reuse">(optional) reuse.</param> <param name="serviceKey">(optional) service key.</param>
+        public static void RegisterDelegate(this IRegistrator registrator,
+            Type serviceType, Func<IResolver, object> factoryDelegate, 
+            IReuse reuse = null, object serviceKey = null)
         {
-            registrator.Register(serviceType, serviceKey,
-                (context, scope) =>
-                {
-                    var service = factoryDelegate(context.Resolver);
-                    if (service != null)
-                        Throw.If(!serviceType.GetTypeInfo().IsAssignableFrom(service.GetType().GetTypeInfo()),
-                            Error.ProducedServiceIsNotAssignableToRequiredServiceType, service, serviceType);
-                    return service;
-                });
+            FactoryDelegate factory = (context, scope) =>
+            {
+                var service = factoryDelegate(context.Resolver);
+                if (service != null)
+                    Throw.If(!serviceType.GetTypeInfo().IsAssignableFrom(service.GetType().GetTypeInfo()),
+                        Error.ProducedServiceIsNotAssignableToRequiredServiceType, service, serviceType);
+                return service;
+            };
+
+            registrator.Register(serviceType, factory, reuse, serviceKey);
+        }
+
+        /// <summary>Registers user provided delegate to create the service</summary>
+        /// <typeparam name="TService">Service type.</typeparam>
+        ///  <param name="registrator">Registrator to register with.</param>
+        /// <param name="factoryDelegate">Delegate to produce service instance.</param>
+        /// <param name="reuse">(optional) reuse.</param> <param name="serviceKey">(optional) service key.</param>
+        public static void RegisterDelegate<TService>(this IRegistrator registrator,
+            IReuse reuse, Func<IResolver, TService> factoryDelegate, object serviceKey = null)
+        {
+            registrator.Register(typeof(TService), 
+                (context, _) => factoryDelegate(context.Resolver), reuse, serviceKey);
         }
 
         /// <summary>Registers user provided delegate to create the service</summary>
@@ -724,11 +737,10 @@ namespace DryIocZero
         ///  <param name="registrator">Registrator to register with.</param>
         /// <param name="factoryDelegate">Delegate to produce service instance.</param>
         /// <param name="serviceKey">(optional) Service key.</param>
-        public static void RegisterDelegate<TService>(this IFactoryDelegateRegistrator registrator,
+        public static void RegisterDelegate<TService>(this IRegistrator registrator,
             Func<IResolver, TService> factoryDelegate, object serviceKey = null)
         {
-            registrator.Register(typeof(TService), serviceKey,
-                (context, scope) => factoryDelegate(context.Resolver));
+            registrator.RegisterDelegate(null, factoryDelegate, serviceKey);
         }
 
         /// <summary>Registers passed service instance.</summary>
@@ -736,7 +748,7 @@ namespace DryIocZero
         /// <param name="registrator">Registrator to register with.</param>
         /// <param name="instance">Externally managed service instance.</param>
         /// <param name="serviceKey">(optional) Service key.</param>
-        public static void UseInstance<TService>(this IFactoryDelegateRegistrator registrator,
+        public static void UseInstance<TService>(this IRegistrator registrator,
             TService instance, object serviceKey = null)
         {
             registrator.RegisterDelegate(_ => instance, serviceKey);
@@ -796,11 +808,29 @@ namespace DryIocZero
         }
 
         /// <summary>Resolves collection of services of specified service type.</summary>
+        /// <param name="resolver"></param> <param name="serviceType">Service type.</param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        /// <returns>Resolved service or throws exception otherwise.</returns>
+        public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType, object serviceKey)
+        {
+            return resolver.ResolveMany(serviceType, serviceKey, null, null, null, RequestInfo.Empty, null);
+        }
+
+        /// <summary>Resolves collection of services of specified service type.</summary>
         /// <typeparam name="TService">Service type.</typeparam> <param name="resolver"></param> 
         /// <returns>Resolved service or throws exception otherwise.</returns>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver)
         {
             return resolver.ResolveMany(typeof(TService)).Cast<TService>();
+        }
+
+        /// <summary>Resolves collection of services of specified service type.</summary>
+        /// <typeparam name="TService">Service type.</typeparam> <param name="resolver"></param>
+        /// <param name="serviceKey">(optional) Service key.</param>
+        /// <returns>Resolved service or throws exception otherwise.</returns>
+        public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver, object serviceKey)
+        {
+            return resolver.ResolveMany(typeof(TService), serviceKey).Cast<TService>();
         }
 
         /// <summary>For given instance resolves and sets properties.</summary>
@@ -1251,7 +1281,7 @@ namespace DryIocZero
             UnableToResolveKeyedService = Of(
                 "Unable to resolve {0} with key [{1}] from {2}empty runtime registrations and from generated factory delegates."),
             NoCurrentScope = Of(
-                "No current scope available: probably you are registering to, or resolving from outside of scope."),
+                "No current scope is available in {0}. Probably you are resolving from outside of scope."),
             NoMatchedScopeFound = Of(
                 "Unable to find scope with matching name: {0}."),
             NotDirectScopeParent = Of(
@@ -1337,6 +1367,11 @@ namespace DryIocZero
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         int Lifespan { get; }
+
+        /// <summary>Applies reuse to passed service creation factory.</summary>
+        /// <param name="itemId">Reused item id, used to store and find item in scope.</param>
+        /// <param name="factoryDelegate">Source factory</param> <returns>Transformed factory</returns>
+        FactoryDelegate Apply(int itemId, FactoryDelegate factoryDelegate);
     }
 
     /// <summary>Specifies pre-defined reuse behaviors supported by container: 
@@ -1378,6 +1413,18 @@ namespace DryIocZero
                 : new ResolutionScopeReuse(assignableFromServiceType, serviceKey, outermost);
         }
 
+        /// <summary>Creates reuse to search for <typeparamref name="TAssignableFromServiceType"/> and <paramref name="serviceKey"/>
+        /// in existing resolution scope hierarchy.</summary>
+        /// <typeparam name="TAssignableFromServiceType">To search for scope with service type assignable to type specified in parameter.</typeparam>
+        /// <param name="serviceKey">(optional) Search for specified key.</param>
+        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
+        /// <returns>New reuse with specified parameters.</returns>
+        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null, 
+            bool outermost = false)
+        {
+            return InResolutionScopeOf(typeof(TAssignableFromServiceType), serviceKey, outermost);
+        }
+
         /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
         public static readonly string WebRequestScopeName = "WebRequestScopeName";
 
@@ -1393,6 +1440,12 @@ namespace DryIocZero
         {
             get { return 0; }
         }
+
+        /// <summary>Returns the input factory as-is. No reuse is applied.</summary>
+        public FactoryDelegate Apply(int itemId, FactoryDelegate factoryDelegate)
+        {
+            return factoryDelegate;
+        }
     }
 
     /// <summary>Represents lifetime of singleton reuse.</summary>
@@ -1402,6 +1455,12 @@ namespace DryIocZero
         public int Lifespan
         {
             get { return 1000; }
+        }
+
+        /// <inheritdoc />
+        public FactoryDelegate Apply(int itemId, FactoryDelegate factoryDelegate)
+        {
+            return (r, _) => r.SingletonScope().GetOrAdd(itemId, () => factoryDelegate(r, _));
         }
     }
 
@@ -1415,6 +1474,14 @@ namespace DryIocZero
         public int Lifespan
         {
             get { return 100; }
+        }
+
+        /// <inheritdoc />
+        public FactoryDelegate Apply(int itemId, FactoryDelegate factoryDelegate)
+        {
+            return (context, _) => 
+                GetOrAddItemOrDefault(context.Scopes, Name, true,
+                    itemId, () => factoryDelegate(context, _));
         }
 
         /// <summary>Creates reuse optionally specifying its name.</summary> 
@@ -1448,6 +1515,16 @@ namespace DryIocZero
             get { return 0; }
         }
 
+        // 
+        /// <inheritdoc />
+        public FactoryDelegate Apply(int itemId, FactoryDelegate factoryDelegate)
+        {
+            throw new NotSupportedException("Resolution scope is not supported");
+            //return (r, scope) => r.Scopes
+            //    .GetOrCreateResolutionScope(ref scope, AssignableFromServiceType, ServiceKey)
+            //    .GetOrAdd(itemId, () => factoryDelegate(r, scope));
+        }
+
         /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>
         public readonly Type AssignableFromServiceType;
 
@@ -1461,8 +1538,7 @@ namespace DryIocZero
         /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
         /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="outermost">(optional)</param>
-        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null,
-            bool outermost = false)
+        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null, bool outermost = false)
         {
             AssignableFromServiceType = assignableFromServiceType;
             ServiceKey = serviceKey;
@@ -1819,8 +1895,10 @@ namespace DryIocZero
         /// <returns>True if keys have the same order.</returns>
         public override bool Equals(object key)
         {
+            if (key == null)
+                return true;
             var defaultKey = key as DefaultKey;
-            return key == null || defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
+            return defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
         }
 
         /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>

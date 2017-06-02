@@ -13,8 +13,8 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.RegisterDelegate(r => new Potato());
 
-            var potato = container.Resolve(typeof(Potato), false);
-            
+            var potato = container.Resolve<Potato>();
+
             Assert.IsNotNull(potato);
         }
 
@@ -24,7 +24,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
             container.RegisterDelegate(r => new Potato(), "mashed");
 
-            var potato = container.Resolve(typeof(Potato), "mashed");
+            var potato = container.Resolve<Potato>("mashed");
 
             Assert.IsNotNull(potato);
         }
@@ -36,7 +36,7 @@ namespace DryIocZero.UnitTests
 
             container.RegisterDelegate(typeof(Cabbage), _ => new Potato());
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Cabbage>());
 
             Assert.AreEqual(Error.ProducedServiceIsNotAssignableToRequiredServiceType, ex.Error);
@@ -47,7 +47,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve(typeof(Potato), null));
 
             Assert.AreEqual(Error.UnableToResolveDefaultService, ex.Error);
@@ -76,14 +76,14 @@ namespace DryIocZero.UnitTests
             Assert.AreSame(potato, resolvedPotato);
         }
 
-        internal class Potato {}
-        internal class Cabbage {}
+        internal class Potato { }
+        internal class Cabbage { }
 
         [Test]
         public void Can_open_scope()
         {
             var container = new Container();
-            container.Register(typeof(Potato), (r, scope) => new Potato());
+            container.RegisterDelegate(_ => new Potato());
             using (var scope = container.OpenScope())
             {
                 var potato = scope.Resolve(typeof(Potato), false);
@@ -92,10 +92,47 @@ namespace DryIocZero.UnitTests
         }
 
         [Test]
+        public void Can_register_scoped_delegate_and_resolve_it_in_open_scope()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(Reuse.InCurrentScope, _ => new Potato());
+
+            using (var scope = container.OpenScope())
+            {
+                var potato = scope.Resolve<Potato>();
+                Assert.IsNotNull(potato);
+                Assert.AreSame(potato, scope.Resolve<Potato>());
+            }
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Potato>());
+
+            Assert.AreEqual(Error.NoCurrentScope, ex.Error);
+        }
+
+        [Test]
+        public void Can_register_singleton_delegate()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(Reuse.Singleton, _ => new Potato());
+
+            var potato = container.Resolve<Potato>();
+            using (var scope = container.OpenScope())
+            {
+                Assert.IsNotNull(potato);
+                Assert.AreSame(potato, scope.Resolve<Potato>());
+            }
+
+            Assert.AreSame(potato, container.Resolve<Potato>());
+        }
+
+        [Test]
         public void Dispose_should_remove_registrations()
         {
             var container = new Container();
-            container.Register(typeof(Potato), (r, scope) => new Potato());
+            container.RegisterDelegate(_ => new Potato());
             container.Dispose();
             Assert.Throws<ContainerException>(() => container.Resolve(typeof(Potato), false));
         }
@@ -146,7 +183,7 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var handlers = container.ResolveMany(typeof(ISomeDb)).Cast<ISomeDb>().ToArray();
+            var handlers = container.ResolveMany<ISomeDb>().ToArray();
 
             Assert.AreEqual(1, handlers.Length);
         }
@@ -189,8 +226,8 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IMultiExported), (context, scope) => new AnotherMulti());
-            container.Register(typeof(IMultiExported), "another", (context, scope) => new AnotherMulti());
+            container.RegisterDelegate<IMultiExported>(_ => new AnotherMulti());
+            container.RegisterDelegate<IMultiExported>(_ => new AnotherMulti(), "another");
 
             var ms = container.ResolveMany(typeof(IMultiExported)).Cast<IMultiExported>().ToArray();
             Assert.AreEqual(2, ms.Count(m => m.GetType() == typeof(AnotherMulti)));
@@ -202,9 +239,9 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IMultiExported), "c", (context, scope) => new AnotherMulti());
+            container.RegisterDelegate<IMultiExported>(_ => new AnotherMulti(), "c");
 
-            var ms = container.ResolveMany(typeof(IMultiExported), "c").Cast<IMultiExported>().ToArray();
+            var ms = container.ResolveMany<IMultiExported>("c").ToArray();
             Assert.AreEqual(1, ms.Count(m => m.GetType() == typeof(AnotherMulti)));
             Assert.AreEqual(2, ms.Length);
         }
@@ -214,12 +251,12 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
 
-            var ms = container.ResolveMany(typeof(IMultiExported)).Cast<IMultiExported>().ToArray();
+            var ms = container.ResolveMany<IMultiExported>().ToArray();
             Assert.AreEqual(3, ms.Length);
         }
 
         [Test]
-        public void Can_register_into_resolution_scope_at_runtime()
+        public void Can_manually_register_into_resolution_scope_at_runtime()
         {
             var container = new Container();
             var yID = container.GetNextFactoryID();
@@ -227,7 +264,8 @@ namespace DryIocZero.UnitTests
                     (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), null)
                         .GetOrAdd(yID, () => new Y()),
                     (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), null)
-                        .GetOrAdd(yID, () => new Y())));
+                        .GetOrAdd(yID, () => new Y())),
+                        null, null);
 
             var x = container.Resolve<X>();
             Assert.IsNotNull(x.Y1);
@@ -239,13 +277,14 @@ namespace DryIocZero.UnitTests
         {
             var container = new Container();
             var yID = container.GetNextFactoryID();
-            container.Register(typeof(X), "a", (context, scope) => new X(
+            container.Register(typeof(X), (context, scope) => new X(
                     (Y)context.Scopes.GetMatchingResolutionScope(
                         context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), "a"),
                         typeof(X), "a", false, true)
                         .GetOrAdd(yID, () => new Y()),
                     (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), "a")
-                        .GetOrAdd(yID, () => new Y())));
+                        .GetOrAdd(yID, () => new Y())),
+                        null, "a");
 
             var x = container.Resolve<X>(serviceKey: "a");
             Assert.IsNotNull(x.Y1);
@@ -254,7 +293,7 @@ namespace DryIocZero.UnitTests
 
         internal class AnotherMulti : IMultiExported { }
 
-        internal class NotRegistered {}
+        internal class NotRegistered { }
 
         internal class X
         {
