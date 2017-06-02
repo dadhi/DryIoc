@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2015 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,19 +36,16 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-Resolution generation is completed without errors.
+Factory delegate generation is completed without errors.
 ----------------------------------
 */
 
     partial class Container
     {
-        private int _lastFactoryID = 28; // generated, equals to last used Factory.FactoryID 
-
-        /// <summary>The unique factory ID, which may be used for runtime scoped registrations.</summary>
-        /// <returns>New factory ID.</returns>
-        public int GetNextFactoryID() 
+        [ExcludeFromCodeCoverage]
+        partial void GetNextFactoryID(ref int lastFactoryID)
         {
-            return Interlocked.Increment(ref _lastFactoryID);
+            lastFactoryID = 28; // generated: equals to last used Factory.FactoryID 
         }
 
         [ExcludeFromCodeCoverage]
