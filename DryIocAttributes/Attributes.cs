@@ -40,7 +40,9 @@ namespace DryIocAttributes
         /// <summary>subj.</summary>
         CurrentScope,
         /// <summary>subj.</summary>
-        ResolutionScope
+        ResolutionScope,
+        /// <summary>subj.</summary>
+        ScopedOrSingleton
     }
 
     /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
@@ -187,6 +189,13 @@ namespace DryIocAttributes
     {
         /// <summary>Creates attribute.</summary>
         public ResolutionScopeReuseAttribute() : base(ReuseType.ResolutionScope) { }
+    }
+
+    /// <summary>Denotes exported type with Scoped Or Singleton Reuse.</summary>
+    public class ScopedOrSingletonReuseAttribute : ReuseAttribute
+    {
+        /// <summary>Creates attribute.</summary>
+        public ScopedOrSingletonReuseAttribute() : base(ReuseType.ScopedOrSingleton) { }
     }
 
     /// <summary>Specifies for export part to use the whatever reuse of importing site.</summary>
