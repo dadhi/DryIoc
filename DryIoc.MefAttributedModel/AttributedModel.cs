@@ -44,7 +44,8 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
-            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope);
+            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope)
+            .AddOrUpdate(ReuseType.ScopedOrSingleton, _ => Reuse.ScopedOrSingleton);
 
         /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
         /// <param name="rules">Source rules.</param> <returns>New rules.</returns>
