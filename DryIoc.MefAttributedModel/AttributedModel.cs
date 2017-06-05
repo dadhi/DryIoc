@@ -37,8 +37,7 @@ namespace DryIoc.MefAttributedModel
     /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
     public static class AttributedModel
     {
-        /// <summary>Map of supported reuse types: so the reuse type specified by <see cref="ReuseAttribute"/>
-        /// could be mapped to corresponding <see cref="Reuse"/> members.</summary>
+        /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
         public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
             ImTreeMap<ReuseType, Func<object, IReuse>>.Empty
             .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
@@ -453,7 +452,9 @@ namespace DryIoc.MefAttributedModel
                         // todo: Review need for factory service key
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
-                        var factoryTypeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
+                        var factoryKey = Constants.InstanceFactory;
+
+                        var factoryTypeAttributes = new Attribute[] { new ExportAttribute(factoryKey) };
                         typeRegistrationInfo = GetRegistrationInfoOrDefault(type, factoryTypeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
@@ -684,30 +685,31 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             // may be null if service key is registered at all Or registered not through MEF
-            var types = contractNameStore.GetServiceTypesOrDefault(serviceKey);
-            if (types == null)
+            var serviceTypes = contractNameStore.GetServiceTypesOrDefault(serviceKey);
+            if (serviceTypes == null)
                 return null;
 
             // required when importing the wrappers
             var unwrappedType = request.Container.GetWrappedType(type, null);
 
             // first filter out non compatible / assignable types
-            if (types.Length != 1)
+            if (serviceTypes.Length != 1)
             {
-                types = types.Match(t => t.Key.IsAssignableTo(unwrappedType));
-                if (types.Length > 1)
-                    Throw.It(Error.UnableToSelectFromMultipleTypes, types, KV.Of(serviceKey, type));
+                serviceTypes = serviceTypes.Match(t => t.Key.IsAssignableTo(unwrappedType));
+                if (serviceTypes.Length > 1)
+                    Throw.It(Error.UnableToSelectFromMultipleTypes, serviceTypes, KV.Of(serviceKey, type));
             }
 
-            if (types.Length == 1)
+            if (serviceTypes.Length == 1)
             {
-                var exportedType = types[0].Key;
+                var exportedType = serviceTypes[0].Key;
                 if (exportedType.IsAssignableTo(unwrappedType))
                     return exportedType;
             }
-            else
+            else if (serviceTypes.Length > 1)
             {
                 // todo: multiple required types are not supported at the moment
+                Throw.It(DryIoc.Error.Of("Multiple required types are not supported at the moment: {0}"), serviceTypes);
             }
 
             return null;
