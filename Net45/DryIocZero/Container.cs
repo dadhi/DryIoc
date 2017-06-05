@@ -1504,6 +1504,16 @@ namespace DryIocZero
             var scope = scopes.GetCurrentNamedScope(scopeName, throwIfNoScopeFound);
             return scope == null ? null : scope.GetOrAdd(itemId, createValue);
         }
+
+        internal static object GetScopedOrSingleton(IScopeAccess scopes, IScope singleton,
+            int itemId, CreateScopedValue createValue)
+        {
+            var scope = scopes.GetCurrentNamedScope(null, throwIfNotFound: false);
+            if (scope != null)
+                return scope.GetOrAdd(itemId, createValue);
+            var singetonId = itemId == -1 ? -1 : singleton.GetScopedItemIdOrSelf(itemId);
+            return singleton.GetOrAdd(singetonId, createValue);
+        }
     }
 
     /// <summary>Represent lifetime and compound name of resolution Scoped reuse.</summary>

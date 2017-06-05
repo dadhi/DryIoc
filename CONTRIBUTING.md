@@ -44,18 +44,9 @@ __Note:__ For .NET Core DependencyInjection adapter please run _NetCore\build.ba
 
 There are 3 solutions:
 
-- _DryIoc.sln_ includes every project except for .Net Core for every target plantform.
-- _DryIoc.start.sln_ includes only .NET 4.5 projects of DryIoc and companions (MEF, DIZero). 
+- _DryIoc.start.sln_ contains "starting" set of projects targeting .NET 4.5 only. __It is may be all you need.__
+- _DryIoc.extenstions.sln_ Adds to _DryIoc.start.sln_ all extentions targeting .NET 4.5.
+- _DryIoc.sln_ includes every project except for .Net Core for every target platform.
 - _NetCore/DryIoc.Microsoft.DependencyInjection.sln_ for [.NET Core and DryIoc.Microsoft.DependencyInjection](https://github.com/aspnet/dependencyinjection).
 
-__DryIoc.start.sln__ is a good start and may be all that you need.
-
-Before commit please run _build.bat_ to check that every platform and tests are fine.
-
 __Hint:__ Usually I am enabling [NCrunch](http://www.ncrunch.net/) to build and run Unit Tests continuously, saves me a lot of time.
-
-
-
-
-
-
