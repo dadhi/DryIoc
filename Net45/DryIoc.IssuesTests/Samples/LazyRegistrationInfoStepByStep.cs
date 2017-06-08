@@ -119,6 +119,44 @@ namespace DryIoc.IssuesTests.Samples
             Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
         }
 
+        [Test]
+        public void Lazy_import_of_commands_using_multiple_dynamic_registrations_of_the_same_service()
+        {
+            var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
+            var registrations = AttributedModel.Scan(new[] { assembly });
+            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
+            var assemblyLoaded = false;
+
+            // create a separate DynamicRegistrationProvider for each lazy registration
+            // to simulate that each ICommand is located in a different assembly
+            var dynamicRegistrations = lazyRegistrations.Select(r => new[] { r }.GetLazyTypeRegistrationProvider(() =>
+            {
+                assemblyLoaded = true;
+                return assembly;
+            })).ToArray();
+
+            // Test that resolve works
+            //========================
+            var container = new Container().WithMef()
+                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
+
+            // make sure that CommandImporter itself is available without loading the lazy assembly
+            container.RegisterExports(typeof(CommandImporter));
+
+            // the same resolution code as in previous test
+            //========================
+            var cmds = container.Resolve<CommandImporter>();
+            Assert.IsFalse(assemblyLoaded);
+
+            Assert.IsNotNull(cmds.LazyHandler);
+            Assert.IsNotNull(cmds.LazyHandler.Value);
+            Assert.IsTrue(assemblyLoaded);
+
+            Assert.IsNotNull(cmds.Commands);
+            Assert.AreEqual(2, cmds.Commands.Count()); // fails: only one command is imported
+            Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+        }
+
         public interface ICommandMetadata { string Name { get; } }
 
         [MetadataAttribute]
