@@ -127,13 +127,21 @@ namespace DryIoc.IssuesTests.Samples
             var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
             var assemblyLoaded = false;
 
+            // use shared service exports to compose multiple providers
+            var serviceExports = new Dictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>>();
+
             // create a separate DynamicRegistrationProvider for each lazy registration
             // to simulate that each ICommand is located in a different assembly
-            var dynamicRegistrations = lazyRegistrations.Select(r => new[] { r }.GetLazyTypeRegistrationProvider(() =>
-            {
-                assemblyLoaded = true;
-                return assembly;
-            })).ToArray();
+            var dynamicRegistrations = lazyRegistrations
+                .Select(r => new[] { r }
+                .GetLazyTypeRegistrationProvider(
+                    otherServiceExports: serviceExports,
+                    typeProvider: t =>
+                    {
+                        assemblyLoaded = true;
+                        return assembly.GetType(t);
+                    }))
+                .ToArray();
 
             // Test that resolve works
             //========================

@@ -504,15 +504,20 @@ namespace DryIoc.MefAttributedModel
         /// Then returns the factory provider which uses index for fast registration discovery.</summary>
         /// <param name="lazyRegistrations">Registrations with <see cref="ExportedRegistrationInfo.IsLazy"/> set to true.
         /// Consider to call <see cref="MakeLazyAndEnsureUniqueServiceKeys"/> on registrations before passing them here.</param>
-        /// <param name="getAssembly">Assembly to load type by name from.</param>
+        /// <param name="getAssembly">Assembly to load type by name from. NOTE: The assembly will be loaded only once!</param>
         /// <param name="ifAlreadyRegistered">(optional) Keep existing registrations by default.</param>
+        /// <param name="otherServiceExports">(optional) Index to share with other providers, 
+        /// if not specified - each provider will use its own. The index maps the full service name
+        /// from <paramref name="lazyRegistrations"/> to its registration and (optional) service key pairs.</param>
         /// <returns><see cref="Rules.DynamicRegistrationProvider"/></returns>
         public static Rules.DynamicRegistrationProvider GetLazyTypeRegistrationProvider(
             this IEnumerable<ExportedRegistrationInfo> lazyRegistrations, Func<Assembly> getAssembly,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep)
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep,
+            IDictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>> otherServiceExports = null)
         {
             var assembly = new Lazy<Assembly>(getAssembly);
-            return lazyRegistrations.GetLazyTypeRegistrationProvider(t => assembly.Value.GetType(t), ifAlreadyRegistered);
+            return lazyRegistrations.GetLazyTypeRegistrationProvider(
+                t => assembly.Value.GetType(t), ifAlreadyRegistered, otherServiceExports);
         }
 
         /// <summary>Creates and index by service type name. 
@@ -521,34 +526,39 @@ namespace DryIoc.MefAttributedModel
         /// Consider to call <see cref="MakeLazyAndEnsureUniqueServiceKeys"/> on registrations before passing them here.</param>
         /// <param name="typeProvider">Required for Lazy registration info to create actual Type from type name.</param>
         /// <param name="ifAlreadyRegistered">(optional) Keep existing registrations by default.</param>
+        /// <param name="otherServiceExports">(optional) Index to share with other providers, 
+        /// if not specified - each provider will use its own. The index maps the full service name
+        /// from <paramref name="lazyRegistrations"/> to its registration and (optional) service key pairs.</param>
         /// <returns><see cref="Rules.DynamicRegistrationProvider"/></returns>
         public static Rules.DynamicRegistrationProvider GetLazyTypeRegistrationProvider(
-            this IEnumerable<ExportedRegistrationInfo> lazyRegistrations, Func<string, Type> typeProvider,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep)
+            this IEnumerable<ExportedRegistrationInfo> lazyRegistrations,
+            Func<string, Type> typeProvider,
+            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep,
+            IDictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>> otherServiceExports = null)
         {
-            var serviceTypeNameToKeyedRegistrations =
-                ImTreeMap<string, KeyValuePair<object, ExportedRegistrationInfo>[]>.Empty;
+            otherServiceExports = otherServiceExports
+                ?? new Dictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>>();
 
-            foreach (var registration in lazyRegistrations)
+            foreach (var reg in lazyRegistrations)
             {
-                var exports = registration.Exports;
+                var exports = reg.Exports;
                 for (var i = 0; i < exports.Length; i++)
                 {
                     var e = exports[i];
-                    serviceTypeNameToKeyedRegistrations = serviceTypeNameToKeyedRegistrations
-                        .AddOrUpdate(e.ServiceTypeFullName,
-                            new[] { new KeyValuePair<object, ExportedRegistrationInfo>(e.ServiceKey, registration) },
-                            ArrayTools.Append);
+                    IList<KeyValuePair<object, ExportedRegistrationInfo>> expRegs;
+                    if (!otherServiceExports.TryGetValue(e.ServiceTypeFullName, out expRegs))
+                        otherServiceExports[e.ServiceTypeFullName] =
+                            expRegs = new List<KeyValuePair<object, ExportedRegistrationInfo>>();
+                    expRegs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(e.ServiceKey, reg));
                 }
             }
 
             return (serviceType, serviceKey) =>
             {
-                var keyedRegistrations = serviceTypeNameToKeyedRegistrations.GetValueOrDefault(serviceType.FullName);
-                if (keyedRegistrations == null)
-                    return null;
-                return keyedRegistrations.Map(it =>
-                    new DynamicRegistration(it.Value.CreateFactory(typeProvider), ifAlreadyRegistered, it.Key));
+                IList<KeyValuePair<object, ExportedRegistrationInfo>> regs;
+                return otherServiceExports.TryGetValue(serviceType.FullName, out regs)
+                    ? regs.Map(r => new DynamicRegistration(r.Value.CreateFactory(typeProvider), ifAlreadyRegistered, r.Key))
+                    : null;
             };
         }
 
@@ -1050,8 +1060,8 @@ namespace DryIoc.MefAttributedModel
                       {
                           var typeAndCount = types[typeAndCountIndex];
 
-                        // Change the serviceKey only when multiple same types are registered with the same key
-                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                      // Change the serviceKey only when multiple same types are registered with the same key
+                      serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
                           typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
                           return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
@@ -1572,18 +1582,18 @@ namespace DryIoc.MefAttributedModel
             var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType)
                 .Select(item => new
                 {
-                    // ReSharper disable PossibleNullReferenceException
-                    // ReSharper disable AssignNullToNotNullAttribute
-                    Key = item.Constructor.DeclaringType.FullName,
+                // ReSharper disable PossibleNullReferenceException
+                // ReSharper disable AssignNullToNotNullAttribute
+                Key = item.Constructor.DeclaringType.FullName,
                     Value = string.Format("new {0}({1})",
                         item.Constructor.DeclaringType.FullName,
                         string.Join(", ", item.ConstructorArguments.Map(a => a.ToString()).ToArrayOrSelf())) +
                         (item.NamedArguments.Any() ?
                             " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
                             string.Empty)
-                    // ReSharper restore AssignNullToNotNullAttribute
-                    // ReSharper restore PossibleNullReferenceException
-                })
+                // ReSharper restore AssignNullToNotNullAttribute
+                // ReSharper restore PossibleNullReferenceException
+            })
                 .OrderBy(item => item.Key);
 
             foreach (var attr in attributes)
