@@ -55,13 +55,14 @@ namespace DryIoc.IssuesTests
             // Command1 and Command2
             Assert.AreEqual(2, lazyRegistrations.Length);
 
+            var typeProvider = new Func<string, Type>(t => typeof(Command1).Assembly.GetType(t));
+
             // index export registrations by exported service type
             foreach (var reg in lazyRegistrations)
             {
                 foreach (var export in reg.Exports)
                 {
-                    var regs = DynamicRegistrations.GetOrAdd(export.ServiceTypeFullName, s => new List<DynamicRegistration>());
-                    var typeProvider = new Func<string, Type>(t => typeof(Command1).Assembly.GetType(t));
+                    var regs = DynamicRegistrations.GetOrAdd(export.ServiceTypeFullName, _ => new List<DynamicRegistration>());
                     regs.Add(new DynamicRegistration(reg.CreateFactory(typeProvider), serviceKey: export.ServiceKey));
                 }
             }
@@ -75,13 +76,23 @@ namespace DryIoc.IssuesTests
                 return null;
             }
 
-            var registrations = regs.Where(reg => serviceKey == null || Equals(reg.ServiceKey, serviceKey)).ToArray();
+            // NOTE: 
+            // 1. You may rely on DryIoc to find the dynamic registration by key. 
+            // Therefore the below code can be removed and replaced by `return regs;`
+            // 
+            // 2. You should know that to for default (null) keys the `DefaultDynamicKey` will be generated. 
+            // So the `serviceKey` parameter will be generated `DefaultDynamicKey` instead of `null`. 
+            // The thing is `DefaultDynamicKey.Equals(object obj)` will return true for null `obj`. 
+            // BUT the `Object.Equals(object a, object b)` will fail, because it explicitly check for null and returns false.
+
+            var registrations = regs.Where(reg => serviceKey == null || serviceKey.Equals(reg.ServiceKey)).ToArray();
             if (!registrations.Any())
             {
                 return null;
             }
 
             return registrations.ToArray();
+
         }
 
         public interface IScriptMetadata
