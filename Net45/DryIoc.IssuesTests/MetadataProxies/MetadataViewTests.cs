@@ -51,7 +51,7 @@ namespace DryIoc.IssuesTests.MetadataProxies
             var cont = new Container().WithMef().WithTypedMetadataViewGenerator();
             cont.RegisterExports(new[] { Assembly.GetExecutingAssembly() });
 
-            var importer = cont.Resolve<TypedPluginImporter>(IfUnresolved.ReturnDefault);
+            var importer = cont.Resolve<TypedPluginImporter>();
             Assert.AreEqual(2, importer.Plugins.Length);
             Assert.AreEqual("PdfExport, RtfExport", string.Join(", ", importer.Plugins.Select(p => p.Metadata.PluginName).OrderBy(m => m)));
         }

@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests.MetadataProxies
         /// <param name="registrator">The registrator.</param>
         public static T WithTypedMetadataViewGenerator<T>(this T registrator) where T : IRegistrator
         {
-        	// replace the standard MEF Lazy<,> wrapper with the magic one
+            // replace the standard MEF Lazy<,> wrapper with the magic one
             registrator.Register(typeof(Lazy<,>),
                 made: createLazyWithMetadataMethod,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace,
