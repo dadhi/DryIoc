@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -112,10 +111,10 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.UseInstance("a", serviceKey: "x");
-            Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
+            Assert.AreEqual("a", container.Resolve<string>("x"));
 
             container.UseInstance("b", serviceKey: "x");
-            Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
+            Assert.AreEqual("b", container.Resolve<string>("x"));
         }
 
         [Test]
@@ -124,10 +123,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.RegisterDelegate(_ => "a", serviceKey: "x");
-            Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
+            Assert.AreEqual("a", container.Resolve<string>("x"));
 
             var ex = Assert.Throws<ContainerException>(() => 
                 container.UseInstance("b", serviceKey: "x"));
+
+            // todo: What error it should throw?
             //Assert.AreEqual(Error.NameOf(), Error.NameOf(ex.Error));
         }
 
@@ -437,7 +438,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.UseInstance("x");
-            container.Register<string>(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
+            container.Register(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
 
             var xy = container.Resolve<string>();
 

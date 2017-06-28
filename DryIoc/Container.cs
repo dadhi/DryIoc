@@ -1757,7 +1757,7 @@ namespace DryIoc
                 _instanceType = instanceType;
             }
 
-            /// <summary>Called for Resolution call/root.</summary>
+            /// <summary>Called from Resolve method</summary>
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
                 if (request.IsResolutionRoot)
@@ -5791,7 +5791,11 @@ namespace DryIoc
             var resolverExpr = Container.GetResolverExpr(request);
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var parentRequestInfo = request.RawParent.IsEmpty ? request.PreResolveParent : request.RawParent.RequestInfo;
+            var parentRequestInfo = 
+                request.RawParent.IsEmpty 
+                    ? request.PreResolveParent 
+                    : request.RawParent.RequestInfo;
+
             var preResolveParentExpr = container.RequestInfoToExpression(parentRequestInfo);
 
             var resolveCallExpr = Expression.Call(
@@ -6537,8 +6541,6 @@ namespace DryIoc
             {
                 if (!immediateParent)
                     return true; // skip other checks
-
-                // check if parent is not wrapped itself
 
                 // first run-time parent
                 if (!RawParent.IsEmpty)
@@ -7662,8 +7664,10 @@ namespace DryIoc
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
-            return !request.IsResolutionCall && // prevents recursion on already split graph
-                                                // explicit aka user requested split
+            return
+                // prevents recursion on already split graph
+                !request.IsResolutionCall && 
+                // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside Func with arguments, 
                 // cause for now arguments are not propagated through resolve call
