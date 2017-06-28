@@ -58,12 +58,40 @@ namespace DryIoc.IssuesTests
 
         public class TestParameter2
         {
-            public string Test { get; set; }
+            public string Test { get; private set; }
 
             public TestParameter2(string t = "Hello World")
             {
                 Test = t;
             }
+        }
+
+        [Test]
+        public void Can_combine_WithDependency_property_spec_and_registration_property_spec()
+        {
+            var container = new Container();
+
+            container.Register<TestParameter3>(
+                made: PropertiesAndFields.Of.Name(nameof(TestParameter3.Test), serviceKey: "someSetting"),
+                reuse: Reuse.Singleton);
+
+            container.UseInstance("instance", serviceKey: "someSetting");
+
+            var thing = new TestThing();
+
+            var t = container
+                .WithDependencies(
+                    propertiesAndFields: PropertiesAndFields.Of.Name(nameof(TestParameter3.Thing), _ => thing))
+                .Resolve<TestParameter3>();
+
+            Assert.AreSame(thing, t.Thing);
+            Assert.AreEqual("instance", t.Test);
+        }
+
+        public class TestParameter3
+        {
+            public string Test { get; set; }
+            public TestThing Thing { get; set; }
         }
     }
 }
