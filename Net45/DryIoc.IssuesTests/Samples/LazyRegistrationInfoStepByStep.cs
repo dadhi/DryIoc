@@ -120,6 +120,63 @@ namespace DryIoc.IssuesTests.Samples
         }
 
         [Test]
+        public void Lazy_import_of_commands_using_custom_DynamicRegistrationProvider()
+        {
+            var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;
+            var registrations = AttributedModel.Scan(new[] { assembly });
+            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
+
+            var assemblyLoaded = false;
+            Func<string, Type> typeProvider = typeName =>
+            {
+                assemblyLoaded = true;
+                return assembly.GetType(typeName);
+            };
+
+            var commandRegistrations = lazyRegistrations
+                .Where(r => r.ImplementationTypeFullName.EndsWith("Command"))
+                .Select(r => new DynamicRegistration(r.CreateFactory(typeProvider)))
+                .ToArray();
+
+            Rules.DynamicRegistrationProvider getDynamicRegistrations = (type, key) =>
+            {
+                if (type == typeof(ICommand))
+                {
+                    return commandRegistrations;
+                }
+
+                return null;
+            };
+
+            // Test that resolve works
+            //========================
+            var container = new Container().WithMef()
+                .With(rules => rules.WithDynamicRegistrations(getDynamicRegistrations));
+
+            // make sure that CommandImporter itself is available without loading the lazy assembly
+            container.RegisterExports(typeof(CommandImporter));
+            container.RegisterExports(typeof(ObjectHandler));
+
+            // the same resolution code as in previous test
+            //========================
+            var cmds = container.Resolve<CommandImporter>();
+            Assert.IsFalse(assemblyLoaded);
+
+            Assert.IsNotNull(cmds.LazyHandler);
+            Assert.IsNotNull(cmds.LazyHandler.Value);
+            Assert.IsFalse(assemblyLoaded);
+
+            Assert.IsNotNull(cmds.Commands);
+            Assert.AreEqual(2, cmds.Commands.Count());
+            Assert.AreEqual("Sample command, Another command", string.Join(", ", cmds.Commands.Select(c => c.Metadata.Name).OrderByDescending(c => c)));
+            Assert.IsFalse(assemblyLoaded);
+
+            var command = cmds.Commands.First().Value;
+            Assert.IsNotNull(command);
+            Assert.IsTrue(assemblyLoaded);
+        }
+
+        [Test]
         public void Lazy_import_of_commands_using_multiple_dynamic_registrations_of_the_same_service()
         {
             var assembly = typeof(LazyRegistrationInfoStepByStep).Assembly;

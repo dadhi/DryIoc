@@ -166,6 +166,8 @@
     <Compile Include="Issue451_Should_forbid_static_imports.cs" />
     <Compile Include="Issue473_Unable_to_match_service_with_open_generic.cs" />
     <Compile Include="Issue477_ArgumentException_while_resolving.cs" />
+    <Compile Include="Issue486_CustomDynamicRegistrationProvider.cs" />
+    <Compile Include="Issue488_DryIoc_ContainerException_if_using_WithDependencies.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -177,6 +179,8 @@
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
+    <Compile Include="MetadataProxies\MetadataViewProxyGeneration.cs" />
+    <Compile Include="MetadataProxies\MetadataViewTests.cs" />
     <Compile Include="SO_Open_Generics_Registration.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectingSerilogLogger.cs" />

@@ -1757,7 +1757,7 @@ namespace DryIoc
                 _instanceType = instanceType;
             }
 
-            /// <summary>Called for Resolution call/root.</summary>
+            /// <summary>Called from Resolve method</summary>
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
                 if (request.IsResolutionRoot)
@@ -5791,7 +5791,11 @@ namespace DryIoc
             var resolverExpr = Container.GetResolverExpr(request);
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var parentRequestInfo = request.RawParent.IsEmpty ? request.PreResolveParent : request.RawParent.RequestInfo;
+            var parentRequestInfo = 
+                request.RawParent.IsEmpty 
+                    ? request.PreResolveParent 
+                    : request.RawParent.RequestInfo;
+
             var preResolveParentExpr = container.RequestInfoToExpression(parentRequestInfo);
 
             var resolveCallExpr = Expression.Call(
@@ -6537,8 +6541,6 @@ namespace DryIoc
             {
                 if (!immediateParent)
                     return true; // skip other checks
-
-                // check if parent is not wrapped itself
 
                 // first run-time parent
                 if (!RawParent.IsEmpty)
@@ -7662,8 +7664,10 @@ namespace DryIoc
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
-            return !request.IsResolutionCall && // prevents recursion on already split graph
-                                                // explicit aka user requested split
+            return
+                // prevents recursion on already split graph
+                !request.IsResolutionCall && 
+                // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside Func with arguments, 
                 // cause for now arguments are not propagated through resolve call
@@ -7948,13 +7952,30 @@ namespace DryIoc
         /// <returns>Combined result selector.</returns>
         public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
         {
-            return source.And(other);
+            return source == null || source == Of ? other ?? Of
+                : other == null || other == Of ? source
+                : request => parameterInfo =>
+                {
+                    // try other selctor first
+                    var otherSelector = other(request);
+                    if (otherSelector != null)
+                    {
+                        var parameterServiceInfo = otherSelector(parameterInfo);
+                        if (parameterServiceInfo != null)
+                            return parameterServiceInfo;
+                    }
+
+                    // fallback to source selector if other is failed
+                    var sourceSelector = source(request);
+                    if (sourceSelector != null)
+                        return sourceSelector(parameterInfo);
+
+                    return null;
+                };
         }
 
         // todo: v3: remove because it is replace by OverrideWith method
         /// <summary>Obsolete: use <see cref="OverrideWith"/>.</summary>
-        /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
-        /// <returns>Combined result selector.</returns>
         public static ParameterSelector And(this ParameterSelector source, ParameterSelector other)
         {
             return source == null || source == Of ? other ?? Of
@@ -7972,8 +7993,15 @@ namespace DryIoc
             return request => parameter =>
             {
                 var details = getDetailsOrNull(request, parameter);
-                return details == null ? source(request)(parameter)
-                    : ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+                if (details != null)
+                    return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+
+                // for default source selector, return null to enable fallback to any non-default selector
+                // defined outside, usually by OverrideWith
+                if (source == Of)
+                    return null;
+
+                return source(request)(parameter);
             };
         }
 
@@ -8015,7 +8043,9 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
             string metadataKey = null, object metadata = null)
         {
-            return source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
+            return source.Details((r, p) => 
+                !typeof(T).IsAssignableTo(p.ParameterType) 
+                ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
         }
 
@@ -8294,12 +8324,12 @@ namespace DryIoc
                 {
                     paramExprs = new Expression[parameters.Length];
 
-                    var selector =
+                    var selectorSelector =
                         containerRules.OverrideRegistrationMade
                         ? Made.Parameters.OverrideWith(containerRules.Parameters)
                         : containerRules.Parameters.OverrideWith(Made.Parameters);
 
-                    var parameterSelector = selector(request);
+                    var parameterSelector = selectorSelector(request);
 
                     var funcArgs = request.FuncArgs;
                     var funcArgsUsedMask = 0;

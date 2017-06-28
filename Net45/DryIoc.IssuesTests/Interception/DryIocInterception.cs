@@ -8,7 +8,7 @@ namespace DryIoc.Interception
     // Extension methods for interceptor registration using Castle Dynamic Proxy.
     public static class DryIocInterception
     {
-        public static void Intercept<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null) 
+        public static void Intercept<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null)
             where TInterceptor : class, IInterceptor
         {
             var serviceType = typeof(TService);
@@ -29,7 +29,7 @@ namespace DryIoc.Interception
                 : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
 
             registrator.Register(serviceType, proxyType,
-                made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(c => c.GetParameters().Length != 0), 
+                made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(c => c.GetParameters().Length != 0),
                     Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))),
                 setup: decoratorSetup);
         }

@@ -470,7 +470,7 @@ namespace DryIoc.MefAttributedModel
                         .Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
                         .ToArrayOrSelf();
 
-                    // the only possibility (for now) for registering completely generic T service 
+                    // the only possibility (for now) for registering completely generic T service
                     // is registering it as an Object
                     if (memberReturnType.IsGenericParameter &&
                         memberRegistrationInfo.FactoryType == DryIoc.FactoryType.Decorator)
@@ -500,13 +500,13 @@ namespace DryIoc.MefAttributedModel
             }
         }
 
-        /// <summary>Creates and index by service type name. 
+        /// <summary>Creates and index by service type name.
         /// Then returns the factory provider which uses index for fast registration discovery.</summary>
         /// <param name="lazyRegistrations">Registrations with <see cref="ExportedRegistrationInfo.IsLazy"/> set to true.
         /// Consider to call <see cref="MakeLazyAndEnsureUniqueServiceKeys"/> on registrations before passing them here.</param>
         /// <param name="getAssembly">Assembly to load type by name from. NOTE: The assembly will be loaded only once!</param>
         /// <param name="ifAlreadyRegistered">(optional) Keep existing registrations by default.</param>
-        /// <param name="otherServiceExports">(optional) Index to share with other providers, 
+        /// <param name="otherServiceExports">(optional) Index to share with other providers,
         /// if not specified - each provider will use its own. The index maps the full service name
         /// from <paramref name="lazyRegistrations"/> to its registration and (optional) service key pairs.</param>
         /// <returns><see cref="Rules.DynamicRegistrationProvider"/></returns>
@@ -520,13 +520,13 @@ namespace DryIoc.MefAttributedModel
                 t => assembly.Value.GetType(t), ifAlreadyRegistered, otherServiceExports);
         }
 
-        /// <summary>Creates and index by service type name. 
+        /// <summary>Creates and index by service type name.
         /// Then returns the factory provider which uses index for fast registration discovery.</summary>
         /// <param name="lazyRegistrations">Registrations with <see cref="ExportedRegistrationInfo.IsLazy"/> set to true.
         /// Consider to call <see cref="MakeLazyAndEnsureUniqueServiceKeys"/> on registrations before passing them here.</param>
         /// <param name="typeProvider">Required for Lazy registration info to create actual Type from type name.</param>
         /// <param name="ifAlreadyRegistered">(optional) Keep existing registrations by default.</param>
-        /// <param name="otherServiceExports">(optional) Index to share with other providers, 
+        /// <param name="otherServiceExports">(optional) Index to share with other providers,
         /// if not specified - each provider will use its own. The index maps the full service name
         /// from <paramref name="lazyRegistrations"/> to its registration and (optional) service key pairs.</param>
         /// <returns><see cref="Rules.DynamicRegistrationProvider"/></returns>
@@ -1044,7 +1044,7 @@ namespace DryIoc.MefAttributedModel
         private readonly Ref<ImTreeMap<object, KV<Type, int>[]>>
             _store = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
 
-        /// <summary>Stores the key with respective type, 
+        /// <summary>Stores the key with respective type,
         /// incrementing type count for multiple registrations with same key  and type.</summary>
         /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param>
         /// <returns>The key combined with index, if the key has same type more than once,
@@ -1645,7 +1645,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var metaTypes = new List<TypeInfo>();
                     var metaType = metaAttr.GetType();
-                    while (metaType != null && metaType != typeof(Attribute))
+                    while (metaType != null && metaType != typeof(Attribute) && metaType != typeof(ExportAttribute))
                     {
                         var metaTypeInfo = metaType.GetTypeInfo();
                         metaTypes.Add(metaTypeInfo);

@@ -38,7 +38,7 @@ namespace DryIoc.IssuesTests.Interception
 
             string methodCallLog = null;
             container.Register<LoggerInterceptor>(
-                made: Parameters.Of.Type<Action<IInvocation>>(_ => 
+                made: Parameters.Of.Type<Action<IInvocation>>(_ =>
                     invocation => methodCallLog = invocation.Method.Name));
 
             container.Resolve<ITestDisposable>().Dispose();
