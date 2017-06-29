@@ -70,6 +70,22 @@ namespace DryIoc.IssuesTests.Interception
             Assert.NotNull(c);
             Assert.NotNull(c.Egg);
         }
+
+        [Test]
+        public void Circular_dependency_handling_doesnt_actually_work_for_the_deeper_levels()
+        {
+            var container = new Container();
+            container.RegisterAsLazy<IChicken, Chicken>();
+            container.RegisterAsLazy<IEgg, Egg>();
+
+            var e = container.Resolve<IEgg>();
+            Assert.NotNull(e);
+            Assert.NotNull(e.Chicken);
+            Assert.NotNull(e.Chicken.Egg); // this call throws a circular dependency exception
+            Assert.NotNull(e.Chicken.Egg.Chicken);
+            Assert.NotNull(e.Chicken.Egg.Chicken.Egg);
+            Assert.NotNull(e.Chicken.Egg.Chicken.Egg.Chicken);
+        }
     }
 
     public interface IAlwaysLazy
