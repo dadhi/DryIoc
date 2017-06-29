@@ -93,6 +93,8 @@
     <Compile Include="InjectListOfDepsWithStringDeps.cs" />
     <Compile Include="Interception\DryIocInterception.cs" />
     <Compile Include="Interception\InterceptionTests.cs" />
+    <Compile Include="Interception\WrapAsLazy.cs" />
+    <Compile Include="Interception\WrapAsLazyTests.cs" />
     <Compile Include="Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize.cs" />
     <Compile Include="Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent.cs" />
     <Compile Include="InjectLog4netLog.cs" />
