@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests.Interception
     public class WrapAsLazyTests
     {
         [Test]
-        public void Test_lazy_interception1()
+        public void Service_can_be_registered_as_always_lazy()
         {
             var c = new Container();
             c.RegisterAsLazy<IAlwaysLazy, LazyService>();
@@ -26,7 +26,7 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
-        public void Test_lazy_interception2()
+        public void Interface_can_be_resolved_as_always_lazy()
         {
             var c = new Container();
             c.Register<IAlwaysLazy, LazyService>();
@@ -39,6 +39,36 @@ namespace DryIoc.IssuesTests.Interception
 
             proxy.Test("Created!");
             Assert.AreEqual("Created!", LazyService.LastValue);
+        }
+
+        [Test, ExpectedException(typeof(ContainerException))]
+        public void Circular_dependency_is_normally_not_allowed()
+        {
+            var container = new Container();
+            container.Register<IChicken, Chicken>();
+            container.Register<IEgg, Egg>();
+
+            // this call doesn't detect the circular dependency
+            container.Validate();
+
+            // but the resolution fails
+            var e = container.Resolve<IEgg>();
+        }
+
+        [Test]
+        public void Circular_dependency_is_allowed_when_services_are_registered_as_lazy()
+        {
+            var container = new Container();
+            container.RegisterAsLazy<IChicken, Chicken>();
+            container.RegisterAsLazy<IEgg, Egg>();
+
+            var e = container.Resolve<IEgg>();
+            Assert.NotNull(e);
+            Assert.NotNull(e.Chicken);
+
+            var c = container.Resolve<IChicken>();
+            Assert.NotNull(c);
+            Assert.NotNull(c.Egg);
         }
     }
 
@@ -60,5 +90,29 @@ namespace DryIoc.IssuesTests.Interception
         {
             LastValue = x;
         }
+    }
+
+    public interface IChicken { IEgg Egg { get; } }
+
+    public interface IEgg { IChicken Chicken { get; } }
+
+    public class Chicken : IChicken
+    {
+        public Chicken(IEgg egg)
+        {
+            Egg = egg;
+        }
+
+        public IEgg Egg { get; private set; }
+    }
+
+    public class Egg : IEgg
+    {
+        public Egg(IChicken chicken)
+        {
+            Chicken = chicken;
+        }
+
+        public IChicken Chicken { get; private set; }
     }
 }

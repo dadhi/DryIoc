@@ -11,6 +11,9 @@ namespace DryIoc.IssuesTests.Interception
     // Extension methods for wrapping dependencies as forcible lazy using Castle Dynamic Proxy.
     public static class WrapAsLazy
     {
+        // proxy builder caches the created types internally
+        private static DefaultProxyBuilder ProxyBuilder { get; } = new DefaultProxyBuilder();
+
         /// <summary>
         /// Registers a service that is always resolved as lazy wrapper.
         /// </summary>
@@ -28,8 +31,7 @@ namespace DryIoc.IssuesTests.Interception
             registrator.Register(typeof(LazyInterceptor<>), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             // lazy proxy wrapper
-            var proxyBuilder = new DefaultProxyBuilder();
-            var proxyType = proxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(typeof(TInterface),
+            var proxyType = ProxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(typeof(TInterface),
                 ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
 
             // decorator for the generated proxy class
