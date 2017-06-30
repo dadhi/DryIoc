@@ -112,7 +112,7 @@ namespace DryIoc.IssuesTests.Interception
             var container = new Container();
             container.Register<ICommand, SampleCommand>();
             container.Register<ICommand, AnotherCommand>();
-            container.Register<ICommand, CommandLazyDecorator>(setup: Setup.DecoratorWith(useDecorateeReuse: true));
+            container.Register<ICommand, TrivialDecorator>(setup: Setup.Decorator);
 
             // everything resolves fine
             var commands = container.Resolve<ICommand[]>();
@@ -131,20 +131,26 @@ namespace DryIoc.IssuesTests.Interception
             container.Register<ICommand, SampleCommand>();
 
             // set up the "intercepting" decorator
-            container.Register(typeof(CommandInterceptor<>));
-            container.Register<ICommand, CommandInterceptingDecorator>(
-                setup: Setup.DecoratorWith(useDecorateeReuse: true),
-                made: Made.Of(parameters: Parameters.Of.Type<ICommandInterceptor[]>(typeof(CommandInterceptor<ICommand>[]))));
+            container.Register(typeof(LazyInterceptor<>));
+            container.Register<ICommand, CastleGeneratedProxy>(
+                setup: Setup.Decorator,
+                made: Made.Of(parameters: Parameters.Of.Type<Interceptor[]>(typeof(LazyInterceptor<ICommand>[]))));
 
             // everything resolves and executes fine as single value
             var command = container.Resolve<ICommand>();
-            Assert.IsInstanceOf<CommandInterceptingDecorator>(command);
+            Assert.IsInstanceOf<CastleGeneratedProxy>(command);
             command.Execute();
 
             // also, it resolves and executes fine as array
             var commands = container.Resolve<ICommand[]>();
             Assert.AreEqual(1, commands.Length);
-            Assert.IsInstanceOf<CommandInterceptingDecorator>(commands[0]);
+            Assert.IsInstanceOf<CastleGeneratedProxy>(commands[0]);
+            commands[0].Execute();
+
+            // also, it resolves as many
+            commands = container.ResolveMany<ICommand>().ToArray();
+            Assert.AreEqual(1, commands.Length);
+            Assert.IsInstanceOf<CastleGeneratedProxy>(commands[0]);
             commands[0].Execute();
         }
 
@@ -156,16 +162,16 @@ namespace DryIoc.IssuesTests.Interception
             container.Register<ICommand, AnotherCommand>();
 
             // set up the "intercepting" decorator
-            container.Register(typeof(CommandInterceptor<>));
-            container.Register<ICommand, CommandInterceptingDecorator>(
-                setup: Setup.DecoratorWith(useDecorateeReuse: true),
-                made: Made.Of(parameters: Parameters.Of.Type<ICommandInterceptor[]>(typeof(CommandInterceptor<ICommand>[]))));
+            container.Register(typeof(LazyInterceptor<>));
+            container.Register<ICommand, CastleGeneratedProxy>(
+                setup: Setup.Decorator,
+                made: Made.Of(parameters: Parameters.Of.Type<Interceptor[]>(typeof(LazyInterceptor<ICommand>[]))));
 
             // everything resolves fine
             var commands = container.Resolve<ICommand[]>();
             Assert.AreEqual(2, commands.Length);
-            Assert.IsInstanceOf<CommandInterceptingDecorator>(commands[0]);
-            Assert.IsInstanceOf<CommandInterceptingDecorator>(commands[1]);
+            Assert.IsInstanceOf<CastleGeneratedProxy>(commands[0]);
+            Assert.IsInstanceOf<CastleGeneratedProxy>(commands[1]);
 
             // but fails to execute
             commands[0].Execute(); // NullReferenceException
@@ -259,9 +265,9 @@ namespace DryIoc.IssuesTests.Interception
 
     public class AnotherCommand : ICommand { public void Execute() { } }
 
-    public class CommandLazyDecorator : ICommand
+    public class TrivialDecorator : ICommand
     {
-        public CommandLazyDecorator(Lazy<ICommand> lazyCommand)
+        public TrivialDecorator(Lazy<ICommand> lazyCommand)
         {
             LazyCommand = lazyCommand;
         }
@@ -274,26 +280,26 @@ namespace DryIoc.IssuesTests.Interception
         }
     }
 
-    public class CommandInterceptingDecorator : ICommand
+    public class CastleGeneratedProxy : ICommand
     {
-        public CommandInterceptingDecorator(ICommandInterceptor[] commandInterceptors)
+        public CastleGeneratedProxy(Interceptor[] interceptors)
         {
-            CommandInterceptors = commandInterceptors;
+            Interceptors = interceptors;
         }
 
-        private ICommandInterceptor[] CommandInterceptors { get; }
+        private Interceptor[] Interceptors { get; }
 
         public void Execute()
         {
-            ((ICommand)CommandInterceptors.First().Target).Execute();
+            ((ICommand)Interceptors.First().Target).Execute();
         }
     }
 
-    public interface ICommandInterceptor { object Target { get; } }
+    public interface Interceptor { object Target { get; } }
 
-    public class CommandInterceptor<T> : ICommandInterceptor
+    public class LazyInterceptor<T> : Interceptor
     {
-        public CommandInterceptor(Lazy<T> value)
+        public LazyInterceptor(Lazy<T> value)
         {
             // in the failing tests, this constructor gets a null instead of the Lazy<ICommand> value
             LazyValue = value;
