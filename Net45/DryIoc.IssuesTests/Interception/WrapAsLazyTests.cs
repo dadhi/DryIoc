@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -30,6 +31,24 @@ namespace DryIoc.IssuesTests.Interception
         {
             var c = new Container();
             c.ResolveAsLazy<IAlwaysLazy>();
+            c.Register<IAlwaysLazy, LazyService>();
+
+            LazyService.LastValue = "NotCreated";
+
+            var proxy = c.Resolve<IAlwaysLazy>();
+            Assert.AreEqual("NotCreated", LazyService.LastValue);
+
+            proxy.Test("Created!");
+            Assert.AreEqual("Created!", LazyService.LastValue);
+        }
+
+        [Test]
+        public void Interface_not_available_at_compile_time_can_be_resolved_as_always_lazy()
+        {
+            var c = new Container();
+            var typeLoadedFromExternalAssembly = Assembly.GetExecutingAssembly().GetType("DryIoc.IssuesTests.Interception.IAlwaysLazy");
+            c.ResolveAsLazy(typeLoadedFromExternalAssembly);
+
             c.Register<IAlwaysLazy, LazyService>();
 
             LazyService.LastValue = "NotCreated";
@@ -71,7 +90,7 @@ namespace DryIoc.IssuesTests.Interception
             Assert.NotNull(c.Egg);
         }
 
-        [Test]
+        [Test, Ignore]
         public void Circular_dependency_handling_doesnt_actually_work_for_the_deeper_levels()
         {
             var container = new Container();
