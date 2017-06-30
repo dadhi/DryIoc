@@ -105,6 +105,108 @@ namespace DryIoc.IssuesTests.Interception
             Assert.NotNull(e.Chicken.Egg.Chicken.Egg);
             Assert.NotNull(e.Chicken.Egg.Chicken.Egg.Chicken);
         }
+
+        [Test]
+        public void Resolve_array_works_for_simple_decorators()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+            container.Register<ICommand, AnotherCommand>();
+            container.Register<ICommand, CommandLazyDecorator>(setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            // everything resolves fine
+            var commands = container.Resolve<ICommand[]>();
+            Assert.AreEqual(2, commands.Length);
+            Assert.IsNotNull(commands[0]);
+
+            // and also works fine
+            commands[0].Execute();
+            commands[1].Execute();
+        }
+
+        [Test]
+        public void Resolve_single_works_for_intercepting_decorators_similar_to_CastleDynamicProxy_based_one()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+
+            // set up the "intercepting" decorator
+            container.Register(typeof(CommandInterceptor<>));
+            container.Register<ICommand, CommandInterceptingDecorator>(
+                setup: Setup.DecoratorWith(useDecorateeReuse: true),
+                made: Made.Of(parameters: Parameters.Of.Type<ICommandInterceptor[]>(typeof(CommandInterceptor<ICommand>[]))));
+
+            // everything resolves and executes fine as single value
+            var command = container.Resolve<ICommand>();
+            Assert.IsInstanceOf<CommandInterceptingDecorator>(command);
+            command.Execute();
+
+            // also, it resolves and executes fine as array
+            var commands = container.Resolve<ICommand[]>();
+            Assert.AreEqual(1, commands.Length);
+            Assert.IsInstanceOf<CommandInterceptingDecorator>(commands[0]);
+            commands[0].Execute();
+        }
+
+        [Test, Ignore]
+        public void Resolve_array_doesnt_work_for_intercepting_decorators_similar_to_CastleDynamicProxy_based_one()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+            container.Register<ICommand, AnotherCommand>();
+
+            // set up the "intercepting" decorator
+            container.Register(typeof(CommandInterceptor<>));
+            container.Register<ICommand, CommandInterceptingDecorator>(
+                setup: Setup.DecoratorWith(useDecorateeReuse: true),
+                made: Made.Of(parameters: Parameters.Of.Type<ICommandInterceptor[]>(typeof(CommandInterceptor<ICommand>[]))));
+
+            // everything resolves fine
+            var commands = container.Resolve<ICommand[]>();
+            Assert.AreEqual(2, commands.Length);
+            Assert.IsInstanceOf<CommandInterceptingDecorator>(commands[0]);
+            Assert.IsInstanceOf<CommandInterceptingDecorator>(commands[1]);
+
+            // but fails to execute
+            commands[0].Execute(); // NullReferenceException
+            commands[1].Execute();
+        }
+
+        [Test, Ignore]
+        public void Resolve_array_doesnt_work_with_lazy_proxy()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+            container.Register<ICommand, AnotherCommand>();
+            container.ResolveAsLazy<ICommand>();
+
+            // everything resolves fine
+            var commands = container.Resolve<ICommand[]>();
+            Assert.AreEqual(2, commands.Length);
+            Assert.IsNotNull(commands[0]);
+
+            // but fails to execute because LazyInterceptor<T> got a null value instead of Lazy<T> instance
+            commands[0].Execute(); // NullReferenceException
+            commands[1].Execute();
+        }
+
+        [Test, Ignore]
+        public void ResolveMany_doesnt_work_with_lazy_proxy()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+            container.Register<ICommand, AnotherCommand>();
+            container.ResolveAsLazy<ICommand>();
+
+            // everything resolves fine
+            var commands = container.ResolveMany<ICommand>().ToArray();
+            Assert.AreEqual(2, commands.Length);
+            Assert.IsNotNull(commands[0]);
+
+            // but fails to execute because LazyInterceptor<T> got a null value instead of Lazy<T> instance
+            commands[0].Execute(); // NullReferenceException
+            commands[1].Execute();
+        }
     }
 
     public interface IAlwaysLazy
@@ -149,5 +251,56 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         public IChicken Chicken { get; private set; }
+    }
+
+    public interface ICommand { void Execute(); }
+
+    public class SampleCommand : ICommand { public void Execute() { } }
+
+    public class AnotherCommand : ICommand { public void Execute() { } }
+
+    public class CommandLazyDecorator : ICommand
+    {
+        public CommandLazyDecorator(Lazy<ICommand> lazyCommand)
+        {
+            LazyCommand = lazyCommand;
+        }
+
+        private Lazy<ICommand> LazyCommand { get; }
+
+        public void Execute()
+        {
+            LazyCommand.Value.Execute();
+        }
+    }
+
+    public class CommandInterceptingDecorator : ICommand
+    {
+        public CommandInterceptingDecorator(ICommandInterceptor[] commandInterceptors)
+        {
+            CommandInterceptors = commandInterceptors;
+        }
+
+        private ICommandInterceptor[] CommandInterceptors { get; }
+
+        public void Execute()
+        {
+            ((ICommand)CommandInterceptors.First().Target).Execute();
+        }
+    }
+
+    public interface ICommandInterceptor { object Target { get; } }
+
+    public class CommandInterceptor<T> : ICommandInterceptor
+    {
+        public CommandInterceptor(Lazy<T> value)
+        {
+            // in the failing tests, this constructor gets a null instead of the Lazy<ICommand> value
+            LazyValue = value;
+        }
+
+        private Lazy<T> LazyValue { get; }
+
+        public object Target { get { return LazyValue.Value; } }
     }
 }
