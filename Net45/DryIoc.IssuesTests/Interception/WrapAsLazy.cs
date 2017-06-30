@@ -27,31 +27,15 @@ namespace DryIoc.IssuesTests.Interception
             // perform normal registration
             registrator.Register<TInterface, TClass>();
 
-            // registration of lazy interceptor
-            registrator.Register(typeof(LazyInterceptor<>), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
-
-            // lazy proxy wrapper
-            var proxyType = ProxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(typeof(TInterface),
-                ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
-
-            // decorator for the generated proxy class
-            var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: true);
-            registrator.Register(typeof(TInterface), proxyType,
-                setup: decoratorSetup,
-                made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
-                    parameters: Parameters.Of
-                        .Type<IInterceptor[]>(typeof(LazyInterceptor<TInterface>[]))
-                        .Type<TInterface>(r => null)));
-
-            return registrator;
+            // register the interface for lazy interception
+            return registrator.ResolveAsLazy<TInterface>();
         }
 
         /// <summary>
         /// Ensures that a service always resolves as lazy proxy.
         /// </summary>
         /// <typeparam name="TInterface">The type of the interface.</typeparam>
-        /// <param name="registrator">The c.</param>
-        /// <returns></returns>
+        /// <param name="registrator">The registrator.</param>
         public static IRegistrator ResolveAsLazy<TInterface>(this IRegistrator registrator)
             where TInterface : class
         {

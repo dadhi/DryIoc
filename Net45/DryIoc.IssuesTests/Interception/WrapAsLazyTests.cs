@@ -29,8 +29,8 @@ namespace DryIoc.IssuesTests.Interception
         public void Interface_can_be_resolved_as_always_lazy()
         {
             var c = new Container();
-            c.Register<IAlwaysLazy, LazyService>();
             c.ResolveAsLazy<IAlwaysLazy>();
+            c.Register<IAlwaysLazy, LazyService>();
 
             LazyService.LastValue = "NotCreated";
 
