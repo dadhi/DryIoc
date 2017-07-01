@@ -246,7 +246,7 @@ namespace DryIoc
                     {
                         if (scope == _openedScope)
                             return scope.Parent;
-                        return scope;
+                        return scope; // todo: Clarify why this code is hit, and is it a valid situation?
                     });
             }
             else // whole Container with singletons.
@@ -1461,8 +1461,8 @@ namespace DryIoc
                 var keyedFactory = factories.FindFirst(f => serviceKey.Equals(f.Key));
                 if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
                     // Skip further checks, cause let's the error sink in, 
-                    // and to be cought in respective deep level
-                    return keyedFactory.Value; 
+                    // and to be caught in respective deep level
+                    return keyedFactory.Value;
                 return null;
             }
 
@@ -1488,20 +1488,50 @@ namespace DryIoc
             }
 
             // Next, check the for matching scopes. Only for more than 1 factory.
+            // See #175
             if (matchedFactories.Length > 1)
             {
-                var scopedFactories = matchedFactories
-                    .Match(it => it.Value.HasMatchingReuseScope(request));
-
-                if (scopedFactories.Length == 1)
+                var sameLifespanGroups = matchedFactories.GroupBy(it =>
                 {
-                    // Adds asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                    var reuse = it.Value.Reuse ?? Reuse.Transient;
+                    return reuse.Lifespan == 0 ? int.MaxValue : reuse.Lifespan;
+                })
+                .OrderBy(it => it.Key)
+                .ToArray();
+
+                if (sameLifespanGroups.Length == 1)
+                {
+                    var facs = sameLifespanGroups[0].ToArrayOrSelf();
+                    if (facs.Length > 1)
+                    {
+                        var fac = facs.Match(it => it.Value.HasMatchingReuseScope(request));
+                        if (fac.Length == 1)
+                            matchedFactories = fac;
+                    }
+                }
+                else if (sameLifespanGroups.Length > 1)
+                {
+                    for (int i = 0; i < sameLifespanGroups.Length; i++)
+                    {
+                        var facs = sameLifespanGroups[i].ToArrayOrSelf()
+                            .Match(it => it.Value.HasMatchingReuseScope(request));
+                        if (facs.Length == 1)
+                        {
+                            matchedFactories = facs;
+                            break;
+                        }
+                        if (facs.Length > 1)
+                            break;
+                    }
+                }
+
+                if (matchedFactories.Length == 1)
+                {
+                    // add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
                     // issues: #382
-                    var factory = scopedFactories[0].Value;
+                    var factory = matchedFactories[0].Value;
                     if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
                         factory.Setup = factory.Setup.WithAsResolutionCall();
-
-                    matchedFactories = scopedFactories;
                 }
             }
 
@@ -5800,9 +5830,9 @@ namespace DryIoc
             var resolverExpr = Container.GetResolverExpr(request);
 
             // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
-            var parentRequestInfo = 
-                request.RawParent.IsEmpty 
-                    ? request.PreResolveParent 
+            var parentRequestInfo =
+                request.RawParent.IsEmpty
+                    ? request.PreResolveParent
                     : request.RawParent.RequestInfo;
 
             var preResolveParentExpr = container.RequestInfoToExpression(parentRequestInfo);
@@ -7674,7 +7704,7 @@ namespace DryIoc
         {
             return
                 // prevents recursion on already split graph
-                !request.IsResolutionCall && 
+                !request.IsResolutionCall &&
                 // explicit aka user requested split
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside Func with arguments,
@@ -7964,7 +7994,7 @@ namespace DryIoc
                 : other == null || other == Of ? source
                 : request => parameterInfo =>
                 {
-                    // try other selctor first
+                    // try other selector first
                     var otherSelector = other(request);
                     if (otherSelector != null)
                     {
@@ -10153,6 +10183,11 @@ namespace DryIoc
                 return _transientReuseExpr.Value;
             }
 
+            public override string ToString()
+            {
+                return "TransientReuse";
+            }
+
             #region Obsolete
 
             public IScope GetScopeOrDefault(Request request)
@@ -10932,7 +10967,7 @@ namespace DryIoc
                 "Unable to resolve {0}" + Environment.NewLine +
                 "Where no service registrations found" + Environment.NewLine +
                 "  and no dynamic registrations found in {1} Rules.DynamicServiceProviders" + Environment.NewLine +
-                "  and nothing in {2} Rules.UnknownServiceResolvers" ),
+                "  and nothing in {2} Rules.UnknownServiceResolvers"),
 
             UnableToResolveFromRegisteredServices = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
