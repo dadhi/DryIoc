@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2015 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -43,7 +43,7 @@ Factory delegate generation is completed without errors.
     partial class Container
     {
         [ExcludeFromCodeCoverage]
-        partial void GetNextFactoryID(ref int lastFactoryID)
+        partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
             lastFactoryID = 28; // generated: equals to last used Factory.FactoryID 
         }

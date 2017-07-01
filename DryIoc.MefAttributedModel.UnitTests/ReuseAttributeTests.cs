@@ -140,7 +140,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 var ex = Assert.Throws<ContainerException>(() => 
                     scoped.Resolve<WithNamedCurrentScope>());
 
-                Assert.AreEqual(DryIoc.Error.UnableToResolveFromRegisteredServices, ex.Error);
+                Assert.AreEqual(DryIoc.Error.NoMatchedScopeFound, ex.Error);
             }
         }
 

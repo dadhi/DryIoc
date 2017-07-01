@@ -181,6 +181,7 @@
     <Compile Include="Issue81_SupportForOptionalParametersInConstructor.cs" />
     <Compile Include="Issue86_SkipIndexerOnAllPropertiesInjection.cs" />
     <Compile Include="Issues184_ReuseInNamedChildrenOfNamedScopes.cs" />
+    <Compile Include="Issue_Can_resolve_singleton_with_Func_of_scoped_dependency.cs" />
     <Compile Include="MetadataProxies\MetadataViewProxyGeneration.cs" />
     <Compile Include="MetadataProxies\MetadataViewTests.cs" />
     <Compile Include="SO_Open_Generics_Registration.cs" />

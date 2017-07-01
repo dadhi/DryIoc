@@ -93,12 +93,14 @@ Where no service registrations found
             container.Register<X>();
             container.Register<Y>(Reuse.InCurrentNamedScope("specialScope"));
 
-            using (container.OpenScope("luckyScope"))
+            using (var scope = container.OpenScope("luckyScope"))
             {
                 var ex = Assert.Throws<ContainerException>(() =>
-                    container.Resolve<X>());
+                    scope.Resolve<X>());
 
-                Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+                Assert.AreEqual(
+                    Error.NameOf(Error.NoMatchedScopeFound), 
+                    Error.NameOf(ex.Error));
             }
         }
 

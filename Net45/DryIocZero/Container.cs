@@ -70,7 +70,7 @@ namespace DryIocZero
 
             _rootContainer = rootContainer;
 
-            GetNextFactoryID(ref _lastFactoryID);
+            GetLastGeneratedFactoryID(ref _lastFactoryID);
         }
 
         private int _lastFactoryID;
@@ -102,7 +102,7 @@ namespace DryIocZero
 
         #region IResolver
 
-        partial void GetNextFactoryID(ref int lastGeneratedFactoryID);
+        partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
 
         partial void ResolveGenerated(ref object service, Type serviceType, IScope scope);
 
