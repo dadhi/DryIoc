@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 // ReSharper disable MemberHidesStaticFromOuterClass
@@ -473,7 +472,9 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.Resolve<Blah>());
 
-            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            Assert.AreEqual(
+                Error.NameOf(Error.NoCurrentScope),
+                Error.NameOf(ex.Error));
         }
 
         public interface IAction { }

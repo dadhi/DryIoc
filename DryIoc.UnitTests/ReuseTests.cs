@@ -127,7 +127,9 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AccountUser>());
 
-            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            Assert.AreEqual(
+                Error.NameOf(Error.NoMatchedScopeFound),
+                Error.NameOf(ex.Error));
         }
 
         [Test]
@@ -260,10 +262,12 @@ namespace DryIoc.UnitTests
         public class L
         {
             public K K { get; private set; }
+            public IDisposable Scope { get; private set; }
 
             public L(K k, IDisposable scope)
             {
                 K = k;
+                Scope = scope;
             }
         }
 
@@ -344,7 +348,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Service>());
 
             Assert.AreEqual(
-                Error.NameOf(Error.UnableToResolveFromRegisteredServices),
+                Error.NameOf(Error.NoCurrentScope),
                 Error.NameOf(ex.Error));
         }
 

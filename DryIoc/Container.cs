@@ -1460,40 +1460,49 @@ namespace DryIoc
             {
                 var keyedFactory = factories.FindFirst(f => serviceKey.Equals(f.Key));
                 if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
-                    return keyedFactory.Value; // todo: skip further checks, really?
+                    // Skip further checks, cause let's the error sink in, 
+                    // and to be cought in respective deep level
+                    return keyedFactory.Value; 
                 return null;
             }
 
-            // Filter out non default factories
+            // First, filter out non default normal and dynamic factories
             var defaultFactories = factories.Match(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey);
             if (defaultFactories.Length == 0)
                 return null;
 
-            // Match default factories by condition and reuse
+            // Next, check factories condition
             var matchedFactories = defaultFactories.Match(f => f.Value.CheckCondition(request));
             if (matchedFactories.Length == 0)
                 return null;
 
-            // Adds asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-            // issues: #382, #429
-            if (matchedFactories.Length != defaultFactories.Length)
-            {
-                for (var i = 0; i < matchedFactories.Length; i++)
-                {
-                    var factory = matchedFactories[i].Value;
-                    if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
-                        factory.Setup = factory.Setup.WithAsResolutionCall();
-                }
-            }
-
-            // Match by metadata if requested
+            // Next, check metadata
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
             {
-                matchedFactories = matchedFactories.Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                matchedFactories = matchedFactories
+                    .Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
                 if (matchedFactories.Length == 0)
                     return null;
+            }
+
+            // Next, check the for matching scopes. Only for more than 1 factory.
+            if (matchedFactories.Length > 1)
+            {
+                var scopedFactories = matchedFactories
+                    .Match(it => it.Value.HasMatchingReuseScope(request));
+
+                if (scopedFactories.Length == 1)
+                {
+                    // Adds asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                    // issues: #382
+                    var factory = scopedFactories[0].Value;
+                    if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
+                        factory.Setup = factory.Setup.WithAsResolutionCall();
+
+                    matchedFactories = scopedFactories;
+                }
             }
 
             // todo: May be a bug to match for more than 1 factory. Works with ResolveFactory, but may not work in other call sites.
@@ -7593,8 +7602,7 @@ namespace DryIoc
         /// <returns>True if condition met or no condition setup.</returns>
         public bool CheckCondition(Request request)
         {
-            return (Setup.Condition == null || Setup.Condition(request))
-                && HasMatchingReuseScope(request);
+            return (Setup.Condition == null || Setup.Condition(request));
         }
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
@@ -9858,12 +9866,7 @@ namespace DryIoc
         {
             if (ScopedOrSingleton)
                 return true;
-
-            // A special case with ambient scope context, 
-            // where scope can be switched for already resolved singleton. 
-            // So it may be no valid initially but only afterwards
-            return (request.Container.ScopeContext != null && request.IsWrappedInFunc()) ||
-                request.Scopes.GetCurrentNamedScope(Name, false) != null;
+            return request.Scopes.GetCurrentNamedScope(Name, false) != null;
         }
 
         private readonly Lazy<Expression> _inCurrentScopeReuseExpr = new Lazy<Expression>(() =>

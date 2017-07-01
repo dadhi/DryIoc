@@ -34,10 +34,8 @@ namespace DryIoc.IssuesTests
             container.Register<IAction, ActionOne>(Reuse.InCurrentNamedScope("1"));
             var factory = container.Resolve<Func<int, Service>>();
 
-            using (var scope = container.OpenScope("1"))
-            {
-                var service = factory(1);
-            }
+            using (container.OpenScope("1"))
+                Assert.DoesNotThrow(() => factory(1));
         }
 
         [Test]
