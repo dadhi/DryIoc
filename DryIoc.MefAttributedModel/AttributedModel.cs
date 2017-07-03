@@ -1582,18 +1582,18 @@ namespace DryIoc.MefAttributedModel
             var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType)
                 .Select(item => new
                 {
-                // ReSharper disable PossibleNullReferenceException
-                // ReSharper disable AssignNullToNotNullAttribute
-                Key = item.Constructor.DeclaringType.FullName,
-                    Value = string.Format("new {0}({1})",
-                        item.Constructor.DeclaringType.FullName,
-                        string.Join(", ", item.ConstructorArguments.Map(a => a.ToString()).ToArrayOrSelf())) +
-                        (item.NamedArguments.Any() ?
-                            " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
-                            string.Empty)
-                // ReSharper restore AssignNullToNotNullAttribute
-                // ReSharper restore PossibleNullReferenceException
-            })
+                    // ReSharper disable PossibleNullReferenceException
+                    // ReSharper disable AssignNullToNotNullAttribute
+                    Key = item.Constructor.DeclaringType.FullName,
+                        Value = string.Format("new {0}({1})",
+                            item.Constructor.DeclaringType.FullName,
+                            string.Join(", ", item.ConstructorArguments.Map(a => a.ToString()).ToArrayOrSelf())) +
+                            (item.NamedArguments.Any() ?
+                                " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
+                                string.Empty)
+                    // ReSharper restore AssignNullToNotNullAttribute
+                    // ReSharper restore PossibleNullReferenceException
+                })
                 .OrderBy(item => item.Key);
 
             foreach (var attr in attributes)
