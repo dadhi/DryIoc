@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -131,7 +132,7 @@ namespace DryIoc.IssuesTests.Interception
             container.Register<ICommand, SampleCommand>();
 
             // set up the "intercepting" decorator
-            container.Register(typeof(LazyInterceptor<>));
+            container.Register(typeof(LazyInterceptor<>), setup: Setup.Wrapper);
             container.Register<ICommand, CastleGeneratedProxy>(
                 setup: Setup.Decorator,
                 made: Made.Of(parameters: Parameters.Of.Type<Interceptor[]>(typeof(LazyInterceptor<ICommand>[]))));
@@ -154,7 +155,7 @@ namespace DryIoc.IssuesTests.Interception
             commands[0].Execute();
         }
 
-        [Test, Ignore]
+        [Test]
         public void Resolve_array_doesnt_work_for_intercepting_decorators_similar_to_CastleDynamicProxy_based_one()
         {
             var container = new Container();
@@ -162,7 +163,7 @@ namespace DryIoc.IssuesTests.Interception
             container.Register<ICommand, AnotherCommand>();
 
             // set up the "intercepting" decorator
-            container.Register(typeof(LazyInterceptor<>));
+            container.Register(typeof(LazyInterceptor<>), setup: Setup.Wrapper);
             container.Register<ICommand, CastleGeneratedProxy>(
                 setup: Setup.Decorator,
                 made: Made.Of(parameters: Parameters.Of.Type<Interceptor[]>(typeof(LazyInterceptor<ICommand>[]))));
@@ -173,12 +174,12 @@ namespace DryIoc.IssuesTests.Interception
             Assert.IsInstanceOf<CastleGeneratedProxy>(commands[0]);
             Assert.IsInstanceOf<CastleGeneratedProxy>(commands[1]);
 
-            // but fails to execute
-            commands[0].Execute(); // NullReferenceException
+            // and executes as well
+            commands[0].Execute();
             commands[1].Execute();
         }
 
-        [Test, Ignore]
+        [Test]
         public void Resolve_array_doesnt_work_with_lazy_proxy()
         {
             var container = new Container();
@@ -191,12 +192,12 @@ namespace DryIoc.IssuesTests.Interception
             Assert.AreEqual(2, commands.Length);
             Assert.IsNotNull(commands[0]);
 
-            // but fails to execute because LazyInterceptor<T> got a null value instead of Lazy<T> instance
-            commands[0].Execute(); // NullReferenceException
+            // and executes as well
+            commands[0].Execute();
             commands[1].Execute();
         }
 
-        [Test, Ignore]
+        [Test]
         public void ResolveMany_doesnt_work_with_lazy_proxy()
         {
             var container = new Container();
@@ -209,8 +210,8 @@ namespace DryIoc.IssuesTests.Interception
             Assert.AreEqual(2, commands.Length);
             Assert.IsNotNull(commands[0]);
 
-            // but fails to execute because LazyInterceptor<T> got a null value instead of Lazy<T> instance
-            commands[0].Execute(); // NullReferenceException
+            // and executes as well
+            commands[0].Execute();
             commands[1].Execute();
         }
     }

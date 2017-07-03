@@ -54,7 +54,7 @@ namespace DryIoc.IssuesTests.Interception
         {
             // skip the service registration, assume it already exists
             // registration of lazy interceptor
-            registrator.Register(typeof(LazyInterceptor<>), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            registrator.Register(typeof(LazyInterceptor<>), setup: Setup.Wrapper, ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             // lazy proxy wrapper
             var proxyBuilder = new DefaultProxyBuilder();
