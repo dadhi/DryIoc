@@ -91,7 +91,7 @@ namespace DryIoc.IssuesTests.Interception
                ? Setup.DecoratorWith(useDecorateeReuse: true)
                : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
 
-            var method = typeof(WrapAsLazy).GetSingleMethodOrNull(nameof(CreateLazyProxy), includeNonPublic: true).MakeGenericMethod(new[] { interfaceType });
+            var method = typeof(WrapAsLazy).GetSingleMethodOrNull("CreateLazyProxy", includeNonPublic: true).MakeGenericMethod(new[] { interfaceType });
             registrator.Register(interfaceType, made: Made.Of(method), setup: decoratorSetup);
             return registrator;
         }
