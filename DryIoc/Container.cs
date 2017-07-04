@@ -1489,50 +1489,10 @@ namespace DryIoc
 
             // Next, check the for matching scopes. Only for more than 1 factory.
             // See #175
-            if (matchedFactories.Length > 1)
+            if (matchedFactories.Length > 1 && 
+                request.Rules.ImplicitCheckForReuseMatchingScope)
             {
-                var sameLifespanGroups = matchedFactories.GroupBy(it =>
-                {
-                    var reuse = it.Value.Reuse ?? Reuse.Transient;
-                    return reuse.Lifespan == 0 ? int.MaxValue : reuse.Lifespan;
-                })
-                .OrderBy(it => it.Key)
-                .ToArray();
-
-                if (sameLifespanGroups.Length == 1)
-                {
-                    var facs = sameLifespanGroups[0].ToArrayOrSelf();
-                    if (facs.Length > 1)
-                    {
-                        var fac = facs.Match(it => it.Value.HasMatchingReuseScope(request));
-                        if (fac.Length == 1)
-                            matchedFactories = fac;
-                    }
-                }
-                else if (sameLifespanGroups.Length > 1)
-                {
-                    for (int i = 0; i < sameLifespanGroups.Length; i++)
-                    {
-                        var facs = sameLifespanGroups[i].ToArrayOrSelf()
-                            .Match(it => it.Value.HasMatchingReuseScope(request));
-                        if (facs.Length == 1)
-                        {
-                            matchedFactories = facs;
-                            break;
-                        }
-                        if (facs.Length > 1)
-                            break;
-                    }
-                }
-
-                if (matchedFactories.Length == 1)
-                {
-                    // add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                    // issues: #382
-                    var factory = matchedFactories[0].Value;
-                    if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
-                        factory.Setup = factory.Setup.WithAsResolutionCall();
-                }
+                matchedFactories = MatchFactoriesByReuse(matchedFactories, request);
             }
 
             // todo: May be a bug to match for more than 1 factory. Works with ResolveFactory, but may not work in other call sites.
@@ -1564,6 +1524,54 @@ namespace DryIoc
 
             // Return null to allow fallback strategies
             return null;
+        }
+
+        private static KV<object, Factory>[] MatchFactoriesByReuse(KV<object, Factory>[] matchedFactories, Request request)
+        {
+            var sameLifespanGroups = matchedFactories.GroupBy(it =>
+                {
+                    var reuse = it.Value.Reuse ?? Reuse.Transient;
+                    return reuse.Lifespan == 0 ? int.MaxValue : reuse.Lifespan;
+                })
+                .OrderBy(it => it.Key)
+                .ToArray();
+
+            if (sameLifespanGroups.Length == 1)
+            {
+                var facs = sameLifespanGroups[0].ToArrayOrSelf();
+                if (facs.Length > 1)
+                {
+                    var fac = facs.Match(it => it.Value.HasMatchingReuseScope(request));
+                    if (fac.Length == 1)
+                        matchedFactories = fac;
+                }
+            }
+            else if (sameLifespanGroups.Length > 1)
+            {
+                for (int i = 0; i < sameLifespanGroups.Length; i++)
+                {
+                    var facs = sameLifespanGroups[i].ToArrayOrSelf()
+                        .Match(it => it.Value.HasMatchingReuseScope(request));
+                    if (facs.Length == 1)
+                    {
+                        matchedFactories = facs;
+                        break;
+                    }
+                    if (facs.Length > 1)
+                        break;
+                }
+            }
+
+            if (matchedFactories.Length == 1)
+            {
+                // add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                // issues: #382
+                var factory = matchedFactories[0].Value;
+                if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
+                    factory.Setup = factory.Setup.WithAsResolutionCall();
+            }
+
+            return matchedFactories;
         }
 
         private Factory GetWrapperFactoryOrDefault(Request request)
@@ -7667,8 +7675,6 @@ namespace DryIoc
         /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
         public bool HasMatchingReuseScope(Request request)
         {
-            if (!request.Rules.ImplicitCheckForReuseMatchingScope)
-                return true;
             var reuse = Reuse as IReuseV3;
             return reuse == null || reuse.CanApply(request);
         }
