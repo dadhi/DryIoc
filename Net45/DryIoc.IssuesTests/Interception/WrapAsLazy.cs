@@ -104,9 +104,6 @@ namespace DryIoc.IssuesTests.Interception
             return ProxyGenerator.CreateInterfaceProxyWithTargetInterface<T>(null, new[] { interceptor });
         }
 
-        private static Made CreateLazyProxyMethod { get; } = Made.Of(
-            typeof(WrapAsLazy).GetSingleMethodOrNull(nameof(CreateLazyProxy), includeNonPublic: true));
-
         private class LazyInterceptor<T> : IInterceptor
             where T : class
         {

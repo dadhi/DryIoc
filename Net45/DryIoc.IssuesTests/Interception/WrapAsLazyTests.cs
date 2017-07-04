@@ -369,6 +369,68 @@ namespace DryIoc.IssuesTests.Interception
             var res = commands[0].Execute(10);
             Assert.AreEqual(13, res);
         }
+
+        [Test]
+        public void ImportMany_with_metadata_works_without_lazy_proxies()
+        {
+            var container = new Container().WithMef();
+            container.RegisterExports(typeof(Helper1), typeof(Helper2), typeof(Helper3));
+
+            var consumer = new BusinessLogicConsumer();
+            container.InjectPropertiesAndFields(consumer);
+
+            Assert.AreEqual(3, consumer.Helpers.Length);
+            var h1 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 1);
+            h1.Value.Run(1);
+
+            var h2 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 2);
+            h2.Value.Run(2);
+
+            var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
+            h3.Value.Run(3);
+        }
+
+        [Test, Ignore("Fails")]
+        public void ImportMany_with_metadata_works_with_lazy_proxies_via_ProxyGenerator()
+        {
+            var container = new Container().WithMef();
+            container.RegisterExports(typeof(Helper1), typeof(Helper2), typeof(Helper3));
+            container.ResolveAsLazy(typeof(IBusinessLogicHelper));
+
+            var consumer = new BusinessLogicConsumer();
+            container.InjectPropertiesAndFields(consumer);
+
+            Assert.AreEqual(3, consumer.Helpers.Length);
+            var h1 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 1);
+            h1.Value.Run(1);
+
+            var h2 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 2);
+            h2.Value.Run(2);
+
+            var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
+            h3.Value.Run(3);
+        }
+
+        [Test, Ignore("Fails")]
+        public void ImportMany_with_metadata_works_with_lazy_proxies_via_DefaultProxyBuilder()
+        {
+            var container = new Container().WithMef();
+            container.RegisterExports(typeof(Helper1), typeof(Helper2), typeof(Helper3));
+            container.ResolveAsLazyViaProxyBuilder(typeof(IBusinessLogicHelper));
+
+            var consumer = new BusinessLogicConsumer();
+            container.InjectPropertiesAndFields(consumer);
+
+            Assert.AreEqual(3, consumer.Helpers.Length);
+            var h1 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 1);
+            h1.Value.Run(1);
+
+            var h2 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 2);
+            h2.Value.Run(2);
+
+            var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
+            h3.Value.Run(3);
+        }
     }
 
     public interface IAlwaysLazy
@@ -447,5 +509,31 @@ namespace DryIoc.IssuesTests.Interception
         public CommandWithDependency(ICommandDependency dep) { Dep = dep; }
         public ICommandDependency Dep { get; }
         public int Execute(int param) { return param + 3; }
+    }
+
+    public interface IBusinessLogicHelper { void Run(int a); }
+
+    public interface IBusinessLogicForZone { int ZoneId { get; } }
+
+    [MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public class BusinessLogicAttribute : ExportAttribute, IBusinessLogicForZone
+    {
+        public BusinessLogicAttribute(int zone) : base(typeof(IBusinessLogicHelper)) { ZoneId = zone; }
+        public int ZoneId { get; }
+    }
+
+    [BusinessLogic(1)]
+    public class Helper1 : IBusinessLogicHelper { public void Run(int a) { Assert.AreEqual(1, a); } }
+
+    [BusinessLogic(2)]
+    public class Helper2 : IBusinessLogicHelper { public void Run(int a) { Assert.AreEqual(2, a); } }
+
+    [BusinessLogic(3)]
+    public class Helper3 : IBusinessLogicHelper { public void Run(int a) { Assert.AreEqual(3, a); } }
+
+    public class BusinessLogicConsumer
+    {
+        [ImportMany]
+        public Lazy<IBusinessLogicHelper, IBusinessLogicForZone>[] Helpers { get; set; }
     }
 }
