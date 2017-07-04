@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Interception
@@ -28,7 +30,7 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
-        public void Interface_can_be_resolved_as_always_lazy()
+        public void Interface_can_be_resolved_as_always_lazy_via_ProxyGenerator()
         {
             var c = new Container();
             c.ResolveAsLazy<IAlwaysLazy>();
@@ -44,11 +46,45 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
-        public void Interface_not_available_at_compile_time_can_be_resolved_as_always_lazy()
+        public void Interface_can_be_resolved_as_always_lazy_via_DefaultProxyBuilder()
+        {
+            var c = new Container();
+            c.ResolveAsLazyViaProxyBuilder(typeof(IAlwaysLazy));
+            c.Register<IAlwaysLazy, LazyService>();
+
+            LazyService.LastValue = "NotCreated";
+
+            var proxy = c.Resolve<IAlwaysLazy>();
+            Assert.AreEqual("NotCreated", LazyService.LastValue);
+
+            proxy.Test("Created!");
+            Assert.AreEqual("Created!", LazyService.LastValue);
+        }
+
+        [Test]
+        public void Interface_not_available_at_compile_time_can_be_resolved_as_always_lazy_via_ProxyGenerator()
         {
             var c = new Container();
             var typeLoadedFromExternalAssembly = Assembly.GetExecutingAssembly().GetType("DryIoc.IssuesTests.Interception.IAlwaysLazy");
             c.ResolveAsLazy(typeLoadedFromExternalAssembly);
+
+            c.Register<IAlwaysLazy, LazyService>();
+
+            LazyService.LastValue = "NotCreated";
+
+            var proxy = c.Resolve<IAlwaysLazy>();
+            Assert.AreEqual("NotCreated", LazyService.LastValue);
+
+            proxy.Test("Created!");
+            Assert.AreEqual("Created!", LazyService.LastValue);
+        }
+
+        [Test]
+        public void Interface_not_available_at_compile_time_can_be_resolved_as_always_lazy_via_DefaultProxyBuilder()
+        {
+            var c = new Container();
+            var typeLoadedFromExternalAssembly = Assembly.GetExecutingAssembly().GetType("DryIoc.IssuesTests.Interception.IAlwaysLazy");
+            c.ResolveAsLazyViaProxyBuilder(typeLoadedFromExternalAssembly);
 
             c.Register<IAlwaysLazy, LazyService>();
 
@@ -195,7 +231,7 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
-        public void Resolve_array_works_with_lazy_proxy()
+        public void Resolve_array_works_with_lazy_proxy_via_ProxyGenerator()
         {
             var container = new Container();
             container.Register<ICommand, SampleCommand>();
@@ -225,7 +261,37 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
-        public void ResolveMany_works_with_lazy_proxy()
+        public void Resolve_array_works_with_lazy_proxy_via_DefaultProxyBuilder()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+            container.Register<ICommand, AnotherCommand>();
+            container.ResolveAsLazyViaProxyBuilder(typeof(ICommand));
+            SampleCommand.Created = false;
+            AnotherCommand.Created = false;
+
+            // everything resolves fine
+            var commands = container.Resolve<ICommand[]>();
+            Assert.AreEqual(2, commands.Length);
+            Assert.IsNotNull(commands[0]);
+            Assert.IsNotNull(commands[1]);
+            Assert.IsNotInstanceOf<SampleCommand>(commands[0]);
+            Assert.IsNotInstanceOf<SampleCommand>(commands[1]);
+            Assert.IsNotInstanceOf<AnotherCommand>(commands[0]);
+            Assert.IsNotInstanceOf<AnotherCommand>(commands[1]);
+            Assert.IsFalse(SampleCommand.Created);
+            Assert.IsFalse(AnotherCommand.Created);
+
+            // and executes as well
+            var res1 = commands[0].Execute(10);
+            var res2 = commands[1].Execute(10);
+            Assert.AreEqual(50, res1 + res2);
+            Assert.IsTrue(SampleCommand.Created);
+            Assert.IsTrue(AnotherCommand.Created);
+        }
+
+        [Test]
+        public void ResolveMany_works_with_lazy_proxy_via_ProxyGenerator()
         {
             var container = new Container();
             container.Register<ICommand, SampleCommand>();
@@ -252,6 +318,56 @@ namespace DryIoc.IssuesTests.Interception
             Assert.AreEqual(50, res1 + res2);
             Assert.IsTrue(SampleCommand.Created);
             Assert.IsTrue(AnotherCommand.Created);
+        }
+
+        [Test]
+        public void ResolveMany_works_with_lazy_proxy_via_DefaultProxyBuilder()
+        {
+            var container = new Container();
+            container.Register<ICommand, SampleCommand>();
+            container.Register<ICommand, AnotherCommand>();
+            container.ResolveAsLazyViaProxyBuilder(typeof(ICommand));
+            SampleCommand.Created = false;
+            AnotherCommand.Created = false;
+
+            // everything resolves fine
+            var commands = container.ResolveMany<ICommand>().ToArray();
+            Assert.AreEqual(2, commands.Length);
+            Assert.IsNotNull(commands[0]);
+            Assert.IsNotNull(commands[1]);
+            Assert.IsNotInstanceOf<SampleCommand>(commands[0]);
+            Assert.IsNotInstanceOf<SampleCommand>(commands[1]);
+            Assert.IsNotInstanceOf<AnotherCommand>(commands[0]);
+            Assert.IsNotInstanceOf<AnotherCommand>(commands[1]);
+            Assert.IsFalse(SampleCommand.Created);
+            Assert.IsFalse(AnotherCommand.Created);
+
+            // and executes as well
+            var res1 = commands[0].Execute(10);
+            var res2 = commands[1].Execute(10);
+            Assert.AreEqual(50, res1 + res2);
+            Assert.IsTrue(SampleCommand.Created);
+            Assert.IsTrue(AnotherCommand.Created);
+        }
+
+        [Test]
+        public void Resolve_array_works_with_lazy_proxy2()
+        {
+            var container = new Container();
+            container.Register<ICommand, CommandWithDependency>();
+            container.Register<ICommandDependency, CommandDependency>();
+            container.ResolveAsLazy<ICommandDependency>();
+
+            // everything resolves fine
+            var commands = container.Resolve<ICommand[]>();
+            Assert.AreEqual(1, commands.Length);
+            Assert.IsNotNull(commands[0]);
+            Assert.IsInstanceOf<CommandWithDependency>(commands[0]);
+            Assert.IsNotInstanceOf<CommandDependency>((commands[0] as CommandWithDependency).Dep);
+
+            // and executes as well
+            var res = commands[0].Execute(10);
+            Assert.AreEqual(13, res);
         }
     }
 
@@ -320,5 +436,16 @@ namespace DryIoc.IssuesTests.Interception
         public LazyInterceptor(Lazy<T> value) { LazyValue = value; }
         private Lazy<T> LazyValue { get; }
         public object Target { get { return LazyValue.Value; } }
+    }
+
+    public interface ICommandDependency { }
+
+    public class CommandDependency : ICommandDependency { }
+
+    public class CommandWithDependency : ICommand
+    {
+        public CommandWithDependency(ICommandDependency dep) { Dep = dep; }
+        public ICommandDependency Dep { get; }
+        public int Execute(int param) { return param + 3; }
     }
 }
