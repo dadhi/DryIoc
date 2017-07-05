@@ -127,7 +127,7 @@ namespace DryIoc.IssuesTests.Interception
             Assert.NotNull(c.Egg);
         }
 
-        [Test, Ignore]
+        [Test]
         public void Circular_dependency_handling_doesnt_actually_work_for_the_deeper_levels()
         {
             var container = new Container();
@@ -351,7 +351,7 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
-        public void Resolve_array_works_with_lazy_proxy2()
+        public void Resolve_array_works_for_command_with_dependency_lazy_proxy_via_ProxyGenerator()
         {
             var container = new Container();
             container.Register<ICommand, CommandWithDependency>();
