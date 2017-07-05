@@ -371,6 +371,71 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         [Test]
+        public void Resolve_array_works_with_metadata()
+        {
+            var container = new Container().WithMef();
+            container.Register<IBusinessLogicHelper, Helper1>(setup: Setup.With(new BusinessLogicAttribute(1)));
+            container.Register<IBusinessLogicHelper, Helper2>(setup: Setup.With(new BusinessLogicAttribute(2)));
+            container.Register<IBusinessLogicHelper, Helper3>(setup: Setup.With(new BusinessLogicAttribute(3)));
+
+            var helpers = container.Resolve<Meta<IBusinessLogicHelper, IBusinessLogicForZone>[]>();
+
+            Assert.AreEqual(3, helpers.Length);
+            var h1 = helpers.Single(h => h.Metadata.ZoneId == 1);
+            h1.Value.ProcessZone(1);
+
+            var h2 = helpers.Single(h => h.Metadata.ZoneId == 2);
+            h2.Value.ProcessZone(2);
+
+            var h3 = helpers.Single(h => h.Metadata.ZoneId == 3);
+            h3.Value.ProcessZone(3);
+        }
+
+        [Test, Ignore("Fails")]
+        public void Resolve_array_works_with_metadata_and_trivial_decorator()
+        {
+            var container = new Container().WithMef();
+            container.Register<IBusinessLogicHelper, Helper1>(setup: Setup.With(new BusinessLogicAttribute(1)));
+            container.Register<IBusinessLogicHelper, Helper2>(setup: Setup.With(new BusinessLogicAttribute(2)));
+            container.Register<IBusinessLogicHelper, Helper3>(setup: Setup.With(new BusinessLogicAttribute(3)));
+            container.Register<IBusinessLogicHelper, TrivialBusinessLogicDecorator>(setup: Setup.Decorator);
+
+            var helpers = container.Resolve<Meta<IBusinessLogicHelper, IBusinessLogicForZone>[]>();
+
+            Assert.AreEqual(3, helpers.Length);
+            var h1 = helpers.Single(h => h.Metadata.ZoneId == 1);
+            h1.Value.ProcessZone(1);
+
+            var h2 = helpers.Single(h => h.Metadata.ZoneId == 2);
+            h2.Value.ProcessZone(2);
+
+            var h3 = helpers.Single(h => h.Metadata.ZoneId == 3);
+            h3.Value.ProcessZone(3);
+        }
+
+        [Test, Ignore("Fails")]
+        public void Resolve_array_with_metadata_works_with_LazyProxy()
+        {
+            var container = new Container().WithMef();
+            container.Register<IBusinessLogicHelper, Helper1>(setup: Setup.With(new BusinessLogicAttribute(1)));
+            container.Register<IBusinessLogicHelper, Helper2>(setup: Setup.With(new BusinessLogicAttribute(2)));
+            container.Register<IBusinessLogicHelper, Helper3>(setup: Setup.With(new BusinessLogicAttribute(3)));
+            container.ResolveAsLazy(typeof(IBusinessLogicHelper));
+
+            var helpers = container.Resolve<Lazy<IBusinessLogicHelper, IBusinessLogicForZone>[]>();
+
+            Assert.AreEqual(3, helpers.Length);
+            var h1 = helpers.Single(h => h.Metadata.ZoneId == 1);
+            h1.Value.ProcessZone(1);
+
+            var h2 = helpers.Single(h => h.Metadata.ZoneId == 2);
+            h2.Value.ProcessZone(2);
+
+            var h3 = helpers.Single(h => h.Metadata.ZoneId == 3);
+            h3.Value.ProcessZone(3);
+        }
+
+        [Test]
         public void ImportMany_with_metadata_works_without_lazy_proxies()
         {
             var container = new Container().WithMef();
@@ -381,13 +446,13 @@ namespace DryIoc.IssuesTests.Interception
 
             Assert.AreEqual(3, consumer.Helpers.Length);
             var h1 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 1);
-            h1.Value.Run(1);
+            h1.Value.ProcessZone(1);
 
             var h2 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 2);
-            h2.Value.Run(2);
+            h2.Value.ProcessZone(2);
 
             var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
-            h3.Value.Run(3);
+            h3.Value.ProcessZone(3);
         }
 
         [Test, Ignore("Fails")]
@@ -402,13 +467,13 @@ namespace DryIoc.IssuesTests.Interception
 
             Assert.AreEqual(3, consumer.Helpers.Length);
             var h1 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 1);
-            h1.Value.Run(1);
+            h1.Value.ProcessZone(1);
 
             var h2 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 2);
-            h2.Value.Run(2);
+            h2.Value.ProcessZone(2);
 
             var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
-            h3.Value.Run(3);
+            h3.Value.ProcessZone(3);
         }
 
         [Test, Ignore("Fails")]
@@ -423,13 +488,13 @@ namespace DryIoc.IssuesTests.Interception
 
             Assert.AreEqual(3, consumer.Helpers.Length);
             var h1 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 1);
-            h1.Value.Run(1);
+            h1.Value.ProcessZone(1);
 
             var h2 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 2);
-            h2.Value.Run(2);
+            h2.Value.ProcessZone(2);
 
             var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
-            h3.Value.Run(3);
+            h3.Value.ProcessZone(3);
         }
     }
 
@@ -511,7 +576,7 @@ namespace DryIoc.IssuesTests.Interception
         public int Execute(int param) { return param + 3; }
     }
 
-    public interface IBusinessLogicHelper { void Run(int a); }
+    public interface IBusinessLogicHelper { void ProcessZone(int a); }
 
     public interface IBusinessLogicForZone { int ZoneId { get; } }
 
@@ -523,17 +588,24 @@ namespace DryIoc.IssuesTests.Interception
     }
 
     [BusinessLogic(1)]
-    public class Helper1 : IBusinessLogicHelper { public void Run(int a) { Assert.AreEqual(1, a); } }
+    public class Helper1 : IBusinessLogicHelper { public void ProcessZone(int a) { Assert.AreEqual(1, a); } }
 
     [BusinessLogic(2)]
-    public class Helper2 : IBusinessLogicHelper { public void Run(int a) { Assert.AreEqual(2, a); } }
+    public class Helper2 : IBusinessLogicHelper { public void ProcessZone(int a) { Assert.AreEqual(2, a); } }
 
     [BusinessLogic(3)]
-    public class Helper3 : IBusinessLogicHelper { public void Run(int a) { Assert.AreEqual(3, a); } }
+    public class Helper3 : IBusinessLogicHelper { public void ProcessZone(int a) { Assert.AreEqual(3, a); } }
 
     public class BusinessLogicConsumer
     {
         [ImportMany]
         public Lazy<IBusinessLogicHelper, IBusinessLogicForZone>[] Helpers { get; set; }
+    }
+
+    public class TrivialBusinessLogicDecorator : IBusinessLogicHelper
+    {
+        public TrivialBusinessLogicDecorator(Lazy<IBusinessLogicHelper> lazyHelper) { LazyHelper = lazyHelper; }
+        private Lazy<IBusinessLogicHelper> LazyHelper { get; }
+        public void ProcessZone(int a) { LazyHelper.Value.ProcessZone(a); }
     }
 }
