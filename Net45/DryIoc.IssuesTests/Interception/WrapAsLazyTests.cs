@@ -137,7 +137,7 @@ namespace DryIoc.IssuesTests.Interception
             var e = container.Resolve<IEgg>();
             Assert.NotNull(e);
             Assert.NotNull(e.Chicken);
-            Assert.NotNull(e.Chicken.Egg); // this call throws a circular dependency exception
+            Assert.NotNull(e.Chicken.Egg);
             Assert.NotNull(e.Chicken.Egg.Chicken);
             Assert.NotNull(e.Chicken.Egg.Chicken.Egg);
             Assert.NotNull(e.Chicken.Egg.Chicken.Egg.Chicken);
