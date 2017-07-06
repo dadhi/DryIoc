@@ -1005,13 +1005,13 @@ namespace DryIoc
             }
 
             // Filter out the recursive decorators:
-            // the decorator with the same which was applied before up to the root
+            // the decorator with the same ID which was applied before up to the root
             if (!decorators.IsNullOrEmpty())
             {
                 var parent = request.ParentOrWrapper;
                 if (!parent.IsEmpty)
                 {
-                    var ids = parent.Enumerate().Map(p => p.FactoryID).ToArrayOrSelf();
+                    var ids = parent.Enumerate().TakeWhile(r => !r.IsLazyWrapper()).Map(p => p.FactoryID).ToArrayOrSelf();
                     decorators = decorators.Match(d => ids.IndexOf(d.FactoryID) == -1);
                 }
             }
@@ -1460,7 +1460,7 @@ namespace DryIoc
             {
                 var keyedFactory = factories.FindFirst(f => serviceKey.Equals(f.Key));
                 if (keyedFactory != null && keyedFactory.Value.CheckCondition(request))
-                    // Skip further checks, cause let's the error sink in, 
+                    // Skip further checks, cause let's the error sink in,
                     // and to be caught in respective deep level
                     return keyedFactory.Value;
                 return null;
@@ -1489,7 +1489,7 @@ namespace DryIoc
 
             // Next, check the for matching scopes. Only for more than 1 factory.
             // See #175
-            if (matchedFactories.Length > 1 && 
+            if (matchedFactories.Length > 1 &&
                 request.Rules.ImplicitCheckForReuseMatchingScope)
             {
                 matchedFactories = MatchFactoriesByReuse(matchedFactories, request);
@@ -10540,6 +10540,17 @@ namespace DryIoc
             {
                 return (h1 << 5) + h1 ^ h2;
             }
+        }
+    }
+
+    public static class RequestInfoExtensions
+    {
+        public static bool IsLazyWrapper(this RequestInfo request)
+        {
+            if (request == null || request.FactoryType != FactoryType.Wrapper || request.ServiceType == null)
+                return false;
+
+            return request.ServiceType.IsGenericType && request.ServiceType.GetGenericTypeDefinition() == typeof(Lazy<>);
         }
     }
 
