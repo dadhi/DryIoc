@@ -10558,7 +10558,7 @@ namespace DryIoc
             if (request == null || request.FactoryType != FactoryType.Wrapper || request.ServiceType == null)
                 return false;
 
-            return request.ServiceType.IsGenericType && request.ServiceType.GetGenericTypeDefinition() == typeof(Lazy<>);
+            return request.ServiceType.GetGenericDefinitionOrNull() == typeof(Lazy<>);
         }
     }
 
