@@ -51,7 +51,7 @@ namespace FastExpressionCompiler
         /// <returns>Compiled delegate.</returns>
         public static Func<T> Compile<T>(Expression<Func<T>> lambdaExpr)
         {
-            return TryCompile<Func<T>>(lambdaExpr.Body, lambdaExpr.Parameters, _emptyTypes, typeof(T))
+            return TryCompile<Func<T>>(lambdaExpr.Body, lambdaExpr.Parameters, Empty<Type>(), typeof(T))
                    ?? lambdaExpr.Compile();
         }
 
@@ -78,11 +78,12 @@ namespace FastExpressionCompiler
             return TryCompile<TDelegate>(expr, paramExprs, paramTypes, expr.Type);
         }
 
-        private static Type[] GetParamExprTypes(IList<ParameterExpression> paramExprs)
+        /// <summary>Performant method to get parameter types from parameter expressions.</summary>
+        public static Type[] GetParamExprTypes(IList<ParameterExpression> paramExprs)
         {
             var paramsCount = paramExprs.Count;
             if (paramsCount == 0)
-                return _emptyTypes;
+                return Empty<Type>();
 
             if (paramsCount == 1)
                 return new[] { paramExprs[0].Type };
@@ -112,42 +113,104 @@ namespace FastExpressionCompiler
                 typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
         }
 
+        /// <summary>Tries to compile lambda expression to <typeparamref name="TDelegate"/>.</summary>
+        /// <typeparam name="TDelegate">The compatible delegate type, otherwise case will throw.</typeparam>
+        /// <param name="lambdaExpr">Lambda expression to compile.</param>
+        /// <returns>Compiled delegate.</returns>
+        public static TDelegate TryCompile<TDelegate>(LambdaExpressionInfo lambdaExpr)
+            where TDelegate : class
+        {
+            var paramExprs = lambdaExpr.Parameters;
+            var paramTypes = GetParamExprTypes(paramExprs);
+            var expr = lambdaExpr.Body;
+            return TryCompile<TDelegate>(expr, paramExprs, paramTypes, expr.Type);
+        }
+
+        /// <summary>Compiles expression to delegate by emitting the IL. 
+        /// If sub-expressions are not supported by emitter, then the method returns null.
+        /// The usage should be calling the method, if result is null then calling the Expression.Compile.</summary>
+        /// <param name="bodyExpr">Lambda body.</param>
+        /// <param name="paramExprs">Lambda parameter expressions.</param>
+        /// <param name="paramTypes">The types of parameters.</param>
+        /// <param name="returnType">The return type.</param>
+        /// <returns>Result delegate or null, if unable to compile.</returns>
+        public static TDelegate TryCompile<TDelegate>(
+            ExpressionInfo bodyExpr,
+            IList<ParameterExpression> paramExprs,
+            Type[] paramTypes,
+            Type returnType) where TDelegate : class
+        {
+            ClosureInfo ignored = null;
+            return (TDelegate)TryCompile(ref ignored,
+                typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
+        }
+
+        private struct Expr
+        {
+            public static implicit operator Expr(Expression expr)
+            {
+                return expr == null ? default(Expr) : new Expr(expr, expr.NodeType, expr.Type);
+            }
+
+            public static implicit operator Expr(ExpressionInfo expr)
+            {
+                return expr == null ? default(Expr) : new Expr(expr, expr.NodeType, expr.Type);
+            }
+
+            public object Expression;
+            public ExpressionType NodeType;
+            public Type Type;
+
+            private Expr(object expression, ExpressionType nodeType, Type type)
+            {
+                Expression = expression;
+                NodeType = nodeType;
+                Type = type;
+            }
+        }
+
         private static object TryCompile(ref ClosureInfo closureInfo,
             Type delegateType, Type[] paramTypes, Type returnType,
-            Expression bodyExpr, IList<ParameterExpression> paramExprs)
+            Expr bodyExpr, IList<ParameterExpression> paramExprs,
+            bool isNestedLambda = false)
         {
             if (!TryCollectBoundConstants(ref closureInfo, bodyExpr, paramExprs))
                 return null;
 
-            if (closureInfo != null)
-                closureInfo.ConstructClosure();
+            if (closureInfo == null)
+            {
+                var method = new DynamicMethod(string.Empty, returnType, paramTypes,
+                    typeof(ExpressionCompiler), skipVisibility: true);
+                if (!TryEmit(method, bodyExpr, paramExprs, closureInfo))
+                    return null;
+                return method.CreateDelegate(delegateType);
+            }
 
-            var method = GetDynamicMethod(paramTypes, returnType, closureInfo);
+            var closureObject = closureInfo.ConstructClosure(closureTypeOnly: isNestedLambda);
+            var closureAndParamTypes = GetClosureAndParamTypes(paramTypes, closureInfo.ClosureType);
 
-            var il = method.GetILGenerator();
+            var methodWithClosure = new DynamicMethod(string.Empty, returnType, closureAndParamTypes,
+                typeof(ExpressionCompiler), skipVisibility: true);
 
-            if (!EmittingVisitor.TryEmit(bodyExpr, paramExprs, il, closureInfo))
+            if (!TryEmit(methodWithClosure, bodyExpr, paramExprs, closureInfo))
                 return null;
 
-            il.Emit(OpCodes.Ret); // emits return from generated method
+            if (isNestedLambda) // include closure as the first parameter, BUT don't bound to it. It will be bound later in EmitNestedLambda.
+                return methodWithClosure.CreateDelegate(GetFuncOrActionType(closureAndParamTypes, returnType));
 
-            // create open delegate with closure object
-            if (closureInfo == null)
-                return method.CreateDelegate(delegateType);
-
-            return method.CreateDelegate(delegateType, closureInfo.ClosureObject);
+            return methodWithClosure.CreateDelegate(delegateType, closureObject);
         }
 
-        private static DynamicMethod GetDynamicMethod(Type[] paramTypes, Type returnType, ClosureInfo closureInfo)
+        private static bool TryEmit(DynamicMethod method,
+            Expr bodyExpr, IList<ParameterExpression> paramExprs,
+            ClosureInfo closureInfo)
         {
-            if (closureInfo == null)
-                return new DynamicMethod(string.Empty, returnType, paramTypes,
-                    typeof(ExpressionCompiler), skipVisibility: true);
+            var il = method.GetILGenerator();
+            if (!EmittingVisitor.TryEmit(bodyExpr, paramExprs, il, closureInfo))
+                return false;
 
-            var closureType = closureInfo.ClosureObject.GetType();
-            var closureAndParamTypes = GetClosureAndParamTypes(paramTypes, closureType);
-
-            return new DynamicMethod(string.Empty, returnType, closureAndParamTypes, closureType, skipVisibility: true);
+            il.Emit(OpCodes.Ret); // emits return from generated method
+            return true;
         }
 
         private static Type[] GetClosureAndParamTypes(Type[] paramTypes, Type closureType)
@@ -156,112 +219,209 @@ namespace FastExpressionCompiler
             if (paramCount == 0)
                 return new[] { closureType };
 
+            if (paramCount == 1)
+                return new[] { closureType, paramTypes[0] };
+
             var closureAndParamTypes = new Type[paramCount + 1];
             closureAndParamTypes[0] = closureType;
-            if (paramCount == 1)
-                closureAndParamTypes[1] = paramTypes[0];
-            else if (paramCount > 1)
-                Array.Copy(paramTypes, 0, closureAndParamTypes, 1, paramCount);
-
+            Array.Copy(paramTypes, 0, closureAndParamTypes, 1, paramCount);
             return closureAndParamTypes;
+        }
+
+        private struct ConstantInfo
+        {
+            public object ConstantExpr;
+            public Type Type;
+            public object Value;
+            public ConstantInfo(object constantExpr, object value, Type type)
+            {
+                ConstantExpr = constantExpr;
+                Value = value;
+                Type = type;
+            }
+        }
+
+        private static class EmptyArray<T>
+        {
+            public static readonly T[] Value = new T[0];
+        }
+
+        private static T[] Empty<T>()
+        {
+            return EmptyArray<T>.Value;
+        }
+
+        private static T[] Append<T>(this T[] source, T value)
+        {
+            if (source == null || source.Length == 0)
+                return new[] { value };
+            if (source.Length == 1)
+                return new[] { source[0], value };
+            if (source.Length == 2)
+                return new[] { source[0], source[1], value };
+            var sourceLength = source.Length;
+            var result = new T[sourceLength + 1];
+            Array.Copy(source, result, sourceLength);
+            result[sourceLength] = value;
+            return result;
+        }
+
+        private static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
+        {
+            if (source == null || source.Length == 0)
+                return -1;
+            if (source.Length == 1)
+                return predicate(source[0]) ? 0 : -1;
+            for (var i = 0; i < source.Length; ++i)
+                if (predicate(source[i]))
+                    return i;
+            return -1;
         }
 
         private sealed class ClosureInfo
         {
-            public List<ConstantExpression> ConstantExpressions { get; private set; }
-            public List<ParameterExpression> UsedParamExpressions { get; private set; }
-            public List<NestedLambdaInfo> NestedLambdas { get; private set; }
+            // Closed values used by expression and by its nested lambdas
+            public ConstantInfo[] Constants = Empty<ConstantInfo>();
 
+            // Parameters not passed through lambda parameter list But used inside lambda body.
+            // The top expression should not! contain non passed parameters. 
+            public ParameterExpression[] NonPassedParameters = Empty<ParameterExpression>();
+
+            // All nested lambdas recursively nested in expression
+            public NestedLambdaInfo[] NestedLambdas = Empty<NestedLambdaInfo>();
+
+            // Field infos are needed to load field of closure object on stack in emitter
+            // It is also an indicator that we use typed Closure object and not an array
             public FieldInfo[] Fields { get; private set; }
+            public bool IsArray { get { return Fields == null; } }
 
-            public bool IsArray { get; private set; }
+            public Type ClosureType { get; private set; }
 
-            public object ClosureObject { get; private set; }
+            public int ClosedItemCount { get; private set; }
 
-            public int ConstantCount { get { return ConstantExpressions == null ? 0 : ConstantExpressions.Count; } }
-
-            public int UsedParamCount { get { return UsedParamExpressions == null ? 0 : UsedParamExpressions.Count; } }
-
-            public int NestedLambdaCount { get { return NestedLambdas == null ? 0 : NestedLambdas.Count; } }
-
-            public void Add(ConstantExpression expr)
+            public void AddConstant(object expr, object value, Type type)
             {
-                if (ConstantExpressions == null)
-                    ConstantExpressions = new List<ConstantExpression>();
-                ConstantExpressions.Add(expr);
+                if (Constants.Length == 0 ||
+                    Constants.IndexOf(it => it.ConstantExpr == expr) == -1)
+                    Constants = Constants.Append(new ConstantInfo(expr, value, type));
             }
 
-            public void Add(ParameterExpression expr)
+            public void AddConstant(ConstantInfo info)
             {
-                if (UsedParamExpressions == null)
-                    UsedParamExpressions = new List<ParameterExpression>();
-                UsedParamExpressions.Add(expr);
+                if (Constants.Length == 0 ||
+                    Constants.IndexOf(it => it.ConstantExpr == info.ConstantExpr) == -1)
+                    Constants = Constants.Append(info);
             }
 
-            public void Add(NestedLambdaInfo nestedLambdaInfo)
+            public void AddNonPassedParam(ParameterExpression expr)
             {
-                if (NestedLambdas == null)
-                    NestedLambdas = new List<NestedLambdaInfo>();
-                NestedLambdas.Add(nestedLambdaInfo);
+                if (NonPassedParameters.Length == 0 ||
+                    NonPassedParameters.IndexOf(it => it == expr) == -1)
+                    NonPassedParameters = NonPassedParameters.Append(expr);
             }
 
-            public void ConstructClosure()
+            public void AddNestedLambda(object lambdaExpr, object lambda, ClosureInfo closureInfo, bool isAction)
             {
-                var constantCount = ConstantCount;
-                var constantPlusParamCount = constantCount + UsedParamCount;
-                var totalItemCount = constantPlusParamCount + NestedLambdaCount;
+                if (NestedLambdas.Length == 0 ||
+                    NestedLambdas.IndexOf(it => it.LambdaExpr == lambdaExpr) == -1)
+                    NestedLambdas = NestedLambdas.Append(new NestedLambdaInfo(closureInfo, lambdaExpr, lambda, isAction));
+            }
 
-                var items = new object[totalItemCount];
+            public void AddNestedLambda(NestedLambdaInfo info)
+            {
+                if (NestedLambdas.Length == 0 ||
+                    NestedLambdas.IndexOf(it => it.LambdaExpr == info.LambdaExpr) == -1)
+                    NestedLambdas = NestedLambdas.Append(info);
+            }
 
-                // Deciding to create typed or array based closure, based on number of closed constants
-                // Not null array of constant types means a typed closure can be created
-                var typedClosureCreateMethods = Closure.TypedClosureCreateMethods;
-                var constantTypes = totalItemCount <= typedClosureCreateMethods.Length ? new Type[totalItemCount] : null;
+            public object ConstructClosure(bool closureTypeOnly)
+            {
+                var constants = Constants;
+                var nonPassedParams = NonPassedParameters;
+                var nestedLambdas = NestedLambdas;
 
-                if (ConstantExpressions != null)
-                    for (var i = 0; i < ConstantExpressions.Count; i++)
-                    {
-                        var constantExpr = ConstantExpressions[i];
-                        items[i] = constantExpr.Value;
-                        if (constantTypes != null)
-                            constantTypes[i] = constantExpr.Type;
-                    }
+                var constPlusParamCount = constants.Length + nonPassedParams.Length;
+                var totalItemCount = constPlusParamCount + nestedLambdas.Length;
 
-                if (UsedParamExpressions != null)
-                    for (var i = 0; i < UsedParamExpressions.Count; i++)
-                    {
-                        items[constantCount + i] = null;
-                        if (constantTypes != null)
-                            constantTypes[constantCount + i] = UsedParamExpressions[i].Type;
-                    }
+                ClosedItemCount = totalItemCount;
 
-                if (NestedLambdas != null)
-                    for (var i = 0; i < NestedLambdas.Count; i++)
-                    {
-                        var lambda = NestedLambdas[i].Lambda;
-                        items[constantPlusParamCount + i] = lambda;
-                        if (constantTypes != null)
-                            constantTypes[constantPlusParamCount + i] = lambda.GetType();
-                    }
+                var typedClosureCreateMethods = Closure.CreateMethods;
 
-                if (constantTypes != null)
+                // Construct the array base closure when number of values is bigger than
+                // number of fields in biggest Closure class
+                if (totalItemCount > typedClosureCreateMethods.Length)
                 {
-                    var createClosureMethod = typedClosureCreateMethods[totalItemCount - 1];
-                    var createClosure = createClosureMethod.MakeGenericMethod(constantTypes);
+                    ClosureType = typeof(ArrayClosure);
 
-                    var closure = createClosure.Invoke(null, items);
+                    if (closureTypeOnly)
+                        return null;
 
-                    var fields = closure.GetType().GetTypeInfo().DeclaredFields;
-                    var fieldsArray = fields as FieldInfo[] ?? fields.ToArray();
+                    var items = new object[totalItemCount];
+                    if (constants.Length != 0)
+                        for (var i = 0; i < constants.Length; i++)
+                            items[i] = constants[i].Value;
 
-                    ClosureObject = closure;
-                    Fields = fieldsArray;
+                    // skip non passed parameters as it is only for nested lambdas
+
+                    if (nestedLambdas.Length != 0)
+                        for (var i = 0; i < nestedLambdas.Length; i++)
+                            items[constPlusParamCount + i] = nestedLambdas[i].Lambda;
+
+                    return new ArrayClosure(items);
+                }
+
+                // Construct the Closure Type and optionally Closure object with closed values stored as fields:
+                object[] fieldValues = null;
+                var fieldTypes = new Type[totalItemCount];
+                if (closureTypeOnly)
+                {
+                    if (constants.Length != 0)
+                        for (var i = 0; i < constants.Length; i++)
+                            fieldTypes[i] = constants[i].Type;
+
+                    if (nonPassedParams.Length != 0)
+                        for (var i = 0; i < nonPassedParams.Length; i++)
+                            fieldTypes[constants.Length + i] = nonPassedParams[i].Type;
+
+                    if (nestedLambdas.Length != 0)
+                        for (var i = 0; i < nestedLambdas.Length; i++)
+                            fieldTypes[constPlusParamCount + i] = nestedLambdas[i].Lambda.GetType();
                 }
                 else
                 {
-                    ClosureObject = new ArrayClosure(items);
-                    IsArray = true;
+                    fieldValues = new object[totalItemCount];
+
+                    if (constants.Length != 0)
+                        for (var i = 0; i < constants.Length; i++)
+                        {
+                            var constantExpr = constants[i];
+                            fieldTypes[i] = constantExpr.Type;
+                            fieldValues[i] = constantExpr.Value;
+                        }
+
+                    if (nonPassedParams.Length != 0)
+                        for (var i = 0; i < nonPassedParams.Length; i++)
+                            fieldTypes[constants.Length + i] = nonPassedParams[i].Type;
+
+                    if (nestedLambdas.Length != 0)
+                        for (var i = 0; i < nestedLambdas.Length; i++)
+                        {
+                            var lambda = nestedLambdas[i].Lambda;
+                            fieldValues[constPlusParamCount + i] = lambda;
+                            fieldTypes[constPlusParamCount + i] = lambda.GetType();
+                        }
                 }
+
+                var createClosureMethod = typedClosureCreateMethods[totalItemCount - 1];
+                var createClosure = createClosureMethod.MakeGenericMethod(fieldTypes);
+                ClosureType = createClosure.ReturnType;
+
+                var fields = ClosureType.GetTypeInfo().DeclaredFields;
+                Fields = fields as FieldInfo[] ?? fields.ToArray();
+
+                if (fieldValues == null)
+                    return null;
+                return createClosure.Invoke(null, fieldValues);
             }
         }
 
@@ -269,8 +429,11 @@ namespace FastExpressionCompiler
 
         internal static class Closure
         {
-            public static readonly MethodInfo[] TypedClosureCreateMethods =
-                typeof(Closure).GetTypeInfo().DeclaredMethods.ToArray();
+            private static readonly IEnumerable<MethodInfo> _methods =
+                typeof(Closure).GetTypeInfo().DeclaredMethods;
+
+            public static readonly MethodInfo[] CreateMethods =
+                _methods as MethodInfo[] ?? _methods.ToArray();
 
             public static Closure<T1> CreateClosure<T1>(T1 v1)
             {
@@ -522,7 +685,9 @@ namespace FastExpressionCompiler
         internal sealed class ArrayClosure
         {
             public readonly object[] Constants;
+
             public static FieldInfo ArrayField = typeof(ArrayClosure).GetTypeInfo().DeclaredFields.First(f => !f.IsStatic);
+            public static ConstructorInfo Constructor = typeof(ArrayClosure).GetTypeInfo().DeclaredConstructors.First();
 
             public ArrayClosure(object[] constants)
             {
@@ -532,21 +697,60 @@ namespace FastExpressionCompiler
 
         #endregion
 
-        #region Collect Bound Constants
+        #region Nested Lambdas
 
-        private sealed class NestedLambdaInfo
+        private struct NestedLambdaInfo
         {
-            public readonly object Lambda;
-            public readonly Expression LambdaExpr; // to find the lambda in bigger parent expression
-            public readonly ClosureInfo ClosureInfo;
+            public ClosureInfo ClosureInfo;
 
-            public NestedLambdaInfo(object lambda, Expression lambdaExpr, ClosureInfo closureInfo)
+            public object LambdaExpr; // to find the lambda in bigger parent expression
+            public object Lambda;
+            public bool IsAction;
+
+            public NestedLambdaInfo(ClosureInfo closureInfo, object lambdaExpr, object lambda, bool isAction)
             {
+                ClosureInfo = closureInfo;
                 Lambda = lambda;
                 LambdaExpr = lambdaExpr;
-                ClosureInfo = closureInfo;
+                IsAction = isAction;
             }
         }
+
+        internal static class CurryClosureFuncs
+        {
+            private static readonly IEnumerable<MethodInfo> _methods =
+                typeof(CurryClosureFuncs).GetTypeInfo().DeclaredMethods;
+
+            public static readonly MethodInfo[] Methods = _methods as MethodInfo[] ?? _methods.ToArray();
+
+            public static Func<R> Curry<C, R>(Func<C, R> f, C c) { return () => f(c); }
+            public static Func<T1, R> Curry<C, T1, R>(Func<C, T1, R> f, C c) { return t1 => f(c, t1); }
+            public static Func<T1, T2, R> Curry<C, T1, T2, R>(Func<C, T1, T2, R> f, C c) { return (t1, t2) => f(c, t1, t2); }
+            public static Func<T1, T2, T3, R> Curry<C, T1, T2, T3, R>(Func<C, T1, T2, T3, R> f, C c) { return (t1, t2, t3) => f(c, t1, t2, t3); }
+            public static Func<T1, T2, T3, T4, R> Curry<C, T1, T2, T3, T4, R>(Func<C, T1, T2, T3, T4, R> f, C c) { return (t1, t2, t3, t4) => f(c, t1, t2, t3, t4); }
+            public static Func<T1, T2, T3, T4, T5, R> Curry<C, T1, T2, T3, T4, T5, R>(Func<C, T1, T2, T3, T4, T5, R> f, C c) { return (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5); }
+            public static Func<T1, T2, T3, T4, T5, T6, R> Curry<C, T1, T2, T3, T4, T5, T6, R>(Func<C, T1, T2, T3, T4, T5, T6, R> f, C c) { return (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6); }
+        }
+
+        internal static class CurryClosureActions
+        {
+            private static readonly IEnumerable<MethodInfo> _methods =
+                typeof(CurryClosureActions).GetTypeInfo().DeclaredMethods;
+
+            public static readonly MethodInfo[] Methods = _methods as MethodInfo[] ?? _methods.ToArray();
+
+            internal static Action Curry<C>(Action<C> a, C c) { return () => a(c); }
+            internal static Action<T1> Curry<C, T1>(Action<C, T1> f, C c) { return t1 => f(c, t1); }
+            internal static Action<T1, T2> Curry<C, T1, T2>(Action<C, T1, T2> f, C c) { return (t1, t2) => f(c, t1, t2); }
+            internal static Action<T1, T2, T3> Curry<C, T1, T2, T3>(Action<C, T1, T2, T3> f, C c) { return (t1, t2, t3) => f(c, t1, t2, t3); }
+            internal static Action<T1, T2, T3, T4> Curry<C, T1, T2, T3, T4>(Action<C, T1, T2, T3, T4> f, C c) { return (t1, t2, t3, t4) => f(c, t1, t2, t3, t4); }
+            internal static Action<T1, T2, T3, T4, T5> Curry<C, T1, T2, T3, T4, T5>(Action<C, T1, T2, T3, T4, T5> f, C c) { return (t1, t2, t3, t4, t5) => f(c, t1, t2, t3, t4, t5); }
+            internal static Action<T1, T2, T3, T4, T5, T6> Curry<C, T1, T2, T3, T4, T5, T6>(Action<C, T1, T2, T3, T4, T5, T6> f, C c) { return (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6); }
+        }
+
+        #endregion
+
+        #region Collect Bound Constants
 
         private static bool IsBoundConstant(object value)
         {
@@ -554,61 +758,65 @@ namespace FastExpressionCompiler
                 return false;
 
             var typeInfo = value.GetType().GetTypeInfo();
-            return !typeInfo.IsPrimitive 
-                && !(value is string) 
-                && !(value is Type)
-                && !typeInfo.IsEnum;
+            return !typeInfo.IsPrimitive
+                   && !(value is string)
+                   && !(value is Type)
+                   && !typeInfo.IsEnum;
         }
 
-        private static readonly Type[] _emptyTypes = new Type[0];
-
         // @paramExprs is required for nested lambda compilation
-        private static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IList<ParameterExpression> paramExprs)
+        private static bool TryCollectBoundConstants(
+            ref ClosureInfo closure, Expr e, IList<ParameterExpression> paramExprs)
         {
+            var expr = e.Expression;
             if (expr == null)
                 return false;
 
-            switch (expr.NodeType)
+            switch (e.NodeType)
             {
                 case ExpressionType.Constant:
-                    var constantExpr = (ConstantExpression)expr;
-                    var constantValue = constantExpr.Value;
-
-                    if (constantValue is Delegate ||
-                        IsBoundConstant(constantValue))
-                    {
-                        closure = closure ?? new ClosureInfo();
-                        closure.Add(constantExpr);
-                    }
-
+                    var constExprInfo = expr as ConstantExpressionInfo;
+                    var value = constExprInfo != null ? constExprInfo.Value : ((ConstantExpression)expr).Value;
+                    if (value is Delegate || IsBoundConstant(value))
+                        (closure ?? (closure = new ClosureInfo())).AddConstant(expr, value, e.Type);
                     break;
 
                 case ExpressionType.Parameter:
                     // if parameter is used But no passed (not in parameter expressions)
                     // it means parameter is provided by outer lambda and should be put in closure for current lambda
-                    var paramExpr = (ParameterExpression)expr;
+                    var exprInfo = expr as ParameterExpressionInfo;
+                    var paramExpr = exprInfo ?? (ParameterExpression)expr;
                     if (paramExprs.IndexOf(paramExpr) == -1)
-                    {
-                        closure = closure ?? new ClosureInfo();
-                        closure.Add(paramExpr);
-                    }
+                        (closure ?? (closure = new ClosureInfo())).AddNonPassedParam(paramExpr);
                     break;
 
                 case ExpressionType.Call:
-                    var methodCallExpr = (MethodCallExpression)expr;
-                    var methodOwnerExpr = methodCallExpr.Object;
+                    var callExprInfo = expr as MethodCallExpressionInfo;
+                    if (callExprInfo != null)
+                        return (callExprInfo.Object == null ||
+                                TryCollectBoundConstants(ref closure, callExprInfo.Object, paramExprs)) &&
+                               TryCollectBoundConstants(ref closure, callExprInfo.Arguments, paramExprs);
 
-                    return (methodOwnerExpr == null
-                        || TryCollectBoundConstants(ref closure, methodOwnerExpr, paramExprs))
-                        && TryCollectBoundConstants(ref closure, methodCallExpr.Arguments, paramExprs);
+                    var callExpr = (MethodCallExpression)expr;
+                    return (callExpr.Object == null ||
+                            TryCollectBoundConstants(ref closure, callExpr.Object, paramExprs)) &&
+                           TryCollectBoundConstants(ref closure, callExpr.Arguments, paramExprs);
 
                 case ExpressionType.MemberAccess:
+                    var memberExprInfo = expr as MemberExpressionInfo;
+                    if (memberExprInfo != null)
+                        return memberExprInfo.Expression == null
+                               || TryCollectBoundConstants(ref closure, memberExprInfo.Expression, paramExprs);
+
                     var memberExpr = ((MemberExpression)expr).Expression;
-                    return memberExpr == null 
-                        || TryCollectBoundConstants(ref closure, memberExpr, paramExprs);
+                    return memberExpr == null ||
+                           TryCollectBoundConstants(ref closure, memberExpr, paramExprs);
 
                 case ExpressionType.New:
-                    return TryCollectBoundConstants(ref closure, ((NewExpression)expr).Arguments, paramExprs);
+                    var newExprInfo = expr as NewExpressionInfo;
+                    return newExprInfo != null
+                        ? TryCollectBoundConstants(ref closure, newExprInfo.Arguments, paramExprs)
+                        : TryCollectBoundConstants(ref closure, ((NewExpression)expr).Arguments, paramExprs);
 
                 case ExpressionType.NewArrayInit:
                     return TryCollectBoundConstants(ref closure, ((NewArrayExpression)expr).Expressions, paramExprs);
@@ -629,56 +837,82 @@ namespace FastExpressionCompiler
                     }
                     break;
 
-                // nested lambda
+                // nested lambda expression
                 case ExpressionType.Lambda:
 
                     // 1. Try to compile nested lambda in place
                     // 2. Check that parameters used in compiled lambda are passed or closed by outer lambda
                     // 3. Add the compiled lambda to closure of outer lambda for later invocation
 
-                    var lambdaExpr = (LambdaExpression)expr;
-                    var lambdaParamExprs = lambdaExpr.Parameters;
-                    var paramTypes = GetParamExprTypes(lambdaParamExprs);
-
+                    object lambda;
+                    Type lambdaReturnType;
                     ClosureInfo nestedClosure = null;
-                    var lambda = TryCompile(ref nestedClosure,
-                        lambdaExpr.Type, paramTypes, lambdaExpr.Body.Type, lambdaExpr.Body, lambdaParamExprs);
+
+                    var lambdaExprInfo = expr as LambdaExpressionInfo;
+                    if (lambdaExprInfo != null)
+                    {
+                        var lambdaParamExprs = lambdaExprInfo.Parameters;
+                        lambdaReturnType = lambdaExprInfo.Body.Type;
+                        lambda = TryCompile(ref nestedClosure,
+                            lambdaExprInfo.Type, GetParamExprTypes(lambdaParamExprs), lambdaReturnType,
+                            lambdaExprInfo.Body, lambdaParamExprs, isNestedLambda: true);
+                    }
+                    else
+                    {
+                        var lambdaExpr = (LambdaExpression)expr;
+                        var lambdaParamExprs = lambdaExpr.Parameters;
+                        lambdaReturnType = lambdaExpr.Body.Type;
+                        lambda = TryCompile(ref nestedClosure,
+                            lambdaExpr.Type, GetParamExprTypes(lambdaParamExprs), lambdaReturnType,
+                            lambdaExpr.Body, lambdaParamExprs, isNestedLambda: true);
+                    }
 
                     if (lambda == null)
                         return false;
 
-                    var lambdaInfo = new NestedLambdaInfo(lambda, lambdaExpr, nestedClosure);
+                    // add the nested lambda into closure
+                    (closure ?? (closure = new ClosureInfo()))
+                        .AddNestedLambda(expr, lambda, nestedClosure, isAction: lambdaReturnType == typeof(void));
 
-                    closure = closure ?? new ClosureInfo();
-                    closure.Add(lambdaInfo);
+                    if (nestedClosure == null)
+                        break;
 
-                    // if nested parameter is no matched with any outer parameter, that ensure it goes to outer closure
-                    if (nestedClosure != null && nestedClosure.UsedParamExpressions != null)
-                    {
-                        var nestedClosedParams = nestedClosure.UsedParamExpressions;
-                        for (var i = 0; i < nestedClosedParams.Count; i++)
+                    // if nested non passed parameter is no matched with any outer passed parameter, 
+                    // then ensure it goes to outer non passed parameter.
+                    // But check that have non passed parameter in root expression is invalid.
+                    var nestedNonPassedParams = nestedClosure.NonPassedParameters;
+                    if (nestedNonPassedParams.Length != 0)
+                        for (var i = 0; i < nestedNonPassedParams.Length; i++)
                         {
-                            var nestedClosedParamExpr = nestedClosedParams[i];
+                            var nestedNonPassedParam = nestedNonPassedParams[i];
                             if (paramExprs.Count == 0 ||
-                                paramExprs.IndexOf(nestedClosedParamExpr) == -1)
-                            {
-                                closure.Add(nestedClosedParamExpr);
-                            }
+                                paramExprs.IndexOf(nestedNonPassedParam) == -1)
+                                closure.AddNonPassedParam(nestedNonPassedParam);
                         }
-                    }
+
+                    // Promote found constants and nested lambdas into outer closure
+                    var nestedConstants = nestedClosure.Constants;
+                    if (nestedConstants.Length != 0)
+                        for (var i = 0; i < nestedConstants.Length; i++)
+                            closure.AddConstant(nestedConstants[i]);
+
+                    var nestedNestedLambdas = nestedClosure.NestedLambdas;
+                    if (nestedNestedLambdas.Length != 0)
+                        for (var i = 0; i < nestedNestedLambdas.Length; i++)
+                            closure.AddNestedLambda(nestedNestedLambdas[i]);
 
                     break;
 
                 case ExpressionType.Invoke:
                     var invocationExpr = (InvocationExpression)expr;
                     return TryCollectBoundConstants(ref closure, invocationExpr.Expression, paramExprs)
-                        && TryCollectBoundConstants(ref closure, invocationExpr.Arguments, paramExprs);
+                           && TryCollectBoundConstants(ref closure, invocationExpr.Arguments, paramExprs);
 
                 case ExpressionType.Conditional:
                     var conditionalExpr = (ConditionalExpression)expr;
                     return TryCollectBoundConstants(ref closure, conditionalExpr.Test, paramExprs)
-                        && TryCollectBoundConstants(ref closure, conditionalExpr.IfTrue, paramExprs)
-                        && TryCollectBoundConstants(ref closure, conditionalExpr.IfFalse, paramExprs);
+                           && TryCollectBoundConstants(ref closure, conditionalExpr.IfTrue, paramExprs)
+                           && TryCollectBoundConstants(ref closure, conditionalExpr.IfFalse, paramExprs);
 
                 default:
                     var unaryExpr = expr as UnaryExpression;
@@ -688,20 +922,65 @@ namespace FastExpressionCompiler
                     var binaryExpr = expr as BinaryExpression;
                     if (binaryExpr != null)
                         return TryCollectBoundConstants(ref closure, binaryExpr.Left, paramExprs)
-                            && TryCollectBoundConstants(ref closure, binaryExpr.Right, paramExprs);
+                               && TryCollectBoundConstants(ref closure, binaryExpr.Right, paramExprs);
                     break;
             }
 
             return true;
         }
 
-        private static bool TryCollectBoundConstants(ref ClosureInfo closure, IList<Expression> exprs, IList<ParameterExpression> paramExprs)
+        private static bool TryCollectBoundConstants(ref ClosureInfo closure, ExpressionInfo[] exprs, IList<ParameterExpression> paramExprs)
         {
-            var count = exprs.Count;
-            for (var i = 0; i < count; i++)
+            for (var i = 0; i < exprs.Length; i++)
                 if (!TryCollectBoundConstants(ref closure, exprs[i], paramExprs))
                     return false;
             return true;
+        }
+
+        private static bool TryCollectBoundConstants(ref ClosureInfo closure, IList<Expression> exprs, IList<ParameterExpression> paramExprs)
+        {
+            for (var i = 0; i < exprs.Count; i++)
+                if (!TryCollectBoundConstants(ref closure, exprs[i], paramExprs))
+                    return false;
+            return true;
+        }
+
+        /// <summary>Construct delegate type (Func or Action) from given input and return parameter types.</summary>
+        public static Type GetFuncOrActionType(Type[] paramTypes, Type returnType)
+        {
+            if (returnType == typeof(void))
+            {
+                switch (paramTypes.Length)
+                {
+                    case 0: return typeof(Action);
+                    case 1: return typeof(Action<>).MakeGenericType(paramTypes);
+                    case 2: return typeof(Action<,>).MakeGenericType(paramTypes);
+                    case 3: return typeof(Action<,,>).MakeGenericType(paramTypes);
+                    case 4: return typeof(Action<,,,>).MakeGenericType(paramTypes);
+                    case 5: return typeof(Action<,,,,>).MakeGenericType(paramTypes);
+                    case 6: return typeof(Action<,,,,,>).MakeGenericType(paramTypes);
+                    case 7: return typeof(Action<,,,,,,>).MakeGenericType(paramTypes);
+                    default:
+                        throw new NotSupportedException(
+                            string.Format("Action with so many ({0}) parameters is not supported!", paramTypes.Length));
+                }
+            }
+
+            paramTypes = paramTypes.Append(returnType);
+            switch (paramTypes.Length)
+            {
+                case 1: return typeof(Func<>).MakeGenericType(paramTypes);
+                case 2: return typeof(Func<,>).MakeGenericType(paramTypes);
+                case 3: return typeof(Func<,,>).MakeGenericType(paramTypes);
+                case 4: return typeof(Func<,,,>).MakeGenericType(paramTypes);
+                case 5: return typeof(Func<,,,,>).MakeGenericType(paramTypes);
+                case 6: return typeof(Func<,,,,,>).MakeGenericType(paramTypes);
+                case 7: return typeof(Func<,,,,,,>).MakeGenericType(paramTypes);
+                case 8: return typeof(Func<,,,,,,,>).MakeGenericType(paramTypes);
+                default:
+                    throw new NotSupportedException(
+                        string.Format("Func with so many ({0}) parameters is not supported!", paramTypes.Length));
+            }
         }
 
         #endregion
@@ -711,34 +990,36 @@ namespace FastExpressionCompiler
         /// to normal and slow Expression.Compile.</summary>
         private static class EmittingVisitor
         {
-            private static readonly MethodInfo _getDelegateTargetProperty =
-                typeof(Delegate).GetTypeInfo().DeclaredMethods.First(p => p.Name == "get_Target");
+            private static readonly MethodInfo _getTypeFromHandleMethod = typeof(Type).GetTypeInfo()
+                .DeclaredMethods.First(m => m.Name == "GetTypeFromHandle");
 
-            public static bool TryEmit(Expression expr, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
+            public static bool TryEmit(Expr e, IList<ParameterExpression> paramExprs,
+                ILGenerator il, ClosureInfo closure)
             {
-                switch (expr.NodeType)
+                var expr = e.Expression;
+                switch (e.NodeType)
                 {
                     case ExpressionType.Parameter:
-                        return EmitParameter((ParameterExpression)expr, paramExprs, il, closure);
+                        var pInfo = expr as ParameterExpressionInfo;
+                        return EmitParameter(pInfo != null ? pInfo.ParamExpr : (ParameterExpression)expr, paramExprs, il, closure);
                     case ExpressionType.Convert:
                         return EmitConvert((UnaryExpression)expr, paramExprs, il, closure);
                     case ExpressionType.ArrayIndex:
                         return EmitArrayIndex((BinaryExpression)expr, paramExprs, il, closure);
                     case ExpressionType.Constant:
-                        return EmitConstant((ConstantExpression)expr, il, closure);
+                        return EmitConstant(e, il, closure);
+                    case ExpressionType.Call:
+                        return EmitMethodCall(e, paramExprs, il, closure);
+                    case ExpressionType.MemberAccess:
+                        return EmitMemberAccess(e, paramExprs, il, closure);
                     case ExpressionType.New:
-                        return EmitNew((NewExpression)expr, paramExprs, il, closure);
+                        return EmitNew(e, paramExprs, il, closure);
                     case ExpressionType.NewArrayInit:
                         return EmitNewArray((NewArrayExpression)expr, paramExprs, il, closure);
                     case ExpressionType.MemberInit:
                         return EmitMemberInit((MemberInitExpression)expr, paramExprs, il, closure);
-                    case ExpressionType.Call:
-                        return EmitMethodCall((MethodCallExpression)expr, paramExprs, il, closure);
-                    case ExpressionType.MemberAccess:
-                        return EmitMemberAccess((MemberExpression)expr, paramExprs, il, closure);
-
                     case ExpressionType.Lambda:
-                        return EmitNestedLambda((LambdaExpression)expr, paramExprs, il, closure);
+                        return EmitNestedLambda(expr, paramExprs, il, closure);
 
                     case ExpressionType.Invoke:
                         return EmitInvokeLambda((InvocationExpression)expr, paramExprs, il, closure);
@@ -777,17 +1058,17 @@ namespace FastExpressionCompiler
                     return true;
                 }
 
-                // Otherwise (parameter isn't passed) then it is probably passed into outer lambda,
+                // if parameter isn't passed, then it is passed into some outer lambda,
                 // so it should be loaded from closure
                 if (closure == null)
                     return false;
 
-                var usedParamIndex = closure.UsedParamExpressions.IndexOf(p);
+                var usedParamIndex = closure.NonPassedParameters.IndexOf(it => it == p);
                 if (usedParamIndex == -1)
                     return false;  // what??? no chance
 
-                var closureItemIndex = usedParamIndex + closure.ConstantCount;
-                LoadClosureFieldOrItem(il, closure, closureItemIndex, p.Type);
+                var closureItemIndex = usedParamIndex + closure.Constants.Length;
+                LoadClosureFieldOrArrayItem(il, closure, closureItemIndex, p.Type);
                 return true;
             }
 
@@ -819,10 +1100,18 @@ namespace FastExpressionCompiler
             private static bool EmitBinary(BinaryExpression e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
                 return TryEmit(e.Left, ps, il, closure)
-                    && TryEmit(e.Right, ps, il, closure);
+                       && TryEmit(e.Right, ps, il, closure);
             }
 
             private static bool EmitMany(IList<Expression> es, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            {
+                for (int i = 0, n = es.Count; i < n; i++)
+                    if (!TryEmit(es[i], ps, il, closure))
+                        return false;
+                return true;
+            }
+
+            private static bool EmitMany(IList<ExpressionInfo> es, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
                 for (int i = 0, n = es.Count; i < n; i++)
                     if (!TryEmit(es[i], ps, il, closure))
@@ -865,137 +1154,153 @@ namespace FastExpressionCompiler
                 return true;
             }
 
-            private static bool EmitConstant(ConstantExpression e, ILGenerator il, ClosureInfo closure)
+            private static bool EmitConstant(Expr e, ILGenerator il, ClosureInfo closure)
             {
-                var constant = e.Value;
-                if (constant == null)
+                var expr = e.Expression;
+                var constExprInfo = expr as ConstantExpressionInfo;
+                var constantValue = constExprInfo != null ? constExprInfo.Value : ((ConstantExpression)expr).Value;
+                if (constantValue == null)
                 {
                     il.Emit(OpCodes.Ldnull);
                     return true;
                 }
 
-                var constantActualType = constant.GetType();
+                var constantActualType = constantValue.GetType();
                 if (constantActualType.GetTypeInfo().IsEnum)
                     constantActualType = Enum.GetUnderlyingType(constantActualType);
 
                 if (constantActualType == typeof(int))
                 {
-                    EmitLoadConstantInt(il, (int)constant);
+                    EmitLoadConstantInt(il, (int)constantValue);
                 }
                 else if (constantActualType == typeof(char))
                 {
-                    EmitLoadConstantInt(il, (char)constant);
+                    EmitLoadConstantInt(il, (char)constantValue);
                 }
                 else if (constantActualType == typeof(short))
                 {
-                    EmitLoadConstantInt(il, (short)constant);
+                    EmitLoadConstantInt(il, (short)constantValue);
                 }
                 else if (constantActualType == typeof(byte))
                 {
-                    EmitLoadConstantInt(il, (byte)constant);
+                    EmitLoadConstantInt(il, (byte)constantValue);
                 }
                 else if (constantActualType == typeof(ushort))
                 {
-                    EmitLoadConstantInt(il, (ushort)constant);
+                    EmitLoadConstantInt(il, (ushort)constantValue);
                 }
                 else if (constantActualType == typeof(sbyte))
                 {
-                    EmitLoadConstantInt(il, (sbyte)constant);
+                    EmitLoadConstantInt(il, (sbyte)constantValue);
                 }
                 else if (constantActualType == typeof(uint))
                 {
                     unchecked
                     {
-                        EmitLoadConstantInt(il, (int)(uint)constant);
+                        EmitLoadConstantInt(il, (int)(uint)constantValue);
                     }
                 }
                 else if (constantActualType == typeof(long))
                 {
-                    il.Emit(OpCodes.Ldc_I8, (long)constant);
+                    il.Emit(OpCodes.Ldc_I8, (long)constantValue);
                 }
                 else if (constantActualType == typeof(ulong))
                 {
                     unchecked
                     {
-                        il.Emit(OpCodes.Ldc_I8, (long)(ulong)constant);
+                        il.Emit(OpCodes.Ldc_I8, (long)(ulong)constantValue);
                     }
                 }
                 else if (constantActualType == typeof(float))
                 {
-                    il.Emit(OpCodes.Ldc_R8, (float)constant);
+                    il.Emit(OpCodes.Ldc_R8, (float)constantValue);
                 }
                 else if (constantActualType == typeof(double))
                 {
-                    il.Emit(OpCodes.Ldc_R8, (double)constant);
+                    il.Emit(OpCodes.Ldc_R8, (double)constantValue);
                 }
                 else if (constantActualType == typeof(bool))
                 {
-                    il.Emit((bool)constant ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
+                    il.Emit((bool)constantValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
                 }
-                else if (constant is string)
+                else if (constantValue is string)
                 {
-                    il.Emit(OpCodes.Ldstr, (string)constant);
+                    il.Emit(OpCodes.Ldstr, (string)constantValue);
                 }
-                else if (constant is Type)
+                else if (constantValue is Type)
                 {
-                    il.Emit(OpCodes.Ldtoken, (Type)constant);
-                    var getTypeFromHandle = typeof(Type).GetTypeInfo()
-                        .DeclaredMethods.First(m => m.Name == "GetTypeFromHandle");
-                    il.Emit(OpCodes.Call, getTypeFromHandle);
+                    il.Emit(OpCodes.Ldtoken, (Type)constantValue);
+                    il.Emit(OpCodes.Call, _getTypeFromHandleMethod);
                 }
                 else if (closure != null)
                 {
-                    var constantIndex = closure.ConstantExpressions.IndexOf(e);
+                    var constantIndex = closure.Constants.IndexOf(it => it.ConstantExpr == expr);
                     if (constantIndex == -1)
                         return false;
-                    LoadClosureFieldOrItem(il, closure, constantIndex, e.Type);
+                    LoadClosureFieldOrArrayItem(il, closure, constantIndex, e.Type);
 
                 }
                 else return false;
 
                 // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
                 if (e.Type == typeof(object) && constantActualType.GetTypeInfo().IsValueType)
-                    il.Emit(OpCodes.Box, constant.GetType()); // using normal type for Enum instead of underlying type
+                    il.Emit(OpCodes.Box, constantValue.GetType()); // using normal type for Enum instead of underlying type
 
                 return true;
             }
 
-            private static void LoadClosureFieldOrItem(ILGenerator il, ClosureInfo closure, int constantIndex, Type constantType)
+            // The @skipCastOrUnboxing option is for use-case when we loading and immediately storing the item, 
+            // it may happen when copying from one object array to another.
+            private static void LoadClosureFieldOrArrayItem(ILGenerator il,
+                ClosureInfo closure, int closedItemIndex, Type closedItemType = null)
             {
-                // load closure argument: Closure object or Closure array
+                // Load closure argument: typed or array-based.
+                // Closure will always be a first argument.
                 il.Emit(OpCodes.Ldarg_0);
 
                 if (!closure.IsArray)
                 {
                     // load closure field
-                    il.Emit(OpCodes.Ldfld, closure.Fields[constantIndex]);
+                    il.Emit(OpCodes.Ldfld, closure.Fields[closedItemIndex]);
                     return;
                 }
-                
+
                 // load array field
                 il.Emit(OpCodes.Ldfld, ArrayClosure.ArrayField);
 
                 // load array item index
-                EmitLoadConstantInt(il, constantIndex);
+                EmitLoadConstantInt(il, closedItemIndex);
 
                 // load item from index
                 il.Emit(OpCodes.Ldelem_Ref);
 
+                if (closedItemType == null ||
+                    closedItemType == typeof(object))
+                    return;
+
                 // Cast or unbox the object item depending if it is a class or value type
-                if (constantType != typeof(object))
-                {
-                    if (constantType.GetTypeInfo().IsValueType)
-                        il.Emit(OpCodes.Unbox_Any, constantType);
-                    else
-                        il.Emit(OpCodes.Castclass, constantType);
-                }
+                if (closedItemType.GetTypeInfo().IsValueType)
+                    il.Emit(OpCodes.Unbox_Any, closedItemType);
+                else
+                    il.Emit(OpCodes.Castclass, closedItemType);
             }
 
-            private static bool EmitNew(NewExpression e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitNew(Expr e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
-                if (!EmitMany(e.Arguments, ps, il, closure))
-                    return false;
-                il.Emit(OpCodes.Newobj, e.Constructor);
+                var newExprInfo = e.Expression as NewExpressionInfo;
+                if (newExprInfo != null)
+                {
+                    if (!EmitMany(newExprInfo.Arguments, ps, il, closure))
+                        return false;
+                    il.Emit(OpCodes.Newobj, newExprInfo.Constructor);
+                }
+                else
+                {
+                    var newExpr = (NewExpression)e.Expression;
+                    if (!EmitMany(newExpr.Arguments, ps, il, closure))
+                        return false;
+                    il.Emit(OpCodes.Newobj, newExpr.Constructor);
+                }
                 return true;
             }
 
@@ -1069,7 +1374,7 @@ namespace FastExpressionCompiler
                             .DeclaredMethods.FirstOrDefault(m => m.Name == propSetMethodName);
                         if (setMethod == null)
                             return false;
-                        EmitMethodCall(setMethod, il);
+                        EmitMethodCall(il, setMethod);
                     }
                     else
                     {
@@ -1084,25 +1389,42 @@ namespace FastExpressionCompiler
                 return true;
             }
 
-            private static bool EmitMethodCall(MethodCallExpression e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitMethodCall(Expr e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
-                var methodOwnerExpr = e.Object;
-                if (methodOwnerExpr != null)
+                var exprObj = e.Expression;
+                var exprInfo = exprObj as MethodCallExpressionInfo;
+                if (exprInfo != null)
                 {
-                    if (!TryEmit(methodOwnerExpr, ps, il, closure))
+                    if (exprInfo.Object != null)
+                    {
+                        if (!TryEmit(exprInfo.Object, ps, il, closure)) return false;
+                        IfValueTypeStoreAndLoadValueAddress(il, exprInfo.Object.Type);
+                    }
+
+                    if (exprInfo.Arguments.Length != 0 &&
+                        !EmitMany(exprInfo.Arguments, ps, il, closure))
                         return false;
-                    ForValueTypeStoreAndLoadValueAddress(il, methodOwnerExpr.Type);
+                }
+                else
+                {
+                    var expr = (MethodCallExpression)exprObj;
+                    if (expr.Object != null)
+                    {
+                        if (!TryEmit(expr.Object, ps, il, closure)) return false;
+                        IfValueTypeStoreAndLoadValueAddress(il, expr.Object.Type);
+                    }
+
+                    if (expr.Arguments.Count != 0 &&
+                        !EmitMany(expr.Arguments, ps, il, closure))
+                        return false;
                 }
 
-                if (e.Arguments.Count != 0 &&
-                    !EmitMany(e.Arguments, ps, il, closure))
-                    return false;
-
-                EmitMethodCall(e.Method, il);
+                var method = exprInfo != null ? exprInfo.Method : ((MethodCallExpression)exprObj).Method;
+                EmitMethodCall(il, method);
                 return true;
             }
 
-            private static void ForValueTypeStoreAndLoadValueAddress(ILGenerator il, Type ownerType)
+            private static void IfValueTypeStoreAndLoadValueAddress(ILGenerator il, Type ownerType)
             {
                 if (ownerType.GetTypeInfo().IsValueType)
                 {
@@ -1112,123 +1434,193 @@ namespace FastExpressionCompiler
                 }
             }
 
-            private static bool EmitMemberAccess(MemberExpression e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
+            private static bool EmitMemberAccess(Expr e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
-                var memberOwnerExpr = e.Expression;
-                if (memberOwnerExpr != null)
+                var exprObj = e.Expression;
+                var exprInfo = exprObj as MemberExpressionInfo;
+                if (exprInfo != null)
                 {
-                    if (!TryEmit(memberOwnerExpr, ps, il, closure))
-                        return false;
-                    ForValueTypeStoreAndLoadValueAddress(il, memberOwnerExpr.Type);
+                    if (exprInfo.Expression != null)
+                    {
+                        if (!TryEmit(exprInfo.Expression, ps, il, closure)) return false;
+                        IfValueTypeStoreAndLoadValueAddress(il, exprInfo.Expression.Type);
+                    }
+                }
+                else
+                {
+                    var instanceExpr = ((MemberExpression)exprObj).Expression;
+                    if (instanceExpr != null)
+                    {
+                        if (!TryEmit(instanceExpr, ps, il, closure)) return false;
+                        IfValueTypeStoreAndLoadValueAddress(il, instanceExpr.Type);
+                    }
                 }
 
-                var field = e.Member as FieldInfo;
+                var member = exprInfo != null ? exprInfo.Member : ((MemberExpression)exprObj).Member;
+                var field = member as FieldInfo;
                 if (field != null)
                 {
                     il.Emit(field.IsStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, field);
                     return true;
                 }
 
-                var prop = e.Member as PropertyInfo;
+                var prop = member as PropertyInfo;
                 if (prop != null)
                 {
                     var propGetMethodName = "get_" + prop.Name;
                     var getMethod = prop.DeclaringType.GetTypeInfo()
-                        .DeclaredMethods.FirstOrDefault(_ => _.Name == propGetMethodName);
+                        .DeclaredMethods.FirstOrDefault(m => m.Name == propGetMethodName);
                     if (getMethod == null)
                         return false;
-                    EmitMethodCall(getMethod, il);
+                    EmitMethodCall(il, getMethod);
                 }
                 return true;
             }
 
-            private static bool EmitNestedLambda(LambdaExpression lambdaExpr, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
+            private static bool EmitNestedLambda(object lambdaExpr,
+                IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
             {
                 // First, find in closed compiled lambdas the one corresponding to the current lambda expression.
-                var nestedLambdas = closure.NestedLambdas;
-                var nestedLambdaIndex = nestedLambdas.Count - 1;
-                while (nestedLambdaIndex >= 0 && nestedLambdas[nestedLambdaIndex].LambdaExpr != lambdaExpr)
-                    --nestedLambdaIndex;
-
-                // Situation with not found lambda is not possible/exceptional - 
-                // means that we somehow skipped the lambda expression while collecting closure info.
-                if (nestedLambdaIndex == -1)
+                // Situation with not found lambda is not possible/exceptional,
+                // it means that we somehow skipped the lambda expression while collecting closure info.
+                var outerNestedLambdas = closure.NestedLambdas;
+                var outerNestedLambdaIndex = outerNestedLambdas.IndexOf(it => it.LambdaExpr == lambdaExpr);
+                if (outerNestedLambdaIndex == -1)
                     return false;
 
-                var nestedLambdaInfo = nestedLambdas[nestedLambdaIndex];
+                var nestedLambdaInfo = outerNestedLambdas[outerNestedLambdaIndex];
                 var nestedLambda = nestedLambdaInfo.Lambda;
-                var nestedLambdaType = nestedLambda.GetType();
 
-                // Next we are loading compiled lambda on stack
-                var closureItemIndex = nestedLambdaIndex + closure.ConstantCount + closure.UsedParamCount;
-                LoadClosureFieldOrItem(il, closure, closureItemIndex, nestedLambdaType);
+                var outerConstants = closure.Constants;
+                var outerNonPassedParams = closure.NonPassedParameters;
+
+                // Load compiled lambda on stack counting the offset
+                outerNestedLambdaIndex += outerConstants.Length + outerNonPassedParams.Length;
+                LoadClosureFieldOrArrayItem(il, closure, outerNestedLambdaIndex, nestedLambda.GetType());
 
                 // If lambda does not use any outer parameters to be set in closure, then we're done
-                var nestedLambdaClosure = nestedLambdaInfo.ClosureInfo;
-                if (nestedLambdaClosure == null ||
-                    nestedLambdaClosure.UsedParamExpressions == null)
+                var nestedClosureInfo = nestedLambdaInfo.ClosureInfo;
+                if (nestedClosureInfo == null)
                     return true;
 
-                // Sets closure param placeholder fields to the param values 
-                var nestedLambdaUsedParamExprs = nestedLambdaClosure.UsedParamExpressions;
-                for (var i = 0; i < nestedLambdaUsedParamExprs.Count; i++)
+                // If closure is array-based, the create a new array to represent closure for the nested lambda
+                var isNestedArrayClosure = nestedClosureInfo.IsArray;
+                if (isNestedArrayClosure)
                 {
-                    var nestedUsedParamExpr = nestedLambdaUsedParamExprs[i];
+                    EmitLoadConstantInt(il, nestedClosureInfo.ClosedItemCount); // size of array
+                    il.Emit(OpCodes.Newarr, typeof(object));
+                }
 
-                    // copy lambda field on stack in order to set it Target.Param to param value
-                    il.Emit(OpCodes.Dup);
-
-                    // load lambda.Target property
-                    EmitMethodCall(_getDelegateTargetProperty, il);
-
-                    // params go after constants
-                    var nestedUsedParamIndex = i + nestedLambdaClosure.ConstantCount;
-
-                    if (nestedLambdaClosure.IsArray)
+                // Load constants on stack
+                var nestedConstants = nestedClosureInfo.Constants;
+                if (nestedConstants.Length != 0)
+                {
+                    for (var nestedConstIndex = 0; nestedConstIndex < nestedConstants.Length; nestedConstIndex++)
                     {
-                        // load array field
-                        il.Emit(OpCodes.Ldfld, ArrayClosure.ArrayField);
+                        var nestedConstant = nestedConstants[nestedConstIndex];
 
-                        // load array item index
-                        EmitLoadConstantInt(il, nestedUsedParamIndex);
-                    }
+                        // Find constant index in the outer closure
+                        var outerConstIndex = outerConstants.IndexOf(it => it.ConstantExpr == nestedConstant.ConstantExpr);
+                        if (outerConstIndex == -1)
+                            return false; // some error is here
 
-                    var paramIndex = paramExprs.IndexOf(nestedUsedParamExpr);
-                    if (paramIndex != -1) // load param from input params
-                    {
-                        // +1 is set cause of added first closure argument
-                        LoadParamArg(il, paramIndex + 1);
-                    }
-                    else // load parameter from outer closure
-                    {
-                        if (closure.UsedParamExpressions == null)
-                            return false; // impossible, better to throw?
+                        if (isNestedArrayClosure)
+                        {
+                            // Duplicate nested array on stack to store the item, and load index to where to store
+                            il.Emit(OpCodes.Dup);
+                            EmitLoadConstantInt(il, nestedConstIndex);
+                        }
 
-                        var outerClosureParamIndex = closure.UsedParamExpressions.IndexOf(nestedUsedParamExpr);
-                        if (outerClosureParamIndex == -1)
-                            return false; // impossible, better to throw?
+                        LoadClosureFieldOrArrayItem(il, closure, outerConstIndex,
+                            isNestedArrayClosure ? null : nestedConstant.Type);
 
-                        var outerClosureParamItemIndex = closure.ConstantCount + outerClosureParamIndex;
-                        LoadClosureFieldOrItem(il, closure, outerClosureParamItemIndex, nestedUsedParamExpr.Type);
-                    }
-
-                    if (nestedLambdaClosure.IsArray)
-                    {
-                        // box value types before setting the object array item
-                        if (nestedUsedParamExpr.Type.GetTypeInfo().IsValueType)
-                            il.Emit(OpCodes.Box, nestedUsedParamExpr.Type);
-
-                        // load item from index
-                        il.Emit(OpCodes.Stelem_Ref);
-                    }
-                    else
-                    {
-                        var closedParamField = nestedLambdaClosure.Fields[nestedUsedParamIndex];
-                        il.Emit(OpCodes.Stfld, closedParamField);
+                        if (isNestedArrayClosure)
+                            il.Emit(OpCodes.Stelem_Ref); // store the item in array
                     }
                 }
 
+                // Load used and closed parameter values on stack
+                var nestedNonPassedParams = nestedClosureInfo.NonPassedParameters;
+                for (var nestedParamIndex = 0; nestedParamIndex < nestedNonPassedParams.Length; nestedParamIndex++)
+                {
+                    var nestedUsedParam = nestedNonPassedParams[nestedParamIndex];
+
+                    // Duplicate nested array on stack to store the item, and load index to where to store
+                    if (isNestedArrayClosure)
+                    {
+                        il.Emit(OpCodes.Dup);
+                        EmitLoadConstantInt(il, nestedConstants.Length + nestedParamIndex);
+                    }
+
+                    var paramIndex = paramExprs.IndexOf(nestedUsedParam);
+                    if (paramIndex != -1) // load param from input params
+                    {
+                        // +1 is set cause of added first closure argument
+                        LoadParamArg(il, 1 + paramIndex);
+                    }
+                    else // load parameter from outer closure
+                    {
+                        if (outerNonPassedParams.Length == 0)
+                            return false; // impossible, better to throw?
+
+                        var outerParamIndex = outerNonPassedParams.IndexOf(it => it == nestedUsedParam);
+                        if (outerParamIndex == -1)
+                            return false; // impossible, better to throw?
+
+                        LoadClosureFieldOrArrayItem(il, closure, outerConstants.Length + outerParamIndex,
+                            isNestedArrayClosure ? null : nestedUsedParam.Type);
+                    }
+
+                    if (isNestedArrayClosure)
+                        il.Emit(OpCodes.Stelem_Ref); // store the item in array
+                }
+
+                // Load nested lambdas on stack
+                var nestedNestedLambdas = nestedClosureInfo.NestedLambdas;
+                if (nestedNestedLambdas.Length != 0)
+                {
+                    for (var nestedLambdaIndex = 0; nestedLambdaIndex < nestedNestedLambdas.Length; nestedLambdaIndex++)
+                    {
+                        var nestedNestedLambda = nestedNestedLambdas[nestedLambdaIndex];
+
+                        // Find constant index in the outer closure
+                        var outerLambdaIndex = outerNestedLambdas.IndexOf(it => it.LambdaExpr == nestedNestedLambda.LambdaExpr);
+                        if (outerLambdaIndex == -1)
+                            return false; // some error is here
+
+                        // Duplicate nested array on stack to store the item, and load index to where to store
+                        if (isNestedArrayClosure)
+                        {
+                            il.Emit(OpCodes.Dup);
+                            EmitLoadConstantInt(il, nestedConstants.Length + nestedNonPassedParams.Length + nestedLambdaIndex);
+                        }
+
+                        outerLambdaIndex += outerConstants.Length + outerNonPassedParams.Length;
+                        LoadClosureFieldOrArrayItem(il, closure, outerLambdaIndex,
+                            isNestedArrayClosure ? null : nestedNestedLambda.GetType());
+
+                        if (isNestedArrayClosure)
+                            il.Emit(OpCodes.Stelem_Ref); // store the item in array
+                    }
+                }
+
+                // Create nested closure object composed of all constants, params, lambdas loaded on stack
+                if (isNestedArrayClosure)
+                    il.Emit(OpCodes.Newobj, ArrayClosure.Constructor);
+                else
+                    il.Emit(OpCodes.Newobj,
+                        nestedClosureInfo.ClosureType.GetTypeInfo().DeclaredConstructors.First());
+
+                EmitMethodCall(il, GetCurryClosureMethod(nestedLambda, nestedLambdaInfo.IsAction));
                 return true;
+            }
+
+            private static MethodInfo GetCurryClosureMethod(object lambda, bool isAction)
+            {
+                var lambdaTypeArgs = lambda.GetType().GetTypeInfo().GenericTypeArguments;
+                return isAction
+                    ? CurryClosureActions.Methods[lambdaTypeArgs.Length - 1].MakeGenericMethod(lambdaTypeArgs)
+                    : CurryClosureFuncs.Methods[lambdaTypeArgs.Length - 2].MakeGenericMethod(lambdaTypeArgs);
             }
 
             private static bool EmitInvokeLambda(InvocationExpression e, IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure)
@@ -1238,13 +1630,13 @@ namespace FastExpressionCompiler
                     return false;
 
                 var invokeMethod = e.Expression.Type.GetTypeInfo().DeclaredMethods.First(m => m.Name == "Invoke");
-                EmitMethodCall(invokeMethod, il);
+                EmitMethodCall(il, invokeMethod);
                 return true;
             }
 
             private static bool EmitComparison(BinaryExpression e, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
-                if (!TryEmit(e.Left, ps, il, closure) || 
+                if (!TryEmit(e.Left, ps, il, closure) ||
                     !TryEmit(e.Right, ps, il, closure))
                     return false;
 
@@ -1285,10 +1677,11 @@ namespace FastExpressionCompiler
 
                 var labelSkipRight = il.DefineLabel();
                 var isAnd = e.NodeType == ExpressionType.AndAlso;
-                il.Emit(isAnd ? OpCodes.Brfalse_S : OpCodes.Brtrue_S, labelSkipRight);
+                il.Emit(isAnd ? OpCodes.Brfalse : OpCodes.Brtrue, labelSkipRight);
 
                 if (!TryEmit(e.Right, ps, il, closure))
                     return false;
+
                 var labelDone = il.DefineLabel();
                 il.Emit(OpCodes.Br, labelDone);
 
@@ -1305,7 +1698,7 @@ namespace FastExpressionCompiler
                     return false;
 
                 var labelIfFalse = il.DefineLabel();
-                il.Emit(OpCodes.Brfalse_S, labelIfFalse);
+                il.Emit(OpCodes.Brfalse, labelIfFalse);
 
                 if (!TryEmit(e.IfTrue, ps, il, closure))
                     return false;
@@ -1321,7 +1714,7 @@ namespace FastExpressionCompiler
                 return true;
             }
 
-            private static void EmitMethodCall(MethodInfo method, ILGenerator il)
+            private static void EmitMethodCall(ILGenerator il, MethodInfo method)
             {
                 il.Emit(method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method);
             }
@@ -1366,5 +1759,258 @@ namespace FastExpressionCompiler
                 }
             }
         }
+    }
+
+    /// <summary>Base expression.</summary>
+    public abstract class ExpressionInfo
+    {
+        /// <summary>Expression node type.</summary>
+        public abstract ExpressionType NodeType { get; }
+
+        /// <summary>All expressions should have a Type.</summary>
+        public abstract Type Type { get; }
+
+        /// <summary>Allow to change parameter expression as info interchangeable.</summary>
+        public static implicit operator ExpressionInfo(ParameterExpression paramExpr)
+        {
+            return new ParameterExpressionInfo(paramExpr);
+        }
+
+        /// <summary>Analog of Expression.Constant</summary>
+        public static ConstantExpressionInfo Constant(object value, Type type = null)
+        {
+            return new ConstantExpressionInfo(value, type);
+        }
+
+        /// <summary>Analog of Expression.New</summary>
+        public static NewExpressionInfo New(ConstructorInfo ctor, params ExpressionInfo[] arguments)
+        {
+            return new NewExpressionInfo(ctor, arguments);
+        }
+
+        /// <summary>Static method call</summary>
+        public static MethodCallExpressionInfo Call(MethodInfo method, params ExpressionInfo[] arguments)
+        {
+            return new MethodCallExpressionInfo(null, method, arguments);
+        }
+
+        /// <summary>Instance method call</summary>
+        public static MethodCallExpressionInfo Call(
+            ExpressionInfo instance, MethodInfo method, params ExpressionInfo[] arguments)
+        {
+            return new MethodCallExpressionInfo(instance, method, arguments);
+        }
+
+        /// <summary>Static property</summary>
+        public static PropertyExpressionInfo Property(PropertyInfo property)
+        {
+            return new PropertyExpressionInfo(null, property);
+        }
+
+        /// <summary>Instance property</summary>
+        public static PropertyExpressionInfo Property(ExpressionInfo instance, PropertyInfo property)
+        {
+            return new PropertyExpressionInfo(instance, property);
+        }
+
+        /// <summary>Static field</summary>
+        public static FieldExpressionInfo Field(FieldInfo field)
+        {
+            return new FieldExpressionInfo(null, field);
+        }
+
+        /// <summary>Instance field</summary>
+        public static FieldExpressionInfo Property(ExpressionInfo instance, FieldInfo field)
+        {
+            return new FieldExpressionInfo(instance, field);
+        }
+
+        /// <summary>Analog of Expression.Lambda</summary>
+        public static LambdaExpressionInfo Lambda(ExpressionInfo body, params ParameterExpression[] parameters)
+        {
+            return new LambdaExpressionInfo(body, parameters);
+        }
+    }
+
+    /// <summary>Wraps ParameterExpression and just it.</summary>
+    public class ParameterExpressionInfo : ExpressionInfo
+    {
+        /// <summary>Wrapped parameter expression.</summary>
+        public ParameterExpression ParamExpr { get; }
+
+        /// <summary>Allow to change parameter expression as info interchangeable.</summary>
+        public static implicit operator ParameterExpression(ParameterExpressionInfo info)
+        {
+            return info.ParamExpr;
+        }
+
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.Parameter; } }
+
+        /// <inheritdoc />
+        public override Type Type { get { return ParamExpr.Type; } }
+
+        /// <summary>Optional name.</summary>
+        public string Name { get { return ParamExpr.Name; } }
+
+        /// <summary>Constructor</summary>
+        public ParameterExpressionInfo(ParameterExpression paramExpr)
+        {
+            ParamExpr = paramExpr;
+        }
+    }
+
+    /// <summary>Analog of ConstantExpression.</summary>
+    public class ConstantExpressionInfo : ExpressionInfo
+    {
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.Constant; } }
+
+        /// <inheritdoc />
+        public override Type Type { get; }
+
+        /// <summary>Value of constant.</summary>
+        public readonly object Value;
+
+        /// <summary>Constructor</summary>
+        public ConstantExpressionInfo(object value, Type type = null)
+        {
+            Value = value;
+            Type = type ?? (value == null ? typeof(object) : value.GetType());
+        }
+    }
+
+    /// <summary>Base class for expressions with arguments.</summary>
+    public abstract class ArgumentsExpressionInfo : ExpressionInfo
+    {
+        /// <summary>List of arguments</summary>
+        public readonly ExpressionInfo[] Arguments;
+
+        /// <summary>Constructor</summary>
+        protected ArgumentsExpressionInfo(ExpressionInfo[] arguments)
+        {
+            Arguments = arguments;
+        }
+    }
+
+    /// <summary>Analog of NewExpression</summary>
+    public class NewExpressionInfo : ArgumentsExpressionInfo
+    {
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.New; } }
+
+        /// <inheritdoc />
+        public override Type Type { get { return Constructor.DeclaringType; } }
+
+        /// <summary>The constructor info.</summary>
+        public readonly ConstructorInfo Constructor;
+
+        /// <summary>Construct from constructor info and argument expressions</summary>
+        public NewExpressionInfo(ConstructorInfo constructor, params ExpressionInfo[] arguments) : base(arguments)
+        {
+            Constructor = constructor;
+        }
+    }
+
+    /// <summary>Analog of MethodCallExpression</summary>
+    public class MethodCallExpressionInfo : ArgumentsExpressionInfo
+    {
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.Call; } }
+
+        /// <inheritdoc />
+        public override Type Type { get { return Method.ReturnType; } }
+
+        /// <summary>The method info.</summary>
+        public readonly MethodInfo Method;
+
+        /// <summary>Instance expression, null if static.</summary>
+        public readonly ExpressionInfo Object;
+
+        /// <summary>Construct from method info and argument expressions</summary>
+        public MethodCallExpressionInfo(
+            ExpressionInfo @object, MethodInfo method, params ExpressionInfo[] arguments) : base(arguments)
+        {
+            Object = @object;
+            Method = method;
+        }
+    }
+
+    /// <summary>Analog of MemberExpression</summary>
+    public abstract class MemberExpressionInfo : ExpressionInfo
+    {
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.MemberAccess; } }
+
+        /// <summary>Member info.</summary>
+        public readonly MemberInfo Member;
+
+        /// <summary>Instance expression, null if static.</summary>
+        public readonly ExpressionInfo Expression;
+
+        /// <summary>Constructs with</summary>
+        protected MemberExpressionInfo(ExpressionInfo expression, MemberInfo member)
+        {
+            Expression = expression;
+            Member = member;
+        }
+    }
+
+    /// <summary>Analog of PropertyExpression</summary>
+    public class PropertyExpressionInfo : MemberExpressionInfo
+    {
+        /// <inheritdoc />
+        public override Type Type { get { return ((PropertyInfo)Member).PropertyType; } }
+
+        /// <summary>Construct from property info</summary>
+        public PropertyExpressionInfo(ExpressionInfo instance, PropertyInfo property)
+            : base(instance, property) { }
+    }
+
+    /// <summary>Analog of PropertyExpression</summary>
+    public class FieldExpressionInfo : MemberExpressionInfo
+    {
+        /// <inheritdoc />
+        public override Type Type { get { return ((FieldInfo)Member).FieldType; } }
+
+        /// <summary>Construct from field info</summary>
+        public FieldExpressionInfo(ExpressionInfo instance, FieldInfo field)
+            : base(instance, field) { }
+    }
+
+    /// <summary>LambdaExpression</summary>
+    public class LambdaExpressionInfo : ExpressionInfo
+    {
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.Lambda; } }
+
+        /// <inheritdoc />
+        public override Type Type { get { return _type; } }
+
+        private readonly Type _type;
+
+        /// <summary>Lambda body.</summary>
+        public readonly ExpressionInfo Body;
+
+        /// <summary>List of parameters.</summary>
+        public readonly ParameterExpression[] Parameters;
+
+        /// <summary>Constructor</summary>
+        public LambdaExpressionInfo(ExpressionInfo body, ParameterExpression[] parameters)
+        {
+            Body = body;
+            Parameters = parameters;
+            _type = ExpressionCompiler.GetFuncOrActionType(ExpressionCompiler.GetParamExprTypes(parameters), Body.Type);
+        }
+    }
+
+    /// <summary>Typedclambda expression.</summary>
+    public sealed class ExpressionInfo<TDelegate> : LambdaExpressionInfo
+    {
+        /// <summary>Tyoe of lambda</summary>
+        public Type DelegateType { get { return typeof(TDelegate); } }
+
+        /// <summary>Constructor</summary>
+        public ExpressionInfo(ExpressionInfo body, ParameterExpression[] parameters) : base(body, parameters) { }
     }
 }
