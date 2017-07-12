@@ -10543,8 +10543,16 @@ namespace DryIoc
         }
     }
 
+    /// <summary>
+    /// todo: Remove
+    /// </summary>
     public static class RequestInfoExtensions
     {
+        /// <summary>
+        /// todo: Remove
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
         public static bool IsLazyWrapper(this RequestInfo request)
         {
             if (request == null || request.FactoryType != FactoryType.Wrapper || request.ServiceType == null)
