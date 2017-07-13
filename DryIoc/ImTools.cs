@@ -144,7 +144,7 @@ namespace ImTools
                 for (var i = 0; i < source.Length; ++i)
                 {
                     var item = source[i];
-                    if (ReferenceEquals(item, value) || Equals(item, value))
+                    if (Equals(item, value))
                         return i;
                 }
             return -1;

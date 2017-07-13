@@ -45,16 +45,15 @@ namespace DryIoc.IssuesTests.Interception
         }
 
         /// <summary>
-        /// Ensures that a service always resolves as lazy proxy.
+        /// Ensures that a service always resolves as lazy proxy (uses DefaultProxyBuilder).
         /// </summary>
         /// <param name="registrator">The registrator.</param>
         /// <param name="interfaceType">The type of the interface.</param>
         /// <param name="serviceKey">Optional service key.</param>
-        public static IRegistrator ResolveAsLazy(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
+        public static IRegistrator ResolveAsLazyViaProxyBuilder(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
         {
-            // skip the service registration, assume it already exists
             // registration of lazy interceptor
-            registrator.Register(typeof(LazyInterceptor<>), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            registrator.Register(typeof(LazyInterceptor<>), setup: Setup.Wrapper, ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             // lazy proxy wrapper
             var proxyBuilder = new DefaultProxyBuilder();
@@ -78,6 +77,31 @@ namespace DryIoc.IssuesTests.Interception
                         .Type(interfaceType, r => null)));
 
             return registrator;
+        }
+
+        /// <summary>
+        /// Ensures that a service always resolves as lazy proxy (uses ProxyGenerator, a bit easier to understand).
+        /// </summary>
+        /// <param name="registrator">The registrator.</param>
+        /// <param name="interfaceType">The type of the interface.</param>
+        /// <param name="serviceKey">Optional service key.</param>
+        public static IRegistrator ResolveAsLazy(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
+        {
+            var decoratorSetup = serviceKey == null
+               ? Setup.DecoratorWith(useDecorateeReuse: true)
+               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
+
+            var method = typeof(WrapAsLazy).GetSingleMethodOrNull("CreateLazyProxy", includeNonPublic: true).MakeGenericMethod(new[] { interfaceType });
+            registrator.Register(interfaceType, made: Made.Of(method), setup: decoratorSetup);
+            return registrator;
+        }
+
+        private static ProxyGenerator ProxyGenerator { get; } = new ProxyGenerator();
+
+        private static T CreateLazyProxy<T>(Lazy<T> lazyValue) where T : class
+        {
+            var interceptor = new LazyInterceptor<T>(lazyValue);
+            return ProxyGenerator.CreateInterfaceProxyWithTargetInterface<T>(null, new[] { interceptor });
         }
 
         private class LazyInterceptor<T> : IInterceptor
