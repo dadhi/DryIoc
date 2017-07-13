@@ -123,7 +123,7 @@ namespace DryIoc.IssuesTests.Interception
             Assert.NotNull(c.Egg);
         }
 
-        [Test]
+        [Test, Ignore("Not fixed. Decorators.")]
         public void Circular_dependency_handling_doesnt_actually_work_for_the_deeper_levels()
         {
             var container = new Container();

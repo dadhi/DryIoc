@@ -1005,13 +1005,14 @@ namespace DryIoc
             }
 
             // Filter out the recursive decorators:
-            // the decorator with the same ID which was applied before up to the root
+            // the decorator with the same ID which was applied before up to the root.
+            // We need to filter only ..
             if (!decorators.IsNullOrEmpty())
             {
                 var parent = request.ParentOrWrapper;
                 if (!parent.IsEmpty)
                 {
-                    var ids = parent.Enumerate().TakeWhile(r => !r.IsLazyWrapper()).Map(p => p.FactoryID).ToArrayOrSelf();
+                    var ids = parent.Enumerate().Map(p => p.FactoryID).ToArrayOrSelf();
                     decorators = decorators.Match(d => ids.IndexOf(d.FactoryID) == -1);
                 }
             }
@@ -10540,25 +10541,6 @@ namespace DryIoc
             {
                 return (h1 << 5) + h1 ^ h2;
             }
-        }
-    }
-
-    /// <summary>
-    /// todo: Remove
-    /// </summary>
-    public static class RequestInfoExtensions
-    {
-        /// <summary>
-        /// todo: Remove
-        /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        public static bool IsLazyWrapper(this RequestInfo request)
-        {
-            if (request == null || request.FactoryType != FactoryType.Wrapper || request.ServiceType == null)
-                return false;
-
-            return request.ServiceType.GetGenericDefinitionOrNull() == typeof(Lazy<>);
         }
     }
 
