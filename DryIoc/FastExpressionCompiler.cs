@@ -145,6 +145,7 @@ namespace FastExpressionCompiler
                 typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
         }
 
+        // todo: Review  do we need conversion operators here
         private struct Expr
         {
             public static implicit operator Expr(Expression expr)
@@ -794,24 +795,24 @@ namespace FastExpressionCompiler
                 case ExpressionType.Call:
                     var callExprInfo = expr as MethodCallExpressionInfo;
                     if (callExprInfo != null)
-                        return (callExprInfo.Object == null ||
-                                TryCollectBoundConstants(ref closure, callExprInfo.Object, paramExprs)) &&
-                               TryCollectBoundConstants(ref closure, callExprInfo.Arguments, paramExprs);
+                        return (callExprInfo.Object == null
+                            || TryCollectBoundConstants(ref closure, callExprInfo.Object, paramExprs))
+                            && TryCollectBoundConstants(ref closure, callExprInfo.Arguments, paramExprs);
 
                     var callExpr = (MethodCallExpression)expr;
-                    return (callExpr.Object == null ||
-                            TryCollectBoundConstants(ref closure, callExpr.Object, paramExprs)) &&
-                           TryCollectBoundConstants(ref closure, callExpr.Arguments, paramExprs);
+                    return (callExpr.Object == null
+                        || TryCollectBoundConstants(ref closure, callExpr.Object, paramExprs))
+                        && TryCollectBoundConstants(ref closure, callExpr.Arguments, paramExprs);
 
                 case ExpressionType.MemberAccess:
                     var memberExprInfo = expr as MemberExpressionInfo;
                     if (memberExprInfo != null)
                         return memberExprInfo.Expression == null
-                               || TryCollectBoundConstants(ref closure, memberExprInfo.Expression, paramExprs);
+                            || TryCollectBoundConstants(ref closure, memberExprInfo.Expression, paramExprs);
 
                     var memberExpr = ((MemberExpression)expr).Expression;
-                    return memberExpr == null ||
-                           TryCollectBoundConstants(ref closure, memberExpr, paramExprs);
+                    return memberExpr == null
+                        || TryCollectBoundConstants(ref closure, memberExpr, paramExprs);
 
                 case ExpressionType.New:
                     var newExprInfo = expr as NewExpressionInfo;
@@ -914,6 +915,9 @@ namespace FastExpressionCompiler
                     return TryCollectBoundConstants(ref closure, conditionalExpr.Test, paramExprs)
                            && TryCollectBoundConstants(ref closure, conditionalExpr.IfTrue, paramExprs)
                            && TryCollectBoundConstants(ref closure, conditionalExpr.IfFalse, paramExprs);
+
+                case ExpressionType.Assign:
+                    return false; // todo: Implement next
 
                 default:
                     var unaryExpr = expr as UnaryExpression;

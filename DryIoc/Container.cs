@@ -8473,8 +8473,8 @@ namespace DryIoc
                 }
             }
 
-            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, request,
-                allParamsAreConstants);
+            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, 
+                factoryExpr, paramExprs, request, allParamsAreConstants);
         }
 
         internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
@@ -8689,8 +8689,8 @@ namespace DryIoc
             _implementationType = knownImplType;
         }
 
-        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs,
-            Request request, bool allParamsAreConstants)
+        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, 
+            Expression factoryExpr, Expression[] paramExprs, Request request, bool allParamsAreConstants)
         {
             var rules = request.Rules;
 
