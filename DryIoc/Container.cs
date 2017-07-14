@@ -1827,7 +1827,9 @@ namespace DryIoc
 
             public override Expression CreateExpressionOrDefault(Request request)
             {
-                return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
+                return Resolver.CreateResolutionExpression(request, 
+                    isRuntimeDependency: true, 
+                    skipResolutionScope: true); // no need in resolution scope for instance
             }
 
             #region Implementation
@@ -5809,13 +5811,15 @@ namespace DryIoc
         }
 
         internal static Expression CreateResolutionExpression(Request request,
-            bool openResolutionScope = false, bool isRuntimeDependency = false)
+            bool openResolutionScope = false, bool isRuntimeDependency = false,
+            bool skipResolutionScope = false)
         {
             request.ContainsNestedResolutionCall = true;
 
             var container = request.Container;
 
-            if (!isRuntimeDependency && container.Rules.DependencyResolutionCallExpressions != null)
+            if (!isRuntimeDependency && 
+                container.Rules.DependencyResolutionCallExpressions != null)
                 PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
             var serviceTypeExpr = Expression.Constant(request.ServiceType, typeof(Type));
@@ -5823,22 +5827,31 @@ namespace DryIoc
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
-            // first ensure that we have parent scope if any to propagate it across resolution call boundaries
-            var scopeExpr = Container.GetResolutionScopeExpression(request);
-            if (openResolutionScope)
+            Expression scopeExpr;
+            if (skipResolutionScope)
             {
-                // creates new scope and link it to existing (or new) parent
-                // Here the code looks: scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-                var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
-                var scopeCtor = typeof(Scope).GetSingleConstructorOrNull().ThrowIfNull();
-                scopeExpr = Expression.New(scopeCtor, scopeExpr,
-                    Expression.New(typeof(KV<Type, object>).GetSingleConstructorOrNull().ThrowIfNull(),
-                        actualServiceTypeExpr, serviceKeyExpr));
+                scopeExpr = Expression.Constant(null, typeof(IScope));
+            }
+            else
+            {
+                // first ensure that we have parent scope if any to propagate it across resolution call boundaries
+                scopeExpr = Container.GetResolutionScopeExpression(request);
+                if (openResolutionScope)
+                {
+                    // creates new scope and link it to existing (or new) parent
+                    // Here the code looks: scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
+                    var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
+                    var scopeCtor = typeof(Scope).GetSingleConstructorOrNull().ThrowIfNull();
+                    scopeExpr = Expression.New(scopeCtor, scopeExpr,
+                        Expression.New(typeof(KV<Type, object>).GetSingleConstructorOrNull().ThrowIfNull(),
+                            actualServiceTypeExpr, serviceKeyExpr));
+                }
             }
 
             var resolverExpr = Container.GetResolverExpr(request);
 
-            // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
+            // Only parent is converted to be passed to Resolve.
+            // The current request is formed by rest of Resolve parameters.
             var parentRequestInfo =
                 request.RawParent.IsEmpty
                     ? request.PreResolveParent

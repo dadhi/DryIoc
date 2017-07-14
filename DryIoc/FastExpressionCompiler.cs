@@ -1041,6 +1041,7 @@ namespace FastExpressionCompiler
                 }
             }
 
+            // todo: review implementation for robustness
             private static bool EmitAssignment(IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure, object expr)
             {
                 var assignExpr = (BinaryExpression)expr;
