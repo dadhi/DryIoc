@@ -135,7 +135,6 @@ namespace FastExpressionCompiler
                 typeof(TDelegate), paramTypes, returnType, bodyExpr, paramExprs);
         }
 
-        // todo: Review  do we need conversion operators here
         private struct Expr
         {
             public static implicit operator Expr(Expression expr)
@@ -906,9 +905,6 @@ namespace FastExpressionCompiler
                            && TryCollectBoundConstants(ref closure, conditionalExpr.IfTrue, paramExprs)
                            && TryCollectBoundConstants(ref closure, conditionalExpr.IfFalse, paramExprs);
 
-                //case ExpressionType.Assign: // Supported since .NET 4.0
-                //    return false; // todo: Implement next
-
                 default:
                     var unaryExpr = expr as UnaryExpression;
                     if (unaryExpr != null)
@@ -917,7 +913,7 @@ namespace FastExpressionCompiler
                     var binaryExpr = expr as BinaryExpression;
                     if (binaryExpr != null)
                         return TryCollectBoundConstants(ref closure, binaryExpr.Left, paramExprs)
-                               && TryCollectBoundConstants(ref closure, binaryExpr.Right, paramExprs);
+                            && TryCollectBoundConstants(ref closure, binaryExpr.Right, paramExprs);
                     break;
             }
 
@@ -992,7 +988,12 @@ namespace FastExpressionCompiler
                 ILGenerator il, ClosureInfo closure)
             {
                 var expr = e.Expression;
-                switch (e.NodeType)
+                var exprNodeType = e.NodeType;
+
+                if ((int)exprNodeType == 46) // Support for ExpressionType.Assign in .NET < 4.0
+                    return EmitAssignment(paramExprs, il, closure, expr);
+
+                switch (exprNodeType)
                 {
                     case ExpressionType.Parameter:
                         var pInfo = expr as ParameterExpressionInfo;
@@ -1040,6 +1041,36 @@ namespace FastExpressionCompiler
                 }
             }
 
+            private static bool EmitAssignment(IList<ParameterExpression> paramExprs, ILGenerator il, ClosureInfo closure, object expr)
+            {
+                var assignExpr = (BinaryExpression)expr;
+                if (!TryEmit(assignExpr.Right, paramExprs, il, closure))
+                    return false;
+
+                var lValueExpr = assignExpr.Left;
+                if (lValueExpr.NodeType == ExpressionType.MemberAccess)
+                {
+                    ; // todo: OpCodes.Stfld
+                }
+                else if (lValueExpr.NodeType == ExpressionType.Parameter)
+                {
+                    var paramExpr = (ParameterExpression)lValueExpr;
+                    var paramIndex = paramExprs.IndexOf(paramExpr);
+                    if (paramIndex != -1)
+                    {
+                        if (closure != null)
+                            paramIndex += 1;
+                        il.Emit(OpCodes.Starg, paramIndex);
+                        LoadParamArg(il, paramIndex);
+                        return true;
+                    }
+
+                    ; // todo: For parameter in closure, probably also a OpCodes.Stfld
+                }
+
+                return false;
+            }
+
             private static bool EmitParameter(ParameterExpression p, IList<ParameterExpression> ps, ILGenerator il, ClosureInfo closure)
             {
                 var paramIndex = ps.IndexOf(p);
@@ -1054,7 +1085,7 @@ namespace FastExpressionCompiler
                 }
 
                 // if parameter isn't passed, then it is passed into some outer lambda,
-                // so it should be loaded from closure
+                // so it should be loaded from closure. Then the closure is null will be an invalid case.
                 if (closure == null)
                     return false;
 
@@ -1126,8 +1157,24 @@ namespace FastExpressionCompiler
                     return false;
 
                 var targetType = e.Type;
+                var sourceType = e.Operand.Type;
+                if (targetType == sourceType)
+                    return true; // do nothing, no conversion is needed
+
                 if (targetType == typeof(object))
-                    return false;
+                {
+                    if (sourceType.GetTypeInfo().IsValueType)
+                        il.Emit(OpCodes.Box, sourceType); // for valuy type to object, just box a value
+                    return true; // for reference type we don't need to convert
+                }
+
+                // Just unbox type object to the target value type
+                if (targetType.GetTypeInfo().IsValueType &&
+                    sourceType == typeof(object))
+                {
+                    il.Emit(OpCodes.Unbox_Any, targetType);
+                    return true;
+                }
 
                 if (targetType == typeof(int))
                     il.Emit(OpCodes.Conv_I4);
@@ -1395,7 +1442,8 @@ namespace FastExpressionCompiler
                 {
                     if (exprInfo.Object != null)
                     {
-                        if (!TryEmit(exprInfo.Object, ps, il, closure)) return false;
+                        if (!TryEmit(exprInfo.Object, ps, il, closure))
+                            return false;
                         IfValueTypeStoreAndLoadValueAddress(il, exprInfo.Object.Type);
                     }
 
@@ -1408,7 +1456,8 @@ namespace FastExpressionCompiler
                     var expr = (MethodCallExpression)exprObj;
                     if (expr.Object != null)
                     {
-                        if (!TryEmit(expr.Object, ps, il, closure)) return false;
+                        if (!TryEmit(expr.Object, ps, il, closure))
+                            return false;
                         IfValueTypeStoreAndLoadValueAddress(il, expr.Object.Type);
                     }
 
@@ -1798,6 +1847,12 @@ namespace FastExpressionCompiler
             return new ConstantExpressionInfo(value, type);
         }
 
+        /// <summary>Analog of Expression.Constant</summary>
+        public static ConvertExpressionInfo Convert(ExpressionInfo operand, Type targetType)
+        {
+            return new ConvertExpressionInfo(operand, targetType);
+        }
+
         /// <summary>Analog of Expression.New</summary>
         public static NewExpressionInfo New(ConstructorInfo ctor, params ExpressionInfo[] arguments)
         {
@@ -1893,6 +1948,27 @@ namespace FastExpressionCompiler
         {
             Value = value;
             Type = type ?? (value == null ? typeof(object) : value.GetType());
+        }
+    }
+
+    /// <summary>Analog of Convert expression.</summary>
+    public class ConvertExpressionInfo : ExpressionInfo
+    {
+        /// <inheritdoc />
+        public override ExpressionType NodeType { get { return ExpressionType.Convert; } }
+
+        /// <summary>Target type.</summary>
+        public override Type Type { get { return _targetType; } }
+        private readonly Type _targetType;
+
+        /// <summary>Operand to cast to a target type.</summary>
+        public readonly ExpressionInfo Operand;
+
+        /// <summary>Constructor</summary>
+        public ConvertExpressionInfo(ExpressionInfo operand, Type targetType)
+        {
+            Operand = operand;
+            _targetType = targetType;
         }
     }
 
