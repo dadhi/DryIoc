@@ -374,7 +374,7 @@ namespace DryIoc
                 return (state, context, scope) => value;
             }
 
-            var factoryDelegate = FastExpressionCompiler.ExpressionCompiler.DoCompile<FactoryDelegate>(
+            var factoryDelegate = FastExpressionCompiler.ExpressionCompiler.TryCompile<FactoryDelegate>(
                 expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
             if (factoryDelegate != null)
                 return factoryDelegate;
@@ -12082,32 +12082,6 @@ namespace DryIoc
         }
 
         static partial void GetCurrentManagedThreadID(ref int threadID);
-    }
-}
-
-namespace FastExpressionCompiler
-{
-    using System;
-    using System.Linq.Expressions;
-    using System.Collections.Generic;
-
-    /// <summary>Compiles to delegate using FastExpressionCompiler.</summary>
-    public static partial class ExpressionCompiler
-    {
-        internal static TDelegate DoCompile<TDelegate>(Expression bodyExpr,
-            ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class
-        {
-            TDelegate compiledDelegate = null;
-            TryCompile(ref compiledDelegate, bodyExpr, paramExprs, paramTypes, returnType);
-            return compiledDelegate;
-        }
-
-        static partial void TryCompile<TDelegate>(
-            ref TDelegate compileDelegate,
-            Expression bodyExpr,
-            IList<ParameterExpression> paramExprs,
-            Type[] paramTypes,
-            Type returnType) where TDelegate : class;
     }
 }
 

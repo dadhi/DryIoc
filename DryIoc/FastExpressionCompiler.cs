@@ -35,16 +35,6 @@ namespace FastExpressionCompiler
     /// The emitter is ~20 times faster than Expression.Compile.</summary>
     public static partial class ExpressionCompiler
     {
-        // ReSharper disable once RedundantAssignment
-        static partial void TryCompile<TDelegate>(ref TDelegate compileDelegate,
-            Expression bodyExpr,
-            IList<ParameterExpression> paramExprs,
-            Type[] paramTypes,
-            Type returnType) where TDelegate : class
-        {
-            compileDelegate = TryCompile<TDelegate>(bodyExpr, paramExprs, paramTypes, returnType);
-        }
-
         /// <summary>First tries to compile fast and if failed (null result), then falls back to Expression.Compile.</summary>
         /// <typeparam name="T">Type of compiled delegate return result.</typeparam>
         /// <param name="lambdaExpr">Expr to compile.</param>
@@ -52,7 +42,7 @@ namespace FastExpressionCompiler
         public static Func<T> Compile<T>(Expression<Func<T>> lambdaExpr)
         {
             return TryCompile<Func<T>>(lambdaExpr.Body, lambdaExpr.Parameters, Empty<Type>(), typeof(T))
-                   ?? lambdaExpr.Compile();
+                ?? lambdaExpr.Compile();
         }
 
         /// <summary>Compiles lambda expression to <typeparamref name="TDelegate"/>.</summary>
@@ -916,8 +906,8 @@ namespace FastExpressionCompiler
                            && TryCollectBoundConstants(ref closure, conditionalExpr.IfTrue, paramExprs)
                            && TryCollectBoundConstants(ref closure, conditionalExpr.IfFalse, paramExprs);
 
-                case ExpressionType.Assign:
-                    return false; // todo: Implement next
+                //case ExpressionType.Assign: // Supported since .NET 4.0
+                //    return false; // todo: Implement next
 
                 default:
                     var unaryExpr = expr as UnaryExpression;
@@ -1314,6 +1304,9 @@ namespace FastExpressionCompiler
                 var elems = e.Expressions;
                 var arrType = e.Type;
                 var elemType = arrType.GetElementType();
+                if (elemType == null)
+                    return false;
+
                 var isElemOfValueType = elemType.GetTypeInfo().IsValueType;
 
                 var arrVar = il.DeclareLocal(arrType);
