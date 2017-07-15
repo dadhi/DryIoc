@@ -55,7 +55,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{92D2ADDB
 		NuGet\DryIoc.WebApi.nuspec = NuGet\DryIoc.WebApi.nuspec
 		NuGet\DryIoc.WebApi.Owin.dll.nuspec = NuGet\DryIoc.WebApi.Owin.dll.nuspec
 		NuGet\DryIoc.WebApi.Owin.nuspec = NuGet\DryIoc.WebApi.Owin.nuspec
-		NuGet\DryIoc.Zero.nuspec = NuGet\DryIoc.Zero.nuspec
 		NuGet\DryIocAttributes.dll.nuspec = NuGet\DryIocAttributes.dll.nuspec
 		NuGet\DryIocAttributes.nuspec = NuGet\DryIocAttributes.nuspec
 		NuGet\DryIocZero.nuspec = NuGet\DryIocZero.nuspec

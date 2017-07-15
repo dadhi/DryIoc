@@ -40,21 +40,20 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc\ImTools.cs">
-      <Link>DryIocZero\ImTools.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIocZero\AsyncExecutionFlowScopeContext.cs">
-      <Link>DryIocZero\AsyncExecutionFlowScopeContext.cs</Link>
-    </Compile>
-    <Compile Include="..\DryIocZero\Container.cs">
-      <Link>DryIocZero\Container.cs</Link>
-    </Compile>
     <Compile Include="AttributedModelTests.cs" />
     <Compile Include="AttributedModelTestsBase.cs" />
+    <Compile Include="DryIocZero\AsyncExecutionFlowScopeContext.cs" />
+    <Compile Include="DryIocZero\Container.cs" />
     <Compile Include="DryIocZero\Container.Generated.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Container.Generated.tt</DependentUpon>
+    </Compile>
+    <Compile Include="DryIocZero\ImTools.cs" />
+    <Compile Include="DryIocZero\Registrations.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Registrations.tt</DependentUpon>
     </Compile>
     <Compile Include="GeneratedResolutionsTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -78,7 +77,10 @@
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>Container.Generated.cs</LastGenOutput>
     </Content>
-    <None Include="DryIocZero\Registrations.tt" />
+    <Content Include="DryIocZero\Registrations.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Registrations.cs</LastGenOutput>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />

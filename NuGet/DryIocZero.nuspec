@@ -21,8 +21,7 @@
       - changed: Optimized a generated code
     </releaseNotes>
     <dependencies>
-      <dependency id="DryIoc.dll" version="[2.11.3]" />
-      <dependency id="ExpressionToCodeLib" version="[1.5.4]" />
+      <!--no run-time dependencies-->
     </dependencies>
     <contentFiles>
       <files include="cs/any/*.*" buildAction="Compile" />
@@ -31,10 +30,10 @@
   <files>
     <file src="..\LICENSE.txt" />
 
+    <!--Compile-time dependencies-->
     <file src="..\Net45\bin\Release\DryIoc.dll" target="tools" />
     <file src="..\Net45\bin\Release\DryIoc.pdb" target="tools" />
     <file src="..\Net45\bin\Release\DryIoc.xml" target="tools" />
-    
     <file src="..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" target="tools" />
 
     <!--net45-->
