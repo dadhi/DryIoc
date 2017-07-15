@@ -25,8 +25,8 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.11.3\lib\net45\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
+<#@ assembly Name="$(ProjectDir)CompileTimeTools\DryIoc.dll" #>
+<#@ assembly Name="$(ProjectDir)CompileTimeTools\ExpressionToCodeLib.dll" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Collections.Generic" #>

@@ -15,7 +15,7 @@
 //
 //=======================================================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.11.3\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(ProjectDir)CompileTimeTools\DryIoc.dll" #>
 <#@ import Namespace="DryIoc" #>
 
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>

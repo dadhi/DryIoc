@@ -12,12 +12,12 @@
 //
 //=======================================================================
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.11.3\lib\net45\DryIoc.dll" #>
+<#@ assembly Name="$(ProjectDir)CompileTimeTools\DryIoc.dll" #>
 <#@ import Namespace="DryIoc" #>
 
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocAttributes.dll.3.0.0\lib\net45\DryIocAttributes.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.MefAttributedModel.dll.3.0.1\lib\net45\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(ProjectDir)CompileTimeTools\DryIocAttributes.dll" #>
+<#@ assembly Name="$(ProjectDir)CompileTimeTools\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>

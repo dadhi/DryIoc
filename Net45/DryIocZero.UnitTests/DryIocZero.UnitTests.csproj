@@ -40,9 +40,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc.UnitTests\HashTreeTests.cs">
-      <Link>HashTreeTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc\ImTools.cs">
       <Link>DryIocZero\ImTools.cs</Link>
     </Compile>
