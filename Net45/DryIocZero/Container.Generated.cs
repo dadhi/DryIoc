@@ -24,6 +24,8 @@ THE SOFTWARE.
 
 
 
+
+
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
@@ -36,8 +38,8 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-Factory delegate generation is completed without errors.
-----------------------------------
+Factory methods generation was success.
+---------------------------------------
 */
 
     partial class Container

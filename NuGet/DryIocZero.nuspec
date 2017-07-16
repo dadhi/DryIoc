@@ -12,6 +12,8 @@
     <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
+      v3.0.0-preview-04:
+      - changed: More explicit versions of tools stated in folder
       v3.0.0-preview-03:
       - changed: Moved DryIoc and ExpressionToCodeLib dependencies to package/tools folder
       v3.0.0-preview-02:
@@ -32,7 +34,6 @@
 
     <!--Compile-time dependencies-->
     <file src="..\Net45\bin\Release\DryIoc.dll" target="tools" />
-    <file src="..\Net45\bin\Release\DryIoc.pdb" target="tools" />
     <file src="..\Net45\bin\Release\DryIoc.xml" target="tools" />
     <file src="..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" target="tools" />
 

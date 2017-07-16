@@ -94,7 +94,7 @@ namespace DryIocZero
     else
         WriteLine("FAILED to generate for:");
 #>
-----------------------------------
+--------------------------------------
 <#
     for(var i = 0; i < errors.Length; ++i)
     {
