@@ -6,7 +6,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
-using System.Threading;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using ImTools;
@@ -144,7 +143,7 @@ namespace Playground
             [Setup]
             public void SetupData()
             {
-                _funcExpr = CreateExpression();
+                _funcExpr = CreateComplexExpression();
             }
 
             [Benchmark]
@@ -172,7 +171,7 @@ namespace Playground
             [Setup]
             public void SetupData()
             {
-                var expression = CreateExpression();
+                var expression = CreateComplexExpression();
                 _funcCompiled = expression.Compile();
                 _funcEmitted = EmitDelegateFromExpression(expression.Body);
                 _state = new object[15];
@@ -193,72 +192,13 @@ namespace Playground
             }
         }
 
-        /// <summary>Result delegate to be created by <see cref="CreateExpression"/></summary>
+        // Result delegate to be created by CreateComplexExpression
         public object CreateA(object[] state)
         {
             return new A(new B(), (string)state[11], new ID[] { new D1(), new D2() }) { Prop = new P(new B()), Bop = new B() };
         }
 
-        private static object ExpressionVsEmit()
-        {
-            const int times = 3000;
-            const int runTimes = 5000000;
-            Func<object[], object> func = null;
-            var funcExpr = CreateExpression();
-            var state = new object[15];
-            state[11] = "x";
-            object result = null;
-
-            Thread.CurrentThread.Priority = ThreadPriority.Highest;
-
-            var stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < times; i++)
-            {
-                func = funcExpr.Compile();
-            }
-            stopwatch.Stop();
-            Console.WriteLine("Compile Expression " + times + " times: " + stopwatch.ElapsedMilliseconds);
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < runTimes; i++)
-            {
-                result = func(state);
-            }
-            stopwatch.Stop();
-            Console.WriteLine("Invoke Compiled Expression " + runTimes + " times: " + stopwatch.ElapsedMilliseconds);
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < times; i++)
-            {
-                func = EmitDelegateFromExpression(funcExpr.Body);
-            }
-            stopwatch.Stop();
-            Console.WriteLine("Emit from Expression " + times + " times: " + stopwatch.ElapsedMilliseconds);
-
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < runTimes; i++)
-            {
-                result = func(state);
-            }
-            stopwatch.Stop();
-            Console.WriteLine("Run Emitted Expression: " + runTimes + " times: " + stopwatch.ElapsedMilliseconds);
-
-            return result;
-        }
-
-        private static Expression<Func<object[], object>> CreateExpression()
+        private static Expression<Func<object[], object>> CreateComplexExpression()
         {
             var stateParamExpr = Expression.Parameter(typeof(object[])); 
 
