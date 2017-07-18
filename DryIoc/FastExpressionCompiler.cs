@@ -1305,8 +1305,7 @@ namespace FastExpressionCompiler
 
             // The @skipCastOrUnboxing option is for use-case when we loading and immediately storing the item, 
             // it may happen when copying from one object array to another.
-            private static void LoadArrayClosureItem(ILGenerator il, int closedItemIndex,
-                Type closedItemType = null)
+            private static void LoadArrayClosureItem(ILGenerator il, int closedItemIndex, Type closedItemType)
             {
                 // load array field
                 il.Emit(OpCodes.Ldfld, ArrayClosure.ArrayField);
@@ -1316,10 +1315,6 @@ namespace FastExpressionCompiler
 
                 // load item from index
                 il.Emit(OpCodes.Ldelem_Ref);
-
-                if (closedItemType == null ||
-                    closedItemType == typeof(object))
-                    return;
 
                 // Cast or unbox the object item depending if it is a class or value type
                 if (closedItemType.GetTypeInfo().IsValueType)
@@ -1588,11 +1583,14 @@ namespace FastExpressionCompiler
                         if (closure.Fields != null)
                             il.Emit(OpCodes.Ldfld, closure.Fields[outerConstIndex]);
                         else
-                            LoadArrayClosureItem(il, outerConstIndex,
-                                isNestedArrayClosure ? null : nestedConstant.Type);
+                            LoadArrayClosureItem(il, outerConstIndex, nestedConstant.Type);
 
                         if (isNestedArrayClosure)
+                        {
+                            if (nestedConstant.Type.GetTypeInfo().IsValueType)
+                                il.Emit(OpCodes.Box, nestedConstant.Type);
                             il.Emit(OpCodes.Stelem_Ref); // store the item in array
+                        }
                     }
                 }
 
@@ -1628,12 +1626,15 @@ namespace FastExpressionCompiler
                         if (closure.Fields != null)
                             il.Emit(OpCodes.Ldfld, closure.Fields[outerConstants.Length + outerParamIndex]);
                         else
-                            LoadArrayClosureItem(il, outerConstants.Length + outerParamIndex,
-                                isNestedArrayClosure ? null : nestedUsedParam.Type);
+                            LoadArrayClosureItem(il, outerConstants.Length + outerParamIndex, nestedUsedParam.Type);
                     }
 
                     if (isNestedArrayClosure)
+                    {
+                        if (nestedUsedParam.Type.GetTypeInfo().IsValueType)
+                            il.Emit(OpCodes.Box, nestedUsedParam.Type);
                         il.Emit(OpCodes.Stelem_Ref); // store the item in array
+                    }
                 }
 
                 // Load nested lambdas on stack
@@ -1662,8 +1663,8 @@ namespace FastExpressionCompiler
                         if (closure.Fields != null)
                             il.Emit(OpCodes.Ldfld, closure.Fields[outerLambdaIndex]);
                         else
-                            LoadArrayClosureItem(il, outerLambdaIndex,
-                                isNestedArrayClosure ? null : nestedNestedLambda.GetType());
+                            LoadArrayClosureItem(il, outerLambdaIndex, 
+                                nestedNestedLambda.Lambda.GetType());
 
                         if (isNestedArrayClosure)
                             il.Emit(OpCodes.Stelem_Ref); // store the item in array
