@@ -33,9 +33,9 @@
     <file src="..\LICENSE.txt" />
 
     <!--Compile-time dependencies-->
-    <file src="..\Net45\bin\Release\DryIoc.dll" target="tools" />
-    <file src="..\Net45\bin\Release\DryIoc.xml" target="tools" />
-    <file src="..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" target="tools" />
+    <file src="..\Net45\bin\Release\DryIoc.dll" target="tools\DryIoc.2.11.5" />
+    <file src="..\Net45\bin\Release\DryIoc.xml" target="tools\DryIoc.2.11.5" />
+    <file src="..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.1.5.4" />
 
     <!--net45-->
     <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />

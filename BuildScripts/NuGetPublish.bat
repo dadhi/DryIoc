@@ -14,7 +14,7 @@ rem DryIoc.Microsoft.DependencyInjection
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
-%NUGET% push "%PACKAGEDIR%\DryIocZero.3.0.0-preview-04.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIocZero.3.0.0-preview-05.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocAttributes
 rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.3.1.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%

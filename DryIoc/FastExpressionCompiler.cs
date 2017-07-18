@@ -1848,7 +1848,7 @@ namespace FastExpressionCompiler
             return new ConstantExpressionInfo(value, type);
         }
 
-        /// <summary>Analog of Expression.Constant</summary>
+        /// <summary>Analog of Expression.Convert</summary>
         public static ConvertExpressionInfo Convert(ExpressionInfo operand, Type targetType)
         {
             return new ConvertExpressionInfo(operand, targetType);
