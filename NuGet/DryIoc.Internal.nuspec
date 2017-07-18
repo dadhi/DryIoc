@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.11.6:
+      - fixed (!!!): #495: InvalidCastException on type resolution
       v2.11.5:
       - fixed (!!!): #493 Some resolving of the controller ends up with exception "Container is disposed..."
       - fixed: #175 Deterministic implicit rule to select from multiple services for specific scope
