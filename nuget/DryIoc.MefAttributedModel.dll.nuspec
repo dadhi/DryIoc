@@ -19,8 +19,8 @@
       v3.1.0
       - added: Support for ScopedOrSingleton reuse
       v3.0.1:
-      - fixed: Updating to DryIoc 2.11.3 as work-around for backward compatibility issue with Setup.Condition
-      v3.0.0:
+      - fixed: Updating to DryIoc 2.11.5 as work-around for backward compatibility issue with Setup.Condition
+      v3.1.0:
       - added: WithMef() for maximum MEF compatibility in addition to WithMefAttributedModel() for only the attributes
       - added: #292: Add ImportManyAttribute support for full MEF compatibility
       - added: #293: Integrate lazy part discovery into MefAttributedModel API
@@ -38,13 +38,34 @@
       - fixed: #451: DryIoc should know about static members
     </releaseNotes>
     <dependencies>
-      <group>
-        <dependency id="DryIoc.dll" version="2.11.3" />
-        <dependency id="DryIocAttributes.dll" version="3.0.0" />
+      <!--Explicitly specify no dependencies for full .NET -->
+      <group targetFramework="net35">
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
+      </group>
+      <group targetFramework="net40">
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
+      </group>
+      <group targetFramework="net45">
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
+      </group>
+      <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1">
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
+      </group>
+      <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1">
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
+      </group>
+      <group targetFramework="xamarinmac20">
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
       </group>
       <group targetFramework="netstandard1.0">
-        <dependency id="DryIoc.dll" version="2.11.3" />
-        <dependency id="DryIocAttributes.dll" version="3.0.0" />
+        <dependency id="DryIoc.dll" version="2.11.5" />
+        <dependency id="DryIocAttributes.dll" version="3.1.0" />
 
         <dependency id="System.Runtime" version="4.3.0" />
         <dependency id="System.Runtime.Extensions" version="4.3.0" />

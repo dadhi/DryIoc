@@ -12,6 +12,10 @@
     <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
+      v3.0.0-preview-04:
+      - changed: More explicit versions of tools stated in folder
+      v3.0.0-preview-03:
+      - changed: Moved DryIoc and ExpressionToCodeLib dependencies to package/tools folder
       v3.0.0-preview-02:
       - changed: Updated to work with DryIoc 2.11.3
       - added: Support for run-time IReuse
@@ -19,8 +23,7 @@
       - changed: Optimized a generated code
     </releaseNotes>
     <dependencies>
-      <dependency id="DryIoc.dll" version="[2.11.3]" />
-      <dependency id="ExpressionToCodeLib" version="[1.5.4]" />
+      <!--no run-time dependencies-->
     </dependencies>
     <contentFiles>
       <files include="cs/any/*.*" buildAction="Compile" />
@@ -29,9 +32,10 @@
   <files>
     <file src="..\LICENSE.txt" />
 
-    <!--Removes reference to DryIoc.dll and ExpressionToCodeLib from target project 
-            as it is required by compile-time T4 template only -->
-    <file src="..\NuGet\DryIocZero\install.ps1" target="tools" />
+    <!--Compile-time dependencies-->
+    <file src="..\Net45\bin\Release\DryIoc.dll" target="tools\DryIoc.2.11.5" />
+    <file src="..\Net45\bin\Release\DryIoc.xml" target="tools\DryIoc.2.11.5" />
+    <file src="..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.1.5.4" />
 
     <!--net45-->
     <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />

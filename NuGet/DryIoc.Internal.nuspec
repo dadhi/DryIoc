@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.11.6:
+      - fixed (!!!): #495: InvalidCastException on type resolution
       v2.11.5:
       - fixed (!!!): #493 Some resolving of the controller ends up with exception "Container is disposed..."
       - fixed: #175 Deterministic implicit rule to select from multiple services for specific scope
@@ -67,20 +69,24 @@
     <file src="..\DryIoc.Internal\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\PCL\DryIoc\Ported-net.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
 
     <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
     <file src="..\DryIoc.Internal\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\DryIoc.Internal\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     <file src="..\PCL\DryIoc\Ported-net.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
 
     <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
     <file src="..\DryIoc\Container.cs" target="content\xamarinmac20\DryIoc" />
     <file src="..\DryIoc\ImTools.cs" target="content\xamarinmac20\DryIoc" />
     <file src="..\PCL\DryIoc\Ported-net.cs" target="content\xamarinmac20\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\xamarinmac20\DryIoc" />
 
     <!--uap10.0: Universal Windows Platform-->
     <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\any" />
     <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\any" />
     <file src="..\PCL\DryIoc\Ported-net.cs" target="contentFiles\cs\any" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\any" />
   </files>
 </package>

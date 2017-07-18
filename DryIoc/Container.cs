@@ -374,7 +374,7 @@ namespace DryIoc
                 return (state, context, scope) => value;
             }
 
-            var factoryDelegate = FastExpressionCompiler.ExpressionCompiler.DoCompile<FactoryDelegate>(
+            var factoryDelegate = FastExpressionCompiler.ExpressionCompiler.TryCompile<FactoryDelegate>(
                 expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
             if (factoryDelegate != null)
                 return factoryDelegate;
@@ -1005,13 +1005,14 @@ namespace DryIoc
             }
 
             // Filter out the recursive decorators:
-            // the decorator with the same ID which was applied before up to the root
+            // the decorator with the same ID which was applied before up to the root.
+            // We need to filter only ..
             if (!decorators.IsNullOrEmpty())
             {
                 var parent = request.ParentOrWrapper;
                 if (!parent.IsEmpty)
                 {
-                    var ids = parent.Enumerate().TakeWhile(r => !r.IsLazyWrapper()).Map(p => p.FactoryID).ToArrayOrSelf();
+                    var ids = parent.Enumerate().Map(p => p.FactoryID).ToArrayOrSelf();
                     decorators = decorators.Match(d => ids.IndexOf(d.FactoryID) == -1);
                 }
             }
@@ -1826,7 +1827,9 @@ namespace DryIoc
 
             public override Expression CreateExpressionOrDefault(Request request)
             {
-                return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
+                return Resolver.CreateResolutionExpression(request, 
+                    isRuntimeDependency: true, 
+                    skipResolutionScope: true); // no need in resolution scope for instance
             }
 
             #region Implementation
@@ -5808,13 +5811,15 @@ namespace DryIoc
         }
 
         internal static Expression CreateResolutionExpression(Request request,
-            bool openResolutionScope = false, bool isRuntimeDependency = false)
+            bool openResolutionScope = false, bool isRuntimeDependency = false,
+            bool skipResolutionScope = false)
         {
             request.ContainsNestedResolutionCall = true;
 
             var container = request.Container;
 
-            if (!isRuntimeDependency && container.Rules.DependencyResolutionCallExpressions != null)
+            if (!isRuntimeDependency && 
+                container.Rules.DependencyResolutionCallExpressions != null)
                 PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
 
             var serviceTypeExpr = Expression.Constant(request.ServiceType, typeof(Type));
@@ -5822,22 +5827,31 @@ namespace DryIoc
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
-            // first ensure that we have parent scope if any to propagate it across resolution call boundaries
-            var scopeExpr = Container.GetResolutionScopeExpression(request);
-            if (openResolutionScope)
+            Expression scopeExpr;
+            if (skipResolutionScope)
             {
-                // creates new scope and link it to existing (or new) parent
-                // Here the code looks: scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-                var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
-                var scopeCtor = typeof(Scope).GetSingleConstructorOrNull().ThrowIfNull();
-                scopeExpr = Expression.New(scopeCtor, scopeExpr,
-                    Expression.New(typeof(KV<Type, object>).GetSingleConstructorOrNull().ThrowIfNull(),
-                        actualServiceTypeExpr, serviceKeyExpr));
+                scopeExpr = Expression.Constant(null, typeof(IScope));
+            }
+            else
+            {
+                // first ensure that we have parent scope if any to propagate it across resolution call boundaries
+                scopeExpr = Container.GetResolutionScopeExpression(request);
+                if (openResolutionScope)
+                {
+                    // creates new scope and link it to existing (or new) parent
+                    // Here the code looks: scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
+                    var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
+                    var scopeCtor = typeof(Scope).GetSingleConstructorOrNull().ThrowIfNull();
+                    scopeExpr = Expression.New(scopeCtor, scopeExpr,
+                        Expression.New(typeof(KV<Type, object>).GetSingleConstructorOrNull().ThrowIfNull(),
+                            actualServiceTypeExpr, serviceKeyExpr));
+                }
             }
 
             var resolverExpr = Container.GetResolverExpr(request);
 
-            // Only parent is converted to be passed to Resolve (the current request is formed by rest of Resolve parameters)
+            // Only parent is converted to be passed to Resolve.
+            // The current request is formed by rest of Resolve parameters.
             var parentRequestInfo =
                 request.RawParent.IsEmpty
                     ? request.PreResolveParent
@@ -8472,8 +8486,8 @@ namespace DryIoc
                 }
             }
 
-            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, factoryExpr, paramExprs, request,
-                allParamsAreConstants);
+            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember, 
+                factoryExpr, paramExprs, request, allParamsAreConstants);
         }
 
         internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
@@ -8688,8 +8702,8 @@ namespace DryIoc
             _implementationType = knownImplType;
         }
 
-        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, Expression factoryExpr, Expression[] paramExprs,
-            Request request, bool allParamsAreConstants)
+        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember, 
+            Expression factoryExpr, Expression[] paramExprs, Request request, bool allParamsAreConstants)
         {
             var rules = request.Rules;
 
@@ -10543,25 +10557,6 @@ namespace DryIoc
         }
     }
 
-    /// <summary>
-    /// todo: Remove
-    /// </summary>
-    public static class RequestInfoExtensions
-    {
-        /// <summary>
-        /// todo: Remove
-        /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        public static bool IsLazyWrapper(this RequestInfo request)
-        {
-            if (request == null || request.FactoryType != FactoryType.Wrapper || request.ServiceType == null)
-                return false;
-
-            return request.ServiceType.GetGenericDefinitionOrNull() == typeof(Lazy<>);
-        }
-    }
-
     /// <summary>Declares minimal API for service resolution.
     /// The user friendly convenient methods are implemented as extension methods in <see cref="Resolver"/> class.</summary>
     /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
@@ -12100,32 +12095,6 @@ namespace DryIoc
         }
 
         static partial void GetCurrentManagedThreadID(ref int threadID);
-    }
-}
-
-namespace FastExpressionCompiler
-{
-    using System;
-    using System.Linq.Expressions;
-    using System.Collections.Generic;
-
-    /// <summary>Compiles to delegate using FastExpressionCompiler.</summary>
-    public static partial class ExpressionCompiler
-    {
-        internal static TDelegate DoCompile<TDelegate>(Expression bodyExpr,
-            ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class
-        {
-            TDelegate compiledDelegate = null;
-            TryCompile(ref compiledDelegate, bodyExpr, paramExprs, paramTypes, returnType);
-            return compiledDelegate;
-        }
-
-        static partial void TryCompile<TDelegate>(
-            ref TDelegate compileDelegate,
-            Expression bodyExpr,
-            IList<ParameterExpression> paramExprs,
-            Type[] paramTypes,
-            Type returnType) where TDelegate : class;
     }
 }
 

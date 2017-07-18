@@ -54,6 +54,7 @@
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="FastExpressionCompiler.cs" />
     <Compile Include="Ported-net.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
