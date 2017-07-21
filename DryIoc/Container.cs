@@ -1005,18 +1005,16 @@ namespace DryIoc
                 }
             }
 
-            // Filter out the recursive decorators:
-            // the decorator with the same ID which was applied before up to the root.
-            // We need to filter only ..
-            //if (!decorators.IsNullOrEmpty())
-            //{
-            //    var parent = request.ParentOrWrapper;
-            //    if (!parent.IsEmpty)
-            //    {
-            //        var ids = parent.Enumerate().Map(p => p.FactoryID).ToArrayOrSelf();
-            //        decorators = decorators.Match(d => ids.IndexOf(d.FactoryID) == -1);
-            //    }
-            //}
+            // Filter out the recursive decorators by doing the same recursive check 
+            // that Request.WithResolvedFactory does. Fixes: #267
+            if (!decorators.IsNullOrEmpty())
+                decorators = decorators.Match(d =>
+                {
+                    for (var p = request.RawParent; !p.IsEmpty; p = p.RawParent)
+                        if (p.FactoryID == d.FactoryID)
+                            return false;
+                    return true;
+                });
 
             // Return earlier if no decorators found, or we have filtered out everything
             if (decorators.IsNullOrEmpty())
@@ -6582,8 +6580,6 @@ namespace DryIoc
         /// <summary>Resolved factory, initially is null.</summary>
         public readonly Factory Factory;
 
-        private readonly Factory _decoratedFactory;
-
         /// <summary>User provided arguments: key tracks what args are still unused.</summary>
         /// <remarks>Mutable: tracks used arguments</remarks>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
@@ -6934,8 +6930,7 @@ namespace DryIoc
             }
 
             _requestContext.IncrementDependencyCount();
-            return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags,
-                decoratedFactory);
+            return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -7126,9 +7121,6 @@ namespace DryIoc
 
             s.Append(_serviceInfo);
 
-            if (_decoratedFactory != null)
-                s.Append(" of ").Append(_decoratedFactory);
-
             if (FuncArgs != null)
                 s.AppendFormat(" with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
 
@@ -7171,8 +7163,7 @@ namespace DryIoc
 
         private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo,
             Factory factory, IReuse reuse,
-            KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags,
-            Factory decoratedFactory = null)
+            KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags)
         {
             _requestContext = requestContext;
             RawParent = parent;
@@ -7181,7 +7172,6 @@ namespace DryIoc
             _reuse = reuse;
             FuncArgs = funcArgs;
             _flags = flags;
-            _decoratedFactory = decoratedFactory;
         }
 
         internal sealed class RequestContext
