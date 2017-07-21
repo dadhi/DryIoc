@@ -1059,7 +1059,8 @@ namespace DryIoc
             if (parent.IsEmpty)
                 return ArrayTools.Empty<int>();
             return parent.Enumerate()
-                .TakeWhile(p => p.FactoryType != FactoryType.Service) // until the normal service
+                .TakeWhile(p =>
+                    p.FactoryType != FactoryType.Service)
                 .Where(p => p.FactoryType == FactoryType.Decorator)
                 .Select(d => d.FactoryID)
                 .ToArray();
@@ -6902,7 +6903,8 @@ namespace DryIoc
                 if (Factory.FactoryID == factory.FactoryID)
                     return this;
 
-                if (factory.FactoryType == FactoryType.Decorator)
+                if (Factory.FactoryType != FactoryType.Decorator &&
+                    factory.FactoryType == FactoryType.Decorator)
                     decoratedFactory = Factory;
             }
 
@@ -8429,10 +8431,10 @@ namespace DryIoc
             }
 
             var containerRules = container.Rules;
-            var allParamsAreConstants = true;
 
             Expression[] paramExprs = null;
-            var ctorOrMethod = factoryMethod.ConstructorOrMethodOrMember as MethodBase;
+            var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
+            var ctorOrMethod = ctorOrMember as MethodBase;
             if (ctorOrMethod != null)
             {
                 var parameters = ctorOrMethod.GetParameters();
@@ -8504,18 +8506,12 @@ namespace DryIoc
                             }
                         }
 
-                        if (paramExpr.NodeType != ExpressionType.Constant &&
-                            !(paramExpr.NodeType == ExpressionType.Convert &&
-                              ((UnaryExpression)paramExpr).Operand.NodeType == ExpressionType.Constant))
-                            allParamsAreConstants = false;
-
                         paramExprs[i] = paramExpr;
                     }
                 }
             }
 
-            return CreateServiceExpression(factoryMethod.ConstructorOrMethodOrMember,
-                factoryExpr, paramExprs, request, allParamsAreConstants);
+            return CreateServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
         }
 
         internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
@@ -8730,31 +8726,39 @@ namespace DryIoc
             _implementationType = knownImplType;
         }
 
-        private Expression CreateServiceExpression(MemberInfo ctorOrMethodOrMember,
-            Expression factoryExpr, Expression[] paramExprs, Request request, bool allParamsAreConstants)
+        private Expression CreateServiceExpression(MemberInfo ctorOrMember,
+            Expression factoryExpr, Expression[] paramExprs, Request request)
         {
             var rules = request.Rules;
 
-            var ctor = ctorOrMethodOrMember as ConstructorInfo;
+            var ctor = ctorOrMember as ConstructorInfo;
             if (ctor != null)
             {
-                // optimize singleton creation bypassing Expression.New
-                if (allParamsAreConstants && ctor.IsPublic &&
-                    rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
-                {
-                    if (request.Reuse is SingletonReuse &&
-                        request.Rules.EagerCachingSingletonForFasterAccess &&
-                        FactoryType == FactoryType.Service &&
-                        !Setup.PreventDisposal && !Setup.WeaklyReferenced &&
-                        !request.TracksTransientDisposable &&
-                        !request.IsWrappedInFunc())
-                    {
-                        var activateSingleton = ActivateSingleton(ctor.DeclaringType, paramExprs);
+                // Optimize singleton creation by bypassing Expression.New and using Activator.CreateInstance.
+                // Why? Because singleton is created only once and it does not make sense
+                // to create an optimal delegate for multiple singleton creation. We spend more time 
+                // to create the delegate itself.
+                // Moreover, the singleton dependency may be a singleton or Transient,
+                // so we may activate Transients on a spot as well.
+                if (request.Reuse is SingletonReuse &&
+                    rules.EagerCachingSingletonForFasterAccess &&
 
+                    ctor.IsPublic &&
+                    rules.PropertiesAndFields == null &&
+                    Made.PropertiesAndFields == null &&
+
+                    FactoryType == FactoryType.Service &&
+                    !Setup.PreventDisposal &&
+                    !Setup.WeaklyReferenced &&
+                    !request.TracksTransientDisposable &&
+                    !request.IsWrappedInFunc())
+                {
+                    var singletonFactory = GetActivator(ctor.DeclaringType, paramExprs);
+                    if (singletonFactory != null)
+                    {
                         var singletonScope = request.SingletonScope;
                         var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
-                        var singleton = singletonScope.GetOrAdd(singletonId, activateSingleton);
-
+                        var singleton = singletonScope.GetOrAdd(singletonId, singletonFactory);
                         return Expression.Constant(singleton);
                     }
                 }
@@ -8775,64 +8779,56 @@ namespace DryIoc
                 return InitPropertiesAndFields(newServiceExpr, request, propertiesAndFields);
             }
 
-            var method = ctorOrMethodOrMember as MethodInfo;
+            var method = ctorOrMember as MethodInfo;
             var serviceExpr = method != null
                 ? (Expression)Expression.Call(factoryExpr, method, paramExprs)
-                : (ctorOrMethodOrMember is PropertyInfo
-                    ? Expression.Property(factoryExpr, (PropertyInfo)ctorOrMethodOrMember)
-                    : Expression.Field(factoryExpr, (FieldInfo)ctorOrMethodOrMember));
+                : (ctorOrMember is PropertyInfo
+                    ? Expression.Property(factoryExpr, (PropertyInfo)ctorOrMember)
+                    : Expression.Field(factoryExpr, (FieldInfo)ctorOrMember));
 
-            var returnType = ctorOrMethodOrMember.GetReturnTypeOrDefault().ThrowIfNull();
+            var returnType = ctorOrMember.GetReturnTypeOrDefault().ThrowIfNull();
             if (!returnType.IsAssignableTo(request.ServiceType))
                 return Throw.IfThrows<InvalidOperationException, Expression>(
                     () => Expression.Convert(serviceExpr, request.ServiceType),
                     request.IfUnresolved == IfUnresolved.Throw,
-                    Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMethodOrMember, request);
+                    Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMember, request);
 
             return serviceExpr;
         }
 
-        private static CreateScopedValue ActivateSingleton(Type singletonType, IList<Expression> argExprs)
+        private static CreateScopedValue GetActivator(Type type, IList<Expression> argExprs)
         {
-            object[] args = null;
             if (argExprs == null || argExprs.Count == 0)
+                return () => Activator.CreateInstance(type, ArrayTools.Empty<object>());
+
+            var args = new object[argExprs.Count];
+            for (var i = 0; i < args.Length; ++i)
             {
-                args = ArrayTools.Empty<object>();
-            }
-            else if (argExprs.Count == 1)
-            {
-                var argExpr = argExprs[0];
+                var argExpr = argExprs[i];
                 if (argExpr.NodeType == ExpressionType.Convert)
                     argExpr = ((UnaryExpression)argExpr).Operand;
 
                 var constExpr = argExpr as ConstantExpression;
                 if (constExpr != null)
-                    args = new[] { constExpr.Value };
-            }
-            else
-            {
-                var constantArgs = new object[argExprs.Count];
-                int i = constantArgs.Length - 1;
-                for (; i >= 0; --i)
+                    args[i] = constExpr.Value;
+                else
                 {
-                    var argExpr = argExprs[i];
-                    if (argExpr.NodeType == ExpressionType.Convert)
-                        argExpr = ((UnaryExpression)argExpr).Operand;
-
-                    var constExpr = argExpr as ConstantExpression;
-                    if (constExpr == null)
-                        break;
-                    constantArgs[i] = constExpr.Value;
+                    var argNewExpr = argExpr as NewExpression;
+                    if (argNewExpr != null)
+                    {
+                        var activator = GetActivator(argNewExpr.Type, argNewExpr.Arguments);
+                        if (activator == null)
+                            return null;
+                        args[i] = activator();
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
-
-                if (i == -1) // all args are constants
-                    args = constantArgs;
             }
 
-            if (args == null)
-                return null;
-
-            return () => Activator.CreateInstance(singletonType, args);
+            return () => Activator.CreateInstance(type, args);
         }
 
         private FactoryMethod GetFactoryMethod(Request request)
