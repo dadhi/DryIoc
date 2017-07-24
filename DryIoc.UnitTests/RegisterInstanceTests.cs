@@ -419,7 +419,7 @@ namespace DryIoc.UnitTests
             Assert.AreSame(anotherDep, anotherBB.Dep);
         }
 
-        [Test, Ignore("Bug. It does not work. Fix is hard with current UseInstance impl. Or likely is impossible.")]
+        [Test, Ignore("Case relates to #494. Does not work. Fix is hard with current UseInstance impl or likely is impossible.")]
         public void Replacing_typed_registration_via_scoped_instance_should_do_WHAT()
         {
             var container = new Container();

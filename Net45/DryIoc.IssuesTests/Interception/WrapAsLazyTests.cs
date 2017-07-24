@@ -123,7 +123,7 @@ namespace DryIoc.IssuesTests.Interception
             Assert.NotNull(c.Egg);
         }
 
-        [Test, Ignore("Not fixed. Decorators.")]
+        [Test]
         public void Circular_dependency_handling_doesnt_actually_work_for_the_deeper_levels()
         {
             var container = new Container();
@@ -387,18 +387,20 @@ namespace DryIoc.IssuesTests.Interception
             h3.Value.ProcessZone(3);
         }
 
-        [Test, Ignore("Fails")]
+        [Test]
         public void Resolve_array_works_with_metadata_and_trivial_decorator()
         {
             var container = new Container().WithMef();
             container.Register<IBusinessLogicHelper, Helper1>(setup: Setup.With(new BusinessLogicAttribute(1)));
             container.Register<IBusinessLogicHelper, Helper2>(setup: Setup.With(new BusinessLogicAttribute(2)));
             container.Register<IBusinessLogicHelper, Helper3>(setup: Setup.With(new BusinessLogicAttribute(3)));
-            container.Register<IBusinessLogicHelper, TrivialBusinessLogicDecorator>(setup: Setup.Decorator);
+            container.Register<IBusinessLogicHelper, TrivialBusinessLogicDecorator>(Reuse.Transient, setup: Setup.Decorator);
 
             var helpers = container.Resolve<Meta<IBusinessLogicHelper, IBusinessLogicForZone>[]>();
-
             Assert.AreEqual(3, helpers.Length);
+
+            Assert.AreNotSame(helpers[0].Value, helpers[1].Value);
+
             var h1 = helpers.Single(h => h.Metadata.ZoneId == 1);
             h1.Value.ProcessZone(1);
 
@@ -409,7 +411,7 @@ namespace DryIoc.IssuesTests.Interception
             h3.Value.ProcessZone(3);
         }
 
-        [Test, Ignore("Fails")]
+        [Test]
         public void Resolve_array_with_metadata_works_with_LazyProxy()
         {
             var container = new Container().WithMef();
@@ -451,7 +453,7 @@ namespace DryIoc.IssuesTests.Interception
             h3.Value.ProcessZone(3);
         }
 
-        [Test, Ignore("Fails")]
+        [Test]
         public void ImportMany_with_metadata_works_with_lazy_proxies_via_ProxyGenerator()
         {
             var container = new Container().WithMef();
@@ -472,7 +474,7 @@ namespace DryIoc.IssuesTests.Interception
             h3.Value.ProcessZone(3);
         }
 
-        [Test, Ignore("Fails")]
+        [Test]
         public void ImportMany_with_metadata_works_with_lazy_proxies_via_DefaultProxyBuilder()
         {
             var container = new Container().WithMef();

@@ -62,17 +62,18 @@ namespace DryIoc.IssuesTests.Interception
 
             // decorator for the generated proxy class
             var decoratorSetup = serviceKey == null
-               ? Setup.DecoratorWith(useDecorateeReuse: true)
-               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
+               ? Setup.Decorator
+               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey));
 
             // make typeof(LazyInterceptor<interfaceType>[])
             var lazyInterceptorArrayType = typeof(LazyInterceptor<>).MakeGenericType(interfaceType).MakeArrayType();
 
             // register the proxy class as decorator
             registrator.Register(interfaceType, proxyType,
+                Reuse.Transient,
                 setup: decoratorSetup,
                 made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
-                    parameters: Parameters.Of
+                    Parameters.Of
                         .Type(typeof(IInterceptor[]), lazyInterceptorArrayType)
                         .Type(interfaceType, r => null)));
 
@@ -88,11 +89,11 @@ namespace DryIoc.IssuesTests.Interception
         public static IRegistrator ResolveAsLazy(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
         {
             var decoratorSetup = serviceKey == null
-               ? Setup.DecoratorWith(useDecorateeReuse: true)
-               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
+               ? Setup.Decorator
+               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey));
 
             var method = typeof(WrapAsLazy).GetSingleMethodOrNull("CreateLazyProxy", includeNonPublic: true).MakeGenericMethod(new[] { interfaceType });
-            registrator.Register(interfaceType, made: Made.Of(method), setup: decoratorSetup);
+            registrator.Register(interfaceType, Reuse.Transient, Made.Of(method), decoratorSetup);
             return registrator;
         }
 
