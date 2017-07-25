@@ -999,14 +999,15 @@ namespace DryIoc
                 if (!genericDecorators.IsNullOrEmpty())
                 {
                     genericDecorators = genericDecorators
-                        .Map(d => d.FactoryGenerator == null ? d : d.FactoryGenerator.GetGeneratedFactory(request))
+                        .Map(d => d.FactoryGenerator == null ? d
+                            : d.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true))
                         .Match(d => d != null);
                     decorators = decorators.Append(genericDecorators);
                 }
             }
 
-            // Filter out the recursive decorators by doing the same recursive check 
-            // that Request.WithResolvedFactory does. Fixes: #267
+            //Filter out the recursive decorators by doing the same recursive check
+            //that Request.WithResolvedFactory does. Fixes: #267
             if (!decorators.IsNullOrEmpty())
                 decorators = decorators.Match(d =>
                 {
@@ -1057,8 +1058,8 @@ namespace DryIoc
             if (parent.IsEmpty)
                 return ArrayTools.Empty<int>();
             return parent.Enumerate()
-                .TakeWhile(p =>
-                    p.FactoryType != FactoryType.Service)
+                .TakeWhile(p => p.FactoryType == FactoryType.Wrapper
+                    || p.FactoryType == FactoryType.Decorator && (p.DecoratedFactoryID == 0 || p.DecoratedFactoryID == request.FactoryID))
                 .Where(p => p.FactoryType == FactoryType.Decorator)
                 .Select(d => d.FactoryID)
                 .ToArray();
@@ -2796,6 +2797,7 @@ namespace DryIoc
             var factoryType = request.FactoryType;
             var ifUnresolved = request.IfUnresolved;
             var flags = request.Flags;
+            //todo: Convert request.DecoratedFactoryID;
 
             var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
             var factoryIdExpr = Expression.Constant(factoryID, typeof(int));
@@ -5543,11 +5545,10 @@ namespace DryIoc
             ((Container)container).UseInstanceInternal(serviceType, instance, IfAlreadyRegistered, serviceKey);
         }
 
-        /// <summary>Registers initializing action that will be called after service is resolved just before returning it to caller.
-        /// Check example below for using initializer to automatically subscribe to singleton event aggregator.
-        /// You can register multiple initializers for single service.
-        /// Or you can register initializer for <see cref="Object"/> type to be applied for all services and use <paramref name="condition"/>
-        /// to filter target services. </summary>
+        /// <summary>Registers initializing action that will be called after service is resolved 
+        /// just before returning it to the caller.  You can register multiple initializers for single service.
+        /// Or you can register initializer for <see cref="Object"/> type to be applied 
+        /// for all services and use <paramref name="condition"/> to specify the target services.</summary>
         /// <typeparam name="TTarget">Any type implemented by requested service type including service type itself and object type.</typeparam>
         /// <param name="registrator">Usually is <see cref="Container"/> object.</param>
         /// <param name="initialize">Delegate with <typeparamref name="TTarget"/> object and
@@ -5559,10 +5560,18 @@ namespace DryIoc
             initialize.ThrowIfNull();
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
-                parameters: Parameters.Of.Type(_ => initialize)),
-                setup: Setup.DecoratorWith(useDecorateeReuse: true,
-                condition: r => r.ServiceType.IsAssignableTo(typeof(TTarget)) &&
-                    (condition == null || condition(r))));
+                parameters: Parameters.Of
+                    .Type(r => // specify as parameter to prevent applying initializer for injected resolver too
+                    {
+                        var ctx = r.ContainerWeakRef;
+                        return r.IsSingletonOrDependencyOfSingleton ? ctx.RootContainerOrSelf() : ctx.Resolver;
+                    })
+                    .Type(_ => initialize)),
+                setup: Setup.DecoratorWith(
+                    useDecorateeReuse: true,
+                    condition: r => 
+                        r.ServiceType.IsAssignableTo(typeof(TTarget)) && 
+                        (condition == null || condition(r))));
         }
 
         private static readonly MethodInfo _initializerMethod =
@@ -6526,10 +6535,11 @@ namespace DryIoc
         public static Request CreateEmpty(Container container)
         {
             var resolverContext = new RequestContext(container, container, null, RequestInfo.Empty);
-            return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(RequestFlags));
+            return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(RequestFlags), null);
         }
 
-        private static readonly Request _empty = new Request(null, null, ServiceInfo.Empty, null, null, null, default(RequestFlags));
+        private static readonly Request _empty =
+            new Request(null, null, ServiceInfo.Empty, null, null, null, default(RequestFlags), null);
 
         /// <summary>Creates empty request associated with container.
         /// The shared part of request is stored in request context. Pre-request info is also store once in shared context.</summary>
@@ -6566,7 +6576,7 @@ namespace DryIoc
                 flags = preResolveParent.Flags & ~NotInheritedFlags;
             }
 
-            return new Request(resolverContext, _empty, serviceInfo, null, null, null, flags);
+            return new Request(resolverContext, _empty, serviceInfo, null, null, null, flags, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
@@ -6584,13 +6594,16 @@ namespace DryIoc
         /// <remarks>Mutable: tracks used arguments</remarks>
         public readonly KV<bool[], ParameterExpression[]> FuncArgs;
 
+        // Shared info in requests in chain.
+        private readonly RequestContext _requestContext;
+
         private IServiceInfo _serviceInfo;
 
         private readonly IReuse _reuse;
 
         private readonly RequestFlags _flags;
 
-        private readonly RequestContext _requestContext;
+        private readonly Factory _decoratedFactory;
 
         #endregion
 
@@ -6736,6 +6749,9 @@ namespace DryIoc
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
 
+        /// <summary>Relative number representing reuse lifespan.</summary>
+        public int DecoratedFactoryID { get { return _decoratedFactory == null ? 0 : _decoratedFactory.FactoryID; } }
+
         /// <summary>Returns result of <see cref="DryIoc.RequestInfo.GetActualServiceType"/>>.</summary>
         /// <returns>The type to be used for lookup in registry.</returns>
         public Type GetActualServiceType()
@@ -6767,7 +6783,7 @@ namespace DryIoc
             var inheritedInfo = info.InheritInfoFromDependencyOwner(parentInfo, ownerType: FactoryType, container: Container);
             var inheritedFlags = _flags & ~NotInheritedFlags | flags;
 
-            return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, inheritedFlags);
+            return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, inheritedFlags, null);
         }
 
         // todo: v3: review and remove if possible
@@ -6818,7 +6834,7 @@ namespace DryIoc
             var newInfo = getInfo(_serviceInfo);
             if (newInfo == _serviceInfo)
                 return this;
-            return new Request(_requestContext, RawParent, getInfo(_serviceInfo), Factory, _reuse, FuncArgs, _flags);
+            return new Request(_requestContext, RawParent, getInfo(_serviceInfo), Factory, _reuse, FuncArgs, _flags, _decoratedFactory);
         }
 
         // todo: v3: Try to removed in future versions.
@@ -6840,7 +6856,7 @@ namespace DryIoc
         {
             var argsUsed = new bool[argExpressions.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
-            return new Request(_requestContext, RawParent, _serviceInfo, Factory, _reuse, argsInfo, _flags);
+            return new Request(_requestContext, RawParent, _serviceInfo, Factory, _reuse, argsInfo, _flags, _decoratedFactory);
         }
 
         // todo: v3: remove
@@ -6866,7 +6882,7 @@ namespace DryIoc
 
             var argsUsed = new bool[argExprs.Length];
             var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExprs);
-            return new Request(_requestContext, RawParent, _serviceInfo, Factory, _reuse, argsInfo, _flags);
+            return new Request(_requestContext, RawParent, _serviceInfo, Factory, _reuse, argsInfo, _flags, _decoratedFactory);
         }
 
         /// <summary>Changes container to passed one. Could be used by child container,
@@ -6876,7 +6892,7 @@ namespace DryIoc
         public Request WithNewContainer(ContainerWeakRef newContainer)
         {
             var newContext = _requestContext.With(newContainer.Container);
-            return new Request(newContext, RawParent, _serviceInfo, Factory, _reuse, FuncArgs, _flags);
+            return new Request(newContext, RawParent, _serviceInfo, Factory, _reuse, FuncArgs, _flags, _decoratedFactory);
         }
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -6930,7 +6946,7 @@ namespace DryIoc
             }
 
             _requestContext.IncrementDependencyCount();
-            return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags);
+            return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags, decoratedFactory);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -7035,7 +7051,8 @@ namespace DryIoc
                     return parentRequestInfo.Push(_serviceInfo);
 
                 return parentRequestInfo.Push(_serviceInfo,
-                    Factory.FactoryID, Factory.FactoryType, Factory.ImplementationType, _reuse);
+                    Factory.FactoryID, Factory.FactoryType, Factory.ImplementationType, _reuse, _flags,
+                    DecoratedFactoryID);
             }
         }
 
@@ -7121,6 +7138,9 @@ namespace DryIoc
 
             s.Append(_serviceInfo);
 
+            if (_decoratedFactory != null)
+                s.Append(" of ").Append(_decoratedFactory);
+
             if (FuncArgs != null)
                 s.AppendFormat(" with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
 
@@ -7163,7 +7183,8 @@ namespace DryIoc
 
         private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo,
             Factory factory, IReuse reuse,
-            KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags)
+            KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags,
+            Factory decoratedFactory)
         {
             _requestContext = requestContext;
             RawParent = parent;
@@ -7172,6 +7193,7 @@ namespace DryIoc
             _reuse = reuse;
             FuncArgs = funcArgs;
             _flags = flags;
+            _decoratedFactory = decoratedFactory;
         }
 
         internal sealed class RequestContext
@@ -7440,7 +7462,7 @@ namespace DryIoc
         public static readonly Setup Decorator = new DecoratorSetup();
 
         /// <summary>Creates setup with optional condition.</summary>
-        /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
+        /// <param name="condition">Applied to decorated service, if true then decorator is applied.</param>
         /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
         /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
@@ -7454,8 +7476,8 @@ namespace DryIoc
             return DecoratorWith(requestCondition, order, useDecorateeReuse);
         }
 
-        /// <summary>Creates setup with optional condition.</summary>
-        /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
+        /// <summary>Creates setup with condition.</summary>
+        /// <param name="condition">Applied to decorated service, if true then decorator is applied.</param>
         /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
         /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
@@ -7467,6 +7489,45 @@ namespace DryIoc
             if (condition == null && order == 0 && !useDecorateeReuse)
                 return Decorator;
             return new DecoratorSetup(condition, order, useDecorateeReuse);
+        }
+
+        /// <summary>Creates setup with optional condition.</summary>
+        /// <param name="decorateeType">(optional) Type that should be implemented by decorated service.</param>
+        /// <param name="decorateeServiceKey">(optional) Identifies keyed decorated service.</param>
+        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
+        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
+        /// - first registered are closer decoratee.</param>
+        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
+        public static Setup DecoratorOf(Type decorateeType = null,
+            int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null)
+        {
+            Func<Request, bool> condition
+                = decorateeType == null
+                    ? (r => r.ServiceKey == null || r.ServiceKey.Equals(null))
+                : decorateeServiceKey == null
+                    ? (r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType))
+                : (Func<Request, bool>)(r =>
+                    decorateeServiceKey.Equals(r.ServiceKey) &&
+                    r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType));
+
+            return DecoratorWith(condition, order, useDecorateeReuse);
+        }
+
+        /// <summary>Creates setup with optional condition.</summary>
+        /// <typeparam name="TDecoratee">Type that should be implemented by decorated service.</typeparam>
+        /// <param name="decorateeServiceKey">(optional) Identifies keyed decorated service.</param>
+        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
+        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
+        /// Greater number means further from decoratee - specify negative number to stay closer.
+        /// Decorators without order (Order is 0) or with equal order are applied in registration order
+        /// - first registered are closer decoratee.</param>
+        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
+        public static Setup DecoratorOf<TDecoratee>(
+            int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null)
+        {
+            return DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, decorateeServiceKey);
         }
 
         /// <summary>Service setup.</summary>
@@ -7600,8 +7661,9 @@ namespace DryIoc
             /// - first registered are closer decoratee.</summary>
             public readonly int Order;
 
+            // todo: It does not consider the keys of decorated services, therefore it will be shared between all services in collection
             /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
-            public readonly bool UseDecorateeReuse;
+            public readonly bool UseDecorateeReuse; 
 
             /// <summary>Default setup.</summary>
             public DecoratorSetup() { }
@@ -7778,7 +7840,8 @@ namespace DryIoc
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (request.Rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse &&
-                !Setup.PreventDisposal && !Setup.WeaklyReferenced)
+                !Setup.PreventDisposal && 
+                !Setup.WeaklyReferenced)
             {
                 var singletons = (SingletonScope)request.SingletonScope;
                 var singletonID = singletons.IndexOf(FactoryID);
@@ -7826,7 +7889,6 @@ namespace DryIoc
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
                 }
             }
-            // Otherwise throw
             else if (request.IfUnresolved == IfUnresolved.Throw)
             {
                 Container.ThrowUnableToResolve(request);
@@ -8954,6 +9016,10 @@ namespace DryIoc
             Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs,
             int resultCount = 0)
         {
+
+            if (serviceArgs.Length != serviceParams.Length)
+                return false;
+
             for (var i = 0; i < serviceParams.Length; i++)
             {
                 var serviceArg = serviceArgs[i];
@@ -10283,6 +10349,9 @@ namespace DryIoc
         /// <summary>The options and check results propagated with request from <see cref="RequestFlags"/>.</summary>
         public readonly RequestFlags Flags;
 
+        /// <summary>ID of decorated factory in case of decorator factory type</summary>
+        public readonly int DecoratedFactoryID;
+
         #endregion
 
         /// <summary>Returns true for an empty request.</summary>
@@ -10415,12 +10484,13 @@ namespace DryIoc
         /// <param name="factoryType">(optional)</param> <param name="factoryID">(optional)</param>
         /// <param name="implementationType">(optional)</param> <param name="reuse">(optional)</param>
         /// <param name="flags">(optional)</param>
+        /// <param name="decoratedFactoryID">(optional)</param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(IServiceInfo serviceInfo,
             int factoryID = 0, FactoryType factoryType = FactoryType.Service, Type implementationType = null, IReuse reuse = null,
-            RequestFlags flags = default(RequestFlags))
+            RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0)
         {
-            return new RequestInfo(serviceInfo, factoryID, factoryType, implementationType, reuse, flags, this);
+            return new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
@@ -10546,14 +10616,12 @@ namespace DryIoc
             return hash;
         }
 
-        private RequestInfo()
-        {
-            FactoryID = -1;
-        }
+        private RequestInfo() { }
 
-        private RequestInfo(IServiceInfo serviceInfo,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
-            RequestInfo parentOrWrapper)
+        private RequestInfo(RequestInfo parentOrWrapper, IServiceInfo serviceInfo,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
+            RequestFlags flags,
+            int decoratedFactoryID)
         {
             ParentOrWrapper = parentOrWrapper;
 
@@ -10566,6 +10634,8 @@ namespace DryIoc
             Reuse = reuse;
 
             Flags = flags;
+
+            DecoratedFactoryID = decoratedFactoryID;
         }
 
         // Inspired by System.Tuple.CombineHashCodes
@@ -10761,7 +10831,7 @@ namespace DryIoc
     /// That's why most of them are implemented explicitly by <see cref="Container"/>.</summary>
     public interface IContainer : IRegistrator, IResolver, IDisposable
     {
-        // todo: v3: change type from impl. specific to IResolverContext
+        // todo: v3: change type from implementation specific to IResolverContext
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         ContainerWeakRef ContainerWeakRef { get; }
 

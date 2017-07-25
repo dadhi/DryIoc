@@ -170,6 +170,7 @@
     <Compile Include="Issue477_ArgumentException_while_resolving.cs" />
     <Compile Include="Issue486_CustomDynamicRegistrationProvider.cs" />
     <Compile Include="Issue488_DryIoc_ContainerException_if_using_WithDependencies.cs" />
+    <Compile Include="Issue496_Provide_builtin_method_to_post_initialize_instance_after_it_is_registered.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
