@@ -1,5 +1,4 @@
-﻿using System;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -15,9 +14,9 @@ namespace DryIoc.IssuesTests
             c.Register<B>(Reuse.Singleton);
 
             c.Register<object>(
-                made: Made.Of(r => FactoryMethod.Of(
-                    r.GetKnownImplementationOrServiceType().GetMethod("Init"),
-                    ServiceInfo.Of(r.ServiceType, serviceKey: r.ServiceKey))),
+                made: Made.Of(
+                    r => r.GetKnownImplementationOrServiceType().GetMethod("Init"), 
+                    r => ServiceInfo.Of(r.ServiceType, serviceKey: r.ServiceKey)),
                 setup: Setup.DecoratorOf<IInitializable>());
 
             var a = c.Resolve<A>();

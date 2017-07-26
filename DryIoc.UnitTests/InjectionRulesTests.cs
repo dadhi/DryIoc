@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
@@ -269,12 +270,7 @@ namespace DryIoc.UnitTests
                 Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
-                made: Made.Of(r =>
-                {
-                    var method = GetType().GetMethodOrNull("GetTargetName");
-                    var targetType = r.Parent.Parent.ImplementationType;
-                    return FactoryMethod.Of(method.MakeGenericMethod(targetType));
-                }));
+                made: Made.Of(r => GetType().GetMethodOrNull("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
 
             var service = container.Resolve<MyService>();
 
