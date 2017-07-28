@@ -294,7 +294,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IMeasurer, Measurer>();
-            container.RegisterDelegateDecorator<IOperation>(r => 
+            container.RegisterDelegateDecorator<IOperation>(r =>
                 op => MeasureExecutionTimeOperationDecorator.MeasureWith(op, r.Resolve<IMeasurer>()));
 
             var operation = container.Resolve<IOperation>();
@@ -374,7 +374,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>(Reuse.Singleton);
-            container.RegisterDelegateDecorator<IOperation>(r => 
+            container.RegisterDelegateDecorator<IOperation>(r =>
                 op => new MeasureExecutionTimeOperationDecorator(op));
 
             var operation = container.Resolve<IOperation>();
@@ -651,7 +651,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<S>();
-            container.Register<object>(made: Made.Of(r => 
+            container.Register<object>(made: Made.Of(r =>
                 GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
                 setup: Setup.Decorator);
 
@@ -727,7 +727,7 @@ namespace DryIoc.UnitTests
             container.Register<object>(
                 made: Made.Of(r => typeof(DecoratorFactory)
                     .GetSingleMethodOrNull("Decorate")
-                    .MakeGenericMethod(r.ServiceType)), 
+                    .MakeGenericMethod(r.ServiceType)),
                 setup: Setup.Decorator);
 
             var x = container.Resolve<X>();
@@ -787,7 +787,7 @@ namespace DryIoc.UnitTests
             return t;
         }
 
-        public static string PutMessage3<T>(T t) 
+        public static string PutMessage3<T>(T t)
         {
             var s = t as S;
             if (s != null)
@@ -802,7 +802,7 @@ namespace DryIoc.UnitTests
             public A Decorate(A a)
             {
                 return new B(a);
-            }     
+            }
         }
 
         class B : A
@@ -854,7 +854,7 @@ namespace DryIoc.UnitTests
             public void Dispose()
             {
                 if (Interlocked.CompareExchange(ref _state, Disposed, Tracked) != Tracked)
-                    return;    
+                    return;
                 var item = _item;
                 if (item != null)
                 {
@@ -864,9 +864,9 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public interface IBird {}
+        public interface IBird { }
 
-        public class Duck : IBird {}
+        public class Duck : IBird { }
 
         public class TalkingBirdDecorator : IBird
         {
@@ -885,7 +885,7 @@ namespace DryIoc.UnitTests
 
             container.Register(typeof(IEnumerable<>), setup: Setup.Decorator,
                 made: Made.Of(
-                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"), 
+                    FactoryMethod.Of<DecoratorTests>("FilterCollectionByMultiKeys"),
                     Parameters.Of.Type(r => r.ServiceKey)));
 
             container.Register<Aaaa>(made: Parameters.Of.Name("bs", serviceKey: "a"));
@@ -938,6 +938,45 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(2, aaa.Bs.Length);
         }
 
+        [Test]
+        public void Can_use_different_reuses_for_decorators_based_on_different_decoratee_reuse_in_collection()
+        {
+            var container = new Container();
+
+            container.Register<BB>();
+
+            container.Register<IAx, A1>(Reuse.Singleton);
+            container.Register<IAx, A2>(Reuse.Transient);
+
+            container.Register<IAx, AD>(setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var aax1 = container.Resolve<BB>().Aax;
+            Assert.AreNotSame(aax1[0], aax1[1]);
+
+            var aax2 = container.Resolve<BB>().Aax;
+            Assert.AreNotSame(aax2[0], aax2[1]);
+
+            Assert.AreSame(aax1[0], aax2[0]);
+            Assert.AreNotSame(aax1[1], aax2[1]);
+        }
+
+        public interface IAx { }
+        public class A1 : IAx { }
+        public class A2 : IAx { }
+        public class AD : IAx { }
+
+        public class BB
+        {
+            public IAx[] Aax { get; private set; }
+
+            public BB(IAx[] aax)
+            {
+                Aax = aax;
+            }
+        }
+
+        #region CUT
+
         public static IEnumerable<T> FilterCollectionByMultiKeys<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
         {
             return serviceKey == null
@@ -946,10 +985,10 @@ namespace DryIoc.UnitTests
                     {
                         if (it.Key is DefaultKey)
                             return false;
-                        return serviceKey.Equals(it.Key) 
-                            || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
+                        return serviceKey.Equals(it.Key)
+                               || it.Key is KV<object, int> && serviceKey.Equals(((KV<object, int>)it.Key).Key);
                     })
-                .Select(it => it.Value);
+                    .Select(it => it.Value);
         }
 
         public class Bbbb { }
@@ -983,150 +1022,148 @@ namespace DryIoc.UnitTests
                 Bs = bs;
             }
         }
-    }
 
-    #region CUT
-
-    public interface IOperationUser<T>
-    {
-        Meta<Func<IOperation<T>>, string> GetOperation { get; }
-    }
-
-    public class LogUserOps<T> : IOperationUser<T>
-    {
-        public readonly IOperationUser<T> Decorated;
-        public Meta<Func<IOperation<T>>, string> GetOperation { get { return Decorated.GetOperation; } }
-
-        public LogUserOps(IOperationUser<T> decorated)
+        public interface IOperationUser<T>
         {
-            Decorated = decorated;
-        }
-    }
-
-    public class OperationUser<T> : IOperationUser<T>
-    {
-        public Meta<Func<IOperation<T>>, string> GetOperation { get; set; }
-
-        public OperationUser(Meta<Func<IOperation<T>>, string> getOperation)
-        {
-            GetOperation = getOperation;
-        }
-    }
-
-    public interface IOperation
-    {
-    }
-
-    public class SomeOperation : IOperation
-    {
-    }
-
-    public class AnotherOperation : IOperation
-    {
-    }
-
-    public class ParameterizedOperation : IOperation
-    {
-        public object Param { get; set; }
-
-        public ParameterizedOperation(object param)
-        {
-            Param = param;
-        }
-    }
-
-    public class MeasureExecutionTimeOperationDecorator : IOperation
-    {
-        public IOperation Decorated;
-
-        public MeasureExecutionTimeOperationDecorator(IOperation operation)
-        {
-            Decorated = operation;
+            Meta<Func<IOperation<T>>, string> GetOperation { get; }
         }
 
-        public static IOperation MeasureWith(IOperation operation, IMeasurer measurer)
+        public class LogUserOps<T> : IOperationUser<T>
         {
-            return new MeasureExecutionTimeOperationDecorator(operation) { Measurer = measurer };
+            public readonly IOperationUser<T> Decorated;
+            public Meta<Func<IOperation<T>>, string> GetOperation { get { return Decorated.GetOperation; } }
+
+            public LogUserOps(IOperationUser<T> decorated)
+            {
+                Decorated = decorated;
+            }
         }
 
-        public IMeasurer Measurer { get; set; }
-    }
-
-    public interface IMeasurer
-    {
-    }
-
-    public class Measurer : IMeasurer
-    {
-    }
-
-    public class RetryOperationDecorator : IOperation
-    {
-        public IOperation Decorated;
-
-        public RetryOperationDecorator(IOperation operation)
+        public class OperationUser<T> : IOperationUser<T>
         {
-            Decorated = operation;
+            public Meta<Func<IOperation<T>>, string> GetOperation { get; set; }
+
+            public OperationUser(Meta<Func<IOperation<T>>, string> getOperation)
+            {
+                GetOperation = getOperation;
+            }
         }
-    }
 
-    public class AsyncOperationDecorator : IOperation
-    {
-        public readonly Func<IOperation> Decorated;
-
-        public AsyncOperationDecorator(Func<IOperation> a)
+        public interface IOperation
         {
-            Decorated = a;
         }
-    }
 
-    public interface IOperation<T>
-    {
-    }
-
-    public class SomeOperation<T> : IOperation<T>
-    {
-    }
-
-    public class RetryOperationDecorator<T> : IOperation<T>
-    {
-        public IOperation<T> Decorated;
-
-        public RetryOperationDecorator(IOperation<T> operation)
+        public class SomeOperation : IOperation
         {
-            Decorated = operation;
         }
-    }
 
-    public class MeasureExecutionTimeOperationDecorator<T> : IOperation<T>
-    {
-        public IOperation<T> Decorated;
-
-        public MeasureExecutionTimeOperationDecorator(IOperation<T> operation)
+        public class AnotherOperation : IOperation
         {
-            Decorated = operation;
         }
-    }
 
-    public class LazyDecorator : IOperation
-    {
-        public Lazy<IOperation> Decorated;
-
-        public LazyDecorator(Lazy<IOperation> decorated)
+        public class ParameterizedOperation : IOperation
         {
-            Decorated = decorated;
+            public object Param { get; set; }
+
+            public ParameterizedOperation(object param)
+            {
+                Param = param;
+            }
         }
-    }
 
-    public class FuncWithArgDecorator : IOperation
-    {
-        public Func<object, IOperation> DecoratedFunc;
-
-        public FuncWithArgDecorator(Func<object, IOperation> decoratedFunc)
+        public class MeasureExecutionTimeOperationDecorator : IOperation
         {
-            DecoratedFunc = decoratedFunc;
-        }
-    }
+            public IOperation Decorated;
 
-    #endregion
+            public MeasureExecutionTimeOperationDecorator(IOperation operation)
+            {
+                Decorated = operation;
+            }
+
+            public static IOperation MeasureWith(IOperation operation, IMeasurer measurer)
+            {
+                return new MeasureExecutionTimeOperationDecorator(operation) { Measurer = measurer };
+            }
+
+            public IMeasurer Measurer { get; set; }
+        }
+
+        public interface IMeasurer
+        {
+        }
+
+        public class Measurer : IMeasurer
+        {
+        }
+
+        public class RetryOperationDecorator : IOperation
+        {
+            public IOperation Decorated;
+
+            public RetryOperationDecorator(IOperation operation)
+            {
+                Decorated = operation;
+            }
+        }
+
+        public class AsyncOperationDecorator : IOperation
+        {
+            public readonly Func<IOperation> Decorated;
+
+            public AsyncOperationDecorator(Func<IOperation> a)
+            {
+                Decorated = a;
+            }
+        }
+
+        public interface IOperation<T>
+        {
+        }
+
+        public class SomeOperation<T> : IOperation<T>
+        {
+        }
+
+        public class RetryOperationDecorator<T> : IOperation<T>
+        {
+            public IOperation<T> Decorated;
+
+            public RetryOperationDecorator(IOperation<T> operation)
+            {
+                Decorated = operation;
+            }
+        }
+
+        public class MeasureExecutionTimeOperationDecorator<T> : IOperation<T>
+        {
+            public IOperation<T> Decorated;
+
+            public MeasureExecutionTimeOperationDecorator(IOperation<T> operation)
+            {
+                Decorated = operation;
+            }
+        }
+
+        public class LazyDecorator : IOperation
+        {
+            public Lazy<IOperation> Decorated;
+
+            public LazyDecorator(Lazy<IOperation> decorated)
+            {
+                Decorated = decorated;
+            }
+        }
+
+        public class FuncWithArgDecorator : IOperation
+        {
+            public Func<object, IOperation> DecoratedFunc;
+
+            public FuncWithArgDecorator(Func<object, IOperation> decoratedFunc)
+            {
+                DecoratedFunc = decoratedFunc;
+            }
+        }
+
+        #endregion
+    }
 }

@@ -5580,8 +5580,8 @@ namespace DryIoc
                     .Type(_ => initialize)),
                 setup: Setup.DecoratorWith(
                     useDecorateeReuse: true,
-                    condition: r => 
-                        r.ServiceType.IsAssignableTo(typeof(TTarget)) && 
+                    condition: r =>
+                        r.ServiceType.IsAssignableTo(typeof(TTarget)) &&
                         (condition == null || condition(r))));
         }
 
@@ -7674,7 +7674,7 @@ namespace DryIoc
 
             // todo: It does not consider the keys of decorated services, therefore it will be shared between all services in collection
             /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
-            public readonly bool UseDecorateeReuse; 
+            public readonly bool UseDecorateeReuse;
 
             /// <summary>Default setup.</summary>
             public DecoratorSetup() { }
@@ -7851,7 +7851,7 @@ namespace DryIoc
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (request.Rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse &&
-                !Setup.PreventDisposal && 
+                !Setup.PreventDisposal &&
                 !Setup.WeaklyReferenced)
             {
                 var singletons = (SingletonScope)request.SingletonScope;
@@ -7896,9 +7896,8 @@ namespace DryIoc
                 }
 
                 if (isCacheable)
-                {
                     container.CacheFactoryExpression(FactoryID, serviceExpr);
-                }
+
             }
             else if (request.IfUnresolved == IfUnresolved.Throw)
             {
