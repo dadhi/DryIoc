@@ -2402,8 +2402,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        public static FactoryDelegate GetValueOrDefault(this ImTreeMap<Type, FactoryDelegate>[] maps,
-            Type key)
+        public static FactoryDelegate GetValueOrDefault(this ImTreeMap<Type, FactoryDelegate>[] maps, Type key)
         {
             var hash = key.GetHashCode();
 
@@ -2411,13 +2410,15 @@ namespace DryIoc
             if (map == null)
                 return null;
 
-            while (map.Height != 0 && map.Hash != hash)
-                map = hash < map.Hash ? map.Left : map.Right;
+            for (; map.Height != 0; map = hash < map.Hash ? map.Left : map.Right)
+            {
+                if (map.Key == key)
+                    return map.Value;
+                if (map.Hash == hash)
+                    return map.GetConflictedValueOrDefault(key, null);
+            }
 
-            if (map.Height != 0 && key == map.Key)
-                return map.Value;
-
-            return map.GetConflictedValueOrDefault(key, null);
+            return null;
         }
 
         [MethodImpl((MethodImplOptions)256)]
