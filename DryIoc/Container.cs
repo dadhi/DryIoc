@@ -34,6 +34,8 @@ namespace DryIoc
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;  // for SupressMessage
     using System.Diagnostics;               // for StackTrace
+    using System.Runtime.CompilerServices;  // for MethodImpl aggressive inlining
+
     using ImTools;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
@@ -251,7 +253,7 @@ namespace DryIoc
             }
             else // whole Container with singletons.
             {
-                _defaultFactoryDelegateCache = Ref.Of(FactoryDelegateCache.Empty);
+                _defaultFactoryDelegateCache = Ref.Of(FactoryDelegateCache.Empty());
                 _registry.Swap(Registry.Empty);
                 Rules = Rules.Default;
 
@@ -1612,7 +1614,7 @@ namespace DryIoc
         private StackTrace _disposeStackTrace;
 
         private readonly Ref<Registry> _registry;
-        private Ref<FactoryDelegateCache> _defaultFactoryDelegateCache;
+        private Ref<ImTreeMap<Type, FactoryDelegate>[]> _defaultFactoryDelegateCache;
 
         private readonly SingletonScope _singletonScope;
 
@@ -1871,81 +1873,6 @@ namespace DryIoc
             #endregion
         }
 
-        internal sealed class FactoryDelegateCache
-        {
-            private const int NumberOfTrees = 32;
-            private const int HashBitsToTree = NumberOfTrees - 1;  // get last 4 bits, fast (hash % NumberOfTrees)
-
-            public static readonly FactoryDelegateCache Empty = new FactoryDelegateCache(new ImTreeMap<Type, FactoryDelegate>[NumberOfTrees], 0);
-
-            public readonly int Count;
-
-            public FactoryDelegate GetValueOrDefault(Type key)
-            {
-                var hash = key.GetHashCode();
-
-                var t = _trees[hash & HashBitsToTree];
-                if (t == null)
-                    return null;
-
-                while (t.Height != 0 && t.Hash != hash)
-                    t = hash < t.Hash ? t.Left : t.Right;
-
-                if (t.Height != 0 && key == t.Key)
-                    return t.Value;
-
-                return t.GetConflictedValueOrDefault(key, null);
-            }
-
-            public FactoryDelegateCache AddOrUpdate(Type key, FactoryDelegate value)
-            {
-                var hash = key.GetHashCode();
-
-                var treeIndex = hash & HashBitsToTree;
-
-                var trees = _trees;
-                var tree = trees[treeIndex];
-                if (tree == null)
-                    tree = ImTreeMap<Type, FactoryDelegate>.Empty;
-
-                tree = tree.AddOrUpdate(hash, key, value, null, false);
-
-                var newTrees = new ImTreeMap<Type, FactoryDelegate>[NumberOfTrees];
-                Array.Copy(trees, 0, newTrees, 0, NumberOfTrees);
-                newTrees[treeIndex] = tree;
-
-                return new FactoryDelegateCache(newTrees, Count + 1);
-            }
-
-            public FactoryDelegateCache Update(Type key, FactoryDelegate value)
-            {
-                var hash = key.GetHashCode();
-
-                var trees = _trees;
-                var tree = trees[hash & HashBitsToTree];
-                if (tree == null)
-                    return this;
-
-                var newTree = tree.AddOrUpdate(hash, key, value, null, true);
-                if (newTree == tree)
-                    return this;
-
-                var newTrees = new ImTreeMap<Type, FactoryDelegate>[NumberOfTrees];
-                Array.Copy(trees, 0, newTrees, 0, NumberOfTrees);
-                newTrees[hash & HashBitsToTree] = newTree;
-
-                return new FactoryDelegateCache(newTrees, Count);
-            }
-
-            private readonly ImTreeMap<Type, FactoryDelegate>[] _trees;
-
-            private FactoryDelegateCache(ImTreeMap<Type, FactoryDelegate>[] newTrees, int count)
-            {
-                _trees = newTrees;
-                Count = count;
-            }
-        }
-
         internal sealed class Registry
         {
             public static readonly Registry Empty = new Registry();
@@ -1959,7 +1886,7 @@ namespace DryIoc
             // Cache:
             public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
 
-            public readonly Ref<FactoryDelegateCache> DefaultFactoryDelegateCache;
+            public readonly Ref<ImTreeMap<Type, FactoryDelegate>[]> DefaultFactoryDelegateCache;
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and IntTreeMap<{requiredServicType+preResolvedParent}, FactoryDelegate>
@@ -1971,7 +1898,7 @@ namespace DryIoc
             public Registry WithoutCache()
             {
                 return new Registry(Services, Decorators, Wrappers,
-                    Ref.Of(FactoryDelegateCache.Empty),
+                    Ref.Of(FactoryDelegateCache.Empty()),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
                     _isChangePermitted);
@@ -1981,7 +1908,7 @@ namespace DryIoc
                 : this(ImTreeMap<Type, object>.Empty,
                     ImTreeMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImTreeMap<Type, Factory>.Empty,
-                    Ref.Of(FactoryDelegateCache.Empty),
+                    Ref.Of(FactoryDelegateCache.Empty()),
                     Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
                     Ref.Of(ImTreeMapIntToObj.Empty),
                     IsChangePermitted.Permitted)
@@ -1991,7 +1918,7 @@ namespace DryIoc
                 ImTreeMap<Type, object> services,
                 ImTreeMap<Type, Factory[]> decorators,
                 ImTreeMap<Type, Factory> wrappers,
-                Ref<FactoryDelegateCache> defaultFactoryDelegateCache,
+                Ref<ImTreeMap<Type, FactoryDelegate>[]> defaultFactoryDelegateCache,
                 Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
                 Ref<ImTreeMapIntToObj> factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
@@ -2462,6 +2389,78 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    internal static class FactoryDelegateCache
+    {
+        private const int NumberOfMapBuckets = 16;
+        private const int NumberOfMapMask = NumberOfMapBuckets - 1;  // get last 4 bits, fast (hash % NumberOfTrees)
+
+        public static ImTreeMap<Type, FactoryDelegate>[] Empty()
+        {
+            return new ImTreeMap<Type, FactoryDelegate>[NumberOfMapBuckets];
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static FactoryDelegate GetValueOrDefault(this ImTreeMap<Type, FactoryDelegate>[] maps,
+            Type key)
+        {
+            var hash = key.GetHashCode();
+
+            var map = maps[hash & NumberOfMapMask];
+            if (map == null)
+                return null;
+
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+
+            if (map.Height != 0 && key == map.Key)
+                return map.Value;
+
+            return map.GetConflictedValueOrDefault(key, null);
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImTreeMap<Type, FactoryDelegate>[] AddOrUpdate(this ImTreeMap<Type, FactoryDelegate>[] maps, 
+            Type key, FactoryDelegate value)
+        {
+            var hash = key.GetHashCode();
+
+            var mapIndex = hash & NumberOfMapMask;
+            var map = maps[mapIndex];
+            if (map == null)
+                map = ImTreeMap<Type, FactoryDelegate>.Empty;
+
+            map = map.AddOrUpdate(hash, key, value, null, false);
+
+            var newMaps = new ImTreeMap<Type, FactoryDelegate>[NumberOfMapBuckets];
+            Array.Copy(maps, 0, newMaps, 0, NumberOfMapBuckets);
+            newMaps[mapIndex] = map;
+
+            return newMaps;
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImTreeMap<Type, FactoryDelegate>[] Update(this ImTreeMap<Type, FactoryDelegate>[] maps,
+            Type key, FactoryDelegate value)
+        {
+            var hash = key.GetHashCode();
+
+            var mapIndex = hash & NumberOfMapMask;
+            var map = maps[mapIndex];
+            if (map == null)
+                return maps;
+
+            var newMap = map.AddOrUpdate(hash, key, value, null, true);
+            if (newMap == map)
+                return maps;
+
+            var newMaps = new ImTreeMap<Type, FactoryDelegate>[NumberOfMapBuckets];
+            Array.Copy(maps, 0, newMaps, 0, NumberOfMapBuckets);
+            newMaps[mapIndex] = newMap;
+
+            return newMaps;
+        }
     }
 
     /// <summary>Container extended features.</summary>
@@ -3591,7 +3590,7 @@ namespace DryIoc
         /// <summary>Factory</summary>
         public readonly Factory Factory;
 
-        /// <summary>Optional: will be <see cref="IfAlreadyRegistered.AppendNotKeyed"/> by default.</summary>
+        /// <summary>Optional: will be <see cref="DryIoc.IfAlreadyRegistered.AppendNotKeyed"/> by default.</summary>
         public readonly IfAlreadyRegistered IfAlreadyRegistered;
 
         /// <summary>Optional service key: if null the default <see cref="DefaultDynamicKey"/> will be used. </summary>
@@ -3600,7 +3599,7 @@ namespace DryIoc
         /// <summary>Constructs the info</summary>
         /// <param name="factory"></param>
         /// <param name="ifAlreadyRegistered">(optional) Defines how to combine with normal registrations.
-        /// Will use <see cref="IfAlreadyRegistered.AppendNotKeyed"/> by default.</param>
+        /// Will use <see cref="DryIoc.IfAlreadyRegistered.AppendNotKeyed"/> by default.</param>
         /// <param name="serviceKey">(optional) Service key.</param>
         public DynamicRegistration(Factory factory,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
@@ -9208,7 +9207,6 @@ namespace DryIoc
 
             return FactoryMethod.Of(factoryMember, factoryInfo);
         }
-
 
         #endregion
     }
