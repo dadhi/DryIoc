@@ -494,6 +494,44 @@ namespace DryIoc.IssuesTests.Interception
             var h3 = consumer.Helpers.Single(h => h.Metadata.ZoneId == 3);
             h3.Value.ProcessZone(3);
         }
+
+        [Test]
+        public void Import_lazy_calls_OnImportsSatisfied()
+        {
+            var c = new Container().WithMef();
+            c.ResolveAsLazy<IAlwaysLazy>();
+            c.Register<IAlwaysLazy, AnotherLazyService>();
+
+            AnotherLazyService.LastValue = "NotCreated";
+            AnotherLazyService.PartImportsSatisfied = false;
+
+            var proxy = c.Resolve<IAlwaysLazy>();
+            Assert.AreEqual("NotCreated", AnotherLazyService.LastValue);
+            Assert.IsFalse(AnotherLazyService.PartImportsSatisfied);
+
+            proxy.Test("Created!");
+            Assert.AreEqual("Created!", AnotherLazyService.LastValue);
+            Assert.IsTrue(AnotherLazyService.PartImportsSatisfied);
+        }
+
+        [Test]
+        public void Imported_service_with_a_trivial_decorator_calls_OnImportsSatisfied()
+        {
+            var c = new Container().WithMef();
+            c.Register<IAlwaysLazy, AnotherLazyService>();
+            c.Register<IAlwaysLazy, TrivialAlwaysLazyDecorator>(Reuse.Transient, setup: Setup.Decorator);
+
+            AnotherLazyService.LastValue = "NotCreated";
+            AnotherLazyService.PartImportsSatisfied = false;
+
+            var proxy = c.Resolve<IAlwaysLazy>();
+            Assert.AreEqual("NotCreated", AnotherLazyService.LastValue);
+            Assert.IsFalse(AnotherLazyService.PartImportsSatisfied);
+
+            proxy.Test("Created!");
+            Assert.AreEqual("Created!", AnotherLazyService.LastValue);
+            Assert.IsTrue(AnotherLazyService.PartImportsSatisfied);
+        }
     }
 
     public interface IAlwaysLazy
@@ -506,6 +544,22 @@ namespace DryIoc.IssuesTests.Interception
         public LazyService() { LastValue = "LazyServiceCreated"; }
         public static string LastValue { get; set; }
         public void Test(string x) { LastValue = x; }
+    }
+
+    class AnotherLazyService : IAlwaysLazy, IPartImportsSatisfiedNotification
+    {
+        public AnotherLazyService() { LastValue = "AnotherLazyService"; }
+        public static string LastValue { get; set; }
+        public void Test(string x) { LastValue = x; }
+        public static bool PartImportsSatisfied { get; set; }
+        public void OnImportsSatisfied() { PartImportsSatisfied = true; }
+    }
+
+    class TrivialAlwaysLazyDecorator : IAlwaysLazy
+    {
+        public TrivialAlwaysLazyDecorator(Lazy<IAlwaysLazy> lazy) { InnerLazy = lazy; }
+        private Lazy<IAlwaysLazy> InnerLazy { get; }
+        public void Test(string x) { InnerLazy.Value.Test(x); }
     }
 
     public interface IChicken { IEgg Egg { get; } }
