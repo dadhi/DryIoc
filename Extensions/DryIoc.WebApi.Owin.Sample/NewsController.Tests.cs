@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web.Http;
+﻿using System.Web.Http;
 using NUnit.Framework;
 
 namespace DryIoc.WebApi.Owin.Sample
@@ -16,16 +11,29 @@ namespace DryIoc.WebApi.Owin.Sample
         {
             var container = new Container();
 
-            // todo: Replace with face services
             Startup.RegisterServices(container);
 
-            var testContainer = container.WithWebApi(new HttpConfiguration(), 
+            // Fake some services
+            container.RegisterMany<GetNewsStub>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            var testContainer = container.WithWebApi(new HttpConfiguration(),
                 new[] { typeof(NewsController).Assembly },
                 throwIfUnresolved: t => t.IsController());
 
             using (var scope = testContainer.OpenScope(Reuse.WebRequestScopeName))
             {
                 var news = scope.Resolve<NewsController>();
+                var newsItems = news.GetNewsItems();
+
+                Assert.AreEqual("fake1", newsItems[0]);
+            }
+        }
+
+        internal class GetNewsStub : IGetNews
+        {
+            public string[] News()
+            {
+                return new[] {"fake1", "fake2"};
             }
         }
     }

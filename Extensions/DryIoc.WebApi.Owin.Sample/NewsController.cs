@@ -16,8 +16,7 @@ namespace DryIoc.WebApi.Owin.Sample
         [HttpGet]
         public IHttpActionResult GetNews()
         {
-
-            var newsItems = _getNews.News();
+            var newsItems = GetNewsItems();
 
             if (newsItems == null || newsItems.Length == 0)
             {
@@ -26,6 +25,11 @@ namespace DryIoc.WebApi.Owin.Sample
             }
 
             return Ok(newsItems);
+        }
+
+        internal string[] GetNewsItems()
+        {
+            return _getNews.News();
         }
     }
 
