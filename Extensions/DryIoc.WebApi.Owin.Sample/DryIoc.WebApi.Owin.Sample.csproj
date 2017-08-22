@@ -72,8 +72,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="NewsController.Tests.cs" />
+    <Compile Include="Services\NewsProvider.cs" />
+    <Compile Include="Services\ConsoleLogger.cs" />
+    <Compile Include="NewsController.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Startup.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
