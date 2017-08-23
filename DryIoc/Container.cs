@@ -4325,7 +4325,8 @@ namespace DryIoc
 
                 var ctorsWithMaxParamsFirst = ctors
                     .Select(c => new { Ctor = c, Params = c.GetParameters() })
-                    .OrderByDescending(x => x.Params.Length);
+                    .OrderByDescending(x => x.Params.Length)
+                    .ToArray();
 
                 var containerRules = request.Rules;
                 var selector = containerRules.OverrideRegistrationMade
@@ -4362,10 +4363,10 @@ namespace DryIoc
                                 {
                                     var inputArgIndex = funcArgs.IndexOf(p.ParameterType);
                                     if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
-                                        (matchedIndecesMask & inputArgIndex << 1) != 0)
+                                        (matchedIndecesMask & (1 << inputArgIndex)) != 0)
                                         // input argument was already matched by another parameter
                                         return false;
-                                    matchedIndecesMask |= inputArgIndex << 1;
+                                    matchedIndecesMask |= 1 << inputArgIndex;
                                     return true;
                                 })).All(p => IsResolvableParameter(p, parameterSelector, request));
                         });

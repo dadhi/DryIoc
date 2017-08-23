@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue497_ConstructorWithResolvableArguments_is_not_working_properly
     {
-        [Test, Ignore("fix")]
+        [Test]
         public void Test()
         {
             var c = new Container(Rules.Default.With(FactoryMethod.ConstructorWithResolvableArguments));
@@ -18,7 +18,7 @@ namespace DryIoc.IssuesTests
             c.Register<A>();
             c.Register<B>();
 
-            //var a2 = c.Resolve<Func<int, int, A>>()(6, 7); // this works
+            var a2 = c.Resolve<Func<int, int, A>>()(6, 7); // this works
             var a1 = c.Resolve<Func<int, A>>()(5); // this does NOT work
         }
 
