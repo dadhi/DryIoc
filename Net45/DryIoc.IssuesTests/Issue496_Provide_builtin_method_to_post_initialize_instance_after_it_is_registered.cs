@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     public class Issue496_Provide_builtin_method_to_post_initialize_instance_after_it_is_registered
     {
         [Test]
-        public void Test()
+        public void Try_decorator_factory()
         {
             var c = new Container();
 
@@ -48,6 +48,58 @@ namespace DryIoc.IssuesTests
                 Name += " is initialized";
                 return this;
             }
+        }
+
+        [Test]
+        public void Try_initializer()
+        {
+            var c = new Container();
+
+            c.Register<M>(Reuse.Singleton);
+
+            var mInitialized = false;
+            c.RegisterInitializer<M>((m, r) =>
+            {
+                if (mInitialized)
+                    return;
+                mInitialized = true;
+
+                m.S += "i";
+                var n = r.Resolve<N>();
+                Assert.AreEqual(">i", n.S);
+            });
+
+            c.Register<N>(Reuse.Singleton);
+
+            var nInitialized = false;
+            c.RegisterInitializer<N>((n, r) =>
+            {
+                if (nInitialized)
+                    return;
+                nInitialized = true;
+
+                n.S += "i";
+                var m = r.Resolve<M>();
+                Assert.AreEqual(">i", m.S);
+            });
+
+            var mm = c.Resolve<M>();
+            Assert.AreEqual(">i", mm.S);
+            Assert.AreEqual(">i", c.Resolve<M>().S); // does not change because singleton
+
+            var nn = c.Resolve<N>();
+            Assert.AreEqual(">i", nn.S);
+            Assert.AreEqual(">i", c.Resolve<N>().S); // does not change because singleton
+        }
+
+        class M
+        {
+            public string S = ">";
+        }
+
+        class N
+        {
+            public string S = ">";
         }
     }
 }
