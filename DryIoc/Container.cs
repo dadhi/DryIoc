@@ -1863,9 +1863,9 @@ namespace DryIoc
                 if (weaklyReferenced != null)
                     value = weaklyReferenced.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
 
-                var preventDisposable = value as object[];
-                if (preventDisposable != null && preventDisposable.Length == 1)
-                    value = preventDisposable[0];
+                var hiddenDisposable = value as HiddenDisposable;
+                if (hiddenDisposable != null)
+                    value = hiddenDisposable.Value;
 
                 return value;
             }
@@ -2389,6 +2389,18 @@ namespace DryIoc
         }
 
         #endregion
+    }
+
+    // Hides/wraps object with disposable interface.
+    internal sealed class HiddenDisposable
+    {
+        public static ConstructorInfo Ctor = typeof(HiddenDisposable).GetTypeInfo().DeclaredConstructors.First();
+        internal static FieldInfo ValueField = typeof(HiddenDisposable).GetTypeInfo().DeclaredFields.First();
+        public readonly object Value;
+        public HiddenDisposable(object value)
+        {
+            Value = value;
+        }
     }
 
     internal static class FactoryDelegateCache
@@ -5578,7 +5590,7 @@ namespace DryIoc
                 instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
             if (preventDisposal)
-                instance = new[] { instance };
+                instance = new HiddenDisposable(instance);
 
             if (weaklyReferenced)
                 instance = new WeakReference(instance);
@@ -7967,7 +7979,7 @@ namespace DryIoc
                 if (Setup.PreventDisposal)
                 {
                     var factory = factoryDelegate;
-                    factoryDelegate = (_, cs, rs) => new[] { factory(null, cs, rs) };
+                    factoryDelegate = (_, cs, rs) => new HiddenDisposable(factory(null, cs, rs));
                 }
 
                 if (Setup.WeaklyReferenced)
@@ -7986,7 +7998,7 @@ namespace DryIoc
             else
             {
                 if (Setup.PreventDisposal)
-                    serviceExpr = Expression.NewArrayInit(typeof(object), serviceExpr);
+                    serviceExpr = Expression.New(HiddenDisposable.Ctor, serviceExpr);
 
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
@@ -8016,9 +8028,9 @@ namespace DryIoc
                     Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
 
             if (Setup.PreventDisposal)
-                serviceExpr = Expression.ArrayIndex(
-                    Expression.Convert(serviceExpr, typeof(object[])),
-                    Expression.Constant(0, typeof(int)));
+                serviceExpr = Expression.Field(
+                    Expression.Convert(serviceExpr, typeof(HiddenDisposable)),
+                    HiddenDisposable.ValueField);
 
             return serviceExpr;
         }

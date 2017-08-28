@@ -372,5 +372,14 @@ namespace DryIoc.UnitTests
         public class X : ICmd { }
         public class Y : ICmd { }
         public class MenuItem<T> where T : ICmd { }
+
+        [Test]
+        public void Can_resolve_array_of_strings()
+        {
+            var container = new Container();
+            var arr = new[] { "str" };
+            container.UseInstance(arr, serviceKey: "key");
+            var inst = container.Resolve<string[]>("key");
+        }
     }
 }
