@@ -2422,7 +2422,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ImTreeMap<Type, FactoryDelegate>[] AddOrUpdate(this ImTreeMap<Type, FactoryDelegate>[] maps, 
+        public static ImTreeMap<Type, FactoryDelegate>[] AddOrUpdate(this ImTreeMap<Type, FactoryDelegate>[] maps,
             Type key, FactoryDelegate value)
         {
             var hash = key.GetHashCode();
@@ -4323,57 +4323,87 @@ namespace DryIoc
                 if (!mostResolvable)
                     return null;
 
-                var ctorsWithMaxParamsFirst = ctors
-                    .Select(c => new { Ctor = c, Params = c.GetParameters() })
-                    .OrderByDescending(x => x.Params.Length)
-                    .ToArray();
-
                 var containerRules = request.Rules;
                 var selector = containerRules.OverrideRegistrationMade
                     ? request.Made.Parameters.OverrideWith(containerRules.Parameters)
                     : containerRules.Parameters.OverrideWith(request.Made.Parameters);
-
                 var parameterSelector = selector(request);
 
+                var ctorsWithMaxParamsFirst = ctors
+                    .OrderByDescending(it => it.GetParameters().Length)
+                    .ToArray();
+
+                // First the check for normal resolution without Func<a, b, c>
                 if (!request.IsWrappedInFuncWithArgs(immediateParent: true))
-                {
-                    var matchedCtor = ctorsWithMaxParamsFirst.FirstOrDefault(x =>
-                        x.Params.All(p => IsResolvableParameter(p, parameterSelector, request)));
-                    var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request).Ctor;
-                    return Of(ctor);
-                }
-                else
-                {
-                    // For Func with arguments the constructor should contain all input arguments and
-                    // the rest should be resolvable.
-                    var funcType = !request.RawParent.IsEmpty
-                        ? request.RawParent.ServiceType
-                        : request.PreResolveParent.ServiceType;
+                    return Of(ctorsWithMaxParamsFirst
+                        .FindFirst(it => it.GetParameters().All(p => IsResolvableParameter(p, parameterSelector, request)))
+                        .ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request));
 
-                    var funcArgs = funcType.GetGenericParamsAndArgs();
-                    var inputArgCount = funcArgs.Length - 1;
+                // For Func<a, b, c> the constructor should contain all input arguments and
+                // the rest should be resolvable.
+                var funcType = !request.RawParent.IsEmpty
+                    ? request.RawParent.ServiceType
+                    : request.PreResolveParent.ServiceType;
 
-                    var matchedCtor = ctorsWithMaxParamsFirst
-                        .Where(x => x.Params.Length >= inputArgCount)
-                        .FirstOrDefault(x =>
+                var inputArgTypes = funcType.GetGenericParamsAndArgs();
+                var inputArgCount = inputArgTypes.Length - 1;
+
+                // will store already resolved parameters to not repeat work twice
+                List<ParameterInfo> resolvedParams = null;
+
+                ConstructorInfo ctor = null;
+                for (var i = 0; ctor == null && i < ctorsWithMaxParamsFirst.Length; i++)
+                {
+                    ctor = ctorsWithMaxParamsFirst[i];
+                    var ctorParams = ctor.GetParameters();
+
+                    // Important: we will not consider constructors with less parameters than in Func,
+                    // even if all constructor parameters are matched with some in Func. 
+                    if (ctorParams.Length < inputArgCount)
+                    {
+                        ctor = null;
+                        continue;
+                    }
+
+                    var alreadyFoundInputArgTypes = 0; // bit mask to track and exclude alreay found input args
+                    for (int j = 0; j < ctorParams.Length; j++)
+                    {
+                        var param = ctorParams[j];
+
+                        // search for parameter in input arguments
+                        var isParamInInputArgs = false;
+                        for (var k = 0; k < inputArgCount; k++) // important to exclude last parameter
                         {
-                            var matchedIndecesMask = 0;
-                            return x.Params.Except(
-                                x.Params.Where(p =>
+                            if (inputArgTypes[k] == param.ParameterType)
+                            {
+                                if ((alreadyFoundInputArgTypes & (1 << k)) == 0)
                                 {
-                                    var inputArgIndex = funcArgs.IndexOf(p.ParameterType);
-                                    if (inputArgIndex == -1 || inputArgIndex == inputArgCount ||
-                                        (matchedIndecesMask & (1 << inputArgIndex)) != 0)
-                                        // input argument was already matched by another parameter
-                                        return false;
-                                    matchedIndecesMask |= 1 << inputArgIndex;
-                                    return true;
-                                })).All(p => IsResolvableParameter(p, parameterSelector, request));
-                        });
+                                    alreadyFoundInputArgTypes |= 1 << k; // remember that we checked the input arg already
+                                    isParamInInputArgs = true;
+                                    break;
+                                }
+                            }
+                        }
 
-                    var ctor = matchedCtor.ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request).Ctor;
-                    return Of(ctor);
+                        // if parameter is not provided as Func input argument, 
+                        // check if it is resolvable by container
+                        if (!isParamInInputArgs)
+                        {
+                            if (resolvedParams == null ||
+                                resolvedParams.IndexOf(param) == -1) // not resolve yet
+                            {
+                                if (!IsResolvableParameter(param, parameterSelector, request))
+                                {
+                                    ctor = null;
+                                    break; // if parameter is not resolvable, stop considering this constructor
+                                }
+                                (resolvedParams ?? (resolvedParams = new List<ParameterInfo>())).Add(param);
+                            }
+                        }
+                    }
                 }
+
+                return Of(ctor.ThrowIfNull(Error.UnableToFindMatchingCtorForFuncWithArgs, funcType, request));
             };
         }
 
