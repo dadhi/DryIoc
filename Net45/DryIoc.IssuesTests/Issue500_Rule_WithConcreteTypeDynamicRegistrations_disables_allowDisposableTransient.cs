@@ -73,7 +73,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(typeof(MyDbContext).Name, controller.SeviceTypeName);
         }
 
-        [Test, Ignore("fix")] // Fails
+        [Test] // Fixed!
         public void ContainerWithConcreteTypeDynamicRegistrations_ServiceWithResolve()
         {
             // Arrange
@@ -106,7 +106,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(typeof(MyDbContext).Name, controller.SeviceTypeName);
         }
 
-        [Test, Ignore("fix")] // Fails
+        [Test]// Fixed!
         public void ContainerWithConcreteTypeDynamicRegistrations_ServiceWithFuncInjection()
         {
             // Arrange

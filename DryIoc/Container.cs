@@ -1348,6 +1348,10 @@ namespace DryIoc
         private KV<object, Factory>[] GetCombinedRegisteredAndDynamicFactories(
             KV<object, Factory>[] registeredFactories, FactoryType factoryType, Type serviceType, object serviceKey)
         {
+            if (!registeredFactories.IsNullOrEmpty() && 
+                Rules.UseDynamicRegistrationsAsFallback)
+                return registeredFactories;
+
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
             if (dynamicRegistrationProviders.IsNullOrEmpty())
                 return registeredFactories;
@@ -1442,10 +1446,9 @@ namespace DryIoc
             var serviceType = GetRegisteredServiceType(request);
             var serviceKey = request.ServiceKey;
 
-            var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
-
-            var factories = GetCombinedRegisteredAndDynamicFactories(
-                registeredFactories, FactoryType.Service, serviceType, serviceKey);
+            var factories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
+            factories = GetCombinedRegisteredAndDynamicFactories(
+                factories, FactoryType.Service, serviceType, serviceKey);
 
             if (factories.IsNullOrEmpty())
                 return null;
@@ -3762,8 +3765,27 @@ namespace DryIoc
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
+            // todo: Make it a default? only 5 tests are failing
+            //newRules._settings |= Settings.UseDynamicRegistrationsAsFallback;
             newRules.DynamicRegistrationProviders = newRules.DynamicRegistrationProviders.Append(rules);
             return newRules;
+        }
+
+        /// <summary>Appends handler to current unknown service providers.</summary>
+        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
+        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules)
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings |= Settings.UseDynamicRegistrationsAsFallback; // todo: Make it default?
+            newRules.DynamicRegistrationProviders = newRules.DynamicRegistrationProviders.Append(rules);
+            return newRules;
+        }
+
+        //todo: May be introduce an opposite option?
+        /// <summary></summary>
+        public bool UseDynamicRegistrationsAsFallback
+        {
+            get { return (_settings & Settings.UseDynamicRegistrationsAsFallback) != 0; }
         }
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
@@ -3886,7 +3908,7 @@ namespace DryIoc
         public Rules WithConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null)
         {
-            return WithDynamicRegistrations(ConcreteTypeDynamicRegistrations(condition, reuse));
+            return WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
         }
 
         // todo: v3: Mark with ObsoleteAttribute
@@ -4259,7 +4281,8 @@ namespace DryIoc
             EagerCachingSingletonForFasterAccess = 1 << 7,
             ImplicitRootOpenScope = 1 << 8,
             ThrowIfRuntimeStateRequired = 1 << 9,
-            CaptureContainerDisposeStackTrace = 1 << 10
+            CaptureContainerDisposeStackTrace = 1 << 10,
+            UseDynamicRegistrationsAsFallback = 1 << 11
         }
 
         private const Settings DEFAULT_SETTINGS
