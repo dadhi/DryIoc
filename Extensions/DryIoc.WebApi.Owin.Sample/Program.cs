@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Net.Http;
 using System.Web.Http;
-using Microsoft.Owin.Diagnostics;
 using Microsoft.Owin.Hosting;
-using Owin;
 
 namespace DryIoc.WebApi.Owin.Sample
 {
@@ -15,40 +12,9 @@ namespace DryIoc.WebApi.Owin.Sample
 
             using (WebApp.Start<Startup>(url))
             {
-                Console.WriteLine("Owin host started, any key to exit");
+                Console.WriteLine("Owin host is started at {0} \npress any key to exit", url);
                 Console.ReadKey();
             }
-        }
-    }
-
-    public class Startup
-    {
-        public void Configuration(IAppBuilder app)
-        {
-            var config = new HttpConfiguration();
-            config.MapHttpAttributeRoutes();
-
-            config.Routes.MapHttpRoute(
-                name: "default",
-                routeTemplate: "{controller}"
-               );
-
-            var di = new Container();
-
-            // NOTE: Registers ISession provider to work with injected Request
-            di.Register(Made.Of(() => GetSession(Arg.Of<HttpRequestMessage>())));
-
-            di.WithWebApi(config);
-
-            app.UseWebApi(config);
-            app.UseErrorPage(ErrorPageOptions.ShowAll);
-        }
-
-        public static ISession GetSession(HttpRequestMessage request)
-        {
-            // TODO: This is just a sample. Insert whatever session management logic you need.
-            var session = new Session();
-            return session;
         }
     }
 
@@ -59,7 +25,7 @@ namespace DryIoc.WebApi.Owin.Sample
 
     public class Session : ISession
     {
-        string m_token;
+        string _token;
 
         public Session()
         {
@@ -68,7 +34,7 @@ namespace DryIoc.WebApi.Owin.Sample
 
         public string Token
         {
-            get { return m_token ?? (m_token = Guid.NewGuid().ToString()); }
+            get { return _token ?? (_token = Guid.NewGuid().ToString()); }
         }
     }
 

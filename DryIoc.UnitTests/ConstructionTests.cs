@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<SomeService>(made: Made.Of(
-                r => FactoryMethod.Of(r.ImplementationType.GetMethodOrNull("Create"))));
+                r => r.ImplementationType.GetMethodOrNull("Create")));
 
             var service = container.Resolve<SomeService>();
 
@@ -143,9 +143,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, SomeService>(made: Made.Of(
-                r => FactoryMethod.Of(
-                    typeof(ServiceFactory).GetMethodOrNull("Create"), 
-                    ServiceInfo.Of<ServiceFactory>())));
+                r => typeof(ServiceFactory).GetMethodOrNull("Create"),
+                ServiceInfo.Of<ServiceFactory>()));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());

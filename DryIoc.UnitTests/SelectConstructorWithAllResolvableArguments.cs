@@ -75,7 +75,7 @@ namespace DryIoc.UnitTests
 
             var func = container.Resolve<Func<int, SomeClient>>();
 
-            Assert.That(func(4).Dependency, Is.InstanceOf<SomeDependency>());
+            Assert.IsInstanceOf<SomeDependency>(func(4).Dependency);
         }
 
         [Test]
@@ -86,7 +86,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<Func<string, SomeClient>>());
 
-            Assert.That(ex.Message, Is.StringStarting("Unable to find constructor with all parameters matching Func signature"));
+            StringAssert.StartsWith("Unable to find constructor with all parameters matching Func signature", ex.Message);
         }
 
         [Test]

@@ -372,5 +372,26 @@ namespace DryIoc.UnitTests
         public class X : ICmd { }
         public class Y : ICmd { }
         public class MenuItem<T> where T : ICmd { }
+
+        [Test]
+        public void Can_resolve_array_of_strings()
+        {
+            var container = new Container();
+            var arr = new[] { "str" };
+            container.UseInstance(arr, serviceKey: "key");
+            var inst = container.Resolve<string[]>("key");
+        }
+
+        [Test]
+        public void Can_resolve_array_of_asResolutionCall_service()
+        {
+            var c = new Container();
+            c.Register<N>(setup: Setup.With(asResolutionCall: true));
+
+            var ns = c.Resolve<N[]>();
+            Assert.AreEqual(1, ns.Length);
+        }
+
+        class N { }
     }
 }

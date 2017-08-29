@@ -1717,8 +1717,7 @@ namespace DryIocZero
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
         {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
-                factoryID, factoryType, implementationType, reuse, flags, this);
+            return new RequestInfo(this, serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved, factoryID, factoryType, implementationType, reuse, flags);
         }
 
         /// <summary>Returns all request until the root - parent is null.</summary>
@@ -1834,12 +1833,11 @@ namespace DryIocZero
             FactoryID = -1;
         }
 
-        private RequestInfo(
-            Type serviceType, Type requiredServiceType, object serviceKey,
-            string metadataKey, object metadata, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
-            RequestFlags flags,
-            RequestInfo parentOrWrapper)
+        private RequestInfo(RequestInfo parentOrWrapper, 
+            Type serviceType, Type requiredServiceType, object serviceKey, 
+            string metadataKey, object metadata, IfUnresolved ifUnresolved, 
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, 
+            RequestFlags flags)
         {
             ParentOrWrapper = parentOrWrapper;
 

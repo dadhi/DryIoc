@@ -190,6 +190,7 @@
     <Compile Include="ArrayToolsTest.cs" />
     <Compile Include="AsyncExecutionFlowScopeContextTests.cs" />
     <Compile Include="DynamicRegistrationsTests.cs" />
+    <Compile Include="RegisterPlaceholderTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj">
