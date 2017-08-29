@@ -2576,7 +2576,7 @@ namespace DryIoc
         public static void RegisterPlaceholder(this IContainer container, Type serviceType,
             object serviceKey = null)
         {
-            container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, IfAlreadyRegistered.Keep, true);
+            container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, IfAlreadyRegistered.AppendNotKeyed, true);
         }
 
         /// <summary>Register a service without implementation which can be provided later in terms

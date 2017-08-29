@@ -64,7 +64,24 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(1, arrFuncN.Length);
 
             c.Register<IN, N1>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            Assert.IsInstanceOf<N1>(arrFuncN[0].Invoke());
+            Assert.IsInstanceOf<N1>(arrFuncN[0]());
+        }
+
+        [Test]
+        public void Can_register_multiple_placeholders()
+        {
+            var c = new Container();
+
+            c.RegisterPlaceholder<IN>();
+            c.RegisterPlaceholder<IN>();
+
+            var arrFuncN = c.Resolve<Func<IN>[]>();
+            Assert.AreEqual(2, arrFuncN.Length);
+
+            c.Register<IN, N1>(ifAlreadyRegistered: IfAlreadyRegistered.Replace, serviceKey: DefaultKey.Of(0));
+            c.Register<IN, N2>(ifAlreadyRegistered: IfAlreadyRegistered.Replace, serviceKey: DefaultKey.Of(1));
+            Assert.IsInstanceOf<N1>(arrFuncN[0]());
+            Assert.IsInstanceOf<N2>(arrFuncN[1]());
         }
 
         class M
@@ -78,5 +95,6 @@ namespace DryIoc.UnitTests
 
         interface IN { }
         class N1 : IN {}
+        class N2 : IN {}
     }
 }
