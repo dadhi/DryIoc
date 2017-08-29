@@ -311,7 +311,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_include_closed_and_open_generic_version_of_service()
+        public void Should_include_closed_and_open_generic_version_of_service_in_order_of_registration()
         {
             var container = new Container();
 
@@ -319,7 +319,19 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IFoo<int>), typeof(ClosedFoo));
 
             var fooTypes = container.Resolve<IFoo<int>[]>().Select(f => f.GetType());
-            CollectionAssert.AreEqual(new[] { typeof(ClosedFoo), typeof(OpenFoo<int>) }, fooTypes);
+            CollectionAssert.AreEqual(new[] { typeof(OpenFoo<int>), typeof(ClosedFoo) }, fooTypes);
+        }
+
+        [Test]
+        public void LazyEnumerable_should_include_closed_and_open_generic_version_of_service_in_order_of_registration()
+        {
+            var container = new Container();
+
+            container.Register(typeof(IFoo<>), typeof(OpenFoo<>));
+            container.Register(typeof(IFoo<int>), typeof(ClosedFoo));
+
+            var fooTypes = container.Resolve<LazyEnumerable<IFoo<int>>>().Select(f => f.GetType());
+            CollectionAssert.AreEqual(new[] { typeof(OpenFoo<int>), typeof(ClosedFoo) }, fooTypes);
         }
 
         public interface IFoo<T> { }

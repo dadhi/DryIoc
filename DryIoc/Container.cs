@@ -606,7 +606,7 @@ namespace DryIoc
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Select(x => new ServiceRegistrationInfo(x.Value, requiredItemOpenGenericType, x.Key));
+                    .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemOpenGenericType, f.Key));
             }
 
             // Append registered generic types with compatible variance,
@@ -658,6 +658,7 @@ namespace DryIoc
                     variantGenericItems = variantGenericItems.Where(x => x.Factory.FactoryID != parent.FactoryID);
             }
 
+            // todo: add ordering across all discovered kind of services
             foreach (var item in items)
             {
                 var service = container.Resolve(serviceType, item.Key,
@@ -3283,18 +3284,17 @@ namespace DryIoc
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Map(f => new ServiceRegistrationInfo(f.Value,
-                            requiredItemType,
+                    .Map(f => new ServiceRegistrationInfo(f.Value, requiredItemType,
                             // NOTE: Special service key with info about open-generic factory service type
-                            new[] { requiredItemOpenGenericType, f.Key }))
+                            optionalServiceKey: new[] { requiredItemOpenGenericType, f.Key }))
                     .ToArrayOrSelf();
                 items = items.Append(openGenericItems);
             }
 
             // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
-            var includeVariantGenericItems = requiredItemType.IsGeneric() && rules.VariantGenericTypesInResolvedCollection;
-            if (includeVariantGenericItems)
+            if (requiredItemType.IsGeneric() &&
+                rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations()
                     .Match(x =>
@@ -3330,6 +3330,8 @@ namespace DryIoc
             List<Expression> itemExprList = null;
             if (!items.IsNullOrEmpty())
             {
+                Array.Sort(items); // Preserves the order of resgitratons when resolving items
+
                 itemExprList = new List<Expression>(items.Length);
                 for (var i = 0; i < items.Length; i++)
                 {
@@ -10330,6 +10332,9 @@ namespace DryIoc
         /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
 
+        /// <summary>Same as InCurrentScope.</summary>
+        public static readonly IReuse Scoped = new CurrentScopeReuse();
+
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Reuse.Singleton"/></summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
@@ -10830,7 +10835,7 @@ namespace DryIoc
     }
 
     /// <summary>Define registered service structure.</summary>
-    public struct ServiceRegistrationInfo
+    public struct ServiceRegistrationInfo : IComparable<ServiceRegistrationInfo>
     {
         /// <summary>Required service type.</summary>
         public Type ServiceType;
@@ -10853,6 +10858,12 @@ namespace DryIoc
             OptionalServiceKey = optionalServiceKey;
             Factory = factory;
             FactoryRegistrationOrder = factory.FactoryID;
+        }
+
+        /// <inheritdoc />
+        public int CompareTo(ServiceRegistrationInfo other)
+        {
+            return FactoryRegistrationOrder - other.FactoryRegistrationOrder;
         }
 
         /// <summary>Pretty-prints info to string.</summary> <returns>The string.</returns>
