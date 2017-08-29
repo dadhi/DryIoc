@@ -1,12 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.10
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AC570BFB-20F4-4395-A7B8-D33A151A2FE1}"
 	ProjectSection(SolutionItems) = preProject
 		build.bat = build.bat
-		global.json = global.json
 		NuGet.Config = NuGet.Config
 	EndProjectSection
 EndProject
@@ -14,23 +13,23 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{51CD64D5-4E2
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.Microsoft.DependencyInjection", "src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.xproj", "{A6A43508-BAC9-4A3A-B044-52490B6BE1F5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Microsoft.DependencyInjection", "src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj", "{A6A43508-BAC9-4A3A-B044-52490B6BE1F5}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.xproj", "{55030596-4BA0-4BA5-8BE8-8B4BB568DF19}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj", "{55030596-4BA0-4BA5-8BE8-8B4BB568DF19}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.NetCore.UnitTests", "test\DryIoc.NetCore.UnitTests\DryIoc.NetCore.UnitTests.xproj", "{C5367D71-59D7-4C30-B07F-D090304E43D6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.NetCore.UnitTests", "test\DryIoc.NetCore.UnitTests\DryIoc.NetCore.UnitTests.csproj", "{C5367D71-59D7-4C30-B07F-D090304E43D6}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc", "src\DryIoc\DryIoc.xproj", "{436BD241-A7A5-40B9-BBB5-4C03E8138492}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc", "src\DryIoc\DryIoc.csproj", "{436BD241-A7A5-40B9-BBB5-4C03E8138492}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.AspNetCore.Sample", "src\DryIoc.AspNetCore.Sample\DryIoc.AspNetCore.Sample.xproj", "{3ABFD3C2-BEE0-4D39-B864-74DF113002E1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.AspNetCore.Sample", "src\DryIoc.AspNetCore.Sample\DryIoc.AspNetCore.Sample.csproj", "{3ABFD3C2-BEE0-4D39-B864-74DF113002E1}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIocAttributes", "src\DryIocAttributes\DryIocAttributes.xproj", "{E91BA1E9-8E7C-4881-80B0-E9625E18603A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIocAttributes", "src\DryIocAttributes\DryIocAttributes.csproj", "{E91BA1E9-8E7C-4881-80B0-E9625E18603A}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.MefAttributedModel", "src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.xproj", "{CA9AF1CA-DC01-4448-AC9C-B6FC312946E8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel", "src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj", "{CA9AF1CA-DC01-4448-AC9C-B6FC312946E8}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.MefAttributedModel.UnitTests", "test\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.xproj", "{54AA91D5-B97C-4348-B945-DFFF2B241F4A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel.UnitTests", "test\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj", "{54AA91D5-B97C-4348-B945-DFFF2B241F4A}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "DryIoc.MefAttributedModel.UnitTests.CUT", "test\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.xproj", "{84F78FBB-5393-47C7-B7A2-7164E04EC80B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel.UnitTests.CUT", "test\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj", "{84F78FBB-5393-47C7-B7A2-7164E04EC80B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -88,5 +87,8 @@ Global
 		{CA9AF1CA-DC01-4448-AC9C-B6FC312946E8} = {51CD64D5-4E22-4FCA-8110-2EEED5C79C4B}
 		{54AA91D5-B97C-4348-B945-DFFF2B241F4A} = {3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}
 		{84F78FBB-5393-47C7-B7A2-7164E04EC80B} = {3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9C5A5DCE-C56C-4FC1-86BC-3388EC713B12}
 	EndGlobalSection
 EndGlobal

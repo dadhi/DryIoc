@@ -12,6 +12,16 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.12.0:
+      - added: #499: Add RegisterPlaceholder to enable delayed registration
+      - added: Setup.DecoratorOf{T}(key) and runtime version to simplify specifying condition for matching decoratee type and key
+      - added: Missing overload for Made.Of to consider request -> instance factory info.
+      - added: Rules.WithDynamicRegistrationsAsFallback
+      - changed: Updated FEC to v1.3.0
+      - fixed: #492: Lazy imports disguised as non-lazy
+      - fixed: #497: ConstructorWithResolvableArguments is not working properly
+      - fixed: #500: Rule WithConcreteTypeDynamicRegistrations disables allowDisposableTransient
+      - fixed: #506: Cannot resolve string[]
       v2.11.6:
       - fixed (!!!): #495: InvalidCastException on type resolution
       v2.11.5:

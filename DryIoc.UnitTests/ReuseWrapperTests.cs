@@ -114,7 +114,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        [Test]
+        [Test, Explicit("GC bound")]
         public void Can_nest_Disposable_into_WeakReference_reused_in_current_scope()
         {
             var container = new Container();
