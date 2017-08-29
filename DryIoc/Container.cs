@@ -8820,7 +8820,7 @@ namespace DryIoc
 
             var factoryMethodResultType = Made.FactoryMethodKnownResultType;
             if (implType == null ||
-                implType == typeof(object) ||
+                implType == typeof(object) || // required as currently object represents the open-generic type argument T registrations
                 implType.IsAbstract())
             {
                 if (made.FactoryMethod == null)
