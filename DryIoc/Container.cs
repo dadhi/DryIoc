@@ -3760,7 +3760,7 @@ namespace DryIoc
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
-        /// <summary>Appends handler to current unknown service providers.</summary>
+        /// <summary>Appends dynamic registration rules.</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules)
         {
@@ -3771,18 +3771,18 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Appends handler to current unknown service providers.</summary>
+        /// <summary>Appends dynamic registration rules 
+        /// And additionally specifies to use dynamic registrations only when no normal registrations found!</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.UseDynamicRegistrationsAsFallback; // todo: Make it default?
+            newRules._settings |= Settings.UseDynamicRegistrationsAsFallback;
             newRules.DynamicRegistrationProviders = newRules.DynamicRegistrationProviders.Append(rules);
             return newRules;
         }
 
-        //todo: May be introduce an opposite option?
-        /// <summary></summary>
+        /// <summary>Specifies to use dynamic registrations only when no normal registrations found</summary>
         public bool UseDynamicRegistrationsAsFallback
         {
             get { return (_settings & Settings.UseDynamicRegistrationsAsFallback) != 0; }
@@ -3831,7 +3831,7 @@ namespace DryIoc
         }
 
         // todo: v3: Mark with ObsoleteAttribute
-        /// <summary>Replaced by ConcreteTypeDynamicRegistrations</summary>
+        /// <summary>Obsolete: Replaced by ConcreteTypeDynamicRegistrations</summary>
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null)
         {
             return request =>
@@ -3846,7 +3846,7 @@ namespace DryIoc
                     return null;
 
                 var factory = new ReflectionFactory(concreteServiceType,
-                    made: DryIoc.FactoryMethod.Constructor(true, true));
+                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 // try resolve expression first and return null,
                 // to enable fallback to other rules if unresolved
@@ -3892,7 +3892,7 @@ namespace DryIoc
                     made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
 
                     // condition checks that factory is resolvable
-                    setup: Setup.With(null, req =>
+                    setup: Setup.With(null, condition: req =>
                         null != factory.GetExpressionOrDefault(
                             req.WithChangedServiceInfo(r => r.WithIfUnresolved(IfUnresolved.ReturnDefault)))));
 
@@ -4371,7 +4371,9 @@ namespace DryIoc
                 // First the check for normal resolution without Func<a, b, c>
                 if (!request.IsWrappedInFuncWithArgs(immediateParent: true))
                     return Of(ctorsWithMaxParamsFirst
-                        .FindFirst(it => it.GetParameters().All(p => IsResolvableParameter(p, parameterSelector, request)))
+                        .FindFirst(it => it
+                            .GetParameters()
+                            .FindFirst(p => !IsResolvableParameter(p, parameterSelector, request)) == null)
                         .ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request));
 
                 // For Func<a, b, c> the constructor should contain all input arguments and
@@ -4383,7 +4385,7 @@ namespace DryIoc
                 var inputArgTypes = funcType.GetGenericParamsAndArgs();
                 var inputArgCount = inputArgTypes.Length - 1;
 
-                // will store already resolved parameters to not repeat work twice
+                // Will store already resolved parameters to not repeat work twice
                 List<ParameterInfo> resolvedParams = null;
 
                 ConstructorInfo ctor = null;
