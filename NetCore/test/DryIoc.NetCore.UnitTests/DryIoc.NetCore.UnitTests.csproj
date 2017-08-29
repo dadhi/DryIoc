@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp1.1</TargetFramework>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+    <AssemblyName>DryIoc.NetCore.UnitTests</AssemblyName>
+    <PackageId>DryIoc.NetCore.UnitTests</PackageId>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <RuntimeFrameworkVersion>1.1.1</RuntimeFrameworkVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="..\..\..\DryIoc.UnitTests\ThrowTests.cs;..\..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs" />
+    <Compile Include="..\..\..\DryIoc.UnitTests\*.cs" Exclude="bin\**;obj\**;**\*.xproj;packages\**;..\..\..\DryIoc.UnitTests\ThrowTests.cs;..\..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0-preview-20170106-08" />
+    <PackageReference Include="NUnit" Version="3.6.0" />
+    <PackageReference Include="dotnet-test-nunit" Version="3.4.0-beta-3" />
+  </ItemGroup>
+
+</Project>
