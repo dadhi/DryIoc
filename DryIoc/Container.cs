@@ -2565,6 +2565,34 @@ namespace DryIoc
             container.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
         }
 
+        /// <summary>Register a service without implementation which can be provided later in terms
+        /// of normal registration with IfAlreadyRegistered.Replace parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed,
+        /// then the exception will be thrown.
+        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
+        /// That means, instead of placing service instance into graph expression we put here redirecting call to
+        /// container Resolve.</remarks>
+        public static void RegisterPlaceholder(this IContainer container, Type serviceType,
+            object serviceKey = null)
+        {
+            container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, IfAlreadyRegistered.Keep, true);
+        }
+
+        /// <summary>Register a service without implementation which can be provided later in terms
+        /// of normal registration with IfAlreadyRegistered.Replace parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed,
+        /// then the exception will be thrown.
+        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
+        /// That means, instead of placing service instance into graph expression we put here redirecting call to
+        /// container Resolve.</remarks>
+        public static void RegisterPlaceholder<TService>(this IContainer container,
+            object serviceKey = null)
+        {
+            container.RegisterPlaceholder(typeof(TService), serviceKey);
+        }
+
         // todo: v3: Mark with ObsoleteAttribute
         /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
         public static IContainer WithAutoFallbackResolution(this IContainer container,
@@ -9422,6 +9450,20 @@ namespace DryIoc
         private readonly Type _knownImplementationType;
     }
 
+    internal sealed class FactoryPlaceholder : Factory
+    {
+        public static readonly Factory Default = new FactoryPlaceholder();
+
+        // Always resolved asResolutionCall, to create a hole in object graph to be filled in later
+        public override Setup Setup { get { return _setup; } }
+        private static readonly Setup _setup = Setup.With(asResolutionCall: true);
+
+        public override Expression CreateExpressionOrDefault(Request request)
+        {
+            return Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
+        }
+    }
+
     /// <summary>Should return value stored in scope.</summary>
     public delegate object CreateScopedValue();
 
@@ -11163,7 +11205,8 @@ namespace DryIoc
                 "  with normal and dynamic registrations:" + Environment.NewLine + "{2}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration but found many:" + Environment.NewLine + "{0}" + Environment.NewLine +
+                "Expecting single default registration but found many:" + Environment.NewLine + "{0}" +
+                Environment.NewLine +
                 "When resolving {1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
@@ -11191,7 +11234,8 @@ namespace DryIoc
             RegisteringAbstractImplementationTypeAndNoFactoryMethod = Of(
                 "Registering abstract implementation type {0} when it is should be concrete. Also there is not FactoryMethod to use instead."),
             UnableToSelectSinglePublicConstructorFromMultiple = Of(
-                "Unable to select single public constructor from implementation type {0}:" + Environment.NewLine + "{1}"),
+                "Unable to select single public constructor from implementation type {0}:" + Environment.NewLine +
+                "{1}"),
             UnableToSelectSinglePublicConstructorFromNone = Of(
                 "Unable to select single public constructor from implementation type {0} because it does not have one."),
             NoMatchedImplementedTypesWithServiceType = Of(
@@ -11279,7 +11323,8 @@ namespace DryIoc
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
                 "Runtime state is required to inject (or use) the: {0}. " + Environment.NewLine +
-                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + Environment.NewLine +
+                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." +
+                Environment.NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgValueIndexIsProvidedButNoArgValues = Of(
                 "Arg.Index of value is used but no values are passed"),
@@ -11324,7 +11369,10 @@ namespace DryIoc
                 "{1}" + Environment.NewLine +
                 "When resolving: {2}"),
             ImplTypeIsNotSpecifiedForAutoCtorSelection = Of(
-                "Implementation type is not specified when using automatic constructor selection: {0}");
+                "Implementation type is not specified when using automatic constructor selection: {0}"),
+            NoImplementationForPlaceholder = Of(
+                "There is no real implementation, only a placeholder for the service {0}." + Environment.NewLine +
+                "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
