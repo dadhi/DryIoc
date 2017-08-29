@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Castle.DynamicProxy;
 using ImTools;
 
@@ -61,9 +58,7 @@ namespace DryIoc.IssuesTests.Interception
                 ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
 
             // decorator for the generated proxy class
-            var decoratorSetup = serviceKey == null
-               ? Setup.Decorator
-               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey));
+            var decoratorSetup = GetDecoratorSetup(serviceKey);
 
             // make typeof(LazyInterceptor<interfaceType>[])
             var lazyInterceptorArrayType = typeof(LazyInterceptor<>).MakeGenericType(interfaceType).MakeArrayType();
@@ -80,6 +75,14 @@ namespace DryIoc.IssuesTests.Interception
             return registrator;
         }
 
+        private static Setup GetDecoratorSetup(object serviceKey = null)
+        {
+            // Specify an order to apply decorator as a last one
+            return serviceKey == null
+                ? Setup.Decorator
+                : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey));
+        }
+
         /// <summary>
         /// Ensures that a service always resolves as lazy proxy (uses ProxyGenerator, a bit easier to understand).
         /// </summary>
@@ -88,11 +91,8 @@ namespace DryIoc.IssuesTests.Interception
         /// <param name="serviceKey">Optional service key.</param>
         public static IRegistrator ResolveAsLazy(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
         {
-            var decoratorSetup = serviceKey == null
-               ? Setup.Decorator
-               : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey));
-
             var method = typeof(WrapAsLazy).GetSingleMethodOrNull("CreateLazyProxy", includeNonPublic: true).MakeGenericMethod(new[] { interfaceType });
+            var decoratorSetup = GetDecoratorSetup(serviceKey);
             registrator.Register(interfaceType, Reuse.Transient, Made.Of(method), decoratorSetup);
             return registrator;
         }
@@ -121,8 +121,9 @@ namespace DryIoc.IssuesTests.Interception
                 if (target == null)
                 {
                     // create the lazy value on the first invocation
-                    (invocation as IChangeProxyTarget).ChangeInvocationTarget(LazyTarget.Value);
-                    (invocation as IChangeProxyTarget).ChangeProxyTarget(LazyTarget.Value);
+                    var changeProxyTarget = (IChangeProxyTarget)invocation;
+                    changeProxyTarget.ChangeInvocationTarget(LazyTarget.Value);
+                    changeProxyTarget.ChangeProxyTarget(LazyTarget.Value);
                 }
 
                 invocation.Proceed();

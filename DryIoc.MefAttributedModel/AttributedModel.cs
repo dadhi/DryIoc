@@ -121,7 +121,8 @@ namespace DryIoc.MefAttributedModel
             typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification)),
+            (Func<Request, bool>)(request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification))),
+            order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
             useDecorateeReuse: true);
 
         #endregion
