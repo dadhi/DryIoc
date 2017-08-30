@@ -1,5 +1,4 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -24,18 +23,22 @@ namespace DryIoc.IssuesTests
 
         public class CustomRegistrationB : ICustomRegistration { }
 
-        [Test]
-        public void Can_ResolveMany_of_not_registered_service_generic_interface_in_registration_order()
+        [Test] // Scanning or registration order does not make sense for dynamic registrations
+        public void Can_ResolveMany_of_not_registered_service_generic_interface_without_scanning_order()
         {
-            var implTypes = new[] { typeof(CustomRegistrationA<>), typeof(CustomRegistrationB<>) };
+            var implTypes = new[] {
+                typeof(CustomRegistrationA<>),
+                typeof(CustomRegistrationAStr),
+                typeof(CustomRegistrationB<>) };
 
             var container = new Container().WithAutoFallbackDynamicRegistrations(implTypes);
 
             var xs = container.ResolveMany<ICustomRegistration<string>>().ToArray();
 
-            Assert.AreEqual(2, xs.Length);
-            Assert.IsInstanceOf<CustomRegistrationA<string>>(xs[0]);
-            Assert.IsInstanceOf<CustomRegistrationB<string>>(xs[1]);
+            Assert.AreEqual(3, xs.Length);
+            Assert.IsInstanceOf<CustomRegistrationAStr>(xs[0]);
+            Assert.IsInstanceOf<CustomRegistrationA<string>>(xs[1]);
+            Assert.IsInstanceOf<CustomRegistrationB<string>>(xs[2]);
         }
 
         public interface ICustomRegistration<T> { }
@@ -43,6 +46,8 @@ namespace DryIoc.IssuesTests
         public class CustomRegistrationA<T> : ICustomRegistration<T> { }
 
         public class CustomRegistrationB<T> : ICustomRegistration<T> { }
+
+        public class CustomRegistrationAStr : ICustomRegistration<string> { }
 
         [Test]
         public void Selects_only_valid_non_generic_impl_for_non_generic_service()

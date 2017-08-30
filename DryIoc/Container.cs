@@ -1369,14 +1369,17 @@ namespace DryIoc
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
-                var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey);
-                if (dynamicRegistrations == null)
-                    continue;
-
-                if (!bothClosedAndOpenGenerics)
+                var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey).ToArrayOrSelf();
+                if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
                 {
-                    ;
+                    var openGenServiceType = serviceType.GetGenericTypeDefinition();
+                    var openGenDynamicRegistrations = dynamicRegistrationProvider(openGenServiceType, serviceKey);
+                    if (openGenDynamicRegistrations != null)
+                        dynamicRegistrations = dynamicRegistrations.Append(openGenDynamicRegistrations);
                 }
+
+                if (dynamicRegistrations.IsNullOrEmpty())
+                    continue;
 
                 if (resultFactories.IsNullOrEmpty())
                 {
@@ -1455,6 +1458,7 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
 
             var factories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
+
             factories = GetCombinedRegisteredAndDynamicFactories(
                 factories, true, FactoryType.Service, serviceType, serviceKey);
 
@@ -5268,8 +5272,10 @@ namespace DryIoc
         /// are valid implementation and service types.</summary>
         /// <param name="type">Implementation type.</param>
         /// <param name="serviceType">Service type.</param>
+        /// <param name="checkIfOpenGenericImplementsClosedGeneric">(optional)</param>
         /// <returns>Check result.</returns>
-        public static bool ImplementsServiceType(this Type type, Type serviceType)
+        public static bool ImplementsServiceType(this Type type, Type serviceType, 
+            bool checkIfOpenGenericImplementsClosedGeneric = false)
         {
             if (!type.IsImplementationType())
                 return false;
@@ -5280,6 +5286,10 @@ namespace DryIoc
 
             if (!type.IsOpenGeneric())
                 return serviceTypes.IndexOf(serviceType) != -1;
+
+            if (!checkIfOpenGenericImplementsClosedGeneric &&
+                !serviceType.IsOpenGeneric())
+                return false;
 
             if (!serviceType.IsGeneric()) // should be generic to supply arguments to implType
                 return false;
