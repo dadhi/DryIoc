@@ -599,93 +599,92 @@ namespace DryIoc
                     0, FactoryType.Wrapper, implementationType: null, reuse: null, flags: RequestFlags.IsServiceCollection);
 
             var container = (IContainer)this;
-            var items = container.GetAllServiceFactories(requiredItemType);
+            var items = container.GetAllServiceFactories(requiredItemType)
+                .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemOpenGenericType, f.Key));
+                    .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType,
+                        // note: Special service key with info about open-generic service type
+                        new[] { requiredItemOpenGenericType, f.Key }));
             }
 
             // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             IEnumerable<ServiceRegistrationInfo> variantGenericItems = null;
             if (requiredItemType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
+            {
                 variantGenericItems = container.GetServiceRegistrations()
-                    .Where(x => x.ServiceType.IsGeneric()
-                        && x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition()
-                        && x.ServiceType != requiredItemType
-                        && x.ServiceType.IsAssignableTo(requiredItemType));
+                    .Where(it => it.ServiceType.IsGeneric()
+                        && it.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition()
+                        && it.ServiceType != requiredItemType
+                        && it.ServiceType.IsAssignableTo(requiredItemType));
+            }
 
             if (serviceKey != null) // include only single item matching key.
             {
-                items = items.Where(it => serviceKey.Equals(it.Key));
+                items = items.Where(it => serviceKey.Equals(it.OptionalServiceKey));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Where(it => serviceKey.Equals(it.OptionalServiceKey));
+                    openGenericItems = openGenericItems // extract the actual key from combined type and key
+                        .Where(it => serviceKey.Equals(((object[])it.OptionalServiceKey)[1]));
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Where(it => serviceKey.Equals(it.OptionalServiceKey));
+                    variantGenericItems = variantGenericItems
+                        .Where(it => serviceKey.Equals(it.OptionalServiceKey));
             }
 
             var metadataKey = preResolveParent.MetadataKey;
             var metadata = preResolveParent.Metadata;
             if (metadataKey != null || metadata != null)
             {
-                items = items.Where(it => it.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                items = items.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                    openGenericItems = openGenericItems
+                        .Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                    variantGenericItems = variantGenericItems
+                        .Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
             }
 
             // Exclude composite parent service from items, skip decorators
             var parent = preResolveParent;
             if (parent.FactoryType != FactoryType.Service)
-                parent = parent.Enumerate().FirstOrDefault(p => p.FactoryType == FactoryType.Service) ?? RequestInfo.Empty;
+                parent = parent.Enumerate().FirstOrDefault(p => p.FactoryType == FactoryType.Service) 
+                    ?? RequestInfo.Empty;
 
             if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
             {
-                items = items.Where(x => x.Value.FactoryID != parent.FactoryID);
+                items = items.Where(x => x.Factory.FactoryID != parent.FactoryID);
 
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Where(x =>
-                        !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate().Any(f =>
-                            f.Value.FactoryID == parent.FactoryID &&
-                            f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey));
+                    openGenericItems = openGenericItems
+                        .Where(it => !it.Factory.FactoryGenerator.GeneratedFactories.Enumerate()
+                            .Any(f => f.Value.FactoryID == parent.FactoryID 
+                                && f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey));
 
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Where(x => x.Factory.FactoryID != parent.FactoryID);
+                    variantGenericItems = variantGenericItems
+                        .Where(x => x.Factory.FactoryID != parent.FactoryID);
             }
 
-            // todo: add ordering across all discovered kind of services
-            foreach (var item in items)
+            var allItems = items;
+            if (openGenericItems != null)
+                allItems = items.Concat(openGenericItems);
+            if (variantGenericItems != null)
+                allItems = allItems.Concat(variantGenericItems);
+
+            // Resolve in resgitration order
+            foreach (var item in allItems.OrderBy(it => it.FactoryRegistrationOrder))
             {
-                var service = container.Resolve(serviceType, item.Key,
-                    true, requiredServiceType, preResolveParent, scope);
+                var service = container.Resolve(serviceType, item.OptionalServiceKey,
+                    true, item.ServiceType, preResolveParent, scope);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
-
-            if (openGenericItems != null)
-                foreach (var item in openGenericItems)
-                {
-                    var serviceKeyWithOpenGenericRequiredType = new[] { item.ServiceType, item.OptionalServiceKey };
-                    var service = container.Resolve(serviceType, serviceKeyWithOpenGenericRequiredType,
-                        true, requiredItemType, preResolveParent, scope);
-                    if (service != null) // skip unresolved items
-                        yield return service;
-                }
-
-            if (variantGenericItems != null)
-                foreach (var item in variantGenericItems)
-                {
-                    var service = container.Resolve(serviceType, item.OptionalServiceKey,
-                        true, item.ServiceType, preResolveParent, scope);
-                    if (service != null) // skip unresolved items
-                        yield return service;
-                }
-
+            
+            // todo: Don't like it here
             var fallbackContainers = container.Rules.FallbackContainers;
             if (!fallbackContainers.IsNullOrEmpty())
             {
@@ -3285,7 +3284,7 @@ namespace DryIoc
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
                     .Map(f => new ServiceRegistrationInfo(f.Value, requiredItemType,
-                            // NOTE: Special service key with info about open-generic factory service type
+                            // note: Special service key with info about open-generic factory service type
                             optionalServiceKey: new[] { requiredItemOpenGenericType, f.Key }))
                     .ToArrayOrSelf();
                 items = items.Append(openGenericItems);
@@ -3297,11 +3296,11 @@ namespace DryIoc
                 rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations()
-                    .Match(x =>
-                        x.ServiceType.IsGeneric() &&
-                        x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
-                        x.ServiceType != requiredItemType &&
-                        x.ServiceType.IsAssignableTo(requiredItemType))
+                    .Match(it =>
+                        it.ServiceType.IsGeneric() &&
+                        it.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
+                        it.ServiceType != requiredItemType &&
+                        it.ServiceType.IsAssignableTo(requiredItemType))
                     .ToArrayOrSelf();
                 items = items.Append(variantGenericItems);
             }
@@ -3330,7 +3329,7 @@ namespace DryIoc
             List<Expression> itemExprList = null;
             if (!items.IsNullOrEmpty())
             {
-                Array.Sort(items); // Preserves the order of resgitratons when resolving items
+                Array.Sort(items); // to resolve the items in order of registration
 
                 itemExprList = new List<Expression>(items.Length);
                 for (var i = 0; i < items.Length; i++)

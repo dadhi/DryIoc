@@ -25,7 +25,7 @@ namespace DryIoc.IssuesTests
         public class CustomRegistrationB : ICustomRegistration { }
 
         [Test]
-        public void Can_ResolveMany_of_not_registered_service_generic_interface()
+        public void Can_ResolveMany_of_not_registered_service_generic_interface_in_registration_order()
         {
             var implTypes = new[] { typeof(CustomRegistrationA<>), typeof(CustomRegistrationB<>) };
 
@@ -33,6 +33,7 @@ namespace DryIoc.IssuesTests
 
             var xs = container.ResolveMany<ICustomRegistration<string>>().ToArray();
 
+            Assert.AreEqual(2, xs.Length);
             Assert.IsInstanceOf<CustomRegistrationA<string>>(xs[0]);
             Assert.IsInstanceOf<CustomRegistrationB<string>>(xs[1]);
         }
