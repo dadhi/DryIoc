@@ -833,7 +833,7 @@ namespace DryIoc
 
         Factory IContainer.ResolveFactory(Request request)
         {
-            var factory = GetServiceFactoryOrDefault(request, Rules.FactorySelector);
+            var factory = ((IContainer)this).GetServiceFactoryOrDefault(request);
             if (factory == null)
             {
                 factory = GetWrapperFactoryOrDefault(request);
@@ -901,7 +901,10 @@ namespace DryIoc
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
-            return GetServiceFactoryOrDefault(request, Rules.FactorySelector);
+            var factorySelector = Rules.FactorySelector;
+            return factorySelector == null
+                ? GetSingleServiceFactoryOrDefault(request)
+                : GetRuleSelectedServiceFactoryOrDefault(factorySelector, request);
         }
 
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
@@ -1451,28 +1454,17 @@ namespace DryIoc
             return resultFactories;
         }
 
-        private Factory GetServiceFactoryOrDefault(
-            Request request, Rules.FactorySelectorRule factorySelector)
+        private Factory GetSingleServiceFactoryOrDefault(Request request)
         {
             var serviceType = GetRegisteredServiceType(request);
             var serviceKey = request.ServiceKey;
 
-            var factories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
-
-            factories = GetCombinedRegisteredAndDynamicFactories(
-                factories, true, FactoryType.Service, serviceType, serviceKey);
+            var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
+            var factories = GetCombinedRegisteredAndDynamicFactories(
+                registeredFactories, true, FactoryType.Service, serviceType, serviceKey);
 
             if (factories.IsNullOrEmpty())
                 return null;
-
-            if (factorySelector != null)
-            {
-                var validFactories = factories.Match(
-                    f => f.Value.CheckCondition(request),
-                    f => new KeyValuePair<object, Factory>(f.Key, f.Value));
-                var selectedFactory = factorySelector(request, validFactories);
-                return selectedFactory;
-            }
 
             // For requested keyed service just lookup for key and return anyway
             if (serviceKey != null)
@@ -1543,6 +1535,36 @@ namespace DryIoc
 
             // Return null to allow fallback strategies
             return null;
+        }
+
+        private Factory GetRuleSelectedServiceFactoryOrDefault(
+            Rules.FactorySelectorRule factorySelector, Request request)
+        {
+            var serviceType = GetRegisteredServiceType(request);
+
+            var factories = ((IContainer)this)
+                .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
+                .ToArrayOrSelf();
+
+            if (factories.IsNullOrEmpty())
+                return null;
+
+            Array.Sort(factories, _keyFactoryComparer);
+
+            var validFactories = factories.Match(
+                f => f.Value.CheckCondition(request),
+                f => new KeyValuePair<object, Factory>(f.Key, f.Value));
+
+            return factorySelector(request, validFactories);
+        }
+
+        private static readonly KeyFactoryComparer _keyFactoryComparer = new KeyFactoryComparer();
+        private struct KeyFactoryComparer : IComparer<KV<object, Factory>>
+        {
+            public int Compare(KV<object, Factory> first, KV<object, Factory> next)
+            {
+                return first.Value.FactoryID - next.Value.FactoryID;
+            }
         }
 
         private static KV<object, Factory>[] MatchFactoriesByReuse(KV<object, Factory>[] matchedFactories, Request request)
@@ -3773,7 +3795,8 @@ namespace DryIoc
         /// <returns>Factory selection rule.</returns>
         public static FactorySelectorRule SelectLastRegisteredFactory()
         {
-            return (request, factories) => factories.LastOrDefault(f => f.Key.Equals(request.ServiceKey)).Value;
+            return (request, factories) => 
+                factories.LastOrDefault(f => f.Key.Equals(request.ServiceKey)).Value;
         }
 
         //we are watching you...public static
@@ -11057,9 +11080,10 @@ namespace DryIoc
         /// <returns>Found factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
         Factory ResolveFactory(Request request);
 
-        /// <summary>Searches for registered service factory and returns it, or null if not found.</summary>
+        /// <summary>Searches for registered service factory and returns it, or null if not found.
+        /// Will use <see cref="DryIoc.Rules.FactorySelector"/> if specified.</summary>
         /// <param name="request">Factory request.</param>
-        /// <returns>Found registered factory or null.</returns>
+        /// <returns>Found factory or null.</returns>
         Factory GetServiceFactoryOrDefault(Request request);
 
         /// <summary>Finds all registered default and keyed service factories and returns them.
