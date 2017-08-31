@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended
     {
-        [Test, Ignore("fix")]
+        [Test]
         public void ResolvesDifferentInstancesForServiceWhenResolvingEnumerable()
         {
             var c = new Container(r => r.WithFactorySelector(Rules.SelectLastRegisteredFactory()));
