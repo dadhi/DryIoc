@@ -88,6 +88,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended.cs" />
     <Compile Include="DotnetWeekBlogExample.cs" />
     <Compile Include="DryIocAdapterSpecificationTests.cs" />
     <Compile Include="InjectListOfDepsWithStringDeps.cs" />
