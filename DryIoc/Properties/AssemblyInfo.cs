@@ -6,4 +6,4 @@
 
 [assembly: AssemblyVersion(             "2.12.0")]
 [assembly: AssemblyFileVersion(         "2.12.0")]
-[assembly: AssemblyInformationalVersion("2.12.0-preview-01")]
+[assembly: AssemblyInformationalVersion("2.12.0")]

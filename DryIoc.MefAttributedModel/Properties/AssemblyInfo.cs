@@ -5,8 +5,8 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyDescription("DryIoc is small, fast, capable IoC container.")]
 [assembly: AssemblyCopyright("Copyright © 2016 Maksim Volkau")]
 
-[assembly: AssemblyVersion(             "3.1.2")]
-[assembly: AssemblyFileVersion(         "3.1.2")]
-[assembly: AssemblyInformationalVersion("3.1.2")]
+[assembly: AssemblyVersion(             "3.1.3")]
+[assembly: AssemblyFileVersion(         "3.1.3")]
+[assembly: AssemblyInformationalVersion("3.1.3")]
 
 [assembly: InternalsVisibleTo("DryIoc.MefAttributedModel.UnitTests")]

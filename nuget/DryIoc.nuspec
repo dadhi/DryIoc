@@ -22,6 +22,8 @@
       - fixed: #497: ConstructorWithResolvableArguments is not working properly
       - fixed: #500: Rule WithConcreteTypeDynamicRegistrations disables allowDisposableTransient
       - fixed: #506: Cannot resolve string[]
+      - fixed: #507: Resolved collection of mixed open and closed generics does not preserve order of registration
+      - fixed: #508: SelectLastRegisteredFactory and resolving collection of open-generic is not working as intended
       v2.11.6:
       - fixed (!!!): #495: InvalidCastException on type resolution
       v2.11.5:
