@@ -45,6 +45,33 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScript
 		BuildScripts\RunTestsWithCoverage.bat = BuildScripts\RunTestsWithCoverage.bat
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", "{61DEA9E3-8A76-4390-8BB0-9947F538613B}"
+	ProjectSection(SolutionItems) = preProject
+		NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec
+		NuGetSpecs\DryIoc.CommonServiceLocator.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.nuspec
+		NuGetSpecs\DryIoc.dll.nuspec = NuGetSpecs\DryIoc.dll.nuspec
+		NuGetSpecs\DryIoc.Internal.nuspec = NuGetSpecs\DryIoc.Internal.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.nuspec
+		NuGetSpecs\DryIoc.Mvc.dll.nuspec = NuGetSpecs\DryIoc.Mvc.dll.nuspec
+		NuGetSpecs\DryIoc.Mvc.nuspec = NuGetSpecs\DryIoc.Mvc.nuspec
+		NuGetSpecs\DryIoc.nuspec = NuGetSpecs\DryIoc.nuspec
+		NuGetSpecs\DryIoc.Owin.dll.nuspec = NuGetSpecs\DryIoc.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.Owin.nuspec = NuGetSpecs\DryIoc.Owin.nuspec
+		NuGetSpecs\DryIoc.SignalR.dll.nuspec = NuGetSpecs\DryIoc.SignalR.dll.nuspec
+		NuGetSpecs\DryIoc.SignalR.nuspec = NuGetSpecs\DryIoc.SignalR.nuspec
+		NuGetSpecs\DryIoc.snk = NuGetSpecs\DryIoc.snk
+		NuGetSpecs\DryIoc.Web.dll.nuspec = NuGetSpecs\DryIoc.Web.dll.nuspec
+		NuGetSpecs\DryIoc.Web.nuspec = NuGetSpecs\DryIoc.Web.nuspec
+		NuGetSpecs\DryIoc.WebApi.dll.nuspec = NuGetSpecs\DryIoc.WebApi.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.nuspec = NuGetSpecs\DryIoc.WebApi.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.nuspec
+		NuGetSpecs\DryIocAttributes.dll.nuspec = NuGetSpecs\DryIocAttributes.dll.nuspec
+		NuGetSpecs\DryIocAttributes.nuspec = NuGetSpecs\DryIocAttributes.nuspec
+		NuGetSpecs\DryIocZero.nuspec = NuGetSpecs\DryIocZero.nuspec
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
