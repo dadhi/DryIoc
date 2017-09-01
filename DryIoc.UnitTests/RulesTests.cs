@@ -196,7 +196,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void You_can_specify_rules_to_resolve_last_registration_from_multiple_available()
+        public void Can_specify_rules_to_resolve_last_registration_from_multiple_available()
         {
             var container = new Container(Rules.Default.WithFactorySelector(Rules.SelectLastRegisteredFactory()));
 
@@ -204,7 +204,24 @@ namespace DryIoc.UnitTests
             container.Register(typeof(IService), typeof(AnotherService));
             var service = container.Resolve(typeof(IService));
 
-            Assert.That(service, Is.InstanceOf<AnotherService>());
+            Assert.IsInstanceOf<AnotherService>(service);
+        }
+
+        [Test]
+        public void Can_specify_rules_to_resolve_last_registration_from_mixed_open_and_closed_generics()
+        {
+            var container = new Container(r => r.WithFactorySelector(Rules.SelectLastRegisteredFactory()));
+
+            container.Register(typeof(IService<>), typeof(Service<>));
+            container.Register(typeof(IService<int>), typeof(IntService));
+            var service = container.Resolve<IService<int>>();
+
+            Assert.IsInstanceOf<IntService>(service);
+        }
+
+        class IntService : IService<int>
+        {
+            public int Dependency { get; set; }
         }
 
         [Test]

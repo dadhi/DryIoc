@@ -519,5 +519,24 @@ namespace DryIoc.UnitTests
         class ClassA
         {
         }
+
+        [Test]
+        public void Can_resolve_collection_of_open_generic_and_instance_in_order_of_registration()
+        {
+            var c = new Container();
+
+            c.Register(typeof(G<>), Reuse.Singleton);
+            c.Register(typeof(G<int>), Reuse.Singleton);
+
+            var instance = new G<int>();
+            c.RegisterDelegate(_ => instance, Reuse.Singleton);
+
+            var items = c.Resolve<IEnumerable<G<int>>>().ToArray();
+
+            Assert.AreEqual(3, items.Length);
+            Assert.AreSame(instance, items[2]);
+        }
+
+        class G<T> { }
     }
 }

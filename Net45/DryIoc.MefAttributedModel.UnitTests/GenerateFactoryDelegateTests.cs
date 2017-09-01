@@ -180,5 +180,31 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             public LazyDep(LazyUser u) {}
         }
+
+        [Test]
+        public void No_errors_for_registered_placeholders()
+        {
+            var c = new Container();
+
+            c.Register<M>();
+            c.RegisterPlaceholder(typeof(IN));
+
+            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
+            KeyValuePair<RequestInfo, Expression>[] deps;
+            var errors = c.GenerateResolutionExpressions(out roots, out deps, 
+                r => r.ServiceType == typeof(M));
+            Assert.IsEmpty(errors);
+        }
+
+        class M
+        {
+            public IN N;
+            public M(IN n)
+            {
+                N = n;
+            }
+        }
+
+        interface IN { }
     }
 }
