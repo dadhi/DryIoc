@@ -1,0 +1,116 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>DryIoc.dll</id>
+    <version>0.0.0</version>
+    <!-- overridden by "NuGet pack -Version" flag -->
+    <authors>Maksim Volkau</authors>
+    <copyright>Copyright © 2013-2017 Maksim Volkau</copyright>
+    <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
+    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
+    <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+    <releaseNotes>
+      v2.12.0:
+      - added: #499: Add RegisterPlaceholder to enable delayed registration
+      - added: Setup.DecoratorOf{T}(key) and runtime version to simplify specifying condition for matching decoratee type and key
+      - added: Missing overload for Made.Of to consider request -> instance factory info.
+      - added: Rules.WithDynamicRegistrationsAsFallback
+      - changed: Updated FEC to v1.3.0
+      - fixed: #492: Lazy imports disguised as non-lazy
+      - fixed: #497: ConstructorWithResolvableArguments is not working properly
+      - fixed: #500: Rule WithConcreteTypeDynamicRegistrations disables allowDisposableTransient
+      - fixed: #506: Cannot resolve string[]
+      - fixed: #507: Resolved collection of mixed open and closed generics does not preserve order of registration
+      - fixed: #508: SelectLastRegisteredFactory and resolving collection of open-generic is not working as intended
+      v2.11.6:
+      - fixed (!!!): #495: InvalidCastException on type resolution
+      v2.11.5:
+      - fixed (!!!): #493 Some resolving of the controller ends up with exception "Container is disposed..."
+      - fixed: #175 Deterministic implicit rule to select from multiple services for specific scope
+      v2.11.4:
+      - fixed: #488 DryIoc.ContainerException if using WithDependencies
+      v2.11.3:
+      - fixed: Backward compatibility of DryIoc 2.11 WrapperSetup.Condition with 2.10
+      v2.11.2:
+      - fixed: Backward compatibility of DryIoc 2.11 Setup.Condition with 2.10
+      - fixed: #480: DryIoc.Microsoft.DependencyInjection - WithDependencyInjectionAdapter() exception
+      v2.11.1:
+      - fixed: UseInstance is not backward compatible with v2.10
+      - fixed: #478: DryIoc.Owin.dll 2.2.0 not compatible with DryIoc.dll 2.11.0
+      v2.11.0:
+      - added: #449: Provide a way to log unresolved dependencies via Rules.WithUnknownServiceHandler
+      - added: #463: Add IfAlreadyRegistered option for UseInstance
+      - added: #475: Dynamic Registration Providers to enable lazy and on-demand registrations
+      - added: #476: AutoFallback and AutoConcreteType resolution based on Dynamic Registration providers
+      - fixed: #396: Enable ResolveMany to use auto fallback resolution via dynamic registrations
+      - fixed: #451: DryIoc should know about static members
+      - fixed: #474: Exclude supported collection wrapper interfaces from RegisterMany / ExportMany
+      - fixed: #477: ArgumentException while resolving
+      - fixed: DryIocAttributes dependency to System.Diagnostics.Tools from ..Debug
+    </releaseNotes>
+    <dependencies>
+      <!--Explicitly specify no dependencies for full .NET -->
+      <group targetFramework="net35"></group>
+      <group targetFramework="net40"></group>
+      <group targetFramework="net45"></group>
+      <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL328--></group>
+      <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL259--></group>
+      <group targetFramework="xamarinmac20"></group>
+      
+      <group targetFramework="netstandard1.0">
+        <dependency id="System.Runtime" version="4.3.0" />
+        <dependency id="System.Runtime.Extensions" version="4.3.0" />
+        <dependency id="System.Collections" version="4.3.0" />
+        <dependency id="System.Linq" version="4.3.0" />
+        <dependency id="System.Linq.Expressions" version="4.3.0" />
+        <dependency id="System.Reflection" version="4.3.0" />
+        <dependency id="System.Reflection.Extensions" version="4.3.0" />
+        <dependency id="System.Threading" version="4.3.0" />
+        <dependency id="System.Diagnostics.Debug" version="4.3.0" />
+        <dependency id="System.Diagnostics.Tools" version="4.3.0" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="..\LICENSE.txt" />
+    <file src="..\NuGet\DryIoc.snk" />
+
+    <!-- netstandard1.0 (based on PCL 259) -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.0" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.0" />
+
+    <!-- net35 -->
+    <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
+    <file src="..\bin\Release\DryIoc.pdb" target="lib\net35" />
+    <file src="..\bin\Release\DryIoc.xml" target="lib\net35" />
+
+    <!-- net40 -->
+    <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
+    <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
+    <file src="..\Net40\bin\Release\DryIoc.xml" target="lib\net40" />
+
+    <!-- net45 -->
+    <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\net45" />
+    <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\net45" />
+    <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\net45" />
+
+    <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+    <file src="..\PCL\bin\Release\DryIoc.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL\bin\Release\DryIoc.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL\bin\Release\DryIoc.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+
+    <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+
+    <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\xamarinmac20" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\xamarinmac20" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\xamarinmac20" />
+
+  </files>
+</package>
