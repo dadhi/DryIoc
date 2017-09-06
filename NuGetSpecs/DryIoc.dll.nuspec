@@ -75,7 +75,7 @@
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
-    <file src="..\NuGet\DryIoc.snk" />
+    <file src="..\NuGetSpecs\DryIoc.snk" />
 
     <!-- netstandard1.0 (based on PCL 259) -->
     <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />

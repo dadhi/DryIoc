@@ -84,7 +84,7 @@
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
-    <file src="..\NuGet\DryIoc.snk" />
+    <file src="..\NuGetSpecs\DryIoc.snk" />
 
     <!-- net35 -->
     <file src="..\bin\Release\DryIoc.MefAttributedModel.dll" target="lib\net35" />

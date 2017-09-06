@@ -33,7 +33,7 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\NuGet\DryIoc.snk" />
+        <file src="..\NuGetSpecs\DryIoc.snk" />
 
         <!-- net45 -->
         <file src="..\Extensions\bin\Release\DryIoc.Owin.dll" target="lib\net45" />

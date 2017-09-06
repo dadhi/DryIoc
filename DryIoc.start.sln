@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "Net45\DryIoc\DryIoc.csproj", "{B6C2FC35-7586-417B-AD35-32AED63ADFA9}"
 EndProject
@@ -33,33 +33,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "Net45\DryIocZ
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero.UnitTests", "Net45\DryIocZero.UnitTests\DryIocZero.UnitTests.csproj", "{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{92D2ADDB-E0D8-4127-9EA1-81DF39827E9C}"
-	ProjectSection(SolutionItems) = preProject
-		NuGet\DryIoc.CommonServiceLocator.dll.nuspec = NuGet\DryIoc.CommonServiceLocator.dll.nuspec
-		NuGet\DryIoc.CommonServiceLocator.nuspec = NuGet\DryIoc.CommonServiceLocator.nuspec
-		NuGet\DryIoc.dll.nuspec = NuGet\DryIoc.dll.nuspec
-		NuGet\DryIoc.Internal.nuspec = NuGet\DryIoc.Internal.nuspec
-		NuGet\DryIoc.MefAttributedModel.dll.nuspec = NuGet\DryIoc.MefAttributedModel.dll.nuspec
-		NuGet\DryIoc.MefAttributedModel.nuspec = NuGet\DryIoc.MefAttributedModel.nuspec
-		NuGet\DryIoc.Mvc.dll.nuspec = NuGet\DryIoc.Mvc.dll.nuspec
-		NuGet\DryIoc.Mvc.nuspec = NuGet\DryIoc.Mvc.nuspec
-		NuGet\DryIoc.nuspec = NuGet\DryIoc.nuspec
-		NuGet\DryIoc.Owin.dll.nuspec = NuGet\DryIoc.Owin.dll.nuspec
-		NuGet\DryIoc.Owin.nuspec = NuGet\DryIoc.Owin.nuspec
-		NuGet\DryIoc.SignalR.dll.nuspec = NuGet\DryIoc.SignalR.dll.nuspec
-		NuGet\DryIoc.SignalR.nuspec = NuGet\DryIoc.SignalR.nuspec
-		NuGet\DryIoc.snk = NuGet\DryIoc.snk
-		NuGet\DryIoc.Web.dll.nuspec = NuGet\DryIoc.Web.dll.nuspec
-		NuGet\DryIoc.Web.nuspec = NuGet\DryIoc.Web.nuspec
-		NuGet\DryIoc.WebApi.dll.nuspec = NuGet\DryIoc.WebApi.dll.nuspec
-		NuGet\DryIoc.WebApi.nuspec = NuGet\DryIoc.WebApi.nuspec
-		NuGet\DryIoc.WebApi.Owin.dll.nuspec = NuGet\DryIoc.WebApi.Owin.dll.nuspec
-		NuGet\DryIoc.WebApi.Owin.nuspec = NuGet\DryIoc.WebApi.Owin.nuspec
-		NuGet\DryIocAttributes.dll.nuspec = NuGet\DryIocAttributes.dll.nuspec
-		NuGet\DryIocAttributes.nuspec = NuGet\DryIocAttributes.nuspec
-		NuGet\DryIocZero.nuspec = NuGet\DryIocZero.nuspec
-	EndProjectSection
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScripts", "{0DC443FD-3783-4F77-BDA1-68965996F9B5}"
 	ProjectSection(SolutionItems) = preProject
 		BuildScripts\_main.bat = BuildScripts\_main.bat
@@ -70,6 +43,33 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScript
 		BuildScripts\NuGetPack.bat = BuildScripts\NuGetPack.bat
 		BuildScripts\NuGetPublish.bat = BuildScripts\NuGetPublish.bat
 		BuildScripts\RunTestsWithCoverage.bat = BuildScripts\RunTestsWithCoverage.bat
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", "{61DEA9E3-8A76-4390-8BB0-9947F538613B}"
+	ProjectSection(SolutionItems) = preProject
+		NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec
+		NuGetSpecs\DryIoc.CommonServiceLocator.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.nuspec
+		NuGetSpecs\DryIoc.dll.nuspec = NuGetSpecs\DryIoc.dll.nuspec
+		NuGetSpecs\DryIoc.Internal.nuspec = NuGetSpecs\DryIoc.Internal.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.nuspec
+		NuGetSpecs\DryIoc.Mvc.dll.nuspec = NuGetSpecs\DryIoc.Mvc.dll.nuspec
+		NuGetSpecs\DryIoc.Mvc.nuspec = NuGetSpecs\DryIoc.Mvc.nuspec
+		NuGetSpecs\DryIoc.nuspec = NuGetSpecs\DryIoc.nuspec
+		NuGetSpecs\DryIoc.Owin.dll.nuspec = NuGetSpecs\DryIoc.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.Owin.nuspec = NuGetSpecs\DryIoc.Owin.nuspec
+		NuGetSpecs\DryIoc.SignalR.dll.nuspec = NuGetSpecs\DryIoc.SignalR.dll.nuspec
+		NuGetSpecs\DryIoc.SignalR.nuspec = NuGetSpecs\DryIoc.SignalR.nuspec
+		NuGetSpecs\DryIoc.snk = NuGetSpecs\DryIoc.snk
+		NuGetSpecs\DryIoc.Web.dll.nuspec = NuGetSpecs\DryIoc.Web.dll.nuspec
+		NuGetSpecs\DryIoc.Web.nuspec = NuGetSpecs\DryIoc.Web.nuspec
+		NuGetSpecs\DryIoc.WebApi.dll.nuspec = NuGetSpecs\DryIoc.WebApi.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.nuspec = NuGetSpecs\DryIoc.WebApi.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.nuspec
+		NuGetSpecs\DryIocAttributes.dll.nuspec = NuGetSpecs\DryIocAttributes.dll.nuspec
+		NuGetSpecs\DryIocAttributes.nuspec = NuGetSpecs\DryIocAttributes.nuspec
+		NuGetSpecs\DryIocZero.nuspec = NuGetSpecs\DryIocZero.nuspec
 	EndProjectSection
 EndProject
 Global
@@ -129,5 +129,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {ADDE327D-5A68-4B09-9D29-CB0D20C2BE4A}
 	EndGlobalSection
 EndGlobal

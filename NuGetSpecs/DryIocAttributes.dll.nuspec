@@ -47,7 +47,7 @@
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
-    <file src="..\NuGet\DryIoc.snk" />
+    <file src="..\NuGetSpecs\DryIoc.snk" />
 
     <!-- net35 -->
     <file src="..\bin\Release\DryIocAttributes.dll" target="lib\net35" />
