@@ -14,10 +14,10 @@
 // and for resolution errors listed under comment "FAILED to generate resolution for"
 //
 //=======================================================================
-//
-// TODO: Replace DryIocZero.version in a path below with the installed version of DryIocZero
 #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.version\tools\DryIoc.2.11.5\DryIoc.dll" #>
+
+<#@ assembly Name="System.Core" #>
+<#@ assembly Name="$(DryIocAssembly)" #>
 <#@ import Namespace="DryIoc" #>
 
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>

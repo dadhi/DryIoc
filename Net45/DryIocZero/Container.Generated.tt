@@ -27,8 +27,8 @@ THE SOFTWARE.
 <#@ assembly Name="System.Core" #>
 
 <# // TODO: Replace DryIocZero.version in 2 paths below with the installed version of DryIocZero #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.version\tools\DryIoc.2.11.5\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.version\tools\ExpressionToCodeLib.1.5.4\ExpressionToCodeLib.dll" #>
+<#@ assembly Name="$(DryIocAssembly)" #>
+<#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
 
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
