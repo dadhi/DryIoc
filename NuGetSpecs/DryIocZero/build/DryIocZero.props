@@ -6,7 +6,7 @@
     -->
 
   <PropertyGroup>
-    <DryIocZeroVersion>3.0.0-preview-07</DryIocZeroVersion>
+    <DryIocZeroVersion>3.0.0-preview-08</DryIocZeroVersion>
     
     <NugetPackageCache>$(USERPROFILE)/.nuget/packages</NugetPackageCache>
     
