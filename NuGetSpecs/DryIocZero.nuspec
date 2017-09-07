@@ -5,25 +5,21 @@
     <version>0.0.0</version>
     <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2016 Maksim Volkau</copyright>
+    <copyright>Copyright © 2016-2017 Maksim Volkau</copyright>
     <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
     <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
-      v3.0.0-preview-08:
-      - fixed: Provide the pathes to compile-time dependencies via additional project props
-      - renamed: Registrations.tt to Registrations.ttinclude to avoid automatic s
-      v3.0.0-preview-04:
-      - changed: More explicit versions of tools stated in folder
-      v3.0.0-preview-03:
-      - changed: Moved DryIoc and ExpressionToCodeLib dependencies to package/tools folder
-      v3.0.0-preview-02:
-      - changed: Updated to work with DryIoc 2.11.3
-      - added: Support for run-time IReuse
-      - changed: Re-organized IRegistrator interface to simplify and add IReuse support
-      - changed: Optimized a generated code
+      v3.0.0:
+      - fixed: Nuget package, so that DryIocZero compiles successfully right after install
+      - changed: Fixed versions of DryIoc and ExpressionToCodeLib dependencies located in package/tools folder
+      - changed: Updated to DryIoc v2.12.0, including `RegisterPlaceholder` support
+      - renamed: Registrations.tt to Registrations.ttinclude
+      - changed: Simplified IRegistrator interface
+      - changed: Optimized generated code
+      - added: Support for run-time reuse
     </releaseNotes>
     <dependencies>
       <!--no run-time dependencies-->

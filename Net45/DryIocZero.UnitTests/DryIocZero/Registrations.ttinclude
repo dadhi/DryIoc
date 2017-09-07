@@ -30,10 +30,6 @@ IContainer GetContainerWithRegistrations()
     var container = new Container()
         .WithMef();
 
-    // NOTE: `RegisterDelegate` and `RegisterInstance` are not supported because of runtime state usage. 
-    // Instead you can use `Register(Made.Of(() => CreateMyService()))` registrations,
-    // which are preferred over Delegate/Instance cause container may inspect and warn you on possible resolution errors.
-
     var types = typeof(IDecoratedResult).Assembly.GetLoadedTypes();
     container.RegisterExports(types);
 

@@ -36,7 +36,7 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 
-<#@ include File="Registrations.tt" #><#
+<#@ include File="Registrations.ttinclude" #><#
 
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
