@@ -12,6 +12,8 @@
     <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
+      v3.0.0-preview-07:
+      - fixed: Provide the pathes to compile-time dependencies via additional project props
       v3.0.0-preview-04:
       - changed: More explicit versions of tools stated in folder
       v3.0.0-preview-03:
@@ -33,10 +35,9 @@
     <file src="..\LICENSE.txt" />
 
     <!--Compile-time dependencies-->
-    <file src="..\Net45\bin\Release\DryIoc.dll" target="tools\DryIoc.2.11.5" />
-    <file src="..\Net45\bin\Release\DryIoc.xml" target="tools\DryIoc.2.11.5" />
-    <file src="..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.1.5.4" />
-    <file src="..\Net45\DryIocZero\DryIocZero.props" target="build" />
+    <file src="..\NuGetSpecs\DryIocZero\tools\DryIoc.dll.2.12.0\net45\DryIoc.dll" target="tools\DryIoc.dll.2.12.0\net45" />
+    <file src="..\NuGetSpecs\DryIocZero\tools\ExpressionToCodeLib.1.5.4\net40-Client\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.1.5.4\net40-Client" />
+    <file src="..\NuGetSpecs\DryIocZero\build\DryIocZero.props" target="build" />
 	
     <!--net45-->
     <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />

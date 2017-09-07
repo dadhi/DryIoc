@@ -1,12 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
   <PropertyGroup>
-    <!--
-    references used by zeor container tt files
-    TODO: automate references versioning for nuget packaging
-    -->
-    <DryIocZeroAssemblyInformationalVersion>3.0.0-preview-05</DryIocZeroAssemblyInformationalVersion>
-    <DryIocAssembly>$(SolutionDir)packages/DryIocZero.$(DryIocZeroAssemblyInformationalVersion)/tools/DryIoc.2.11.5/DryIoc.dll</DryIocAssembly>
-    <ExpressionToCodeLibAssembly>$(SolutionDir)packages/DryIocZero.$(DryIocZeroAssemblyInformationalVersion)/tools/ExpressionToCodeLib.1.5.4/ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
+    <DryIocZeroCompileTimeDeps>$(SolutionDir)/NuGetSpecs/DryIocZero/tools</DryIocZeroCompileTimeDeps>
+    
+    <DryIocAssembly>$(DryIocZeroCompileTimeDeps)/DryIoc.dll.2.12.0/net45/DryIoc.dll</DryIocAssembly>
+    <ExpressionToCodeLibAssembly>$(DryIocZeroCompileTimeDeps)/ExpressionToCodeLib.1.5.4/net40-Client/ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
   </PropertyGroup>
+
 </Project>
