@@ -21,13 +21,11 @@ namespace DryIoc.IssuesTests
             Assert.AreNotSame(t1.Test1, t2.Test1);
         }
 
-        [Test, Ignore("todo: fix")]
+        [Test]
         public void Test_with_MS_DI_container_rules()
         {
             var container = new Container(rules => rules
-                .With(FactoryMethod.ConstructorWithResolvableArguments)
-                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithTrackingDisposableTransients());
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory()));
 
             container.Register<TestScope1>();
             container.Register<TestScope2>();

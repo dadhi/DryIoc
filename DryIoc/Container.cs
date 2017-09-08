@@ -922,39 +922,7 @@ namespace DryIoc
             if (defaultFactories.Length == 0)
                 return null;
 
-            // Next, check factories condition
-            var matchedFactories = defaultFactories.Match(f => f.Value.CheckCondition(request));
-            if (matchedFactories.Length == 0)
-                return null;
-
-            // Next, check metadata
-            var metadataKey = request.MetadataKey;
-            var metadata = request.Metadata;
-            if (metadataKey != null || metadata != null)
-            {
-                matchedFactories = matchedFactories
-                    .Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
-                if (matchedFactories.Length == 0)
-                    return null;
-            }
-
-            // Next, check the for matching scopes. Only for more than 1 factory.
-            // Issue: #175
-            if (matchedFactories.Length > 1 &&
-                request.Rules.ImplicitCheckForReuseMatchingScope)
-                matchedFactories = MatchFactoriesByReuse(matchedFactories, request);
-
-            // todo: May be a bug to match for more than 1 factory. Works with ResolveFactory, but may not work in other call sites.
-            // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
-            // so there should not be repeating of the check, and not match of Performance decrease.
-            if (matchedFactories.Length > 1)
-            {
-                matchedFactories = matchedFactories.Match(f =>
-                    f.Value.FactoryGenerator == null ||
-                    f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null);
-                if (matchedFactories.Length == 0)
-                    return null;
-            }
+            var matchedFactories = FilterFactories(defaultFactories, request);
 
             // Hurrah! The result is a single matched factory
             if (matchedFactories.Length == 1)
@@ -973,6 +941,48 @@ namespace DryIoc
 
             // Return null to allow fallback strategies
             return null;
+        }
+
+        private static KV<object, Factory>[] FilterFactories(KV<object, Factory>[] matchedFactories, Request request)
+        {
+            // Check factories condition, even for the single factory
+            matchedFactories = matchedFactories.Match(f => f.Value.CheckCondition(request));
+            if (matchedFactories.Length == 0)
+                return matchedFactories;
+
+            // Check metadata, even for the single factory
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+            if (metadataKey != null || metadata != null)
+            {
+                matchedFactories = matchedFactories
+                    .Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                if (matchedFactories.Length == 0)
+                    return matchedFactories;
+            }
+
+            // Check the for matching scopes. Only for more than 1 factory, 
+            // for the single factory the check will be down the road
+            // Issue: #175
+            if (matchedFactories.Length > 1 &&
+                request.Rules.ImplicitCheckForReuseMatchingScope)
+            {
+                matchedFactories = MatchFactoriesByReuse(matchedFactories, request);
+                if (matchedFactories.Length == 0)
+                    return matchedFactories;
+            }
+
+            // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
+            // so there should not be repeating of the check, and not match of Performance decrease.
+            if (matchedFactories.Length > 1)
+            {
+                matchedFactories = matchedFactories.Match(f =>
+                    f.Value.FactoryGenerator == null ||
+                    f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null);
+                if (matchedFactories.Length == 0)
+                    return matchedFactories;
+            }
+            return matchedFactories;
         }
 
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
@@ -1541,17 +1551,19 @@ namespace DryIoc
             var allFactories = ((IContainer)this)
                 .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
                 .ToArrayOrSelf();
-            if (allFactories.IsNullOrEmpty())
+            if (allFactories.Length == 0)
                 return null;
 
             // Sort in registration order
-            Array.Sort(allFactories, _keyFactoryComparer);
+            if (allFactories.Length > 1)
+                Array.Sort(allFactories, _keyFactoryComparer);
 
-            var matchedFactories = allFactories.Match(
-                f => f.Value.CheckCondition(request),
-                f => new KeyValuePair<object, Factory>(f.Key, f.Value));
+            var matchedFactories = FilterFactories(allFactories, request);
+            if (matchedFactories.Length == 0)
+                return null;
 
-            var factory = factorySelector(request, matchedFactories);
+            var factory = factorySelector(request, 
+                matchedFactories.Map(f => new KeyValuePair<object, Factory>(f.Key, f.Value)));
             if (factory == null)
                 return null;
 
