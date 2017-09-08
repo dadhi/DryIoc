@@ -21,7 +21,10 @@ namespace DryIoc.AspNetCore.Sample
                 .AddControllersAsServices();
 
             return new Container(rules => rules.With(
-                propertiesAndFields: PropertiesAndFields.Auto))
+                // optional: Enables property injection for Controllers
+                propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
+                    ? PropertiesAndFields.Auto(request) 
+                    : null))
                 // optional: support for MEF service discovery
                 //.WithMef()
                 // setup DI adapter
