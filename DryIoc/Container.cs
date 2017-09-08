@@ -8497,15 +8497,18 @@ namespace DryIoc
         /// <summary>Specifies service details (key, if-unresolved policy, required type) for property/field with the name.</summary>
         /// <param name="source">Original member selector.</param> <param name="name">Member name.</param> <param name="getDetails">Details.</param>
         /// <returns>New selector.</returns>
-        public static PropertiesAndFieldsSelector Details(this PropertiesAndFieldsSelector source, string name, Func<Request, ServiceDetails> getDetails)
+        public static PropertiesAndFieldsSelector Details(this PropertiesAndFieldsSelector source,
+            string name, Func<Request, ServiceDetails> getDetails)
         {
             name.ThrowIfNull();
             getDetails.ThrowIfNull();
             return source.OverrideWith(request =>
             {
-                var implementationType = request.ImplementationType;
+                var implType = request.GetKnownImplementationOrServiceType();
 
-                var property = implementationType.GetPropertyOrNull(name);
+                var property = implType
+                    .GetMembers(it => it.DeclaredProperties, includeBase: true)
+                    .FindFirst(it => it.Name == name);
                 if (property != null && property.IsInjectable(true, true))
                 {
                     var details = getDetails(request);
@@ -8513,7 +8516,9 @@ namespace DryIoc
                         : new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details, request) };
                 }
 
-                var field = implementationType.GetFieldOrNull(name);
+                var field = implType
+                    .GetMembers(it => it.DeclaredFields, includeBase: true)
+                    .FindFirst(it => it.Name == name);
                 if (field != null && field.IsInjectable(true, true))
                 {
                     var details = getDetails(request);
@@ -8521,7 +8526,8 @@ namespace DryIoc
                         : new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, request) };
                 }
 
-                return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(Error.NotFoundSpecifiedWritablePropertyOrField, name, request);
+                return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(
+                    Error.NotFoundSpecifiedWritablePropertyOrField, name, request);
             });
         }
 
@@ -8545,7 +8551,8 @@ namespace DryIoc
         /// <param name="source">Original property/field list.</param>
         /// <param name="name">Target member name.</param> <param name="getCustomValue">Custom value provider.</param>
         /// <returns>Return new combined selector.</returns>
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, Func<Request, object> getCustomValue)
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name, 
+            Func<Request, object> getCustomValue)
         {
             return source.Details(name, r => ServiceDetails.Of(getCustomValue(r)));
         }
@@ -11952,7 +11959,7 @@ namespace DryIoc
             var baseType = typeInfo.BaseType;
             return baseType == null || baseType == typeof(object)
                 ? members
-                : members.Concat(baseType.GetMembers(getMembers, true));
+                : members.Append(baseType.GetMembers(getMembers, true));
         }
 
         // todo: V3: remove.
@@ -11970,7 +11977,7 @@ namespace DryIoc
         /// <param name="type"></param> <returns></returns>
         public static IEnumerable<ConstructorInfo> GetPublicInstanceConstructors(this Type type)
         {
-            return type.GetTypeInfo().DeclaredConstructors.Where(c => c.IsPublic && !c.IsStatic);
+            return type.GetTypeInfo().DeclaredConstructors.Match(c => c.IsPublic && !c.IsStatic);
         }
 
         /// <summary>Enumerates all constructors from input type.</summary>

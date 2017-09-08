@@ -167,6 +167,19 @@ namespace ImTools
             return default(T);
         }
 
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+        /// <typeparam name="T">item type</typeparam>
+        /// <param name="source">items collection to search</param>
+        /// <param name="predicate">condition to evaluate for each item.</param>
+        /// <returns>First item matching condition or default value.</returns>
+        public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate)
+        {
+            var sourceArr = source as T[];
+            if (sourceArr != null)
+                return sourceArr.FindFirst(predicate);
+            return source.FirstOrDefault(predicate);
+        }
+
         private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
         {
             if (results == null)
