@@ -8423,12 +8423,13 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector Of = request => null;
 
         /// <summary>Public assignable instance members of any type except object, string, primitives types, and arrays of those.</summary>
-        public static PropertiesAndFieldsSelector Auto = All(false, false);
+        public static PropertiesAndFieldsSelector Auto = All(false, false); // todo: v3: Exclude fields
 
         /// <summary>Should return service info for input member (property or field).</summary>
         /// <param name="member">Input member.</param> <param name="request">Request to provide context.</param> <returns>Service info.</returns>
         public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo member, Request request);
 
+        // todo: v3: Add includeBase=true parameter
         /// <summary>Generates selector property and field selector with settings specified by parameters.
         /// If all parameters are omitted the return all public not primitive members.</summary>
         /// <param name="withNonPublic">(optional) Specifies to include non public members. Will include by default.</param>
@@ -10415,7 +10416,7 @@ namespace DryIoc
         /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
 
-        /// <summary>Same as InCurrentScope.</summary>
+        /// <summary>Same as InCurrentScope. From now on will be the default name, later the rest of scoped reuses will be renamed to ScopedTo.</summary>
         public static readonly IReuse Scoped = new CurrentScopeReuse();
 
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Reuse.Singleton"/></summary>
