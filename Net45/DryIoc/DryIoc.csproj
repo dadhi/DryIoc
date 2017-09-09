@@ -40,14 +40,14 @@
     <Compile Include="..\..\DryIoc\Container.cs">
       <Link>Container.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc\FastExpressionCompiler.cs">
-      <Link>FastExpressionCompiler.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc\ImTools.cs">
       <Link>ImTools.cs</Link>
     </Compile>
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\Net40\DryIoc\FastExpressionCompiler.cs">
+      <Link>FastExpressionCompiler.cs</Link>
     </Compile>
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
   </ItemGroup>

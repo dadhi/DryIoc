@@ -37,6 +37,7 @@ namespace DryIoc
     using System.Runtime.CompilerServices;  // for MethodImpl aggressive inlining
 
     using ImTools;
+    using FastExpressionCompiler;
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer, IScopeAccess
@@ -376,7 +377,7 @@ namespace DryIoc
                 return (state, context, scope) => value;
             }
 
-            var factoryDelegate = FastExpressionCompiler.ExpressionCompiler.TryCompile<FactoryDelegate>(
+            var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
                 expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
             if (factoryDelegate != null)
                 return factoryDelegate;
