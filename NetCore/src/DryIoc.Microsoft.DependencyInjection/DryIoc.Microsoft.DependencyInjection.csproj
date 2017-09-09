@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
-    <VersionPrefix>1.3.0</VersionPrefix>
+    <VersionPrefix>1.3.1</VersionPrefix>
     <Authors>Maksim Volkau</Authors>
     <Copyright>Copyright © 2017 Maksim Volkau</Copyright>
     <TargetFrameworks>net451;netstandard1.3;netstandard2.0</TargetFrameworks>
@@ -12,6 +12,8 @@
     <PackageId>DryIoc.Microsoft.DependencyInjection</PackageId>
     <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
     <PackageReleaseNotes>
+      v1.3.1:
+      - fixed: DryIoc updated to 2.12.1 with fix for relevant issue #512
       v1.3.0:
       - added: Support for NetStandard/NetCore 2.0
     </PackageReleaseNotes>
@@ -21,7 +23,7 @@
 
   <ItemGroup>
     <!--<ProjectReference Include="..\DryIoc\DryIoc.csproj" />-->
-    <PackageReference Include="DryIoc.dll" Version="2.12.0" />
+    <PackageReference Include="DryIoc.dll" Version="2.12.1" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net451'">
