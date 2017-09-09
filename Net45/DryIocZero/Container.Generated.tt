@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,8 +27,8 @@ THE SOFTWARE.
 <#@ assembly Name="System.Core" #>
 
 <# // TODO: Replace DryIocZero.version in 2 paths below with the installed version of DryIocZero #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.version\tools\DryIoc.2.11.5\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.version\tools\ExpressionToCodeLib.1.5.4\ExpressionToCodeLib.dll" #>
+<#@ assembly Name="$(DryIocAssembly)" #>
+<#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
 
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
@@ -36,7 +36,7 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 
-<#@ include File="Registrations.tt" #><#
+<#@ include File="Registrations.ttinclude" #><#
 
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());

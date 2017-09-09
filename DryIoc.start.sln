@@ -72,6 +72,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", 
 		NuGetSpecs\DryIocZero.nuspec = NuGetSpecs\DryIocZero.nuspec
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIocZero", "DryIocZero", "{FBFB74BB-0F74-4F21-B134-88418D36502C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{70B242BC-350D-48D5-807D-3F046FE96C85}"
+	ProjectSection(SolutionItems) = preProject
+		NuGetSpecs\DryIocZero\build\DryIocZero.props = NuGetSpecs\DryIocZero\build\DryIocZero.props
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +136,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FBFB74BB-0F74-4F21-B134-88418D36502C} = {61DEA9E3-8A76-4390-8BB0-9947F538613B}
+		{70B242BC-350D-48D5-807D-3F046FE96C85} = {FBFB74BB-0F74-4F21-B134-88418D36502C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {ADDE327D-5A68-4B09-9D29-CB0D20C2BE4A}

@@ -1,7 +1,7 @@
-﻿/*
+/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@ THE SOFTWARE.
 
 
 
+
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
@@ -38,8 +39,9 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-Factory methods generation was success.
+Generation is completed successfully.
 ---------------------------------------
+
 */
 
     partial class Container

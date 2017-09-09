@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,15 +25,18 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.3.0.0-preview-03\tools\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIocZero.3.0.0-preview-03\tools\ExpressionToCodeLib.dll" #>
+
+<# // TODO: Replace DryIocZero.version in 2 paths below with the installed version of DryIocZero #>
+<#@ assembly Name="$(DryIocAssembly)" #>
+<#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
+
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 
-<#@ include File="Registrations.tt" #><#
+<#@ include File="Registrations.ttinclude" #><#
 
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
@@ -58,6 +61,8 @@ Func<object, string> code = null;
             .Replace("DryIoc.SingletonReuse", "SingletonReuse")
             .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
             .Replace("DryIoc.FactoryType", "FactoryType")
+            .Replace("DryIoc.DefaultKey", "DefaultKey")
+            .Replace("DryIoc.RequestFlags", "RequestFlags")
 
         : objectToCode.PlainObjectToCode(x) ?? code(x.GetType());
 
@@ -88,22 +93,22 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-<#
-    if (errors.Length == 0)
-        WriteLine("Factory delegate generation is completed without errors.");
-    else
-        WriteLine("FAILED to generate for:");
-#>
---------------------------------------
+<#  if (errors.Length == 0) #>
+Generation is completed successfully.
+<#  else { #>
+Generation is FAILED, please fix the errors below.
+Note: you may fix the error for unresolved service by adding `container.RegisterPlaceholder<...>()` into Registrations.tt and then registering service at runtime.
+<#  }#>
+---------------------------------------
 <#
     for(var i = 0; i < errors.Length; ++i)
     {
         var e = errors[i];
 #>
-<#=i+1#>) <#=e.Key#>
+<#=i+1#>. <#=e.Key#>
 Error: <#=e.Value.Message#>
+<#  } #>
 
-<#  }#>
 */
 
     partial class Container

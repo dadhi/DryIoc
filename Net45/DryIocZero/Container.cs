@@ -1987,4 +1987,15 @@ namespace DryIoc
         // ReSharper disable once UnusedMember.Local
         static partial void GetCurrentManagedThreadID(ref int threadID);
     }
+
+    // Used by generated code
+    // Hides/wraps object with disposable interface.
+    internal sealed class HiddenDisposable
+    {
+        public readonly object Value;
+        public HiddenDisposable(object value)
+        {
+            Value = value;
+        }
+    }
 }
