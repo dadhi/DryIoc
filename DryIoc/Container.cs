@@ -2937,7 +2937,7 @@ namespace DryIoc
         }
 
         private static readonly Lazy<Expression> _emptyRequestInfoExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(RequestInfo).GetFieldOrNull("Empty")));
+            Expression.Field(null, typeof(RequestInfo).Field(nameof(RequestInfo.Empty))));
 
         // todo: v3: replace with more direct access
         /// <summary>Returns the current scope, or null if not opened and <paramref name="throwIfNotFound"/> is not set.</summary>
@@ -3424,7 +3424,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _resolveManyMethod =
-            typeof(IResolver).GetSingleMethodOrNull("ResolveMany").ThrowIfNull();
+            typeof(IResolver).Method(nameof(IResolver.ResolveMany));
 
         private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
         {
@@ -4775,7 +4775,7 @@ namespace DryIoc
             {
                 var invokeExpr = (InvocationExpression)callExpr;
                 var invokedDelegateExpr = invokeExpr.Expression;
-                var invokeMethod = invokedDelegateExpr.Type.GetSingleMethodOrNull("Invoke");
+                var invokeMethod = invokedDelegateExpr.Type.Method("Invoke");
                 ctorOrMethodOrMember = invokeMethod;
                 parameters = invokeMethod.GetParameters();
                 argExprs = invokeExpr.Arguments;
@@ -5753,7 +5753,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _initializerMethod =
-            typeof(Registrator).GetSingleMethodOrNull("Initializer", includeNonPublic: true).ThrowIfNull();
+            typeof(Registrator).Method(nameof(Initializer), includeNonPublic: true);
 
         internal static TService Initializer<TTarget, TService>(
             TService service, IResolver resolver, Action<TTarget, IResolver> initialize) where TService : TTarget
@@ -9340,7 +9340,9 @@ namespace DryIoc
                         factoryMember = targetMethods[0];
                     else // Fallback to MethodHandle only if methods have similar signatures
                     {
-                        var methodHandleProperty = typeof(MethodBase).GetPropertyOrNull("MethodHandle")
+                        var methodHandleProperty = typeof(MethodBase).GetTypeInfo()
+                            .DeclaredProperties
+                            .FindFirst(it => it.Name == "MethodHandle")
                             .ThrowIfNull(Error.OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform,
                                 factoryImplType, closedFactoryImplType, factoryMethodBase.Name);
                         factoryMember = MethodBase.GetMethodFromHandle(
@@ -10105,7 +10107,7 @@ namespace DryIoc
         }
 
         private readonly Lazy<Expression> _singletonReuseExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse).GetFieldOrNull("Singleton")));
+            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
@@ -10182,7 +10184,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _getScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetScopedOrSingleton", includeNonPublic: true);
+            typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetScopedOrSingleton), includeNonPublic: true);
 
         /// <summary>Returns item from current scope with specified name.</summary>
         /// <param name="scopes">Container scopes to select from.</param>
@@ -10199,7 +10201,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _getOrAddOrDefaultMethod =
-            typeof(CurrentScopeReuse).GetSingleMethodOrNull("GetOrAddItemOrDefault");
+            typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetOrAddItemOrDefault));
 
         /// <summary>Returns expression call to <see cref="GetOrAddItemOrDefault"/>.</summary>
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
@@ -10235,10 +10237,10 @@ namespace DryIoc
         }
 
         private readonly Lazy<Expression> _inCurrentScopeReuseExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse).GetFieldOrNull("InCurrentScope")));
+            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
 
         private readonly Lazy<Expression> _scopedOrSingletonExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse).GetFieldOrNull("ScopedOrSingleton")));
+            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.ScopedOrSingleton))));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
@@ -10484,7 +10486,7 @@ namespace DryIoc
             }
 
             private readonly Lazy<Expression> _transientReuseExpr = new Lazy<Expression>(() =>
-                Expression.Field(null, typeof(Reuse).GetFieldOrNull("Transient")));
+                Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Transient))));
 
             public Expression ToExpression(Func<object, Expression> fallbackConverter)
             {
@@ -12021,6 +12023,60 @@ namespace DryIoc
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
         /// <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
         /// <returns>Found method or null.</returns>
+        public static MethodInfo Method(this Type type, string name, bool includeNonPublic = false)
+        {
+            var methods = type.GetTypeInfo().DeclaredMethods
+                .Match(m => (includeNonPublic || m.IsPublic) && m.Name == name)
+                .ToArrayOrSelf();
+            return methods.Length == 1
+                ? methods[0]
+                : Throw.For<MethodInfo>(
+                Error.Of("Undefined Method '{0}' in Type {1} (including non-public={2})"), name, type, includeNonPublic);
+        }
+
+        /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
+        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
+        /// <param name="paramTypes">Argument types</param> <returns>Found method or null.</returns>
+        public static MethodInfo Method(this Type type, string name, params Type[] paramTypes)
+        {
+            var typeInfo = type.GetTypeInfo();
+            var paramCount = paramTypes.Length;
+            foreach (var method in typeInfo.DeclaredMethods)
+            {
+                if (method.Name == name)
+                {
+                    var methodParams = method.GetParameters();
+                    if (paramCount == methodParams.Length)
+                    {
+                        if (paramCount == 0)
+                            return method;
+
+                        if (paramCount == 1)
+                        {
+                            if (paramTypes[0] == methodParams[0].ParameterType)
+                                return method;
+                        }
+                        else
+                        {
+                            var i = 0;
+                            for (; i < paramCount; ++i)
+                                if (paramTypes[i] != methodParams[i].ParameterType)
+                                    break;
+                            if (i == paramCount)
+                                return method;
+                        }
+                    }
+                }
+            }
+
+            return Throw.For<MethodInfo>(
+                Error.Of("Undefined Method '{0}' in Type {1} with parameters {2}."), name, type, paramTypes);
+        }
+
+        /// <summary>Returns single declared (not inherited) method by name, or null if not found.</summary>
+        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
+        /// <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
+        /// <returns>Found method or null.</returns>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
             var methods = type.GetTypeInfo().DeclaredMethods
@@ -12069,10 +12125,32 @@ namespace DryIoc
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         /// <param name="type">Input type.</param> <param name="name">Property name to look for.</param>
+        /// <param name="includeBase">Does not look for base type by default, but can be told so.</param>
+        /// <returns>Found property or throws an exception.</returns>
+        public static PropertyInfo Property(this Type type, string name, bool includeBase = false)
+        {
+            return type.GetMembers(_ => _.DeclaredProperties, includeBase: includeBase)
+                .FindFirst(it => it.Name == name)
+                .ThrowIfNull(Error.Of("Undefined property {0} in type {1}"), name, type);
+        }
+
+        /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
+        /// <param name="type">Input type.</param> <param name="name">Property name to look for.</param>
         /// <returns>Found property or null.</returns>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name)
         {
             return type.GetMembers(_ => _.DeclaredProperties, includeBase: true).FirstOrDefault(p => p.Name == name);
+        }
+
+        /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
+        /// <param name="type">Input type.</param> <param name="name">Field name to look for.</param>
+        /// <param name="includeBase">Does not look for base type by default, but can be told so.</param>
+        /// <returns>Found field or throws an exception.</returns>
+        public static FieldInfo Field(this Type type, string name, bool includeBase = false)
+        {
+            return type.GetMembers(_ => _.DeclaredFields, includeBase: includeBase)
+                .FindFirst(it => it.Name == name)
+                .ThrowIfNull(Error.Of("Undefined field {0} in type {1}"), name, type);
         }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
@@ -12340,7 +12418,8 @@ namespace DryIoc
 
             Expression typesExpr;
 
-            var definedTypeInfosProperty = typeof(Assembly).GetPropertyOrNull("DefinedTypes");
+            var definedTypeInfosProperty = typeof(Assembly)
+                .GetTypeInfo().DeclaredProperties.FindFirst(it => it.Name == "DefinedTypes");
             if (definedTypeInfosProperty == null)
             {
                 typesExpr = Expression.Call(assemblyParamExpr, "GetTypes", ArrayTools.Empty<Type>(),
@@ -12366,6 +12445,7 @@ namespace DryIoc
             return resultFunc.Compile();
         }
 
+        // todo: v3: switch to 
         /// <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
         /// <param name="p">Target property info</param>
         /// <param name="includeNonPublic">(optional) If set then consider non-public getter</param>

@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests.MetadataProxies
         {
             // replace the standard MEF Lazy<,> wrapper with the magic one
             registrator.Register(typeof(Lazy<,>),
-                made: createLazyWithMetadataMethod,
+                made: _createLazyWithMetadataMethod,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace,
                 setup: Setup.WrapperWith(0));
 
@@ -53,7 +53,7 @@ namespace DryIoc.IssuesTests.MetadataProxies
             return new Lazy<T, TMetadata>(() => metaFactory.Value.Value, genMetadata);
         }
 
-        private static Made createLazyWithMetadataMethod { get; } = Made.Of(
-            typeof(MetadataViewProxyGeneration).GetSingleMethodOrNull("CreateLazyWithMetadata", includeNonPublic: true));
+        private static Made _createLazyWithMetadataMethod { get; } = Made.Of(
+            typeof(MetadataViewProxyGeneration).Method(nameof(CreateLazyWithMetadata), includeNonPublic: true));
     }
 }

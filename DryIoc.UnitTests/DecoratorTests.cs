@@ -652,7 +652,7 @@ namespace DryIoc.UnitTests
 
             container.Register<S>();
             container.Register<object>(made: Made.Of(r =>
-                GetType().GetSingleMethodOrNull("PutMessage").MakeGenericMethod(r.ServiceType)),
+                GetType().Method(nameof(PutMessage)).MakeGenericMethod(r.ServiceType)),
                 setup: Setup.Decorator);
 
             var s = container.Resolve<S>();
@@ -667,7 +667,7 @@ namespace DryIoc.UnitTests
             container.Register<S>();
 
             container.Register<object>(made: Made.Of(r =>
-                GetType().GetSingleMethodOrNull("PutMessage2").MakeGenericMethod(r.ServiceType)),
+                GetType().Method(nameof(PutMessage2)).MakeGenericMethod(r.ServiceType)),
                 setup: Setup.Decorator);
 
             Assert.Throws<ArgumentException>(() =>
@@ -682,7 +682,7 @@ namespace DryIoc.UnitTests
             container.Register<S>();
 
             container.Register<object>(made: Made.Of(r =>
-                GetType().GetSingleMethodOrNull("PutMessage3").MakeGenericMethod(r.ServiceType)),
+                GetType().Method(nameof(PutMessage3)).MakeGenericMethod(r.ServiceType)),
                 setup: Setup.Decorator);
 
             var ex = Assert.Throws<ContainerException>(() =>
@@ -699,7 +699,7 @@ namespace DryIoc.UnitTests
             container.Register<S>();
             container.Register<S, SS>(setup: Setup.Decorator);
             container.Register<object>(
-                made: Made.Of(GetType().GetSingleMethodOrNull("PutMessage")),
+                made: Made.Of(GetType().Method(nameof(PutMessage))),
                 setup: Setup.DecoratorWith(order: -1));
 
             var s = container.Resolve<S>();
@@ -726,7 +726,7 @@ namespace DryIoc.UnitTests
             container.Register<X>();
             container.Register<object>(
                 made: Made.Of(r => typeof(DecoratorFactory)
-                    .GetSingleMethodOrNull("Decorate")
+                    .Method(nameof(DecoratorFactory.Decorate))
                     .MakeGenericMethod(r.ServiceType)),
                 setup: Setup.Decorator);
 

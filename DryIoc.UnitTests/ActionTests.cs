@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(void),
-                made: Made.Of(typeof(ActionTests).GetSingleMethodOrNull("Act")));
+                made: Made.Of(typeof(ActionTests).Method(nameof(Act))));
 
             var act = container.Resolve<Action>();
             act();
@@ -25,7 +25,7 @@ namespace DryIoc.UnitTests
 
             container.Register<IntValue>(Reuse.Singleton);
             container.Register(typeof(void),
-                made: Made.Of(typeof(ActionTests).GetSingleMethodOrNull("Act1")));
+                made: Made.Of(typeof(ActionTests).Method(nameof(Act1))));
 
             var act = container.Resolve<Action>();
             act();
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(void),
-                made: Made.Of(typeof(ActionTests).GetSingleMethodOrNull("Act1")));
+                made: Made.Of(typeof(ActionTests).Method(nameof(Act1))));
 
             var act = container.Resolve<Action<IntValue>>();
             var value = new IntValue();
@@ -55,7 +55,7 @@ namespace DryIoc.UnitTests
 
             container.Register<ActionUser>();
             container.Register(typeof(void),
-                made: Made.Of(typeof(ActionTests).GetSingleMethodOrNull("Act1")));
+                made: Made.Of(typeof(ActionTests).Method(nameof(Act1))));
 
             var user = container.Resolve<ActionUser>();
             var value = new IntValue();
@@ -71,7 +71,7 @@ namespace DryIoc.UnitTests
 
             container.Register<LazyActionUser>();
             container.Register(typeof(void),
-                made: Made.Of(typeof(ActionTests).GetSingleMethodOrNull("Act1")));
+                made: Made.Of(typeof(ActionTests).Method(nameof(Act1))));
 
             var user = container.Resolve<LazyActionUser>();
             var value = new IntValue();
