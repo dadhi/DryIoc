@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -38,18 +36,22 @@ namespace DryIoc.IssuesTests
 
         class ShortReuse : IReuse
         {
-            public IScope Scope = new Scope();
-
             public int Lifespan { get { return 10; } }
 
-            public int GetScopedItemIdOrSelf(int factoryID, Request request) { return factoryID; }
-
-            public Expression GetScopeExpression(Request request)
+            public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
             {
-                return Expression.Field(Expression.Constant(this), "Scope");
+                return createItemExpr;
             }
 
-            public IScope GetScopeOrDefault(Request request) { return Scope; }
+            public bool CanApply(Request request)
+            {
+                return true;
+            }
+
+            public Expression ToExpression(Func<object, Expression> fallbackConverter)
+            {
+                return fallbackConverter("SpecialScopeName");
+            }
         }
     }
 }

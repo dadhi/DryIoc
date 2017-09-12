@@ -39,13 +39,13 @@ namespace DryIoc.IssuesTests
     }
 
 
-    class ShortReuse: IReuse, IReuseV3
+    class ShortReuse: IReuse
     {
         public int Lifespan { get { return 50; } }
 
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
-            return ((IReuseV3)Reuse.Singleton).Apply(request, trackTransientDisposable, createItemExpr);
+            return Reuse.Singleton.Apply(request, trackTransientDisposable, createItemExpr);
         }
 
         public bool CanApply(Request request)
@@ -57,24 +57,5 @@ namespace DryIoc.IssuesTests
         {
             return Expression.New(GetType().GetConstructors()[0], ArrayTools.Empty<Expression>());
         }
-
-        #region Obsolete
-
-        public IScope GetScopeOrDefault(Request request)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Expression GetScopeExpression(Request request)
-        {
-            throw new NotSupportedException();
-        }
-
-        public int GetScopedItemIdOrSelf(int factoryID, Request request)
-        {
-            throw new NotSupportedException();
-        }
-
-        #endregion
     }
 }

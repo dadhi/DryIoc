@@ -2902,7 +2902,7 @@ namespace DryIoc
             var implTypeExpr = Expression.Constant(implementationType, typeof(Type));
             var reuseExpr = request.Reuse == null
                 ? Expression.Constant(null, typeof(IReuse))
-                : ((IReuseV3)request.Reuse).ToExpression(it => container.GetOrAddStateItemExpression(it));
+                : request.Reuse.ToExpression(it => container.GetOrAddStateItemExpression(it));
 
             if (ifUnresolved == IfUnresolved.Throw &&
                 requiredServiceType == null && serviceKey == null && metadataKey == null && metadata == null &&
@@ -7956,8 +7956,7 @@ namespace DryIoc
         /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
         public bool HasMatchingReuseScope(Request request)
         {
-            var reuse = Reuse as IReuseV3;
-            return reuse == null || reuse.CanApply(request);
+            return Reuse == null || Reuse.CanApply(request);
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
@@ -8134,21 +8133,7 @@ namespace DryIoc
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-                var reuseV3 = reuse as IReuseV3;
-                if (reuseV3 != null)
-                {
-                    serviceExpr = reuseV3.Apply(request, tracksTransientDisposable, serviceExpr);
-                }
-                else
-                {
-                    var scopeExpr = reuse.GetScopeExpression(request);
-
-                    // For transient disposable we don't care to bind to specific ID, because it should be created each time.
-                    var scopedId = tracksTransientDisposable ? -1 : reuse.GetScopedItemIdOrSelf(FactoryID, request);
-                    serviceExpr = Expression.Call(scopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
-                        Expression.Constant(scopedId),
-                        Expression.Lambda<CreateScopedValue>(serviceExpr, ArrayTools.Empty<ParameterExpression>()));
-                }
+                serviceExpr = reuse.Apply(request, tracksTransientDisposable, serviceExpr);
             }
 
             // Unwrap WeakReference and/or array preventing disposal
@@ -9466,8 +9451,7 @@ namespace DryIoc
             var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
             var instanceExpr = Expression.Constant(instance, instanceType);
 
-            var reuseV3 = (reuse as IReuseV3).ThrowIfNull();
-            var serviceExpr = reuseV3.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
+            var serviceExpr = reuse.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
@@ -10037,33 +10021,10 @@ namespace DryIoc
         private ImTreeMapIntToObj _scopes = ImTreeMapIntToObj.Empty;
     }
 
-    // todo: v3: remove
-    /// <summary>Obsolete: until v3 replaced by <see cref="IReuseV3"/>.</summary>
-    public interface IReuse
-    {
-        /// <summary>Relative to other reuses lifespan value.</summary>
-        int Lifespan { get; }
-
-        /// <summary>Locates or creates scope to store reused service objects.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Located scope.</returns>
-        IScope GetScopeOrDefault(Request request);
-
-        // todo: v3: remove
-        /// <summary>ObsoIReuseV3.ApplyApply"/> instead.</summary>
-        Expression GetScopeExpression(Request request);
-
-        /// <summary>Returns special id/index to lookup scoped item, or original passed factory id otherwise.</summary>
-        /// <param name="factoryID">Id to map to item id/index.</param> <param name="request">Context to get access to scope.</param>
-        /// <returns>id/index or source factory id.</returns>
-        int GetScopedItemIdOrSelf(int factoryID, Request request);
-    }
-
-    // todo: v3: rename to IReuse
     // todo: v3: add object[] Names property
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
     ///  and more powerful as can be based on other storage beside reuse.</summary>
-    public interface IReuseV3 : IConvertibleToExpression
+    public interface IReuse : IConvertibleToExpression
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         int Lifespan { get; }
@@ -10085,7 +10046,7 @@ namespace DryIoc
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
-    public sealed class SingletonReuse : IReuse, IReuseV3
+    public sealed class SingletonReuse : IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 1000; } }
@@ -10115,33 +10076,6 @@ namespace DryIoc
             return _singletonReuseExpr.Value;
         }
 
-        #region Obsolete
-
-        /// <summary>Returns container bound Singleton scope.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Container singleton scope.</returns>
-        public IScope GetScopeOrDefault(Request request)
-        {
-            return request.SingletonScope;
-        }
-
-        /// <inheritdoc />
-        public Expression GetScopeExpression(Request request)
-        {
-            return Throw.For<Expression>(Error.Of("Obsolete"));
-        }
-
-        /// <summary>Returns index of new item in singleton scope.</summary>
-        /// <param name="factoryID">Factory id to map to new item index.</param>
-        /// <param name="request">Context to get singleton scope from.</param>
-        /// <returns>Index in scope.</returns>
-        public int GetScopedItemIdOrSelf(int factoryID, Request request)
-        {
-            return request.SingletonScope.GetScopedItemIdOrSelf(factoryID);
-        }
-
-        #endregion
-
         /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString()
         {
@@ -10151,7 +10085,7 @@ namespace DryIoc
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
-    public sealed class CurrentScopeReuse : IReuse, IReuseV3
+    public sealed class CurrentScopeReuse : IReuse
     {
         // todo: v3: move to IReuse interface + plus add ability to be an array of names
         /// <summary>Name to find current scope or parent with equal name.</summary>
@@ -10250,35 +10184,6 @@ namespace DryIoc
                 : Expression.Call(typeof(Reuse), "InCurrentNamedScope", ArrayTools.Empty<Type>(), fallbackConverter(Name));
         }
 
-        #region Obsolete
-
-        /// <summary>Returns container current scope or if <see cref="Name"/> specified: current scope or its parent with corresponding name.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Found current scope or its parent.</returns>
-        /// <exception cref="ContainerException">with the code <see cref="Error.NoMatchedScopeFound"/> if <see cref="Name"/> specified but
-        /// no matching scope or its parent found.</exception>
-        public IScope GetScopeOrDefault(Request request)
-        {
-            return request.Scopes.GetCurrentNamedScope(Name, false);
-        }
-
-        /// <inheritdoc />
-        public Expression GetScopeExpression(Request request)
-        {
-            return Throw.For<Expression>(Error.Of("Obsolete"));
-        }
-
-        /// <summary>Asks the scope to convert factory ID into internal representation and returns it.
-        /// If scope is not available then return passed factory ID.</summary>
-        /// <param name="factoryID">Input factory ID.</param> <param name="request">Used to get scope back.</param>
-        /// <returns>Scope mapping of factory ID or passed factory ID without changes if scope is not available.</returns>
-        public int GetScopedItemIdOrSelf(int factoryID, Request request)
-        {
-            return Throw.For<int>(Error.Of("Obsolete"));
-        }
-
-        #endregion
-
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
         {
@@ -10291,7 +10196,7 @@ namespace DryIoc
 
     /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
-    public sealed class ResolutionScopeReuse : IReuse, IReuseV3
+    public sealed class ResolutionScopeReuse : IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
         public int Lifespan { get { return 0; } }
@@ -10319,7 +10224,13 @@ namespace DryIoc
         /// <inheritdoc />
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
-            var scopeExpr = GetScopeExpression(request);
+            var scopesExpr = Container.GetScopesExpr(request);
+            var scopeExpr = (Expression)Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
+                Container.GetResolutionScopeExpression(request),
+                Expression.Constant(AssignableFromServiceType, typeof(Type)),
+                request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
+                Expression.Constant(Outermost, typeof(bool)),
+                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw, typeof(bool)));
 
             // For transient disposable we don't care to bind to specific ID, because it should be created each time.
             var scopedId = trackTransientDisposable ? -1 : request.FactoryID;
@@ -10331,7 +10242,15 @@ namespace DryIoc
         /// <inheritdoc />
         public bool CanApply(Request request)
         {
-            return GetScopeOrDefault(request) != null;
+            var scope = request.Scope;
+            if (scope == null)
+            {
+                var parent = request.Enumerate().Last();
+                request.Scopes.GetOrCreateResolutionScope(ref scope, parent.GetActualServiceType(), parent.ServiceKey);
+            }
+
+            return request.Scopes.GetMatchingResolutionScope(scope,
+                AssignableFromServiceType, ServiceKey, Outermost, throwIfNotFound: false) != null;
         }
 
         private readonly Lazy<Expression> _inResolutionScopeReuseExpr = new Lazy<Expression>(() =>
@@ -10348,48 +10267,6 @@ namespace DryIoc
                 fallbackConverter(ServiceKey),
                 Expression.Constant(Outermost, typeof(bool)));
         }
-
-        #region Obsolete
-
-        /// <summary>Creates or returns already created resolution root scope.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Created or existing scope.</returns>
-        public IScope GetScopeOrDefault(Request request)
-        {
-            var scope = request.Scope;
-            if (scope == null)
-            {
-                var parent = request.Enumerate().Last();
-                request.Scopes.GetOrCreateResolutionScope(ref scope, parent.GetActualServiceType(), parent.ServiceKey);
-            }
-
-            return request.Scopes.GetMatchingResolutionScope(scope,
-                AssignableFromServiceType, ServiceKey, Outermost, throwIfNotFound: false);
-        }
-
-        /// <summary>Returns <see cref="IScopeAccess.GetMatchingResolutionScope"/> method call expression.</summary>
-        /// <param name="request">Request to get context information or for example store something in resolution state.</param>
-        /// <returns>Method call expression returning existing or newly created resolution scope.</returns>
-        public Expression GetScopeExpression(Request request)
-        {
-            var scopesExpr = Container.GetScopesExpr(request);
-            return Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
-                Container.GetResolutionScopeExpression(request),
-                Expression.Constant(AssignableFromServiceType, typeof(Type)),
-                request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
-                Expression.Constant(Outermost, typeof(bool)),
-                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw, typeof(bool)));
-        }
-
-        /// <summary>Just returns back passed id without changes.</summary>
-        /// <param name="factoryID">Id to return back.</param> <param name="request">Ignored.</param>
-        /// <returns><paramref name="factoryID"/></returns>
-        public int GetScopedItemIdOrSelf(int factoryID, Request request)
-        {
-            return factoryID;
-        }
-
-        #endregion
 
         /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
         public override string ToString()
@@ -10469,7 +10346,7 @@ namespace DryIoc
         #region Implementation
 
         /// <summary>No-reuse</summary>
-        private sealed class TransientReuse : IReuse, IReuseV3
+        private sealed class TransientReuse : IReuse
         {
             /// <summary>0 means no reused lifespan</summary>
             public int Lifespan { get { return 0; } }
@@ -10497,25 +10374,6 @@ namespace DryIoc
             {
                 return "TransientReuse";
             }
-
-            #region Obsolete
-
-            public IScope GetScopeOrDefault(Request request)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Expression GetScopeExpression(Request request)
-            {
-                throw new NotImplementedException();
-            }
-
-            public int GetScopedItemIdOrSelf(int factoryID, Request request)
-            {
-                throw new NotImplementedException();
-            }
-
-            #endregion
         }
 
         #endregion
