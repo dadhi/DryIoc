@@ -238,14 +238,11 @@ namespace DryIocZero
         /// <param name="serviceType">Return type of an service item.</param>
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
-        /// <param name="compositeParentKey">OBSOLETE: will be removed with DryIoc v3</param>
-        /// <param name="compositeParentRequiredType">OBSOLETE: will be removed with DryIoc v3</param>
         /// <param name="preResolveParent">(optional) Dependency resolution path info prior to resolve.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         public IEnumerable<object> ResolveMany(Type serviceType,
             object serviceKey = null, Type requiredServiceType = null, 
-            object compositeParentKey = null, Type compositeParentRequiredType = null, 
             RequestInfo preResolveParent = null, IScope scope = null)
         {
             serviceType = requiredServiceType ?? serviceType;
@@ -276,6 +273,11 @@ namespace DryIocZero
                 }
                 else
                 {
+                    var parent = preResolveParent?.Parent;
+                    var compositeParentKey = parent != null && parent.ServiceType == serviceType
+                        ? parent.ServiceKey
+                        : null;
+
                     foreach (var resolution in keyedFactories.Enumerate())
                         if (compositeParentKey == null || !compositeParentKey.Equals(resolution.Key))
                             yield return resolution.Value(this, scope);
@@ -559,17 +561,14 @@ namespace DryIocZero
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
-        /// this type. Excludes for result composite parent identified by <paramref name="compositeParentKey"/>.</summary>
+        /// this type..</summary>
         /// <param name="serviceType">Return type of an service item.</param>
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
-        /// <param name="compositeParentKey">(optional) Parent service key to exclude to support Composite pattern.</param>
-        /// <param name="compositeParentRequiredType">(optional) Parent required service type to identify composite, together with key.</param>
         /// <param name="preResolveParent">(optional) Dependency resolution path info prior to resolve.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType,
-            object compositeParentKey, Type compositeParentRequiredType,
             RequestInfo preResolveParent, IScope scope);
     }
 
@@ -804,7 +803,7 @@ namespace DryIocZero
         /// <returns>Resolved service or throws exception otherwise.</returns>
         public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType)
         {
-            return resolver.ResolveMany(serviceType, null, null, null, null, RequestInfo.Empty, null);
+            return resolver.ResolveMany(serviceType, null, null, RequestInfo.Empty, null);
         }
 
         /// <summary>Resolves collection of services of specified service type.</summary>
@@ -813,7 +812,7 @@ namespace DryIocZero
         /// <returns>Resolved service or throws exception otherwise.</returns>
         public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType, object serviceKey)
         {
-            return resolver.ResolveMany(serviceType, serviceKey, null, null, null, RequestInfo.Empty, null);
+            return resolver.ResolveMany(serviceType, serviceKey, null, RequestInfo.Empty, null);
         }
 
         /// <summary>Resolves collection of services of specified service type.</summary>

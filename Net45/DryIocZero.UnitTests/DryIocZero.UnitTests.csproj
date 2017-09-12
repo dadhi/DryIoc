@@ -41,10 +41,12 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\DryIocZero\Container.cs">
+      <Link>DryIocZero\Container.cs</Link>
+    </Compile>
     <Compile Include="AttributedModelTests.cs" />
     <Compile Include="AttributedModelTestsBase.cs" />
     <Compile Include="DryIocZero\AsyncExecutionFlowScopeContext.cs" />
-    <Compile Include="DryIocZero\Container.cs" />
     <Compile Include="DryIocZero\Container.Generated.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

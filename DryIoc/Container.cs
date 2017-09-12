@@ -583,11 +583,9 @@ namespace DryIoc
             return service;
         }
 
-        // todo: v3: remove unused composite key and required type parameters
         // todo: perf: optimize for speed
         IEnumerable<object> IResolver.ResolveMany(
             Type serviceType, object serviceKey, Type requiredServiceType,
-            object compositeParentKey, Type compositeParentRequiredType,
             RequestInfo preResolveParent, IScope scope)
         {
             var requiredItemType = requiredServiceType ?? serviceType;
@@ -694,9 +692,8 @@ namespace DryIoc
                 for (var i = 0; i < fallbackContainers.Length; i++)
                 {
                     var fallbackContainer = fallbackContainers[i];
-                    var fallbackServices = fallbackContainer.Resolver.ResolveMany(serviceType,
-                        serviceKey, requiredServiceType, compositeParentKey, compositeParentRequiredType,
-                        preResolveParent, scope);
+                    var fallbackServices = fallbackContainer.Resolver.ResolveMany(
+                        serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
                     foreach (var fallbackService in fallbackServices)
                         yield return fallbackService;
                 }
@@ -3436,16 +3433,6 @@ namespace DryIoc
             var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
-            // Composite pattern support: find composite parent key to exclude from result.
-            object compositeParentKey = null;
-            Type compositeParentRequiredType = null;
-            var parent = request.Parent;
-            if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
-            {
-                compositeParentKey = parent.ServiceKey ?? DefaultKey.Value;
-                compositeParentRequiredType = parent.RequiredServiceType;
-            }
-
             var resolverExpr = Container.GetResolverExpr(request);
             var resolutionScopeExpr = Container.GetResolutionScopeExpression(request);
             var preResolveParentExpr = container.RequestInfoToExpression(request.RequestInfo);
@@ -3454,8 +3441,6 @@ namespace DryIoc
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
-                container.GetOrAddStateItemExpression(compositeParentKey),
-                Expression.Constant(compositeParentRequiredType, typeof(Type)),
                 preResolveParentExpr,
                 resolutionScopeExpr);
 
@@ -5979,7 +5964,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             return behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, null, null, RequestInfo.Empty, null).Cast<TService>()
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty, null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
@@ -10745,20 +10730,16 @@ namespace DryIoc
         object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType,
             RequestInfo preResolveParent, IScope scope);
 
-        // todo: v3: remove unused @compositeParentKey and @compositeParentRequiredType
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
-        /// this type. Excludes for result composite parent identified by <paramref name="compositeParentKey"/>.</summary>
+        /// this type.</summary>
         /// <param name="serviceType">Return type of an service item.</param>
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
-        /// <param name="compositeParentKey">OBSOLETE: Now I can use <paramref name="preResolveParent"/> to identify composite parent.</param>
-        /// <param name="compositeParentRequiredType">OBSOLETE: Now I can use <paramref name="preResolveParent"/> to identify composite parent.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType,
-            object compositeParentKey, Type compositeParentRequiredType,
             RequestInfo preResolveParent, IScope scope);
     }
 
