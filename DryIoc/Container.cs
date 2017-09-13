@@ -10111,7 +10111,7 @@ namespace DryIoc
     }
 
     /// <summary>Holds the name for the resolution scope.</summary>
-    internal sealed class ResolutionScopeName
+    public sealed class ResolutionScopeName
     {
         // todo: Remove if possible
         /// <summary>Factory ID of service opening the scope.</summary>
@@ -10132,6 +10132,7 @@ namespace DryIoc
             ServiceKey = serviceKey;
         }
 
+        /// <summary>String representation for easy debugging and understood error messages.</summary>
         public override string ToString()
         {
             var s = new StringBuilder()

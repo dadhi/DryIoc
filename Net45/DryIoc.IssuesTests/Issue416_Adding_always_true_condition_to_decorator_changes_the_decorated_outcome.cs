@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<B>(Reuse.InResolutionScopeOf<IA>());
-            container.Register<IA, A>(setup: Setup.With(asResolutionCall: true));
+            container.Register<IA, A>(setup: Setup.With(openResolutionScope: true));
             container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
 
             var a = container.Resolve(typeof(IA));
@@ -30,7 +30,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<B>(Reuse.InResolutionScopeOf<IA>());
-            container.Register<IA, A>();
+            container.Register<IA, A>(setup: Setup.With(openResolutionScope: true));
             container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
 
             var a = container.ResolveMany(typeof(IA)).First();
@@ -75,8 +75,8 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<Aa>();
-            container.Register<Bb>();
+            container.Register<Aa>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Bb>(setup: Setup.With(openResolutionScope: true));
             container.Register<Dd>();
             container.Register<IXx, Xx>(Reuse.InResolutionScopeOf<Aa>());
             container.Register<IXx, Yy>(Reuse.InResolutionScopeOf<Bb>());

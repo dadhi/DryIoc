@@ -94,10 +94,13 @@ namespace DryIoc.UnitTests
             container.Register<Account>();
             container.Register<Log>(Reuse.InResolutionScope);
 
-            var consumer = container.Resolve<Consumer>();
+            using (var scope = container.OpenScope())
+            {
+                var consumer = scope.Resolve<Consumer>();
 
-            Assert.That(consumer.Log, Is.Not.Null);
-            Assert.That(consumer.Log, Is.SameAs(consumer.Account.Log));
+                Assert.That(consumer.Log, Is.Not.Null);
+                Assert.That(consumer.Log, Is.SameAs(consumer.Account.Log));
+            }
         }
 
         [Test]
@@ -770,7 +773,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<O>();
+            container.Register<O>(setup: Setup.With(openResolutionScope: true));
             container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
 
             container.Resolve<object>(typeof(O));
