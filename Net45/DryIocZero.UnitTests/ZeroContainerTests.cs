@@ -86,7 +86,7 @@ namespace DryIocZero.UnitTests
             container.RegisterDelegate(_ => new Potato());
             using (var scope = container.OpenScope())
             {
-                var potato = scope.Resolve(typeof(Potato), false);
+                var potato = scope.Resolver.Resolve(typeof(Potato), false);
                 Assert.IsNotNull(potato);
             }
         }
@@ -100,9 +100,9 @@ namespace DryIocZero.UnitTests
 
             using (var scope = container.OpenScope())
             {
-                var potato = scope.Resolve<Potato>();
+                var potato = scope.Resolver.Resolve<Potato>();
                 Assert.IsNotNull(potato);
-                Assert.AreSame(potato, scope.Resolve<Potato>());
+                Assert.AreSame(potato, scope.Resolver.Resolve<Potato>());
             }
 
             var ex = Assert.Throws<ContainerException>(() => 
@@ -122,7 +122,7 @@ namespace DryIocZero.UnitTests
             using (var scope = container.OpenScope())
             {
                 Assert.IsNotNull(potato);
-                Assert.AreSame(potato, scope.Resolve<Potato>());
+                Assert.AreSame(potato, scope.Resolver.Resolve<Potato>());
             }
 
             Assert.AreSame(potato, container.Resolve<Potato>());
@@ -253,42 +253,6 @@ namespace DryIocZero.UnitTests
 
             var ms = container.ResolveMany<IMultiExported>().ToArray();
             Assert.AreEqual(3, ms.Length);
-        }
-
-        [Test]
-        public void Can_manually_register_into_resolution_scope_at_runtime()
-        {
-            var container = new Container();
-            var yID = container.GetNextFactoryID();
-            container.Register(typeof(X), (context, scope) => new X(
-                    (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), null)
-                        .GetOrAdd(yID, () => new Y()),
-                    (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), null)
-                        .GetOrAdd(yID, () => new Y())),
-                        null, null);
-
-            var x = container.Resolve<X>();
-            Assert.IsNotNull(x.Y1);
-            Assert.AreSame(x.Y1, x.Y2);
-        }
-
-        [Test]
-        public void Can_register_into_matching_resolution_scope_at_runtime()
-        {
-            var container = new Container();
-            var yID = container.GetNextFactoryID();
-            container.Register(typeof(X), (context, scope) => new X(
-                    (Y)context.Scopes.GetMatchingResolutionScope(
-                        context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), "a"),
-                        typeof(X), "a", false, true)
-                        .GetOrAdd(yID, () => new Y()),
-                    (Y)context.Scopes.GetOrCreateResolutionScope(ref scope, typeof(X), "a")
-                        .GetOrAdd(yID, () => new Y())),
-                        null, "a");
-
-            var x = container.Resolve<X>(serviceKey: "a");
-            Assert.IsNotNull(x.Y1);
-            Assert.AreSame(x.Y1, x.Y2);
         }
 
         internal class AnotherMulti : IMultiExported { }

@@ -53,14 +53,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_resolution_scope_reuse()
         {
-            var container = new Container().WithMefAttributedModel();
+            var container = new Container().WithMefAttributedModel();//.With(rules => rules.WithDefaultReuse(Reuse.Transient));
             container.RegisterExports(typeof(ServiceWithResolutionScopeReuse), typeof(UserOfServiceWithResolutionScopeReuse));
 
-            var one = container.Resolve<ServiceWithResolutionScopeReuse>();
             var user = container.Resolve<UserOfServiceWithResolutionScopeReuse>();
 
-            Assert.That(one, Is.Not.SameAs(user.One));
-            Assert.That(user.One, Is.SameAs(user.Another));
+            Assert.AreSame(user.One, user.Another);
         }
 
         [Test]

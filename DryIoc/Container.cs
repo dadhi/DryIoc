@@ -150,21 +150,8 @@ namespace DryIoc
         /// <summary>Returns ambient scope context associated with container.</summary>
         public IScopeContext ScopeContext { get { return _scopeContext; } }
 
-        /// <summary>Creates new container with new opened scope, with shared registrations, singletons and resolutions cache.
-        /// If container uses ambient scope context, then this method sets new opened scope as current scope in the context.
-        /// In case of previous open scope, new open scope references old one as a parent.
-        /// </summary>
-        /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
-        /// <returns>New container with different current scope.</returns>
-        /// <example><code lang="cs"><![CDATA[
-        /// using (var scoped = container.OpenScope())
-        /// {
-        ///     var handler = scoped.Resolve<IHandler>();
-        ///     handler.Handle(data);
-        /// }
-        /// ]]></code></example>
-        public IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null)
+        /// <inheritdoc />
+        public IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null, bool trackInParent = false)
         {
             ThrowIfContainerDisposed();
 
@@ -179,6 +166,10 @@ namespace DryIoc
             if (_scopeContext != null)
                 _scopeContext.SetCurrent(scope =>
                      nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
+
+            // Track in either open scope or singleton scope
+            if (trackInParent)
+                (_openedScope ?? _singletonScope).SetOrAdd(-1, nestedOpenedScope);
 
             var rules = configure == null ? Rules : configure(Rules);
 
@@ -284,11 +275,11 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression ResolverExpr =
-            Expression.Property(ResolverContextParamExpr, "Resolver");
+            Expression.Property(ResolverContextParamExpr, typeof(IResolverContext).Property(nameof(IResolverContext.Resolver)));
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression RootResolverExpr =
-            Expression.Call(typeof(ResolverContext), "RootResolver", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+            Expression.Call(typeof(ResolverContext).Method(nameof(ResolverContext.RootResolver)), ResolverContextParamExpr);
 
         /// <summary>Returns <see cref="ResolverExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
         public static Expression GetResolverExpr(Request request)
@@ -298,15 +289,15 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression SingletonScopeExpr =
-            Expression.Call(typeof(ResolverContext), "SingletonScope", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+            Expression.Call(typeof(ResolverContext).Method(nameof(ResolverContext.SingletonScope)), ResolverContextParamExpr);
 
         /// <summary>Access to scopes in FactoryDelegate.</summary>
         public static readonly Expression ScopesExpr =
-            Expression.Property(ResolverContextParamExpr, "Scopes");
+            Expression.Property(ResolverContextParamExpr, typeof(IResolverContext).Property(nameof(IResolverContext.Scopes)));
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression RootScopesExpr =
-            Expression.Call(typeof(ResolverContext), "RootScopes", ArrayTools.Empty<Type>(), ResolverContextParamExpr);
+            Expression.Call(typeof(ResolverContext).Method(nameof(ResolverContext.RootScopes)), ResolverContextParamExpr);
 
         /// <summary>Returns <see cref="ScopesExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
         public static Expression GetScopesExpr(Request request)
@@ -314,46 +305,9 @@ namespace DryIoc
             return request.IsSingletonOrDependencyOfSingleton ? RootScopesExpr : ScopesExpr;
         }
 
-        /// <summary>Resolution scope parameter expression in FactoryDelegate.</summary>
-        public static readonly ParameterExpression ResolutionScopeParamExpr =
-            Expression.Parameter(typeof(IScope), "scope");
-
-        internal static Expression GetResolutionScopeExpression(Request request)
-        {
-            if (request.Scope != null)
-                return ResolutionScopeParamExpr;
-
-            // the only situation when we could be here: the root resolution call
-            // and scope was not created on the boundary of Resolve call.
-            var parent = request.Enumerate().Last();
-
-            var container = request.Container;
-            var registeredServiceType = container.GetWrappedType(parent.ServiceType, parent.RequiredServiceType);
-            var parentServiceTypeExpr = Expression.Constant(registeredServiceType, typeof(Type));
-            var parentServiceKeyExpr = container.GetOrAddStateItemExpression(parent.ServiceKey, typeof(object));
-
-            // if assign in expression is supported then use it.
-            var scopesExpr = GetScopesExpr(request);
-            if (_expressionAssignMethod != null)
-            {
-                var getOrNewScopeExpr = Expression.Call(scopesExpr, "GetOrNewResolutionScope",
-                    ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
-                var parameters = new object[] { ResolutionScopeParamExpr, getOrNewScopeExpr };
-                return (Expression)_expressionAssignMethod.Value.Invoke(null, parameters);
-            }
-
-            return Expression.Call(scopesExpr, "GetOrCreateResolutionScope",
-                ArrayTools.Empty<Type>(), ResolutionScopeParamExpr, parentServiceTypeExpr, parentServiceKeyExpr);
-        }
-
-        private static readonly Lazy<MethodInfo> _expressionAssignMethod = new Lazy<MethodInfo>(() =>
-            typeof(Expression).GetMethodOrNull("Assign", typeof(Expression), typeof(Expression)));
-
-        private static readonly Type[] _factoryDelegateParamTypes =
-            { typeof(object[]), typeof(IResolverContext), typeof(IScope) };
-
-        private static readonly ParameterExpression[] _factoryDelegateParamExprs =
-            { StateParamExpr, ResolverContextParamExpr, ResolutionScopeParamExpr };
+        // todo: v3: change to (IResolverContext r, object[] args)
+        private static readonly Type[] _factoryDelegateParamTypes = { typeof(object[]), typeof(IResolverContext) };
+        private static readonly ParameterExpression[] _factoryDelegateParamExprs = { StateParamExpr, ResolverContextParamExpr };
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
@@ -374,7 +328,7 @@ namespace DryIoc
             if (expression.NodeType == ExpressionType.Constant)
             {
                 var value = ((ConstantExpression)expression).Value;
-                return (state, context, scope) => value;
+                return (state, context) => value;
             }
 
             var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
@@ -474,12 +428,11 @@ namespace DryIoc
         {
             var factoryDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             if (factoryDelegate != null)
-                return factoryDelegate(null, _resolverContext, null);
+                return factoryDelegate(null, _resolverContext);
             return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolvedReturnDefault);
         }
 
-        object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent,
-            IScope scope)
+        object IResolver.Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent)
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
@@ -504,14 +457,14 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(null, _resolverContext, scope);
+                    return cachedFactoryDelegate(null, _resolverContext);
             }
 
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
             var ifUnresolved = ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw;
-            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, scope,
-                preResolveParent);
+            var request = Request.Create(this, 
+                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent);
 
             var factory = ((IContainer)this).ResolveFactory(request);
 
@@ -526,7 +479,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(null, _resolverContext, scope);
+            var service = factoryDelegate(null, _resolverContext);
 
             if (registry.Services.IsEmpty)
                 return service;
@@ -561,14 +514,14 @@ namespace DryIoc
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, null, null);
+                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolvedReturnDefault, null, null);
 
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(null, _resolverContext, null);
+            var service = factoryDelegate(null, _resolverContext);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
@@ -585,8 +538,7 @@ namespace DryIoc
 
         // todo: perf: optimize for speed
         IEnumerable<object> IResolver.ResolveMany(
-            Type serviceType, object serviceKey, Type requiredServiceType,
-            RequestInfo preResolveParent, IScope scope)
+            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preResolveParent)
         {
             var requiredItemType = requiredServiceType ?? serviceType;
 
@@ -680,7 +632,7 @@ namespace DryIoc
             foreach (var item in allItems.OrderBy(it => it.FactoryRegistrationOrder))
             {
                 var service = container.Resolve(serviceType, item.OptionalServiceKey,
-                    true, item.ServiceType, preResolveParent, scope);
+                    true, item.ServiceType, preResolveParent);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -693,7 +645,7 @@ namespace DryIoc
                 {
                     var fallbackContainer = fallbackContainers[i];
                     var fallbackServices = fallbackContainer.Resolver.ResolveMany(
-                        serviceType, serviceKey, requiredServiceType, preResolveParent, scope);
+                        serviceType, serviceKey, requiredServiceType, preResolveParent);
                     foreach (var fallbackService in fallbackServices)
                         yield return fallbackService;
                 }
@@ -715,6 +667,7 @@ namespace DryIoc
             return ((IScopeAccess)this).GetCurrentNamedScope(null, false);
         }
 
+        // todo: combine with GetMatchingResolutionScope by adding or removing @outermost parameter
         /// <summary>Gets current scope matching the <paramref name="name"/>.
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
@@ -725,11 +678,11 @@ namespace DryIoc
             var currentScope = _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
             return currentScope == null
                 ? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null)
-                : GetMatchingScopeOrDefault(currentScope, name)
+                : MatchScope(currentScope, name)
                 ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, currentScope, name) : null);
         }
 
-        private static IScope GetMatchingScopeOrDefault(IScope scope, object name)
+        private static IScope MatchScope(IScope scope, object name)
         {
             if (name != null)
                 while (scope != null && !name.Equals(scope.Name))
@@ -737,46 +690,19 @@ namespace DryIoc
             return scope;
         }
 
-        // note: The method required for .NET 3.5 which  does not have Expression.Assign, so the need for "ref" parameter (BTW "ref" is not supported in XAMARIN)
-        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
-        /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param>
-        /// <param name="serviceKey">Marking scope with resolved service key.</param>
-        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope IScopeAccess.GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey)
+        // todo: combine with GetMatchingResolutionScope by adding or removing @outermost parameter
+        /// <inheritdoc />
+        IScope IScopeAccess.GetMatchingResolutionScope(
+            Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound)
         {
-            return scope ?? (scope = new Scope(null, new KV<Type, object>(serviceType, serviceKey)));
-        }
-
-        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
-        /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param>
-        /// <param name="serviceKey">Marking scope with resolved service key.</param>
-        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        public IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey)
-        {
-            return scope ?? new Scope(null, new KV<Type, object>(serviceType, serviceKey));
-        }
-
-        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null,
-        /// then returns input <paramref name="scope"/>.
-        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and
-        /// Key equal to <paramref name="serviceKey"/>.</summary>
-        /// <param name="scope">Scope to start matching with Type and Key specified.</param>
-        /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
-        /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
-        /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <returns>Matching scope or throws <see cref="ContainerException"/>.</returns>
-        IScope IScopeAccess.GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
-            bool outermost, bool throwIfNotFound)
-        {
-            return FindMatchingResolutionScope(scope, assignableFromServiceType, serviceKey, outermost)
+            var scope = _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
+            return MatchScope(scope, assignableFromServiceType, serviceKey, outermost)
                 ?? (!throwIfNotFound ? null
                 : Throw.For<IScope>(Error.NoMatchedScopeFound, scope, new KV<Type, object>(assignableFromServiceType, serviceKey)));
         }
 
-        private static IScope FindMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey,
-            bool outermost)
+        private static IScope MatchScope(
+            IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost)
         {
             if (assignableFromServiceType == null && serviceKey == null)
                 return scope;
@@ -784,13 +710,11 @@ namespace DryIoc
             IScope matchedScope = null;
             while (scope != null)
             {
-                var name = scope.Name as KV<Type, object>;
-                if (name != null && (
-                    assignableFromServiceType == null ||
-                    name.Key.IsAssignableTo(assignableFromServiceType) ||
-                    assignableFromServiceType.IsOpenGeneric() &&
-                    name.Key.GetGenericDefinitionOrNull().IsAssignableTo(assignableFromServiceType)) &&
-                    (serviceKey == null || serviceKey.Equals(name.Value)))
+                var name = scope.Name as ResolutionScopeName;
+                if (name != null && 
+                    (assignableFromServiceType == null || name.ServiceType.IsAssignableTo(assignableFromServiceType) ||
+                     assignableFromServiceType.IsOpenGeneric() && name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(assignableFromServiceType)) &&
+                    (serviceKey == null || serviceKey.Equals(name.ServiceKey)))
                 {
                     matchedScope = scope;
                     if (!outermost) // break on first found match.
@@ -1237,8 +1161,7 @@ namespace DryIoc
                         details.ServiceKey,
                         details.IfUnresolved == IfUnresolved.ReturnDefault,
                         details.RequiredServiceType,
-                        preResolveParent: requestInfo,
-                        scope: null);
+                        requestInfo);
 
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
@@ -1884,14 +1807,12 @@ namespace DryIoc
 
             public override Expression CreateExpressionOrDefault(Request request)
             {
-                return Resolver.CreateResolutionExpression(request,
-                    isRuntimeDependency: true,
-                    skipResolutionScope: true); // no need in resolution scope for instance
+                return Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
             }
 
             #region Implementation
 
-            private object GetInstanceFromScopeChainOrSingletons(object[] _, IResolverContext r, IScope __)
+            private object GetInstanceFromScopeChainOrSingletons(object[] _, IResolverContext r)
             {
                 var scope = r.Scopes.GetCurrentScope();
                 while (scope != null)
@@ -3100,12 +3021,20 @@ namespace DryIoc
 
         /// <summary>Access to the singleton and current scopes.</summary>
         IScopeAccess Scopes { get; }
+
+        /// <summary>Opens scope with optional name.</summary>
+        /// <param name="name">(optional)</param> <param name="trackInParent">(optional)</param>
+        /// <returns>Scoped resolver.</returns>
+        IResolver OpenScope(object name = null, bool trackInParent = false);
     }
 
     // todo: v3: Remove dependency on  ContainerWeakRef impl. of IResolver context.
     /// <summary>Provides the shortcuts to <see cref="IResolverContext"/></summary>
     public static class ResolverContext
     {
+        internal static readonly MethodInfo OpenScopeMethod = 
+            typeof(IResolverContext).Method(nameof(IResolverContext.OpenScope));
+
         /// <summary>Returns subj.</summary>
         /// <param name="ctx"></param> <returns></returns>
         public static IResolver RootResolver(this IResolverContext ctx)
@@ -3157,6 +3086,14 @@ namespace DryIoc
             _rootContainer = rootContainer;
         }
 
+        /// <summary>Opens scope with optional name.</summary>
+        /// <param name="name">(optional)</param><param name="trackInParent">(optional)</param>
+        /// <returns>Scoped resolver.</returns>
+        public IResolver OpenScope(object name = null, bool trackInParent = false)
+        {
+            return Container.OpenScope(name, trackInParent: trackInParent);
+        }
+
         internal readonly Container _container;
         internal readonly Container _rootContainer;
 
@@ -3167,16 +3104,12 @@ namespace DryIoc
         }
     }
 
-    /// <summary>The delegate type which is actually used to create service instance by container.
-    /// Delegate instance required to be static with all information supplied by <paramref name="state"/> and <paramref name="scope"/>
-    /// parameters. The requirement is due to enable compilation to DynamicMethod in DynamicAssembly, and also to simplify
-    /// state management and minimizes memory leaks.</summary>
-    /// <param name="state">All the state items available in resolution root.</param>
-    /// <param name="r">Provides access to <see cref="IResolver"/> implementation to enable nested/dynamic resolve inside:
+    /// <summary>The delegate type which is actually used to create service instance by container.</summary>
+    /// <param name="state">OBSOLETE</param>
+    /// <param name="r">Provides access to <see cref="IResolver"/> implementation to enable dynamic resolve inside:
     /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
-    /// <param name="scope">Resolution root scope: initially passed value will be null, but then the actual will be created on demand.</param>
     /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(object[] state, IResolverContext r, IScope scope);
+    public delegate object FactoryDelegate(object[] state, IResolverContext r);
 
     /// <summary>Adds to Container support for:
     /// <list type="bullet">
@@ -3303,8 +3236,10 @@ namespace DryIoc
                 .AddOrUpdate(typeof(IContainer), containerFactory);
 
             wrappers = wrappers.AddOrUpdate(typeof(IDisposable),
-                new ExpressionFactory(r => r.IsResolutionRoot ? null : Container.GetResolutionScopeExpression(r),
-                setup: Setup.Wrapper));
+                new ExpressionFactory(
+                    r => r.IsResolutionRoot ? null : Expression.Call(Container.ScopesExpr, "GetCurrentScope",
+                    ArrayTools.Empty<Type>(), ArrayTools.Empty<Expression>()),
+                    setup: Setup.Wrapper));
 
             return wrappers;
         }
@@ -3434,21 +3369,18 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
             var resolverExpr = Container.GetResolverExpr(request);
-            var resolutionScopeExpr = Container.GetResolutionScopeExpression(request);
             var preResolveParentExpr = container.RequestInfoToExpression(request.RequestInfo);
 
             var callResolveManyExpr = Expression.Call(resolverExpr, _resolveManyMethod,
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
-                preResolveParentExpr,
-                resolutionScopeExpr);
+                preResolveParentExpr);
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemType }, callResolveManyExpr);
 
-            var lazyEnumerableCtor = typeof(LazyEnumerable<>).MakeGenericType(itemType).GetSingleConstructorOrNull();
-            return Expression.New(lazyEnumerableCtor, callResolveManyExpr);
+            return Expression.New(typeof(LazyEnumerable<>).MakeGenericType(itemType).Constructor(), callResolveManyExpr);
         }
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
@@ -3566,9 +3498,8 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            var pairCtor = keyValueType.GetSingleConstructorOrNull().ThrowIfNull();
             var keyExpr = request.Container.GetOrAddStateItemExpression(serviceKey, serviceKeyType);
-            var pairExpr = Expression.New(pairCtor, keyExpr, serviceExpr);
+            var pairExpr = Expression.New(keyValueType.Constructor(), keyExpr, serviceExpr);
             return pairExpr;
         }
 
@@ -5903,7 +5834,7 @@ namespace DryIoc
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             var ifUnresolvedReturnDefault = ifUnresolved == IfUnresolved.ReturnDefault;
-            return (TService)resolver.Resolve(typeof(TService), null, ifUnresolvedReturnDefault, requiredServiceType, null, null);
+            return (TService)resolver.Resolve(typeof(TService), null, ifUnresolvedReturnDefault, requiredServiceType, null);
         }
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
@@ -5926,7 +5857,7 @@ namespace DryIoc
             var ifUnresolvedReturnDefault = ifUnresolved == IfUnresolved.ReturnDefault;
             return serviceKey == null && requiredServiceType == null
                 ? resolver.Resolve(serviceType, ifUnresolvedReturnDefault)
-                : resolver.Resolve(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, null, null);
+                : resolver.Resolve(serviceType, serviceKey, ifUnresolvedReturnDefault, requiredServiceType, null);
         }
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
@@ -5964,7 +5895,7 @@ namespace DryIoc
             object serviceKey = null)
         {
             return behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty, null).Cast<TService>()
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
         }
 
@@ -5983,8 +5914,7 @@ namespace DryIoc
         }
 
         internal static Expression CreateResolutionExpression(Request request,
-            bool openResolutionScope = false, bool isRuntimeDependency = false,
-            bool skipResolutionScope = false)
+            bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
             request.ContainsNestedResolutionCall = true;
 
@@ -5992,35 +5922,32 @@ namespace DryIoc
 
             if (!isRuntimeDependency &&
                 container.Rules.DependencyResolutionCallExpressions != null)
-                PopulateDependencyResolutionCallExpressions(request, openResolutionScope);
+                PopulateDependencyResolutionCallExpressions(request);
 
             var serviceTypeExpr = Expression.Constant(request.ServiceType, typeof(Type));
+            // todo: v3: just use request.IfUnresolved
             var ifUnresolvedExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.ReturnDefault, typeof(bool));
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
-            Expression scopeExpr;
-            if (skipResolutionScope)
-            {
-                scopeExpr = Expression.Constant(null, typeof(IScope));
-            }
-            else
-            {
-                // first ensure that we have parent scope if any to propagate it across resolution call boundaries
-                scopeExpr = Container.GetResolutionScopeExpression(request);
-                if (openResolutionScope)
-                {
-                    // creates new scope and link it to existing (or new) parent
-                    // Here the code looks: scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-                    var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
-                    var scopeCtor = typeof(Scope).GetSingleConstructorOrNull().ThrowIfNull();
-                    scopeExpr = Expression.New(scopeCtor, scopeExpr,
-                        Expression.New(typeof(KV<Type, object>).GetSingleConstructorOrNull().ThrowIfNull(),
-                            actualServiceTypeExpr, serviceKeyExpr));
-                }
-            }
-
             var resolverExpr = Container.GetResolverExpr(request);
+
+            if (openResolutionScope)
+            {
+                // code to generate:
+                // r => r.OpenScope(new ResolutionScopeName(12, serviceType, serviceKey)).Resolve(serviceType, serviceKey)
+                var factoryIdExpr = Expression.Constant(request.FactoryID);
+                var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
+
+                var scopeNameExpr = Expression.New(
+                    typeof(ResolutionScopeName).Constructor().ThrowIfNull(),
+                    factoryIdExpr, actualServiceTypeExpr, serviceKeyExpr);
+
+                var trackInParent = Expression.Constant(true);
+
+                resolverExpr = Expression.Call(Container.ResolverContextParamExpr,
+                    ResolverContext.OpenScopeMethod, scopeNameExpr, trackInParent);
+            }
 
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
@@ -6034,35 +5961,26 @@ namespace DryIoc
             var resolveCallExpr = Expression.Call(
                 resolverExpr, "Resolve", ArrayTools.Empty<Type>(),
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr,
-                preResolveParentExpr, scopeExpr);
+                preResolveParentExpr);
 
             return Expression.Convert(resolveCallExpr, request.ServiceType);
         }
 
-        private static void PopulateDependencyResolutionCallExpressions(Request request, bool openResolutionScope)
+        private static void PopulateDependencyResolutionCallExpressions(Request request)
         {
             // Actually calls nested Resolution Call and stores produced expression in collection
             // if the collection to accumulate call expressions is defined and:
-            //   - Resolve call is the first nested in chain
-            //   - Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
+            // 1. Resolve call is the first nested in chain
+            // 2. Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
             var preResolveParent = request.PreResolveParent;
             if (!preResolveParent.IsEmpty &&
                 (request.RawParent.IsEmpty || preResolveParent.EqualsWithoutParent(request.RawParent)))
                 return;
 
-            var serviceType = request.ServiceType;
-            var serviceKey = request.ServiceKey;
-
-            // Create scope for first nesting level or where corresponding setting is saying so
-            var scope = request.Scope;
-            if (scope == null || openResolutionScope)
-                scope = new Scope(scope, new KV<Type, object>(serviceType, serviceKey));
-
             var container = request.Container;
 
-            var newRequest = Request.Create(container, serviceType, serviceKey,
-                request.IfUnresolved, request.RequiredServiceType, scope,
-                request.ParentOrWrapper);
+            var newRequest = Request.Create(container, request.ServiceType, request.ServiceKey,
+                request.IfUnresolved, request.RequiredServiceType, request.ParentOrWrapper);
 
             var factory = container.ResolveFactory(newRequest);
             if (factory == null || factory is FactoryPlaceholder)
@@ -6072,8 +5990,8 @@ namespace DryIoc
             if (factoryExpr == null)
                 return;
 
-            container.Rules.DependencyResolutionCallExpressions.Swap(it =>
-                it.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
+            container.Rules.DependencyResolutionCallExpressions
+                .Swap(it => it.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
         }
     }
 
@@ -6704,7 +6622,7 @@ namespace DryIoc
         /// <summary>Obsolete: replaced with <see cref="Create"/>/.</summary>
         public static Request CreateEmpty(Container container)
         {
-            var resolverContext = new RequestContext(container, container, null, RequestInfo.Empty);
+            var resolverContext = new RequestContext(container, container, RequestInfo.Empty);
             return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(RequestFlags), null);
         }
 
@@ -6718,12 +6636,11 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) Service key to resolve.</param>
         /// <param name="ifUnresolved">(optional) How to handle unresolved service.</param>
         /// <param name="requiredServiceType">(optional) Actual registered or unwrapped service type to look for.</param>
-        /// <param name="scope">(optional) Pre-request info: resolution scope.</param> // todo: v3: remove
         /// <param name="preResolveParent">(optional) Request info preceding Resolve call.</param>
         /// <returns>New request with provided info.</returns>
         public static Request Create(IContainer container, Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
-            IScope scope = null, RequestInfo preResolveParent = null)
+            RequestInfo preResolveParent = null)
         {
             serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
@@ -6731,7 +6648,7 @@ namespace DryIoc
             if (preResolveParent == null)
                 preResolveParent = RequestInfo.Empty;
 
-            var resolverContext = new RequestContext(container, (IScopeAccess)container, scope, preResolveParent);
+            var resolverContext = new RequestContext(container, (IScopeAccess)container, preResolveParent);
 
             IServiceInfo serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
 
@@ -6878,9 +6795,6 @@ namespace DryIoc
 
         /// <summary>Weak reference to container. May be replaced in request flowed from parent to child container.</summary>
         public ContainerWeakRef ContainerWeakRef { get { return _requestContext.Container.ContainerWeakRef; } }
-
-        /// <summary>Resolution scope.</summary>
-        public IScope Scope { get { return _requestContext.Scope; } }
 
         /// <summary>(optional) Made spec used for resolving request.</summary>
         public Made Made { get { return Factory == null ? null : Factory.Made; } }
@@ -7370,24 +7284,22 @@ namespace DryIoc
         {
             public readonly IContainer Container;
             public readonly IScopeAccess Scopes;
-            public readonly IScope Scope;
             public readonly RequestInfo PreResolveParent;
 
             // Mutable updatable part
             public bool ContainsNestedResolutionCall;
             public int DependencyCount;
 
-            public RequestContext(IContainer container, IScopeAccess scopes, IScope scope, RequestInfo preResolveParent)
+            public RequestContext(IContainer container, IScopeAccess scopes, RequestInfo preResolveParent)
             {
                 Container = container;
                 Scopes = scopes;
-                Scope = scope;
                 PreResolveParent = preResolveParent;
             }
 
             public RequestContext With(IContainer newContainer)
             {
-                return new RequestContext(newContainer, Scopes, Scope, PreResolveParent);
+                return new RequestContext(newContainer, Scopes, PreResolveParent);
             }
 
             public void IncrementDependencyCount()
@@ -7971,6 +7883,20 @@ namespace DryIoc
             || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
         }
 
+        private bool ShouldOpenResolutionScope(Request request)
+        {
+            if (!Setup.OpenResolutionScope)
+                return false;
+
+            var scope = request.Scopes.GetCurrentScope();
+
+            // Prevents recursion of generating OpenScope: 
+            // r => r.OpenScope().Resolve<IDependency>(new KV<Type, object>(typeof(IDependency), null))
+            return scope == null ||
+                   !(scope.Name is ResolutionScopeName) ||
+                   ((ResolutionScopeName)scope.Name).FactoryID != FactoryID;
+        }
+
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
             return
@@ -7993,7 +7919,8 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            if (ShouldBeInjectedAsResolutionCall(request))
+            if (ShouldOpenResolutionScope(request) ||
+                ShouldBeInjectedAsResolutionCall(request))
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             var container = request.Container;
@@ -8094,19 +8021,18 @@ namespace DryIoc
                 if (Setup.PreventDisposal)
                 {
                     var factory = factoryDelegate;
-                    factoryDelegate = (_, cs, rs) => new HiddenDisposable(factory(null, cs, rs));
+                    factoryDelegate = (_, cs) => new HiddenDisposable(factory(null, cs));
                 }
 
                 if (Setup.WeaklyReferenced)
                 {
                     var factory = factoryDelegate;
-                    factoryDelegate = (_, cs, rs) => new WeakReference(factory(null, cs, rs));
+                    factoryDelegate = (_, cs) => new WeakReference(factory(null, cs));
                 }
 
                 var singletonScope = request.SingletonScope;
                 var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
-                var singleton = singletonScope.GetOrAdd(singletonId, () =>
-                    factoryDelegate(null, request.ContainerWeakRef, request.Scope));
+                var singleton = singletonScope.GetOrAdd(singletonId, () => factoryDelegate(null, request.ContainerWeakRef));
 
                 serviceExpr = Expression.Constant(singleton);
             }
@@ -9500,7 +9426,7 @@ namespace DryIoc
             if (request.Reuse != DryIoc.Reuse.Transient)
                 return base.GetDelegateOrDefault(request); // use expression creation
 
-            return (state, r, scope) => _factoryDelegate(r.Resolver);
+            return (state, r) => _factoryDelegate(r.Resolver);
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;
@@ -9627,7 +9553,9 @@ namespace DryIoc
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            if (id != -1)
+                Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            TrackDisposable(item);
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
@@ -9809,13 +9737,16 @@ namespace DryIoc
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            if (id < BucketSize)
-                Items[id] = item;
-            else
+            if (id != -1)
             {
-                var bucket = GetOrAddBucket(id);
-                var indexInBucket = id % BucketSize;
-                bucket[indexInBucket] = item;
+                if (id < BucketSize)
+                    Items[id] = item;
+                else
+                {
+                    var bucket = GetOrAddBucket(id);
+                    var indexInBucket = id % BucketSize;
+                    bucket[indexInBucket] = item;
+                }
             }
 
             TrackDisposable(item);
@@ -10179,12 +10110,48 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Holds the name for the resolution scope.</summary>
+    internal sealed class ResolutionScopeName
+    {
+        // todo: Remove if possible
+        /// <summary>Factory ID of service opening the scope.</summary>
+        public readonly int FactoryID;
+
+        /// <summary>Type of service opening the scope.</summary>
+        public readonly Type ServiceType;
+
+        /// <summary>Optional service key of service opening the scope.</summary>
+        public readonly object ServiceKey;
+
+        // todo: v3: remove factoryID, why should we include it into name.
+        /// <summary>Creates the key.</summary>
+        public ResolutionScopeName(int factoryID, Type serviceType, object serviceKey)
+        {
+            FactoryID = factoryID;
+            ServiceType = serviceType;
+            ServiceKey = serviceKey;
+        }
+
+        public override string ToString()
+        {
+            var s = new StringBuilder()
+                .Append(GetType().Name)
+                .Append("(#").Append(FactoryID)
+                .Append(", ").Print(ServiceType);
+
+            if (ServiceKey != null)
+                s.Print(ServiceKey);
+
+            return s.Append(")").ToString();
+        }
+    }
+
     /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
     /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
     public sealed class ResolutionScopeReuse : IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 0; } }
+        public int Lifespan { get { return 0; } } // todo: should we change it to match CurrentScopeReuse?
 
         /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>
         public readonly Type AssignableFromServiceType;
@@ -10210,8 +10177,7 @@ namespace DryIoc
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
             var scopesExpr = Container.GetScopesExpr(request);
-            var scopeExpr = (Expression)Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
-                Container.GetResolutionScopeExpression(request),
+            var scopeExpr = Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
                 Expression.Constant(Outermost, typeof(bool)),
@@ -10227,14 +10193,7 @@ namespace DryIoc
         /// <inheritdoc />
         public bool CanApply(Request request)
         {
-            var scope = request.Scope;
-            if (scope == null)
-            {
-                var parent = request.Enumerate().Last();
-                request.Scopes.GetOrCreateResolutionScope(ref scope, parent.GetActualServiceType(), parent.ServiceKey);
-            }
-
-            return request.Scopes.GetMatchingResolutionScope(scope,
+            return request.Scopes.GetMatchingResolutionScope(
                 AssignableFromServiceType, ServiceKey, Outermost, throwIfNotFound: false) != null;
         }
 
@@ -10713,7 +10672,6 @@ namespace DryIoc
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
         object Resolve(Type serviceType, bool ifUnresolvedReturnDefault);
 
-        // todo: v3: remove @scope parameter
         /// <summary>Resolves service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
         /// <param name="serviceKey">Optional service key used for registering service.</param>
@@ -10721,14 +10679,8 @@ namespace DryIoc
         /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>,
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
-        /// <param name="scope">Propagated resolution scope.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolvedReturnDefault"/> provided.</returns>
-        /// <remarks>
-        /// This method covers all possible resolution input parameters comparing to <see cref="Resolve(System.Type,bool)"/>, and
-        /// by specifying the same parameters as for <see cref="Resolve(System.Type,bool)"/> should return the same result.
-        /// </remarks>
-        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType,
-            RequestInfo preResolveParent, IScope scope);
+        object Resolve(Type serviceType, object serviceKey, bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -10737,10 +10689,8 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
-        /// <param name="scope">propagated resolution scope, may be null.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType,
-            RequestInfo preResolveParent, IScope scope);
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preResolveParent);
     }
 
     /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
@@ -10857,29 +10807,12 @@ namespace DryIoc
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
         IScope GetCurrentNamedScope(object name, bool throwIfNotFound);
 
-        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
-        /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param>
-        /// <param name="serviceKey">Marking scope with resolved service key.</param>
-        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope GetOrCreateResolutionScope(ref IScope scope, Type serviceType, object serviceKey);
-
-        /// <summary>Check if scope is not null, then just returns it, otherwise will create and return it.</summary>
-        /// <param name="scope">May be null scope.</param>
-        /// <param name="serviceType">Marking scope with resolved service type.</param>
-        /// <param name="serviceKey">Marking scope with resolved service key.</param>
-        /// <returns>Input <paramref name="scope"/> ensuring it is not null.</returns>
-        IScope GetOrNewResolutionScope(IScope scope, Type serviceType, object serviceKey);
-
-        /// <summary>If both <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/> are null,
-        /// then returns input <paramref name="scope"/>.
-        /// Otherwise searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and
+        /// <summary>Searches scope hierarchy to find first scope with: Type assignable <paramref name="assignableFromServiceType"/> and
         /// Key equal to <paramref name="serviceKey"/>.</summary>
-        /// <param name="scope">Scope to start matching with Type and Key specified.</param>
         /// <param name="assignableFromServiceType">Type to match.</param> <param name="serviceKey">Key to match.</param>
         /// <param name="outermost">If true - commands to look for outermost match instead of nearest.</param>
         /// <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        IScope GetMatchingResolutionScope(IScope scope, Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound);
+        IScope GetMatchingResolutionScope(Type assignableFromServiceType, object serviceKey, bool outermost, bool throwIfNotFound);
     }
 
     /// <summary>Exposes operations required for internal registry access.
@@ -10935,6 +10868,7 @@ namespace DryIoc
         /// </summary>
         /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
+        /// <param name="trackInParent">(optional) The scope will be tracked and disposed by parent scope.</param>
         /// <returns>New container with different current scope.</returns>
         /// <example><code lang="cs"><![CDATA[
         /// using (var scoped = container.OpenScope())
@@ -10943,7 +10877,7 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null);
+        IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null, bool trackInParent = false);
 
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade shares rules with this container, everything else is its own.
@@ -11852,6 +11786,16 @@ namespace DryIoc
         /// <param name="type">Type to inspect.</param>
         /// <param name="includeNonPublic">(optional) If set includes non-public constructors.</param>
         /// <returns>Single constructor or null.</returns>
+        public static ConstructorInfo Constructor(this Type type, bool includeNonPublic = false)
+        {
+            var ctors = type.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
+            return ctors.Length == 1 ? ctors[0] 
+                : Throw.For<ConstructorInfo>(
+                        Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
+        }
+
+        // todo: Make an obsolete
+        /// <summary>Obsolete: use <see cref="Constructor"/></summary>
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
             var ctors = type.GetAllConstructors(includeNonPublic).ToArrayOrSelf();

@@ -104,8 +104,8 @@ namespace DryIoc.UnitTests
         public void In_different_resolution_scopes_Log_instances_should_be_different()
         {
             var container = new Container();
-            container.Register<Consumer>();
-            container.Register<Account>();
+            container.Register<Consumer>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Account>(setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScope);
 
             var consumer = container.Resolve<Consumer>();
@@ -206,7 +206,7 @@ namespace DryIoc.UnitTests
         public void Can_use_resolution_scope_reuse_bound_to_resolution_root()
         {
             var container = new Container();
-            container.Register<ViewModel2>();
+            container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf<ViewModel2>());
 
             var vm = container.Resolve<ViewModel2>();

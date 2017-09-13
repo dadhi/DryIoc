@@ -53,13 +53,13 @@ Generation is completed successfully.
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
+        partial void ResolveGenerated(ref object service, Type serviceType)
         {
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, 
-            Type requiredServiceType, RequestInfo preRequestParent, IScope scope)
+        partial void ResolveGenerated(ref object service,
+            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent)
         {
         }
 

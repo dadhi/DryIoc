@@ -1106,7 +1106,7 @@ namespace DryIoc.MefAttributedModel
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
-                "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) +
+                "Unable to find single constructor nor marked with " + typeof(ImportingConstructorAttribute) +
                 " nor default constructor in {0} when resolving: {1}"),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
