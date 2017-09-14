@@ -7550,12 +7550,13 @@ namespace DryIoc
         /// Greater number means further from decoratee - specify negative number to stay closer.
         /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</param>
+        /// <param name="openResolutionScope">The decorator opens resolution scope</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
         public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0,
-            bool useDecorateeReuse = false)
+            bool useDecorateeReuse = false, bool openResolutionScope = false)
         {
             var requestCondition = condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo));
-            return DecoratorWith(requestCondition, order, useDecorateeReuse);
+            return DecoratorWith(requestCondition, order, useDecorateeReuse, openResolutionScope);
         }
 
         /// <summary>Creates setup with condition.</summary>
@@ -7565,12 +7566,14 @@ namespace DryIoc
         /// Greater number means further from decoratee - specify negative number to stay closer.
         /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</param>
+        /// <param name="openResolutionScope">The decorator opens resolution scope</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<Request, bool> condition, int order, bool useDecorateeReuse)
+        public static Setup DecoratorWith(Func<Request, bool> condition, int order, bool useDecorateeReuse,
+            bool openResolutionScope = false)
         {
-            if (condition == null && order == 0 && !useDecorateeReuse)
+            if (condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope)
                 return Decorator;
-            return new DecoratorSetup(condition, order, useDecorateeReuse);
+            return new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope);
         }
 
         /// <summary>Creates setup with optional condition.</summary>
@@ -7758,8 +7761,10 @@ namespace DryIoc
             /// - first registered are closer decoratee.</param>
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
-            public DecoratorSetup(Func<Request, bool> condition, int order, bool useDecorateeReuse)
-                : base(condition)
+            /// <param name="openResolutionScope">Opens resolution scope</param>
+            public DecoratorSetup(Func<Request, bool> condition, int order, bool useDecorateeReuse,
+                bool openResolutionScope = false)
+                : base(condition, openResolutionScope)
             {
                 Order = order;
                 UseDecorateeReuse = useDecorateeReuse;
@@ -7899,7 +7904,7 @@ namespace DryIoc
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
-            return
+            var shouldBe =
                 // prevents recursion on already split graph
                 !request.IsResolutionCall &&
                 // explicit aka user requested split
@@ -7907,9 +7912,10 @@ namespace DryIoc
                 // implicit split only when not inside Func with arguments,
                 // cause for now arguments are not propagated through resolve call
                 (request.ShouldSplitObjectGraph() ||
-                Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) &&
+                    Setup.UseParentReuse/* || request.Reuse is ResolutionScopeReuse*/) &&
                 !request.IsWrappedInFuncWithArgs()) &&
                 request.GetActualServiceType() != typeof(void);
+            return shouldBe;
         }
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
@@ -10177,7 +10183,8 @@ namespace DryIoc
         /// <inheritdoc />
         public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
         {
-            var scopesExpr = Container.GetScopesExpr(request);
+            // even inside singleton we should not look for root scopes, cause
+            var scopesExpr = Container.ScopesExpr; 
             var scopeExpr = Expression.Call(scopesExpr, "GetMatchingResolutionScope", ArrayTools.Empty<Type>(),
                 Expression.Constant(AssignableFromServiceType, typeof(Type)),
                 request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),

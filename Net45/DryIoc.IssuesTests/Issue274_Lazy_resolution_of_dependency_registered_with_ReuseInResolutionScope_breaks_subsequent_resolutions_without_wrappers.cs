@@ -30,9 +30,10 @@ namespace DryIoc.IssuesTests
         public void FirstLazyResolutionShouldNotBreakSubsequentResolutions()
         {
             var container = new Container();
+
             container.Register<IDependency, Dependency>(Reuse.InResolutionScope);
-            container.Register<IService, Service>();
-            container.Register<ILazyService, LazyService>();
+            container.Register<IService, Service>(setup: Setup.With(openResolutionScope: true));
+            container.Register<ILazyService, LazyService>(setup: Setup.With(openResolutionScope: true));
 
             Assert.DoesNotThrow(() => container.Resolve<ILazyService>());
             Assert.DoesNotThrow(() => container.Resolve<IService>());

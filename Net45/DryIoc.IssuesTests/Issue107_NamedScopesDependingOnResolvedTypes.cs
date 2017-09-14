@@ -413,7 +413,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<SomeTool>();
 
-            container.Register<AreaManager>();
+            container.Register<AreaManager>(setup: Setup.With(openResolutionScope: true));
 
             var manager = container.Resolve<AreaManager>();
             var area = manager.OneCarAreas[0];
@@ -457,7 +457,7 @@ namespace DryIoc.IssuesTests
             container.Register<ICar, SmallCar>(Reuse.InResolutionScope);
             container.Register<AreaWithOneCar>(Reuse.InResolutionScope, setup: Setup.With(openResolutionScope: true));
             container.Register<SomeTool>();
-            container.Register<CarefulAreaManager>(Reuse.InResolutionScope);
+            container.Register<CarefulAreaManager>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
             var manager = container.Resolve<CarefulAreaManager>();
             var area = manager.Areas.First();

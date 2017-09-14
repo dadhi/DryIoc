@@ -168,7 +168,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(Aaa<>));
+            container.Register(typeof(Aaa<>), setup: Setup.With(openResolutionScope: true));
             container.Register<Bbb>(Reuse.InResolutionScopeOf(typeof(Aaa<>)));
 
             var aaa = container.Resolve<Aaa<Bbb>>();
@@ -450,13 +450,16 @@ namespace DryIoc.UnitTests
         public void Can_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
         {
             var container = new Container();
-            container.Register<ServiceWithResolutionAndSingletonDependencies>();
+
+            container.Register<ServiceWithResolutionAndSingletonDependencies>(
+                setup: Setup.With(openResolutionScope: true));
+
             container.Register<SingletonDep>(Reuse.InResolutionScope);
             container.Register<ResolutionScopeDep>(Reuse.Singleton);
 
             var service = container.Resolve<ServiceWithResolutionAndSingletonDependencies>();
 
-            Assert.That(service.ResolutionScopeDep, Is.SameAs(service.SingletonDep.ResolutionScopeDep));
+            Assert.AreSame(service.ResolutionScopeDep, service.SingletonDep.ResolutionScopeDep);
         }
 
         [Test]
@@ -479,7 +482,7 @@ namespace DryIoc.UnitTests
         public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
         {
             var container = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
-            container.Register<Client>(Reuse.Singleton);
+            container.Register<Client>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
             container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
 
             var client = container.Resolve<Client>();
@@ -491,8 +494,9 @@ namespace DryIoc.UnitTests
         public void Can_dispose_resolution_reused_services()
         {
             var container = new Container();
+
             container.Register<SomeDep>(Reuse.InResolutionScope);
-            container.Register<SomeRoot>(Reuse.Singleton);
+            container.Register<SomeRoot>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
             var root = container.Resolve<SomeRoot>();
             root.Dispose();
