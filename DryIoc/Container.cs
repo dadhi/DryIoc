@@ -1905,7 +1905,7 @@ namespace DryIoc
                     scope = scope.Parent;
                 }
 
-                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID);
+                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID);//.ThrowIfNull(Error.UnableToFindSingletonInstance);
             }
 
             private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
@@ -11468,7 +11468,10 @@ namespace DryIoc
                 "Implementation type is not specified when using automatic constructor selection: {0}"),
             NoImplementationForPlaceholder = Of(
                 "There is no real implementation, only a placeholder for the service {0}." + Environment.NewLine +
-                "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder.");
+                "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder."),
+            UnableToFindSingletonInstance = Of(
+                "Expecting the instance to be stored in singleton scope, but unable to find anything here." + Environment.NewLine + 
+                "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
