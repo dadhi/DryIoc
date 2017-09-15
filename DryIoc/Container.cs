@@ -3966,6 +3966,7 @@ namespace DryIoc
             return AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
             {
                 if (serviceType.IsAbstract() ||
+                    serviceType.IsOpenGeneric() || // service type in principle should be concrete, so should not be open-generic
                     condition != null && !condition(serviceType, serviceKey))
                     return null;
 
