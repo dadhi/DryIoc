@@ -201,8 +201,14 @@ namespace DryIoc
         public IContainer CreateFacade()
         {
             ThrowIfContainerDisposed();
+
+            //todo: v3: Possible alternative implementation
+            //return With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
+
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
+
+        public static readonly string FacadeKey = "facade";
 
         /// <summary>Clears cache for specified service(s).
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -1905,7 +1911,8 @@ namespace DryIoc
                     scope = scope.Parent;
                 }
 
-                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID);//.ThrowIfNull(Error.UnableToFindSingletonInstance);
+                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID)
+                    .ThrowIfNull(Error.UnableToFindSingletonInstance);
             }
 
             private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)

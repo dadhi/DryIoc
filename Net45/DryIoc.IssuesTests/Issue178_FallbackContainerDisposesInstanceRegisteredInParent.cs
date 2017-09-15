@@ -38,6 +38,7 @@ namespace DryIoc.IssuesTests
             {
                 c2.Register<B>();
                 var b1 = c2.Resolve<B>();
+                Assert.IsNotNull(b1.A);
             }
 
             Assert.IsFalse(a.IsDisposed);

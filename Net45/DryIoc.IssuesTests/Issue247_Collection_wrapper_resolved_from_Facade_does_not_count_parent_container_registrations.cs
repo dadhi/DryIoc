@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using ImTools;
 
@@ -18,8 +19,7 @@ namespace DryIoc.IssuesTests
             f.UseInstance("b");
             var strs = f.Resolve<string[]>();
 
-            GC.KeepAlive(container);
-            Assert.AreEqual(2, strs.Length);
+            CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);
         }
 
         [Test]
@@ -31,8 +31,7 @@ namespace DryIoc.IssuesTests
             var f = container.CreateFacade();
             var strs = f.Resolve<string[]>();
 
-            GC.KeepAlive(container);
-            Assert.AreEqual(1, strs.Length);
+            CollectionAssert.AreEqual(new[] { "a" }, strs);
         }
 
         [Test]
@@ -45,8 +44,7 @@ namespace DryIoc.IssuesTests
             f.UseInstance("b", serviceKey: 2);
             var strs = f.Resolve<KeyValuePair<int, string>[]>();
 
-            GC.KeepAlive(container);
-            Assert.AreEqual(2, strs.Length);
+            CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs.Select(it => it.Value));
         }
 
         [Test]

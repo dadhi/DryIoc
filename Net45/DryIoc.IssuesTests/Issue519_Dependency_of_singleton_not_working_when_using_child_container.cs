@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue519_Dependency_of_singleton_not_working_when_using_child_container
     {
-        [Test, Ignore("to fix")]
+        [Test]
         public void Test()
         {
             var c = new Container();
@@ -15,8 +15,12 @@ namespace DryIoc.IssuesTests
 
             childContainer.UseInstance<IServiceDependency>(new ServiceDependency());
 
-            Assert.Throws<ContainerException>(() =>
+            var ex = Assert.Throws<ContainerException>(() =>
                 childContainer.Resolve<IService>());
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToFindSingletonInstance),
+                Error.NameOf(ex.Error));
         }
 
         public interface IService
