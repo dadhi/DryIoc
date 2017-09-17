@@ -45,7 +45,7 @@
     <!--net40-->
     <file src="..\DryIoc.Internal\Container.cs" target="content\net40\DryIoc" />
     <file src="..\DryIoc.Internal\ImTools.cs" target="content\net40\DryIoc" />
-    <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
     <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\net40\DryIoc" />
 
     <!--net45-->

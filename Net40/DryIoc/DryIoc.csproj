@@ -50,7 +50,9 @@
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="FastExpressionCompiler.cs" />
+    <Compile Include="..\..\PCL\DryIoc\FastExpressionCompiler.cs">
+      <Link>FastExpressionCompiler.cs</Link>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
