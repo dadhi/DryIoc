@@ -208,7 +208,7 @@ namespace DryIoc
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
 
-        public static readonly string FacadeKey = "facade";
+        //public static readonly string FacadeKey = "facade";
 
         /// <summary>Clears cache for specified service(s).
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -8239,7 +8239,7 @@ namespace DryIoc
             if (Setup.OpenResolutionScope)
                 s.Append(", OpensResolutionScope");
             else if (Setup.AsResolutionCall)
-                s.Append(", AsResolutionScope");
+                s.Append(", AsResolutionCall");
 
             return s.Append("}").ToString();
         }
