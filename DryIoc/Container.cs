@@ -7920,7 +7920,7 @@ namespace DryIoc
                 // implicit split only when not inside Func with arguments,
                 // cause for now arguments are not propagated through resolve call
                 (request.ShouldSplitObjectGraph() ||
-                    Setup.UseParentReuse/* || request.Reuse is ResolutionScopeReuse*/) &&
+                    Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) &&
                 !request.IsWrappedInFuncWithArgs()) &&
                 request.GetActualServiceType() != typeof(void);
             return shouldBe;

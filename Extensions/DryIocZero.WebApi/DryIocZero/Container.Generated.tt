@@ -1,7 +1,7 @@
-﻿/*
+/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,15 +25,18 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-<#@ assembly Name="$(SolutionDir)packages\DryIoc.dll.2.11.3\lib\net45\DryIoc.dll" #>
-<#@ assembly Name="$(SolutionDir)packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll" #>
+
+<# // TODO: Replace DryIocZero.version in 2 paths below with the installed version of DryIocZero #>
+<#@ assembly Name="$(DryIocAssembly)" #>
+<#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
+
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Collections.Generic" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 
-<#@ include File="Registrations.tt" #><#
+<#@ include File="Registrations.ttinclude" #><#
 
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
@@ -58,6 +61,8 @@ Func<object, string> code = null;
             .Replace("DryIoc.SingletonReuse", "SingletonReuse")
             .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
             .Replace("DryIoc.FactoryType", "FactoryType")
+            .Replace("DryIoc.DefaultKey", "DefaultKey")
+            .Replace("DryIoc.RequestFlags", "RequestFlags")
 
         : objectToCode.PlainObjectToCode(x) ?? code(x.GetType());
 
@@ -88,22 +93,22 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-<#
-    if (errors.Length == 0)
-        WriteLine("Factory delegate generation is completed without errors.");
-    else
-        WriteLine("FAILED to generate for:");
-#>
-----------------------------------
+<#  if (errors.Length == 0) #>
+Generation is completed successfully.
+<#  else { #>
+Generation is FAILED, please fix the errors below.
+Note: you may fix the error for unresolved service by adding `container.RegisterPlaceholder<...>()` into Registrations.tt and then registering service at runtime.
+<#  }#>
+---------------------------------------
 <#
     for(var i = 0; i < errors.Length; ++i)
     {
         var e = errors[i];
 #>
-<#=i+1#>) <#=e.Key#>
+<#=i+1#>. <#=e.Key#>
 Error: <#=e.Value.Message#>
+<#  } #>
 
-<#  }#>
 */
 
     partial class Container
@@ -115,7 +120,7 @@ Error: <#=e.Value.Message#>
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveGenerated(ref object service, Type serviceType, IScope scope)
+        partial void ResolveGenerated(ref object service, Type serviceType)
         {
 <#
         var index = 0;
@@ -125,15 +130,15 @@ Error: <#=e.Value.Message#>
             else");
 #>
             if (serviceType == <#= factory.ServiceType #>)
-                service = Create_<#= factory.Index #>(this, scope);
+                service = Create_<#= factory.Index #>(this);
 <#
         }
 #>
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveGenerated(ref object service, Type serviceType, object serviceKey, 
-            Type requiredServiceType, RequestInfo preRequestParent, IScope scope)
+        partial void ResolveGenerated(ref object service,
+            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent)
         {
 <#
         index = 0;
@@ -152,7 +157,7 @@ Error: <#=e.Value.Message#>
                 else");
 #>
                 if (<#= root.ServiceKey #>.Equals(serviceKey))
-                    service = Create_<#= root.Index #>(this, scope);
+                    service = Create_<#= root.Index #>(this);
 <#
             }
 
@@ -182,7 +187,7 @@ Error: <#=e.Value.Message#>
                      : dep.ServiceKey + ".Equals(serviceKey)"#> &&
                     requiredServiceType == <#= dep.RequiredServiceType #> &&
                     Equals(preRequestParent, <#= dep.PreResolveParent #>)) 
-                    service = CreateDependency_<#= dep.Index #>(this, scope);
+                    service = CreateDependency_<#= dep.Index #>(this);
 <#
             }
 #>
@@ -236,7 +241,7 @@ Error: <#=e.Value.Message#>
     {
 #>
         // <#= root.ServiceType #>
-        internal static object Create_<#=root.Index#>(IResolverContext r, IScope scope)
+        internal static object Create_<#=root.Index#>(IResolverContext r)
         {
             return <#= root.Expression #>;
         }
@@ -249,7 +254,7 @@ Error: <#=e.Value.Message#>
     {
 #>
         // <#= dep.ServiceType #>
-        internal static object CreateDependency_<#=dep.Index#>(IResolverContext r, IScope scope)
+        internal static object CreateDependency_<#=dep.Index#>(IResolverContext r)
         {
             return <#= dep.Expression #>;
         }
