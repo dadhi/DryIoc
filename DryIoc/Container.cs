@@ -290,7 +290,9 @@ namespace DryIoc
         /// <summary>Returns <see cref="ResolverExpr"/> or <see cref="RootResolverExpr"/> based on request.</summary>
         public static Expression GetResolverExpr(Request request)
         {
-            return request.IsSingletonOrDependencyOfSingleton ? RootResolverExpr : ResolverExpr;
+            return request.IsSingletonOrDependencyOfSingleton 
+                && !(request.Reuse is ResolutionScopeReuse)
+                ? RootResolverExpr : ResolverExpr;
         }
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
