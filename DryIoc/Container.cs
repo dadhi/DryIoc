@@ -193,13 +193,12 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            //todo: v3: Possible alternative implementation
-            //return With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
-
-            return new Container(Rules.WithFallbackContainer(this), _scopeContext);
+            // wipes the cache, but preserves singletons and opened scope
+            return With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
         }
 
-        //public static readonly string FacadeKey = "facade";
+        /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
+        public static readonly string FacadeKey = "##facade";
 
         /// <summary>Clears cache for specified service(s).
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>

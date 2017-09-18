@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using ImTools;
@@ -9,20 +8,20 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue247_Collection_wrapper_resolved_from_Facade_does_not_count_parent_container_registrations
     {
-        [Test, Ignore("fix")]
+        [Test]
         public void When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
             container.UseInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b");
+            f.UseInstance("b", serviceKey: Container.FacadeKey);
             var strs = f.Resolve<string[]>();
 
             CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);
         }
 
-        [Test, Ignore("fix")]
+        [Test]
         public void When_only_fallback_services_are_available()
         {
             var container = new Container();
@@ -34,7 +33,7 @@ namespace DryIoc.IssuesTests
             CollectionAssert.AreEqual(new[] { "a" }, strs);
         }
 
-        [Test, Ignore("fix")]
+        [Test]
         public void For_KeyValuePair_When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
@@ -54,11 +53,10 @@ namespace DryIoc.IssuesTests
             container.UseInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b");
+            f.UseInstance("b", serviceKey: Container.FacadeKey);
             var strs = f.Resolve<LazyEnumerable<string>>().ToArrayOrSelf();
 
-            GC.KeepAlive(container);
-            Assert.AreEqual(2, strs.Length);
+            CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);
         }
 
         [Test]
@@ -70,7 +68,6 @@ namespace DryIoc.IssuesTests
             var f = container.CreateFacade();
             var strs = f.Resolve<LazyEnumerable<string>>().ToArrayOrSelf();
 
-            GC.KeepAlive(container);
             Assert.AreEqual(1, strs.Length);
         }
 
@@ -84,7 +81,6 @@ namespace DryIoc.IssuesTests
             f.UseInstance("b", serviceKey: 2);
             var strs = f.Resolve<LazyEnumerable<KeyValuePair<int, string>>>().ToArrayOrSelf();
 
-            GC.KeepAlive(container);
             Assert.AreEqual(2, strs.Length);
         }
     }
