@@ -12,6 +12,10 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v2.12.2:
+      - fixed: #519 Dependency of singleton not working when using "child" container
+      - fixed: #520 AccessViolationException on some machines
+      - fixed: #521 Rule ConcreteTypeDynamicRegistrations: Exception while resolving instance of class with constructor-injected generic instance of not registered class
       v2.12.1:
       - fixed: #512 InResolutionScopeOf in combination with SelectLastRegisteredFactory
       - changed: Updated to FEC v1.4 - now all DryIoc expressions are covered by FEC. This means perf improvements for asResolutionCall injection
@@ -45,7 +49,7 @@
     <!--net40-->
     <file src="..\DryIoc.Internal\Container.cs" target="content\net40\DryIoc" />
     <file src="..\DryIoc.Internal\ImTools.cs" target="content\net40\DryIoc" />
-    <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
     <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\net40\DryIoc" />
 
     <!--net45-->

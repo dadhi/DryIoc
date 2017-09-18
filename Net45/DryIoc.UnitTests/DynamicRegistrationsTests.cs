@@ -267,5 +267,30 @@ namespace DryIoc.UnitTests
                 X = x;
             }
         }
+
+        [Test]
+        public void Issue_521()
+        {
+            var container = new Container(r => r.WithConcreteTypeDynamicRegistrations());
+
+            container.Register<SomeClass>();
+            var instance = container.Resolve<SomeClass>();
+
+            Assert.IsInstanceOf<GenericClass<int>>(instance.GenericClass);
+        }
+
+        public class SomeClass
+        {
+            public readonly GenericClass<int> GenericClass;
+
+            public SomeClass(GenericClass<int> genericClass)
+            {
+                GenericClass = genericClass;
+            }
+        }
+
+        public class GenericClass<T>
+        {
+        }
     }
 }

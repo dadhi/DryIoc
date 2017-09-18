@@ -46,10 +46,8 @@
     <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="..\..\Net40\DryIoc\FastExpressionCompiler.cs">
-      <Link>FastExpressionCompiler.cs</Link>
-    </Compile>
     <Compile Include="AsyncExecutionFlowScopeContext.cs" />
+    <Compile Include="FastExpressionCompiler.cs" />
   </ItemGroup>
   <ItemGroup>
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />

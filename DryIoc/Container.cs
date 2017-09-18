@@ -192,8 +192,14 @@ namespace DryIoc
         public IContainer CreateFacade()
         {
             ThrowIfContainerDisposed();
+
+            //todo: v3: Possible alternative implementation
+            //return With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
+
             return new Container(Rules.WithFallbackContainer(this), _scopeContext);
         }
+
+        //public static readonly string FacadeKey = "facade";
 
         /// <summary>Clears cache for specified service(s).
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -1823,7 +1829,8 @@ namespace DryIoc
                     scope = scope.Parent;
                 }
 
-                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID);
+                return GetAndUnwrapOrDefault(r.SingletonScope(), FactoryID)
+                    .ThrowIfNull(Error.UnableToFindSingletonInstance);
             }
 
             private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
@@ -3882,6 +3889,7 @@ namespace DryIoc
             return AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
             {
                 if (serviceType.IsAbstract() ||
+                    serviceType.IsOpenGeneric() || // service type in principle should be concrete, so should not be open-generic
                     condition != null && !condition(serviceType, serviceKey))
                     return null;
 
@@ -8133,7 +8141,7 @@ namespace DryIoc
             if (Setup.OpenResolutionScope)
                 s.Append(", OpensResolutionScope");
             else if (Setup.AsResolutionCall)
-                s.Append(", AsResolutionScope");
+                s.Append(", AsResolutionCall");
 
             return s.Append("}").ToString();
         }
@@ -11251,7 +11259,10 @@ namespace DryIoc
                 "Implementation type is not specified when using automatic constructor selection: {0}"),
             NoImplementationForPlaceholder = Of(
                 "There is no real implementation, only a placeholder for the service {0}." + Environment.NewLine +
-                "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder.");
+                "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder."),
+            UnableToFindSingletonInstance = Of(
+                "Expecting the instance to be stored in singleton scope, but unable to find anything here." + Environment.NewLine + 
+                "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

@@ -4,7 +4,7 @@ $inputFiles = @(
 	".\DryIoc\Ported-net40.cs",
 	".\DryIoc\Ported-net45.cs",
 	".\PCL\DryIoc\Ported-net.cs",
-	".\Net40\DryIoc\FastExpressionCompiler.cs",
+	".\Net45\DryIoc\FastExpressionCompiler.cs",
 	".\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs"
 )
 $outputFolder = ".\DryIoc.Internal"
