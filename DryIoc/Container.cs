@@ -5940,7 +5940,9 @@ namespace DryIoc
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
-            var resolverExpr = Container.GetResolverExpr(request);
+            var resolverExpr = 
+                request.IsSingletonOrDependencyOfSingleton && !(request.Reuse is ResolutionScopeReuse)
+                ? Container.RootResolverExpr : Container.ResolverExpr;
 
             if (openResolutionScope)
             {
@@ -5949,6 +5951,7 @@ namespace DryIoc
                 var factoryIdExpr = Expression.Constant(request.FactoryID);
                 var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
 
+                // todo: Get constructor beforehand and store in the static field
                 var scopeNameExpr = Expression.New(
                     typeof(ResolutionScopeName).Constructor().ThrowIfNull(),
                     factoryIdExpr, actualServiceTypeExpr, serviceKeyExpr);

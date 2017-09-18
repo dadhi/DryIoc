@@ -783,6 +783,21 @@ namespace DryIoc.UnitTests
             container.Resolve<object>(typeof(O));
         }
 
+        [Test, Ignore("todo: fix #288 when we have an access to the parent scope from inside of resolution scope")]
+        public void Scoped_service_can_open_resolution_scope()
+        {
+            var container = new Container();
+
+            container.Register<O>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
+            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+
+            using (var scope = container.OpenScope())
+            {
+                var o = scope.Resolve<O>();
+                Assert.AreSame(o, scope.Resolve<O>());
+            }
+        }
+
         public class Ho {}
 
         public class O
