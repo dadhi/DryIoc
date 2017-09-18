@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue178_FallbackContainerDisposesInstanceRegisteredInParent
     {
-        [Test, Ignore("fix")]
+        [Test]
         public void Test_WithPreventDisposal()
         {
             var container = new Container();
@@ -15,9 +15,9 @@ namespace DryIoc.IssuesTests
 
             container.UseInstance<IA>(a, preventDisposal: true);
 
-            using (var c2 = new Container(Rules.Default.WithFallbackContainer(container)))
+            using (var c2 = container.CreateFacade())
             {
-                c2.Register<B>();
+                c2.Register<B>(serviceKey: Container.FacadeKey);
 
                 var p2 = c2.Resolve<B>();
             }
@@ -25,7 +25,7 @@ namespace DryIoc.IssuesTests
             Assert.IsFalse(a.IsDisposed);
         }
 
-        [Test, Ignore("fix")]
+        [Test]
         public void Test_WithPreventDisposalAndReplace()
         {
             var container = new Container();
@@ -34,9 +34,9 @@ namespace DryIoc.IssuesTests
 
             container.UseInstance<IA>(a, preventDisposal: true);
 
-            using (var c2 = new Container(Rules.Default.WithFallbackContainer(container)))
+            using (var c2 = container.CreateFacade())
             {
-                c2.Register<B>();
+                c2.Register<B>(serviceKey: Container.FacadeKey);
                 var b1 = c2.Resolve<B>();
                 Assert.IsNotNull(b1.A);
             }
@@ -44,7 +44,7 @@ namespace DryIoc.IssuesTests
             Assert.IsFalse(a.IsDisposed);
         }
 
-        [Test, Ignore("fix")]
+        [Test]
         public void Test_WithPreventDisposalAndWeaklyReferenced()
         {
             var container = new Container();
@@ -53,9 +53,9 @@ namespace DryIoc.IssuesTests
 
             container.UseInstance<IA>(a, preventDisposal: true, weaklyReferenced: true);
 
-            using (var c2 = new Container(Rules.Default.WithFallbackContainer(container)))
+            using (var c2 = container.CreateFacade())
             {
-                c2.Register<B>();
+                c2.Register<B>(serviceKey: Container.FacadeKey);
 
                 var p2 = c2.Resolve<B>();
             }

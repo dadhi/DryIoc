@@ -138,64 +138,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Attach_multiple_parents_with_single_rule()
-        {
-            IContainer parent = new Container();
-            parent.Register<FruitJuice>();
-
-            IContainer anotherParent = new Container();
-            anotherParent.Register<IFruit, Melon>();
-
-            var container = new Container();
-
-            var childContainer = container.With(rules => rules
-                .WithFallbackContainer(parent)
-                .WithFallbackContainer(anotherParent));
-
-            Assert.IsInstanceOf<Melon>(childContainer.Resolve<FruitJuice>().Fruit);
-        }
-
-        [Test]
-        public void Parent_attachment_should_not_affect_original_container()
-        {
-            IContainer parent = new Container();
-            parent.Register<FruitJuice>();
-            parent.Register<IFruit, Melon>();
-
-            var container = new Container();
-            container.Register<IFruit, Orange>();
-
-            var childContainer = container.With(rules => rules.WithFallbackContainer(parent));
-
-            Assert.IsInstanceOf<Melon>(parent.Resolve<FruitJuice>().Fruit);
-            Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
-
-            Assert.Throws<ContainerException>(() => 
-                container.Resolve<FruitJuice>());
-        }
-
-        [Test]
-        public void Can_detach_parent()
-        {
-            IContainer parent = new Container();
-            parent.Register<FruitJuice>();
-            parent.Register<IFruit, Melon>();
-
-            var container = new Container();
-            container.Register<IFruit, Orange>();
-
-            var childContainer = container.With(rules => rules.WithFallbackContainer(parent));
-
-            Assert.IsInstanceOf<Melon>(parent.Resolve<FruitJuice>().Fruit);
-            Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);
-
-            var detachedChild = childContainer.With(rules => rules.WithoutFallbackContainer(parent));
-
-            Assert.Throws<ContainerException>(() =>
-                detachedChild.Resolve<FruitJuice>());
-        }
-
-        [Test]
         public void Without_singletons_should_work()
         {
             var container = new Container();

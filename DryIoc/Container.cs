@@ -643,20 +643,6 @@ namespace DryIoc
                 if (service != null) // skip unresolved items
                     yield return service;
             }
-            
-            // todo: Don't like it here
-            var fallbackContainers = container.Rules.FallbackContainers;
-            if (!fallbackContainers.IsNullOrEmpty())
-            {
-                for (var i = 0; i < fallbackContainers.Length; i++)
-                {
-                    var fallbackContainer = fallbackContainers[i];
-                    var fallbackServices = fallbackContainer.Resolver.ResolveMany(
-                        serviceType, serviceKey, requiredServiceType, preResolveParent);
-                    foreach (var fallbackService in fallbackServices)
-                        yield return fallbackService;
-                }
-            }
         }
 
         private void ThrowIfContainerDisposed()
@@ -769,9 +755,6 @@ namespace DryIoc
                 if (factory != null)
                     return factory;
 
-                if (!Rules.FallbackContainers.IsNullOrEmpty())
-                    factory = ResolveFromFallbackContainers(Rules.FallbackContainers, request);
-
                 if (factory == null && !Rules.UnknownServiceResolvers.IsNullOrEmpty())
                     for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
                         factory = Rules.UnknownServiceResolvers[i](request);
@@ -784,27 +767,6 @@ namespace DryIoc
                 ThrowUnableToResolve(request);
 
             return factory;
-        }
-
-        private static Factory ResolveFromFallbackContainers(ContainerWeakRef[] fallbackContainers, Request request)
-        {
-            var container = request.Container;
-            for (var i = 0; i < fallbackContainers.Length; i++)
-            {
-                var containerWeakRef = fallbackContainers[i];
-                var containerRequest = request.WithNewContainer(containerWeakRef);
-
-                // Continue to next parent if factory is not found in first parent by
-                // updating IfUnresolved policy to ReturnDefault.
-                if (containerRequest.IfUnresolved == IfUnresolved.Throw)
-                    containerRequest = containerRequest.WithChangedServiceInfo(info => info.WithIfUnresolved(IfUnresolved.ReturnDefault));
-
-                var factory = containerWeakRef.Container.ResolveFactory(containerRequest);
-                if (factory != null)
-                    return factory;
-            }
-
-            return null;
         }
 
         internal static void ThrowUnableToResolve(Request request)
@@ -945,10 +907,9 @@ namespace DryIoc
 
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
-            // return early if no decorators registered and no fallback containers to provide them
+            // return early if no decorators registered
             if (_registry.Value.Decorators.IsEmpty &&
-                request.Rules.DynamicRegistrationProviders.IsNullOrEmpty() &&
-                request.Rules.FallbackContainers.IsNullOrEmpty())
+                request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
@@ -1100,15 +1061,6 @@ namespace DryIoc
                     decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)),
                     true, FactoryType.Decorator, serviceType)
                 .Map(it => it.Value);
-
-            if (!Rules.FallbackContainers.IsNullOrEmpty())
-            {
-                var fallbackDecorators = Rules.FallbackContainers
-                    .SelectMany(c => c.Container.GetDecoratorFactoriesOrDefault(serviceType))
-                    .ToArrayOrSelf();
-                if (!fallbackDecorators.IsNullOrEmpty())
-                    decorators = decorators.Append(fallbackDecorators);
-            }
 
             return decorators;
         }
@@ -3343,23 +3295,6 @@ namespace DryIoc
                 }
             }
 
-            // add items from fallback containers if any
-            var fallbackContainers = container.Rules.FallbackContainers;
-            if (!fallbackContainers.IsNullOrEmpty())
-            {
-                for (var i = 0; i < fallbackContainers.Length; i++)
-                {
-                    var fallbackContainer = fallbackContainers[i];
-                    var fallbackRequest = request.WithNewContainer(fallbackContainer);
-                    var itemsExpr = (NewArrayExpression)GetArrayExpression(fallbackRequest);
-                    if (itemsExpr.Expressions.Count != 0)
-                        if (itemExprList != null)
-                            itemExprList.AddRange(itemsExpr.Expressions);
-                        else
-                            itemExprList = new List<Expression>(itemsExpr.Expressions);
-                }
-            }
-
             return Expression.NewArrayInit(itemType, itemExprList ?? Enumerable.Empty<Expression>());
         }
 
@@ -4010,27 +3945,6 @@ namespace DryIoc
 
                 return request.Container.GetServiceFactoryOrDefault(request);
             };
-        }
-
-        /// <summary>List of containers to fallback resolution to.</summary>
-        public ContainerWeakRef[] FallbackContainers { get; private set; }
-
-        /// <summary>Appends WeakReference to new fallback container to the end of the list.</summary>
-        /// <param name="container">To append.</param> <returns>New rules.</returns>
-        public Rules WithFallbackContainer(IContainer container)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.FallbackContainers = newRules.FallbackContainers.AppendOrUpdate(container.ContainerWeakRef);
-            return newRules;
-        }
-
-        /// <summary>Removes WeakReference to fallback container from the list.</summary>
-        /// <param name="container">To remove.</param> <returns>New rules.</returns>
-        public Rules WithoutFallbackContainer(IContainer container)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.FallbackContainers = newRules.FallbackContainers.Remove(container.ContainerWeakRef);
-            return newRules;
         }
 
         /// <summary>See <see cref="WithDefaultReuseInsteadOfTransient"/></summary>
