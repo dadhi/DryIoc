@@ -99,12 +99,12 @@ namespace DryIoc.UnitTests
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
             Assert.AreEqual(
-                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Error.ScopeIsDisposed),
                 Error.NameOf(Assert.Throws<ContainerException>(() => getLog()).Error));
 
             // the same error should be kept for further operations
             Assert.AreEqual(
-                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Error.ScopeIsDisposed),
                 Error.NameOf(Assert.Throws<ContainerException>(() => getLog()).Error));
         }
 
@@ -370,7 +370,7 @@ namespace DryIoc.UnitTests
         public void Exist_rule_to_open_scope_with_container_and_scope_has_root_name()
         {
             var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            Assert.AreEqual(Container.NonAmbientRootScopeName, container.GetCurrentScope().Name);
+            Assert.AreEqual(Container.NonAmbientRootScopeName, container.OpenedScope.Name);
         }
 
         [Test]

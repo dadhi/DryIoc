@@ -43,9 +43,11 @@ namespace DryIoc.IssuesTests
     {
         public int Lifespan { get { return 50; } }
 
-        public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+        public object Name { get { return null; } }
+
+        public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
         {
-            return Reuse.Singleton.Apply(request, trackTransientDisposable, createItemExpr);
+            return Reuse.Singleton.Apply(request, trackTransientDisposable, serviceFactoryExpr);
         }
 
         public bool CanApply(Request request)

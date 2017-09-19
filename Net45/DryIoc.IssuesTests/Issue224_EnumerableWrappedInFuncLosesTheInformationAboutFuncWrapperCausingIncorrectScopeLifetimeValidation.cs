@@ -38,9 +38,11 @@ namespace DryIoc.IssuesTests
         {
             public int Lifespan { get { return 10; } }
 
-            public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+            public object Name { get { return null; } }
+
+            public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
             {
-                return createItemExpr;
+                return serviceFactoryExpr;
             }
 
             public bool CanApply(Request request)

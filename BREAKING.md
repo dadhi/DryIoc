@@ -9,3 +9,8 @@
 5. Removed `Rules.FallbackContainers`
 6. `Container.CreateFacade` implementation is changed from the use of fallback containers to 
 `rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey))`
+7. Removed `IScopeAccess` interface, replaced with `IResolverContext.OpenedScoped` and extension methods.
+8. Removed `ContainerWeakRef` implementation of `IResolverContext`. Now `IResolverContext` is implemented by `Container` itself.
+9. Added `IReuse.Name` to support reuse name
+10. Renamed `IContainer.ContainerWeakRef` into `IContainer.ResolverContext`
+11. Removed `ContainerTools.GetCurrentScope` extenstion. It is replaced by `IResolverContext.OpenedScope`
