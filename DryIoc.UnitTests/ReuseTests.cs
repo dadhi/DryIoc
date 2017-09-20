@@ -783,7 +783,7 @@ namespace DryIoc.UnitTests
             container.Resolve<object>(typeof(O));
         }
 
-        [Test, Ignore("todo: fix #288 when we have an access to the parent scope from inside of resolution scope")]
+        [Test]
         public void Scoped_service_can_open_resolution_scope()
         {
             var container = new Container();

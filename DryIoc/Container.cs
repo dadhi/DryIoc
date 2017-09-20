@@ -267,6 +267,10 @@ namespace DryIoc
         public static readonly ParameterExpression ResolverContextParamExpr =
             Expression.Parameter(typeof(IResolverContext), "r");
 
+        /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression ResolverContextParentExpr =
+            Expression.Property(ResolverContextParamExpr, ResolverContext.ParentProperty);
+
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression ResolverExpr =
             Expression.Property(ResolverContextParamExpr, ResolverContext.ResolverProperty);
@@ -2691,6 +2695,7 @@ namespace DryIoc
         /// <summary>Represents construction of whole request info stack as expression.</summary>
         /// <param name="container">Required to access container facilities for expression conversion.</param>
         /// <param name="request">Request info to convert to expression.</param>
+        /// <param name="opensResolutionScope">(optional) Will add <see cref="RequestFlags.OpensResolutionScope"/> to result expression.</param>
         /// <returns>Returns result expression.</returns>
         public static Expression RequestInfoToExpression(this IContainer container,
             RequestInfo request, bool opensResolutionScope = false)
@@ -2941,6 +2946,9 @@ namespace DryIoc
     {
         internal static readonly PropertyInfo ResolverProperty =
             typeof(IResolverContext).Property(nameof(IResolverContext.Resolver));
+
+        internal static readonly PropertyInfo ParentProperty =
+            typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
             typeof(IResolverContext).Method(nameof(IResolverContext.OpenScope));
@@ -6577,7 +6585,7 @@ namespace DryIoc
             => IsResolutionCall && PreResolveParent.IsEmpty;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionCallOpensResolutionScope
+        public bool OpensResolutionScope
             => IsResolutionCall && (PreResolveParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Request prior to Resolve call.</summary>
@@ -7002,13 +7010,6 @@ namespace DryIoc
                     Factory.FactoryID, Factory.FactoryType, Factory.ImplementationType, _reuse, _flags,
                     DecoratedFactoryID);
             }
-        }
-
-        // todo: v3: remove
-        /// <summary>Obsolete: use <see cref="RequestInfo"/> instead.</summary>
-        public RequestInfo ToRequestInfo()
-        {
-            return RequestInfo;
         }
 
         /// <summary>If request corresponds to dependency injected into parameter,
@@ -7729,23 +7730,15 @@ namespace DryIoc
         /// GetExpressionOrDefault. By default only service setup and no  user passed arguments may be cached.</summary>
         /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
         protected virtual bool IsFactoryExpressionCacheable(Request request)
-        {
-            return Setup.FactoryType == FactoryType.Service
-                && !request.TracksTransientDisposable
-                && request.FuncArgs == null
-                && !Setup.AsResolutionCall
-                && !request.IsResolutionRoot
-                && Setup.Condition == null &&
-                !IsScopeDependent(request);
-        }
+            => Setup.FactoryType == FactoryType.Service
+            && Setup.Condition == null
+            && !Setup.UseParentReuse
+            && !Setup.AsResolutionCall
 
-        private bool IsScopeDependent(Request request)
-            => Setup.UseParentReuse
-            || request.Reuse is ResolutionScopeReuse
-            || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
-
-        private bool ShouldOpenResolutionScope(Request request)
-            => Setup.OpenResolutionScope && !request.IsResolutionCallOpensResolutionScope;
+            && request.FuncArgs == null
+            && request.Reuse.Name == null
+            && !request.TracksTransientDisposable
+            && !request.IsResolutionRoot;
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
@@ -7770,7 +7763,7 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            if (ShouldOpenResolutionScope(request) ||
+            if (Setup.OpenResolutionScope && !request.OpensResolutionScope ||
                 ShouldBeInjectedAsResolutionCall(request))
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
@@ -9902,7 +9895,7 @@ namespace DryIoc
         private static readonly MethodInfo _getOrAddOrDefaultMethod =
             typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetOrAddItemOrDefault), includeNonPublic: true);
 
-        /// <summary>Returns expression call to <see cref="GetOrAddItemOrDefault"/>.</summary>
+        /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
         {
             var itemId = trackTransientDisposable ? -1 : request.FactoryID;
@@ -9918,8 +9911,12 @@ namespace DryIoc
             if (Name != null && Name.GetType().IsValueType())
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
+            Expression resolvedContextExpr = request.OpensResolutionScope
+                ? Container.ResolverContextParentExpr
+                : Container.ResolverContextParamExpr;
+
             return Expression.Call(_getOrAddOrDefaultMethod,
-                Container.ResolverContextParamExpr,
+                resolvedContextExpr,
                 scopeNameExpr,
                 Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
                 Expression.Constant(itemId),

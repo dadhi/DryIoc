@@ -13,6 +13,7 @@
 8. Removed `ContainerWeakRef` implementation of `IResolverContext`. Now `IResolverContext` is implemented by `Container` itself.
 9. Added `IReuse.Name` to support reuse name
 10. Renamed `IContainer.ContainerWeakRef` into `IContainer.ResolverContext`
-11. Removed `ContainerTools.GetCurrentScope` extenstion. It is replaced by `IResolverContext.OpenedScope`
-12. Removed `IContainer.EmptyRequest` and `Request.CreateEmpty`
-13. Removed `IContainer.ResolutionStateCache` and `IContainer.GetOrAddStateItem`
+11. Removed `ContainerTools.GetCurrentScope` extension. It is replaced by `IResolverContext.OpenedScope`
+12. Removed obsolete `IContainer.EmptyRequest` and `Request.CreateEmpty`
+13. Removed obsolete `IContainer.ResolutionStateCache` and `IContainer.GetOrAddStateItem`
+14. Removed obsolete `Request.ToRequestInfo`
