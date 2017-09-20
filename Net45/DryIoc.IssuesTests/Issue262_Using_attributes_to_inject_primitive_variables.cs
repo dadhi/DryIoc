@@ -70,8 +70,7 @@ namespace DryIoc.IssuesTests
                         if (attr == null)
                             return null;
                         var value = ConfigWrapper.GetValue(attr.Key);
-                        return PropertyOrFieldServiceInfo.Of(member)
-                            .WithDetails(ServiceDetails.Of(value), request);
+                        return PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(value));
                     })));
 
             container.Register<IService, BlahService>();
