@@ -15,3 +15,4 @@
 10. Renamed `IContainer.ContainerWeakRef` into `IContainer.ResolverContext`
 11. Removed `ContainerTools.GetCurrentScope` extenstion. It is replaced by `IResolverContext.OpenedScope`
 12. Removed `IContainer.EmptyRequest` and `Request.CreateEmpty`
+13. Removed `IContainer.ResolutionStateCache` and `IContainer.GetOrAddStateItem`

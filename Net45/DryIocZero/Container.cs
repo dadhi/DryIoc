@@ -1464,9 +1464,6 @@ namespace DryIocZero
         public FactoryDelegate Apply(int itemId, FactoryDelegate factoryDelegate)
         {
             throw new NotSupportedException("Resolution scope is not supported");
-            //return (r, scope) => r.Scopes
-            //    .GetOrCreateResolutionScope(ref scope, AssignableFromServiceType, ServiceKey)
-            //    .GetOrAdd(itemId, () => factoryDelegate(r, scope));
         }
 
         /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>

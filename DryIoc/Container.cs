@@ -1100,13 +1100,6 @@ namespace DryIoc
             return _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID) as Expression;
         }
 
-        // todo: v3: remove
-        /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc..</summary>
-        public object[] ResolutionStateCache
-        {
-            get { return null; }
-        }
-
         /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
         /// <param name="item">Item to convert.</param>
         /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
@@ -1152,12 +1145,6 @@ namespace DryIoc
                 Error.StateIsRequiredToUseItem, item);
 
             return Expression.Constant(item, itemType);
-        }
-
-        /// <inheritdoc />
-        public int GetOrAddStateItem(object item)
-        {
-            return -1;
         }
 
         #endregion
@@ -10658,9 +10645,6 @@ namespace DryIoc
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
-        /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
-        object[] ResolutionStateCache { get; }
-
         /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
         /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
         /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
@@ -10772,6 +10756,7 @@ namespace DryIoc
         /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
         Expression GetCachedFactoryExpressionOrDefault(int factoryID);
 
+        // todo: add the ValueType check to GetOrAddStateItemExpression
         /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
         /// <param name="item">Item to convert.</param>
         /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
@@ -10779,10 +10764,6 @@ namespace DryIoc
         /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
         Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
-
-        // todo: v3: remove with implementation
-        /// <summary>Obsolete: Please don't use. Will be removed in V3.</summary>
-        int GetOrAddStateItem(object item);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
