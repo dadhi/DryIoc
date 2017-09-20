@@ -34,9 +34,9 @@ namespace DryIoc.IssuesTests
             /// <inheritdoc />
             public object Name { get { return null; } }
 
-            public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
+            public Expression Apply(Request request, Expression serviceFactoryExpr)
             {
-                return Reuse.Singleton.Apply(request, trackTransientDisposable, serviceFactoryExpr);
+                return Reuse.Singleton.Apply(request,serviceFactoryExpr);
             }
 
             public bool CanApply(Request request)

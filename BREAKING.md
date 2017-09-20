@@ -17,4 +17,7 @@
 12. Removed obsolete `IContainer.EmptyRequest` and `Request.CreateEmpty`
 13. Removed obsolete `IContainer.ResolutionStateCache` and `IContainer.GetOrAddStateItem`
 14. Removed obsolete `Request.ToRequestInfo`
-15. Removed `outemost` parameter of `Reuse.InResolutionScopeOf` 
+15. Removed feature `outemost` parameter of `Reuse.InResolutionScopeOf`
+16. Removed not necessary `trackTransientDisposable` parameter from `IReuse.Apply` method
+17. Removed `ResolutionScopeReuse`, replaced by `CurrentScopeReuse`
+18. Changed `Reuse.InResolutionScope` to be just `Reuse.Scoped` underneath

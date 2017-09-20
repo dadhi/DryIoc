@@ -1934,7 +1934,7 @@ namespace DryIoc
     }
 
     /// <summary>Holds the name for the resolution scope.</summary>
-    internal sealed class ResolutionScopeName
+    public struct ResolutionScopeName
     {
         /// <summary>Type of service opening the scope.</summary>
         public readonly Type ServiceType;
@@ -1949,6 +1949,7 @@ namespace DryIoc
             ServiceKey = serviceKey;
         }
 
+        /// <summary>For debugging and exception messages</summary>
         public override string ToString()
         {
             var s = new StringBuilder("ResolutionScopeName(").Append(ServiceType);
@@ -1957,5 +1958,4 @@ namespace DryIoc
             return s.Append(")").ToString();
         }
     }
-
 }

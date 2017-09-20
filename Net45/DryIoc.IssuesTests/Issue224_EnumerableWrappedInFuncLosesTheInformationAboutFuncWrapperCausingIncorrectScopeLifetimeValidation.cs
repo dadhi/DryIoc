@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
 
             public object Name { get { return null; } }
 
-            public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
+            public Expression Apply(Request request, Expression serviceFactoryExpr)
             {
                 return serviceFactoryExpr;
             }

@@ -281,10 +281,9 @@ namespace DryIoc
                 ResolverContextParamExpr);
 
         /// <summary>Returns root or self resolver based on request.</summary>
-        public static Expression GetRootOrSelfResolverContextExpr(Request request)
-            => request.IsSingletonOrDependencyOfSingleton
-                   && !(request.Reuse is ResolutionScopeReuse) // todo: smells bad
-                ? RootOrSelfResolverContextExpr : ResolverContextParamExpr;
+        public static Expression GetRootOrSelfResolverContextExpr(Request request) =>
+            request.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope
+            ? RootOrSelfResolverContextExpr : ResolverContextParamExpr;
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfResolverExpr(Request request) =>
@@ -2940,7 +2939,6 @@ namespace DryIoc
         IResolverContext OpenScope(object name, bool trackInParent);
     }
 
-    // todo: v3: Remove dependency on  ContainerWeakRef impl. of IResolver context.
     /// <summary>Provides the shortcuts to <see cref="IResolverContext"/></summary>
     public static class ResolverContext
     {
@@ -2953,14 +2951,9 @@ namespace DryIoc
         internal static readonly MethodInfo OpenScopeMethod =
             typeof(IResolverContext).Method(nameof(IResolverContext.OpenScope));
 
-        internal static readonly MethodInfo GetFirstMatchingResolutionScopeMethod =
-            typeof(ResolverContext).Method(nameof(ResolverContext.GetFirstMatchingResolutionScope));
-
         /// <summary>Just a sugar that allow to get root or self container.</summary>
-        public static IResolverContext RootOrSelf(this IResolverContext r)
-        {
-            return r.Root ?? r;
-        }
+        public static IResolverContext RootOrSelf(this IResolverContext r) =>
+            r.Root ?? r;
 
         /// <summary>Gets current scope matching the <paramref name="name"/>.
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
@@ -2976,43 +2969,21 @@ namespace DryIoc
             if (name == null)
                 return scope;
 
-            while (scope != null && !name.Equals(scope.Name))
-                scope = scope.Parent;
-
-            return scope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, scope, name) : null);
-        }
-
-        /// <summary>Searches for the first matching resolution scope.</summary>
-        /// <param name="r">Source resolver context.</param>
-        /// <param name="serviceType"></param>
-        /// <param name="serviceKey"></param>
-        /// <param name="throwIfNotFound"></param>
-        /// <returns></returns>
-        public static IScope GetFirstMatchingResolutionScope(this IResolverContext r,
-            Type serviceType, object serviceKey, bool throwIfNotFound)
-        {
-            var scope = r.OpenedScope;
-            if (scope == null)
-                return throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null;
-
-            if (serviceType == null && serviceKey == null)
-                return scope;
-
-            while (scope != null)
+            var scopeName = name as IScopeName;
+            if (scopeName != null)
             {
-                var name = scope.Name as ResolutionScopeName;
-                if (name != null &&
-                    (serviceType == null || name.ServiceType.IsAssignableTo(serviceType) ||
-                     serviceType.IsOpenGeneric() && name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(serviceType)) &&
-                    (serviceKey == null || serviceKey.Equals(name.ServiceKey)))
-                    return scope;
-                scope = scope.Parent;
+                for (; scope != null; scope = scope.Parent)
+                    if (scopeName.Match(scope.Name))
+                        return scope;
+            }
+            else
+            {
+                for (; scope != null; scope = scope.Parent)
+                    if (name.Equals(scope.Name))
+                        return scope;
             }
 
-            if (throwIfNotFound)
-                Throw.It(Error.NoMatchedScopeFound, scope, new KV<Type, object>(serviceType, serviceKey));
-
-            return null;
+            return throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, scope, name) : null;
         }
     }
 
@@ -5366,7 +5337,6 @@ namespace DryIoc
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
-            Throw.If(reuse is ResolutionScopeReuse, Error.ResolutionScopeIsNotSupportedForRegisterInstance, instance);
             reuse = reuse ?? Reuse.Singleton;
 
             var scopedReuse = reuse as CurrentScopeReuse;
@@ -6706,17 +6676,13 @@ namespace DryIoc
 
         /// <summary>Returns result of <see cref="DryIoc.RequestInfo.GetActualServiceType"/>>.</summary>
         /// <returns>The type to be used for lookup in registry.</returns>
-        public Type GetActualServiceType()
-        {
-            return _serviceInfo.GetActualServiceType();
-        }
+        public Type GetActualServiceType() =>
+            _serviceInfo.GetActualServiceType();
 
         /// <summary>Returns known implementation, or otherwise actual service type.</summary>
         /// <returns>The subject.</returns>
-        public Type GetKnownImplementationOrServiceType()
-        {
-            return ImplementationType ?? GetActualServiceType();
-        }
+        public Type GetKnownImplementationOrServiceType() =>
+            ImplementationType ?? GetActualServiceType();
 
         /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
         /// <param name="info">Info about service to resolve.</param>
@@ -6889,7 +6855,8 @@ namespace DryIoc
             }
 
             _requestContext.IncrementDependencyCount();
-            return new Request(_requestContext, RawParent, _serviceInfo, factory, reuse, FuncArgs, flags, decoratedFactory);
+            return new Request(_requestContext,
+                RawParent, _serviceInfo, factory, reuse, FuncArgs, flags, decoratedFactory);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -6936,7 +6903,8 @@ namespace DryIoc
             if (!RawParent.IsEmpty)
                 for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
                 {
-                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                    if (p.OpensResolutionScope ||
+                        p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
                         break;
 
                     if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuse.Lifespan)
@@ -6947,7 +6915,8 @@ namespace DryIoc
             {
                 for (var p = PreResolveParent; !p.IsEmpty; p = p.ParentOrWrapper)
                 {
-                    if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                    if (p.OpensResolutionScope ||
+                        p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
                         break;
 
                     if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuse.Lifespan)
@@ -7736,10 +7705,8 @@ namespace DryIoc
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside Func with arguments,
                 // cause for now arguments are not propagated through resolve call
-                (request.ShouldSplitObjectGraph() ||
-                    Setup.UseParentReuse || request.Reuse is ResolutionScopeReuse) &&
-                !request.IsWrappedInFuncWithArgs()) &&
-                request.GetActualServiceType() != typeof(void);
+                (request.ShouldSplitObjectGraph() || Setup.UseParentReuse) && !request.IsWrappedInFuncWithArgs())
+                && request.GetActualServiceType() != typeof(void);
             return shouldBe;
         }
 
@@ -7875,7 +7842,7 @@ namespace DryIoc
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
 
-                serviceExpr = reuse.Apply(request, tracksTransientDisposable, serviceExpr);
+                serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
             // Unwrap WeakReference and/or array preventing disposal
@@ -9193,7 +9160,7 @@ namespace DryIoc
             var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
             var instanceExpr = Expression.Constant(instance, instanceType);
 
-            var serviceExpr = reuse.Apply(request, tracksTransientDisposableIgnored, instanceExpr);
+            var serviceExpr = reuse.Apply(request, instanceExpr);
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
@@ -9781,17 +9748,15 @@ namespace DryIoc
         /// It also may be interpreted as object[] Names for matching with multiple scopes </summary>
         object Name { get; }
 
-        // todo: v3: remove trackTransientDisposable param as it is available from Request param.
-        /// <summary>Returns composed expression.</summary>
-        /// <param name="request">info</param>
-        /// <param name="trackTransientDisposable">Indicates that item should be tracked.</param>
-        /// <param name="serviceFactoryExpr">Service creation expression</param>
-        /// <returns>Subject</returns>
-        Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr);
-
         /// <summary>Returns true if reuse can be applied: may check if scope or other reused item storage is present.</summary>
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         bool CanApply(Request request);
+
+        /// <summary>Returns composed expression.</summary>
+        /// <param name="request">info</param>
+        /// <param name="serviceFactoryExpr">Service creation expression</param>
+        /// <returns>Subject</returns>
+        Expression Apply(Request request, Expression serviceFactoryExpr);
     }
 
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
@@ -9804,9 +9769,10 @@ namespace DryIoc
         public object Name { get { return null; } }
 
         /// <summary>Returns expression call to GetOrAddItem.</summary>
-        public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
+        public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var itemId = trackTransientDisposable ? -1
+            var itemId = request.TracksTransientDisposable
+                ? -1
                 : request.SingletonScope.GetScopedItemIdOrSelf(request.FactoryID);
             return Expression.Call(Container.SingletonScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                 Expression.Constant(itemId), Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
@@ -9814,49 +9780,37 @@ namespace DryIoc
 
         /// <summary>Returns true because singleton is always available.</summary>
         /// <param name="request">_</param> <returns>True.</returns>
-        public bool CanApply(Request request)
-        {
-            return true;
-        }
+        public bool CanApply(Request request) => true;
 
         private readonly Lazy<Expression> _singletonReuseExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
-        {
-            return _singletonReuseExpr.Value;
-        }
+        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
+            _singletonReuseExpr.Value;
 
         /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            return GetType().Name + " {Lifespan=" + Lifespan + "}";
-        }
+        public override string ToString() =>
+            GetType().Name + " {Lifespan=" + Lifespan + "}";
     }
 
     /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
     /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
     public sealed class CurrentScopeReuse : IReuse
     {
+        /// <summary>Relative to other reuses lifespan value.</summary>
+        public int Lifespan => 100;
+
         /// <inheritdoc />
-        public object Name { get; private set; }
+        public object Name { get; }
 
-        /// <summary>Relative to other reuses lifespan value. Less than Singleton.</summary>
-        public int Lifespan { get { return 100; } }
+        private bool _scopedOrSingleton;
 
-        // todo: Add lifetime parameter
         /// <summary>Creates reuse optionally specifying its name.</summary>
-        /// <param name="name">(optional) Used to find matching current scope or parent.</param>
-        public CurrentScopeReuse(object name = null)
+        public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false)
         {
             Name = name;
-        }
-
-        internal bool ScopedOrSingleton;
-        internal CurrentScopeReuse(bool scopedOrSingleton)
-        {
-            ScopedOrSingleton = scopedOrSingleton;
+            _scopedOrSingleton = scopedOrSingleton;
         }
 
         internal static object GetScopedOrSingleton(IResolverContext r,
@@ -9883,10 +9837,10 @@ namespace DryIoc
             typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetOrAddItemOrDefault), includeNonPublic: true);
 
         /// <summary>Creates scoped item creation and access expression.</summary>
-        public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
+        public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var itemId = trackTransientDisposable ? -1 : request.FactoryID;
-            if (ScopedOrSingleton)
+            var itemId = request.TracksTransientDisposable ? -1 : request.FactoryID;
+            if (_scopedOrSingleton)
                 return Expression.Call(_getScopedOrSingletonMethod,
                     Container.ResolverContextParamExpr,
                     Container.SingletonScopeExpr,
@@ -9912,12 +9866,8 @@ namespace DryIoc
 
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
-        public bool CanApply(Request request)
-        {
-            if (ScopedOrSingleton)
-                return true;
-            return request.ResolverContext.GetFirstMatchedScope(Name, false) != null;
-        }
+        public bool CanApply(Request request) =>
+            _scopedOrSingleton || request.ResolverContext.GetFirstMatchedScope(Name, false) != null;
 
         private readonly Lazy<Expression> _scopedExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
@@ -9929,10 +9879,10 @@ namespace DryIoc
             Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.ScopedOrSingleton))));
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
-            => Name == null && !ScopedOrSingleton ? _scopedExpr.Value
-                : ScopedOrSingleton ? _scopedOrSingletonExpr.Value
-                : Expression.Call(_scopedToMethod.Value, fallbackConverter(Name));
+        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
+            Name == null && !_scopedOrSingleton ? _scopedExpr.Value
+            : _scopedOrSingleton ? _scopedOrSingletonExpr.Value
+            : Expression.Call(_scopedToMethod.Value, fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -9944,8 +9894,15 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Abstracts way to match reuse and scope names</summary>
+    public interface IScopeName
+    {
+        /// <summary>Does the job.</summary>
+        bool Match(object scopeName);
+    }
+
     /// <summary>Holds the name for the resolution scope.</summary>
-    public sealed class ResolutionScopeName
+    public sealed class ResolutionScopeName : IScopeName
     {
         internal static readonly ConstructorInfo Constructor = typeof(ResolutionScopeName)
             .GetTypeInfo().DeclaredConstructors.First();
@@ -9963,6 +9920,23 @@ namespace DryIoc
             ServiceKey = serviceKey;
         }
 
+        /// <inheritdoc />
+        public bool Match(object scopeName)
+        {
+            var resolutionScopeName = scopeName as ResolutionScopeName;
+            if (resolutionScopeName == null)
+                return false;
+
+            if ((ServiceType == null ||
+                resolutionScopeName.ServiceType.IsAssignableTo(ServiceType) ||
+                 ServiceType.IsOpenGeneric() &&
+                 resolutionScopeName.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
+                (ServiceKey == null || ServiceKey.Equals(resolutionScopeName.ServiceKey)))
+                return true;
+
+            return false;
+        }
+
         /// <summary>String representation for easy debugging and understood error messages.</summary>
         public override string ToString()
         {
@@ -9970,80 +9944,6 @@ namespace DryIoc
             if (ServiceKey != null)
                 s.Append(',').Print(ServiceKey);
             return s.Append(")").ToString();
-        }
-    }
-
-    /// <summary>Represents services created once per resolution root (when some of Resolve methods called).</summary>
-    /// <remarks>Scope is created only if accessed to not waste memory.</remarks>
-    public sealed class ResolutionScopeReuse : IReuse
-    {
-        /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 0; } }
-
-        /// <inheritdoc />
-        public object Name { get; private set; } // todo: set the name to ResolutionScopeName
-
-        /// <summary>Indicates consumer with assignable service type that defines resolution scope.</summary>
-        public readonly Type AssignableFromServiceType;
-
-        /// <summary>Indicates service key of the consumer that defines resolution scope.</summary>
-        public readonly object ServiceKey;
-
-        /// <summary>Creates new resolution scope reuse with specified type and key.</summary>
-        /// <param name="assignableFromServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
-        public ResolutionScopeReuse(Type assignableFromServiceType = null, object serviceKey = null)
-        {
-            AssignableFromServiceType = assignableFromServiceType;
-            ServiceKey = serviceKey;
-        }
-
-        /// <inheritdoc />
-        public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
-        {
-            // even inside singleton we should not look for root scopes, cause
-            var scopeExpr = Expression.Call(ResolverContext.GetFirstMatchingResolutionScopeMethod,
-                Container.ResolverContextParamExpr,
-                Expression.Constant(AssignableFromServiceType, typeof(Type)),
-                request.Container.GetOrAddStateItemExpression(ServiceKey, typeof(object)),
-                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw, typeof(bool)));
-
-            // For transient disposable we don't care to bind to specific ID, because it should be created each time.
-            var scopedId = trackTransientDisposable ? -1 : request.FactoryID;
-            return Expression.Call(scopeExpr, Scope.GetOrAddMethod,
-                Expression.Constant(scopedId),
-                Expression.Lambda<CreateScopedValue>(serviceFactoryExpr, ArrayTools.Empty<ParameterExpression>()));
-        }
-
-        /// <inheritdoc />
-        public bool CanApply(Request request)
-        {
-            return request.ResolverContext.GetFirstMatchingResolutionScope(
-                AssignableFromServiceType, ServiceKey, throwIfNotFound: false) != null;
-        }
-
-        private readonly Lazy<Expression> _scopedExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
-
-        /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
-        {
-            if (AssignableFromServiceType == null && ServiceKey == null)
-                return _scopedExpr.Value;
-
-            return Expression.Call(typeof(Reuse)
-                .Method(nameof(Reuse.ScopedTo), typeof(Type), typeof(object)),
-                Expression.Constant(AssignableFromServiceType, typeof(Type)),
-                fallbackConverter(ServiceKey));
-        }
-
-        /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            var s = new StringBuilder().Append(GetType().Name)
-                .Append(" {Name={").Print(AssignableFromServiceType)
-                .Append(", ").Print(ServiceKey, "\"")
-                .Append("}}");
-            return s.ToString();
         }
     }
 
@@ -10061,25 +9961,24 @@ namespace DryIoc
         public static readonly IReuse Scoped = new CurrentScopeReuse();
 
         /// <summary>Same as InCurrentNamedScope. From now on will be the default name.</summary>
-        public static IReuse ScopedTo(object name = null) => 
-            name == null ? Scoped : new CurrentScopeReuse(name);
+        public static IReuse ScopedTo(object name) => new CurrentScopeReuse(name);
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
-        public static IReuse ScopedTo(Type assignableFromServiceType = null, object serviceKey = null) => 
-            assignableFromServiceType == null && serviceKey == null 
+        public static IReuse ScopedTo(Type assignableFromServiceType = null, object serviceKey = null) =>
+            assignableFromServiceType == null && serviceKey == null
             ? Scoped
-            : new ResolutionScopeReuse(assignableFromServiceType, serviceKey);
+            : new CurrentScopeReuse(new ResolutionScopeName(assignableFromServiceType, serviceKey));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
-        public static IReuse ScopedTo<T>(object serviceKey = null) =>
-            ScopedTo(typeof(T), serviceKey);
+        public static IReuse ScopedTo<TService>(object serviceKey = null) =>
+            ScopedTo(typeof(TService), serviceKey);
 
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Reuse.Singleton"/></summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
-        /// <summary>Specifies to store single service instance per resolution root created by <see cref="Resolver"/> methods.</summary>
-        public static readonly IReuse InResolutionScope = new ResolutionScopeReuse();
+        /// <summary>Obsolete: use <see cref="Scoped"/> instead.</summary>
+        public static readonly IReuse InResolutionScope = Scoped;
 
         /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
@@ -10088,7 +9987,7 @@ namespace DryIoc
         /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
         /// <param name="name">(optional) Name to match with scope.</param>
         /// <returns>Created current scope reuse.</returns>
-        public static IReuse InCurrentNamedScope(object name = null) => 
+        public static IReuse InCurrentNamedScope(object name = null) =>
             ScopedTo(name);
 
         /// <summary>Creates reuse to search for <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/>
@@ -10121,35 +10020,21 @@ namespace DryIoc
         /// <summary>No-reuse</summary>
         private sealed class TransientReuse : IReuse
         {
-            /// <summary>0 means no reused lifespan</summary>
-            public int Lifespan { get { return 0; } }
+            public int Lifespan => 0;
 
-            /// <inheritdoc />
-            public object Name { get { return null; } }
+            public object Name => null;
 
-            /// <summary>returns source expression without modification</summary>
-            public Expression Apply(Request request, bool trackTransientDisposable, Expression serviceFactoryExpr)
-            {
-                return serviceFactoryExpr;
-            }
+            public Expression Apply(Request _, Expression serviceFactoryExpr) => serviceFactoryExpr;
 
-            public bool CanApply(Request request)
-            {
-                return true;
-            }
+            public bool CanApply(Request request) => true;
 
             private readonly Lazy<Expression> _transientReuseExpr = new Lazy<Expression>(() =>
-                Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Transient))));
+                Expression.Field(null, typeof(Reuse).Field(nameof(Transient))));
 
-            public Expression ToExpression(Func<object, Expression> fallbackConverter)
-            {
-                return _transientReuseExpr.Value;
-            }
+            public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
+                _transientReuseExpr.Value;
 
-            public override string ToString()
-            {
-                return "TransientReuse";
-            }
+            public override string ToString() => "TransientReuse";
         }
 
         #endregion
@@ -10202,12 +10087,12 @@ namespace DryIoc
         #endregion
 
         /// <summary>Returns true for an empty request.</summary>
-        public bool IsEmpty
-            => ServiceInfo == null;
+        public bool IsEmpty =>
+            ServiceInfo == null;
 
         /// <summary>Returns true if request is the first in a chain.</summary>
-        public bool IsResolutionRoot
-            => !IsEmpty && ParentOrWrapper.IsEmpty;
+        public bool IsResolutionRoot =>
+            !IsEmpty && ParentOrWrapper.IsEmpty;
 
         /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
         public RequestInfo Parent
@@ -10225,49 +10110,53 @@ namespace DryIoc
         }
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType
-            => ServiceInfo?.ServiceType;
+        public Type ServiceType =>
+            ServiceInfo?.ServiceType;
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType
-            => ServiceInfo?.Details.RequiredServiceType;
+        public Type RequiredServiceType =>
+            ServiceInfo?.Details.RequiredServiceType;
 
         /// <summary>Returns <see cref="RequiredServiceType"/> if it is specified and assignable to <see cref="ServiceType"/>,
         /// otherwise returns <see cref="ServiceType"/>.</summary>
         /// <returns>The type to be used for lookup in registry.</returns>
-        public Type GetActualServiceType()
-            => ServiceInfo.GetActualServiceType();
+        public Type GetActualServiceType() =>
+            ServiceInfo.GetActualServiceType();
 
         /// <summary>Returns known implementation, or otherwise actual service type.</summary>
         /// <returns>The subject.</returns>
-        public Type GetKnownImplementationOrServiceType()
-            => ImplementationType ?? GetActualServiceType();
+        public Type GetKnownImplementationOrServiceType() =>
+            ImplementationType ?? GetActualServiceType();
 
         /// <summary>Policy to deal with unresolved request.</summary>
-        public IfUnresolved IfUnresolved
-            => ServiceInfo == null ? IfUnresolved.Throw : ServiceInfo.Details.IfUnresolved;
+        public IfUnresolved IfUnresolved =>
+            ServiceInfo == null ? IfUnresolved.Throw : ServiceInfo.Details.IfUnresolved;
 
         /// <summary>Optional service key to identify service of the same type.</summary>
-        public object ServiceKey
-            => ServiceInfo?.Details.ServiceKey;
+        public object ServiceKey =>
+            ServiceInfo?.Details.ServiceKey;
 
         /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
-        public string MetadataKey
-            => ServiceInfo?.Details.MetadataKey;
+        public string MetadataKey =>
+            ServiceInfo?.Details.MetadataKey;
 
         /// <summary>Metadata or the value (if key specified) to find in resolved service.</summary>
-        public object Metadata
-            => ServiceInfo?.Details.Metadata;
+        public object Metadata =>
+            ServiceInfo?.Details.Metadata;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
-        public int ReuseLifespan
-            => Reuse == null ? 0 : Reuse.Lifespan;
+        public int ReuseLifespan =>
+            Reuse == null ? 0 : Reuse.Lifespan;
+
+        /// <summary>Indicates the service opening resolution scope</summary>
+        public bool OpensResolutionScope =>
+            (Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
         /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
         /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
-            => Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
+            Push(serviceType, null, null, null, null, IfUnresolved.Throw,
                 factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -10276,8 +10165,8 @@ namespace DryIoc
         /// <param name="implementationType"></param> <param name="reuse"></param><param name="flags"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-            => Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
                 factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -10288,8 +10177,8 @@ namespace DryIoc
         /// <param name="flags"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-            => Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
                 factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -10301,8 +10190,8 @@ namespace DryIoc
         /// <param name="flags"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-            => Push(DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            Push(DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
                 factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
@@ -10314,8 +10203,8 @@ namespace DryIoc
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(IServiceInfo serviceInfo,
             int factoryID = 0, FactoryType factoryType = FactoryType.Service, Type implementationType = null, IReuse reuse = null,
-            RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0)
-            => new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
+            RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0) => 
+            new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         /// <summary>Returns all request until the root - parent is null.</summary>
         /// <returns>Requests from the last to first.</returns>
@@ -10356,28 +10245,25 @@ namespace DryIoc
         }
 
         /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
-        public override string ToString()
-            => Print(new StringBuilder()).ToString();
+        public override string ToString() => 
+            Print(new StringBuilder()).ToString();
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
-        public override bool Equals(object obj)
-            => Equals(obj as RequestInfo);
+        public override bool Equals(object obj) => 
+            Equals(obj as RequestInfo);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
         /// <param name="other"></param> <returns></returns>
-        public bool Equals(RequestInfo other)
-        {
-            return other != null && EqualsWithoutParent(other)
+        public bool Equals(RequestInfo other) =>
+            other != null && EqualsWithoutParent(other)
                 && (ParentOrWrapper == null && other.ParentOrWrapper == null
                 || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
-        }
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
-        public bool EqualsWithoutParent(RequestInfo other)
-        {
-            return other.ServiceType == ServiceType
+        public bool EqualsWithoutParent(RequestInfo other) =>
+            other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
                 && other.IfUnresolved == IfUnresolved
                 && Equals(other.ServiceKey, ServiceKey)
@@ -10387,13 +10273,11 @@ namespace DryIoc
                 && other.FactoryType == FactoryType
                 && other.ImplementationType == ImplementationType
                 && other.ReuseLifespan == ReuseLifespan;
-        }
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
-        public bool EqualsWithoutParent(Request other)
-        {
-            return other.ServiceType == ServiceType
+        public bool EqualsWithoutParent(Request other) => 
+            other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
                 && other.IfUnresolved == IfUnresolved
                 && Equals(other.ServiceKey, ServiceKey)
@@ -10403,8 +10287,8 @@ namespace DryIoc
                 && other.FactoryType == FactoryType
                 && other.ImplementationType == ImplementationType
                 && other.ReuseLifespan == ReuseLifespan;
-        }
 
+        // todo: use factoryId as hash if known
         /// <summary>Returns hash code combined from info fields plus its parent.</summary>
         /// <returns>Combined hash code.</returns>
         public override int GetHashCode()
