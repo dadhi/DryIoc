@@ -1939,35 +1939,24 @@ namespace DryIoc
     /// <summary>Holds the name for the resolution scope.</summary>
     internal sealed class ResolutionScopeName
     {
-        // todo: Remove if possible
-        /// <summary>Factory ID of service opening the scope.</summary>
-        public readonly int FactoryID;
-
         /// <summary>Type of service opening the scope.</summary>
         public readonly Type ServiceType;
 
         /// <summary>Optional service key of service opening the scope.</summary>
         public readonly object ServiceKey;
 
-        // todo: v3: remove factoryID, why should we include it into name.
         /// <summary>Creates the key.</summary>
-        public ResolutionScopeName(int factoryID, Type serviceType, object serviceKey)
+        public ResolutionScopeName(Type serviceType, object serviceKey)
         {
-            FactoryID = factoryID;
             ServiceType = serviceType;
             ServiceKey = serviceKey;
         }
 
         public override string ToString()
         {
-            var s = new StringBuilder()
-                .Append(GetType().Name)
-                .Append("(#").Append(FactoryID)
-                .Append(", ").Append(ServiceType);
-
+            var s = new StringBuilder("ResolutionScopeName(").Append(ServiceType);
             if (ServiceKey != null)
-                s.Append(ServiceKey);
-
+                s.Append(',').Append(ServiceKey);
             return s.Append(")").ToString();
         }
     }

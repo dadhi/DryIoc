@@ -14,3 +14,4 @@
 9. Added `IReuse.Name` to support reuse name
 10. Renamed `IContainer.ContainerWeakRef` into `IContainer.ResolverContext`
 11. Removed `ContainerTools.GetCurrentScope` extenstion. It is replaced by `IResolverContext.OpenedScope`
+12. Removed `IContainer.EmptyRequest` and `Request.CreateEmpty`

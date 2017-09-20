@@ -689,13 +689,6 @@ namespace DryIoc
             get { return _disposed == 1 || _singletonScope.IsDisposed; }
         }
 
-        // todo: v3: remove
-        /// <summary>Obsolete: replaced with <see cref="Request.Create"/>/.</summary>
-        Request IContainer.EmptyRequest
-        {
-            get { return Request.CreateEmpty(this); }
-        }
-
         /// <summary>Self weak reference, with readable message when container is GCed/Disposed.</summary>
         IResolverContext IContainer.ResolverContext
         {
@@ -2712,10 +2705,13 @@ namespace DryIoc
         /// <param name="container">Required to access container facilities for expression conversion.</param>
         /// <param name="request">Request info to convert to expression.</param>
         /// <returns>Returns result expression.</returns>
-        public static Expression RequestInfoToExpression(this IContainer container, RequestInfo request)
+        public static Expression RequestInfoToExpression(this IContainer container,
+            RequestInfo request, bool opensResolutionScope = false)
         {
             if (request.IsEmpty)
-                return _emptyRequestInfoExpr.Value;
+                return opensResolutionScope
+                    ? _emptyOpensResolutionScopeRequestInfoExpr.Value
+                    : _emptyRequestInfoExpr.Value;
 
             // recursively ask for parent expression until it is empty
             var parentRequestInfoExpr = container.RequestInfoToExpression(request.ParentOrWrapper);
@@ -2730,6 +2726,9 @@ namespace DryIoc
             var factoryType = request.FactoryType;
             var ifUnresolved = request.IfUnresolved;
             var flags = request.Flags;
+            if (opensResolutionScope)
+                flags |= RequestFlags.OpensResolutionScope;
+
             //todo: Convert request.DecoratedFactoryID;
 
             var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
@@ -2773,6 +2772,9 @@ namespace DryIoc
 
         private static readonly Lazy<Expression> _emptyRequestInfoExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(RequestInfo).Field(nameof(RequestInfo.Empty))));
+
+        private static readonly Lazy<Expression> _emptyOpensResolutionScopeRequestInfoExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(RequestInfo).Field(nameof(RequestInfo.EmptyOpensResolutionScope))));
 
         /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/>.
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -5828,15 +5830,11 @@ namespace DryIoc
             if (openResolutionScope)
             {
                 // code to generate:
-                // r => r.OpenScope(new ResolutionScopeName(12, serviceType, serviceKey)).Resolve(serviceType, serviceKey)
+                // r => r.OpenScope(new ResolutionScopeName(serviceType, serviceKey)).Resolve(serviceType, serviceKey)
                 var factoryIdExpr = Expression.Constant(request.FactoryID);
                 var actualServiceTypeExpr = Expression.Constant(request.GetActualServiceType(), typeof(Type));
 
-                // todo: Get constructor beforehand and store in the static field
-                var scopeNameExpr = Expression.New(
-                    typeof(ResolutionScopeName).Constructor().ThrowIfNull(),
-                    factoryIdExpr, actualServiceTypeExpr, serviceKeyExpr);
-
+                var scopeNameExpr = Expression.New(ResolutionScopeName.Constructor, actualServiceTypeExpr, serviceKeyExpr);
                 var trackInParent = Expression.Constant(true);
 
                 resolverExpr = Expression.Property(
@@ -5852,7 +5850,8 @@ namespace DryIoc
                     ? request.PreResolveParent
                     : request.RawParent.RequestInfo;
 
-            var preResolveParentExpr = container.RequestInfoToExpression(parentRequestInfo);
+            var preResolveParentExpr = container.RequestInfoToExpression(
+                parentRequestInfo, openResolutionScope);
 
             var resolveCallExpr = Expression.Call(resolverExpr, ResolveMethod,
                 serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr);
@@ -6500,6 +6499,9 @@ namespace DryIoc
         IsWrappedInFunc = 1 << 4,
         /// <summary>Inherited</summary>
         IsWrappedInFuncWithArgs = 1 << 5,
+
+        /// <summary>Non inherited</summary>
+        OpensResolutionScope = 1 << 6
     }
 
     /// <summary>Contains resolution stack with information about resolved service and factory for it,
@@ -6511,14 +6513,6 @@ namespace DryIoc
         public static readonly RequestFlags NotInheritedFlags
             = RequestFlags.TracksTransientDisposable
             | RequestFlags.IsServiceCollection;
-
-        // todo: v3: remove
-        /// <summary>Obsolete: replaced with <see cref="Create"/>/.</summary>
-        public static Request CreateEmpty(Container container)
-        {
-            var resolverContext = new RequestContext(container, RequestInfo.Empty);
-            return new Request(resolverContext, null, ServiceInfo.Empty, null, null, null, default(RequestFlags), null);
-        }
 
         private static readonly Request _empty =
             new Request(null, null, ServiceInfo.Empty, null, null, null, default(RequestFlags), null);
@@ -6588,10 +6582,16 @@ namespace DryIoc
         #endregion
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall { get { return !IsEmpty && RawParent.IsEmpty; } }
+        public bool IsResolutionCall 
+            => !IsEmpty && RawParent.IsEmpty;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionRoot { get { return IsResolutionCall && PreResolveParent.IsEmpty; } }
+        public bool IsResolutionRoot 
+            => IsResolutionCall && PreResolveParent.IsEmpty;
+
+        /// <summary>Returns true if request is First in First Resolve call.</summary>
+        public bool IsResolutionCallOpensResolutionScope
+            => IsResolutionCall && (PreResolveParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Request prior to Resolve call.</summary>
         public RequestInfo PreResolveParent { get { return _requestContext.PreResolveParent; } }
@@ -6629,15 +6629,11 @@ namespace DryIoc
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable
-        {
-            get { return (_flags & RequestFlags.TracksTransientDisposable) != 0; }
-        }
+            => (_flags & RequestFlags.TracksTransientDisposable) != 0;
 
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton
-        {
-            get { return (_flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0; }
-        }
+            => (_flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
         /// <summary>Gathers the info from resolved dependency graph.
         /// If dependency injected <c>asResolutionCall</c> the whole graph is not cacheable (issue #416).</summary>
@@ -6650,10 +6646,7 @@ namespace DryIoc
 
         /// <summary>Provides approximate number of dependencies in resolution graph (starting from Resolve method),
         /// excluding registered delegates, instances, and wrappers.</summary>
-        public int DependencyCount
-        {
-            get { return _requestContext.DependencyCount; }
-        }
+        public int DependencyCount => _requestContext.DependencyCount;
 
         /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.MaxObjectGraphSize"/> setting.</summary>
         /// <returns>True if should be split, and false otherwise.</returns>
@@ -6903,9 +6896,10 @@ namespace DryIoc
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
             if (reuse == DryIoc.Reuse.Singleton)
+            {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
-            // check for disposable transient
-            else if (reuse == DryIoc.Reuse.Transient)
+            }
+            else if (reuse == DryIoc.Reuse.Transient) // check for disposable transient
             {
                 reuse = GetTransientDisposableTrackingReuse(factory);
                 if (reuse != DryIoc.Reuse.Transient)
@@ -7759,24 +7753,12 @@ namespace DryIoc
         }
 
         private bool IsScopeDependent(Request request)
-        {
-            return Setup.UseParentReuse
+            => Setup.UseParentReuse
             || request.Reuse is ResolutionScopeReuse
             || (request.Reuse is CurrentScopeReuse && ((CurrentScopeReuse)request.Reuse).Name != null);
-        }
 
         private bool ShouldOpenResolutionScope(Request request)
-        {
-            if (!Setup.OpenResolutionScope)
-                return false;
-
-            // Prevents recursion of generating OpenScope: 
-            // r => r.OpenScope().Resolve<IDependency>(new KV<Type, object>(typeof(IDependency), null))
-            var scope = request.OpenedScope;
-            return scope == null ||
-                   !(scope.Name is ResolutionScopeName) ||
-                   ((ResolutionScopeName)scope.Name).FactoryID != FactoryID;
-        }
+            => Setup.OpenResolutionScope && !request.IsResolutionCallOpensResolutionScope;
 
         private bool ShouldBeInjectedAsResolutionCall(Request request)
         {
@@ -9977,11 +9959,9 @@ namespace DryIoc
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter)
-        {
-            return Name == null && !ScopedOrSingleton ? _scopedExpr.Value
+            => Name == null && !ScopedOrSingleton ? _scopedExpr.Value
                 : ScopedOrSingleton ? _scopedOrSingletonExpr.Value
                 : Expression.Call(_scopedToMethod.Value, fallbackConverter(Name));
-        }
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -9996,9 +9976,8 @@ namespace DryIoc
     /// <summary>Holds the name for the resolution scope.</summary>
     public sealed class ResolutionScopeName
     {
-        // todo: Remove if possible
-        /// <summary>Factory ID of service opening the scope.</summary>
-        public readonly int FactoryID;
+        internal static readonly ConstructorInfo Constructor = typeof(ResolutionScopeName)
+            .GetTypeInfo().DeclaredConstructors.First();
 
         /// <summary>Type of service opening the scope.</summary>
         public readonly Type ServiceType;
@@ -10006,11 +9985,9 @@ namespace DryIoc
         /// <summary>Optional service key of service opening the scope.</summary>
         public readonly object ServiceKey;
 
-        // todo: v3: remove factoryID, why should we include it into name.
         /// <summary>Creates the key.</summary>
-        public ResolutionScopeName(int factoryID, Type serviceType, object serviceKey)
+        public ResolutionScopeName(Type serviceType, object serviceKey)
         {
-            FactoryID = factoryID;
             ServiceType = serviceType;
             ServiceKey = serviceKey;
         }
@@ -10018,14 +9995,9 @@ namespace DryIoc
         /// <summary>String representation for easy debugging and understood error messages.</summary>
         public override string ToString()
         {
-            var s = new StringBuilder()
-                .Append(GetType().Name)
-                .Append("(#").Append(FactoryID)
-                .Append(", ").Print(ServiceType);
-
+            var s = new StringBuilder("ResolutionScopeName(").Print(ServiceType);
             if (ServiceKey != null)
-                s.Print(ServiceKey);
-
+                s.Append(',').Print(ServiceKey);
             return s.Append(")").ToString();
         }
     }
@@ -10035,7 +10007,7 @@ namespace DryIoc
     public sealed class ResolutionScopeReuse : IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 0; } } // todo: should we change it to match CurrentScopeReuse?
+        public int Lifespan { get { return 0; } }
 
         /// <inheritdoc />
         public object Name { get; private set; } // todo: set the name to ResolutionScopeName
@@ -10242,6 +10214,9 @@ namespace DryIoc
         /// <summary>Represents an empty info.</summary>
         public static readonly RequestInfo Empty = new RequestInfo();
 
+        /// <summary>Represents an empty info and indicates an open resolution scope.</summary>
+        public static readonly RequestInfo EmptyOpensResolutionScope = new RequestInfo(opensResolutionScope: true);
+
         /// <summary>Parent request or null for root resolution request.</summary>
         public readonly RequestInfo ParentOrWrapper;
 
@@ -10269,10 +10244,12 @@ namespace DryIoc
         #endregion
 
         /// <summary>Returns true for an empty request.</summary>
-        public bool IsEmpty { get { return ServiceInfo == null; } }
+        public bool IsEmpty
+            => ServiceInfo == null;
 
         /// <summary>Returns true if request is the first in a chain.</summary>
-        public bool IsResolutionRoot { get { return !IsEmpty && ParentOrWrapper.IsEmpty; } }
+        public bool IsResolutionRoot 
+            => !IsEmpty && ParentOrWrapper.IsEmpty;
 
         /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
         public RequestInfo Parent
@@ -10290,67 +10267,50 @@ namespace DryIoc
         }
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType
-        {
-            get { return ServiceInfo == null ? null : ServiceInfo.ServiceType; }
-        }
+        public Type ServiceType 
+            => ServiceInfo?.ServiceType;
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType
-        {
-            get { return ServiceInfo == null ? null : ServiceInfo.Details.RequiredServiceType; }
-        }
+        public Type RequiredServiceType 
+            => ServiceInfo?.Details.RequiredServiceType;
 
         /// <summary>Returns <see cref="RequiredServiceType"/> if it is specified and assignable to <see cref="ServiceType"/>,
         /// otherwise returns <see cref="ServiceType"/>.</summary>
         /// <returns>The type to be used for lookup in registry.</returns>
-        public Type GetActualServiceType()
-        {
-            return ServiceInfo.GetActualServiceType();
-        }
+        public Type GetActualServiceType() 
+            => ServiceInfo.GetActualServiceType();
 
         /// <summary>Returns known implementation, or otherwise actual service type.</summary>
         /// <returns>The subject.</returns>
-        public Type GetKnownImplementationOrServiceType()
-        {
-            return ImplementationType ?? GetActualServiceType();
-        }
+        public Type GetKnownImplementationOrServiceType() 
+            => ImplementationType ?? GetActualServiceType();
 
         /// <summary>Policy to deal with unresolved request.</summary>
         public IfUnresolved IfUnresolved
-        {
-            get { return ServiceInfo == null ? IfUnresolved.Throw : ServiceInfo.Details.IfUnresolved; }
-        }
+            => ServiceInfo == null ? IfUnresolved.Throw : ServiceInfo.Details.IfUnresolved;
 
         /// <summary>Optional service key to identify service of the same type.</summary>
         public object ServiceKey
-        {
-            get { return ServiceInfo == null ? null : ServiceInfo.Details.ServiceKey; }
-        }
+            => ServiceInfo?.Details.ServiceKey;
 
         /// <summary>Metadata key to find in metadata dictionary in resolved service.</summary>
         public string MetadataKey
-        {
-            get { return ServiceInfo == null ? null : ServiceInfo.Details.MetadataKey; }
-        }
+            => ServiceInfo?.Details.MetadataKey;
 
         /// <summary>Metadata or the value (if key specified) to find in resolved service.</summary>
         public object Metadata
-        {
-            get { return ServiceInfo == null ? null : ServiceInfo.Details.Metadata; }
-        }
+            => ServiceInfo?.Details.Metadata;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
-        public int ReuseLifespan { get { return Reuse == null ? 0 : Reuse.Lifespan; } }
+        public int ReuseLifespan 
+            => Reuse == null ? 0 : Reuse.Lifespan;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
         /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
         /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse)
-        {
-            return Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+            => Push(serviceType, null, null, null, null, IfUnresolved.Throw,
                 factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
-        }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
@@ -10359,10 +10319,8 @@ namespace DryIoc
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-        {
-            return Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
+            => Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
                 factoryID, factoryType, implementationType, reuse, flags);
-        }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
@@ -10373,10 +10331,8 @@ namespace DryIoc
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-        {
-            return Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
+            => Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
                 factoryID, factoryType, implementationType, reuse, flags);
-        }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
@@ -10388,10 +10344,8 @@ namespace DryIoc
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-        {
-            var info = DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata);
-            return Push(info, factoryID, factoryType, implementationType, reuse, flags);
-        }
+            =>  Push(DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata), 
+                factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         /// <param name="serviceInfo"></param>
@@ -10403,9 +10357,7 @@ namespace DryIoc
         public RequestInfo Push(IServiceInfo serviceInfo,
             int factoryID = 0, FactoryType factoryType = FactoryType.Service, Type implementationType = null, IReuse reuse = null,
             RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0)
-        {
-            return new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
-        }
+            => new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         /// <summary>Returns all request until the root - parent is null.</summary>
         /// <returns>Requests from the last to first.</returns>
@@ -10447,16 +10399,12 @@ namespace DryIoc
 
         /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
         public override string ToString()
-        {
-            return Print(new StringBuilder()).ToString();
-        }
+            => Print(new StringBuilder()).ToString();
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
         public override bool Equals(object obj)
-        {
-            return Equals(obj as RequestInfo);
-        }
+            => Equals(obj as RequestInfo);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
         /// <param name="other"></param> <returns></returns>
@@ -10530,7 +10478,11 @@ namespace DryIoc
             return hash;
         }
 
-        private RequestInfo() { }
+        private RequestInfo(bool opensResolutionScope = false)
+        {
+            if (opensResolutionScope)
+                Flags = RequestFlags.OpensResolutionScope;
+        }
 
         private RequestInfo(RequestInfo parentOrWrapper, IServiceInfo serviceInfo,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
@@ -10705,9 +10657,6 @@ namespace DryIoc
 
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
-
-        /// <summary>Empty request bound to container. All other requests are created by pushing to empty request.</summary>
-        Request EmptyRequest { get; }
 
         /// <summary>State item objects which may include: singleton instances for fast access, reuses, reuse wrappers, factory delegates, etc.</summary>
         object[] ResolutionStateCache { get; }
