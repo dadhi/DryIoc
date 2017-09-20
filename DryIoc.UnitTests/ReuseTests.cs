@@ -218,23 +218,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_resolve_corresponding_log_in_resolution_scope_automagically_Without_condition()
-        {
-            var container = new Container();
-            container.Register<ViewModel1Presenter>();
-            container.Register<ViewModel1>(setup: Setup.With(openResolutionScope: true));
-            container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
-
-            container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(outermost: true));
-            container.Register<Log>(setup: Setup.With(
-                condition: request => request.Parent.IsResolutionRoot));
-
-            var presenter = container.Resolve<ViewModel1Presenter>();
-
-            Assert.AreSame(presenter.VM1.Log, presenter.VM1.VM2.Log);
-        }
-
-        [Test]
         public void Resolution_scope_can_be_tracked_as_disposable_transient_when_injected_as_IDisposable()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());

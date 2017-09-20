@@ -17,3 +17,4 @@
 12. Removed obsolete `IContainer.EmptyRequest` and `Request.CreateEmpty`
 13. Removed obsolete `IContainer.ResolutionStateCache` and `IContainer.GetOrAddStateItem`
 14. Removed obsolete `Request.ToRequestInfo`
+15. Removed `outemost` parameter of `Reuse.InResolutionScopeOf` 
