@@ -23,3 +23,6 @@
 18. Changed `Reuse.InResolutionScope` to be just `Reuse.Scoped` underneath
 19. Changed obsolete `RegisterInstance` implementation to just call `UseInstance`
 20. Removed `InstanceFactory` which was used by obsolete `RegisterInstance`
+21. Changed `IResolverContext` to implement the `IResolver` instead of holding it as property
+to simplifies the path to `IResolver` from the object graph.
+22. Removed: Unused `Request.IsWrappedInFuncWithArgs` method

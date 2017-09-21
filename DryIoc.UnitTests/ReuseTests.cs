@@ -777,7 +777,9 @@ namespace DryIoc.UnitTests
             using (var scope = container.OpenScope())
             {
                 var o = scope.Resolve<O>();
-                Assert.AreSame(o, scope.Resolve<O>());
+                var o2 = scope.Resolve<O>();
+                Assert.AreSame(o, o2);
+                Assert.AreSame(o.Ho, o.Ho2);
             }
         }
 
@@ -785,7 +787,14 @@ namespace DryIoc.UnitTests
 
         public class O
         {
-            public O(Ho ho) { }
+            public Ho Ho { get; }
+            public Ho Ho2 { get; }
+
+            public O(Ho ho, Ho ho2)
+            {
+                Ho = ho;
+                Ho2 = ho2;
+            }
         }
 
         [Test]

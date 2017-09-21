@@ -267,46 +267,14 @@ namespace DryIoc
         public static readonly ParameterExpression ResolverContextParamExpr =
             Expression.Parameter(typeof(IResolverContext), "r");
 
-        /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
-        public static readonly Expression ResolverContextParentExpr =
-            Expression.Property(ResolverContextParamExpr, ResolverContext.ParentProperty);
-
-        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
-        public static readonly Expression ResolverExpr =
-            Expression.Property(ResolverContextParamExpr, ResolverContext.ResolverProperty);
-
-        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
-        public static readonly Expression RootOrSelfResolverContextExpr =
-            Expression.Call(typeof(ResolverContext).Method(nameof(ResolverContext.RootOrSelf)),
-                ResolverContextParamExpr);
-
-        /// <summary>Returns root or self resolver based on request.</summary>
-        public static Expression GetRootOrSelfResolverContextExpr(Request request) =>
-            request.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope
-            ? RootOrSelfResolverContextExpr : ResolverContextParamExpr;
-
-        /// <summary>Returns root or self resolver based on request.</summary>
-        public static Expression GetRootOrSelfResolverExpr(Request request) =>
-            Expression.Property(GetRootOrSelfResolverContextExpr(request), ResolverContext.ResolverProperty);
-
-        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
-        public static readonly Expression SingletonScopeExpr =
-            Expression.Property(ResolverContextParamExpr,
-                typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
-
-        /// <summary>Access to scopes in FactoryDelegate.</summary>
-        public static readonly Expression OpenedScopeExpr =
-            Expression.Property(ResolverContextParamExpr,
-                typeof(IResolverContext).Property(nameof(IResolverContext.OpenedScope)));
-
         // todo: v3: change to (IResolverContext r, object[] args)
         private static readonly Type[] _factoryDelegateParamTypes = { typeof(object[]), typeof(IResolverContext) };
         private static readonly ParameterExpression[] _factoryDelegateParamExprs = { StateParamExpr, ResolverContextParamExpr };
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
-        public static Expression<FactoryDelegate> WrapInFactoryExpression(Expression expression)
-            => Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
+        public static Expression<FactoryDelegate> WrapInFactoryExpression(Expression expression) => 
+            Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
@@ -2893,13 +2861,10 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Provides access to the container facilities from the generated object graph</summary>
-    public interface IResolverContext : IDisposable
+    /// <summary>Extends IResolver to provide and access to the container facilities 
+    /// for asResolutionCall dependencies.</summary>
+    public interface IResolverContext : IResolver, IDisposable
     {
-        // todo: v3: may be make IResolverContext to implement resolver to minimize indirection
-        /// <summary>Provides access to current / scoped resolver.</summary>
-        IResolver Resolver { get; }
-
         /// <summary>Singleton scope, always associated with root scope.</summary>
         IScope SingletonScope { get; }
 
@@ -2923,9 +2888,6 @@ namespace DryIoc
     /// <summary>Provides the shortcuts to <see cref="IResolverContext"/></summary>
     public static class ResolverContext
     {
-        internal static readonly PropertyInfo ResolverProperty =
-            typeof(IResolverContext).Property(nameof(IResolverContext.Resolver));
-
         internal static readonly PropertyInfo ParentProperty =
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
@@ -2936,12 +2898,40 @@ namespace DryIoc
         public static IResolverContext RootOrSelf(this IResolverContext r) =>
             r.Root ?? r;
 
+        /// <summary>Returns root or self resolver based on request.</summary>
+        public static Expression GetRootOrSelfExpr(Request request) =>
+            request.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope
+                ? RootOrSelfExpr : Container.ResolverContextParamExpr;
+
+        /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression ParentExpr =
+            Expression.Property(Container.ResolverContextParamExpr, ParentProperty);
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression RootOrSelfExpr =
+            Expression.Call(typeof(ResolverContext).Method(nameof(RootOrSelf)), Container.ResolverContextParamExpr);
+
+        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        public static readonly Expression SingletonScopeExpr =
+            Expression.Property(Container.ResolverContextParamExpr,
+                typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
+
+        /// <summary>Access to scopes in FactoryDelegate.</summary>
+        public static readonly Expression OpenedScopeExpr =
+            Expression.Property(Container.ResolverContextParamExpr,
+                typeof(IResolverContext).Property(nameof(IResolverContext.OpenedScope)));
+
+        internal static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound)
+        {
+            return r.OpenedScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null);
+        }
+
         /// <summary>Gets current scope matching the <paramref name="name"/>.
         /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
         /// <param name="r">Source resolver context.</param>
         /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
         /// <returns>Found scope or throws exception.</returns>
-        public static IScope GetFirstMatchedScope(this IResolverContext r, object name, bool throwIfNotFound)
+        public static IScope GetFirstScope(this IResolverContext r, object name, bool throwIfNotFound)
         {
             var scope = r.OpenedScope;
             if (scope == null)
@@ -3023,14 +3013,6 @@ namespace DryIoc
             return genericDefinition != null && FuncTypes.IndexOf(genericDefinition) != -1;
         }
 
-        // todo: v3: remove as not used
-        /// <summary>Returns true if type is Func with 1 or more input arguments.</summary>
-        /// <param name="type">Type to check.</param><returns>True for Func type, false otherwise.</returns>
-        public static bool IsFuncWithArgs(this Type type)
-        {
-            return type.IsFunc() && type.GetGenericTypeDefinition() != typeof(Func<>);
-        }
-
         /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
         public static readonly ImTreeMap<Type, Factory> Wrappers = BuildSupportedWrappers();
 
@@ -3085,12 +3067,12 @@ namespace DryIoc
             var asContainerWrapper = Setup.WrapperWith(preventDisposal: true);
 
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(Container.GetRootOrSelfResolverExpr,
+                new ExpressionFactory(ResolverContext.GetRootOrSelfExpr,
                 Reuse.Transient,
                 setup: asContainerWrapper));
 
             var containerFactory = new ExpressionFactory(r =>
-                Expression.Convert(Container.GetRootOrSelfResolverContextExpr(r), r.ServiceType),
+                Expression.Convert(ResolverContext.GetRootOrSelfExpr(r), r.ServiceType),
                 Reuse.Transient,
                 setup: asContainerWrapper);
 
@@ -3100,7 +3082,7 @@ namespace DryIoc
 
             wrappers = wrappers.AddOrUpdate(typeof(IDisposable),
                 new ExpressionFactory(
-                    r => r.IsResolutionRoot ? null : Container.OpenedScopeExpr,
+                    r => r.IsResolutionRoot ? null : ResolverContext.OpenedScopeExpr,
                     setup: Setup.Wrapper));
 
             return wrappers;
@@ -3213,7 +3195,7 @@ namespace DryIoc
             var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
-            var resolverExpr = Container.GetRootOrSelfResolverExpr(request);
+            var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             var preResolveParentExpr = container.RequestInfoToExpression(request.RequestInfo);
 
             var callResolveManyExpr = Expression.Call(resolverExpr, _resolveManyMethod,
@@ -5419,12 +5401,8 @@ namespace DryIoc
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                 parameters: Parameters.Of
-                    .Type(req => // specify as parameter to prevent applying initializer for injected resolver too
-                    {
-                        return req.IsSingletonOrDependencyOfSingleton
-                            ? req.ResolverContext.RootOrSelf().Resolver
-                            : req.ResolverContext.Resolver;
-                    })
+                    .Type<IResolver>(r => // specify as parameter to prevent applying initializer for injected resolver too
+                        r.IsSingletonOrDependencyOfSingleton ? r.ResolverContext.RootOrSelf() : r.ResolverContext)
                     .Type(_ => initialize)),
                 setup: Setup.DecoratorWith(
                     useDecorateeReuse: true,
@@ -5700,7 +5678,7 @@ namespace DryIoc
             var requiredServiceTypeExpr = Expression.Constant(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = container.GetOrAddStateItemExpression(request.ServiceKey, typeof(object));
 
-            var resolverExpr = Container.GetRootOrSelfResolverExpr(request);
+            var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
 
             if (openResolutionScope)
             {
@@ -5712,10 +5690,8 @@ namespace DryIoc
                 var scopeNameExpr = Expression.New(ResolutionScopeName.Constructor, actualServiceTypeExpr, serviceKeyExpr);
                 var trackInParent = Expression.Constant(true);
 
-                resolverExpr = Expression.Property(
-                    Expression.Call(Container.ResolverContextParamExpr,
-                        ResolverContext.OpenScopeMethod, scopeNameExpr, trackInParent),
-                    ResolverContext.ResolverProperty);
+                resolverExpr = Expression.Call(Container.ResolverContextParamExpr,
+                    ResolverContext.OpenScopeMethod, scopeNameExpr, trackInParent);
             }
 
             // Only parent is converted to be passed to Resolve.
@@ -6533,11 +6509,11 @@ namespace DryIoc
         }
 
         /// <summary>Returns service parent of request, skipping intermediate wrappers if any.</summary>
-        public RequestInfo Parent { get { return RequestInfo.Parent; } }
+        public RequestInfo Parent => RequestInfo.Parent;
 
         /// <summary>Returns direct parent either it service or not (wrapper).
         /// In comparison with logical <see cref="Parent"/> which returns first service parent skipping wrapper if any.</summary>
-        public RequestInfo ParentOrWrapper { get { return RequestInfo.ParentOrWrapper; } }
+        public RequestInfo ParentOrWrapper => RequestInfo.ParentOrWrapper;
 
         /// <summary>Provides access to container currently bound to request.
         /// By default it is container initiated request by calling resolve method,
@@ -9060,7 +9036,7 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.Container.GetOrAddStateItemExpression(_factoryDelegate);
-            var resolverExpr = Container.GetRootOrSelfResolverExpr(request);
+            var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             var invokeExpr = Expression.Invoke(factoryDelegateExpr, resolverExpr);
             return Expression.Convert(invokeExpr, request.GetActualServiceType());
         }
@@ -9080,7 +9056,7 @@ namespace DryIoc
             if (request.Reuse != DryIoc.Reuse.Transient)
                 return base.GetDelegateOrDefault(request); // use expression creation
 
-            return (state, r) => _factoryDelegate(r.Resolver);
+            return (state, r) => _factoryDelegate(r);
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;
@@ -9630,7 +9606,7 @@ namespace DryIoc
             var itemId = request.TracksTransientDisposable
                 ? -1
                 : request.SingletonScope.GetScopedItemIdOrSelf(request.FactoryID);
-            return Expression.Call(Container.SingletonScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+            return Expression.Call(ResolverContext.SingletonScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
                 Expression.Constant(itemId), Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
         }
 
@@ -9672,7 +9648,7 @@ namespace DryIoc
         internal static object GetScopedOrSingleton(IResolverContext r,
             IScope singleton, int itemId, CreateScopedValue createValue)
         {
-            var scope = r.GetFirstMatchedScope(name: null, throwIfNotFound: false);
+            var scope = r.GetFirstScope(name: null, throwIfNotFound: false);
             if (scope != null)
                 return scope.GetOrAdd(itemId, createValue);
             var singetonId = itemId == -1 ? -1 : singleton.GetScopedItemIdOrSelf(itemId);
@@ -9685,7 +9661,7 @@ namespace DryIoc
         internal static object GetOrAddItemOrDefault(IResolverContext r,
             object scopeName, bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue)
         {
-            var scope = r.GetFirstMatchedScope(scopeName, throwIfNoScopeFound);
+            var scope = r.GetFirstScope(scopeName, throwIfNoScopeFound);
             return scope?.GetOrAdd(itemId, createValue);
         }
 
@@ -9699,7 +9675,7 @@ namespace DryIoc
             if (_scopedOrSingleton)
                 return Expression.Call(_getScopedOrSingletonMethod,
                     Container.ResolverContextParamExpr,
-                    Container.SingletonScopeExpr,
+                    ResolverContext.SingletonScopeExpr,
                     Expression.Constant(itemId),
                     Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
 
@@ -9709,7 +9685,7 @@ namespace DryIoc
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
             Expression resolvedContextExpr = request.OpensResolutionScope
-                ? Container.ResolverContextParentExpr
+                ? ResolverContext.ParentExpr
                 : Container.ResolverContextParamExpr;
 
             return Expression.Call(_getOrAddOrDefaultMethod,
@@ -9723,7 +9699,7 @@ namespace DryIoc
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         public bool CanApply(Request request) =>
-            _scopedOrSingleton || request.ResolverContext.GetFirstMatchedScope(Name, false) != null;
+            _scopedOrSingleton || request.ResolverContext.GetFirstScope(Name, false) != null;
 
         private readonly Lazy<Expression> _scopedExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
@@ -11752,7 +11728,6 @@ namespace DryIoc
             return resultFunc.Compile();
         }
 
-        // todo: v3: switch to 
         /// <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
         /// <param name="p">Target property info</param>
         /// <param name="includeNonPublic">(optional) If set then consider non-public getter</param>

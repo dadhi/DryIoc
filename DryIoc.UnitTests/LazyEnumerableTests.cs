@@ -204,7 +204,7 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<Child>(man.Children.FirstOrDefault());
 
             var expr = container.Resolve<LambdaExpression>(typeof(Man));
-            StringAssert.Contains("r.Resolver.ResolveMany(", expr.ToString());
+            StringAssert.Contains("r.ResolveMany(", expr.ToString());
         }
 
         public class Man
