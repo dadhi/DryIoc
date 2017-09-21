@@ -273,7 +273,7 @@ namespace DryIoc
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
-        public static Expression<FactoryDelegate> WrapInFactoryExpression(Expression expression) => 
+        public static Expression<FactoryDelegate> WrapInFactoryExpression(Expression expression) =>
             Expression.Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
 
         /// <summary>First wraps the input service expression into lambda expression and
@@ -2921,17 +2921,14 @@ namespace DryIoc
             Expression.Property(Container.ResolverContextParamExpr,
                 typeof(IResolverContext).Property(nameof(IResolverContext.OpenedScope)));
 
-        internal static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound)
+        /// <summary>Provides acces to the scope.</summary>
+        public static IScope GetScope(this IResolverContext r, bool throwIfNotFound)
         {
             return r.OpenedScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null);
         }
 
-        /// <summary>Gets current scope matching the <paramref name="name"/>.
-        /// If name is null then current scope is returned, or if there is no current scope then exception thrown.</summary>
-        /// <param name="r">Source resolver context.</param>
-        /// <param name="name">May be null</param> <param name="throwIfNotFound">Says to throw if no scope found.</param>
-        /// <returns>Found scope or throws exception.</returns>
-        public static IScope GetFirstScope(this IResolverContext r, object name, bool throwIfNotFound)
+        /// <summary>Gets current scope matching the <paramref name="name"/></summary>
+        public static IScope GetNamedScope(this IResolverContext r, object name, bool throwIfNotFound)
         {
             var scope = r.OpenedScope;
             if (scope == null)
@@ -9648,7 +9645,7 @@ namespace DryIoc
         internal static object GetScopedOrSingleton(IResolverContext r,
             IScope singleton, int itemId, CreateScopedValue createValue)
         {
-            var scope = r.GetFirstScope(name: null, throwIfNotFound: false);
+            var scope = r.GetNamedScope(name: null, throwIfNotFound: false);
             if (scope != null)
                 return scope.GetOrAdd(itemId, createValue);
             var singetonId = itemId == -1 ? -1 : singleton.GetScopedItemIdOrSelf(itemId);
@@ -9656,17 +9653,21 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _getScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetScopedOrSingleton), includeNonPublic: true);
+            typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetScopedOrSingleton), true);
 
-        internal static object GetOrAddItemOrDefault(IResolverContext r,
-            object scopeName, bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue)
-        {
-            var scope = r.GetFirstScope(scopeName, throwIfNoScopeFound);
-            return scope?.GetOrAdd(itemId, createValue);
-        }
+        internal static object GetNamedScopedItem(IResolverContext r, object scopeName,
+            bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue) =>
+            r.GetNamedScope(scopeName, throwIfNoScopeFound)?.GetOrAdd(itemId, createValue);
 
-        private static readonly MethodInfo _getOrAddOrDefaultMethod =
-            typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetOrAddItemOrDefault), includeNonPublic: true);
+        private static readonly MethodInfo _getNamedScopedItemMethod =
+            typeof(CurrentScopeReuse).Method(nameof(GetNamedScopedItem), true);
+
+        internal static object GetScopedItem(IResolverContext r,
+            bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue) =>
+            r.GetScope(throwIfNoScopeFound)?.GetOrAdd(itemId, createValue);
+
+        private static readonly MethodInfo _getScopedItemMethod =
+            typeof(CurrentScopeReuse).Method(nameof(GetScopedItem), true);
 
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
@@ -9679,19 +9680,25 @@ namespace DryIoc
                     Expression.Constant(itemId),
                     Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
 
-            // todo: add the ValueType check to GetOrAddStateItemExpression
-            var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
-            if (Name != null && Name.GetType().IsValueType())
-                scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
-
             Expression resolvedContextExpr = request.OpensResolutionScope
                 ? ResolverContext.ParentExpr
                 : Container.ResolverContextParamExpr;
 
-            return Expression.Call(_getOrAddOrDefaultMethod,
-                resolvedContextExpr,
-                scopeNameExpr,
-                Expression.Constant(request.IfUnresolved == IfUnresolved.Throw),
+            var ifUnresolvedThrowExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
+
+            if (Name == null)
+                return Expression.Call(_getScopedItemMethod,
+                    resolvedContextExpr, ifUnresolvedThrowExpr,
+                    Expression.Constant(itemId),
+                    Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
+
+            // todo: add the ValueType check to GetOrAddStateItemExpression
+            var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
+            if (Name.GetType().IsValueType())
+                scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
+
+            return Expression.Call(_getNamedScopedItemMethod,
+                resolvedContextExpr, scopeNameExpr, ifUnresolvedThrowExpr,
                 Expression.Constant(itemId),
                 Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
         }
@@ -9699,7 +9706,7 @@ namespace DryIoc
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
         /// <param name="request">Service request.</param> <returns>Check result.</returns>
         public bool CanApply(Request request) =>
-            _scopedOrSingleton || request.ResolverContext.GetFirstScope(Name, false) != null;
+            _scopedOrSingleton || request.ResolverContext.GetNamedScope(Name, false) != null;
 
         private readonly Lazy<Expression> _scopedExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
@@ -10035,7 +10042,7 @@ namespace DryIoc
         /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(IServiceInfo serviceInfo,
             int factoryID = 0, FactoryType factoryType = FactoryType.Service, Type implementationType = null, IReuse reuse = null,
-            RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0) => 
+            RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0) =>
             new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         /// <summary>Returns all request until the root - parent is null.</summary>
@@ -10077,12 +10084,12 @@ namespace DryIoc
         }
 
         /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
-        public override string ToString() => 
+        public override string ToString() =>
             Print(new StringBuilder()).ToString();
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
-        public override bool Equals(object obj) => 
+        public override bool Equals(object obj) =>
             Equals(obj as RequestInfo);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
@@ -10108,7 +10115,7 @@ namespace DryIoc
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         /// <param name="other">Info to compare for equality.</param> <returns></returns>
-        public bool EqualsWithoutParent(Request other) => 
+        public bool EqualsWithoutParent(Request other) =>
             other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
                 && other.IfUnresolved == IfUnresolved
