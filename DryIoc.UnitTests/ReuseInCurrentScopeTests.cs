@@ -370,7 +370,7 @@ namespace DryIoc.UnitTests
         public void Exist_rule_to_open_scope_with_container_and_scope_has_root_name()
         {
             var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            Assert.AreEqual(Container.NonAmbientRootScopeName, container.OpenedScope.Name);
+            Assert.AreEqual(Container.NonAmbientRootScopeName, container.CurrentScope.Name);
         }
 
         [Test]

@@ -25,4 +25,7 @@
 20. Removed `InstanceFactory` which was used by obsolete `RegisterInstance`
 21. Changed `IResolverContext` to implement the `IResolver` instead of holding it as property
 to simplifies the path to `IResolver` from the object graph.
-22. Removed: Unused `Request.IsWrappedInFuncWithArgs` method
+22. Removed unused `Request.IsWrappedInFuncWithArgs` method
+23. Changed `IContainer` to implement `IResolverContext` as it is already does this
+24. Removed `IContainer.ResolverContext` property
+25. Removed no longer used `Request.WithFuncArgs`
