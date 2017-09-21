@@ -49,7 +49,7 @@ namespace DryIoc.WebApi.UnitTests
         {
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config);
-            
+
             container.Register<Blah>(Reuse.InWebRequest);
             container.Register<Fooh>(Reuse.InWebRequest, serviceKey: 1);
             container.Register<Fooh>(Reuse.InWebRequest, serviceKey: 2);
@@ -101,7 +101,7 @@ namespace DryIoc.WebApi.UnitTests
             var errors = container.Validate();
 
             Assert.AreEqual(
-                typeof(MissingDependencyController).GetImplementedServiceTypes().Length, 
+                typeof(MissingDependencyController).GetImplementedServiceTypes().Length,
                 errors.Length);
         }
 
@@ -113,7 +113,7 @@ namespace DryIoc.WebApi.UnitTests
 
             using (var scope = config.DependencyResolver.BeginScope())
             {
-                var ex = Assert.Throws<ContainerException>(() => 
+                var ex = Assert.Throws<ContainerException>(() =>
                     scope.GetService(typeof(MissingDependencyController)));
 
                 Assert.AreEqual(DryIoc.Error.UnableToResolveUnknownService, ex.Error);
@@ -149,7 +149,7 @@ namespace DryIoc.WebApi.UnitTests
             public A A { get; set; }
         }
 
-        public class A {}
+        public class A { }
 
         public class MyController : ApiController { }
 
@@ -175,7 +175,7 @@ namespace DryIoc.WebApi.UnitTests
             var config = new HttpConfiguration();
             var container = new Container().WithAutoFallbackResolution(config.Services.GetAssembliesResolver().GetAssemblies());
 
-            container.WithWebApi(config);   
+            container.WithWebApi(config);
 
             using (var scope = config.DependencyResolver.BeginScope())
             {
@@ -238,9 +238,9 @@ namespace DryIoc.WebApi.UnitTests
             Assert.IsInstanceOf<DummyContext>(container.ScopeContext);
         }
 
-        public class Blah {}
+        public class Blah { }
 
-        public class Fooh {}
+        public class Fooh { }
 
         public class DummyContext : IScopeContext
         {

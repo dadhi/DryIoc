@@ -160,8 +160,9 @@ namespace DryIoc.WebApi
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
         public object GetService(Type serviceType)
         {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return Container.Resolve(serviceType, ifUnresolvedReturnDefault);
+            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            return Container.Resolve(serviceType, ifUnresolved);
         }
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
@@ -212,8 +213,9 @@ namespace DryIoc.WebApi
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
         public object GetService(Type serviceType)
         {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return ScopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault);
+            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            return ScopedContainer.Resolve(serviceType, ifUnresolved);
         }
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
