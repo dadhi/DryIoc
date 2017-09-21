@@ -2036,21 +2036,6 @@ namespace DryIoc
                     });
                 }
 
-                // Note: We are reusing replaced factory (with same setup and reuse) by using the ID.
-                // It is possible because cache depends only on ID.
-                var reuseReplacedInstanceFactory = false;
-                if (replacedFactory != null)
-                {
-                    var replacedInstanceFactory = replacedFactory as InstanceFactory;
-                    reuseReplacedInstanceFactory =
-                        replacedInstanceFactory != null && factory is InstanceFactory &&
-                        replacedInstanceFactory.Reuse == factory.Reuse &&
-                        replacedInstanceFactory.Setup == factory.Setup;
-
-                    if (reuseReplacedInstanceFactory)
-                        ((InstanceFactory)factory).FactoryID = replacedInstanceFactory.FactoryID;
-                }
-
                 var registry = this;
                 if (registry.Services != services)
                 {
@@ -2058,15 +2043,11 @@ namespace DryIoc
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
                         FactoryExpressionCache.NewRef(), _isChangePermitted);
 
-                    if ((replacedFactories != null || replacedFactory != null) &&
-                        !reuseReplacedInstanceFactory)
-                    {
-                        if (replacedFactory != null)
-                            registry = registry.WithoutFactoryCache(replacedFactory, serviceType, serviceKey);
-                        else if (replacedFactories != null)
-                            foreach (var f in replacedFactories.Enumerate())
-                                registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
-                    }
+                    if (replacedFactory != null)
+                        registry = registry.WithoutFactoryCache(replacedFactory, serviceType, serviceKey);
+                    else if (replacedFactories != null)
+                        foreach (var f in replacedFactories.Enumerate())
+                            registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
                 }
 
                 return registry;
@@ -5328,76 +5309,17 @@ namespace DryIoc
             }
         }
 
-        // todo: v3: remove
+        // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
-            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse ignored = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
-            if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
-
-            reuse = reuse ?? Reuse.Singleton;
-
-            var scopedReuse = reuse as CurrentScopeReuse;
-            var scope = scopedReuse != null
-                ? container.ResolverContext.GetFirstMatchedScope(scopedReuse.Name, throwIfNotFound: true)
-                : container.ResolverContext.SingletonScope;
-
-            var setup = _defaultInstanceSetup;
-            if (preventDisposal)
-            {
-                instance = new[] { instance };
-                setup = _preventDisposableInstanceSetup;
-            }
-            if (weaklyReferenced)
-            {
-                instance = new WeakReference(instance);
-                setup = preventDisposal
-                    ? _weaklyReferencedAndPreventDisposableInstanceSetup
-                    : _weaklyReferencedInstanceSetup;
-            }
-
-            InstanceFactory factory = null;
-            if (ifAlreadyRegistered == IfAlreadyRegistered.Replace ||
-                ifAlreadyRegistered == IfAlreadyRegistered.Keep)
-            {
-                var factories = container.GetAllServiceFactories(serviceType);
-                if (serviceKey != null)
-                    factories = factories.Where(f => serviceKey.Equals(f.Key));
-
-                // Replace the single factory
-                var factoriesList = factories.ToArray();
-                if (factoriesList.Length == 1)
-                    factory = factoriesList[0].Value as InstanceFactory;
-
-                if (ifAlreadyRegistered == IfAlreadyRegistered.Keep && factoriesList.Length != 0)
-                    return;
-            }
-
-            var canReuseAlreadyRegisteredFactory =
-                factory != null && factory.Reuse == reuse && factory.Setup == setup;
-            if (canReuseAlreadyRegisteredFactory)
-                factory.ReplaceInstance(instance);
-            else
-                factory = new InstanceFactory(instance, reuse, setup);
-
-            if (!canReuseAlreadyRegisteredFactory)
-                container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
-
-            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(factory.FactoryID), instance);
+            container.UseInstance(serviceType, instance, ifAlreadyRegistered,
+                preventDisposal, weaklyReferenced, serviceKey);
         }
 
-        private static readonly Setup _defaultInstanceSetup =
-            Setup.With(asResolutionCall: true);
-        private static readonly Setup _weaklyReferencedInstanceSetup =
-            Setup.With(weaklyReferenced: true, asResolutionCall: true);
-        private static readonly Setup _preventDisposableInstanceSetup =
-            Setup.With(preventDisposal: true, asResolutionCall: true);
-        private static readonly Setup _weaklyReferencedAndPreventDisposableInstanceSetup =
-            Setup.With(weaklyReferenced: true, preventDisposal: true, asResolutionCall: true);
-
-        // todo: v3: remove
+        // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
@@ -9110,72 +9032,6 @@ namespace DryIoc
         }
 
         private readonly Func<Request, Expression> _getServiceExpression;
-    }
-
-    // todo: v3: Remove
-    /// <summary>Obsolete: replaced with UsedInstanceFactory.</summary>
-    public sealed class InstanceFactory : Factory
-    {
-        private object _instance;
-
-        /// <summary>Instance type, or null for null instance.</summary>
-        public override Type ImplementationType
-        {
-            get { return _instance == null ? null : _instance.GetType(); }
-        }
-
-        /// <summary>Creates factory wrapping provided instance.</summary>
-        /// <param name="instance">Instance to register.</param>
-        /// <param name="reuse"></param> <param name="setup"></param>
-        public InstanceFactory(object instance, IReuse reuse, Setup setup) : base(reuse, setup)
-        {
-            _instance = instance;
-        }
-
-        /// <summary>Replaces current instance with new one.</summary> <param name="newInstance"></param>
-        public void ReplaceInstance(object newInstance)
-        {
-            Interlocked.Exchange(ref _instance, newInstance);
-        }
-
-        /// <summary>The method should not be really called. That's why it returns exception throwing expression.</summary>
-        /// <param name="request">Context</param> <returns>Expression throwing exception.</returns>
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            return Expression.Constant(_instance);
-        }
-
-        /// <summary>Puts instance directly to available scope.</summary>
-        protected override Expression ApplyReuse(Expression _, IReuse reuse, bool tracksTransientDisposableIgnored, Request request)
-        {
-            var scopedReuse = reuse as CurrentScopeReuse;
-            var scope = scopedReuse != null
-                ? request.ResolverContext.GetFirstMatchedScope(scopedReuse.Name, throwIfNotFound: true)
-                : request.SingletonScope;
-
-            var scopedId = scope.GetScopedItemIdOrSelf(FactoryID);
-            var instance = _instance;
-            scope.GetOrAdd(scopedId, () => instance);
-
-            var instanceType = instance == null || instance.GetType().IsValueType() ? typeof(object) : instance.GetType();
-            var instanceExpr = Expression.Constant(instance, instanceType);
-
-            var serviceExpr = reuse.Apply(request, instanceExpr);
-
-            // Unwrap WeakReference and/or array preventing disposal
-            if (Setup.WeaklyReferenced)
-                serviceExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull",
-                    ArrayTools.Empty<Type>(),
-                    Expression.Property(Expression.Convert(serviceExpr, typeof(WeakReference)), "Target"),
-                    Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
-
-            if (Setup.PreventDisposal)
-                serviceExpr = Expression.ArrayIndex(
-                    Expression.Convert(serviceExpr, typeof(object[])),
-                    Expression.Constant(0, typeof(int)));
-
-            return Expression.Convert(serviceExpr, request.ServiceType);
-        }
     }
 
     /// <summary>This factory is the thin wrapper for user provided delegate

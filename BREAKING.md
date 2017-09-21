@@ -21,3 +21,5 @@
 16. Removed not necessary `trackTransientDisposable` parameter from `IReuse.Apply` method
 17. Removed `ResolutionScopeReuse`, replaced by `CurrentScopeReuse`
 18. Changed `Reuse.InResolutionScope` to be just `Reuse.Scoped` underneath
+19. Changed obsolete `RegisterInstance` implementation to just call `UseInstance`
+20. Removed `InstanceFactory` which was used by obsolete `RegisterInstance`
