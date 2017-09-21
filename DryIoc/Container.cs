@@ -994,7 +994,7 @@ namespace DryIoc
             var instanceType = instance.ThrowIfNull().GetType();
 
             var request = Request.Create(this, instanceType)
-                .WithResolvedFactory(new UsedInstanceFactory(instanceType));
+                .WithResolvedFactory(new InstanceFactory(instanceType));
 
             var requestInfo = request.RequestInfo;
             var resolver = (IResolver)this;
@@ -1468,7 +1468,7 @@ namespace DryIoc
                                 case IfAlreadyRegistered.Replace: // the DEFAULT option
                                     // the special case for re-use of existing factory,
                                     // we can just update scope with the new instance
-                                    var reusedFactory = singleDefaultFactory as UsedInstanceFactory;
+                                    var reusedFactory = singleDefaultFactory as InstanceFactory;
                                     if (reusedFactory != null)
                                         scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID), instance);
                                     else
@@ -1510,7 +1510,7 @@ namespace DryIoc
                                     case IfAlreadyRegistered.Replace: // the DEFAULT option
                                         // the special case for re-use of existing factory,
                                         // we can just update scope with the new instance
-                                        var reusedFactory = keyedFactory as UsedInstanceFactory;
+                                        var reusedFactory = keyedFactory as InstanceFactory;
                                         if (reusedFactory != null)
                                             scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID),
                                                 instance);
@@ -1546,7 +1546,7 @@ namespace DryIoc
                                     case IfAlreadyRegistered.Replace: // the DEFAULT option
                                         // the special case for reusing of existing factory,
                                         // we can just update scope with the new instance
-                                        if (defaultFactories.Length == 1 && defaultFactories[0] is UsedInstanceFactory)
+                                        if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
                                             scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultFactories[0].FactoryID),
                                                 instance);
                                         else
@@ -1595,20 +1595,20 @@ namespace DryIoc
             });
         }
 
-        private static UsedInstanceFactory GetInstanceFactory(object instance, Type instanceType, IScope scope)
+        private static InstanceFactory GetInstanceFactory(object instance, Type instanceType, IScope scope)
         {
-            var instanceFactory = new UsedInstanceFactory(instanceType);
+            var instanceFactory = new InstanceFactory(instanceType);
             scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
             return instanceFactory;
         }
 
         // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
-        internal sealed class UsedInstanceFactory : Factory
+        internal sealed class InstanceFactory : Factory
         {
             public override Type ImplementationType { get { return _instanceType; } }
             private readonly Type _instanceType;
 
-            public UsedInstanceFactory(Type instanceType)
+            public InstanceFactory(Type instanceType)
             {
                 _instanceType = instanceType;
             }
@@ -5231,31 +5231,25 @@ namespace DryIoc
                 _getDecorator = getDecorator;
             }
 
-            public TDecoratee Decorate(TDecoratee decoratee, IResolver resolver)
-            {
-                return _getDecorator(resolver)(decoratee);
-            }
+            public TDecoratee Decorate(TDecoratee decoratee, IResolver resolver) =>
+                _getDecorator(resolver)(decoratee);
         }
 
         // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
             IReuse ignored = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
-        {
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) => 
             container.UseInstance(serviceType, instance, ifAlreadyRegistered,
                 preventDisposal, weaklyReferenced, serviceKey);
-        }
 
         // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance<TService>(this IContainer container, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
-        {
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered,
                 preventDisposal, weaklyReferenced, serviceKey);
-        }
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
@@ -5266,11 +5260,8 @@ namespace DryIoc
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance<TService>(this IContainer container, TService instance,
-            bool preventDisposal = false, bool weaklyReferenced = false,
-            object serviceKey = null)
-        {
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             container.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-        }
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
@@ -5281,42 +5272,34 @@ namespace DryIoc
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance(this IContainer container, Type serviceType, object instance,
-            bool preventDisposal = false, bool weaklyReferenced = false,
-            object serviceKey = null)
-        {
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             container.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-        }
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         /// <typeparam name="TService">Specified instance type. May be a base type or interface of instance actual type.</typeparam>
         /// <param name="container">Container to register</param>
         /// <param name="instance">Instance to register</param>
-        /// <param name="IfAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
+        /// <param name="ifAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
         public static void UseInstance<TService>(this IContainer container, TService instance,
-            IfAlreadyRegistered IfAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false,
-            object serviceKey = null)
-        {
-            container.UseInstance(typeof(TService), instance, IfAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-        }
+            IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            container.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         /// <param name="container">Container to register</param>
         /// <param name="serviceType">Runtime service type to register instance with</param>
         /// <param name="instance">Instance to register</param>
-        /// <param name="IfAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
+        /// <param name="ifAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void UseInstance(this IContainer container, Type serviceType, object instance,
-            IfAlreadyRegistered IfAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false,
-            object serviceKey = null)
+        public static void UseInstance(this IContainer container, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
@@ -5328,7 +5311,7 @@ namespace DryIoc
                 instance = new WeakReference(instance);
 
             // todo: v3: remove the hack
-            ((Container)container).UseInstanceInternal(serviceType, instance, IfAlreadyRegistered, serviceKey);
+            ((Container)container).UseInstanceInternal(serviceType, instance, ifAlreadyRegistered, serviceKey);
         }
 
         /// <summary>Registers initializing action that will be called after service is resolved 
@@ -11248,7 +11231,7 @@ namespace DryIoc
             return methods.Length == 1 ? methods[0] : null;
         }
 
-        /// <summary>Obsolete: replaced by <see cref="Method"/></summary>
+        /// <summary>Obsolete: replaced by Method</summary>
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
             var typeInfo = type.GetTypeInfo();

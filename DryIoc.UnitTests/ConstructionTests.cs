@@ -1,4 +1,6 @@
-﻿using NUnit.Framework;
+﻿using System;
+using ImTools;
+using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
@@ -10,7 +12,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<SomeService>(made: Made.Of(
-                r => r.ImplementationType.Method("Create")));
+                r => r.ImplementationType.Method("Create", ArrayTools.Empty<Type>())));
 
             var service = container.Resolve<SomeService>();
 
@@ -67,7 +69,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.Register<IService>(made: Made.Of(
-                typeof(ServiceFactory).Method("Create"), 
+                typeof(ServiceFactory).Method("Create", ArrayTools.Empty<Type>()), 
                 ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>();
@@ -143,7 +145,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, SomeService>(made: Made.Of(
-                r => typeof(ServiceFactory).Method("Create"),
+                r => typeof(ServiceFactory).Method("Create", ArrayTools.Empty<Type>()),
                 ServiceInfo.Of<ServiceFactory>()));
 
             var ex = Assert.Throws<ContainerException>(() =>
@@ -156,7 +158,8 @@ namespace DryIoc.UnitTests
         public void Should_throw_for_instance_method_without_factory()
         {
             var container = new Container();
-            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).Method("Create")));
+            container.Register<IService>(made: 
+                Made.Of(typeof(ServiceFactory).Method("Create", ArrayTools.Empty<Type>())));
 
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<IService>());
@@ -169,7 +172,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService>(made: Made.Of(
-                typeof(ServiceFactory).Method("Create"), 
+                typeof(ServiceFactory).Method("Create", ArrayTools.Empty<Type>()), 
                 ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);

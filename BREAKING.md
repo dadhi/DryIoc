@@ -31,3 +31,4 @@ to simplifies the path to `IResolver` from the object graph.
 25. Removed no longer used `Request.WithFuncArgs`
 26. Changed parameter `bool ifUnresolvedReturnDefault` to `IfUnresolved ifUnresolved` in 
 `IResolver.Resolve` methods to allow to add more `IfUnresolved` options
+27. renamed: `IfAlreadyRegistered` parameter to `ifAlreadyRegistered` in `UseInstance` methods
