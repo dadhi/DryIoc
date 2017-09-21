@@ -10,7 +10,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<SomeService>(made: Made.Of(
-                r => r.ImplementationType.GetMethodOrNull("Create")));
+                r => r.ImplementationType.Method("Create")));
 
             var service = container.Resolve<SomeService>();
 
@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests
         public void Can_use_any_type_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).GetMethodOrNull("CreateService")));
+            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).Method("CreateService")));
 
             var service = container.Resolve<IService>();
 
@@ -67,7 +67,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceFactory>();
             container.Register<IService>(made: Made.Of(
-                typeof(ServiceFactory).GetMethodOrNull("Create"), 
+                typeof(ServiceFactory).Method("Create"), 
                 ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>();
@@ -82,7 +82,7 @@ namespace DryIoc.UnitTests
             container.Register<ServiceFactory>();
             container.UseInstance("parameter");
             container.Register<IService>(made: Made.Of(
-                typeof(ServiceFactory).GetMethodOrNull("Create", typeof(string)), 
+                typeof(ServiceFactory).Method("Create", typeof(string)),
                 ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>();
@@ -143,7 +143,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<IService, SomeService>(made: Made.Of(
-                r => typeof(ServiceFactory).GetMethodOrNull("Create"),
+                r => typeof(ServiceFactory).Method("Create"),
                 ServiceInfo.Of<ServiceFactory>()));
 
             var ex = Assert.Throws<ContainerException>(() =>
@@ -156,7 +156,7 @@ namespace DryIoc.UnitTests
         public void Should_throw_for_instance_method_without_factory()
         {
             var container = new Container();
-            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).GetMethodOrNull("Create")));
+            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).Method("Create")));
 
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<IService>());
@@ -169,7 +169,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService>(made: Made.Of(
-                typeof(ServiceFactory).GetMethodOrNull("Create"), 
+                typeof(ServiceFactory).Method("Create"), 
                 ServiceInfo.Of<ServiceFactory>()));
 
             var service = container.Resolve<IService>(IfUnresolved.ReturnDefault);
@@ -183,7 +183,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Register<SomeService>(made: Made.Of(typeof(BadFactory).GetMethodOrNull("Create"))));
+                container.Register<SomeService>(made: Made.Of(typeof(BadFactory).Method("Create"))));
 
             Assert.AreEqual(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, ex.Error);
         }

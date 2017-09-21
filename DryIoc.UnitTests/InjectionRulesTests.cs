@@ -269,7 +269,7 @@ namespace DryIoc.UnitTests
                 Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
-                made: Made.Of(r => GetType().GetMethodOrNull("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
+                made: Made.Of(r => GetType().Method("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
 
             var service = container.Resolve<MyService>();
 

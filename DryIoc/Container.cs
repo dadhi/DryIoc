@@ -11175,7 +11175,6 @@ namespace DryIoc
                         Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
         }
 
-        // todo: Make an obsolete
         /// <summary>Obsolete: use <see cref="Constructor"/></summary>
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
@@ -11249,9 +11248,7 @@ namespace DryIoc
             return methods.Length == 1 ? methods[0] : null;
         }
 
-        /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
-        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="paramTypes">Argument types</param> <returns>Found method or null.</returns>
+        /// <summary>Obsolete: replaced by <see cref="Method"/></summary>
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
             var typeInfo = type.GetTypeInfo();
@@ -11464,10 +11461,10 @@ namespace DryIoc
             }
         }
 
-        private static readonly Lazy<MethodInfo> _getDefaultMethod = new Lazy<MethodInfo>(() =>
-            typeof(ReflectionTools).GetMethodOrNull("GetDefault", ArrayTools.Empty<Type>()));
+        internal static T GetDefault<T>() => default(T);
 
-        internal static T GetDefault<T>() { return default(T); }
+        private static readonly Lazy<MethodInfo> _getDefaultMethod = new Lazy<MethodInfo>(() =>
+            typeof(ReflectionTools).Method(nameof(GetDefault), true));
 
         #endregion
     }
