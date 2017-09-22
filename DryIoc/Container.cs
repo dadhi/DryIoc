@@ -43,20 +43,20 @@ namespace DryIoc
     public sealed partial class Container : IContainer
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
-        public Container() : this(Rules.Default, Ref.Of(Registry.Default), new SingletonScope())
+        public Container() : this(Rules.Default, Ref.Of(Registry.Default), singletonScope: new Scope())
         { }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior.
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
-        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
+        /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new SingletonScope(), scopeContext)
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new Scope(), scopeContext)
         { }
 
         /// <summary>Creates new container with configured rules.</summary>
-        /// <param name="configure">Delegate gets <see cref="DryIoc.Rules.Default"/> as input and may return configured rules.</param>
-        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>, default is <see cref="ThreadScopeContext"/>.</param>
+        /// <param name="configure">Allows to modify <see cref="DryIoc.Rules.Default"/> rules.</param>
+        /// <param name="scopeContext">(optional) Scope context to use for <see cref="Reuse.InCurrentScope"/>.</param>
         public Container(Func<Rules, Rules> configure, IScopeContext scopeContext = null)
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext)
         { }
@@ -115,8 +115,7 @@ namespace DryIoc
         public IContainer WithoutCache()
         {
             ThrowIfContainerDisposed();
-            var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, registryWithoutCache,
+            return new Container(Rules, Ref.Of(_registry.Value.WithoutCache()),
                 _singletonScope, _scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
@@ -127,11 +126,9 @@ namespace DryIoc
         public IContainer WithoutSingletonsAndCache()
         {
             ThrowIfContainerDisposed();
-            var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            var newSingletons = new SingletonScope();
-            return new Container(Rules, registryWithoutCache,
-                newSingletons, _scopeContext, _currentScope,
-                _disposed, _disposeStackTrace, _parent, _root);
+            return new Container(Rules,
+                Ref.Of(_registry.Value.WithoutCache()), new Scope(), 
+                _scopeContext, _currentScope, _disposed, _disposeStackTrace, _parent, _root);
         }
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
@@ -1586,8 +1583,7 @@ namespace DryIoc
         private readonly Ref<Registry> _registry;
         private Ref<ImTreeMap<Type, FactoryDelegate>[]> _defaultFactoryDelegateCache;
 
-        private readonly SingletonScope _singletonScope;
-
+        private readonly IScope _singletonScope;
         private readonly IScope _currentScope;
         private readonly IScopeContext _scopeContext;
 
@@ -2141,7 +2137,7 @@ namespace DryIoc
             }
         }
 
-        private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
+        private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
             IScopeContext scopeContext = null, IScope currentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null, IResolverContext root = null)
@@ -6902,13 +6898,13 @@ namespace DryIoc
         }
 
         /// <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
-        public bool AsResolutionRoot { get { return (_settings & Settings.AsResolutionRoot) != 0; } }
+        public bool AsResolutionRoot => (_settings & Settings.AsResolutionRoot) != 0;
 
-        /// <summary>In addition to <see cref="AsResolutionCall"/> opens scope.</summary>
-        public bool OpenResolutionScope { get { return (_settings & Settings.OpenResolutionScope) != 0; } }
+        /// <summary>Opens scope, also implies <see cref="AsResolutionCall"/>.</summary>
+        public bool OpenResolutionScope => (_settings & Settings.OpenResolutionScope) != 0;
 
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
-        public bool PreventDisposal { get { return (_settings & Settings.PreventDisposal) != 0; } }
+        public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
 
         /// <summary>Stores reused instance as WeakReference.</summary>
         public bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
@@ -7353,16 +7349,14 @@ namespace DryIoc
     public abstract class Factory
     {
         /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
-        public static int GetNextID()
-        {
-            return Interlocked.Increment(ref _lastFactoryID);
-        }
+        public static int GetNextID() => 
+            Interlocked.Increment(ref _lastFactoryID);
 
         /// <summary>Unique factory id generated from static seed.</summary>
         public int FactoryID { get; internal set; }
 
         /// <summary>Reuse policy for created services.</summary>
-        public virtual IReuse Reuse { get { return _reuse; } }
+        public virtual IReuse Reuse => _reuse;
 
         /// <summary>Setup may contain different/non-default factory settings.</summary>
         public virtual Setup Setup
@@ -7476,14 +7470,10 @@ namespace DryIoc
                 !Setup.PreventDisposal &&
                 !Setup.WeaklyReferenced)
             {
-                var singletons = (SingletonScope)request.SingletonScope;
-                var singletonID = singletons.IndexOf(FactoryID);
-                if (singletonID > 0)
-                {
-                    var value = singletons.GetOrDefault(singletonID);
-                    if (value != null)
-                        return Expression.Constant(value, request.ServiceType);
-                }
+                var singletons = request.SingletonScope;
+                object singleton;
+                if (singletons.TryGet(out singleton, FactoryID))
+                    return Expression.Constant(singleton, request.ServiceType);
             }
 
             // Then check the expression cache
@@ -8931,6 +8921,9 @@ namespace DryIoc
         /// <summary>Optional name object associated with scope.</summary>
         object Name { get; }
 
+        /// <summary>True if scope is disposed.</summary>
+        bool IsDisposed { get; }
+
         /// <summary>Creates, stores, and returns stored object.</summary>
         /// <param name="id">Unique ID to find created object in subsequent calls.</param>
         /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will not be stored.</param>
@@ -8943,6 +8936,10 @@ namespace DryIoc
         /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
         void SetOrAdd(int id, object item);
 
+        /// <summary>Looks up for stored item by id.</summary>
+        bool TryGet(out object item, int id);
+
+        // todo: remove
         /// <summary>Creates id/index for new item to be stored in scope.
         /// If separate index is not supported then just returns back passed <paramref name="externalId"/>.</summary>
         /// <param name="externalId">Id to be mapped to new item id/index</param>
@@ -8962,6 +8959,9 @@ namespace DryIoc
 
         /// <summary>Optional name object associated with scope.</summary>
         public object Name { get; }
+
+        /// <summary>True if scope is disposed.</summary>
+        public bool IsDisposed => _disposed == 1;
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
@@ -9028,6 +9028,15 @@ namespace DryIoc
             if (id != -1)
                 Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
             TrackDisposable(item);
+        }
+
+        /// <inheritdoc />
+        public bool TryGet(out object item, int id)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed);
+            // todo: null may be a valid valid, replace with TryGet
+            return (item = _items.GetValueOrDefault(id)) != null;
         }
 
         /// <inheritdoc />
@@ -9109,239 +9118,6 @@ namespace DryIoc
                 }
             }
         }
-    }
-
-    /// <summary>Different from <see cref="Scope"/> so that uses single array of items for fast access.
-    /// The array structure is:
-    /// items[0] is reserved for storing object[][] buckets.
-    /// items[1-BucketSize] are used for storing actual singletons up to (BucketSize-1) index
-    /// Buckets structure is variable number of object[BucketSize] buckets used to storing items with index >= BucketSize.
-    /// The structure allows very fast access to up to <see cref="BucketSize"/> singletons - it just array access: items[itemIndex]
-    /// For further indexes it is a fast O(1) access: ((object[][])items[i])[i / BucketSize - 1][i % BucketSize]
-    /// </summary>
-    public sealed class SingletonScope : IScope
-    {
-        /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public IScope Parent { get; private set; }
-
-        /// <summary>Optional name object associated with scope.</summary>
-        public object Name { get; private set; }
-
-        /// <summary>Amount of items in item array.</summary>
-        public static readonly int BucketSize = 32;
-
-        /// <summary>Returns true if scope was disposed.</summary>
-        public bool IsDisposed { get { return _disposed == 1; } }
-
-        /// <summary>Creates scope.</summary>
-        /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
-        public SingletonScope(IScope parent = null, object name = null)
-        {
-            Parent = parent;
-            Name = name;
-            Items = new object[BucketSize];
-            _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-            _lastItemIndex = 0;
-        }
-
-        internal int IndexOf(int factoryId)
-        {
-            var indexObj = _factoryIdToIndexMap.GetValueOrDefault(factoryId);
-            return indexObj == null ? -1 : (int)indexObj;
-        }
-
-        internal object GetOrDefault(int index)
-        {
-            if (index < BucketSize)
-                return Items[index];
-
-            var buckets = Items[0] as object[][];
-            if (buckets == null)
-                return null;
-
-            var bucketIndex = (index / BucketSize) - 1; // bucket indices start with 0
-            if (bucketIndex >= buckets.Length)
-                return null;
-
-            var bucket = buckets[bucketIndex];
-            if (bucket == null)
-                return null;
-
-            return bucket[index % BucketSize];
-        }
-
-        /// <summary>Adds mapping between provide id and index for new stored item. Returns index.</summary>
-        /// <param name="externalId">External id mapped to internal index.</param>
-        /// <returns>Already mapped index, or newly created.</returns>
-        public int GetScopedItemIdOrSelf(int externalId)
-        {
-            return (int)(_factoryIdToIndexMap.GetValueOrDefault(externalId) ?? MapExternalId(externalId));
-        }
-
-        private object MapExternalId(int externalId)
-        {
-            object index = null;
-            Ref.Swap(ref _factoryIdToIndexMap, map =>
-            {
-                index = map.GetValueOrDefault(externalId);
-                return index == null
-                    ? map.AddOrUpdate(externalId, index = Interlocked.Increment(ref _lastItemIndex))
-                    : map;
-            });
-
-            return index;
-        }
-
-        /// <summary><see cref="IScope.GetOrAdd"/> for description.
-        /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
-        /// <param name="id">Unique ID to find created object in subsequent calls.</param>
-        /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
-        /// <returns>Created and stored object.</returns>
-        /// <exception cref="ContainerException">if scope is disposed.</exception>
-        public object GetOrAdd(int id, CreateScopedValue createValue)
-        {
-            return id < BucketSize && id >= 0 // it could be -1 for disposable transients
-                ? (Items[id] ?? GetOrAddItem(Items, id, createValue))
-                : GetOrAddItem(id, createValue);
-        }
-
-        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
-        public void SetOrAdd(int id, object item)
-        {
-            Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            if (id != -1)
-            {
-                if (id < BucketSize)
-                    Items[id] = item;
-                else
-                {
-                    var bucket = GetOrAddBucket(id);
-                    var indexInBucket = id % BucketSize;
-                    bucket[indexInBucket] = item;
-                }
-            }
-
-            TrackDisposable(item);
-        }
-
-        /// <inheritdoc />
-        public void TrackDisposable(object item)
-        {
-            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
-            {
-                // Decrement here is because dispose should happen in reverse resolution order
-                // By adding items with decreasing IDs we get rid off ordering on Dispose.
-                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
-                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
-            }
-        }
-
-        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
-        public void Dispose()
-        {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
-                return;
-
-            var disposables = _disposables;
-            if (!disposables.IsEmpty)
-                foreach (var disposable in disposables.Enumerate())
-                    ScopedDisposableHandling.DisposeItem(disposable.Value);
-
-            _disposables = ImTreeMapIntToObj.Empty;
-            _factoryIdToIndexMap = ImTreeMapIntToObj.Empty;
-            Items = ArrayTools.Empty<object>();
-        }
-
-        #region Implementation
-
-        private readonly object _syncRoot = new object();
-
-        private ImTreeMapIntToObj _factoryIdToIndexMap;
-        private int _lastItemIndex;
-        private int _disposed;
-
-        /// <summary>value at 0 index is reserved for [][] structure to accommodate more values</summary>
-        internal object[] Items;
-
-        private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
-        private int _nextDisposablelID = int.MaxValue;
-
-        private object GetOrAddItem(int index, CreateScopedValue createValue)
-        {
-            if (index == -1) // disposable transient
-            {
-                var transient = createValue();
-                TrackDisposable(transient);
-                return transient;
-            }
-
-            var bucket = GetOrAddBucket(index);
-            index = index % BucketSize;
-            return GetOrAddItem(bucket, index, createValue);
-        }
-
-        private object GetOrAddItem(object[] bucket, int index, CreateScopedValue createValue)
-        {
-            var value = bucket[index];
-            if (value != null)
-                return value;
-
-            lock (_syncRoot)
-            {
-                value = bucket[index];
-                if (value == null)
-                {
-                    value = createValue();
-                    TrackDisposable(value);
-                    bucket[index] = value;
-                }
-            }
-
-            return value;
-        }
-
-        // find if bucket already created starting from 0
-        // if not - create new buckets array and copy old buckets into it
-        private object[] GetOrAddBucket(int index)
-        {
-            var bucketIndex = (index / BucketSize) - 1;
-            var buckets = Items[0] as object[][];
-            if (buckets == null ||
-                buckets.Length < bucketIndex + 1 ||
-                buckets[bucketIndex] == null)
-            {
-                Ref.Swap(ref Items[0], value =>
-                {
-                    if (value == null)
-                    {
-                        var newBuckets = new object[bucketIndex + 1][];
-                        newBuckets[bucketIndex] = new object[BucketSize];
-                        return newBuckets;
-                    }
-
-                    var oldBuckets = (object[][])value;
-                    if (oldBuckets.Length < bucketIndex + 1)
-                    {
-                        var newBuckets = new object[bucketIndex + 1][];
-                        Array.Copy(oldBuckets, 0, newBuckets, 0, oldBuckets.Length);
-                        newBuckets[bucketIndex] = new object[BucketSize];
-                        return newBuckets;
-                    }
-
-                    if (oldBuckets[bucketIndex] == null)
-                        oldBuckets[bucketIndex] = new object[BucketSize];
-
-                    return value;
-                });
-            }
-
-            var bucket = ((object[][])Items[0])[bucketIndex];
-            return bucket;
-        }
-
-        #endregion
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>

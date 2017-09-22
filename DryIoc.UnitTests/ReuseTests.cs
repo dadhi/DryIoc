@@ -680,7 +680,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var count = SingletonScope.BucketSize * 2 + 1;
+            const int count = 32 * 2 + 1;
             for (var i = 0; i < count; i++)
             {
                 var serviceKey = new IntKey(i);

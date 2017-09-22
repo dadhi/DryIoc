@@ -38,3 +38,4 @@ to simplifies the path to `IResolver` from the object graph.
 30. `InjectPropertiesAndFields` may define the names of members to inject instead of full blown `PropertiesAndFieldsSelector`,
 but there is still possibility to define the selector on container level
 31. Added `object[] args` parameter into `Resolve` and `ResolveMany`
+32. Removed special SingletonScope, using one implementation for both scope and singletons
