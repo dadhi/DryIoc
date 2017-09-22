@@ -5,15 +5,16 @@
 1. Using C# 6 through codebase.
 2. `IReuse` contents is replaced with `IReuseV3` contents, `IReuseV3` is removed.
 3. Removed unused `compositeParentKey` and `compositeRequiredType` parameters from `IResolver.ResolveMany` both in DryIoc and DIZero
+4. Removed `scope` parameter from `Resolve` and `ResolveMany`
 4. Removed `state` and `scope` parameter from FactoryDelegate due #288 both in DryIoc and DryIocZero
 5. Removed `Rules.FallbackContainers`
 6. `Container.CreateFacade` implementation is changed from the use of fallback containers to 
 `rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey))`
-7. Removed `IScopeAccess` interface, replaced with `IResolverContext.OpenedScoped` and extension methods.
+7. Removed `IScopeAccess` interface, replaced with `IResolverContext.OpenedScope` and extension methods.
 8. Removed `ContainerWeakRef` implementation of `IResolverContext`. Now `IResolverContext` is implemented by `Container` itself.
 9. Added `IReuse.Name` to support reuse name
 10. Renamed `IContainer.ContainerWeakRef` into `IContainer.ResolverContext`
-11. Removed `ContainerTools.GetCurrentScope` extension. It is replaced by `IResolverContext.OpenedScope`
+11. Removed `ContainerTools.GetCurrentScope` extension. It is replaced by `IResolverContext.CurrentScope`
 12. Removed obsolete `IContainer.EmptyRequest` and `Request.CreateEmpty`
 13. Removed obsolete `IContainer.ResolutionStateCache` and `IContainer.GetOrAddStateItem`
 14. Removed obsolete `Request.ToRequestInfo`
@@ -36,3 +37,4 @@ to simplifies the path to `IResolver` from the object graph.
 29. `OpenScope` no longer accepts the `Action<Rules>`, but you can always use `container.With(Action<Rules>)` before opening scope
 30. `InjectPropertiesAndFields` may define the names of members to inject instead of full blown `PropertiesAndFieldsSelector`,
 but there is still possibility to define the selector on container level
+31. Added `object[] args` parameter into `Resolve` and `ResolveMany`

@@ -352,7 +352,8 @@ namespace DryIoc
             return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
         }
 
-        object IResolver.Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent)
+        object IResolver.Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
+            Type requiredServiceType, RequestInfo preResolveParent, object[] args) // todo: args are for the future Func<args> propagation through Resolve call boundaries
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
@@ -431,7 +432,7 @@ namespace DryIoc
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolved, null, null);
+                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolved, null, null, null);
 
             var factoryDelegate = factory == null ? null : factory.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
@@ -453,9 +454,8 @@ namespace DryIoc
             return service;
         }
 
-        // todo: perf: optimize for speed
-        IEnumerable<object> IResolver.ResolveMany(
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preResolveParent)
+        IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey,
+            Type requiredServiceType, RequestInfo preResolveParent, object[] args)
         {
             var requiredItemType = requiredServiceType ?? serviceType;
 
@@ -549,7 +549,7 @@ namespace DryIoc
             foreach (var item in allItems.OrderBy(it => it.FactoryRegistrationOrder))
             {
                 var service = container.Resolve(serviceType, item.OptionalServiceKey,
-                    IfUnresolved.ReturnDefault, item.ServiceType, preResolveParent);
+                    IfUnresolved.ReturnDefault, item.ServiceType, preResolveParent, null);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -817,8 +817,8 @@ namespace DryIoc
                 if (serviceInfo != null)
                 {
                     var details = serviceInfo.Details;
-                    var value = resolver.Resolve(serviceInfo.ServiceType,
-                        details.ServiceKey, details.IfUnresolved, details.RequiredServiceType, requestInfo);
+                    var value = resolver.Resolve(serviceInfo.ServiceType, details.ServiceKey,
+                        details.IfUnresolved, details.RequiredServiceType, requestInfo, args: null);
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
                 }
@@ -1639,7 +1639,7 @@ namespace DryIoc
 
             private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
             {
-                for (var scope = r.CurrentScope; scope != null ; scope = scope.Parent)
+                for (var scope = r.CurrentScope; scope != null; scope = scope.Parent)
                 {
                     var result = GetAndUnwrapOrDefault(scope, FactoryID);
                     if (result != null)
@@ -2267,7 +2267,7 @@ namespace DryIoc
 
         /// <summary>For given instance resolves and sets properties and fields. You may specify what 
         /// properties and fields.</summary>
-        public static TService InjectPropertiesAndFields<TService>(this IResolverContext r, TService instance, 
+        public static TService InjectPropertiesAndFields<TService>(this IResolverContext r, TService instance,
             params string[] propertyAndFieldNames)
         {
             r.InjectPropertiesAndFields(instance, propertyAndFieldNames);
@@ -3155,7 +3155,8 @@ namespace DryIoc
                 Expression.Constant(itemType),
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
-                preResolveParentExpr);
+                preResolveParentExpr,
+                Expression.Constant(null, typeof(object[])));
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemType }, callResolveManyExpr);
@@ -5244,7 +5245,7 @@ namespace DryIoc
         /// <summary>Obsolete: replaced with UseInstance</summary>
         public static void RegisterInstance(this IResolverContext r, Type serviceType, object instance,
             IReuse ignored = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) => 
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         // todo: remove in future
@@ -5445,8 +5446,8 @@ namespace DryIoc
     public static class Resolver
     {
         internal static readonly MethodInfo ResolveMethod =
-            typeof(IResolver).Method(nameof(IResolver.Resolve),
-                typeof(Type), typeof(object), typeof(IfUnresolved), typeof(Type), typeof(RequestInfo));
+            typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
+                typeof(IfUnresolved), typeof(Type), typeof(RequestInfo), typeof(object[]));
 
         internal static readonly MethodInfo ResolveManyMethod =
             typeof(IResolver).Method(nameof(IResolver.ResolveMany));
@@ -5478,7 +5479,7 @@ namespace DryIoc
         /// ]]></code></example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw) =>
-            (TService)resolver.Resolve(typeof(TService), null, ifUnresolved, requiredServiceType, null);
+            (TService)resolver.Resolve(typeof(TService), null, ifUnresolved, requiredServiceType, null, null);
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
         /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="requiredServiceType"/>
@@ -5498,7 +5499,7 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null) =>
             serviceKey == null && requiredServiceType == null
                 ? resolver.Resolve(serviceType, ifUnresolved)
-                : resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, null);
+                : resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, null, null);
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
@@ -5533,7 +5534,7 @@ namespace DryIoc
             Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable,
             object serviceKey = null) =>
             behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty).Cast<TService>()
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty, args: null).Cast<TService>()
                 : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
 
         /// <summary>Returns all registered services as objects, including all keyed and default registrations.</summary>
@@ -5588,8 +5589,11 @@ namespace DryIoc
             var preResolveParentExpr = container.RequestInfoToExpression(
                 parentRequestInfo, openResolutionScope);
 
-            var resolveCallExpr = Expression.Call(resolverExpr, ResolveMethod,
-                serviceTypeExpr, serviceKeyExpr, ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr);
+            // todo: for future propagating of Func<args>
+            var argsExpr = Expression.Constant(null, typeof(object[]));
+
+            var resolveCallExpr = Expression.Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
+                ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, argsExpr);
 
             return Expression.Convert(resolveCallExpr, request.ServiceType);
         }
@@ -5824,7 +5828,7 @@ namespace DryIoc
         /// <param name="container">required for <see cref="IContainer.GetWrappedType"/></param>
         /// <param name="ownerType">(optional)to be removed</param>
         /// <returns>Either input dependency info, or new info with properties inherited from the owner.</returns>
-        public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency, 
+        public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency,
             IServiceInfo owner, IContainer container, FactoryType ownerType = FactoryType.Service)
         {
             var ownerDetails = owner.Details;
@@ -6092,7 +6096,7 @@ namespace DryIoc
         /// <param name="member">Member is either property or field.</param> <returns>Created info.</returns>
         public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
             member.ThrowIfNull() is PropertyInfo
-                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member) 
+                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member)
                 : new Field((FieldInfo)member);
 
         /// <summary>The required service type. It will be either <see cref="FieldInfo.FieldType"/> or <see cref="PropertyInfo.PropertyType"/>.</summary>
@@ -9056,7 +9060,7 @@ namespace DryIoc
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
-        public override string ToString() => 
+        public override string ToString() =>
             "{Name=" + (Name ?? "<no-name>")
             + (Parent == null ? string.Empty : ", Parent=" + Parent)
             + "}";
@@ -10035,9 +10039,8 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Declares minimal API for service resolution.
-    /// The user friendly convenient methods are implemented as extension methods in <see cref="Resolver"/> class.</summary>
-    /// <remarks>Resolve default and keyed is separated because of micro optimization for faster resolution.</remarks>
+    /// <summary>Declares minimal API for service resolution. 
+    /// Resolve default and keyed is separated because of optimization for faster resolution of the forner.</summary>
     public interface IResolver
     {
         /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
@@ -10046,15 +10049,17 @@ namespace DryIoc
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> provided.</returns>
         object Resolve(Type serviceType, IfUnresolved ifUnresolved);
 
-        /// <summary>Resolves service from container and returns created service object.</summary>
+        /// <summary>Resolves service instance from container.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
-        /// <param name="serviceKey">Optional service key used for registering service.</param>
-        /// <param name="ifUnresolved">Says what to do if service is unresolved.</param>
-        /// <param name="requiredServiceType">Actual registered service type to use instead of <paramref name="serviceType"/>,
+        /// <param name="serviceKey">(optional) service key used for registering service.</param>
+        /// <param name="ifUnresolved">(optional) Says what to do if service is unresolved.</param>
+        /// <param name="requiredServiceType">(optional) Registered or wrapped service type to use instead of <paramref name="serviceType"/>,
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
-        /// <param name="preResolveParent">Dependency resolution path info.</param>
+        /// <param name="preResolveParent">(optional) Dependency chain info.</param>
+        /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> parameter.</returns>
-        object Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent);
+        object Resolve(Type serviceType, object serviceKey,
+            IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent, object[] args);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -10063,8 +10068,10 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
+        /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preResolveParent);
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, 
+            Type requiredServiceType, RequestInfo preResolveParent, object[] args);
     }
 
     /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
