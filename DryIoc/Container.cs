@@ -252,18 +252,12 @@ namespace DryIoc
 
         #region Static state
 
-        // todo: v3: remove
-        /// <summary>State parameter expression in FactoryDelegate.</summary>
-        public static readonly ParameterExpression StateParamExpr =
-            Expression.Parameter(typeof(object[]), "state");
-
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr =
             Expression.Parameter(typeof(IResolverContext), "r");
 
-        // todo: v3: change to (IResolverContext r, object[] args)
-        private static readonly Type[] _factoryDelegateParamTypes = { typeof(object[]), typeof(IResolverContext) };
-        private static readonly ParameterExpression[] _factoryDelegateParamExprs = { StateParamExpr, ResolverContextParamExpr };
+        private static readonly Type[] _factoryDelegateParamTypes = { typeof(IResolverContext) };
+        private static readonly ParameterExpression[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         /// <param name="expression">Service expression (body) to wrap.</param> <returns>Created lambda expression.</returns>
@@ -282,7 +276,7 @@ namespace DryIoc
             if (expression.NodeType == ExpressionType.Constant)
             {
                 var value = ((ConstantExpression)expression).Value;
-                return (state, context) => value;
+                return _ => value;
             }
 
             var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
@@ -382,7 +376,7 @@ namespace DryIoc
         {
             var cachedFactory = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
             if (cachedFactory != null)
-                return cachedFactory(null, this);
+                return cachedFactory(this);
             return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
         }
 
@@ -411,7 +405,7 @@ namespace DryIoc
                     : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(null, this);
+                    return cachedFactoryDelegate(this);
             }
 
             // Cache is missed, so get the factory and put it into cache:
@@ -431,7 +425,7 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(null, this);
+            var service = factoryDelegate(this);
 
             if (registry.Services.IsEmpty)
                 return service;
@@ -472,7 +466,7 @@ namespace DryIoc
                 return null;
 
             var registryValue = _registry.Value;
-            var service = factoryDelegate(null, this);
+            var service = factoryDelegate(this);
 
             // Additionally disable caching when:
             // no services registered, so the service probably empty collection wrapper or alike.
@@ -1605,7 +1599,7 @@ namespace DryIoc
         // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
         internal sealed class InstanceFactory : Factory
         {
-            public override Type ImplementationType { get { return _instanceType; } }
+            public override Type ImplementationType => _instanceType;
             private readonly Type _instanceType;
 
             public InstanceFactory(Type instanceType)
@@ -1633,22 +1627,18 @@ namespace DryIoc
                     ?? CreateExpressionOrDefault(request);
             }
 
-            public override Expression CreateExpressionOrDefault(Request request)
-            {
-                return DryIoc.Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
-            }
+            public override Expression CreateExpressionOrDefault(Request request) =>
+                Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
 
             #region Implementation
 
-            private object GetInstanceFromScopeChainOrSingletons(object[] _, IResolverContext r)
+            private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
             {
-                var scope = r.CurrentScope;
-                while (scope != null)
+                for (var scope = r.CurrentScope; scope != null ; scope = scope.Parent)
                 {
                     var result = GetAndUnwrapOrDefault(scope, FactoryID);
                     if (result != null)
                         return result;
-                    scope = scope.Parent;
                 }
 
                 var instance = GetAndUnwrapOrDefault(r.SingletonScope, FactoryID);
@@ -2907,12 +2897,8 @@ namespace DryIoc
         }
     }
 
-    /// <summary>The delegate type which is actually used to create service instance by container.</summary>
-    /// <param name="state">OBSOLETE</param>
-    /// <param name="r">Provides access to <see cref="IResolver"/> implementation to enable dynamic resolve inside:
-    /// registered delegate factory, <see cref="Lazy{T}"/>, and <see cref="LazyEnumerable{TService}"/>.</param>
-    /// <returns>Created service object.</returns>
-    public delegate object FactoryDelegate(object[] state, IResolverContext r);
+    /// <summary>The result generated delegate used for service creation.</summary>
+    public delegate object FactoryDelegate(IResolverContext r);
 
     /// <summary>Adds to Container support for:
     /// <list type="bullet">
@@ -7576,18 +7562,18 @@ namespace DryIoc
                 if (Setup.PreventDisposal)
                 {
                     var factory = factoryDelegate;
-                    factoryDelegate = (_, cs) => new HiddenDisposable(factory(null, cs));
+                    factoryDelegate = r => new HiddenDisposable(factory(r));
                 }
 
                 if (Setup.WeaklyReferenced)
                 {
                     var factory = factoryDelegate;
-                    factoryDelegate = (_, cs) => new WeakReference(factory(null, cs));
+                    factoryDelegate = r => new WeakReference(factory(r));
                 }
 
                 var singletonScope = request.SingletonScope;
                 var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
-                var singleton = singletonScope.GetOrAdd(singletonId, () => factoryDelegate(null, request.Container));
+                var singleton = singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container));
 
                 serviceExpr = Expression.Constant(singleton);
             }
@@ -8915,7 +8901,7 @@ namespace DryIoc
             if (request.Reuse != DryIoc.Reuse.Transient)
                 return base.GetDelegateOrDefault(request); // use expression creation
 
-            return (state, r) => _factoryDelegate(r);
+            return r => _factoryDelegate(r);
         }
 
         private readonly Func<IResolver, object> _factoryDelegate;
