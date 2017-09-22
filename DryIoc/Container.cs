@@ -5451,39 +5451,27 @@ namespace DryIoc
         internal static readonly MethodInfo ResolveManyMethod =
             typeof(IResolver).Method(nameof(IResolver.ResolveMany));
 
-        /// <summary>Returns instance of service type.</summary>
-        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="serviceType">The type of the requested service.</param>
-        /// <returns>The requested service instance.</returns>
+        /// <summary>Resolves instance of service type from container. Throws exception if unable to resolve.</summary>
         public static object Resolve(this IResolver resolver, Type serviceType) =>
             resolver.Resolve(serviceType, IfUnresolved.Throw);
 
-        /// <summary>Returns instance of service type.</summary>
-        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="serviceType">The type of the requested service.</param>
-        /// <param name="ifUnresolved">Says how to handle unresolved service.</param>
-        /// <returns>The requested service instance.</returns>
+        /// <summary>Resolves instance of service type from container.</summary>
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved) =>
             resolver.Resolve(serviceType, ifUnresolved);
 
-        /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
-        /// <typeparam name="TService">The type of the requested service.</typeparam>
-        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="ifUnresolved">Says how to handle unresolved service.</param>
-        /// <returns>The requested service instance.</returns>
+        /// <summary>Resolves instance of service type from container.</summary>
+        public static object Resolve(this IResolver resolver, Type serviceType, bool ifUnresolvedReturnDefault) =>
+            resolver.Resolve(serviceType, ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw);
+
+        /// <summary>Resolves instance of type TService from container.</summary>
         public static TService Resolve<TService>(this IResolver resolver,
             IfUnresolved ifUnresolved = IfUnresolved.Throw) =>
             (TService)resolver.Resolve(typeof(TService), ifUnresolved);
 
         /// <summary>Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
-        /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="requiredServiceType"/>
-        /// could specify wrapped service type.</summary>
-        /// <typeparam name="TService">The type of the requested service.</typeparam>
-        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="requiredServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
-        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
-        /// <returns>The requested service instance.</returns>
-        /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
+        /// <paramref name="requiredServiceType"/> allow you to specify wrapped service type.</summary>
+        /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .NET 3.5</remarks>
         /// <example><code lang="cs"><![CDATA[
         ///     container.Register<IService, Service>();
         ///     var services = container.Resolve<IEnumerable<object>>(typeof(IService));
