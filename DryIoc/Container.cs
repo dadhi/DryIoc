@@ -93,7 +93,7 @@ namespace DryIoc
             scopeContext = scopeContext ?? _scopeContext;
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             return new Container(rules, registryWithoutCache,
-                _singletonScope, scopeContext, _openedScope,
+                _singletonScope, scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
@@ -105,7 +105,7 @@ namespace DryIoc
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
             return new Container(Rules, readonlyRegistry,
-                _singletonScope, _scopeContext, _openedScope,
+                _singletonScope, _scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
@@ -117,7 +117,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             return new Container(Rules, registryWithoutCache,
-                _singletonScope, _scopeContext, _openedScope,
+                _singletonScope, _scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
@@ -130,7 +130,7 @@ namespace DryIoc
             var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
             var newSingletons = new SingletonScope();
             return new Container(Rules, registryWithoutCache,
-                newSingletons, _scopeContext, _openedScope,
+                newSingletons, _scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
@@ -143,40 +143,12 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
             return new Container(Rules, newRegistry,
-                _singletonScope, _scopeContext, _openedScope,
+                _singletonScope, _scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
         /// <summary>Returns ambient scope context associated with container.</summary>
         public IScopeContext ScopeContext { get { return _scopeContext; } }
-
-        /// <inheritdoc />
-        public IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null, bool trackInParent = false)
-        {
-            ThrowIfContainerDisposed();
-
-            if (name == null)
-                name = _openedScope != null ? null
-                    : _scopeContext != null ? _scopeContext.RootScopeName
-                    : NonAmbientRootScopeName;
-
-            var nestedOpenedScope = new Scope(_openedScope, name);
-
-            // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            if (_scopeContext != null)
-                _scopeContext.SetCurrent(scope =>
-                     nestedOpenedScope.ThrowIf(scope != _openedScope, Error.NotDirectScopeParent, _openedScope, scope));
-
-            // Track in either open scope or singleton scope
-            if (trackInParent)
-                (_openedScope ?? _singletonScope).SetOrAdd(-1, nestedOpenedScope);
-
-            var rules = configure == null ? Rules : configure(Rules);
-
-            return new Container(rules, _registry,
-                _singletonScope, _scopeContext, nestedOpenedScope, _disposed, _disposeStackTrace,
-                parent: this, root: _root ?? this);
-        }
 
         // todo: v3: Review do we need this name at all, probably not and it is decreasing performance.
         /// <summary>The default name of root scope without ambient context.</summary>
@@ -229,7 +201,7 @@ namespace DryIoc
                 if (_scopeContext != null)
                     _scopeContext.SetCurrent(scope =>
                     {
-                        if (scope == _openedScope)
+                        if (scope == _currentScope)
                             return scope.Parent;
                         return scope; // todo: Clarify why this code is hit, and is it a valid situation?
                     });
@@ -246,8 +218,8 @@ namespace DryIoc
                     _scopeContext.Dispose();
             }
 
-            if (_openedScope != null)
-                _openedScope.Dispose();
+            if (_currentScope != null)
+                _currentScope.Dispose();
         }
 
         #region Static state
@@ -606,7 +578,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IScope CurrentScope
-            => _scopeContext == null ? _openedScope : _scopeContext.GetCurrentOrDefault();
+            => _scopeContext == null ? _currentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
         public IResolverContext Parent => _parent;
@@ -615,8 +587,242 @@ namespace DryIoc
         public IResolverContext Root => _root;
 
         /// <inheritdoc />
-        IResolverContext IResolverContext.OpenScope(object name, bool trackInParent) =>
-            OpenScope(name, trackInParent: trackInParent);
+        public IResolverContext OpenScope(object name = null, bool trackInParent = false)
+        {
+            ThrowIfContainerDisposed();
+
+            // todo: v3: remove automatic scope names
+            if (name == null)
+                name = _currentScope != null ? null
+                    : _scopeContext != null ? _scopeContext.RootScopeName
+                        : NonAmbientRootScopeName;
+
+            var newScope = new Scope(_currentScope, name);
+
+            // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
+            if (_scopeContext != null)
+                _scopeContext.SetCurrent(scope =>
+                    newScope.ThrowIf(scope != _currentScope, Error.NotDirectScopeParent, _currentScope, scope));
+
+            // Track in either open scope or singleton scope
+            if (trackInParent)
+                (_currentScope ?? _singletonScope).TrackDisposable(newScope);
+
+            return new Container(Rules, _registry,
+                _singletonScope, _scopeContext, newScope, _disposed, _disposeStackTrace,
+                parent: this, root: _root ?? this);
+        }
+
+        void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey)
+        {
+            ThrowIfContainerDisposed();
+
+            if (instance != null)
+                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
+
+            if (preventDisposal)
+                instance = new HiddenDisposable(instance);
+
+            if (weaklyReferenced)
+                instance = new WeakReference(instance);
+
+            var scope = _currentScope ?? _singletonScope;
+            var instanceType = instance == null ? typeof(object) : instance.GetType();
+
+            _registry.Swap(r =>
+            {
+                var entry = r.Services.GetValueOrDefault(serviceType);
+
+                // no entries, first registration, usual/hot path
+                if (entry == null)
+                {
+                    // add new entry with instance factory
+                    var instanceFactory = GetInstanceFactory(instance, instanceType, scope);
+                    entry = serviceKey == null
+                        ? (object)instanceFactory
+                        : FactoriesEntry.Empty.With(instanceFactory, serviceKey);
+                }
+                else
+                {
+                    // have some registrations of instance, find if we should replace, add, or throw
+                    var singleDefaultFactory = entry as Factory;
+                    if (singleDefaultFactory != null)
+                    {
+                        if (serviceKey != null)
+                        {
+                            // @ifAlreadyRegistered doe no make sense for keyed, because there are no other keyed
+                            entry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                                .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
+                        }
+                        else // for default instance
+                        {
+                            switch (IfAlreadyRegistered)
+                            {
+                                case IfAlreadyRegistered.Replace: // the DEFAULT option
+                                    // the special case for re-use of existing factory,
+                                    // we can just update scope with the new instance
+                                    var reusedFactory = singleDefaultFactory as InstanceFactory;
+                                    if (reusedFactory != null)
+                                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID), instance);
+                                    else
+                                        entry = GetInstanceFactory(instance, instanceType, scope);
+                                    break;
+                                case IfAlreadyRegistered.AppendNotKeyed:
+                                    entry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                                        .With(GetInstanceFactory(instance, instanceType, scope));
+                                    break;
+                                case IfAlreadyRegistered.Throw:
+                                    Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, singleDefaultFactory);
+                                    break;
+                                case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
+                                    if (singleDefaultFactory.CanAccessImplementationType &&
+                                        singleDefaultFactory.ImplementationType != instanceType)
+                                        entry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                                            .With(GetInstanceFactory(instance, instanceType, scope));
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    }
+                    else // for multiple existing or single keyed factory
+                    {
+                        var singleKeyedOrManyFactories = (FactoriesEntry)entry;
+                        if (serviceKey != null)
+                        {
+                            var keyedFactory = singleKeyedOrManyFactories.Factories.GetValueOrDefault(serviceKey);
+                            if (keyedFactory == null)
+                            {
+                                entry = singleKeyedOrManyFactories
+                                    .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
+                            }
+                            else // when keyed instance is found
+                            {
+                                switch (IfAlreadyRegistered)
+                                {
+                                    case IfAlreadyRegistered.Replace: // the DEFAULT option
+                                        // the special case for re-use of existing factory,
+                                        // we can just update scope with the new instance
+                                        var reusedFactory = keyedFactory as InstanceFactory;
+                                        if (reusedFactory != null)
+                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID),
+                                                instance);
+                                        else // note: not possible for the moment
+                                            Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
+                                                KV.Of(serviceKey, instance), keyedFactory);
+                                        break;
+                                    case IfAlreadyRegistered.Keep:
+                                        break;
+                                    default:
+                                        Throw.It(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, keyedFactory);
+                                        break;
+                                }
+                            }
+                        }
+                        else // for default instance
+                        {
+                            var defaultFactories = singleKeyedOrManyFactories.LastDefaultKey == null
+                                ? ArrayTools.Empty<Factory>()
+                                : singleKeyedOrManyFactories.Factories.Enumerate()
+                                    .Match(it => it.Key is DefaultKey, it => it.Value)
+                                    .ToArrayOrSelf();
+
+                            if (defaultFactories.Length == 0) // no default factories among the multiple existing keyed factories
+                            {
+                                entry = singleKeyedOrManyFactories
+                                    .With(GetInstanceFactory(instance, instanceType, scope));
+                            }
+                            else // there are existing default factories
+                            {
+                                switch (IfAlreadyRegistered)
+                                {
+                                    case IfAlreadyRegistered.Replace: // the DEFAULT option
+                                        // the special case for reusing of existing factory,
+                                        // we can just update scope with the new instance
+                                        if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
+                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultFactories[0].FactoryID),
+                                                instance);
+                                        else
+                                        {
+                                            var keyedFactories = singleKeyedOrManyFactories.Factories.Enumerate()
+                                                .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
+                                            if (keyedFactories.Length == 0)
+                                                entry = GetInstanceFactory(instance, instanceType, scope);
+                                            else
+                                            {
+                                                var factoriesEntry = FactoriesEntry.Empty;
+                                                for (int i = 0; i < keyedFactories.Length; i++)
+                                                    factoriesEntry = factoriesEntry
+                                                        .With(keyedFactories[i].Value, keyedFactories[i].Key);
+                                                entry = factoriesEntry.With(GetInstanceFactory(instance, instanceType, scope));
+                                            }
+                                        }
+
+                                        break;
+                                    case IfAlreadyRegistered.AppendNotKeyed:
+                                        entry = singleKeyedOrManyFactories
+                                            .With(GetInstanceFactory(instance, instanceType, scope));
+                                        break;
+                                    case IfAlreadyRegistered.Throw:
+                                        Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, defaultFactories);
+                                        break;
+                                    case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
+                                        var duplicateImplIndex = defaultFactories.IndexOf(
+                                            it => it.CanAccessImplementationType &&
+                                            it.ImplementationType == instanceType);
+                                        if (duplicateImplIndex == -1) // add new implementation
+                                            entry = singleKeyedOrManyFactories
+                                                .With(GetInstanceFactory(instance, instanceType, scope));
+                                        // otherwise do nothing - keep the old entry
+                                        break;
+                                    default: // IfAlreadyRegistered.Keep
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // add instance entry to service registrations
+                return r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
+            });
+        }
+
+        void IResolverContext.InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames)
+        {
+            var instanceType = instance.ThrowIfNull().GetType();
+
+            PropertiesAndFieldsSelector propertiesAndFields = null;
+            if (!propertyAndFieldNames.IsNullOrEmpty())
+            {
+                var matchedMembers = instanceType.GetTypeInfo().DeclaredMembers
+                    .Match(m => (m is PropertyInfo || m is FieldInfo)
+                                && propertyAndFieldNames.IndexOf(m.Name) != -1,
+                        PropertyOrFieldServiceInfo.Of);
+                propertiesAndFields = _ => matchedMembers;
+            }
+
+            propertiesAndFields = propertiesAndFields
+                                  ?? Rules.PropertiesAndFields
+                                  ?? PropertiesAndFields.Auto;
+
+            var request = Request.Create(this, instanceType)
+                .WithResolvedFactory(new InstanceFactory(instanceType));
+
+            var requestInfo = request.RequestInfo;
+            var resolver = (IResolver)this;
+
+            foreach (var serviceInfo in propertiesAndFields(request))
+                if (serviceInfo != null)
+                {
+                    var details = serviceInfo.Details;
+                    var value = resolver.Resolve(serviceInfo.ServiceType,
+                        details.ServiceKey, details.IfUnresolved, details.RequiredServiceType, requestInfo);
+                    if (value != null)
+                        serviceInfo.SetValue(instance, value);
+                }
+        }
 
         #endregion
 
@@ -970,40 +1176,6 @@ namespace DryIoc
 
             return wrappedType == null ? serviceType
                 : ((IContainer)this).GetWrappedType(wrappedType, null);
-        }
-
-        /// <summary>For given instance resolves and sets properties and fields.</summary>
-        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.
-        /// If not specified then method will use container <see cref="DryIoc.Rules.PropertiesAndFields"/>,
-        /// or if not specified method fallbacks to <see cref="PropertiesAndFields.Auto"/>.</param>
-        /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
-        public object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields)
-        {
-            propertiesAndFields = propertiesAndFields
-                ?? Rules.PropertiesAndFields
-                ?? PropertiesAndFields.Auto;
-
-            var instanceType = instance.ThrowIfNull().GetType();
-
-            var request = Request.Create(this, instanceType)
-                .WithResolvedFactory(new InstanceFactory(instanceType));
-
-            var requestInfo = request.RequestInfo;
-            var resolver = (IResolver)this;
-
-            foreach (var serviceInfo in propertiesAndFields(request))
-                if (serviceInfo != null)
-                {
-                    var details = serviceInfo.Details;
-                    var value = resolver.Resolve(serviceInfo.ServiceType,
-                        details.ServiceKey, details.IfUnresolved, details.RequiredServiceType, requestInfo);
-                    if (value != null)
-                        serviceInfo.SetValue(instance, value);
-                }
-
-            return instance;
         }
 
         /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
@@ -1416,178 +1588,11 @@ namespace DryIoc
 
         private readonly SingletonScope _singletonScope;
 
-        internal readonly IScope _openedScope;
+        private readonly IScope _currentScope;
         private readonly IScopeContext _scopeContext;
 
         private readonly IResolverContext _root;
         private readonly IResolverContext _parent;
-
-        internal void UseInstanceInternal(Type serviceType, object instance,
-            IfAlreadyRegistered IfAlreadyRegistered, object serviceKey)
-        {
-            ThrowIfContainerDisposed();
-
-            var scope = _openedScope ?? _singletonScope;
-            var instanceType = instance == null ? typeof(object) : instance.GetType();
-
-            _registry.Swap(r =>
-            {
-                var entry = r.Services.GetValueOrDefault(serviceType);
-
-                // no entries, first registration, usual/hot path
-                if (entry == null)
-                {
-                    // add new entry with instance factory
-                    var instanceFactory = GetInstanceFactory(instance, instanceType, scope);
-                    entry = serviceKey == null
-                        ? (object)instanceFactory
-                        : FactoriesEntry.Empty.With(instanceFactory, serviceKey);
-                }
-                else
-                {
-                    // have some registrations of instance, find if we should replace, add, or throw
-                    var singleDefaultFactory = entry as Factory;
-                    if (singleDefaultFactory != null)
-                    {
-                        if (serviceKey != null)
-                        {
-                            // @ifAlreadyRegistered doe no make sense for keyed, because there are no other keyed
-                            entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
-                        }
-                        else // for default instance
-                        {
-                            switch (IfAlreadyRegistered)
-                            {
-                                case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                    // the special case for re-use of existing factory,
-                                    // we can just update scope with the new instance
-                                    var reusedFactory = singleDefaultFactory as InstanceFactory;
-                                    if (reusedFactory != null)
-                                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID), instance);
-                                    else
-                                        entry = GetInstanceFactory(instance, instanceType, scope);
-                                    break;
-                                case IfAlreadyRegistered.AppendNotKeyed:
-                                    entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                        .With(GetInstanceFactory(instance, instanceType, scope));
-                                    break;
-                                case IfAlreadyRegistered.Throw:
-                                    Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, singleDefaultFactory);
-                                    break;
-                                case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
-                                    if (singleDefaultFactory.CanAccessImplementationType &&
-                                        singleDefaultFactory.ImplementationType != instanceType)
-                                        entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                            .With(GetInstanceFactory(instance, instanceType, scope));
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                    }
-                    else // for multiple existing or single keyed factory
-                    {
-                        var singleKeyedOrManyFactories = (FactoriesEntry)entry;
-                        if (serviceKey != null)
-                        {
-                            var keyedFactory = singleKeyedOrManyFactories.Factories.GetValueOrDefault(serviceKey);
-                            if (keyedFactory == null)
-                            {
-                                entry = singleKeyedOrManyFactories
-                                    .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
-                            }
-                            else // when keyed instance is found
-                            {
-                                switch (IfAlreadyRegistered)
-                                {
-                                    case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                        // the special case for re-use of existing factory,
-                                        // we can just update scope with the new instance
-                                        var reusedFactory = keyedFactory as InstanceFactory;
-                                        if (reusedFactory != null)
-                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID),
-                                                instance);
-                                        else // note: not possible for the moment
-                                            Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
-                                                KV.Of(serviceKey, instance), keyedFactory);
-                                        break;
-                                    case IfAlreadyRegistered.Keep:
-                                        break;
-                                    default:
-                                        Throw.It(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, keyedFactory);
-                                        break;
-                                }
-                            }
-                        }
-                        else // for default instance
-                        {
-                            var defaultFactories = singleKeyedOrManyFactories.LastDefaultKey == null
-                                ? ArrayTools.Empty<Factory>()
-                                : singleKeyedOrManyFactories.Factories.Enumerate()
-                                    .Match(it => it.Key is DefaultKey, it => it.Value)
-                                    .ToArrayOrSelf();
-
-                            if (defaultFactories.Length == 0) // no default factories among the multiple existing keyed factories
-                            {
-                                entry = singleKeyedOrManyFactories
-                                    .With(GetInstanceFactory(instance, instanceType, scope));
-                            }
-                            else // there are existing default factories
-                            {
-                                switch (IfAlreadyRegistered)
-                                {
-                                    case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                        // the special case for reusing of existing factory,
-                                        // we can just update scope with the new instance
-                                        if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
-                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultFactories[0].FactoryID),
-                                                instance);
-                                        else
-                                        {
-                                            var keyedFactories = singleKeyedOrManyFactories.Factories.Enumerate()
-                                                .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
-                                            if (keyedFactories.Length == 0)
-                                                entry = GetInstanceFactory(instance, instanceType, scope);
-                                            else
-                                            {
-                                                var factoriesEntry = FactoriesEntry.Empty;
-                                                for (int i = 0; i < keyedFactories.Length; i++)
-                                                    factoriesEntry = factoriesEntry
-                                                        .With(keyedFactories[i].Value, keyedFactories[i].Key);
-                                                entry = factoriesEntry.With(GetInstanceFactory(instance, instanceType, scope));
-                                            }
-                                        }
-
-                                        break;
-                                    case IfAlreadyRegistered.AppendNotKeyed:
-                                        entry = singleKeyedOrManyFactories
-                                            .With(GetInstanceFactory(instance, instanceType, scope));
-                                        break;
-                                    case IfAlreadyRegistered.Throw:
-                                        Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, defaultFactories);
-                                        break;
-                                    case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
-                                        var duplicateImplIndex = defaultFactories.IndexOf(
-                                            it => it.CanAccessImplementationType &&
-                                            it.ImplementationType == instanceType);
-                                        if (duplicateImplIndex == -1) // add new implementation
-                                            entry = singleKeyedOrManyFactories
-                                                .With(GetInstanceFactory(instance, instanceType, scope));
-                                        // otherwise do nothing - keep the old entry
-                                        break;
-                                    default: // IfAlreadyRegistered.Keep
-                                        break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // add instance entry to service registrations
-                return r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
-            });
-        }
 
         private static InstanceFactory GetInstanceFactory(object instance, Type instanceType, IScope scope)
         {
@@ -2137,7 +2142,7 @@ namespace DryIoc
         }
 
         private Container(Rules rules, Ref<Registry> registry, SingletonScope singletonScope,
-            IScopeContext scopeContext = null, IScope openedScope = null,
+            IScopeContext scopeContext = null, IScope currentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null, IResolverContext root = null)
         {
@@ -2154,13 +2159,13 @@ namespace DryIoc
 
             _singletonScope = singletonScope;
 
-            _openedScope = openedScope;
+            _currentScope = currentScope;
             _scopeContext = scopeContext;
 
             // todo: v3: Remove implicit opened scope if possible
             // creating scope in a root container (its own root is null) is valid only for non-ambient scopes
-            if (rules.ImplicitOpenedRootScope && openedScope == null && scopeContext == null && root == null)
-                _openedScope = new Scope(null, NonAmbientRootScopeName);
+            if (rules.ImplicitOpenedRootScope && currentScope == null && scopeContext == null && root == null)
+                _currentScope = new Scope(null, NonAmbientRootScopeName);
         }
 
         #endregion
@@ -2255,18 +2260,19 @@ namespace DryIoc
     public static class ContainerTools
     {
         /// <summary>For given instance resolves and sets properties and fields.
-        /// It respects <see cref="DryIoc.Rules.PropertiesAndFields"/> rules set per container,
-        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>,
-        /// or you can specify your own rules with <paramref name="propertiesAndFields"/> parameter.</summary>
-        /// <typeparam name="TService">Input and returned instance type.</typeparam>Service (wrapped)
-        /// <param name="container">Usually a container instance, cause <see cref="Container"/> implements <see cref="IResolver"/></param>
-        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <returns>Input instance with resolved dependencies, to enable fluent method composition.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
-        public static TService InjectPropertiesAndFields<TService>(this IContainer container,
-            TService instance, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            (TService)container.InjectPropertiesAndFields(instance, propertiesAndFields);
+        /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
+        /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>.</summary>
+        public static TService InjectPropertiesAndFields<TService>(this IResolverContext r, TService instance) =>
+            r.InjectPropertiesAndFields<TService>(instance, null);
+
+        /// <summary>For given instance resolves and sets properties and fields. You may specify what 
+        /// properties and fields.</summary>
+        public static TService InjectPropertiesAndFields<TService>(this IResolverContext r, TService instance, 
+            params string[] propertyAndFieldNames)
+        {
+            r.InjectPropertiesAndFields(instance, propertyAndFieldNames);
+            return instance;
+        }
 
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
@@ -2819,12 +2825,27 @@ namespace DryIoc
         /// <summary>Current opened scope.</summary>
         IScope CurrentScope { get; }
 
-        /// <summary>Opens scope with optional name or names.</summary>
+        /// <summary>Opens scope with optional name.</summary>
         /// <param name="name">(optional)</param>
         /// <param name="trackInParent">(optional) Instructs to additionally store the opened scope in parent, 
-        /// so it will be disposed when parent is disposed. Used to dispose a resolution scope.</param>
+        /// so it will be disposed when parent is disposed. If no parent scope is available the scope will be tracked by Singleton scope.
+        /// Used to dispose a resolution scope.</param>
         /// <returns>Scoped resolver context.</returns>
-        IResolverContext OpenScope(object name, bool trackInParent);
+        /// <example><code lang="cs"><![CDATA[
+        /// using (var scope = container.OpenScope())
+        /// {
+        ///     var handler = scope.Resolve<IHandler>();
+        ///     handler.Handle(data);
+        /// }
+        /// ]]></code></example>
+        IResolverContext OpenScope(object name = null, bool trackInParent = false);
+
+        /// <summary>Allows to put instance into the scope.</summary>
+        void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey);
+
+        /// <summary>For given instance resolves and sets properties and fields.</summary>
+        void InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames);
     }
 
     /// <summary>Provides the shortcuts to <see cref="IResolverContext"/></summary>
@@ -3961,9 +3982,7 @@ namespace DryIoc
         }
 
         /// <summary>Specifies to open scope as soon as container is created (the same as for Singleton scope).
-        /// That way you don't need to call <see cref="IContainer.OpenScope"/>.
-        /// Implicitly opened scope will be disposed together with Singletons when container is disposed.
-        /// The name of root scope is <see cref="Container.NonAmbientRootScopeName"/>.</summary>
+        /// Implicitly opened scope will be disposed together with Singletons when container is disposed.</summary>
         /// <remarks>The setting is only valid for container without ambient scope context.</remarks>
         /// <returns>Returns new rules with flag set.</returns>
         public Rules WithImplicitRootOpenScope()
@@ -5223,82 +5242,68 @@ namespace DryIoc
 
         // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
-        public static void RegisterInstance(this IContainer container, Type serviceType, object instance,
+        public static void RegisterInstance(this IResolverContext r, Type serviceType, object instance,
             IReuse ignored = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) => 
-            container.UseInstance(serviceType, instance, ifAlreadyRegistered,
-                preventDisposal, weaklyReferenced, serviceKey);
+            r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
-        public static void RegisterInstance<TService>(this IContainer container, TService instance,
+        public static void RegisterInstance<TService>(this IResolverContext r, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            container.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered,
+            r.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered,
                 preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         /// <typeparam name="TService">Specified instance type. May be a base type or interface of instance actual type.</typeparam>
-        /// <param name="container">Container to register</param>
+        /// <param name="r">Container to register</param>
         /// <param name="instance">Instance to register</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void UseInstance<TService>(this IContainer container, TService instance,
+        public static void UseInstance<TService>(this IResolverContext r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            container.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+            r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
-        /// <param name="container">Container to register</param>
+        /// <param name="r">Context</param>
         /// <param name="serviceType">Runtime service type to register instance with</param>
         /// <param name="instance">Instance to register</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void UseInstance(this IContainer container, Type serviceType, object instance,
+        public static void UseInstance(this IResolverContext r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            container.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+            r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         /// <typeparam name="TService">Specified instance type. May be a base type or interface of instance actual type.</typeparam>
-        /// <param name="container">Container to register</param>
+        /// <param name="r">Context</param>
         /// <param name="instance">Instance to register</param>
         /// <param name="ifAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void UseInstance<TService>(this IContainer container, TService instance,
-            IfAlreadyRegistered ifAlreadyRegistered,
+        public static void UseInstance<TService>(this IResolverContext r, TService instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            container.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+            r.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
-        /// <param name="container">Container to register</param>
+        /// <param name="r">Context</param>
         /// <param name="serviceType">Runtime service type to register instance with</param>
         /// <param name="instance">Instance to register</param>
         /// <param name="ifAlreadyRegistered">The default is <see cref="IfAlreadyRegistered.Replace"/>.</param>
         /// <param name="preventDisposal">(optional) Prevents disposing of disposable instance by container.</param>
         /// <param name="weaklyReferenced">(optional)Stores the weak reference to instance, allowing to GC it.</param>
         /// <param name="serviceKey">(optional) Service key to identify instance from many.</param>
-        public static void UseInstance(this IContainer container, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
-        {
-            if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
-
-            if (preventDisposal)
-                instance = new HiddenDisposable(instance);
-
-            if (weaklyReferenced)
-                instance = new WeakReference(instance);
-
-            // todo: v3: remove the hack
-            ((Container)container).UseInstanceInternal(serviceType, instance, ifAlreadyRegistered, serviceKey);
-        }
+        public static void UseInstance(this IResolverContext r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
@@ -6097,17 +6102,16 @@ namespace DryIoc
     {
         /// <summary>Create member info out of provide property or field.</summary>
         /// <param name="member">Member is either property or field.</param> <returns>Created info.</returns>
-        public static PropertyOrFieldServiceInfo Of(MemberInfo member)
-        {
-            return member.ThrowIfNull() is PropertyInfo ? (PropertyOrFieldServiceInfo)
-                new Property((PropertyInfo)member) : new Field((FieldInfo)member);
-        }
+        public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
+            member.ThrowIfNull() is PropertyInfo
+                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member) 
+                : new Field((FieldInfo)member);
 
         /// <summary>The required service type. It will be either <see cref="FieldInfo.FieldType"/> or <see cref="PropertyInfo.PropertyType"/>.</summary>
         public abstract Type ServiceType { get; }
 
         /// <summary>Optional details: service key, if-unresolved policy, required service type.</summary>
-        public virtual ServiceDetails Details { get { return ServiceDetails.IfUnresolvedReturnDefault; } }
+        public virtual ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefault;
 
         /// <summary>Creates info from service type and details.</summary>
         /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
@@ -8952,6 +8956,9 @@ namespace DryIoc
         /// <param name="externalId">Id to be mapped to new item id/index</param>
         /// <returns>New it/index or just passed <paramref name="externalId"/></returns>
         int GetScopedItemIdOrSelf(int externalId);
+
+        /// <summary>The tracked item will be disposed with the scope.</summary>
+        void TrackDisposable(object item);
     }
 
     /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
@@ -8959,13 +8966,12 @@ namespace DryIoc
     public sealed class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public IScope Parent { get; private set; }
+        public IScope Parent { get; }
 
         /// <summary>Optional name object associated with scope.</summary>
-        public object Name { get; private set; }
+        public object Name { get; }
 
-        /// <summary>Create scope with optional parent and name.</summary>
-        /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
+        /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
         {
             Parent = parent;
@@ -8975,23 +8981,20 @@ namespace DryIoc
 
         /// <summary>Just returns back <paramref name="externalId"/> without any changes.</summary>
         /// <param name="externalId">Id will be returned back.</param> <returns><paramref name="externalId"/>.</returns>
-        public int GetScopedItemIdOrSelf(int externalId)
-        {
-            return externalId;
-        }
+        public int GetScopedItemIdOrSelf(int externalId) => externalId;
 
-        internal static readonly MethodInfo GetOrAddMethod = typeof(IScope).Method(nameof(IScope.GetOrAdd));
+        internal static readonly MethodInfo GetOrAddMethod =
+            typeof(IScope).Method(nameof(IScope.GetOrAdd));
 
         /// <summary><see cref="IScope.GetOrAdd"/> for description.
         /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
-        /// <param name="id">Unique ID to find created object in subsequent calls.</param>
+        /// <param name="id">Unique ID to find created object in subsequent calls.
+        /// <c>-1 value means transient disposable</c></param>
         /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
         /// <returns>Created and stored object.</returns>
         /// <exception cref="ContainerException">if scope is disposed.</exception>
-        public object GetOrAdd(int id, CreateScopedValue createValue)
-        {
-            return _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
-        }
+        public object GetOrAdd(int id, CreateScopedValue createValue) =>
+            _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
 
         private object TryGetOrAdd(int id, CreateScopedValue createValue)
         {
@@ -9035,6 +9038,18 @@ namespace DryIoc
             TrackDisposable(item);
         }
 
+        /// <inheritdoc />
+        public void TrackDisposable(object item)
+        {
+            if (ScopedDisposableHandling.TryUnwrapDisposable(item) == null)
+                return;
+
+            // Decrement here is because dispose should happen in reverse resolution order
+            // By adding items with decreasing IDs we get rid off ordering on Dispose.
+            var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
+            Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
+        }
+
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
         /// <remarks>If item disposal throws exception, then it won't be propagated outside,
         /// so the rest of the items could be disposed.</remarks>
@@ -9053,16 +9068,16 @@ namespace DryIoc
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
-        /// <returns>String representation.</returns>
-        public override string ToString()
-        {
-            return "{Name=" + (Name ?? "<no-name>")
-                + (Parent == null ? string.Empty : ", Parent=" + Parent)
-                + "}";
-        }
+        public override string ToString() => 
+            "{Name=" + (Name ?? "<no-name>")
+            + (Parent == null ? string.Empty : ", Parent=" + Parent)
+            + "}";
 
         #region Implementation
 
+        // todo: merge _items to _improve performance, 
+        // anyway most of disposables will be stored in items, except the transient disposables
+        // and tracked scopes
         private ImTreeMapIntToObj _items;
         private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
         private int _nextDisposablelID = int.MaxValue;
@@ -9070,17 +9085,6 @@ namespace DryIoc
 
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
-
-        private void TrackDisposable(object item)
-        {
-            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
-            {
-                // Decrement here is because dispose should happen in reverse resolution order
-                // By adding items with decreasing IDs we get rid off ordering on Dispose.
-                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
-                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
-            }
-        }
 
         #endregion
     }
@@ -9229,6 +9233,18 @@ namespace DryIoc
             TrackDisposable(item);
         }
 
+        /// <inheritdoc />
+        public void TrackDisposable(object item)
+        {
+            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
+            {
+                // Decrement here is because dispose should happen in reverse resolution order
+                // By adding items with decreasing IDs we get rid off ordering on Dispose.
+                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
+                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
+            }
+        }
+
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
         /// <remarks>If item disposal throws exception, then it won't be propagated outside, so the rest of the items could be disposed.</remarks>
         public void Dispose()
@@ -9259,17 +9275,6 @@ namespace DryIoc
 
         private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
         private int _nextDisposablelID = int.MaxValue;
-
-        private void TrackDisposable(object item)
-        {
-            if (ScopedDisposableHandling.TryUnwrapDisposable(item) != null)
-            {
-                // Decrement here is because dispose should happen in reverse resolution order
-                // By adding items with decreasing IDs we get rid off ordering on Dispose.
-                var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
-                Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
-            }
-        }
 
         private object GetOrAddItem(int index, CreateScopedValue createValue)
         {
@@ -9471,8 +9476,7 @@ namespace DryIoc
             GetType().Name + " {Lifespan=" + Lifespan + "}";
     }
 
-    /// <summary>Returns container bound current scope created by <see cref="Container.OpenScope"/> method.</summary>
-    /// <remarks>It is the same as Singleton scope if container was not created by <see cref="Container.OpenScope"/>.</remarks>
+    /// <summary>Specifies that instances are created, stored and disposed together with some scope.</summary>
     public sealed class CurrentScopeReuse : IReuse
     {
         /// <summary>Relative to other reuses lifespan value.</summary>
@@ -9660,14 +9664,14 @@ namespace DryIoc
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
             ScopedTo(typeof(TService), serviceKey);
 
-        /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Reuse.Singleton"/></summary>
+        /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Singleton"/></summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
         /// <summary>Obsolete: use <see cref="Scoped"/> instead.</summary>
         public static readonly IReuse InResolutionScope = Scoped;
 
-        /// <summary>Specifies to store single service instance per current/open scope created with <see cref="Container.OpenScope"/>.</summary>
+        /// <summary>Specifies to store single service instance per current opened scope.</summary>
         public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
 
         /// <summary>Returns current scope reuse with specific name to match with scope.
@@ -10212,27 +10216,10 @@ namespace DryIoc
         /// <summary>Returns scope context associated with container.</summary>
         IScopeContext ScopeContext { get; }
 
-        /// <summary>Creates new container with new opened scope, with shared registrations, singletons and resolutions cache.
-        /// If container uses ambient scope context, then this method sets new opened scope as current scope in the context.
-        /// In case of previous open scope, new open scope references old one as a parent.
-        /// </summary>
-        /// <param name="name">(optional) Name for opened scope to allow reuse to identify the scope.</param>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
-        /// <param name="trackInParent">(optional) The scope will be tracked and disposed by parent scope.</param>
-        /// <returns>New container with different current scope.</returns>
-        /// <example><code lang="cs"><![CDATA[
-        /// using (var scoped = container.OpenScope())
-        /// {
-        ///     var handler = scoped.Resolve<IHandler>();
-        ///     handler.Handle(data);
-        /// }
-        /// ]]></code></example>
-        IContainer OpenScope(object name = null, Func<Rules, Rules> configure = null, bool trackInParent = false);
-
+        // todo: remove from interface and make an extension method
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
         /// Facade shares rules with this container, everything else is its own.
         /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
-        /// <remarks>Singletons from container are not reused by facade, to achieve that rather use <see cref="OpenScope"/> with <see cref="Reuse.InCurrentScope"/>.</remarks>
         /// <returns>New facade container.</returns>
         IContainer CreateFacade();
 
@@ -10268,13 +10255,6 @@ namespace DryIoc
         /// <param name="request">Decorated service request.</param>
         /// <returns>Decorator expression.</returns>
         Expression GetDecoratorExpressionOrDefault(Request request);
-
-        /// <summary>For given instance resolves and sets properties and fields.</summary>
-        /// <param name="instance">Service instance with properties to resolve and initialize.</param>
-        /// <param name="propertiesAndFields">(optional) Function to select properties and fields, overrides all other rules if specified.</param>
-        /// <returns>Instance with assigned properties and fields.</returns>
-        /// <remarks>Different Rules could be combined together using <see cref="PropertiesAndFields.OverrideWith"/> method.</remarks>
-        object InjectPropertiesAndFields(object instance, PropertiesAndFieldsSelector propertiesAndFields);
 
         /// <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,
         /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.

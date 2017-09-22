@@ -100,7 +100,7 @@ namespace Autofac
 
     public interface ILifetimeScope
     {
-        IContainer Container { get; }
+        IResolverContext Container { get; }
     }
 
     public static class RegistrationExtensions
@@ -158,14 +158,14 @@ namespace Autofac
 
     public interface IComponentContext
     {
-        IContainer Container { get; }
+        IResolverContext Container { get; }
     }
 
     public class ContainerAdapter : IComponentContext, ILifetimeScope, IDisposable
     {
-        public IContainer Container { get; private set; }
+        public IResolverContext Container { get; }
 
-        public ContainerAdapter(IContainer container)
+        public ContainerAdapter(IResolverContext container)
         {
             Container = container;
         }

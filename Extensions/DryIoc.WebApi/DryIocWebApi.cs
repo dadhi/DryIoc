@@ -184,11 +184,11 @@ namespace DryIoc.WebApi
         private readonly Func<Type, bool> _throwIfUnresolved;
     }
 
-    /// <summary>Dependency scope adapter to scoped DryIoc container (created by <see cref="IContainer.OpenScope"/>).</summary>
+    /// <summary>Dependency scope adapter to scoped DryIoc container.</summary>
     public sealed class DryIocDependencyScope : IDependencyScope
     {
         /// <summary>Wrapped DryIoc container.</summary>
-        public readonly IContainer ScopedContainer;
+        public readonly IResolverContext ScopedContainer;
 
         private readonly Func<Type, bool> _throwIfUnresolved;
 
@@ -196,7 +196,7 @@ namespace DryIoc.WebApi
         /// <param name="scopedContainer">Container returned by OpenScope method.</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
-        public DryIocDependencyScope(IContainer scopedContainer, Func<Type, bool> throwIfUnresolved = null)
+        public DryIocDependencyScope(IResolverContext scopedContainer, Func<Type, bool> throwIfUnresolved = null)
         {
             ScopedContainer = scopedContainer;
             _throwIfUnresolved = throwIfUnresolved;

@@ -12,18 +12,19 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_reuse_instances_in_new_open_scope()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            container.Register<Log>(Reuse.InCurrentScope);
+
+            using (var scope = container.OpenScope())
             {
-                container.Register<Log>(Reuse.InCurrentScope);
-
-                var outerLog = container.Resolve<Log>();
-                using (var scope = container.OpenScope())
+                var outerLog = scope.Resolve<Log>();
+                using (var scope2 = scope.OpenScope())
                 {
-                    var scopedLog1 = scope.Resolve<Log>();
-                    var scopedLog2 = scope.Resolve<Log>();
+                    var scopedLog1 = scope2.Resolve<Log>();
+                    var scopedLog2 = scope2.Resolve<Log>();
 
-                    Assert.That(scopedLog1, Is.SameAs(scopedLog2));
-                    Assert.That(scopedLog1, Is.Not.SameAs(outerLog));
+                    Assert.AreSame(scopedLog1, scopedLog2);
+                    Assert.AreNotSame(scopedLog1, outerLog);
                 }
             }
         }
@@ -31,16 +32,17 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_reuse_instances_in_three_level_nested_scope()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            using (var scope = container.OpenScope())
             {
                 container.Register<Log>(Reuse.InCurrentScope);
 
-                var outerLog = container.Resolve<Log>();
-                using (var scope = container.OpenScope())
+                var outerLog = scope.Resolve<Log>();
+                using (var scope2 = scope.OpenScope())
                 {
-                    var scopedLog = scope.Resolve<Log>();
+                    var scopedLog = scope2.Resolve<Log>();
 
-                    using (var deepScope = scope.OpenScope())
+                    using (var deepScope = scope2.OpenScope())
                     {
                         var deepLog1 = deepScope.Resolve<Log>();
                         var deepLog2 = deepScope.Resolve<Log>();
@@ -174,8 +176,9 @@ namespace DryIoc.UnitTests
             Assert.That(client.Dep, Is.InstanceOf<Dep>());
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
-            using (var scoped = container.OpenScope(scopeName,
-                rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(scopeName))))
+            using (var scoped = container.With(rules => rules
+                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(scopeName)))
+                .OpenScope(scopeName))
             {
                 var scopedClient = scoped.Resolve<IClient>(scopeName);
 

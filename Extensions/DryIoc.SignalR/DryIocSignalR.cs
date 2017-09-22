@@ -168,20 +168,19 @@ namespace DryIoc.SignalR
     /// and disposes the scope together on the Hub dispose.</summary>
     public sealed class DryIocHubActivator : IHubActivator
     {
-        /// <summary>Creates activator sing provided container.</summary> 
-        /// <param name="container">Container to resolve hubs and open scope.</param>
-        public DryIocHubActivator(IContainer container)
+        /// <summary>Creates activator with provided resolver.</summary> 
+        public DryIocHubActivator(IResolver resolver)
         {
-            _container = container;
+            _resolver = resolver;
         }
 
         /// <summary>Creates hub by using <paramref name="descriptor"/> info.</summary>
         /// <returns>Created hub.</returns>
         public IHub Create(HubDescriptor descriptor)
         {
-            return _container.Resolve<IHub>(descriptor.HubType);
+            return _resolver.Resolve<IHub>(descriptor.HubType);
         }
 
-        private readonly IContainer _container;
+        private readonly IResolver _resolver;
     }
 }

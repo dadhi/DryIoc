@@ -32,3 +32,7 @@ to simplifies the path to `IResolver` from the object graph.
 26. Changed parameter `bool ifUnresolvedReturnDefault` to `IfUnresolved ifUnresolved` in 
 `IResolver.Resolve` methods to allow to add more `IfUnresolved` options
 27. renamed: `IfAlreadyRegistered` parameter to `ifAlreadyRegistered` in `UseInstance` methods
+28. Moving `OpenScope`, `UseInstance`, `InjectPropertiesAndFields` from `IContainer` to `IResolverContext`
+29. `OpenScope` no longer accepts the `Action<Rules>`, but you can always use `container.With(Action<Rules>)` before opening scope
+30. `InjectPropertiesAndFields` may define the names of members to inject instead of full blown `PropertiesAndFieldsSelector`,
+but there is still possibility to define the selector on container level

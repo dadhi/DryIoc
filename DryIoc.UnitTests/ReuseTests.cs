@@ -341,27 +341,29 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
         {
-            using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
+            var container = new Container(scopeContext: new ThreadScopeContext());
+            using (container.OpenScope())
             {
                 container.Register<Service>(Reuse.InThread);
 
                 var one = container.Resolve<Service>();
                 var another = container.Resolve<Service>();
 
-                Assert.That(one, Is.SameAs(another));
+                Assert.AreSame(one, another);
             }
         }
 
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same_In_nested_scope_too()
         {
-            using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
+            var container = new Container(scopeContext: new ThreadScopeContext());
+            using (var scope = container.OpenScope())
             {
                 container.Register<Service>(Reuse.InThread);
 
                 var one = container.Resolve<Service>();
 
-                using (var nested = container.OpenScope())
+                using (var nested = scope.OpenScope())
                 {
                     var two = nested.Resolve<Service>();
                     Assert.That(one, Is.SameAs(two));
@@ -375,13 +377,16 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Dependencies_injected_in_same_thread_should_be_the_same()
         {
-            var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<ServiceWithDependency>();
             container.Register<IDependency, Dependency>(Reuse.InThread);
 
-            var one = container.Resolve<ServiceWithDependency>();
-            var another = container.Resolve<ServiceWithDependency>();
-            Assert.That(one.Dependency, Is.SameAs(another.Dependency));
+            using (var scope = container.OpenScope())
+            {
+                var one = scope.Resolve<ServiceWithDependency>();
+                var another = scope.Resolve<ServiceWithDependency>();
+                Assert.AreSame(one.Dependency, another.Dependency);
+            }
         }
 
         [Test]
@@ -389,7 +394,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(scopeContext: new ThreadScopeContext());
             var mainThread = container.OpenScope();
-            mainThread.Register<Service>(Reuse.InThread);
+            container.Register<Service>(Reuse.InThread);
 
             Service one = null;
             var threadOne = new Thread(() =>
@@ -412,8 +417,8 @@ namespace DryIoc.UnitTests
         {
             var parent = new Container(scopeContext: new ThreadScopeContext());
             var container = parent.OpenScope();
-            container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(Reuse.InThread);
+            parent.Register<ServiceWithDependency>();
+            parent.Register<IDependency, Dependency>(Reuse.InThread);
 
             ServiceWithDependency one = null;
             var threadOne = new Thread(() =>

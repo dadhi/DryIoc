@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.8
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "Net45\DryIoc\DryIoc.csproj", "{B6C2FC35-7586-417B-AD35-32AED63ADFA9}"
 EndProject
@@ -34,6 +34,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{5454D365-E93C-42B8-8314-E304DB5765B3}"
+	ProjectSection(SolutionItems) = preProject
+		Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj = Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc", "Extensions\DryIoc.Mvc\DryIoc.Mvc.csproj", "{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}"
 EndProject
@@ -66,6 +69,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero.WebApi", "Extensions\DryIocZero.WebApi\DryIocZero.WebApi.csproj", "{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.WebApi.Owin.Sample", "Extensions\DryIoc.WebApi.Owin.Sample\DryIoc.WebApi.Owin.Sample.csproj", "{FFBA94E2-8293-4F38-B687-72E4A64D64CD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SignalR.UnitTests", "Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj", "{E68325C4-FD55-42DB-A083-ACD58FF8DF82}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -185,6 +190,10 @@ Global
 		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FFBA94E2-8293-4F38-B687-72E4A64D64CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E68325C4-FD55-42DB-A083-ACD58FF8DF82}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -206,6 +215,7 @@ Global
 		{AA46EECE-D592-43EE-B291-A68A756E89F5} = {5454D365-E93C-42B8-8314-E304DB5765B3}
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8} = {5454D365-E93C-42B8-8314-E304DB5765B3}
 		{FFBA94E2-8293-4F38-B687-72E4A64D64CD} = {5454D365-E93C-42B8-8314-E304DB5765B3}
+		{E68325C4-FD55-42DB-A083-ACD58FF8DF82} = {5454D365-E93C-42B8-8314-E304DB5765B3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C4CEBCCD-70A0-4F90-A671-18C55F87B7C1}

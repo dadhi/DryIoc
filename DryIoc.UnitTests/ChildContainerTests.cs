@@ -170,12 +170,12 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var parent = container.OpenScope("parent");
-            parent.Register<Foo>(Reuse.InCurrentNamedScope("parent"));
+            container.Register<Foo>(Reuse.InCurrentNamedScope("parent"));
 
             var firstChild = parent.OpenScope();
             var firstFoo = firstChild.Resolve<Foo>();
 
-            firstChild.Register<Blah>(Reuse.InCurrentScope);
+            container.Register<Blah>(Reuse.InCurrentScope);
             var firstBlah = firstChild.Resolve<Blah>();
 
             firstChild.Dispose();
