@@ -29,6 +29,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero.UnitTests", "Net
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1D2F543C-CE8C-42B4-ABC2-6E0F9DBD76BE}"
 	ProjectSection(SolutionItems) = preProject
+		BREAKING.md = BREAKING.md
 		CONTRIBUTING.md = CONTRIBUTING.md
 		README.md = README.md
 	EndProjectSection

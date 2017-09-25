@@ -144,13 +144,6 @@ namespace DryIoc
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
-        /// <summary>Returns ambient scope context associated with container.</summary>
-        public IScopeContext ScopeContext { get { return _scopeContext; } }
-
-        // todo: v3: Review do we need this name at all, probably not and it is decreasing performance.
-        /// <summary>The default name of root scope without ambient context.</summary>
-        public static readonly object NonAmbientRootScopeName = "NonAmbientRootScope";
-
         /// <summary>Allows to register new specially keyed services which will facade the same default service,
         /// registered earlier. May be used to "override" resgitrations when testing the container</summary>
         public IContainer CreateFacade()
@@ -563,6 +556,12 @@ namespace DryIoc
         #region IResolverContext
 
         /// <inheritdoc />
+        public IResolverContext Parent => _parent;
+
+        /// <inheritdoc />
+        public IResolverContext Root => _root;
+
+        /// <inheritdoc />
         public IScope SingletonScope
         {
             get
@@ -578,21 +577,12 @@ namespace DryIoc
             => _scopeContext == null ? _currentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
-        public IResolverContext Parent => _parent;
-
-        /// <inheritdoc />
-        public IResolverContext Root => _root;
+        public IScopeContext ScopeContext => _scopeContext;
 
         /// <inheritdoc />
         public IResolverContext OpenScope(object name = null, bool trackInParent = false)
         {
             ThrowIfContainerDisposed();
-
-            // todo: v3: remove automatic scope names
-            if (name == null)
-                name = _currentScope != null ? null
-                    : _scopeContext != null ? _scopeContext.RootScopeName
-                        : NonAmbientRootScopeName;
 
             var newScope = new Scope(_currentScope, name);
 
@@ -2157,7 +2147,7 @@ namespace DryIoc
             // todo: v3: Remove implicit opened scope if possible
             // creating scope in a root container (its own root is null) is valid only for non-ambient scopes
             if (rules.ImplicitOpenedRootScope && currentScope == null && scopeContext == null && root == null)
-                _currentScope = new Scope(null, NonAmbientRootScopeName);
+                _currentScope = new Scope();
         }
 
         #endregion
@@ -2816,6 +2806,9 @@ namespace DryIoc
 
         /// <summary>Current opened scope.</summary>
         IScope CurrentScope { get; }
+
+        /// <summary>Optional scope context associated with container.</summary>
+        IScopeContext ScopeContext { get; }
 
         /// <summary>Opens scope with optional name.</summary>
         /// <param name="name">(optional)</param>
@@ -9070,7 +9063,7 @@ namespace DryIoc
 
         private static void DisposeItem(object item)
         {
-            var disposable = item as IDisposable ?? 
+            var disposable = item as IDisposable ??
                 (item as WeakReference)?.Target as IDisposable;
 
             if (disposable != null)
@@ -9093,9 +9086,6 @@ namespace DryIoc
     /// examples are HttpContext storage, Execution context, Thread local.</summary>
     public interface IScopeContext : IDisposable
     {
-        /// <summary>Name associated with context root scope - so the reuse may find scope context.</summary>
-        string RootScopeName { get; }
-
         /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
         /// <returns>Current scope or null.</returns>
         IScope GetCurrentOrDefault();
@@ -9115,9 +9105,6 @@ namespace DryIoc
     {
         /// <summary>Provides static name for context. It is OK because its constant.</summary>
         public static readonly string ScopeContextName = "ThreadScopeContext";
-
-        /// <summary>Key to identify context.</summary>
-        public string RootScopeName { get { return ScopeContextName; } }
 
         /// <summary>Returns current scope in calling Thread or null, if no scope tracked.</summary>
         /// <returns>Found scope or null.</returns>
@@ -9385,8 +9372,7 @@ namespace DryIoc
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo(Type assignableFromServiceType = null, object serviceKey = null) =>
-            assignableFromServiceType == null && serviceKey == null
-            ? Scoped
+            assignableFromServiceType == null && serviceKey == null ? Scoped
             : new CurrentScopeReuse(new ResolutionScopeName(assignableFromServiceType, serviceKey));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
@@ -9397,11 +9383,11 @@ namespace DryIoc
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
-        /// <summary>Obsolete: use <see cref="Scoped"/> instead.</summary>
+        /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
         public static readonly IReuse InResolutionScope = Scoped;
 
-        /// <summary>Specifies to store single service instance per current opened scope.</summary>
-        public static readonly IReuse InCurrentScope = new CurrentScopeReuse();
+        /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
+        public static readonly IReuse InCurrentScope = Scoped;
 
         /// <summary>Returns current scope reuse with specific name to match with scope.
         /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
@@ -9426,8 +9412,8 @@ namespace DryIoc
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
             ScopedTo<TAssignableFromServiceType>(serviceKey);
 
-        /// <summary>Ensuring single service instance per Thread.</summary>
-        public static readonly IReuse InThread = InCurrentNamedScope(ThreadScopeContext.ScopeContextName);
+        /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
+        public static readonly IReuse InThread = Scoped;
 
         /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
         public static readonly string WebRequestScopeName = "WebRequestScopeName";
@@ -9944,9 +9930,6 @@ namespace DryIoc
         /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
         /// <returns>New container with copy of all registrations.</returns>
         IContainer WithRegistrationsCopy(bool preserveCache = false);
-
-        /// <summary>Returns scope context associated with container.</summary>
-        IScopeContext ScopeContext { get; }
 
         // todo: remove from interface and make an extension method
         /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.

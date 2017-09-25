@@ -28,7 +28,7 @@ namespace DryIoc
     using System.Threading;
 
     /// <summary>Stores scopes propagating through async-await boundaries.</summary>
-    public sealed class AsyncExecutionFlowScopeContext : IScopeContext, IDisposable
+    public sealed class AsyncExecutionFlowScopeContext : IScopeContext
     {
         /// <summary>Statically known name of root scope in this context.</summary>
         public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
@@ -46,9 +46,6 @@ namespace DryIoc
         private static int _seedKey;
         private readonly string _scopeEntryKey = ScopeContextName + Interlocked.Increment(ref _seedKey);
 #endif
-
-        /// <summary>Name associated with context root scope - so the reuse may find scope context.</summary>
-        public string RootScopeName { get { return ScopeContextName; } }
 
         /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
         /// <returns>Current scope or null.</returns>

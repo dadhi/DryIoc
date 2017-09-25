@@ -41,3 +41,6 @@ but there is still possibility to define the selector on container level
 32. Removed special SingletonScope, using one implementation for both scope and singletons
 34. Removed `IScope.GetScopedItemIdOrSelf` as it was required only by `SingletonScope`
 35. Added `IScope.TryGet`
+36. Moved `IContainer.ScopeContext` into `IResolverContext.ScopeContext`
+37. Removed `IScopeContext.ScopeContextName`, you may provide your name instead
+38. Removed `Container.NonAmbientRootScopeName`

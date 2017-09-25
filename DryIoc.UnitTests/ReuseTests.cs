@@ -357,20 +357,20 @@ namespace DryIoc.UnitTests
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same_In_nested_scope_too()
         {
             var container = new Container(scopeContext: new ThreadScopeContext());
-            using (var scope = container.OpenScope())
+            using (var scope = container.OpenScope("root"))
             {
-                container.Register<Service>(Reuse.InThread);
+                container.Register<Service>(Reuse.ScopedTo("root"));
 
-                var one = container.Resolve<Service>();
+                var one = scope.Resolve<Service>();
 
                 using (var nested = scope.OpenScope())
                 {
                     var two = nested.Resolve<Service>();
-                    Assert.That(one, Is.SameAs(two));
+                    Assert.AreSame(one, two);
                 }
 
                 var another = container.Resolve<Service>();
-                Assert.That(one, Is.SameAs(another));
+                Assert.AreSame(one, another);
             }
         }
 

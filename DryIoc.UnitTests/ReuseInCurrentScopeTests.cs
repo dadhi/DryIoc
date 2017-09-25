@@ -360,6 +360,8 @@ namespace DryIoc.UnitTests
         public void Exist_rule_to_open_scope_with_container()
         {
             var container = new Container(rules => rules.WithImplicitRootOpenScope());
+            Assert.IsNotNull(container.CurrentScope);
+
             container.Register<Blah>(Reuse.InCurrentScope);
 
             var blah = container.Resolve<Blah>();
@@ -367,13 +369,6 @@ namespace DryIoc.UnitTests
             container.Dispose();
             container.Dispose();
             Assert.IsTrue(blah.IsDisposed);
-        }
-
-        [Test]
-        public void Exist_rule_to_open_scope_with_container_and_scope_has_root_name()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            Assert.AreEqual(Container.NonAmbientRootScopeName, container.CurrentScope.Name);
         }
 
         [Test]
