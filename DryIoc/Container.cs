@@ -76,9 +76,11 @@ namespace DryIoc
             }
 
             var scope = CurrentScope;
-            var scopeStr = scope == null ? "Container"
-                : _scopeContext != null ? "Ambiently scoped container with scope " + scope
-                : "Scoped container with scope " + scope;
+            var scopeStr = scope == null
+                    ? "Container"
+                : _scopeContext != null
+                    ? "Ambiently scoped container " + scope
+                    : "Scoped container " + scope;
             return scopeStr;
         }
 
@@ -608,11 +610,10 @@ namespace DryIoc
             if (instance != null)
                 instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
-            if (preventDisposal)
-                instance = new HiddenDisposable(instance);
-
             if (weaklyReferenced)
                 instance = new WeakReference(instance);
+            else if (preventDisposal)
+                instance = new HiddenDisposable(instance);
 
             var scope = _currentScope ?? _singletonScope;
             var instanceType = instance == null ? typeof(object) : instance.GetType();
@@ -1639,16 +1640,9 @@ namespace DryIoc
                 object value;
                 if (!scope.TryGet(out value, factoryId))
                     return null;
-
-                var weaklyReferenced = value as WeakReference;
-                if (weaklyReferenced != null)
-                    value = weaklyReferenced.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed);
-
-                var hiddenDisposable = value as HiddenDisposable;
-                if (hiddenDisposable != null)
-                    value = hiddenDisposable.Value;
-
-                return value;
+                return (value as WeakReference)?.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed)
+                   ?? (value as HiddenDisposable)?.Value 
+                   ?? value;
             }
 
             #endregion
@@ -7451,9 +7445,8 @@ namespace DryIoc
                 !Setup.PreventDisposal &&
                 !Setup.WeaklyReferenced)
             {
-                var singletons = request.SingletonScope;
                 object singleton;
-                if (singletons.TryGet(out singleton, FactoryID))
+                if (request.SingletonScope.TryGet(out singleton, FactoryID))
                     return Expression.Constant(singleton, request.ServiceType);
             }
 
@@ -8824,7 +8817,7 @@ namespace DryIoc
     public sealed class DelegateFactory : Factory
     {
         /// <summary>Non-abstract closed implementation type.</summary>
-        public override Type ImplementationType { get { return _knownImplementationType; } }
+        public override Type ImplementationType =>  _knownImplementationType;
 
         /// <summary>Creates factory by providing:</summary>
         /// <param name="factoryDelegate">Specified service creation delegate.</param>
@@ -8903,7 +8896,8 @@ namespace DryIoc
         bool IsDisposed { get; }
 
         /// <summary>Creates, stores, and returns stored object.</summary>
-        /// <param name="id">Unique ID to find created object in subsequent calls.</param>
+        /// <param name="id">Unique ID to find created object in subsequent calls. 
+        /// Value <c>-1</c> means to track a transient disposable (the item will be created each time when calling this method)</param>
         /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will not be stored.</param>
         /// <returns>Created and stored object.</returns>
         /// <remarks>Scope does not store <paramref name="createValue"/> (no memory leak here),
@@ -8917,7 +8911,7 @@ namespace DryIoc
         /// <summary>Looks up for stored item by id.</summary>
         bool TryGet(out object item, int id);
 
-        /// <summary>The tracked item will be disposed with the scope.</summary>
+        /// <summary>Tracked item will be disposed with the scope.</summary>
         void TrackDisposable(object item);
     }
 
@@ -8925,10 +8919,10 @@ namespace DryIoc
     /// <c>lock</c> is used internally to ensure that object factory called only once.</summary>
     public sealed class Scope : IScope
     {
-        /// <summary>Parent scope in scope stack. Null for root scope.</summary>
+        /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
         public IScope Parent { get; }
 
-        /// <summary>Optional name object associated with scope.</summary>
+        /// <summary>Optional name associated with scope.</summary>
         public object Name { get; }
 
         /// <summary>True if scope is disposed.</summary>
@@ -8944,20 +8938,11 @@ namespace DryIoc
             _nextDisposablelID = Int32.MaxValue;
         }
 
-        /// <summary>Just returns back <paramref name="externalId"/> without any changes.</summary>
-        /// <param name="externalId">Id will be returned back.</param> <returns><paramref name="externalId"/>.</returns>
-        public int GetScopedItemIdOrSelf(int externalId) => externalId;
-
         internal static readonly MethodInfo GetOrAddMethod =
             typeof(IScope).Method(nameof(IScope.GetOrAdd));
 
-        /// <summary><see cref="IScope.GetOrAdd"/> for description.
-        /// Will throw <see cref="ContainerException"/> if scope is disposed.</summary>
-        /// <param name="id">Unique ID to find created object in subsequent calls.
-        /// <c>-1 value means transient disposable</c></param>
-        /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will Not be stored.</param>
-        /// <returns>Created and stored object.</returns>
-        /// <exception cref="ContainerException">if scope is disposed.</exception>
+        // todo: Add disposal order
+        /// <inheritdoc />
         public object GetOrAdd(int id, CreateScopedValue createValue) =>
             _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
 
@@ -8966,7 +8951,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed);
 
-            if (id == -1) // disposable transient
+            if (id == -1) // disposable transient, will be created each time
             {
                 var transient = createValue();
                 TrackDisposable(transient);
@@ -8984,12 +8969,11 @@ namespace DryIoc
                 TrackDisposable(item);
             }
 
-            var items = _items;
-            var newItems = items.AddOrUpdate(id, item);
-
             // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
-            if (Interlocked.CompareExchange(ref _items, newItems, items) != items)
-                Ref.Swap(ref _items, _ => _.AddOrUpdate(id, item));
+            var items = _items;
+            if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
+
             return item;
         }
 
@@ -8998,7 +8982,9 @@ namespace DryIoc
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            var items = _items;
+            if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
             TrackDisposable(item);
         }
 
@@ -9014,14 +9000,17 @@ namespace DryIoc
         /// <inheritdoc />
         public void TrackDisposable(object item)
         {
-            if ((item as IDisposable ??
-                 (item as WeakReference)?.Target as IDisposable) == null)
+            var disposable = item as IDisposable;
+            if (disposable == null)
                 return;
 
             // Decrement here is because dispose should happen in reverse resolution order
             // By adding items with decreasing IDs we get rid off ordering on Dispose.
-            var disposableID = Interlocked.Decrement(ref _nextDisposablelID);
-            Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
+            var id = Interlocked.Decrement(ref _nextDisposablelID);
+
+            var items = _disposables;
+            if (Interlocked.CompareExchange(ref _disposables, items.AddOrUpdate(id, disposable), items) != items)
+                Ref.Swap(ref _disposables, it => it.AddOrUpdate(id, disposable));
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and empties item storage.</summary>
@@ -9035,7 +9024,11 @@ namespace DryIoc
             var disposables = _disposables;
             if (!disposables.IsEmpty)
                 foreach (var disposable in disposables.Enumerate())
-                    DisposeItem(disposable.Value);
+                {
+                    // Ignoring disposing exception, as it is not important to proceed the disposal
+                    try { ((IDisposable)disposable.Value).Dispose(); } // todo: Remove cast
+                    catch (Exception) { }
+                }
 
             _disposables = ImTreeMapIntToObj.Empty;
             _items = ImTreeMapIntToObj.Empty;
@@ -9043,8 +9036,9 @@ namespace DryIoc
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
         public override string ToString() =>
-            "{Name=" + (Name ?? "<no-name>")
-            + (Parent == null ? String.Empty : ", Parent=" + Parent)
+            (IsDisposed ? "disposed" : "") + "Scope {"
+            + (Name != null ? "Name=" + Name : "")
+            + (Parent != null ? ", Parent=" + Parent : "")
             + "}";
 
         #region Implementation
@@ -9057,22 +9051,9 @@ namespace DryIoc
         private int _nextDisposablelID;
         private int _disposed;
 
-        // todo: Improve perf, by scaling lockers count with the items amount
+        // todo: Improve perf by scaling lockers count with the items amount
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
-
-        private static void DisposeItem(object item)
-        {
-            var disposable = item as IDisposable ??
-                (item as WeakReference)?.Target as IDisposable;
-
-            if (disposable != null)
-            {
-                // Ignoring disposing exception, as it is not important to proceed the disposal
-                try { disposable.Dispose(); }
-                catch (Exception) { }
-            }
-        }
 
         #endregion
     }

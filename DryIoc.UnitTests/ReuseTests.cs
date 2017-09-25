@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_instance_as_weak_reference_does_not_prevent_it_from_dispose()
+        public void Registering_instance_as_weak_reference_will_prevent_the_disposal()
         {
             var container = new Container();
             var instance = new DisposableService();
@@ -71,7 +71,7 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
 
-            Assert.IsTrue(instance.IsDisposed);
+            Assert.IsFalse(instance.IsDisposed);
             GC.KeepAlive(instance);
         }
 

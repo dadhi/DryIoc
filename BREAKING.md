@@ -44,3 +44,5 @@ but there is still possibility to define the selector on container level
 36. Moved `IContainer.ScopeContext` into `IResolverContext.ScopeContext`
 37. Removed `IScopeContext.ScopeContextName`, you may provide your name instead
 38. Removed `Container.NonAmbientRootScopeName`
+39. Disposable services registered with `WeaklyReferenced` setup are no longer disposed.
+40. Because the disposal in this case is optional anyway and the instance may be collected in any given time.
