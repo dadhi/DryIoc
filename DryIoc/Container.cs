@@ -8817,7 +8817,7 @@ namespace DryIoc
     public sealed class DelegateFactory : Factory
     {
         /// <summary>Non-abstract closed implementation type.</summary>
-        public override Type ImplementationType =>  _knownImplementationType;
+        public override Type ImplementationType => _knownImplementationType;
 
         /// <summary>Creates factory by providing:</summary>
         /// <param name="factoryDelegate">Specified service creation delegate.</param>
@@ -8870,13 +8870,11 @@ namespace DryIoc
         public static readonly Factory Default = new FactoryPlaceholder();
 
         // Always resolved asResolutionCall, to create a hole in object graph to be filled in later
-        public override Setup Setup { get { return _setup; } }
+        public override Setup Setup => _setup;
         private static readonly Setup _setup = Setup.With(asResolutionCall: true);
 
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            return Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
-        }
+        public override Expression CreateExpressionOrDefault(Request request) =>
+            Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
     }
 
     /// <summary>Should return value stored in scope.</summary>
@@ -9185,6 +9183,7 @@ namespace DryIoc
 
         private bool _scopedOrSingleton;
 
+        // todo: Add lifespan into constructor for the future?
         /// <summary>Creates reuse optionally specifying its name.</summary>
         public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false)
         {
@@ -9192,14 +9191,8 @@ namespace DryIoc
             _scopedOrSingleton = scopedOrSingleton;
         }
 
-        internal static object GetScopedOrSingleton(IResolverContext r,
-            IScope singleton, int itemId, CreateScopedValue createValue)
-        {
-            var scope = r.CurrentScope;
-            return scope != null
-                ? scope.GetOrAdd(itemId, createValue)
-                : singleton.GetOrAdd(itemId, createValue);
-        }
+        internal static object GetScopedOrSingleton(IResolverContext r, int itemId, CreateScopedValue createValue) =>
+            (r.CurrentScope ?? r.SingletonScope).GetOrAdd(itemId, createValue);
 
         private static readonly MethodInfo _getScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetScopedOrSingleton), true);
@@ -9221,12 +9214,10 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var itemId = request.TracksTransientDisposable ? -1 : request.FactoryID;
+            var itemIdExpr = Expression.Constant(request.TracksTransientDisposable ? -1 : request.FactoryID);
             if (_scopedOrSingleton)
                 return Expression.Call(_getScopedOrSingletonMethod,
-                    Container.ResolverContextParamExpr,
-                    ResolverContext.SingletonScopeExpr,
-                    Expression.Constant(itemId),
+                    Container.ResolverContextParamExpr, itemIdExpr,
                     Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
 
             Expression resolvedContextExpr = request.OpensResolutionScope
@@ -9234,12 +9225,11 @@ namespace DryIoc
                 : Container.ResolverContextParamExpr;
 
             var ifUnresolvedThrowExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
+            var createItemExpr = Expression.Lambda<CreateScopedValue>(serviceFactoryExpr);
 
             if (Name == null)
                 return Expression.Call(_getScopedItemMethod,
-                    resolvedContextExpr, ifUnresolvedThrowExpr,
-                    Expression.Constant(itemId),
-                    Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
+                    resolvedContextExpr, ifUnresolvedThrowExpr, itemIdExpr, createItemExpr);
 
             // todo: add the ValueType check to GetOrAddStateItemExpression
             var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
@@ -9247,9 +9237,7 @@ namespace DryIoc
                 scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
 
             return Expression.Call(_getNamedScopedItemMethod,
-                resolvedContextExpr, scopeNameExpr, ifUnresolvedThrowExpr,
-                Expression.Constant(itemId),
-                Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
+                resolvedContextExpr, scopeNameExpr, ifUnresolvedThrowExpr, itemIdExpr, createItemExpr);
         }
 
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
