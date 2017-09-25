@@ -2555,15 +2555,6 @@ namespace DryIoc
             return container.GenerateResolutionExpressions(out ignoredRoots, out ignoredDeps, whatRegistrations);
         }
 
-        // todo: v3: remove
-        // previously was checking for primitive value.
-        /// <summary>Checks if custom value of the <paramref name="customValueType"/> is supported by DryIoc injection mechanism.</summary>
-        /// <param name="customValueType">Type to check</param> <returns>True if supported, false otherwise.c</returns>
-        public static bool IsSupportedInjectedCustomValueType(Type customValueType)
-        {
-            return true;
-        }
-
         /// <summary>Represents construction of whole request info stack as expression.</summary>
         /// <param name="container">Required to access container facilities for expression conversion.</param>
         /// <param name="request">Request info to convert to expression.</param>
@@ -7472,7 +7463,7 @@ namespace DryIoc
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
-                    serviceExpr = ApplyReuse(serviceExpr, request.Reuse, request.TracksTransientDisposable, request);
+                    serviceExpr = ApplyReuse(serviceExpr, request);
 
                     if (serviceExpr.NodeType == ExpressionType.Constant)
                         isCacheable = false;
@@ -7493,16 +7484,12 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        // todo: remove trackTransientDisposable param as it is available from Request param.
-        /// <summary>Applies reuse to created expression.  Actually wraps passed expression in scoped access
-        /// and produces another expression.</summary>
-        /// <param name="serviceExpr">Raw service creation (or receiving) expression.</param>
-        /// <param name="reuse">Reuse - may be different from <see cref="Reuse"/> if set <see cref="Rules.DefaultReuseInsteadOfTransient"/>.</param>
-        /// <param name="tracksTransientDisposable">Specifies that reuse is to track transient disposable.</param>
-        /// <param name="request">Context.</param>
-        /// <returns>Scoped expression or originally passed expression.</returns>
-        protected virtual Expression ApplyReuse(Expression serviceExpr, IReuse reuse, bool tracksTransientDisposable, Request request)
+        /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
+        /// and producing the result expression.</summary>
+        protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
+            var reuse = request.Reuse;
+
             // optimization for already activated singleton
             if (serviceExpr.NodeType == ExpressionType.Constant &&
                 reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
@@ -7515,20 +7502,20 @@ namespace DryIoc
                 request.Rules.EagerCachingSingletonForFasterAccess &&
                 // except: For decorators and wrappers, when tracking transient disposable and for lazy consumption in Func
                 FactoryType == FactoryType.Service &&
-                !tracksTransientDisposable &&
+                !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
                 var factoryDelegate = Container.CompileToDelegate(serviceExpr);
-                if (Setup.PreventDisposal)
-                {
-                    var factory = factoryDelegate;
-                    factoryDelegate = r => new HiddenDisposable(factory(r));
-                }
 
                 if (Setup.WeaklyReferenced)
                 {
                     var factory = factoryDelegate;
                     factoryDelegate = r => new WeakReference(factory(r));
+                }
+                else if (Setup.PreventDisposal)
+                {
+                    var factory = factoryDelegate;
+                    factoryDelegate = r => new HiddenDisposable(factory(r));
                 }
 
                 var singleton = request.SingletonScope
@@ -7538,12 +7525,10 @@ namespace DryIoc
             }
             else
             {
-                if (Setup.PreventDisposal)
-                    serviceExpr = Expression.New(HiddenDisposable.Ctor, serviceExpr);
-
                 if (Setup.WeaklyReferenced)
                     serviceExpr = Expression.New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
-
+                else if (Setup.PreventDisposal)
+                    serviceExpr = Expression.New(HiddenDisposable.Ctor, serviceExpr);
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
@@ -7553,8 +7538,7 @@ namespace DryIoc
                     ArrayTools.Empty<Type>(),
                     Expression.Property(Expression.Convert(serviceExpr, typeof(WeakReference)), "Target"),
                     Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
-
-            if (Setup.PreventDisposal)
+            else if (Setup.PreventDisposal)
                 serviceExpr = Expression.Field(
                     Expression.Convert(serviceExpr, typeof(HiddenDisposable)),
                     HiddenDisposable.ValueField);
@@ -7670,38 +7654,31 @@ namespace DryIoc
         /// <summary>Combines source selector with other. Other is used as fallback when source returns null.</summary>
         /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
         /// <returns>Combined result selector.</returns>
-        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other)
-        {
-            return source == null || source == Of ? other ?? Of
-                : other == null || other == Of ? source
-                : request => parameterInfo =>
+        public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other) =>
+            source == null || source == Of ? other ?? Of
+            : other == null || other == Of ? source
+            : request => parameterInfo =>
+            {
+                // try other selector first
+                var otherSelector = other(request);
+                if (otherSelector != null)
                 {
-                    // try other selector first
-                    var otherSelector = other(request);
-                    if (otherSelector != null)
-                    {
-                        var parameterServiceInfo = otherSelector(parameterInfo);
-                        if (parameterServiceInfo != null)
-                            return parameterServiceInfo;
-                    }
+                    var parameterServiceInfo = otherSelector(parameterInfo);
+                    if (parameterServiceInfo != null)
+                        return parameterServiceInfo;
+                }
 
-                    // fallback to source selector if other is failed
-                    var sourceSelector = source(request);
-                    if (sourceSelector != null)
-                        return sourceSelector(parameterInfo);
+                // fallback to source selector if other is failed
+                var sourceSelector = source(request);
+                if (sourceSelector != null)
+                    return sourceSelector(parameterInfo);
 
-                    return null;
-                };
-        }
+                return null;
+            };
 
-        // todo: v3: remove because it is replace by OverrideWith method
-        /// <summary>Obsolete: use <see cref="OverrideWith"/>.</summary>
-        public static ParameterSelector And(this ParameterSelector source, ParameterSelector other)
-        {
-            return source == null || source == Of ? other ?? Of
-                : other == null || other == Of ? source
-                : request => other(request) ?? source(request);
-        }
+        [Obsolete("Replaced with OverrideWith", false)]
+        public static ParameterSelector And(this ParameterSelector source, ParameterSelector other) =>
+            source.OverrideWith(other);
 
         /// <summary>Overrides source parameter rules with specific parameter details. If it is not your parameter just return null.</summary>
         /// <param name="source">Original parameters rules</param>
@@ -7735,20 +7712,17 @@ namespace DryIoc
         public static ParameterSelector Name(this ParameterSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
-            string metadataKey = null, object metadata = null)
-        {
-            return source.Details((r, p) => !p.Name.Equals(name) ? null
+            string metadataKey = null, object metadata = null) =>
+            source.Details((r, p) => !p.Name.Equals(name) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
-        }
 
         /// <summary>Specify parameter by name and set custom value to it.</summary>
         /// <param name="source">Original parameters rules.</param> <param name="name">Parameter name.</param>
         /// <param name="getCustomValue">Custom value provider.</param>
         /// <returns>New parameters rules.</returns>
-        public static ParameterSelector Name(this ParameterSelector source, string name, Func<Request, object> getCustomValue)
-        {
-            return source.Details((r, p) => p.Name.Equals(name) ? ServiceDetails.Of(getCustomValue(r)) : null);
-        }
+        public static ParameterSelector Name(this ParameterSelector source, 
+            string name, Func<Request, object> getCustomValue) =>
+             source.Details((r, p) => p.Name.Equals(name) ? ServiceDetails.Of(getCustomValue(r)) : null);
 
         // todo: add overload with input ParameterInfo so that doing convention as in #443 would be more easy.
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
@@ -7761,25 +7735,17 @@ namespace DryIoc
         public static ParameterSelector Type<T>(this ParameterSelector source,
             Type requiredServiceType = null, object serviceKey = null,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
-            string metadataKey = null, object metadata = null)
-        {
-            return source.Details((r, p) =>
-                !typeof(T).IsAssignableTo(p.ParameterType)
-                ? null
+            string metadataKey = null, object metadata = null) =>
+            source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
-        }
 
         /// <summary>Specify parameter by type and set custom value to it.</summary>
         /// <typeparam name="T">Parameter type.</typeparam>
         /// <param name="source">Original parameters rules.</param>
         /// <param name="getCustomValue">Custom value provider.</param>
         /// <returns>New parameters rules.</returns>
-        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue)
-        {
-            Throw.If(ContainerTools.IsSupportedInjectedCustomValueType(typeof(T)) == false,
-                Error.RegisteringWithNotSupportedDepedendencyCustomValueType, "parameter", typeof(T));
-            return source.Details((r, p) => p.ParameterType == typeof(T) ? ServiceDetails.Of(getCustomValue(r)) : null);
-        }
+        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue) =>
+            source.Details((r, p) => p.ParameterType == typeof(T) ? ServiceDetails.Of(getCustomValue(r)) : null);
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <paramref name="parameterType"/>.</summary>
         /// <param name="source">Source selector.</param> <param name="parameterType">The type of the parameter.</param>
@@ -7791,25 +7757,18 @@ namespace DryIoc
         public static ParameterSelector Type(this ParameterSelector source, Type parameterType,
             Type requiredServiceType = null, object serviceKey = null,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
-            string metadataKey = null, object metadata = null)
-        {
-            return source.Details((r, p) => !parameterType.IsAssignableTo(p.ParameterType)
-                ? null
+            string metadataKey = null, object metadata = null) =>
+            source.Details((r, p) => !parameterType.IsAssignableTo(p.ParameterType) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
-        }
 
         /// <summary>Specify parameter by type and set custom value to it.</summary>
         /// <param name="source">Original parameters rules.</param>
         /// <param name="parameterType">The type of the parameter.</param>
         /// <param name="getCustomValue">Custom value provider.</param>
         /// <returns>New parameters rules.</returns>
-        public static ParameterSelector Type(this ParameterSelector source, Type parameterType, Func<Request, object> getCustomValue)
-        {
-            Throw.If(ContainerTools.IsSupportedInjectedCustomValueType(parameterType) == false,
-                Error.RegisteringWithNotSupportedDepedendencyCustomValueType, "parameter", parameterType);
-
-            return source.Details((r, p) => p.ParameterType == parameterType ? ServiceDetails.Of(getCustomValue(r)) : null);
-        }
+        public static ParameterSelector Type(this ParameterSelector source, 
+            Type parameterType, Func<Request, object> getCustomValue) =>
+            source.Details((r, p) => p.ParameterType == parameterType ? ServiceDetails.Of(getCustomValue(r)) : null);
     }
 
     /// <summary>DSL for specifying <see cref="PropertiesAndFieldsSelector"/> injection rules.</summary>
@@ -7873,24 +7832,10 @@ namespace DryIoc
                 };
         }
 
-        // todo: v3: remove
-        /// <summary>Obsolete: renamed to <see cref="OverrideWith"/>.</summary>
+        [Obsolete("Replaced with OverrideWith", false)]
         public static PropertiesAndFieldsSelector And(
-            this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other)
-        {
-            return source == null || source == Of ? (other ?? Of)
-                : other == null || other == Of ? source
-                : r =>
-                {
-                    var sourceMembers = source(r).ToArrayOrSelf();
-                    var otherMembers = other(r).ToArrayOrSelf();
-                    return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
-                        : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
-                        : otherMembers.Append(
-                            sourceMembers.Match(s => s != null &&
-                                otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
-                };
-        }
+            this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other) =>
+            source.OverrideWith(other);
 
         /// <summary>Specifies service details (key, if-unresolved policy, required type) for property/field with the name.</summary>
         /// <param name="source">Original member selector.</param> <param name="name">Member name.</param> <param name="getDetails">Details.</param>
@@ -7939,21 +7884,17 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
             Type requiredServiceType = null, object serviceKey = null,
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault, object defaultValue = null,
-            string metadataKey = null, object metadata = null)
-        {
-            return source.Details(name, r => ServiceDetails.Of(
+            string metadataKey = null, object metadata = null) =>
+            source.Details(name, r => ServiceDetails.Of(
                 requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
-        }
 
         /// <summary>Specifies custom value for property/field with specific name.</summary>
         /// <param name="source">Original property/field list.</param>
         /// <param name="name">Target member name.</param> <param name="getCustomValue">Custom value provider.</param>
         /// <returns>Return new combined selector.</returns>
-        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, string name,
-            Func<Request, object> getCustomValue)
-        {
-            return source.Details(name, r => ServiceDetails.Of(getCustomValue(r)));
-        }
+        public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source, 
+            string name, Func<Request, object> getCustomValue) =>
+            source.Details(name, r => ServiceDetails.Of(getCustomValue(r)));
 
         /// <summary>Returns true if property matches flags provided.</summary>
         /// <param name="property">Property to match</param>
