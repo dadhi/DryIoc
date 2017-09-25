@@ -127,7 +127,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules,
-                Ref.Of(_registry.Value.WithoutCache()), new Scope(), 
+                Ref.Of(_registry.Value.WithoutCache()), new Scope(),
                 _scopeContext, _currentScope, _disposed, _disposeStackTrace, _parent, _root);
         }
 
@@ -200,7 +200,7 @@ namespace DryIoc
                     {
                         if (scope == _currentScope)
                             return scope.Parent;
-                        return scope; // todo: Clarify why this code is hit, and is it a valid situation?
+                        return scope; // don't touch the context scope as it is was changed by someone else
                     });
             }
             else // whole Container with singletons.
@@ -661,7 +661,7 @@ namespace DryIoc
                                     // we can just update scope with the new instance
                                     var reusedFactory = singleDefaultFactory as InstanceFactory;
                                     if (reusedFactory != null)
-                                        scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID), instance);
+                                        scope.SetOrAdd(reusedFactory.FactoryID, instance);
                                     else
                                         entry = GetInstanceFactory(instance, instanceType, scope);
                                     break;
@@ -703,8 +703,7 @@ namespace DryIoc
                                         // we can just update scope with the new instance
                                         var reusedFactory = keyedFactory as InstanceFactory;
                                         if (reusedFactory != null)
-                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(reusedFactory.FactoryID),
-                                                instance);
+                                            scope.SetOrAdd(reusedFactory.FactoryID, instance);
                                         else // note: not possible for the moment
                                             Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
                                                 KV.Of(serviceKey, instance), keyedFactory);
@@ -738,8 +737,7 @@ namespace DryIoc
                                         // the special case for reusing of existing factory,
                                         // we can just update scope with the new instance
                                         if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
-                                            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(defaultFactories[0].FactoryID),
-                                                instance);
+                                            scope.SetOrAdd(defaultFactories[0].FactoryID, instance);
                                         else
                                         {
                                             var keyedFactories = singleKeyedOrManyFactories.Factories.Enumerate()
@@ -1593,7 +1591,7 @@ namespace DryIoc
         private static InstanceFactory GetInstanceFactory(object instance, Type instanceType, IScope scope)
         {
             var instanceFactory = new InstanceFactory(instanceType);
-            scope.SetOrAdd(scope.GetScopedItemIdOrSelf(instanceFactory.FactoryID), instance);
+            scope.SetOrAdd(instanceFactory.FactoryID, instance);
             return instanceFactory;
         }
 
@@ -1648,10 +1646,8 @@ namespace DryIoc
 
             private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
             {
-                var id = scope.GetScopedItemIdOrSelf(factoryId);
-                var value = scope.GetOrAdd(id, () => null);
-
-                if (value == null)
+                object value;
+                if (!scope.TryGet(out value, factoryId))
                     return null;
 
                 var weaklyReferenced = value as WeakReference;
@@ -3185,7 +3181,7 @@ namespace DryIoc
 
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
 
-            // Note: the conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
             if (serviceExpr.Type != serviceType)
                 serviceExpr = Expression.Convert(serviceExpr, serviceType);
@@ -7349,7 +7345,7 @@ namespace DryIoc
     public abstract class Factory
     {
         /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
-        public static int GetNextID() => 
+        public static int GetNextID() =>
             Interlocked.Increment(ref _lastFactoryID);
 
         /// <summary>Unique factory id generated from static seed.</summary>
@@ -7365,20 +7361,12 @@ namespace DryIoc
             internal set { _setup = value ?? Setup.Default; }
         }
 
-        /// <summary>Checks that condition is met for request or there is no condition setup.
-        /// Additionally check for reuse scope availability.</summary>
-        /// <param name="request">Request to check against.</param>
-        /// <returns>True if condition met or no condition setup.</returns>
-        public bool CheckCondition(Request request)
-        {
-            return (Setup.Condition == null || Setup.Condition(request));
-        }
+        /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
+        public bool CheckCondition(Request request) =>
+            (Setup.Condition == null || Setup.Condition(request));
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
-        public FactoryType FactoryType
-        {
-            get { return Setup.FactoryType; }
-        }
+        public FactoryType FactoryType => Setup.FactoryType;
 
         /// <summary>Non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="DelegateFactory"/>.</summary>
         public virtual Type ImplementationType { get { return null; } }
@@ -7557,9 +7545,8 @@ namespace DryIoc
                     factoryDelegate = r => new WeakReference(factory(r));
                 }
 
-                var singletonScope = request.SingletonScope;
-                var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
-                var singleton = singletonScope.GetOrAdd(singletonId, () => factoryDelegate(request.Container));
+                var singleton = request.SingletonScope
+                    .GetOrAdd(FactoryID, () => factoryDelegate(request.Container));
 
                 serviceExpr = Expression.Constant(singleton);
             }
@@ -8423,9 +8410,7 @@ namespace DryIoc
                     var singletonFactory = GetActivator(ctor.DeclaringType, paramExprs);
                     if (singletonFactory != null)
                     {
-                        var singletonScope = request.SingletonScope;
-                        var singletonId = singletonScope.GetScopedItemIdOrSelf(FactoryID);
-                        var singleton = singletonScope.GetOrAdd(singletonId, singletonFactory);
+                        var singleton = request.SingletonScope.GetOrAdd(FactoryID, singletonFactory);
                         return Expression.Constant(singleton);
                     }
                 }
@@ -8939,19 +8924,12 @@ namespace DryIoc
         /// <summary>Looks up for stored item by id.</summary>
         bool TryGet(out object item, int id);
 
-        // todo: remove
-        /// <summary>Creates id/index for new item to be stored in scope.
-        /// If separate index is not supported then just returns back passed <paramref name="externalId"/>.</summary>
-        /// <param name="externalId">Id to be mapped to new item id/index</param>
-        /// <returns>New it/index or just passed <paramref name="externalId"/></returns>
-        int GetScopedItemIdOrSelf(int externalId);
-
         /// <summary>The tracked item will be disposed with the scope.</summary>
         void TrackDisposable(object item);
     }
 
-    /// <summary>Scope implementation which will dispose stored <see cref="IDisposable"/> items on its own dispose.
-    /// Locking is used internally to ensure that object factory called only once.</summary>
+    /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
+    /// <c>lock</c> is used internally to ensure that object factory called only once.</summary>
     public sealed class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
@@ -8969,6 +8947,8 @@ namespace DryIoc
             Parent = parent;
             Name = name;
             _items = ImTreeMapIntToObj.Empty;
+            _disposables = ImTreeMapIntToObj.Empty;
+            _nextDisposablelID = Int32.MaxValue;
         }
 
         /// <summary>Just returns back <paramref name="externalId"/> without any changes.</summary>
@@ -9021,12 +9001,11 @@ namespace DryIoc
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
+        /// <param name="id">To set value at. Should be >= 0.</param> <param name="item">Value to set.</param>
         public void SetOrAdd(int id, object item)
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
-            if (id != -1)
-                Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
+            Ref.Swap(ref _items, items => items.AddOrUpdate(id, item));
             TrackDisposable(item);
         }
 
@@ -9035,14 +9014,15 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed);
-            // todo: null may be a valid valid, replace with TryGet
+            // todo: null may be a valid value, replace with TryGet
             return (item = _items.GetValueOrDefault(id)) != null;
         }
 
         /// <inheritdoc />
         public void TrackDisposable(object item)
         {
-            if (ScopedDisposableHandling.TryUnwrapDisposable(item) == null)
+            if ((item as IDisposable ??
+                 (item as WeakReference)?.Target as IDisposable) == null)
                 return;
 
             // Decrement here is because dispose should happen in reverse resolution order
@@ -9051,9 +9031,9 @@ namespace DryIoc
             Ref.Swap(ref _disposables, d => d.AddOrUpdate(disposableID, item));
         }
 
-        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and nullifies object storage.</summary>
+        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and empties item storage.</summary>
         /// <remarks>If item disposal throws exception, then it won't be propagated outside,
-        /// so the rest of the items could be disposed.</remarks>
+        /// so the rest of the items may proceed to be disposed.</remarks>
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
@@ -9062,7 +9042,7 @@ namespace DryIoc
             var disposables = _disposables;
             if (!disposables.IsEmpty)
                 foreach (var disposable in disposables.Enumerate())
-                    ScopedDisposableHandling.DisposeItem(disposable.Value);
+                    DisposeItem(disposable.Value);
 
             _disposables = ImTreeMapIntToObj.Empty;
             _items = ImTreeMapIntToObj.Empty;
@@ -9071,7 +9051,7 @@ namespace DryIoc
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
         public override string ToString() =>
             "{Name=" + (Name ?? "<no-name>")
-            + (Parent == null ? string.Empty : ", Parent=" + Parent)
+            + (Parent == null ? String.Empty : ", Parent=" + Parent)
             + "}";
 
         #region Implementation
@@ -9080,44 +9060,28 @@ namespace DryIoc
         // anyway most of disposables will be stored in items, except the transient disposables
         // and tracked scopes
         private ImTreeMapIntToObj _items;
-        private ImTreeMapIntToObj _disposables = ImTreeMapIntToObj.Empty;
-        private int _nextDisposablelID = int.MaxValue;
+        private ImTreeMapIntToObj _disposables;
+        private int _nextDisposablelID;
         private int _disposed;
 
+        // todo: Improve perf, by scaling lockers count with the items amount
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
 
-        #endregion
-    }
-
-    internal static class ScopedDisposableHandling
-    {
-        public static IDisposable TryUnwrapDisposable(object item)
+        private static void DisposeItem(object item)
         {
-            var disposable = item as IDisposable;
-            if (disposable != null)
-                return disposable;
+            var disposable = item as IDisposable ?? 
+                (item as WeakReference)?.Target as IDisposable;
 
-            // Unwrap WeakReference if item wrapped in it.
-            var weakRefItem = item as WeakReference;
-            if (weakRefItem != null)
-                return weakRefItem.Target as IDisposable;
-
-            return null;
-        }
-
-        public static void DisposeItem(object item)
-        {
-            var disposable = TryUnwrapDisposable(item);
             if (disposable != null)
             {
+                // Ignoring disposing exception, as it is not important to proceed the disposal
                 try { disposable.Dispose(); }
-                catch (Exception)
-                {
-                    // NOTE: Ignoring disposing exception, they not so important for program to proceed.
-                }
+                catch (Exception) { }
             }
         }
+
+        #endregion
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -9221,10 +9185,8 @@ namespace DryIoc
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var itemId = request.TracksTransientDisposable
-                ? -1
-                : request.SingletonScope.GetScopedItemIdOrSelf(request.FactoryID);
-            return Expression.Call(ResolverContext.SingletonScopeExpr, "GetOrAdd", ArrayTools.Empty<Type>(),
+            var itemId = request.TracksTransientDisposable ? -1 : request.FactoryID;
+            return Expression.Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddMethod,
                 Expression.Constant(itemId), Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
         }
 
@@ -9265,11 +9227,10 @@ namespace DryIoc
         internal static object GetScopedOrSingleton(IResolverContext r,
             IScope singleton, int itemId, CreateScopedValue createValue)
         {
-            var scope = r.GetNamedScope(name: null, throwIfNotFound: false);
-            if (scope != null)
-                return scope.GetOrAdd(itemId, createValue);
-            var singetonId = itemId == -1 ? -1 : singleton.GetScopedItemIdOrSelf(itemId);
-            return singleton.GetOrAdd(singetonId, createValue);
+            var scope = r.CurrentScope;
+            return scope != null
+                ? scope.GetOrAdd(itemId, createValue)
+                : singleton.GetOrAdd(itemId, createValue);
         }
 
         private static readonly MethodInfo _getScopedOrSingletonMethod =
@@ -9846,7 +9807,7 @@ namespace DryIoc
         /// <param name="preResolveParent">Dependency resolution path info.</param>
         /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
-        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey, 
+        IEnumerable<object> ResolveMany(Type serviceType, object serviceKey,
             Type requiredServiceType, RequestInfo preResolveParent, object[] args);
     }
 

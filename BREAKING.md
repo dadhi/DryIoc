@@ -39,3 +39,5 @@ to simplifies the path to `IResolver` from the object graph.
 but there is still possibility to define the selector on container level
 31. Added `object[] args` parameter into `Resolve` and `ResolveMany`
 32. Removed special SingletonScope, using one implementation for both scope and singletons
+34. Removed `IScope.GetScopedItemIdOrSelf` as it was required only by `SingletonScope`
+35. Added `IScope.TryGet`
