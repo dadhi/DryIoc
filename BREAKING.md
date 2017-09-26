@@ -57,5 +57,6 @@ but there is still possibility to define the selector on container level
 39. Disposable services registered with `WeaklyReferenced` setup are no longer disposed.
 Because the disposal in this case is optional anyway and the instance may be collected in any given time.
 40. Removed `ImplicitOpenedRootScope`
-41. Obsoleting `WithDefaultReuseInsteadOfTransient`
+41. Obsoleting `WithDefaultReuseInsteadOfTransient` replaced by `WithDefaultReuse`
 42. Changed RegisterDelegate to accept Func{IResolverContext, object} instead of Func{IResolver, object}
+43. Obsoleting `WithAutoFallbackResolution` replaced by `WithAutoFallbackDynamicRegistration`

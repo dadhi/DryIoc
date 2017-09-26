@@ -158,13 +158,8 @@ namespace DryIoc
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
         public static readonly string FacadeKey = "##facade";
 
-        /// <summary>Clears cache for specified service(s).
-        /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
-        /// <param name="serviceType">Target service type.</param>
-        /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
-        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all registrations of <paramref name="serviceType"/>.</param>
-        /// <returns>True if target service was found, false - otherwise.</returns>
-        public bool ClearCache(Type serviceType, FactoryType? factoryType = null, object serviceKey = null)
+        /// <inheritdoc />
+        public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
         {
             if (factoryType != null)
                 return _registry.Value.ClearCache(serviceType, serviceKey, factoryType.Value);
@@ -1043,8 +1038,8 @@ namespace DryIoc
                 }
             }
 
-            //Filter out the recursive decorators by doing the same recursive check
-            //that Request.WithResolvedFactory does. Fixes: #267
+            // Filter out the recursive decorators by doing the same recursive check
+            // that Request.WithResolvedFactory does. Fixes: #267
             if (!decorators.IsNullOrEmpty())
                 decorators = decorators.Match(d =>
                 {
@@ -1173,7 +1168,8 @@ namespace DryIoc
         /// <param name="throwIfStateRequired">(optional) Throws for non-primitive and not-recognized items,
         /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
-        public Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
+        public Expression GetOrAddStateItemExpression(object item, 
+            Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
                 return itemType != null
@@ -2279,10 +2275,8 @@ namespace DryIoc
         /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
         /// <remarks>Does nothing if registration is already exists.</remarks>
         public static void RegisterMapping<TService, TRegisteredService>(this IContainer container,
-            object serviceKey = null, object registeredServiceKey = null)
-        {
+            object serviceKey = null, object registeredServiceKey = null) =>
             container.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
-        }
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
@@ -2292,11 +2286,8 @@ namespace DryIoc
         /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
         /// That means, instead of placing service instance into graph expression we put here redirecting call to
         /// container Resolve.</remarks>
-        public static void RegisterPlaceholder(this IContainer container, Type serviceType,
-            object serviceKey = null)
-        {
+        public static void RegisterPlaceholder(this IContainer container, Type serviceType, object serviceKey = null) =>
             container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, IfAlreadyRegistered.AppendNotKeyed, true);
-        }
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
@@ -2306,26 +2297,21 @@ namespace DryIoc
         /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
         /// That means, instead of placing service instance into graph expression we put here redirecting call to
         /// container Resolve.</remarks>
-        public static void RegisterPlaceholder<TService>(this IContainer container,
-            object serviceKey = null)
-        {
+        public static void RegisterPlaceholder<TService>(this IContainer container, object serviceKey = null) =>
             container.RegisterPlaceholder(typeof(TService), serviceKey);
-        }
 
-        // todo: v3: Mark with ObsoleteAttribute
         /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
+        [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null)
-        {
-            return container.ThrowIfNull().With(rules =>
+            Func<Request, bool> condition = null) =>
+            container.ThrowIfNull().With(rules =>
                 rules.WithUnknownServiceResolvers(
                     Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
-        }
 
-        // todo: v3: Mark with ObsoleteAttribute
         /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
+        [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Assembly> implTypeAssemblies,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
@@ -2347,22 +2333,18 @@ namespace DryIoc
         /// <returns>New container with corresponding rule set.</returns>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Type>> getImplTypes,
-            Func<Type, Factory> factory = null)
-        {
-            return container.ThrowIfNull()
+            Func<Type, Factory> factory = null) =>
+            container.ThrowIfNull()
                 .With(rules => rules.WithDynamicRegistrationsAsFallback(
                     Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
-        }
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
         /// <param name="container">Container to use.</param>
         /// <param name="implTypes">Implementation types.</param>
         /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Type[] implTypes)
-        {
-            return container.WithAutoFallbackDynamicRegistrations((ignoredServiceType, ignoredServiceKey) => implTypes);
-        }
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Type[] implTypes) =>
+            container.WithAutoFallbackDynamicRegistrations((ignoredServiceType, ignoredServiceKey) => implTypes);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
@@ -2370,12 +2352,10 @@ namespace DryIoc
         /// <param name="reuse">The implementation reuse.</param>
         /// <param name="implTypes">Implementation types.</param>
         /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, IReuse reuse, params Type[] implTypes)
-        {
-            return container.WithAutoFallbackDynamicRegistrations(
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, IReuse reuse, params Type[] implTypes) =>
+            container.WithAutoFallbackDynamicRegistrations(
                 (ignoredServiceType, ignoredServiceKey) => implTypes,
                 implType => new ReflectionFactory(implType, reuse));
-        }
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
@@ -2384,12 +2364,10 @@ namespace DryIoc
         /// <param name="setup">The implementation setup, including condition</param>
         /// <param name="implTypes">Type to get implementations from.</param>
         /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, IReuse reuse, Setup setup, params Type[] implTypes)
-        {
-            return container.WithAutoFallbackDynamicRegistrations(
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, IReuse reuse, Setup setup, params Type[] implTypes) =>
+            container.WithAutoFallbackDynamicRegistrations(
                 (ignoredServiceType, ignoredServiceKey) => implTypes,
                 implType => new ReflectionFactory(implType, reuse, setup: setup));
-        }
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
@@ -2400,9 +2378,8 @@ namespace DryIoc
         /// <returns>New container with corresponding rule set.</returns>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Assembly>> getImplTypeAssemblies,
-            Func<Type, Factory> factory = null)
-        {
-            return container.ThrowIfNull().With(rules => rules.WithDynamicRegistrations(
+            Func<Type, Factory> factory = null) =>
+            container.ThrowIfNull().With(rules => rules.WithDynamicRegistrations(
                 Rules.AutoFallbackDynamicRegistrations(
                     (serviceType, serviceKey) =>
                     {
@@ -2415,17 +2392,14 @@ namespace DryIoc
                             .ToArray();
                     },
                     factory)));
-        }
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
         /// <param name="container">Container to use.</param>
         /// <param name="implTypeAssemblies">Assemblies with implementation types.</param>
         /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Assembly[] implTypeAssemblies)
-        {
-            return container.WithAutoFallbackDynamicRegistrations((ignoredServiceType, ignoredServiceKey) => implTypeAssemblies);
-        }
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Assembly[] implTypeAssemblies) =>
+            container.WithAutoFallbackDynamicRegistrations((ignoredServiceType, ignoredServiceKey) => implTypeAssemblies);
 
         /// <summary>Creates new container with provided parameters and properties
         /// to pass the custom dependency values for injection. The old parameters and properties are overridden,
@@ -2507,12 +2481,10 @@ namespace DryIoc
         /// <param name="resolutionRoots">(optional) Examined resolved services. If empty will try to resolve every service in container.</param>
         /// <returns>Exceptions happened for corresponding registrations.</returns>
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] Validate(
-            this IContainer container, params Type[] resolutionRoots)
-        {
-            return container.VerifyResolutions(resolutionRoots.IsNullOrEmpty()
+            this IContainer container, params Type[] resolutionRoots) =>
+            container.VerifyResolutions(resolutionRoots.IsNullOrEmpty()
                 ? (Func<ServiceRegistrationInfo, bool>)null
                 : registration => resolutionRoots.IndexOf(registration.ServiceType) != -1);
-        }
 
         // todo: v3: rename to Validate, rename parameters too.
         /// <summary>Used to find potential problems in service registration setup.
@@ -2612,10 +2584,8 @@ namespace DryIoc
         /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
         /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all registrations of <typeparamref name="T"/>.</param>
         /// <returns>True if type is found in the cache and cleared - false otherwise.</returns>
-        public static bool ClearCache<T>(this IContainer container, FactoryType? factoryType = null, object serviceKey = null)
-        {
-            return container.ClearCache(typeof(T), factoryType, serviceKey);
-        }
+        public static bool ClearCache<T>(this IContainer container, FactoryType? factoryType = null, object serviceKey = null) =>
+            container.ClearCache(typeof(T), factoryType, serviceKey);
 
         /// <summary>Clears delegate and expression cache for specified service.
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -2625,11 +2595,8 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all registrations of <paramref name="serviceType"/>.</param>
         /// <returns>True if type is found in the cache and cleared - false otherwise.</returns>
         public static bool ClearCache(this IContainer container, Type serviceType,
-            FactoryType? factoryType = null, object serviceKey = null)
-        {
-            // todo: v3: remove cast. Move to IContainer.
-            return ((Container)container).ClearCache(serviceType, factoryType, serviceKey);
-        }
+            FactoryType? factoryType = null, object serviceKey = null) =>
+            container.ClearCache(serviceType, factoryType, serviceKey);
     }
 
     /// <summary>Interface used to convert reuse instance to expression.</summary>
@@ -9834,6 +9801,13 @@ namespace DryIoc
         /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
         Expression GetOrAddStateItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
+
+        /// <summary>Clears cache for specified service(s). But does not clear instances of already resolved/created singletons and scoped services!</summary>
+        /// <param name="serviceType">Target service type.</param>
+        /// <param name="factoryType">(optional) If not specified, clears cache for all <see cref="FactoryType"/>.</param>
+        /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all registrations of <paramref name="serviceType"/>.</param>
+        /// <returns>True if target service was found, false - otherwise.</returns>
+        bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
@@ -10688,69 +10662,30 @@ namespace DryIoc
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
         /// <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
         /// <returns>Found method or null.</returns>
-        public static MethodInfo Method(this Type type, string name, bool includeNonPublic = false)
-        {
-            var methods = type.GetTypeInfo().DeclaredMethods
-                .Match(m => (includeNonPublic || m.IsPublic) && m.Name == name)
-                .ToArrayOrSelf();
-            return methods.Length == 1
-                ? methods[0]
-                : Throw.For<MethodInfo>(
+        public static MethodInfo Method(this Type type, string name, bool includeNonPublic = false) =>
+            type.GetSingleMethodOrNull(name, includeNonPublic) ??
+            Throw.For<MethodInfo>(
                 Error.Of("Undefined Method '{0}' in Type {1} (including non-public={2})"), name, type, includeNonPublic);
-        }
 
-        /// <summary>Returns declared (not inherited) method by name and argument types, or null if not found.</summary>
-        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="paramTypes">Argument types</param> <returns>Found method or null.</returns>
-        public static MethodInfo Method(this Type type, string name, params Type[] paramTypes)
-        {
-            var typeInfo = type.GetTypeInfo();
-            var paramCount = paramTypes.Length;
-            foreach (var method in typeInfo.DeclaredMethods)
-            {
-                if (method.Name == name)
-                {
-                    var methodParams = method.GetParameters();
-                    if (paramCount == methodParams.Length)
-                    {
-                        if (paramCount == 0)
-                            return method;
-
-                        if (paramCount == 1)
-                        {
-                            if (paramTypes[0] == methodParams[0].ParameterType)
-                                return method;
-                        }
-                        else
-                        {
-                            var i = 0;
-                            for (; i < paramCount; ++i)
-                                if (paramTypes[i] != methodParams[i].ParameterType)
-                                    break;
-                            if (i == paramCount)
-                                return method;
-                        }
-                    }
-                }
-            }
-
-            return Throw.For<MethodInfo>(
+        /// <summary>Looks up for method with and specified parameter types.</summary>
+        public static MethodInfo Method(this Type type, string name, params Type[] paramTypes) =>
+            type.GetMethodOrNull(name, paramTypes) ??
+            Throw.For<MethodInfo>(
                 Error.Of("Undefined Method '{0}' in Type {1} with parameters {2}."), name, type, paramTypes);
-        }
 
-        /// <summary>Returns single declared (not inherited) method by name, or null if not found.</summary>
+        /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
+        /// <param name="includeNonPublic">(optional) To include non public methods into search.</param>
         /// <returns>Found method or null.</returns>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
             var methods = type.GetTypeInfo().DeclaredMethods
-                .Where(m => (includeNonPublic || m.IsPublic) && m.Name == name)
+                .Match(m => (includeNonPublic || m.IsPublic) && m.Name == name)
                 .ToArrayOrSelf();
             return methods.Length == 1 ? methods[0] : null;
         }
 
-        /// <summary>Obsolete: replaced by Method</summary>
+        /// <summary>Looks up for method with and specified parameter types.</summary>
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
             var typeInfo = type.GetTypeInfo();
