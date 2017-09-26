@@ -103,8 +103,7 @@ namespace DryIoc.IssuesTests
         public void Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_within_scope()
         {
             var cnt = new Container().WithMef()
-                .With(r => r.WithImplicitRootOpenScope()
-                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+                .With(r => r.WithDefaultReuse(Reuse.ScopedOrSingleton));
 
             cnt.RegisterExports(typeof(Exporter), typeof(EnumerableOfLazyImporter));
 
@@ -126,7 +125,9 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata_within_scope()
         {
-            var cnt = new Container().WithMef().With(r => r.WithImplicitRootOpenScope().WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var cnt = new Container().WithMef()
+                .With(r => r.WithDefaultReuse(Reuse.ScopedOrSingleton));
+
             cnt.RegisterExports(typeof(Exporter), typeof(EnumerableOfLazyWithMetadataImporter));
 
             // resolution works fine

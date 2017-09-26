@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
         public void Container_with_default_reuse_set_to_singleton_shouldnt_complain_about_transient_disposable_registration()
         {
             var container = new Container().With(r =>
-                r.WithDefaultReuseInsteadOfTransient(Reuse.Singleton));
+                r.WithDefaultReuse(Reuse.Singleton));
 
             Assert.DoesNotThrow(() =>
                 container.Register<IService, Service>());
@@ -45,7 +45,7 @@ namespace DryIoc.IssuesTests
         public void VerifyRules()
         {
             var container = new Container(Rules.Default
-               .WithDefaultReuseInsteadOfTransient(Reuse.InWebRequest)
+               .WithDefaultReuse(Reuse.InWebRequest)
                .WithTrackingDisposableTransients());
 
             container.Register<A>();

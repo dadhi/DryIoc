@@ -101,7 +101,7 @@ namespace DryIoc.IssuesTests
         [Test, Ignore("TODO: fix")]
         public void DryIocWithScopedDefaultReuseCreatesDifferentInstancesOfNamedDriverUsingStaticFactory()
         {
-            var container = new Container().WithMef().With(rules => rules.WithImplicitRootOpenScope().WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var container = new Container().WithMef().With(rules => rules.WithDefaultReuse(Reuse.ScopedOrSingleton));
             container.RegisterExports(typeof(Driver.StaticDriverFactory));
 
             var factory = container.Resolve<Func<string, IDriver>>();
@@ -116,7 +116,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void DryIocWithScopedDefaultReuseCreatesDifferentInstancesOfNamedDriverUsingNonStaticFactory()
         {
-            var container = new Container().WithMef().With(rules => rules.WithImplicitRootOpenScope().WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var container = new Container().WithMef().With(rules => rules.WithDefaultReuse(Reuse.ScopedOrSingleton));
             container.RegisterExports(typeof(Driver.DriverFactory));
 
             var factory = container.Resolve<IDriverFactory>();

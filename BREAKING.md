@@ -1,6 +1,16 @@
-# Breaking changes
+# Breaking Changes
 
 ## v3.0.0
+
+### User perspective
+
+1. OpenScope behavior changes TODO
+5. No more ImplicitOpenedRootScope TODO
+2. RegisterDelegate changes TODO
+4. CreateFacade changes TODO
+3. WeaklyReferenced changes TODO
+
+### Changes list
 
 1. Using C# 6 through codebase.
 2. `IReuse` contents is replaced with `IReuseV3` contents, `IReuseV3` is removed.
@@ -45,4 +55,7 @@ but there is still possibility to define the selector on container level
 37. Removed `IScopeContext.ScopeContextName`, you may provide your name instead
 38. Removed `Container.NonAmbientRootScopeName`
 39. Disposable services registered with `WeaklyReferenced` setup are no longer disposed.
-40. Because the disposal in this case is optional anyway and the instance may be collected in any given time.
+Because the disposal in this case is optional anyway and the instance may be collected in any given time.
+40. Removed `ImplicitOpenedRootScope`
+41. Obsoleting `WithDefaultReuseInsteadOfTransient`
+42. Changed RegisterDelegate to accept Func{IResolverContext, object} instead of Func{IResolver, object}

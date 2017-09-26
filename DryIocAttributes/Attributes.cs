@@ -38,7 +38,7 @@ namespace DryIocAttributes
         /// <summary>subj.</summary>
         Singleton,
         /// <summary>subj.</summary>
-        CurrentScope,
+        CurrentScope, // todo: Make obsolete, replace with Scoped
         /// <summary>subj.</summary>
         ResolutionScope,
         /// <summary>subj.</summary>

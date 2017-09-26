@@ -10,7 +10,6 @@ namespace DryIoc.IssuesTests
         public void DisposingScopeDisposesService()
         {
             var adapter = new Container(rules => rules
-                .WithImplicitRootOpenScope()
                 .WithTrackingDisposableTransients());
 
             adapter.Register<IFakeSingletonService, FakeService>(Reuse.Singleton);

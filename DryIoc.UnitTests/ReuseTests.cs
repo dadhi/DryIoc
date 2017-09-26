@@ -636,8 +636,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_specify_default_reuse_per_Container_different_from_Transient()
         {
-            var container = new Container(r => r
-                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var container = new Container(r => r.WithDefaultReuse(Reuse.Scoped));
 
             container.Register<Abc>();
 

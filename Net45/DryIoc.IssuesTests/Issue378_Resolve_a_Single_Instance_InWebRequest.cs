@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithoutThrowOnRegisteringDisposableTransient()
-                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)); // Specify to use singleton for services with unspecified reuse
+                .WithDefaultReuse(Reuse.Singleton)); // Specify to use singleton for services with unspecified reuse
 
             // Singletons: specified explicitly and do not depend on container default reuse
             container.RegisterMany<A>(Reuse.Singleton);
@@ -27,7 +27,7 @@ namespace DryIoc.IssuesTests
         public static IContainer ReconfigureForWeb(IContainer container)
         {
             return container.With(
-                rules => rules.WithDefaultReuseInsteadOfTransient(Reuse.InWebRequest),
+                rules => rules.WithDefaultReuse(Reuse.InWebRequest),
                 new AsyncExecutionFlowScopeContext());
         }
 

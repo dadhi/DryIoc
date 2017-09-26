@@ -13,8 +13,7 @@ namespace DryIoc.IssuesTests
         private static IContainer CreateContainer()
         {
             var c = new Container().WithMef().With(rules => rules
-                .WithImplicitRootOpenScope()
-                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+                .WithDefaultReuse(Reuse.ScopedOrSingleton));
 
             c.RegisterExports(new[] { typeof(Issue355_UnexpectedSingletonDisposal).GetAssembly() });
             return c;
