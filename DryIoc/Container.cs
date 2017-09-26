@@ -1168,7 +1168,7 @@ namespace DryIoc
         /// <param name="throwIfStateRequired">(optional) Throws for non-primitive and not-recognized items,
         /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
-        public Expression GetOrAddStateItemExpression(object item, 
+        public Expression GetOrAddStateItemExpression(object item,
             Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
@@ -3484,10 +3484,8 @@ namespace DryIoc
         }
 
         /// <summary>Specifies to use dynamic registrations only when no normal registrations found</summary>
-        public bool UseDynamicRegistrationsAsFallback
-        {
-            get { return (_settings & Settings.UseDynamicRegistrationsAsFallback) != 0; }
-        }
+        public bool UseDynamicRegistrationsAsFallback =>
+            (_settings & Settings.UseDynamicRegistrationsAsFallback) != 0;
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
         /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
@@ -3883,11 +3881,23 @@ namespace DryIoc
             (_settings & Settings.CaptureContainerDisposeStackTrace) != 0;
 
         /// <summary>Instructs to capture Dispose stack-trace to include it later into <see cref="Error.ContainerIsDisposed"/>
-        /// exception for easy diagnostics.</summary> <returns>New rules with option set.</returns>
+        /// exception for easy diagnostics.</summary>
         public Rules WithCaptureContainerDisposeStackTrace()
         {
             var newRules = (Rules)MemberwiseClone();
             newRules._settings |= Settings.CaptureContainerDisposeStackTrace;
+            return newRules;
+        }
+
+        /// <summary>Allows Func with args specify its own reuse (sharing) behavior.</summary>
+        public bool IgnoringReuseForFuncWithArgs =>
+            (_settings & Settings.IgnoringReuseForFuncWithArgs) != 0;
+
+        /// <summary>Allows Func with args specify its own reuse (sharing) behavior.</summary>
+        public Rules WithIgnoringReuseForFuncWithArgs()
+        {
+            var newRules = (Rules)MemberwiseClone();
+            newRules._settings |= Settings.IgnoringReuseForFuncWithArgs;
             return newRules;
         }
 
@@ -3916,7 +3926,8 @@ namespace DryIoc
             ImplicitRootOpenScope = 1 << 8,
             ThrowIfRuntimeStateRequired = 1 << 9,
             CaptureContainerDisposeStackTrace = 1 << 10,
-            UseDynamicRegistrationsAsFallback = 1 << 11
+            UseDynamicRegistrationsAsFallback = 1 << 11,
+            IgnoringReuseForFuncWithArgs = 1 << 12
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -5059,7 +5070,7 @@ namespace DryIoc
         /// Consider using <see cref="Made"/> instead:
         /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
         /// </remarks>
-        public static void RegisterDelegate(this IRegistrator registrator, 
+        public static void RegisterDelegate(this IRegistrator registrator,
             Type serviceType, Func<IResolverContext, object> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             object serviceKey = null)
@@ -6204,19 +6215,19 @@ namespace DryIoc
         /// <returns>True if has Func with arguments ancestor.</returns>
         public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
         {
-            if ((_flags & RequestFlags.IsWrappedInFuncWithArgs) != 0)
-            {
-                if (!immediateParent)
-                    return true; // skip other checks
+            if ((_flags & RequestFlags.IsWrappedInFuncWithArgs) == 0)
+                return false;
 
-                // first run-time parent
-                if (!RawParent.IsEmpty)
-                    return (RawParent._flags & RequestFlags.IsWrappedInFuncWithArgs) == 0;
+            if (!immediateParent)
+                return true; // skip other checks
 
-                // and if run-time parent does not exist then check the pre-resolve parent
-                if (!PreResolveParent.IsEmpty)
-                    return (PreResolveParent.Flags & RequestFlags.IsWrappedInFuncWithArgs) != 0;
-            }
+            // first run-time parent
+            if (!RawParent.IsEmpty)
+                return (RawParent._flags & RequestFlags.IsWrappedInFuncWithArgs) == 0;
+
+            // and if run-time parent does not exist then check the pre-resolve parent
+            if (!PreResolveParent.IsEmpty)
+                return (PreResolveParent.Flags & RequestFlags.IsWrappedInFuncWithArgs) != 0;
 
             return false;
         }
@@ -6443,16 +6454,18 @@ namespace DryIoc
                     if (p.FactoryID == factory.FactoryID)
                         Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
-            var reuse = factory.Reuse;
-            if (reuse == null)
-                reuse = GetDefaultReuse(factory);
+            IReuse reuse;
+            if (IsWrappedInFuncWithArgs(true) && Rules.IgnoringReuseForFuncWithArgs)
+                reuse = DryIoc.Reuse.Transient;
+            else
+                reuse = factory.Reuse ?? GetDefaultReuse(factory);
 
-            var flags = _flags;
-
-            if (!skipCaptiveDependencyCheck && reuse.Lifespan != 0 &&
+            if (reuse.Lifespan != 0 &&
+                !skipCaptiveDependencyCheck &&
                 Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
+            var flags = _flags;
             if (reuse == DryIoc.Reuse.Singleton)
             {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
@@ -6474,15 +6487,11 @@ namespace DryIoc
             if (factory.Setup.UseParentReuse)
                 return GetFirstParentNonTransientReuseUntilFunc();
 
-            if (factory.Setup.FactoryType == FactoryType.Decorator
-                && ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
+            if (factory.FactoryType == FactoryType.Decorator &&
+                ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
                 return Reuse; // use reuse of resolved service factory for decorator
 
-            // if no specified the wrapper reuse is always Transient,
-            // other container-wide default reuse is applied
-            return factory.FactoryType == FactoryType.Wrapper
-                ? DryIoc.Reuse.Transient
-                : Container.Rules.DefaultReuse;
+            return factory.FactoryType == FactoryType.Wrapper ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
         }
 
         private IReuse GetTransientDisposableTrackingReuse(Factory factory)
@@ -6713,7 +6722,7 @@ namespace DryIoc
             public readonly IContainer Container;
             public readonly RequestInfo PreResolveParent;
 
-            // Mutable updatable part
+            // Mutable state
             public bool ContainsNestedResolutionCall;
             public int DependencyCount;
 
@@ -7431,9 +7440,11 @@ namespace DryIoc
 
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
-                serviceExpr = Expression.Call(typeof(ThrowInGeneratedCode), "ThrowNewErrorIfNull",
-                    ArrayTools.Empty<Type>(),
-                    Expression.Property(Expression.Convert(serviceExpr, typeof(WeakReference)), "Target"),
+                serviceExpr = Expression.Call(
+                    typeof(ThrowInGeneratedCode).Method(nameof(ThrowInGeneratedCode.ThrowNewErrorIfNull)),
+                    Expression.Property(
+                        Expression.Convert(serviceExpr, typeof(WeakReference)),
+                        typeof(WeakReference).Property(nameof(WeakReference.Target))),
                     Expression.Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
             else if (Setup.PreventDisposal)
                 serviceExpr = Expression.Field(
@@ -8660,9 +8671,9 @@ namespace DryIoc
         public override Type ImplementationType => _knownImplementationType;
 
         /// <summary>Creates factory.</summary>
-         public DelegateFactory(FactoryDelegate factoryDelegate,
-            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
-            : base(reuse, setup)
+        public DelegateFactory(FactoryDelegate factoryDelegate,
+           IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
+           : base(reuse, setup)
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
             _knownImplementationType = knownImplementationType;
