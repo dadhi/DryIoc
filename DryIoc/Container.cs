@@ -5087,20 +5087,19 @@ namespace DryIoc
             public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r)(decoratee);
         }
 
-        // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
+        [Obsolete("Replace by UseInstance", false)]
         public static void RegisterInstance(this IResolverContext r, Type serviceType, object instance,
             IReuse ignored = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        // todo: remove in future
         /// <summary>Obsolete: replaced with UseInstance</summary>
+        [Obsolete("Replace by UseInstance", false)]
         public static void RegisterInstance<TService>(this IResolverContext r, TService instance,
             IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered,
-                preventDisposal, weaklyReferenced, serviceKey);
+            r.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
