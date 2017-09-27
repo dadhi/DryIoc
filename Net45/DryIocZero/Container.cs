@@ -289,7 +289,7 @@ namespace DryIocZero
         #region IScopeAccess
 
         /// <summary>Scope containing container singletons.</summary>
-        public IScope SingletonScope { get; private set; }
+        public IScope SingletonScope { get; }
 
         /// <summary>Current scope.</summary>
         public IScope GetCurrentScope()
@@ -298,7 +298,7 @@ namespace DryIocZero
         }
 
         /// <summary>Scope context or null of not necessary.</summary>
-        public IScopeContext ScopeContext { get; private set; }
+        public IScopeContext ScopeContext { get; }
 
         /// <inheritdoc />
         public IResolverContext OpenScope(object name = null, bool trackInParent = false)
@@ -796,10 +796,10 @@ namespace DryIocZero
     public sealed class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public IScope Parent { get; private set; }
+        public IScope Parent { get; }
 
         /// <summary>Optional name object associated with scope.</summary>
-        public object Name { get; private set; }
+        public object Name { get; }
 
         /// <summary>Create scope with optional parent and name.</summary>
         /// <param name="parent">Parent in scope stack.</param> <param name="name">Associated name object.</param>
@@ -975,10 +975,10 @@ namespace DryIocZero
     public sealed class SingletonScope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for root scope.</summary>
-        public IScope Parent { get; private set; }
+        public IScope Parent { get; }
 
         /// <summary>Optional name object associated with scope.</summary>
-        public object Name { get; private set; }
+        public object Name { get; }
 
         /// <summary>Amount of items in item array.</summary>
         public static readonly int BucketSize = 32;
@@ -1248,7 +1248,7 @@ namespace DryIocZero
     public class ContainerException : InvalidOperationException
     {
         /// <summary>Error code.</summary>
-        public int Error { get; private set; }
+        public int Error { get; }
 
         /// <summary>Creates exception.</summary>
         /// <param name="error">Code.</param> <param name="message">Message.</param>

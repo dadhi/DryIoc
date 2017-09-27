@@ -58,7 +58,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ## Reliability
 
-* Unit-test suite with ~850 tests.
+* Unit-test suite with ~950 tests.
 * Thread-safe and lock-free — registrations and resolutions may proceed in parallel without corrupting container state. 
 * Detects recursive dependencies aka cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.

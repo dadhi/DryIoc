@@ -7,7 +7,7 @@
 1. OpenScope behavior changes TODO
 5. No more ImplicitOpenedRootScope TODO
 2. RegisterDelegate changes TODO
-4. CreateFacade changes TODO
+4. CreateFacade changes and no more FallbackContainers TODO
 3. WeaklyReferenced changes TODO
 
 ### Changes list

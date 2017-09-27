@@ -1162,7 +1162,7 @@ namespace DryIoc
         public Expression GetCachedFactoryExpressionOrDefault(int factoryID) =>
             _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID) as Expression;
 
-        /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
+        /// <summary>Converts known items into custom expression or wraps it in <see cref="ConstantExpression"/>.</summary>
         /// <param name="item">Item to convert.</param>
         /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
         /// <param name="throwIfStateRequired">(optional) Throws for non-primitive and not-recognized items,
@@ -1172,31 +1172,25 @@ namespace DryIoc
             Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
-                return itemType != null
-                    ? Expression.Constant(null, itemType)
-                    : Expression.Constant(null);
+                return itemType == null ? Expression.Constant(null) : Expression.Constant(null, itemType);
 
-            if (item is DefaultKey)
-                return Expression.Call(typeof(DefaultKey), "Of", ArrayTools.Empty<Type>(),
-                    Expression.Constant(((DefaultKey)item).RegistrationOrder));
+            var defaultKey = item as DefaultKey;
+            if (defaultKey != null)
+                return Expression.Call(DefaultKey.OfMethod, Expression.Constant(defaultKey.RegistrationOrder));
 
-            itemType = itemType ?? item.GetType();
-            if (itemType.IsPrimitive() ||
-                itemType.IsAssignableTo(typeof(Type)))
-                return Expression.Constant(item, itemType);
+            var actualItemType = item.GetType();
+            if (actualItemType.IsPrimitive() || actualItemType.IsAssignableTo(typeof(Type)))
+                return itemType == null ? Expression.Constant(item) : Expression.Constant(item, itemType);
 
-            if (itemType.IsArray)
+            if (actualItemType.IsArray)
             {
-                var elemType = itemType.GetElementType().ThrowIfNull();
-                var elems = ((IEnumerable)item).Cast<object>()
-                    .Map(it => GetOrAddStateItemExpression(it, null, throwIfStateRequired));
-                var elemExprs = Expression.NewArrayInit(elemType, elems);
-                return elemExprs;
+                var elems = ((object[])item).Map(it => GetOrAddStateItemExpression(it, null, throwIfStateRequired));
+                return Expression.NewArrayInit(actualItemType.GetElementType().ThrowIfNull(), elems);
             }
 
-            var convertibleToExpression = item as IConvertibleToExpression;
-            if (convertibleToExpression != null)
-                return convertibleToExpression.ToExpression(it => GetOrAddStateItemExpression(it));
+            var convertible = item as IConvertibleToExpression;
+            if (convertible != null)
+                return convertible.ToExpression(it => GetOrAddStateItemExpression(it));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
@@ -1205,7 +1199,7 @@ namespace DryIoc
             Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired,
                 Error.StateIsRequiredToUseItem, item);
 
-            return Expression.Constant(item, itemType);
+            return itemType == null ? Expression.Constant(item) : Expression.Constant(item, itemType);
         }
 
         #endregion
@@ -2326,56 +2320,33 @@ namespace DryIoc
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
-        /// <param name="container">Container to use.</param>
-        /// <param name="getImplTypes">Implementation type provider.</param>
-        /// <param name="factory">(optional) Handler to customize the factory, e.g.
-        /// specify reuse or setup. Handler should not return <c>null</c>.</param>
-        /// <returns>New container with corresponding rule set.</returns>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
-            Func<Type, object, IEnumerable<Type>> getImplTypes,
-            Func<Type, Factory> factory = null) =>
+            Func<Type, object, IEnumerable<Type>> getImplTypes, Func<Type, Factory> factory = null) =>
             container.ThrowIfNull()
                 .With(rules => rules.WithDynamicRegistrationsAsFallback(
                     Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
-        /// <param name="container">Container to use.</param>
-        /// <param name="implTypes">Implementation types.</param>
-        /// <returns>New container with corresponding rule set.</returns>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Type[] implTypes) =>
-            container.WithAutoFallbackDynamicRegistrations((ignoredServiceType, ignoredServiceKey) => implTypes);
+            container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
-        /// <param name="container">Container to use.</param>
-        /// <param name="reuse">The implementation reuse.</param>
-        /// <param name="implTypes">Implementation types.</param>
-        /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, IReuse reuse, params Type[] implTypes) =>
-            container.WithAutoFallbackDynamicRegistrations(
-                (ignoredServiceType, ignoredServiceKey) => implTypes,
-                implType => new ReflectionFactory(implType, reuse));
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            IReuse reuse, params Type[] implTypes) =>
+            container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes, implType => new ReflectionFactory(implType, reuse));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
-        /// <param name="container">Container to use.</param>
-        /// <param name="reuse">The implementation reuse</param>
-        /// <param name="setup">The implementation setup, including condition</param>
-        /// <param name="implTypes">Type to get implementations from.</param>
-        /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, IReuse reuse, Setup setup, params Type[] implTypes) =>
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
                 (ignoredServiceType, ignoredServiceKey) => implTypes,
                 implType => new ReflectionFactory(implType, reuse, setup: setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
-        /// <param name="container">Container to use.</param>
-        /// <param name="getImplTypeAssemblies">Provides assemblies with implementation types.</param>
-        /// <param name="factory">(optional) Handler to customize the factory, e.g.
-        /// specify reuse or setup. Handler should not return <c>null</c>.</param>
-        /// <returns>New container with corresponding rule set.</returns>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Assembly>> getImplTypeAssemblies,
             Func<Type, Factory> factory = null) =>
@@ -2395,11 +2366,15 @@ namespace DryIoc
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
-        /// <param name="container">Container to use.</param>
-        /// <param name="implTypeAssemblies">Assemblies with implementation types.</param>
-        /// <returns>New container with corresponding rule set.</returns>
-        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Assembly[] implTypeAssemblies) =>
-            container.WithAutoFallbackDynamicRegistrations((ignoredServiceType, ignoredServiceKey) => implTypeAssemblies);
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            params Assembly[] implTypeAssemblies) =>
+            container.WithAutoFallbackDynamicRegistrations((_, __) => implTypeAssemblies);
+
+        /// <summary>Provides automatic fallback resolution mechanism for not normally registered
+        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            IEnumerable<Assembly> implTypeAssemblies) =>
+            container.WithAutoFallbackDynamicRegistrations((_, __) => implTypeAssemblies);
 
         /// <summary>Creates new container with provided parameters and properties
         /// to pass the custom dependency values for injection. The old parameters and properties are overridden,
@@ -2414,16 +2389,15 @@ namespace DryIoc
         ///     Assert.AreEqual("Nya!", a.Message)
         /// ]]></code></example>
         public static IContainer WithDependencies(this IContainer container,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return container.With(rules => rules.With(Made.Of(
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            container.With(rules => rules.With(Made.Of(
                 parameters: rules.Parameters.OverrideWith(parameters),
                 propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields)),
                 overrideRegistrationMade: true));
-        }
 
         /// <summary>Pre-defined what-registrations predicate for <seealso cref="GenerateResolutionExpressions"/>.</summary>
-        public static Func<ServiceRegistrationInfo, bool> SetupAsResolutionRoots = r => r.Factory.Setup.AsResolutionRoot;
+        public static Func<ServiceRegistrationInfo, bool> SetupAsResolutionRoots =
+            r => r.Factory.Setup.AsResolutionRoot;
 
         /// <summary>Generates all resolution root and calls expressions.</summary>
         /// <param name="container">For container</param>
@@ -2618,8 +2592,9 @@ namespace DryIoc
         /// <summary>Allows to determine service registration order.</summary>
         public readonly int RegistrationOrder;
 
+        internal static readonly MethodInfo OfMethod = typeof(DefaultKey).Method(nameof(Of));
+
         /// <summary>Create new default key with specified registration order.</summary>
-        /// <param name="registrationOrder"></param> <returns>New default key.</returns>
         public static DefaultKey Of(int registrationOrder)
         {
             return registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
@@ -3333,8 +3308,6 @@ namespace DryIoc
 
         /// <summary>Sets <see cref="MaxObjectGraphSize"/>.
         /// To disable the limit please use <see cref="WithoutMaxObjectGraphSize"/></summary>
-        /// <param name="size">New  value. Should be <c>1</c> or higher.</param>
-        /// <returns>New rules.</returns>
         public Rules WithMaxObjectGraphSize(int size)
         {
             Throw.If(size < 1);
@@ -3345,17 +3318,12 @@ namespace DryIoc
 
         /// <summary>Disables the <see cref="MaxObjectGraphSize"/> limitation,
         /// so that object graph won't be split due this setting.</summary>
-        /// <returns>New rules.</returns>
         public Rules WithoutMaxObjectGraphSize()
         {
             var newRules = (Rules)MemberwiseClone();
             newRules.MaxObjectGraphSize = -1;
             return newRules;
         }
-
-        // todo: v3: Rename to remove
-        /// <summary>Obsolete: replaced with <see cref="MaxObjectGraphSize"/></summary>
-        public int LevelToSplitObjectGraphIntoResolveCalls { get; private set; }
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
@@ -8740,24 +8708,18 @@ namespace DryIoc
         /// <summary>True if scope is disposed.</summary>
         bool IsDisposed { get; }
 
-        /// <summary>Creates, stores, and returns stored object.</summary>
-        /// <param name="id">Unique ID to find created object in subsequent calls. 
-        /// Value <c>-1</c> means to track a transient disposable (the item will be created each time when calling this method)</param>
-        /// <param name="createValue">Delegate to create object. It will be used immediately, and reference to delegate will not be stored.</param>
-        /// <returns>Created and stored object.</returns>
-        /// <remarks>Scope does not store <paramref name="createValue"/> (no memory leak here),
-        /// it stores only result of <paramref name="createValue"/> call.</remarks>
-        object GetOrAdd(int id, CreateScopedValue createValue);
-
-        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at.</param> <param name="item">Value to set.</param>
-        void SetOrAdd(int id, object item);
-
         /// <summary>Looks up for stored item by id.</summary>
         bool TryGet(out object item, int id);
 
-        /// <summary>Tracked item will be disposed with the scope.</summary>
-        void TrackDisposable(object item);
+        /// <summary>Creates, stores, and returns stored disposable by id.</summary>
+        object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1);
+
+        /// <summary>Tracked item will be disposed with the scope. 
+        /// Smaller <paramref name="disposalIndex"/> will be disposed first.</summary>
+        object TrackDisposable(object item, int disposalIndex = -1);
+
+        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
+        void SetOrAdd(int id, object item);
     }
 
     /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
@@ -8780,38 +8742,28 @@ namespace DryIoc
             Name = name;
             _items = ImTreeMapIntToObj.Empty;
             _disposables = ImTreeMapIntToObj.Empty;
-            _nextDisposablelID = Int32.MaxValue;
+            _nextDisposalIndex = Int32.MaxValue;
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
             typeof(IScope).Method(nameof(IScope.GetOrAdd));
 
-        // todo: Add disposal order
         /// <inheritdoc />
-        public object GetOrAdd(int id, CreateScopedValue createValue) =>
-            _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue);
+        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1) =>
+            _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue, disposalIndex);
 
-        private object TryGetOrAdd(int id, CreateScopedValue createValue)
+        private object TryGetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed);
-
-            if (id == -1) // disposable transient, will be created each time
-            {
-                var transient = createValue();
-                TrackDisposable(transient);
-                return transient;
-            }
 
             object item;
             lock (_locker)
             {
                 item = _items.GetValueOrDefault(id);
-                if (item != null)
+                if (item != null) // double check locking
                     return item;
-
-                item = createValue();
-                TrackDisposable(item);
+                item = TrackDisposable(createValue(), disposalIndex);
             }
 
             // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
@@ -8842,20 +8794,23 @@ namespace DryIoc
             return (item = _items.GetValueOrDefault(id)) != null;
         }
 
+        internal static readonly MethodInfo TrackDisposableMethod =
+            typeof(IScope).Method(nameof(IScope.TrackDisposable));
+
         /// <inheritdoc />
-        public void TrackDisposable(object item)
+        public object TrackDisposable(object item, int disposalIndex = -1)
         {
-            var disposable = item as IDisposable;
-            if (disposable == null)
-                return;
+            var disp = item as IDisposable;
+            if (disp != null)
+            {
+                if (disposalIndex == -1)
+                    disposalIndex = Interlocked.Decrement(ref _nextDisposalIndex);
 
-            // Decrement here is because dispose should happen in reverse resolution order
-            // By adding items with decreasing IDs we get rid off ordering on Dispose.
-            var id = Interlocked.Decrement(ref _nextDisposablelID);
-
-            var items = _disposables;
-            if (Interlocked.CompareExchange(ref _disposables, items.AddOrUpdate(id, disposable), items) != items)
-                Ref.Swap(ref _disposables, it => it.AddOrUpdate(id, disposable));
+                var current = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, current.AddOrUpdate(disposalIndex, disp), current) != current)
+                    Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalIndex, disp));
+            }
+            return item;
         }
 
         /// <summary>Disposes all stored <see cref="IDisposable"/> objects and empties item storage.</summary>
@@ -8893,7 +8848,7 @@ namespace DryIoc
         // and tracked scopes
         private ImTreeMapIntToObj _items;
         private ImTreeMapIntToObj _disposables;
-        private int _nextDisposablelID;
+        private int _nextDisposalIndex;
         private int _disposed;
 
         // todo: Improve perf by scaling lockers count with the items amount
@@ -8934,10 +8889,8 @@ namespace DryIoc
 
         /// <summary>Returns current scope in calling Thread or null, if no scope tracked.</summary>
         /// <returns>Found scope or null.</returns>
-        public IScope GetCurrentOrDefault()
-        {
-            return _scopes.GetValueOrDefault(Portable.GetCurrentManagedThreadID()) as IScope;
-        }
+        public IScope GetCurrentOrDefault() =>
+            _scopes.GetValueOrDefault(Portable.GetCurrentManagedThreadID()) as IScope;
 
         /// <summary>Change current scope for the calling Thread.</summary>
         /// <param name="setCurrentScope">Delegate to change the scope given current one (or null).</param>
@@ -8989,23 +8942,28 @@ namespace DryIoc
     /// <summary>Returns container bound scope for storing singleton objects.</summary>
     public sealed class SingletonReuse : IReuse
     {
+        /// <summary>Big lifespan.</summary>
+        public const int DefaultLifespan = 1000;
+
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get { return 1000; } }
+        public int Lifespan => DefaultLifespan;
 
         /// <inheritdoc />
-        public object Name { get { return null; } }
+        public object Name => null;
+
+        /// <summary>Returns true because singleton is always available.</summary>
+        public bool CanApply(Request request) => true;
 
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var itemId = request.TracksTransientDisposable ? -1 : request.FactoryID;
+            if (request.TracksTransientDisposable)
+                return Expression.Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
+                   serviceFactoryExpr, Expression.Constant(-1));
             return Expression.Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddMethod,
-                Expression.Constant(itemId), Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
+                Expression.Constant(request.FactoryID), Expression.Lambda<CreateScopedValue>(serviceFactoryExpr),
+                Expression.Constant(-1));
         }
-
-        /// <summary>Returns true because singleton is always available.</summary>
-        /// <param name="request">_</param> <returns>True.</returns>
-        public bool CanApply(Request request) => true;
 
         private readonly Lazy<Expression> _singletonReuseExpr = new Lazy<Expression>(() =>
             Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
@@ -9022,90 +8980,62 @@ namespace DryIoc
     /// <summary>Specifies that instances are created, stored and disposed together with some scope.</summary>
     public sealed class CurrentScopeReuse : IReuse
     {
+        /// <summary>Less than Singleton's</summary>
+        public const int DefaultLifespan = 100;
+
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan => 100;
+        public int Lifespan { get; }
 
         /// <inheritdoc />
         public object Name { get; }
 
-        private bool _scopedOrSingleton;
-
-        // todo: Add lifespan into constructor for the future?
-        /// <summary>Creates reuse optionally specifying its name.</summary>
-        public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false)
-        {
-            Name = name;
-            _scopedOrSingleton = scopedOrSingleton;
-        }
-
-        internal static object GetScopedOrSingleton(IResolverContext r, int itemId, CreateScopedValue createValue) =>
-            (r.CurrentScope ?? r.SingletonScope).GetOrAdd(itemId, createValue);
-
-        private static readonly MethodInfo _getScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).Method(nameof(CurrentScopeReuse.GetScopedOrSingleton), true);
-
-        internal static object GetNamedScopedItem(IResolverContext r, object scopeName,
-            bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue) =>
-            r.GetNamedScope(scopeName, throwIfNoScopeFound)?.GetOrAdd(itemId, createValue);
-
-        private static readonly MethodInfo _getNamedScopedItemMethod =
-            typeof(CurrentScopeReuse).Method(nameof(GetNamedScopedItem), true);
-
-        internal static object GetScopedItem(IResolverContext r,
-            bool throwIfNoScopeFound, int itemId, CreateScopedValue createValue) =>
-            r.GetCurrentScope(throwIfNoScopeFound)?.GetOrAdd(itemId, createValue);
-
-        private static readonly MethodInfo _getScopedItemMethod =
-            typeof(CurrentScopeReuse).Method(nameof(GetScopedItem), true);
+        /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
+        public bool CanApply(Request request) =>
+            _scopedOrSingleton || Name == null
+                ? request.Container.CurrentScope != null
+                : request.Container.GetNamedScope(Name, false) != null;
 
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var itemIdExpr = Expression.Constant(request.TracksTransientDisposable ? -1 : request.FactoryID);
-            if (_scopedOrSingleton)
-                return Expression.Call(_getScopedOrSingletonMethod,
-                    Container.ResolverContextParamExpr, itemIdExpr,
-                    Expression.Lambda<CreateScopedValue>(serviceFactoryExpr));
-
-            Expression resolvedContextExpr = request.OpensResolutionScope
+            Expression rExpr = request.OpensResolutionScope
                 ? ResolverContext.ParentExpr
                 : Container.ResolverContextParamExpr;
 
-            var ifUnresolvedThrowExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
-            var createItemExpr = Expression.Lambda<CreateScopedValue>(serviceFactoryExpr);
+            if (request.TracksTransientDisposable)
+            {
+                if (_scopedOrSingleton)
+                    return Expression.Call(_trackScopedOrSingletonMethod, rExpr, serviceFactoryExpr);
 
-            if (Name == null)
-                return Expression.Call(_getScopedItemMethod,
-                    resolvedContextExpr, ifUnresolvedThrowExpr, itemIdExpr, createItemExpr);
+                var ifNoScopeThrowExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
+                if (Name == null)
+                    return Expression.Call(_trackScopedMethod, rExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
-            // todo: add the ValueType check to GetOrAddStateItemExpression
-            var scopeNameExpr = request.Container.GetOrAddStateItemExpression(Name);
-            if (Name.GetType().IsValueType())
-                scopeNameExpr = Expression.Convert(scopeNameExpr, typeof(object));
+                var nameExpr = request.Container.GetOrAddStateItemExpression(Name, typeof(object));
+                return Expression.Call(_trackNameScopedMethod, rExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+            }
+            else
+            {
+                var factoryLambdaExpr = Expression.Lambda<CreateScopedValue>(serviceFactoryExpr);
+                var idExpr = Expression.Constant(request.FactoryID);
+                var disposalIndexExpr = Expression.Constant(-1);
+                if (_scopedOrSingleton)
+                    return Expression.Call(_getScopedOrSingletonMethod, rExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
 
-            return Expression.Call(_getNamedScopedItemMethod,
-                resolvedContextExpr, scopeNameExpr, ifUnresolvedThrowExpr, itemIdExpr, createItemExpr);
+                var ifNoScopeThrowExpr = Expression.Constant(request.IfUnresolved == IfUnresolved.Throw);
+                if (Name == null)
+                    return Expression.Call(_getScopedMethod, rExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
+
+                var nameExpr = request.Container.GetOrAddStateItemExpression(Name, typeof(object));
+                return Expression.Call(_getNameScopedMethod, rExpr, nameExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
+            }
         }
-
-        /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
-        /// <param name="request">Service request.</param> <returns>Check result.</returns>
-        public bool CanApply(Request request) =>
-            _scopedOrSingleton || request.Container.GetNamedScope(Name, false) != null;
-
-        private readonly Lazy<Expression> _scopedExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
-
-        private readonly Lazy<MethodInfo> _scopedToMethod = new Lazy<MethodInfo>(() =>
-            typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)));
-
-        private readonly Lazy<Expression> _scopedOrSingletonExpr = new Lazy<Expression>(() =>
-            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.ScopedOrSingleton))));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
             Name == null && !_scopedOrSingleton ? _scopedExpr.Value
-            : _scopedOrSingleton ? _scopedOrSingletonExpr.Value
-            : Expression.Call(_scopedToMethod.Value, fallbackConverter(Name));
+                : _scopedOrSingleton ? _scopedOrSingletonExpr.Value
+                    : Expression.Call(_scopedToMethod.Value, fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -9115,6 +9045,66 @@ namespace DryIoc
                 s.Append("Name=").Print(Name, "\"").Append(", ");
             return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
         }
+
+        /// <summary>Creates reuse optionally specifying its name.</summary>
+        public CurrentScopeReuse(object name = null, int lifespan = DefaultLifespan,
+            bool scopedOrSingleton = false)
+        {
+            Name = name;
+            Lifespan = lifespan;
+            _scopedOrSingleton = scopedOrSingleton;
+        }
+
+        private bool _scopedOrSingleton;
+
+        internal static object TrackScopedOrSingleton(IResolverContext r, object item) =>
+            (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
+
+        private static readonly MethodInfo _trackScopedOrSingletonMethod =
+            typeof(CurrentScopeReuse).Method(nameof(TrackScopedOrSingleton), true);
+
+        internal static object GetScopedOrSingleton(IResolverContext r,
+            int id, CreateScopedValue createValue, int disposalIndex) =>
+            (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
+
+        private static readonly MethodInfo _getScopedOrSingletonMethod =
+            typeof(CurrentScopeReuse).Method(nameof(GetScopedOrSingleton), true);
+
+        internal static object GetScoped(IResolverContext r,
+            bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
+            r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
+
+        private static readonly MethodInfo _getScopedMethod =
+            typeof(CurrentScopeReuse).Method(nameof(GetScoped), true);
+
+        internal static object GetNameScoped(IResolverContext r,
+            object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
+            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
+
+        private static readonly MethodInfo _getNameScopedMethod =
+            typeof(CurrentScopeReuse).Method(nameof(GetNameScoped), true);
+
+        internal static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
+            r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);
+
+        private static readonly MethodInfo _trackScopedMethod =
+            typeof(CurrentScopeReuse).Method(nameof(TrackScoped), true);
+
+        internal static object TrackNameScoped(IResolverContext r,
+            object scopeName, bool throwIfNoScope, object item) =>
+            r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(item);
+
+        private static readonly MethodInfo _trackNameScopedMethod =
+            typeof(CurrentScopeReuse).Method(nameof(TrackNameScoped), true);
+
+        private readonly Lazy<Expression> _scopedExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
+
+        private readonly Lazy<MethodInfo> _scopedToMethod = new Lazy<MethodInfo>(() =>
+            typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)));
+
+        private readonly Lazy<Expression> _scopedOrSingletonExpr = new Lazy<Expression>(() =>
+            Expression.Field(null, typeof(Reuse).Field(nameof(Reuse.ScopedOrSingleton))));
     }
 
     /// <summary>Abstracts way to match reuse and scope names</summary>
@@ -10373,25 +10363,19 @@ namespace DryIoc
         }
 
         /// <summary>Gets a collection of the interfaces implemented by the current type and its base types.</summary>
-        /// <param name="type">Source type</param>
-        /// <returns>Collection of interface types.</returns>
-        public static Type[] GetImplementedInterfaces(this Type type)
-        {
-            return type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
-        }
+        public static Type[] GetImplementedInterfaces(this Type type) =>
+            type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
 
         /// <summary>Gets all declared and base members.</summary>
         /// <param name="type">Type to get members from.</param>
         /// <param name="includeBase">(optional) When set looks into base members.</param>
         /// <returns>All members.</returns>
-        public static IEnumerable<MemberInfo> GetAllMembers(this Type type, bool includeBase = false)
-        {
-            return type.GetMembers(t =>
+        public static IEnumerable<MemberInfo> GetAllMembers(this Type type, bool includeBase = false) =>
+            type.GetMembers(t =>
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
                 t.DeclaredProperties.Cast<MemberInfo>().Concat(
                 t.DeclaredFields.Cast<MemberInfo>())),
                 includeBase);
-        }
 
         /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters
         /// from <paramref name="genericParameters"/>.</summary>
@@ -10418,27 +10402,18 @@ namespace DryIoc
 
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
-        /// <param name="type">Type to check.</param> <returns>Returns true if type is compiler generated.</returns>
-        public static bool IsCompilerGenerated(this Type type)
-        {
-            return type.FullName != null && type.FullName.Contains("<>c__DisplayClass");
-        }
+        public static bool IsCompilerGenerated(this Type type) =>
+            type.FullName != null && type.FullName.Contains("<>c__DisplayClass");
 
-        /// <summary>Returns true if type is generic.</summary><param name="type">Type to check.</param> <returns>True if type generic.</returns>
-        public static bool IsGeneric(this Type type)
-        {
-            return type.GetTypeInfo().IsGenericType;
-        }
+        /// <summary>Returns true if type is generic.</summary>
+        public static bool IsGeneric(this Type type) =>
+            type.GetTypeInfo().IsGenericType;
 
-        /// <summary>Returns true if type is generic type definition (open type).</summary><param name="type">Type to check.</param>
-        /// <returns>True if type is open type: generic type definition.</returns>
-        public static bool IsGenericDefinition(this Type type)
-        {
-            return type.GetTypeInfo().IsGenericTypeDefinition;
-        }
+        /// <summary>Returns true if type is generic type definition (open type).</summary>
+        public static bool IsGenericDefinition(this Type type) =>
+            type.GetTypeInfo().IsGenericTypeDefinition;
 
         /// <summary>Returns true if type is closed generic: does not have open generic parameters, only closed/concrete ones.</summary>
-        /// <param name="type">Type to check</param> <returns>True if closed generic.</returns>
         public static bool IsClosedGeneric(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
@@ -10447,7 +10422,6 @@ namespace DryIoc
 
         /// <summary>Returns true if type if open generic: contains at list one open generic parameter. Could be
         /// generic type definition as well.</summary>
-        /// <param name="type">Type to check.</param> <returns>True if open generic.</returns>
         public static bool IsOpenGeneric(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
@@ -10455,14 +10429,10 @@ namespace DryIoc
         }
 
         /// <summary>Returns generic type definition if type is generic and null otherwise.</summary>
-        /// <param name="type">Source type, could be null.</param> <returns>Generic type definition.</returns>
-        public static Type GetGenericDefinitionOrNull(this Type type)
-        {
-            return type != null && type.GetTypeInfo().IsGenericType ? type.GetGenericTypeDefinition() : null;
-        }
+        public static Type GetGenericDefinitionOrNull(this Type type) =>
+            type != null && type.GetTypeInfo().IsGenericType ? type.GetGenericTypeDefinition() : null;
 
         /// <summary>Returns generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
-        /// <param name="type">Source type.</param> <returns>Array of generic type arguments (closed/concrete types) and parameters (open).</returns>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
@@ -10472,12 +10442,8 @@ namespace DryIoc
         }
 
         /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
-        /// <param name="type">Generic parameter type.</param>
-        /// <returns>Array of interface and base class constraints.</returns>
-        public static Type[] GetGenericParamConstraints(this Type type)
-        {
-            return type.GetTypeInfo().GetGenericParameterConstraints();
-        }
+        public static Type[] GetGenericParamConstraints(this Type type) =>
+            type.GetTypeInfo().GetGenericParameterConstraints();
 
         /// <summary>If type is array returns is element type, otherwise returns null.</summary>
         /// <param name="type">Source type.</param> <returns>Array element type or null.</returns>
@@ -10488,14 +10454,10 @@ namespace DryIoc
         }
 
         /// <summary>Return base type or null, if not exist (the case for only for object type).</summary>
-        /// <param name="type">Source type.</param> <returns>Base type or null for object.</returns>
-        public static Type GetBaseType(this Type type)
-        {
-            return type.GetTypeInfo().BaseType;
-        }
+        public static Type GetBaseType(this Type type) =>
+            type.GetTypeInfo().BaseType;
 
         /// <summary>Checks if type is public or nested public in public type.</summary>
-        /// <param name="type">Type to check.</param> <returns>Return true if check succeeded.</returns>
         public static bool IsPublicOrNestedPublic(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
@@ -10503,35 +10465,22 @@ namespace DryIoc
         }
 
         /// <summary>Returns true if type is class.</summary>
-        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
-        public static bool IsClass(this Type type)
-        {
-            return type.GetTypeInfo().IsClass;
-        }
+        public static bool IsClass(this Type type) =>
+            type.GetTypeInfo().IsClass;
 
         /// <summary>Returns true if type is value type.</summary>
-        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
-        public static bool IsValueType(this Type type)
-        {
-            return type.GetTypeInfo().IsValueType;
-        }
+        public static bool IsValueType(this Type type) =>
+            type.GetTypeInfo().IsValueType;
 
         /// <summary>Returns true if type is interface.</summary>
-        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
-        public static bool IsInterface(this Type type)
-        {
-            return type.GetTypeInfo().IsInterface;
-        }
+        public static bool IsInterface(this Type type) =>
+            type.GetTypeInfo().IsInterface;
 
         /// <summary>Returns true if type if abstract or interface.</summary>
-        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
-        public static bool IsAbstract(this Type type)
-        {
-            return type.GetTypeInfo().IsAbstract;
-        }
+        public static bool IsAbstract(this Type type) =>
+            type.GetTypeInfo().IsAbstract;
 
         /// <summary>Returns true if type is static.</summary>
-        /// <param name="type">Type</param> <returns>True is static.</returns>
         public static bool IsStatic(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
@@ -10539,34 +10488,19 @@ namespace DryIoc
         }
 
         /// <summary>Returns true if type is enum type.</summary>
-        /// <param name="type">Type to check.</param> <returns>Check result.</returns>
-        public static bool IsEnum(this Type type)
-        {
-            return type.GetTypeInfo().IsEnum;
-        }
+        public static bool IsEnum(this Type type) =>
+            type.GetTypeInfo().IsEnum;
 
         /// <summary>Returns true if instance of type is assignable to instance of <paramref name="other"/> type.</summary>
-        /// <param name="type">Type to check, could be null.</param>
-        /// <param name="other">Other type to check, could be null.</param>
-        /// <returns>Check result.</returns>
-        public static bool IsAssignableTo(this Type type, Type other)
-        {
-            return type != null && other != null && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
-        }
+        public static bool IsAssignableTo(this Type type, Type other) =>
+            type != null && other != null && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
 
         /// <summary>Returns true if type of <paramref name="obj"/> is assignable to source <paramref name="type"/>.</summary>
-        /// <param name="type">Is type of object.</param> <param name="obj">Object to check.</param>
-        /// <returns>Check result.</returns>
-        public static bool IsTypeOf(this Type type, object obj)
-        {
-            return obj != null && obj.GetType().IsAssignableTo(type);
-        }
+        public static bool IsTypeOf(this Type type, object obj) =>
+            obj != null && obj.GetType().IsAssignableTo(type);
 
-        /// <summary>Returns true if provided type IsPitmitive in .Net terms, or enum, or string
-        /// , or array of primitives if <paramref name="orArrayOfPrimitives"/> is true.</summary>
-        /// <param name="type">Type to check.</param>
-        /// <param name="orArrayOfPrimitives">Says to return true for array or primitives recursively.</param>
-        /// <returns>Check result.</returns>
+        /// <summary>Returns true if provided type IsPitmitive in .Net terms, or enum, or string,
+        /// or array of primitives if <paramref name="orArrayOfPrimitives"/> is true.</summary>
         public static bool IsPrimitive(this Type type, bool orArrayOfPrimitives = false)
         {
             var typeInfo = type.GetTypeInfo();
@@ -10575,24 +10509,14 @@ namespace DryIoc
         }
 
         /// <summary>Returns all attributes defined on <paramref name="type"/>.</summary>
-        /// <param name="type">Type to get attributes for.</param>
-        /// <param name="attributeType">(optional) Check only for that attribute type, otherwise for any attribute.</param>
-        /// <param name="inherit">(optional) Additionally check for attributes inherited from base type.</param>
-        /// <returns>Sequence of found attributes or empty.</returns>
-        public static Attribute[] GetAttributes(this Type type, Type attributeType = null, bool inherit = false)
-        {
-            return type.GetTypeInfo().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
+        public static Attribute[] GetAttributes(this Type type, Type attributeType = null, bool inherit = false) =>
+            type.GetTypeInfo().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
                 // ReSharper disable once RedundantEnumerableCastCall
                 .Cast<Attribute>() // required in .NET 4.5
                 .ToArrayOrSelf();
-        }
 
         /// <summary>Recursive method to enumerate all input type and its base types for specific details.
         /// Details are returned by <paramref name="getMembers"/> delegate.</summary>
-        /// <typeparam name="TMember">Details type: properties, fields, methods, etc.</typeparam>
-        /// <param name="type">Input type.</param> <param name="getMembers">Get declared type details.</param>
-        /// <param name="includeBase">(optional) When set looks into base members.</param>
-        /// <returns>Enumerated details info objects.</returns>
         public static IEnumerable<TMember> GetMembers<TMember>(this Type type,
             Func<TypeInfo, IEnumerable<TMember>> getMembers,
             bool includeBase = false)
@@ -10607,29 +10531,11 @@ namespace DryIoc
                 : members.Append(baseType.GetMembers(getMembers, true));
         }
 
-        // todo: V3: remove.
-        /// <summary>Obsolete: replaced with <see cref="GetMembers{TMember}"/>.</summary>
-        public static IEnumerable<T> GetDeclaredAndBase<T>(this Type type, Func<TypeInfo, IEnumerable<T>> getDeclared)
-        {
-            var typeInfo = type.GetTypeInfo();
-            var declared = getDeclared(typeInfo);
-            var baseType = typeInfo.BaseType;
-            return baseType == null || baseType == typeof(object) ? declared
-                : declared.Concat(baseType.GetDeclaredAndBase(getDeclared));
-        }
-
         /// <summary>Returns all public instance constructors for the type</summary>
-        /// <param name="type"></param> <returns></returns>
-        public static IEnumerable<ConstructorInfo> GetPublicInstanceConstructors(this Type type)
-        {
-            return type.GetTypeInfo().DeclaredConstructors.Match(c => c.IsPublic && !c.IsStatic);
-        }
+        public static IEnumerable<ConstructorInfo> GetPublicInstanceConstructors(this Type type) =>
+            type.GetTypeInfo().DeclaredConstructors.Match(c => c.IsPublic && !c.IsStatic);
 
         /// <summary>Enumerates all constructors from input type.</summary>
-        /// <param name="type">Input type.</param>
-        /// <param name="includeNonPublic">(optional) If set include non-public constructors into result.</param>
-        /// <param name="includeStatic">(optional) Turned off by default.</param>
-        /// <returns>Enumerated constructors.</returns>
         public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
         {
@@ -10640,26 +10546,17 @@ namespace DryIoc
         }
 
         /// <summary>Searches and returns constructor by its signature.</summary>
-        /// <param name="type">Input type.</param>
-        /// <param name="includeNonPublic">(optional) If set include non-public constructors into result.</param>
-        /// <param name="args">Signature - constructor argument types.</param>
-        /// <returns>Found constructor or null.</returns>
-        public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
-        {
-            return type.GetAllConstructors(includeNonPublic)
+        public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args) =>
+            type.GetAllConstructors(includeNonPublic)
                 .FirstOrDefault(c => c.GetParameters().Select(p => p.ParameterType).SequenceEqual(args));
-        }
 
         /// <summary>Returns single constructor, otherwise if no or more than one: returns false.</summary>
-        /// <param name="type">Type to inspect.</param>
-        /// <param name="includeNonPublic">(optional) If set includes non-public constructors.</param>
-        /// <returns>Single constructor or null.</returns>
         public static ConstructorInfo Constructor(this Type type, bool includeNonPublic = false)
         {
             var ctors = type.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
             return ctors.Length == 1 ? ctors[0]
                 : Throw.For<ConstructorInfo>(
-                        Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
+                    Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
         }
 
         /// <summary>Obsolete: use <see cref="Constructor"/></summary>
@@ -10670,9 +10567,6 @@ namespace DryIoc
         }
 
         /// <summary>Returns single declared (not inherited) method by name, or null if not found.</summary>
-        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="includeNonPublic">(optional) If set includes non public methods into search.</param>
-        /// <returns>Found method or null.</returns>
         public static MethodInfo Method(this Type type, string name, bool includeNonPublic = false) =>
             type.GetSingleMethodOrNull(name, includeNonPublic) ??
             Throw.For<MethodInfo>(
@@ -10685,9 +10579,6 @@ namespace DryIoc
                 Error.Of("Undefined Method '{0}' in Type {1} with parameters {2}."), name, type, paramTypes);
 
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
-        /// <param name="type">Input type</param> <param name="name">Method name to look for.</param>
-        /// <param name="includeNonPublic">(optional) To include non public methods into search.</param>
-        /// <returns>Found method or null.</returns>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
             var methods = type.GetTypeInfo().DeclaredMethods
@@ -10733,114 +10624,63 @@ namespace DryIoc
         }
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
-        /// <param name="type">Input type.</param> <param name="name">Property name to look for.</param>
-        /// <param name="includeBase">Does not look for base type by default, but can be told so.</param>
-        /// <returns>Found property or throws an exception.</returns>
-        public static PropertyInfo Property(this Type type, string name, bool includeBase = false)
-        {
-            return type.GetMembers(_ => _.DeclaredProperties, includeBase: includeBase)
-                .FindFirst(it => it.Name == name)
-                .ThrowIfNull(Error.Of("Undefined property {0} in type {1}"), name, type);
-        }
+        public static PropertyInfo Property(this Type type, string name, bool includeBase = false) =>
+            type.GetPropertyOrNull(name, includeBase).ThrowIfNull(Error.Of("Undefined property {0} in type {1}"), name, type);
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
-        /// <param name="type">Input type.</param> <param name="name">Property name to look for.</param>
-        /// <returns>Found property or null.</returns>
-        public static PropertyInfo GetPropertyOrNull(this Type type, string name)
-        {
-            return type.GetMembers(_ => _.DeclaredProperties, includeBase: true).FirstOrDefault(p => p.Name == name);
-        }
+        public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false) =>
+            type.GetMembers(_ => _.DeclaredProperties, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
-        /// <param name="type">Input type.</param> <param name="name">Field name to look for.</param>
-        /// <param name="includeBase">Does not look for base type by default, but can be told so.</param>
-        /// <returns>Found field or throws an exception.</returns>
-        public static FieldInfo Field(this Type type, string name, bool includeBase = false)
-        {
-            return type.GetMembers(_ => _.DeclaredFields, includeBase: includeBase)
-                .FindFirst(it => it.Name == name)
-                .ThrowIfNull(Error.Of("Undefined field {0} in type {1}"), name, type);
-        }
+        public static FieldInfo Field(this Type type, string name, bool includeBase = false) =>
+            type.GetFieldOrNull(name, includeBase).ThrowIfNull(Error.Of("Undefined field {0} in type {1}"), name, type);
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
-        /// <param name="type">Input type.</param> <param name="name">Field name to look for.</param>
-        /// <returns>Found field or null.</returns>
-        public static FieldInfo GetFieldOrNull(this Type type, string name)
-        {
-            return type.GetMembers(_ => _.DeclaredFields, includeBase: true).FirstOrDefault(p => p.Name == name);
-        }
+        public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false) =>
+            type.GetMembers(_ => _.DeclaredFields, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
 
-        /// <summary>Returns type assembly.</summary> <param name="type">Input type</param> <returns>Type assembly.</returns>
-        public static Assembly GetAssembly(this Type type) { return type.GetTypeInfo().Assembly; }
+        /// <summary>Returns type assembly.</summary>
+        public static Assembly GetAssembly(this Type type) => type.GetTypeInfo().Assembly;
 
         /// <summary>Returns true if member is static, otherwise returns false.</summary>
-        /// <param name="member">Member to check.</param> <returns>True if static.</returns>
-        public static bool IsStatic(this MemberInfo member)
-        {
-            var isStatic =
-                member is MethodInfo ? ((MethodInfo)member).IsStatic :
-                member is PropertyInfo
-                    ? (((PropertyInfo)member).GetGetMethodOrNull(includeNonPublic: true)
-                    ?? ((PropertyInfo)member).GetSetMethodOrNull(includeNonPublic: true)).IsStatic :
-                ((FieldInfo)member).IsStatic;
-            return isStatic;
-        }
+        public static bool IsStatic(this MemberInfo member) =>
+            member is MethodInfo ? ((MethodInfo)member).IsStatic
+            : member is PropertyInfo
+                ? (((PropertyInfo)member).GetGetMethodOrNull(includeNonPublic: true)
+                ?? ((PropertyInfo)member).GetSetMethodOrNull(includeNonPublic: true)).IsStatic
+            : ((FieldInfo)member).IsStatic;
 
-        /// <summary>Return either <see cref="PropertyInfo.PropertyType"/>, or <see cref="FieldInfo.FieldType"/>, <see cref="MethodInfo.ReturnType"/>.
-        /// Otherwise returns null.</summary>
-        /// <param name="member">Expecting member of type <see cref="PropertyInfo"/> or <see cref="FieldInfo"/> only.</param>
-        /// <returns>Type of property of field.</returns>
-        public static Type GetReturnTypeOrDefault(this MemberInfo member)
-        {
-            return member is ConstructorInfo ? member.DeclaringType
+        /// <summary>Return either <see cref="PropertyInfo.PropertyType"/>, or <see cref="FieldInfo.FieldType"/>, 
+        /// <see cref="MethodInfo.ReturnType"/>.</summary>
+        public static Type GetReturnTypeOrDefault(this MemberInfo member) =>
+            member is ConstructorInfo ? member.DeclaringType
                 : member is MethodInfo ? ((MethodInfo)member).ReturnType
                 : member is PropertyInfo ? ((PropertyInfo)member).PropertyType
                 : member is FieldInfo ? ((FieldInfo)member).FieldType
                 : null;
-        }
 
         /// <summary>Returns true if field is backing field for property.</summary>
-        /// <param name="field">Field to check.</param> <returns>Returns true if field is backing property.</returns>
-        public static bool IsBackingField(this FieldInfo field)
-        {
-            return field.Name[0] == '<';
-        }
+        public static bool IsBackingField(this FieldInfo field) =>
+            field.Name[0] == '<';
 
         /// <summary>Returns true if property is indexer: aka this[].</summary>
-        /// <param name="property">Property to check</param><returns>True if indexer.</returns>
-        public static bool IsIndexer(this PropertyInfo property)
-        {
-            return property.GetIndexParameters().Length != 0;
-        }
+        public static bool IsIndexer(this PropertyInfo property) =>
+            property.GetIndexParameters().Length != 0;
 
         /// <summary>Returns true if type is generated type of hoisted closure.</summary>
-        /// <param name="type">Source type.</param> <returns>Check result.</returns>
-        public static bool IsClosureType(this Type type)
-        {
-            return type.Name.Contains("<>c__DisplayClass");
-        }
+        public static bool IsClosureType(this Type type) =>
+            type.Name.Contains("<>c__DisplayClass");
 
         /// <summary>Returns attributes defined for the member/method.</summary>
-        /// <param name="member">Member to check.</param> <param name="attributeType">(optional) Specific attribute type to return, any attribute otherwise.</param>
-        /// <param name="inherit">Check for inherited member attributes.</param> <returns>Found attributes or empty.</returns>
-        public static IEnumerable<Attribute> GetAttributes(this MemberInfo member, Type attributeType = null, bool inherit = false)
-        {
-            return member.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
-        }
+        public static IEnumerable<Attribute> GetAttributes(this MemberInfo member, Type attributeType = null, bool inherit = false) =>
+            member.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
 
         /// <summary>Returns attributes defined for parameter.</summary>
-        ///  <param name="parameter">Target parameter.</param>
-        /// <param name="attributeType">(optional) Specific attribute type to return, any attribute otherwise.</param>
-        /// <param name="inherit">Check for inherited attributes.</param> <returns>Found attributes or empty.</returns>
-        public static IEnumerable<Attribute> GetAttributes(this ParameterInfo parameter, Type attributeType = null, bool inherit = false)
-        {
-            return parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
-        }
+        public static IEnumerable<Attribute> GetAttributes(this ParameterInfo parameter, Type attributeType = null, bool inherit = false) =>
+            parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
 
         /// <summary>Get types from assembly that are loaded successfully.
         /// Hacks to <see cref="ReflectionTypeLoadException"/> for loaded types.</summary>
-        /// <param name="assembly">Assembly to get types from.</param>
-        /// <returns>Array of loaded types.</returns>
         public static Type[] GetLoadedTypes(this Assembly assembly)
         {
             try
@@ -10854,12 +10694,8 @@ namespace DryIoc
         }
 
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
-        /// <param name="type">Type to get default value of.</param>
-        /// <returns>Default value expression.</returns>
-        public static Expression GetDefaultValueExpression(this Type type)
-        {
-            return Expression.Call(_getDefaultMethod.Value.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
-        }
+        public static Expression GetDefaultValueExpression(this Type type) =>
+            Expression.Call(_getDefaultMethod.Value.MakeGenericMethod(type), ArrayTools.Empty<Expression>());
 
         #region Implementation
 
