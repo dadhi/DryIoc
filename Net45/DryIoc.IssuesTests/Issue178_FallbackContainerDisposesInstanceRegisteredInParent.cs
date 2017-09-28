@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests
 
             using (var c2 = container.CreateFacade())
             {
-                c2.Register<B>(serviceKey: Container.FacadeKey);
+                c2.Register<B>(serviceKey: ContainerTools.FacadeKey);
 
                 var p2 = c2.Resolve<B>();
             }
@@ -36,7 +36,7 @@ namespace DryIoc.IssuesTests
 
             using (var c2 = container.CreateFacade())
             {
-                c2.Register<B>(serviceKey: Container.FacadeKey);
+                c2.Register<B>(serviceKey: ContainerTools.FacadeKey);
                 var b1 = c2.Resolve<B>();
                 Assert.IsNotNull(b1.A);
             }
@@ -55,7 +55,7 @@ namespace DryIoc.IssuesTests
 
             using (var c2 = container.CreateFacade())
             {
-                c2.Register<B>(serviceKey: Container.FacadeKey);
+                c2.Register<B>(serviceKey: ContainerTools.FacadeKey);
 
                 var p2 = c2.Resolve<B>();
             }

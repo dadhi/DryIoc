@@ -95,7 +95,7 @@ namespace DryIoc.UnitTests
             container.Register<IFruit, Melon>();
 
             var childContainer = container.CreateFacade();
-            childContainer.Register<IFruit, Orange>(serviceKey: Container.FacadeKey);
+            childContainer.Register<IFruit, Orange>(serviceKey: ContainerTools.FacadeKey);
 
             Assert.IsInstanceOf<Melon>(container.Resolve<FruitJuice>().Fruit);
             Assert.IsInstanceOf<Orange>(childContainer.Resolve<FruitJuice>().Fruit);

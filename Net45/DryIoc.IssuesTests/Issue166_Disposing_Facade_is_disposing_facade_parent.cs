@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
             B b;
             using (var child = parent.CreateFacade().WithoutSingletonsAndCache())
             {
-                child.Register<B>(Reuse.Singleton, serviceKey: Container.FacadeKey);
+                child.Register<B>(Reuse.Singleton, serviceKey: ContainerTools.FacadeKey);
                 b = child.Resolve<B>(); // stores B and B.A in child singleton scope.
             }
 

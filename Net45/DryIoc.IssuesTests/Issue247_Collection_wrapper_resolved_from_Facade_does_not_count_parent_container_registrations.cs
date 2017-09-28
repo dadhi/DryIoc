@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
             container.UseInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: Container.FacadeKey);
+            f.UseInstance("b", serviceKey: ContainerTools.FacadeKey);
             var strs = f.Resolve<string[]>();
 
             CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);
@@ -53,7 +53,7 @@ namespace DryIoc.IssuesTests
             container.UseInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: Container.FacadeKey);
+            f.UseInstance("b", serviceKey: ContainerTools.FacadeKey);
             var strs = f.Resolve<LazyEnumerable<string>>().ToArrayOrSelf();
 
             CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);

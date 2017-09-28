@@ -84,19 +84,22 @@ namespace DryIoc
             return scopeStr;
         }
 
-        /// <summary>Shares all of container state except Cache and specifies new rules.</summary>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
-        /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
-        /// <returns>New container.</returns>
-        public IContainer With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null)
+        /// <inheritdoc />
+        public IContainer With(Rules rules, IScopeContext scopeContext,
+            bool cloneRegistrations, bool preserveCache, bool dropSingletons)
         {
             ThrowIfContainerDisposed();
-            var rules = configure == null ? Rules : configure(Rules);
+
+            rules = rules ?? Rules;
             scopeContext = scopeContext ?? _scopeContext;
-            var registryWithoutCache = Ref.Of(_registry.Value.WithoutCache());
-            return new Container(rules, registryWithoutCache,
-                _singletonScope, scopeContext, _currentScope,
-                _disposed, _disposeStackTrace, _parent, _root);
+
+            var registry = !cloneRegistrations ? _registry :
+                preserveCache ? Ref.Of(_registry.Value) : Ref.Of(_registry.Value.WithoutCache());
+
+            var singletonScope = !dropSingletons ? _singletonScope : new Scope();
+
+            return new Container(rules, registry, singletonScope, scopeContext,
+                _currentScope, _disposed, _disposeStackTrace, _parent, _root);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -110,53 +113,6 @@ namespace DryIoc
                 _singletonScope, _scopeContext, _currentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
-
-        /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
-        /// It will preserve resolved services in Singleton/Current scope.</summary>
-        /// <returns>New container with empty cache.</returns>
-        public IContainer WithoutCache()
-        {
-            ThrowIfContainerDisposed();
-            return new Container(Rules, Ref.Of(_registry.Value.WithoutCache()),
-                _singletonScope, _scopeContext, _currentScope,
-                _disposed, _disposeStackTrace, _parent, _root);
-        }
-
-        /// <summary>Creates new container with state shared with original except singletons and cache.
-        /// Dropping cache is required because singletons are cached in resolution state.</summary>
-        /// <returns>New container with empty Singleton Scope.</returns>
-        public IContainer WithoutSingletonsAndCache()
-        {
-            ThrowIfContainerDisposed();
-            return new Container(Rules,
-                Ref.Of(_registry.Value.WithoutCache()), new Scope(),
-                _scopeContext, _currentScope, _disposed, _disposeStackTrace, _parent, _root);
-        }
-
-        /// <summary>Shares all parts with original container But copies registration, so the new registration
-        /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
-        /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
-        /// <returns>New container with copy of all registrations.</returns>
-        public IContainer WithRegistrationsCopy(bool preserveCache = false)
-        {
-            ThrowIfContainerDisposed();
-            var newRegistry = preserveCache ? _registry.NewRef() : Ref.Of(_registry.Value.WithoutCache());
-            return new Container(Rules, newRegistry,
-                _singletonScope, _scopeContext, _currentScope,
-                _disposed, _disposeStackTrace, _parent, _root);
-        }
-
-        /// <summary>Allows to register new specially keyed services which will facade the same default service,
-        /// registered earlier. May be used to "override" resgitrations when testing the container</summary>
-        public IContainer CreateFacade()
-        {
-            ThrowIfContainerDisposed();
-            // wipes the cache, but preserves singletons and opened scope
-            return With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
-        }
-
-        /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
-        public static readonly string FacadeKey = "##facade";
 
         /// <inheritdoc />
         public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
@@ -308,7 +264,7 @@ namespace DryIoc
 
         /// <summary>Removes specified factory from registry.
         /// Factory is removed only from registry, if there is relevant cache, it will be kept.
-        /// Use <see cref="WithoutCache"/> to remove all the cache.</summary>
+        /// Use <see cref="ContainerTools.WithoutCache"/> to remove all the cache.</summary>
         /// <param name="serviceType">Service type to look for.</param>
         /// <param name="serviceKey">Service key to look for.</param>
         /// <param name="factoryType">Expected factory type.</param>
@@ -2199,6 +2155,37 @@ namespace DryIoc
     /// <summary>Container extended features.</summary>
     public static class ContainerTools
     {
+        /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
+        public const string FacadeKey = "<facade-key>";
+
+        /// <summary>Allows to register new specially keyed services which will facade the same default service,
+        /// registered earlier. May be used to "override" resgitrations when testing the container</summary>
+        public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
+            container.With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
+
+        /// <summary>Shares all of container state except the cache and the new rules.</summary>
+        public static IContainer With(this IContainer container, Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
+            container.With(configure?.Invoke(container.Rules), scopeContext, 
+                cloneRegistrations: true, preserveCache: false, dropSingletons: false);
+
+        /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
+        /// But it will preserve resolved services in Singleton/Current scope.</summary>
+        public static IContainer WithoutCache(this IContainer container) =>
+            container.With(container.Rules, container.ScopeContext, 
+                cloneRegistrations: true, preserveCache: false, dropSingletons: false);
+
+        /// <summary>Creates new container with state shared with original except singletons and cache.
+        /// Dropping cache is required because singletons are cached in resolution state.</summary>
+        public static IContainer WithoutSingletonsAndCache(this IContainer container) =>
+            container.With(container.Rules, container.ScopeContext, 
+                cloneRegistrations: true, preserveCache: false, dropSingletons: true);
+
+        /// <summary>Shares all parts with original container But copies registration, so the new registration
+        /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
+        public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
+            container.With(container.Rules, container.ScopeContext, 
+                cloneRegistrations: true, preserveCache: preserveCache, dropSingletons: false);
+
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
         /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>.</summary>
@@ -9709,39 +9696,15 @@ namespace DryIoc
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
-        /// <summary>Copies all of container state except Cache and specifies new rules.</summary>
-        /// <param name="configure">(optional) Configure rules, if not specified then uses Rules from current container.</param>
-        /// <param name="scopeContext">(optional) New scope context, if not specified then uses context from current container.</param>
-        /// <returns>New container.</returns>
-        IContainer With(Func<Rules, Rules> configure = null, IScopeContext scopeContext = null);
+        /// <summary>Creates new container from the current one.</summary>
+        IContainer With(Rules rules, IScopeContext scopeContext,
+            bool cloneRegistrations, bool preserveCache, bool dropSingletons);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
         /// Throws exception by default.</param>
         /// <returns>New container preserving all current container state but disallowing registrations.</returns>
         IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false);
-
-        /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
-        /// It will preserve resolved services in Singleton/Current scope.</summary>
-        /// <returns>New container with empty cache.</returns>
-        IContainer WithoutCache();
-
-        /// <summary>Creates new container with whole state shared with original except singletons.</summary>
-        /// <returns>New container with empty Singleton Scope.</returns>
-        IContainer WithoutSingletonsAndCache();
-
-        /// <summary>Shares all parts with original container But copies registration, so the new registration
-        /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
-        /// <param name="preserveCache">(optional) If set preserves cache if you know what to do.</param>
-        /// <returns>New container with copy of all registrations.</returns>
-        IContainer WithRegistrationsCopy(bool preserveCache = false);
-
-        // todo: remove from interface and make an extension method
-        /// <summary>Creates container (facade) that fallbacks to this container for unresolved services.
-        /// Facade shares rules with this container, everything else is its own.
-        /// It could be used for instance to create Test facade over original container with replacing some services with test ones.</summary>
-        /// <returns>New facade container.</returns>
-        IContainer CreateFacade();
 
         /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.UnknownServiceResolvers"/>.</summary>
         /// <param name="request">Factory request.</param>
