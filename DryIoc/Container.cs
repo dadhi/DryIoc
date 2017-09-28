@@ -5747,24 +5747,11 @@ namespace DryIoc
         public static readonly IServiceInfo Empty = new ServiceInfo(null);
 
         /// <summary>Creates info out of provided settings</summary>
-        /// <param name="serviceType">Service type</param>
-        /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
-        ///  <param name="serviceKey">(optional) Service key.</param>
-        /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
-        {
-            return Of(serviceType, null, ifUnresolved, serviceKey);
-        }
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
+            Of(serviceType, null, ifUnresolved, serviceKey);
 
         /// <summary>Creates info out of provided settings</summary>
-        /// <param name="serviceType">Service type</param>
-        /// <param name="requiredServiceType">Registered service type to search for.</param>
-        /// <param name="ifUnresolved">(optional) If unresolved policy. Set to Throw if not specified.</param>
-        /// <param name="serviceKey">(optional) Service key.</param>
-        /// <param name="metadataKey">(optional) Required metadata key</param>
-        /// <param name="metadata">Required metadata or the value if key passed.</param>
-        /// <returns>Created info.</returns>
         public static ServiceInfo Of(Type serviceType, Type requiredServiceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null,
             string metadataKey = null, object metadata = null)
@@ -5786,15 +5773,10 @@ namespace DryIoc
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
-        /// <typeparam name="TService">Service type.</typeparam>
-        /// <param name="ifUnresolved">(optional)</param> <param name="serviceKey">(optional)</param>
-        /// <returns>Created info.</returns>
-        public static Typed<TService> Of<TService>(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null)
-        {
-            return serviceKey == null && ifUnresolved == IfUnresolved.Throw
+        public static Typed<TService> Of<TService>(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
+            serviceKey == null && ifUnresolved == IfUnresolved.Throw
                 ? new Typed<TService>()
                 : new TypedWithDetails<TService>(ServiceDetails.Of(null, serviceKey, ifUnresolved));
-        }
 
         /// <summary>Strongly-typed version of Service Info.</summary> <typeparam name="TService">Service type.</typeparam>
         public class Typed<TService> : ServiceInfo
@@ -5807,22 +5789,15 @@ namespace DryIoc
         public Type ServiceType { get; private set; }
 
         /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
-        public virtual ServiceDetails Details { get { return ServiceDetails.Default; } }
+        public virtual ServiceDetails Details => ServiceDetails.Default;
 
         /// <summary>Creates info from service type and details.</summary>
-        /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        public IServiceInfo Create(Type serviceType, ServiceDetails details)
-        {
-            return details == ServiceDetails.Default
-                ? new ServiceInfo(serviceType)
-                : new WithDetails(serviceType, details);
-        }
+        public IServiceInfo Create(Type serviceType, ServiceDetails details) =>
+            details == ServiceDetails.Default ? new ServiceInfo(serviceType) : new WithDetails(serviceType, details);
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            return new StringBuilder().Print(this).ToString();
-        }
+        public override string ToString() =>
+            new StringBuilder().Print(this).ToString();
 
         #region Implementation
 
@@ -5833,14 +5808,14 @@ namespace DryIoc
 
         private class WithDetails : ServiceInfo
         {
-            public override ServiceDetails Details { get { return _details; } }
+            public override ServiceDetails Details => _details;
             public WithDetails(Type serviceType, ServiceDetails details) : base(serviceType) { _details = details; }
             private readonly ServiceDetails _details;
         }
 
         private class TypedWithDetails<TService> : Typed<TService>
         {
-            public override ServiceDetails Details { get { return _details; } }
+            public override ServiceDetails Details => _details;
             public TypedWithDetails(ServiceDetails details) { _details = details; }
             private readonly ServiceDetails _details;
         }
@@ -5873,28 +5848,21 @@ namespace DryIoc
         }
 
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
-        public virtual Type ServiceType { get { return Parameter.ParameterType; } }
+        public virtual Type ServiceType => Parameter.ParameterType;
 
         /// <summary>Optional service details.</summary>
-        public virtual ServiceDetails Details { get { return ServiceDetails.Default; } }
+        public virtual ServiceDetails Details => ServiceDetails.Default;
 
         /// <summary>Creates info from service type and details.</summary>
-        /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        public IServiceInfo Create(Type serviceType, ServiceDetails details)
-        {
-            return serviceType == ServiceType
-                ? new WithDetails(Parameter, details)
-                : new TypeWithDetails(Parameter, serviceType, details);
-        }
+        public IServiceInfo Create(Type serviceType, ServiceDetails details) =>
+            serviceType == ServiceType ? new WithDetails(Parameter, details) : new TypeWithDetails(Parameter, serviceType, details);
 
         /// <summary>Parameter info.</summary>
         public readonly ParameterInfo Parameter;
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            return new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name, "\"").ToString();
-        }
+        public override string ToString() =>
+            new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name, "\"").ToString();
 
         #region Implementation
 
@@ -9285,12 +9253,10 @@ namespace DryIoc
         #endregion
 
         /// <summary>Returns true for an empty request.</summary>
-        public bool IsEmpty =>
-            ServiceInfo == null;
+        public bool IsEmpty => ServiceInfo == null;
 
         /// <summary>Returns true if request is the first in a chain.</summary>
-        public bool IsResolutionRoot =>
-            !IsEmpty && ParentOrWrapper.IsEmpty;
+        public bool IsResolutionRoot => !IsEmpty && ParentOrWrapper.IsEmpty;
 
         /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
         public RequestInfo Parent
@@ -9317,7 +9283,6 @@ namespace DryIoc
 
         /// <summary>Returns <see cref="RequiredServiceType"/> if it is specified and assignable to <see cref="ServiceType"/>,
         /// otherwise returns <see cref="ServiceType"/>.</summary>
-        /// <returns>The type to be used for lookup in registry.</returns>
         public Type GetActualServiceType() =>
             ServiceInfo.GetActualServiceType();
 
@@ -9351,69 +9316,42 @@ namespace DryIoc
             (Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Simplified version of Push with most common properties.</summary>
-        /// <param name="serviceType"></param> <param name="factoryID"></param> <param name="implementationType"></param>
-        /// <param name="reuse"></param> <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
             Push(serviceType, null, null, null, null, IfUnresolved.Throw,
                 factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param><param name="flags"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
             Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
                 factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="ifUnresolved"></param>
-        /// <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param>
-        /// <param name="flags"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
             Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
                 factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param>
-        /// <param name="ifUnresolved"></param>
-        /// <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param>
-        /// <param name="flags"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
             Push(DryIoc.ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
                 factoryID, factoryType, implementationType, reuse, flags);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceInfo"></param>
-        /// <param name="factoryType">(optional)</param> <param name="factoryID">(optional)</param>
-        /// <param name="implementationType">(optional)</param> <param name="reuse">(optional)</param>
-        /// <param name="flags">(optional)</param>
-        /// <param name="decoratedFactoryID">(optional)</param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(IServiceInfo serviceInfo,
             int factoryID = 0, FactoryType factoryType = FactoryType.Service, Type implementationType = null, IReuse reuse = null,
             RequestFlags flags = default(RequestFlags), int decoratedFactoryID = 0) =>
             new RequestInfo(this, serviceInfo, factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         /// <summary>Returns all request until the root - parent is null.</summary>
-        /// <returns>Requests from the last to first.</returns>
         public IEnumerable<RequestInfo> Enumerate()
         {
             for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
                 yield return i;
         }
 
-        /// <summary>Prints request without parents.</summary>
-        /// <param name="s">Where to print.</param><returns><paramref name="s"/> with appended info.</returns>
+        /// <summary>Prints request without parents into the passed builder.</summary>
         public StringBuilder PrintCurrent(StringBuilder s)
         {
             if (IsEmpty)
@@ -9452,14 +9390,12 @@ namespace DryIoc
             Equals(obj as RequestInfo);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
-        /// <param name="other"></param> <returns></returns>
         public bool Equals(RequestInfo other) =>
             other != null && EqualsWithoutParent(other)
                 && (ParentOrWrapper == null && other.ParentOrWrapper == null
                 || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
-        /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(RequestInfo other) =>
             other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
@@ -9473,7 +9409,6 @@ namespace DryIoc
                 && other.ReuseLifespan == ReuseLifespan;
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
-        /// <param name="other">Info to compare for equality.</param> <returns></returns>
         public bool EqualsWithoutParent(Request other) =>
             other.ServiceType == ServiceType
                 && other.RequiredServiceType == RequiredServiceType
@@ -9486,35 +9421,20 @@ namespace DryIoc
                 && other.ImplementationType == ImplementationType
                 && other.ReuseLifespan == ReuseLifespan;
 
-        // todo: use factoryId as hash if known
         /// <summary>Returns hash code combined from info fields plus its parent.</summary>
-        /// <returns>Combined hash code.</returns>
         public override int GetHashCode()
         {
-            var hash = 0;
-            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
+            if (IsEmpty)
+                return 0;
+
+            var hash = FactoryID;
+            var parent = ParentOrWrapper;
+            while (!parent.IsEmpty)
             {
-                var currentHash = i.ServiceType.GetHashCode();
-                if (i.RequiredServiceType != null)
-                    currentHash = CombineHashCodes(currentHash, i.RequiredServiceType.GetHashCode());
-
-                if (i.ServiceKey != null)
-                    currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
-
-                if (i.IfUnresolved != IfUnresolved.Throw)
-                    currentHash = CombineHashCodes(currentHash, i.IfUnresolved.GetHashCode());
-
-                if (i.FactoryType != FactoryType.Service)
-                    currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());
-
-                if (i.ImplementationType != null && i.ImplementationType != i.ServiceType)
-                    currentHash = CombineHashCodes(currentHash, i.ImplementationType.GetHashCode());
-
-                if (i.ReuseLifespan != 0)
-                    currentHash = CombineHashCodes(currentHash, i.ReuseLifespan);
-
-                hash = hash == 0 ? currentHash : CombineHashCodes(hash, currentHash);
+                hash = CombineHashCodes(hash, parent.FactoryID);
+                parent = parent.ParentOrWrapper;
             }
+
             return hash;
         }
 
@@ -9632,10 +9552,8 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public int CompareTo(ServiceRegistrationInfo other)
-        {
-            return FactoryRegistrationOrder - other.FactoryRegistrationOrder;
-        }
+        public int CompareTo(ServiceRegistrationInfo other) =>
+            FactoryRegistrationOrder - other.FactoryRegistrationOrder;
 
         /// <summary>Pretty-prints info to string.</summary> <returns>The string.</returns>
         public override string ToString()
@@ -9787,13 +9705,10 @@ namespace DryIoc
             Items = items.ThrowIfNull();
         }
 
-        /// <summary>Return items enumerator.</summary> <returns>items enumerator.</returns>
-        public IEnumerator<TService> GetEnumerator()
-        {
-            return Items.GetEnumerator();
-        }
+        /// <summary>Return items enumerator.</summary> 
+        public IEnumerator<TService> GetEnumerator() => Items.GetEnumerator();
 
-        IEnumerator IEnumerable.GetEnumerator() { return GetEnumerator(); }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     /// <summary>Wrapper type to box service with associated arbitrary metadata object.</summary>
@@ -9827,11 +9742,6 @@ namespace DryIoc
 
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
         /// optionally with <paramref name="innerException"/> exception.</summary>
-        /// <param name="errorCheck">Type of check</param>
-        /// <param name="errorCode">Error code, check <see cref="Error"/> for possible values.</param>
-        /// <param name="arg0">(optional) Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <param name="innerException">(optional) Inner exception.</param>
-        /// <returns>Created exception.</returns>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception innerException = null)
@@ -9842,17 +9752,12 @@ namespace DryIoc
         }
 
         /// <summary>Gets error message based on provided args.</summary> <param name="errorCheck"></param> <param name="errorCode"></param>
-        /// <returns>message format.</returns>
-        protected static string GetMessage(ErrorCheck errorCheck, int errorCode)
-        {
-            return errorCode == -1 ? Throw.GetDefaultMessage(errorCheck) : DryIoc.Error.Messages[errorCode];
-        }
+        protected static string GetMessage(ErrorCheck errorCheck, int errorCode) =>
+            errorCode == -1 ? Throw.GetDefaultMessage(errorCheck) : DryIoc.Error.Messages[errorCode];
 
         /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
-        protected static string Print(object arg)
-        {
-            return arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
-        }
+        protected static string Print(object arg) =>
+            arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
 
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
@@ -9936,9 +9841,6 @@ namespace DryIoc
                 "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " +
                 Environment.NewLine +
                 "Please give the method an unique name to distinguish it from other overloads."),
-            UnableToSelectConstructor = Of(
-                "Unable to select single constructor from {0} available in {1}." + Environment.NewLine
-                + "Please provide constructor selector when registering service."),
             ResolvingOpenGenericServiceTypeIsNotPossible = Of(
                 "Resolving open-generic service type is not possible for type: {0}."),
             RecursiveDependencyDetected = Of(
@@ -9994,11 +9896,6 @@ namespace DryIoc
                 "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             NoMatchedScopeFound = Of(
                 "Unable to find matching scope with name {1} starting from the current scope {0}."),
-            NoMatchingScopeWhenRegisteringInstance = Of(
-                "No matching scope when registering instance [{0}] with {1}." + Environment.NewLine +
-                "You could register delegate returning instance instead. That will succeed as long as scope is available at resolution."),
-            ResolutionScopeIsNotSupportedForRegisterInstance = Of(
-                "ResolutionScope reuse is not supported for registering instance: {0}"),
             NotSupportedMadeExpression = Of(
                 "Only expression of method call, property getter, or new statement (with optional property initializer) is supported, but found: {0}."),
             UnexpectedFactoryMemberExpression = Of(
@@ -10024,9 +9921,6 @@ namespace DryIoc
                 "When registering mapping, Container is unable to find factory of registered service type {0} and key {1}."),
             RegisteringInstanceNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
-            RegisteringWithNotSupportedDepedendencyCustomValueType = Of(
-                "Registering {0} dependency with not supported custom value type {1}." + Environment.NewLine +
-                "Only DryIoc.DefaultValue, System.Type, .NET primitives types, or array of those are supported."),
             NoMoreRegistrationsAllowed = Of(
                 "Container does not allow further registrations." + Environment.NewLine +
                 "Attempting to register {0}{1} with implementation factory {2}."),
@@ -10142,23 +10036,15 @@ namespace DryIoc
         /// <summary>Returns matched exception for error check and error code.</summary>
         public static GetMatchedExceptionHandler GetMatchedException = ContainerException.Of;
 
-        /// <summary>Throws matched exception if throw condition is true.</summary>
-        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
-        /// <param name="error">Error code to match to exception thrown.</param>
-        /// <param name="arg0">Arguments to formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
+        /// <summary>Throws matched exception with provided error code if throw condition is true.</summary>
         public static void If(bool throwCondition, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
-            if (!throwCondition) return;
-            throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
+            if (throwCondition)
+                throw GetMatchedException(ErrorCheck.InvalidCondition, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// <summary>Throws matched exception if throw condition is true. Otherwise return source <paramref name="arg0"/>.</summary>
-        /// <typeparam name="T">Type of source <paramref name="arg0"/>.</typeparam>
-        /// <param name="arg0">In case of exception <paramref name="arg0"/> will be used as first argument in formatted message.</param>
-        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
-        /// <param name="error">Error code to match to exception thrown.</param>
-        /// <param name="arg1">Rest of arguments to formatted message.</param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <returns><paramref name="arg0"/> if throw condition is false.</returns>
+        /// <summary>Throws matched exception with provided error code if throw condition is true.
+        /// Otherwise returns source <paramref name="arg0"/>.</summary>
         public static T ThrowIf<T>(this T arg0, bool throwCondition, int error = -1, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return arg0;
@@ -10166,11 +10052,6 @@ namespace DryIoc
         }
 
         /// <summary>Throws exception if <paramref name="arg"/> is null, otherwise returns <paramref name="arg"/>.</summary>
-        /// <param name="arg">Argument to check for null.</param>
-        /// <param name="error">Error code.</param>
-        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <typeparam name="T">Type of argument to check and return.</typeparam>
-        /// <returns><paramref name="arg"/> if it is not null.</returns>
         public static T ThrowIfNull<T>(this T arg, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
             where T : class
         {
@@ -10180,12 +10061,6 @@ namespace DryIoc
 
         /// <summary>Throws exception if <paramref name="arg0"/> is not assignable to type specified by <paramref name="arg1"/>,
         /// otherwise just returns <paramref name="arg0"/>.</summary>
-        /// <typeparam name="T">Type of argument to check and return if no error.</typeparam>
-        /// <param name="arg0">Instance to check if it is assignable to type <paramref name="arg1"/>.</param>
-        /// <param name="arg1">Type to check <paramref name="arg0"/> against.</param>
-        /// <param name="error">Error code</param>
-        /// <param name="arg2"></param> <param name="arg3"></param>
-        /// <returns><paramref name="arg0"/> if it assignable to <paramref name="arg1"/>.</returns>
         public static T ThrowIfNotOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
@@ -10194,10 +10069,6 @@ namespace DryIoc
         }
 
         /// <summary>Throws if <paramref name="arg0"/> is not assignable from <paramref name="arg1"/>.</summary>
-        /// <param name="arg0"></param> <param name="arg1"></param>
-        /// <param name="error">Error code</param>
-        ///  <param name="arg2"></param> <param name="arg3"></param>
-        /// <returns><paramref name="arg0"/> if no exception.</returns>
         public static Type ThrowIfNotImplementedBy(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
         {
             if (arg1.IsAssignableTo(arg0)) return arg0;
@@ -10205,16 +10076,6 @@ namespace DryIoc
         }
 
         /// <summary>Invokes <paramref name="operation"/> and in case of <typeparamref name="TEx"/> re-throws it as inner-exception.</summary>
-        /// <typeparam name="TEx">Exception to check and handle, and then wrap as inner-exception.</typeparam>
-        /// <typeparam name="T">Result of <paramref name="operation"/>.</typeparam>
-        /// <param name="operation">To invoke</param>
-        /// <param name="throwCondition">Condition to be evaluated, throws if result is true, otherwise - does nothing.</param>
-        /// <param name="error">Error code</param>
-        /// <param name="arg0"></param>
-        /// <param name="arg1"></param>
-        /// <param name="arg2"></param>
-        /// <param name="arg3"></param>
-        /// <returns>Result of <paramref name="operation"/> if no exception.</returns>
         public static T IfThrows<TEx, T>(Func<T> operation, bool throwCondition, int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) where TEx : Exception
         {
             try
@@ -10230,8 +10091,6 @@ namespace DryIoc
         }
 
         /// <summary>Just throws the exception with the <paramref name="error"/> code.</summary>
-        /// <param name="error">Error code.</param>
-        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
         public static object It(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
@@ -10239,9 +10098,6 @@ namespace DryIoc
 
         /// <summary>Throws <paramref name="error"/> instead of returning value of <typeparamref name="T"/>.
         /// Supposed to be used in expression that require some return value.</summary>
-        /// <typeparam name="T"></typeparam> <param name="error"></param>
-        /// <param name="arg0"></param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <returns>Does not return, throws instead.</returns>
         public static T For<T>(int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
@@ -10722,33 +10578,27 @@ namespace DryIoc
         public static string DefaultItemSeparator = ", " + Environment.NewLine;
 
         /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
-        /// <param name="s">Builder to append output to.</param>
-        /// <param name="x">Object to print.</param>
+        /// <param name="s">Builder to append output to.</param> <param name="x">Object to print.</param>
         /// <param name="quote">(optional) Quote to use for quoting string object.</param>
         /// <param name="itemSeparator">(optional) Separator for enumerable.</param>
         /// <param name="getTypeName">(optional) Custom type printing policy.</param>
         /// <returns>String builder with appended output.</returns>
         public static StringBuilder Print(this StringBuilder s, object x,
-            string quote = null, string itemSeparator = null, Func<Type, string> getTypeName = null)
-        {
-            return x == null ? s.Append("null")
+            string quote = null, string itemSeparator = null, Func<Type, string> getTypeName = null) =>
+            x == null ? s.Append("null")
                 : x is string ? s.Print((string)x, quote)
                 : x is Type ? s.Print((Type)x, getTypeName)
                 : (x is IEnumerable<Type> || x is IEnumerable) &&
                     !x.GetType().IsAssignableTo(typeof(IEnumerable<>).MakeGenericType(x.GetType())) // exclude infinite recursion and StackOverflowEx
                     ? s.Print((IEnumerable)x, itemSeparator ?? DefaultItemSeparator, (_, o) => _.Print(o, quote, null, getTypeName))
                 : s.Append(x);
-        }
 
         /// <summary>Appends string to string builder quoting with <paramref name="quote"/> if provided.</summary>
-        /// <param name="s">String builder to append string to.</param>
-        /// <param name="str">String to print.</param>
+        /// <param name="s">String builder to append string to.</param> <param name="str">String to print.</param>
         /// <param name="quote">(optional) Quote to add before and after string.</param>
         /// <returns>String builder with appended string.</returns>
-        public static StringBuilder Print(this StringBuilder s, string str, string quote = null)
-        {
-            return quote == null ? s.Append(str) : s.Append(quote).Append(str).Append(quote);
-        }
+        public static StringBuilder Print(this StringBuilder s, string str, string quote = null) =>
+            quote == null ? s.Append(str) : s.Append(quote).Append(str).Append(quote);
 
         /// <summary>Prints enumerable by using corresponding Print method for known item type.</summary>
         /// <param name="s">String builder to append output to.</param>
@@ -10856,19 +10706,15 @@ namespace DryIoc
         /// <param name="p">Target property info</param>
         /// <param name="includeNonPublic">(optional) If set then consider non-public getter</param>
         /// <returns>Setter method info if it is defined for property.</returns>
-        public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
-        {
-            return p.DeclaringType.GetSingleMethodOrNull("get_" + p.Name, includeNonPublic);
-        }
+        public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false) =>
+            p.DeclaringType.GetSingleMethodOrNull("get_" + p.Name, includeNonPublic);
 
         /// <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
         /// <param name="p">Target property info</param>
         /// <param name="includeNonPublic">(optional) If set then consider non-public setter</param>
         /// <returns>Setter method info if it is defined for property.</returns>
-        public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
-        {
-            return p.DeclaringType.GetSingleMethodOrNull("set_" + p.Name, includeNonPublic);
-        }
+        public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false) =>
+            p.DeclaringType.GetSingleMethodOrNull("set_" + p.Name, includeNonPublic);
 
         private static readonly Lazy<Func<int>> _getEnvCurrentManagedThreadId = new Lazy<Func<int>>(() =>
         {
@@ -10913,22 +10759,14 @@ namespace DryIoc.Experimental
             .WithConcreteTypeDynamicRegistrations();
 
         /// <summary>Creates new default configured container</summary>
-        /// <param name="configure">(optional) Additional rules.</param>
-        /// <returns>New configured container.</returns>
-        public static IContainer New(Func<Rules, Rules> configure = null)
-        {
-            var rules = configure == null ? Relaxed : configure(Relaxed);
-            return new Container(rules);
-        }
+        public static IContainer New(Func<Rules, Rules> configure = null) =>
+            new Container(configure == null ? Relaxed : configure(Relaxed));
 
         /// <summary>Auto-wired resolution of T from the container.</summary>
         /// <typeparam name="T">Type of service to resolve.</typeparam>
         /// <param name="assemblies">(optional) Assemblies to look for services implementations.</param>
         /// <returns>Resolved service or throws.</returns>
-        public static T Get<T>(params Assembly[] assemblies)
-        {
-            return New().Get<T>(assemblies);
-        }
+        public static T Get<T>(params Assembly[] assemblies) => New().Get<T>(assemblies);
 
         /// <summary>Auto-wired resolution of T from the container.</summary>
         /// <typeparam name="T">Type of service to resolve.</typeparam>
