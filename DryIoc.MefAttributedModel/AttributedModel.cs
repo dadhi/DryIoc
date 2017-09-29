@@ -38,8 +38,8 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
-        public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
-            ImTreeMap<ReuseType, Func<object, IReuse>>.Empty
+        public static readonly ImHashMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
+            ImHashMap<ReuseType, Func<object, IReuse>>.Empty
             .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
             .AddOrUpdate(ReuseType.CurrentScope, Reuse.ScopedTo)
@@ -1037,8 +1037,8 @@ namespace DryIoc.MefAttributedModel
     public sealed class ServiceKeyStore
     {
         // Mapping of ServiceKey/ContractName to { ContractType, count }[]
-        private readonly Ref<ImTreeMap<object, KV<Type, int>[]>>
-            _store = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
+        private readonly Ref<ImHashMap<object, KV<Type, int>[]>>
+            _store = Ref.Of(ImHashMap<object, KV<Type, int>[]>.Empty);
 
         /// <summary>Stores the key with respective type,
         /// incrementing type count for multiple registrations with same key  and type.</summary>

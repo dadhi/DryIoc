@@ -311,7 +311,7 @@ namespace DryIoc
             {
                 var cachedFactoryDelegate = cacheContextKey == null
                     ? cacheEntry.Key
-                    : (cacheEntry.Value ?? ImTreeMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
+                    : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
 
                 if (cachedFactoryDelegate != null)
                     return cachedFactoryDelegate(this);
@@ -339,7 +339,7 @@ namespace DryIoc
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, 
             // so the service probably empty collection wrapper or alike.
-            var cachedContextFactories = cacheEntry?.Value ?? ImTreeMap<object, FactoryDelegate>.Empty;
+            var cachedContextFactories = cacheEntry?.Value ?? ImHashMap<object, FactoryDelegate>.Empty;
 
             if (cacheContextKey == null)
                 cacheEntry = KV.Of(factoryDelegate, cachedContextFactories);
@@ -1116,7 +1116,7 @@ namespace DryIoc
         /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
         /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
         public Expression GetCachedFactoryExpressionOrDefault(int factoryID) =>
-            _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID) as Expression;
+            _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID);
 
         /// <summary>Converts known items into custom expression or wraps it in <see cref="ConstantExpression"/>.</summary>
         /// <param name="item">Item to convert.</param>
@@ -1165,17 +1165,17 @@ namespace DryIoc
         internal sealed class FactoriesEntry
         {
             public readonly DefaultKey LastDefaultKey;
-            public readonly ImTreeMap<object, Factory> Factories;
+            public readonly ImHashMap<object, Factory> Factories;
 
             // lastDefaultKey may be null
-            public FactoriesEntry(DefaultKey lastDefaultKey, ImTreeMap<object, Factory> factories)
+            public FactoriesEntry(DefaultKey lastDefaultKey, ImHashMap<object, Factory> factories)
             {
                 LastDefaultKey = lastDefaultKey;
                 Factories = factories;
             }
 
             public static readonly FactoriesEntry Empty =
-                new FactoriesEntry(null, ImTreeMap<object, Factory>.Empty);
+                new FactoriesEntry(null, ImHashMap<object, Factory>.Empty);
 
             public FactoriesEntry With(Factory factory, object serviceKey = null)
             {
@@ -1495,7 +1495,7 @@ namespace DryIoc
         private StackTrace _disposeStackTrace;
 
         private readonly Ref<Registry> _registry;
-        private Ref<ImTreeMap<Type, FactoryDelegate>[]> _defaultFactoryDelegateCache;
+        private Ref<ImHashMap<Type, FactoryDelegate>[]> _defaultFactoryDelegateCache;
 
         private readonly IScope _singletonScope;
         private readonly IScope _currentScope;
@@ -1579,18 +1579,18 @@ namespace DryIoc
             public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
 
             // Factories:
-            public readonly ImTreeMap<Type, object> Services;
-            public readonly ImTreeMap<Type, Factory[]> Decorators;
-            public readonly ImTreeMap<Type, Factory> Wrappers;
+            public readonly ImHashMap<Type, object> Services;
+            public readonly ImHashMap<Type, Factory[]> Decorators;
+            public readonly ImHashMap<Type, Factory> Wrappers;
 
             // Cache:
-            public readonly Ref<ImTreeMapIntToObj> FactoryExpressionCache;
+            public readonly Ref<ImMap<Expression>> FactoryExpressionCache;
 
-            public readonly Ref<ImTreeMap<Type, FactoryDelegate>[]> DefaultFactoryDelegateCache;
+            public readonly Ref<ImHashMap<Type, FactoryDelegate>[]> DefaultFactoryDelegateCache;
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and IntTreeMap<{requiredServicType+preResolvedParent}, FactoryDelegate>
-            public readonly Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
+            public readonly Ref<ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>> KeyedFactoryDelegateCache;
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
             private readonly IsChangePermitted _isChangePermitted;
@@ -1599,28 +1599,28 @@ namespace DryIoc
             {
                 return new Registry(Services, Decorators, Wrappers,
                     Ref.Of(FactoryDelegateCache.Empty()),
-                    Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty),
+                    Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImMap<Expression>.Empty),
                     _isChangePermitted);
             }
 
-            private Registry(ImTreeMap<Type, Factory> wrapperFactories = null)
-                : this(ImTreeMap<Type, object>.Empty,
-                    ImTreeMap<Type, Factory[]>.Empty,
-                    wrapperFactories ?? ImTreeMap<Type, Factory>.Empty,
+            private Registry(ImHashMap<Type, Factory> wrapperFactories = null)
+                : this(ImHashMap<Type, object>.Empty,
+                    ImHashMap<Type, Factory[]>.Empty,
+                    wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
                     Ref.Of(FactoryDelegateCache.Empty()),
-                    Ref.Of(ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImTreeMapIntToObj.Empty),
+                    Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImMap<Expression>.Empty),
                     IsChangePermitted.Permitted)
             { }
 
             private Registry(
-                ImTreeMap<Type, object> services,
-                ImTreeMap<Type, Factory[]> decorators,
-                ImTreeMap<Type, Factory> wrappers,
-                Ref<ImTreeMap<Type, FactoryDelegate>[]> defaultFactoryDelegateCache,
-                Ref<ImTreeMap<object, KV<FactoryDelegate, ImTreeMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
-                Ref<ImTreeMapIntToObj> factoryExpressionCache,
+                ImHashMap<Type, object> services,
+                ImHashMap<Type, Factory[]> decorators,
+                ImHashMap<Type, Factory> wrappers,
+                Ref<ImHashMap<Type, FactoryDelegate>[]> defaultFactoryDelegateCache,
+                Ref<ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
+                Ref<ImMap<Expression>> factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
                 Services = services;
@@ -1632,7 +1632,7 @@ namespace DryIoc
                 _isChangePermitted = isChangePermitted;
             }
 
-            internal Registry WithServices(ImTreeMap<Type, object> services)
+            internal Registry WithServices(ImHashMap<Type, object> services)
             {
                 return services == Services ? this :
                     new Registry(services, Decorators, Wrappers,
@@ -1640,7 +1640,7 @@ namespace DryIoc
                         FactoryExpressionCache.NewRef(), _isChangePermitted);
             }
 
-            private Registry WithDecorators(ImTreeMap<Type, Factory[]> decorators)
+            private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators)
             {
                 return decorators == Decorators ? this :
                     new Registry(Services, decorators, Wrappers,
@@ -1648,7 +1648,7 @@ namespace DryIoc
                         FactoryExpressionCache.NewRef(), _isChangePermitted);
             }
 
-            private Registry WithWrappers(ImTreeMap<Type, Factory> wrappers)
+            private Registry WithWrappers(ImHashMap<Type, Factory> wrappers)
             {
                 return wrappers == Wrappers ? this :
                     new Registry(Services, Decorators, wrappers,
@@ -1761,8 +1761,8 @@ namespace DryIoc
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 Factory replacedFactory = null;
-                ImTreeMap<object, Factory> replacedFactories = null;
-                ImTreeMap<Type, object> services;
+                ImHashMap<object, Factory> replacedFactories = null;
+                ImHashMap<Type, object> services;
                 if (serviceKey == null)
                 {
                     services = Services.AddOrUpdate(serviceType, factory, (oldEntry, newEntry) =>
@@ -1792,8 +1792,8 @@ namespace DryIoc
                                     var newFactories = oldFactoriesEntry.Factories;
                                     if (oldFactoriesEntry.LastDefaultKey != null)
                                     {
-                                        newFactories = ImTreeMap<object, Factory>.Empty;
-                                        var removedFactories = ImTreeMap<object, Factory>.Empty;
+                                        newFactories = ImHashMap<object, Factory>.Empty;
+                                        var removedFactories = ImHashMap<object, Factory>.Empty;
                                         foreach (var f in newFactories.Enumerate())
                                             if (f.Key is DefaultKey)
                                                 removedFactories = removedFactories.AddOrUpdate(f.Key, f.Value);
@@ -1924,7 +1924,7 @@ namespace DryIoc
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
-                ImTreeMap<Type, object> services;
+                ImHashMap<Type, object> services;
 
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
                     services = Services.Update(serviceType, null, (entry, _null) =>
@@ -1949,7 +1949,7 @@ namespace DryIoc
 
                         var factoriesEntry = (FactoriesEntry)entry;
                         var oldFactories = factoriesEntry.Factories;
-                        var remainingFactories = ImTreeMap<object, Factory>.Empty;
+                        var remainingFactories = ImHashMap<object, Factory>.Empty;
                         if (serviceKey == null) // automatically means condition != null
                         {
                             // keep factories for which condition is true
@@ -1965,7 +1965,7 @@ namespace DryIoc
                             if (factory != null)
                                 remainingFactories = oldFactories.Height > 1
                                     ? oldFactories.Update(serviceKey, null)
-                                    : ImTreeMap<object, Factory>.Empty;
+                                    : ImHashMap<object, Factory>.Empty;
                         }
 
                         if (remainingFactories.IsEmpty)
@@ -2084,13 +2084,13 @@ namespace DryIoc
         private const int NumberOfMapBuckets = 16;
         private const int NumberOfMapMask = NumberOfMapBuckets - 1;  // get last 4 bits, fast (hash % NumberOfTrees)
 
-        public static ImTreeMap<Type, FactoryDelegate>[] Empty()
+        public static ImHashMap<Type, FactoryDelegate>[] Empty()
         {
-            return new ImTreeMap<Type, FactoryDelegate>[NumberOfMapBuckets];
+            return new ImHashMap<Type, FactoryDelegate>[NumberOfMapBuckets];
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        public static FactoryDelegate GetValueOrDefault(this ImTreeMap<Type, FactoryDelegate>[] maps, Type key)
+        public static FactoryDelegate GetValueOrDefault(this ImHashMap<Type, FactoryDelegate>[] maps, Type key)
         {
             var hash = key.GetHashCode();
 
@@ -2110,7 +2110,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ImTreeMap<Type, FactoryDelegate>[] AddOrUpdate(this ImTreeMap<Type, FactoryDelegate>[] maps,
+        public static ImHashMap<Type, FactoryDelegate>[] AddOrUpdate(this ImHashMap<Type, FactoryDelegate>[] maps,
             Type key, FactoryDelegate value)
         {
             var hash = key.GetHashCode();
@@ -2118,11 +2118,11 @@ namespace DryIoc
             var mapIndex = hash & NumberOfMapMask;
             var map = maps[mapIndex];
             if (map == null)
-                map = ImTreeMap<Type, FactoryDelegate>.Empty;
+                map = ImHashMap<Type, FactoryDelegate>.Empty;
 
-            map = map.AddOrUpdate(hash, key, value, null, false);
+            map = map.AddOrUpdate(hash, key, value);
 
-            var newMaps = new ImTreeMap<Type, FactoryDelegate>[NumberOfMapBuckets];
+            var newMaps = new ImHashMap<Type, FactoryDelegate>[NumberOfMapBuckets];
             Array.Copy(maps, 0, newMaps, 0, NumberOfMapBuckets);
             newMaps[mapIndex] = map;
 
@@ -2130,7 +2130,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ImTreeMap<Type, FactoryDelegate>[] Update(this ImTreeMap<Type, FactoryDelegate>[] maps,
+        public static ImHashMap<Type, FactoryDelegate>[] Update(this ImHashMap<Type, FactoryDelegate>[] maps,
             Type key, FactoryDelegate value)
         {
             var hash = key.GetHashCode();
@@ -2140,11 +2140,11 @@ namespace DryIoc
             if (map == null)
                 return maps;
 
-            var newMap = map.AddOrUpdate(hash, key, value, null, true);
+            var newMap = map.Update(hash, key, value, null);
             if (newMap == map)
                 return maps;
 
-            var newMaps = new ImTreeMap<Type, FactoryDelegate>[NumberOfMapBuckets];
+            var newMaps = new ImHashMap<Type, FactoryDelegate>[NumberOfMapBuckets];
             Array.Copy(maps, 0, newMaps, 0, NumberOfMapBuckets);
             newMaps[mapIndex] = newMap;
 
@@ -2843,11 +2843,11 @@ namespace DryIoc
         }
 
         /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
-        public static readonly ImTreeMap<Type, Factory> Wrappers = BuildSupportedWrappers();
+        public static readonly ImHashMap<Type, Factory> Wrappers = BuildSupportedWrappers();
 
-        private static ImTreeMap<Type, Factory> BuildSupportedWrappers()
+        private static ImHashMap<Type, Factory> BuildSupportedWrappers()
         {
-            var wrappers = ImTreeMap<Type, Factory>.Empty;
+            var wrappers = ImHashMap<Type, Factory>.Empty;
 
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
 
@@ -2890,7 +2890,7 @@ namespace DryIoc
             return wrappers;
         }
 
-        private static ImTreeMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImTreeMap<Type, Factory> wrappers)
+        private static ImHashMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImHashMap<Type, Factory> wrappers)
         {
             // Using @preventDisposal to not apply tracking disposable transient
             var asContainerWrapper = Setup.WrapperWith(preventDisposal: true);
@@ -3283,7 +3283,7 @@ namespace DryIoc
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
-        /// <summary>No rules as staring point.</summary>
+        /// <summary>Default rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
         /// <summary>Default value for <see cref="MaxObjectGraphSize"/></summary>
@@ -3313,27 +3313,24 @@ namespace DryIoc
         }
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
-        public FactoryMethodSelector FactoryMethod { get { return _made.FactoryMethod; } }
+        public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
 
         /// <summary>Shorthand to <see cref="Made.Parameters"/></summary>
-        public ParameterSelector Parameters { get { return _made.Parameters; } }
+        public ParameterSelector Parameters => _made.Parameters;
 
         /// <summary>Shorthand to <see cref="Made.PropertiesAndFields"/></summary>
-        public PropertiesAndFieldsSelector PropertiesAndFields { get { return _made.PropertiesAndFields; } }
+        public PropertiesAndFieldsSelector PropertiesAndFields => _made.PropertiesAndFields;
 
         /// <summary>Instructs to override per-registration made settings with these rules settings.</summary>
         public bool OverrideRegistrationMade { get; private set; }
 
         /// <summary>Returns new instance of the rules new Made composed out of
         /// provided factory method, parameters, propertiesAndFields.</summary>
-        /// <returns>New rules.</returns>
         public Rules With(
             FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return With(Made.Of(factoryMethod, parameters, propertiesAndFields));
-        }
+            PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            With(Made.Of(factoryMethod, parameters, propertiesAndFields));
 
         // todo: may be add a override with option, e.g. to fallback from made.FactoryMethod to previous FM, used by MEF at least
         /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
@@ -3353,7 +3350,6 @@ namespace DryIoc
             return newRules;
         }
 
-        // todo: Replace KeyValuePair with KV for consistency, or vice versa.
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="request">Provides service request leading to factory selection.</param>
         /// <param name="factories">Registered factories with corresponding key to select from.</param>
@@ -3366,7 +3362,6 @@ namespace DryIoc
         public FactorySelectorRule FactorySelector { get; private set; }
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
-        /// <param name="rule">Selectors to set, could be null to use default approach.</param> <returns>New rules.</returns>
         public Rules WithFactorySelector(FactorySelectorRule rule)
         {
             var newRules = (Rules)MemberwiseClone();
@@ -3375,11 +3370,7 @@ namespace DryIoc
         }
 
         /// <summary>Select last registered factory from multiple default.</summary>
-        /// <returns>Factory selection rule.</returns>
-        public static FactorySelectorRule SelectLastRegisteredFactory()
-        {
-            return GetLastFactoryByKey;
-        }
+        public static FactorySelectorRule SelectLastRegisteredFactory() => GetLastFactoryByKey;
 
         private static Factory GetLastFactoryByKey(Request request, KeyValuePair<object, Factory>[] factories)
         {
@@ -3397,14 +3388,10 @@ namespace DryIoc
         /// <summary>Prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
-        /// <param name="serviceKey">Service key to look for instead default.</param>
-        /// <returns>Found factory or null.</returns>
-        public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey)
-        {
-            return (_, factories) =>
+        public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
+            (req, factories) =>
                 factories.FindFirst(f => f.Key.Equals(serviceKey)).Value ??
                 factories.FindFirst(f => f.Key.Equals(null)).Value;
-        }
 
         /// <summary>Specify the method signature for returning multiple keyed factories.
         /// This is dynamic analog to the normal Container Registry.</summary>
@@ -3444,14 +3431,12 @@ namespace DryIoc
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
         /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
-        /// <param name="request">Request to return factory for</param> <returns>Factory to resolve request, or null if unable to resolve.</returns>
         public delegate Factory UnknownServiceResolver(Request request);
 
         /// <summary>Gets rules for resolving not-registered services. Null by default.</summary>
         public UnknownServiceResolver[] UnknownServiceResolvers { get; private set; }
 
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
-        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules)
         {
             var newRules = (Rules)MemberwiseClone();
@@ -3462,7 +3447,6 @@ namespace DryIoc
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
         /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance,
         /// so it could be check for remove success or fail.</summary>
-        /// <param name="rule">Rule tor remove.</param> <returns>New rules.</returns>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
         {
             var newRules = (Rules)MemberwiseClone();
@@ -3473,22 +3457,17 @@ namespace DryIoc
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
         /// Does not guard you from action throwing an exception. Actually can be used to throw your custom exception
         /// instead of <see cref="ContainerException"/>.</summary>
-        /// <param name="handler">May be a Logger action or any other diagnostic handler.</param>
-        /// <returns>Rules with unknown resolver.</returns>
-        public Rules WithUnknownServiceHandler(Action<Request> handler)
-        {
-            return WithUnknownServiceResolvers(request =>
+        public Rules WithUnknownServiceHandler(Action<Request> handler) =>
+            WithUnknownServiceResolvers(request =>
             {
                 handler(request);
                 return null;
             });
-        }
 
-        // todo: v3: Mark with ObsoleteAttribute
         /// <summary>Obsolete: Replaced by ConcreteTypeDynamicRegistrations</summary>
-        public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null)
-        {
-            return request =>
+        [Obsolete("Replaced by ConcreteTypeDynamicRegistration", false)]
+        public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null) =>
+            request =>
             {
                 var concreteServiceType = request.GetActualServiceType();
                 if (concreteServiceType.IsAbstract() || condition != null && !condition(request))
@@ -3513,7 +3492,6 @@ namespace DryIoc
 
                 return factory;
             };
-        }
 
         /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
@@ -3561,17 +3539,13 @@ namespace DryIoc
         /// <param name="reuse">(optional) Reuse.</param>
         /// <returns>New rules.</returns>
         public Rules WithConcreteTypeDynamicRegistrations(
-            Func<Type, object, bool> condition = null, IReuse reuse = null)
-        {
-            return WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
-        }
+            Func<Type, object, bool> condition = null, IReuse reuse = null) =>
+            WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
-        // todo: v3: Mark with ObsoleteAttribute
         /// <summary>Replaced with WithConcreteTypeDynamicRegistrations</summary>
-        public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
-        {
-            return WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
-        }
+        [Obsolete("Replaced with WithConcreteTypeDynamicRegistrations", false)]
+        public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
+            WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
 
         /// <summary>Creates dynamic fallback registrations for the requested service type
         /// with provided <paramref name="getImplementationTypes"/>.
@@ -3586,7 +3560,7 @@ namespace DryIoc
             Func<Type, Factory> factory = null)
         {
             // cache factory for implementation type to enable reuse semantics
-            var factories = Ref.Of(ImTreeMap<Type, Factory>.Empty);
+            var factories = Ref.Of(ImHashMap<Type, Factory>.Empty);
 
             return (serviceType, serviceKey) =>
             {
@@ -3618,14 +3592,11 @@ namespace DryIoc
             };
         }
 
-        // todo: v3: Remove
         /// <summary>Obsolete: replaced by <see cref="AutoFallbackDynamicRegistrations"/></summary>
-        public static UnknownServiceResolver AutoRegisterUnknownServiceRule(
-            IEnumerable<Type> implTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null)
-        {
-            return request =>
+        [Obsolete("Replaced by AutoFallbackDynamicRegistrations", false)]
+        public static UnknownServiceResolver AutoRegisterUnknownServiceRule(IEnumerable<Type> implTypes,
+            Func<IReuse, Request, IReuse> changeDefaultReuse = null, Func<Request, bool> condition = null) =>
+            request =>
             {
                 if (condition != null && !condition(request))
                     return null;
@@ -3645,14 +3616,9 @@ namespace DryIoc
 
                 return request.Container.GetServiceFactoryOrDefault(request);
             };
-        }
 
         /// <summary>See <see cref="WithDefaultReuse"/></summary>
         public IReuse DefaultReuse { get; private set; }
-
-        /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
-        [Obsolete("Replaced by WithDefaultReuse because for some cases ..InsteadOfTransient does not make sense.", error: false)]
-        public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse) => WithDefaultReuse(reuse);
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse)
@@ -3661,6 +3627,10 @@ namespace DryIoc
             newRules.DefaultReuse = reuse ?? Reuse.Transient;
             return newRules;
         }
+
+        /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
+        [Obsolete("Replaced by WithDefaultReuse because for some cases ..InsteadOfTransient does not make sense.", error: false)]
+        public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse) => WithDefaultReuse(reuse);
 
         /// <summary>Given item object and its type should return item "pure" expression presentation,
         /// without side-effects or external dependencies.
@@ -3677,7 +3647,6 @@ namespace DryIoc
         /// <summary>Specifies custom rule to convert non-primitive items to their expression representation.
         /// That may be required because DryIoc by default does not support non-primitive service keys and registration metadata.
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
-        /// <returns>New rules</returns>
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault)
         {
             var newRules = (Rules)MemberwiseClone();
@@ -3752,7 +3721,7 @@ namespace DryIoc
         }
 
         /// <summary><see cref="WithDependencyResolutionCallExpressions"/>.</summary>
-        public Ref<ImTreeMap<RequestInfo, Expression>> DependencyResolutionCallExpressions { get; private set; }
+        public Ref<ImHashMap<RequestInfo, Expression>> DependencyResolutionCallExpressions { get; private set; }
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression
         /// and put it into collection.</summary>
@@ -3760,7 +3729,7 @@ namespace DryIoc
         public Rules WithDependencyResolutionCallExpressions()
         {
             var newRules = (Rules)MemberwiseClone();
-            newRules.DependencyResolutionCallExpressions = Ref.Of(ImTreeMap<RequestInfo, Expression>.Empty);
+            newRules.DependencyResolutionCallExpressions = Ref.Of(ImHashMap<RequestInfo, Expression>.Empty);
             return newRules;
         }
 
@@ -7129,7 +7098,7 @@ namespace DryIoc
     public interface IConcreteFactoryGenerator
     {
         /// <summary>Generated factories so far, identified by the service type and key pair.</summary>
-        ImTreeMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
+        ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
 
         /// <summary>Returns factory per request. May track already generated factories and return one without regenerating.</summary>
         /// <param name="request">Request to resolve.</param>
@@ -8012,7 +7981,7 @@ namespace DryIoc
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
-            public ImTreeMap<KV<Type, object>, ReflectionFactory> GeneratedFactories
+            public ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories
             {
                 get { return _generatedFactories.Value; }
             }
@@ -8093,8 +8062,8 @@ namespace DryIoc
             }
 
             private readonly ReflectionFactory _openGenericFactory;
-            private readonly Ref<ImTreeMap<KV<Type, object>, ReflectionFactory>>
-                _generatedFactories = Ref.Of(ImTreeMap<KV<Type, object>, ReflectionFactory>.Empty);
+            private readonly Ref<ImHashMap<KV<Type, object>, ReflectionFactory>>
+                _generatedFactories = Ref.Of(ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
         }
 
         private void SetKnownImplementationType(Type implType, Made made)
@@ -8694,8 +8663,8 @@ namespace DryIoc
         {
             Parent = parent;
             Name = name;
-            _items = ImTreeMapIntToObj.Empty;
-            _disposables = ImTreeMapIntToObj.Empty;
+            _items = ImMap<object>.Empty;
+            _disposables = ImMap<IDisposable>.Empty;
             _nextDisposalIndex = Int32.MaxValue;
         }
 
@@ -8780,12 +8749,12 @@ namespace DryIoc
                 foreach (var disposable in disposables.Enumerate())
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal
-                    try { ((IDisposable)disposable.Value).Dispose(); } // todo: Remove cast
+                    try { disposable.Value.Dispose(); }
                     catch (Exception) { }
                 }
 
-            _disposables = ImTreeMapIntToObj.Empty;
-            _items = ImTreeMapIntToObj.Empty;
+            _disposables = ImMap<IDisposable>.Empty;
+            _items = ImMap<object>.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
@@ -8797,11 +8766,8 @@ namespace DryIoc
 
         #region Implementation
 
-        // todo: merge _items to _improve performance, 
-        // anyway most of disposables will be stored in items, except the transient disposables
-        // and tracked scopes
-        private ImTreeMapIntToObj _items;
-        private ImTreeMapIntToObj _disposables;
+        private ImMap<object> _items;
+        private ImMap<IDisposable> _disposables;
         private int _nextDisposalIndex;
         private int _disposed;
 
@@ -8864,11 +8830,11 @@ namespace DryIoc
         {
             if (!_scopes.IsEmpty)
                 foreach (var scope in _scopes.Enumerate().Where(scope => scope.Value is IDisposable))
-                    ((IDisposable)scope.Value).Dispose();
-            _scopes = ImTreeMapIntToObj.Empty;
+                    scope.Value.Dispose();
+            _scopes = ImMap<IScope>.Empty;
         }
 
-        private ImTreeMapIntToObj _scopes = ImTreeMapIntToObj.Empty;
+        private ImMap<IScope> _scopes = ImMap<IScope>.Empty;
     }
 
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
@@ -10343,10 +10309,13 @@ namespace DryIoc
             var members = getMembers(typeInfo);
             if (!includeBase)
                 return members;
+
             var baseType = typeInfo.BaseType;
-            return baseType == null || baseType == typeof(object)
-                ? members
-                : members.Append(baseType.GetMembers(getMembers, true));
+            if (baseType == null || baseType == typeof(object))
+                return members;
+
+            var baseMembers = baseType.GetMembers(getMembers, true);
+            return members.Append(baseMembers);
         }
 
         /// <summary>Returns all public instance constructors for the type</summary>
@@ -10368,16 +10337,13 @@ namespace DryIoc
             type.GetAllConstructors(includeNonPublic)
                 .FirstOrDefault(c => c.GetParameters().Select(p => p.ParameterType).SequenceEqual(args));
 
-        /// <summary>Returns single constructor, otherwise if no or more than one: returns false.</summary>
-        public static ConstructorInfo Constructor(this Type type, bool includeNonPublic = false)
-        {
-            var ctors = type.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
-            return ctors.Length == 1 ? ctors[0]
-                : Throw.For<ConstructorInfo>(
-                    Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
-        }
+        /// <summary>Returns single constructor otherwise (if no or more than one) throws an exception</summary>
+        public static ConstructorInfo Constructor(this Type type, bool includeNonPublic = false) =>
+            type.GetSingleConstructorOrNull(includeNonPublic) ??
+            Throw.For<ConstructorInfo>(
+                Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
 
-        /// <summary>Obsolete: use <see cref="Constructor"/></summary>
+        /// <summary>Returns single constructor otherwise (if no or more than one) returns null.</summary>
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
             var ctors = type.GetAllConstructors(includeNonPublic).ToArrayOrSelf();

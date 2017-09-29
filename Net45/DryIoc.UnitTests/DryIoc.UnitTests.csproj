@@ -82,9 +82,6 @@
     <Compile Include="..\..\DryIoc.UnitTests\FuncTests.cs">
       <Link>FuncTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\HashTreeTests.cs">
-      <Link>HashTreeTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\DryIoc.UnitTests\IfAlreadyRegisteredTests.cs">
       <Link>IfAlreadyRegisteredTests.cs</Link>
     </Compile>
