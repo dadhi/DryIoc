@@ -243,7 +243,7 @@ namespace DryIoc.UnitTests
                 var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
                 var details = import == null ? ServiceDetails.Default
                     : ServiceDetails.Of(import.ContractType, import.ContractName);
-                return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+                return ParameterServiceInfo.Of(parameter).WithDetails(details);
             };
         }
 
@@ -264,8 +264,7 @@ namespace DryIoc.UnitTests
                     .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                     .ThrowIfNull();
 
-                return ParameterServiceInfo.Of(parameter)
-                    .WithDetails(ServiceDetails.Of(serviceType, factory.Key), request);
+                return ParameterServiceInfo.Of(parameter).WithDetails(ServiceDetails.Of(serviceType, factory.Key));
             };
         }
 

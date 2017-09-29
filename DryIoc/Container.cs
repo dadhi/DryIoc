@@ -84,51 +84,6 @@ namespace DryIoc
             return scopeStr;
         }
 
-        /// <inheritdoc />
-        public IContainer With(Rules rules, IScopeContext scopeContext,
-            bool cloneRegistrations, bool preserveCache, bool dropSingletons)
-        {
-            ThrowIfContainerDisposed();
-
-            rules = rules ?? Rules;
-            scopeContext = scopeContext ?? _scopeContext;
-
-            var registry = !cloneRegistrations ? _registry :
-                preserveCache ? Ref.Of(_registry.Value) : Ref.Of(_registry.Value.WithoutCache());
-
-            var singletonScope = !dropSingletons ? _singletonScope : new Scope();
-
-            return new Container(rules, registry, singletonScope, scopeContext,
-                _currentScope, _disposed, _disposeStackTrace, _parent, _root);
-        }
-
-        /// <summary>Produces new container which prevents any further registrations.</summary>
-        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
-        /// Throws exception by default.</param>
-        /// <returns>New container preserving all current container state but disallowing registrations.</returns>
-        public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
-        {
-            var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
-            return new Container(Rules, readonlyRegistry,
-                _singletonScope, _scopeContext, _currentScope,
-                _disposed, _disposeStackTrace, _parent, _root);
-        }
-
-        /// <inheritdoc />
-        public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
-        {
-            if (factoryType != null)
-                return _registry.Value.ClearCache(serviceType, serviceKey, factoryType.Value);
-
-            var registry = _registry.Value;
-
-            var clearedServices = registry.ClearCache(serviceType, serviceKey, FactoryType.Service);
-            var clearedWrapper = registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper);
-            var clearedDecorator = registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
-
-            return clearedServices || clearedWrapper || clearedDecorator;
-        }
-
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
@@ -756,8 +711,55 @@ namespace DryIoc
         public Rules Rules { get; private set; }
 
         /// <summary>Indicates that container is disposed.</summary>
-        public bool IsDisposed =>
-            _disposed == 1 || _singletonScope.IsDisposed;
+        public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed;
+
+        /// <inheritdoc />
+        public IContainer With(Rules rules, IScopeContext scopeContext,
+            bool cloneRegistrations, bool preserveCache, StateOptions singletonOptions)
+        {
+            ThrowIfContainerDisposed();
+
+            rules = rules ?? Rules;
+            scopeContext = scopeContext ?? _scopeContext;
+
+            var registry = !cloneRegistrations ? _registry :
+                preserveCache ? Ref.Of(_registry.Value) : Ref.Of(_registry.Value.WithoutCache());
+
+            var singletonScope =
+                singletonOptions == StateOptions.Keep ? _singletonScope :
+                singletonOptions == StateOptions.Drop ? new Scope() :
+                _singletonScope.Clone();
+
+            return new Container(rules, registry, singletonScope, scopeContext,
+                _currentScope, _disposed, _disposeStackTrace, _parent, _root);
+        }
+
+        /// <summary>Produces new container which prevents any further registrations.</summary>
+        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
+        /// Throws exception by default.</param>
+        /// <returns>New container preserving all current container state but disallowing registrations.</returns>
+        public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false)
+        {
+            var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
+            return new Container(Rules, readonlyRegistry,
+                _singletonScope, _scopeContext, _currentScope,
+                _disposed, _disposeStackTrace, _parent, _root);
+        }
+
+        /// <inheritdoc />
+        public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
+        {
+            if (factoryType != null)
+                return _registry.Value.ClearCache(serviceType, serviceKey, factoryType.Value);
+
+            var registry = _registry.Value;
+
+            var clearedServices = registry.ClearCache(serviceType, serviceKey, FactoryType.Service);
+            var clearedWrapper = registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper);
+            var clearedDecorator = registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
+
+            return clearedServices || clearedWrapper || clearedDecorator;
+        }
 
         Factory IContainer.ResolveFactory(Request request)
         {
@@ -2165,26 +2167,24 @@ namespace DryIoc
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container, Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
-            container.With(configure?.Invoke(container.Rules), scopeContext, 
-                cloneRegistrations: true, preserveCache: false, dropSingletons: false);
+            container.With(configure?.Invoke(container.Rules), scopeContext, cloneRegistrations: true);
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
         public static IContainer WithoutCache(this IContainer container) =>
-            container.With(container.Rules, container.ScopeContext, 
-                cloneRegistrations: true, preserveCache: false, dropSingletons: false);
+            container.With(container.Rules, container.ScopeContext, cloneRegistrations: true);
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
         /// Dropping cache is required because singletons are cached in resolution state.</summary>
         public static IContainer WithoutSingletonsAndCache(this IContainer container) =>
-            container.With(container.Rules, container.ScopeContext, 
-                cloneRegistrations: true, preserveCache: false, dropSingletons: true);
+            container.With(container.Rules, container.ScopeContext,
+                cloneRegistrations: true, singletonOptions: StateOptions.Drop);
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
-            container.With(container.Rules, container.ScopeContext, 
-                cloneRegistrations: true, preserveCache: preserveCache, dropSingletons: false);
+            container.With(container.Rules, container.ScopeContext,
+                cloneRegistrations: true, preserveCache: preserveCache);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -4045,7 +4045,7 @@ namespace DryIoc
             Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
-            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault, null));
+            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault));
             if (parameterServiceInfo.Details.HasCustomValue)
             {
                 var customValue = parameterServiceInfo.Details.CustomValue;
@@ -4359,8 +4359,7 @@ namespace DryIoc
                     var customValue = GetArgExpressionValueOrThrow(memberAssignment.Expression);
                     propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
                     {
-                        PropertyOrFieldServiceInfo.Of(member).WithDetails(
-                                ServiceDetails.Of(customValue), r)
+                        PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(customValue))
                     });
                 }
                 else
@@ -4373,8 +4372,8 @@ namespace DryIoc
                         var getArgValue = GetArgCustomValueProvider(methodCallExpr, argValues);
                         propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
                         {
-                            PropertyOrFieldServiceInfo.Of(member).WithDetails(
-                                ServiceDetails.Of(getArgValue(r.RequestInfo)), r)
+                            PropertyOrFieldServiceInfo.Of(member)
+                                .WithDetails(ServiceDetails.Of(getArgValue(r.RequestInfo)))
                         });
                         hasCustomValue = true;
                     }
@@ -4384,7 +4383,7 @@ namespace DryIoc
                         var argServiceDetails = GetArgServiceDetails(methodCallExpr, memberType, IfUnresolved.ReturnDefault, null);
                         propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
                         {
-                            PropertyOrFieldServiceInfo.Of(member).WithDetails(argServiceDetails, r)
+                            PropertyOrFieldServiceInfo.Of(member).WithDetails(argServiceDetails)
                         });
                     }
                 }
@@ -7425,19 +7424,12 @@ namespace DryIoc
     }
 
     /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
-    /// <param name="request">Request to resolve.</param>
-    /// <returns>Factory method wrapper over constructor or method.</returns>
     public delegate FactoryMethod FactoryMethodSelector(Request request);
 
     /// <summary>Specifies how to get parameter info for injected parameter and resolved request</summary>
-    /// <remarks>Request is for parameter method owner not for parameter itself.</remarks>
-    /// <param name="request">Request for parameter method/constructor owner.</param>
-    /// <returns>Service info describing how to inject parameter.</returns>
     public delegate Func<ParameterInfo, ParameterServiceInfo> ParameterSelector(Request request);
 
     /// <summary>Specifies what properties or fields to inject and how.</summary>
-    /// <param name="request">Request for property/field owner.</param>
-    /// <returns>Corresponding service info for each property/field to be injected.</returns>
     public delegate IEnumerable<PropertyOrFieldServiceInfo> PropertiesAndFieldsSelector(Request request);
 
     /// <summary>DSL for specifying <see cref="ParameterSelector"/> injection rules.</summary>
@@ -7448,11 +7440,9 @@ namespace DryIoc
 
         /// <summary>Returns service info which considers each parameter as optional.</summary>
         public static ParameterSelector IfUnresolvedReturnDefault =
-            request => pi => ParameterServiceInfo.Of(pi).WithDetails(ServiceDetails.IfUnresolvedReturnDefault, request);
+            request => pi => ParameterServiceInfo.Of(pi).WithDetails(ServiceDetails.IfUnresolvedReturnDefault);
 
         /// <summary>Combines source selector with other. Other is used as fallback when source returns null.</summary>
-        /// <param name="source">Source selector.</param> <param name="other">Specific other selector to add.</param>
-        /// <returns>Combined result selector.</returns>
         public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other) =>
             source == null || source == Of ? other ?? Of
             : other == null || other == Of ? source
@@ -7491,7 +7481,7 @@ namespace DryIoc
             {
                 var details = getDetailsOrNull(request, parameter);
                 if (details != null)
-                    return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+                    return ParameterServiceInfo.Of(parameter).WithDetails(details);
 
                 // for default source selector, return null to enable fallback to any non-default selector
                 // defined outside, usually by OverrideWith
@@ -7578,37 +7568,43 @@ namespace DryIoc
         public static PropertiesAndFieldsSelector Of = request => null;
 
         /// <summary>Public assignable instance members of any type except object, string, primitives types, and arrays of those.</summary>
-        public static PropertiesAndFieldsSelector Auto = All(false, false); // todo: v3: Exclude fields
+        public static PropertiesAndFieldsSelector Auto = All(withNonPublic: false, withPrimitive: false);
+
+        /// <summary>Public, declared, assignable, non-primitive properties.</summary>
+        public static PropertiesAndFieldsSelector Properties(
+            bool withNonPublic = false, bool withBase = false, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault) =>
+            All(withNonPublic: withNonPublic, withPrimitive: false, withFields: false, withBase: withBase, ifUnresolved: ifUnresolved);
 
         /// <summary>Should return service info for input member (property or field).</summary>
-        /// <param name="member">Input member.</param> <param name="request">Request to provide context.</param> <returns>Service info.</returns>
-        public delegate PropertyOrFieldServiceInfo GetInfo(MemberInfo member, Request request);
+        public delegate PropertyOrFieldServiceInfo GetServiceInfo(MemberInfo member, Request request);
 
-        // todo: v3: Add includeBase=true parameter
         /// <summary>Generates selector property and field selector with settings specified by parameters.
         /// If all parameters are omitted the return all public not primitive members.</summary>
-        /// <param name="withNonPublic">(optional) Specifies to include non public members. Will include by default.</param>
-        /// <param name="withPrimitive">(optional) Specifies to include members of primitive types. Will include by default.</param>
-        /// <param name="withFields">(optional) Specifies to include fields as well as properties. Will include by default.</param>
-        /// <param name="ifUnresolved">(optional) Defines ifUnresolved behavior for resolved members.</param>
-        /// <param name="withInfo">(optional) Return service info for a member or null to skip member resolution.</param>
-        /// <returns>Result selector composed using provided settings.</returns>
         public static PropertiesAndFieldsSelector All(
-            bool withNonPublic = true, bool withPrimitive = true, bool withFields = true,
+            bool withNonPublic = true,
+            bool withPrimitive = true,
+            bool withFields = true,
+            bool withBase = true,
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault,
-            GetInfo withInfo = null)
+            GetServiceInfo serviceInfo = null)
         {
-            GetInfo getInfo = (m, r) => withInfo != null ? withInfo(m, r) :
-                  PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved), r);
-            return r =>
+            GetServiceInfo info = (m, r) => 
+                serviceInfo != null ? serviceInfo(m, r) :
+                PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved));
+
+            return req =>
             {
-                var properties = r.ImplementationType.GetMembers(_ => _.DeclaredProperties, includeBase: true)
-                    .Where(p => p.IsInjectable(withNonPublic, withPrimitive))
-                    .Select(m => getInfo(m, r));
-                return !withFields ? properties :
-                    properties.Concat(r.ImplementationType.GetMembers(_ => _.DeclaredFields, includeBase: true)
-                    .Where(f => f.IsInjectable(withNonPublic, withPrimitive))
-                    .Select(m => getInfo(m, r)));
+                var properties = req.ImplementationType.GetMembers(_ => _.DeclaredProperties, includeBase: withBase)
+                    .Match(p => p.IsInjectable(withNonPublic, withPrimitive), p => info(p, req));
+
+                if (!withFields)
+                    return properties;
+
+                var fields = req.ImplementationType
+                    .GetMembers(_ => _.DeclaredFields, includeBase: withBase)
+                    .Match(f => f.IsInjectable(withNonPublic, withPrimitive), f => info(f, req));
+
+                return properties.Append(fields);
             };
         }
 
@@ -7657,7 +7653,7 @@ namespace DryIoc
                 {
                     var details = getDetails(request);
                     return details == null ? null
-                        : new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details, request) };
+                        : new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details) };
                 }
 
                 var field = implType
@@ -7667,7 +7663,7 @@ namespace DryIoc
                 {
                     var details = getDetails(request);
                     return details == null ? null
-                        : new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details, request) };
+                        : new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details) };
                 }
 
                 return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(
@@ -8446,8 +8442,7 @@ namespace DryIoc
                             return null;
 
                         // Copy factory info with closed factory type
-                        factoryInfo = ServiceInfo.Of(closedFactoryServiceType)
-                            .WithDetails(factoryInfo.Details, request);
+                        factoryInfo = ServiceInfo.Of(closedFactoryServiceType).WithDetails(factoryInfo.Details);
                     }
                 }
 
@@ -8643,6 +8638,9 @@ namespace DryIoc
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         void SetOrAdd(int id, object item);
+
+        /// <summary>Clones the scope.</summary>
+        IScope Clone();
     }
 
     /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
@@ -8660,12 +8658,17 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
+            : this(parent, name, ImMap<object>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+        { }
+
+        private Scope(IScope parent, object name, ImMap<object> items,
+            ImMap<IDisposable> disposables, int nextDisposalIndex)
         {
             Parent = parent;
             Name = name;
-            _items = ImMap<object>.Empty;
-            _disposables = ImMap<IDisposable>.Empty;
-            _nextDisposalIndex = Int32.MaxValue;
+            _items = items;
+            _disposables = disposables;
+            _nextDisposalIndex = nextDisposalIndex;
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
@@ -8707,6 +8710,10 @@ namespace DryIoc
                 Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
             TrackDisposable(item);
         }
+
+        /// <inheritdoc />
+        public IScope Clone() =>
+            new Scope(Parent, Name, _items, _disposables, _nextDisposalIndex);
 
         /// <inheritdoc />
         public bool TryGet(out object item, int id)
@@ -9574,15 +9581,31 @@ namespace DryIoc
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
+    /// <summary>What to do with the state.</summary>
+    public enum StateOptions
+    {
+        /// <summary>Keep state</summary>
+        Keep = 0,
+        /// <summary>Remove state</summary>
+        Drop,
+        /// <summary>Clone or copy state</summary>
+        Clone
+    }
+
     /// <summary>Combines registrator and resolver roles, plus rules and scope management.</summary>
     public interface IContainer : IRegistrator, IResolverContext
     {
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
+        /// <summary>True if container is disposed.</summary>
+        bool IsDisposed { get; }
+
         /// <summary>Creates new container from the current one.</summary>
         IContainer With(Rules rules, IScopeContext scopeContext,
-            bool cloneRegistrations, bool preserveCache, bool dropSingletons);
+            bool cloneRegistrations = false,
+            bool preserveCache = false,
+            StateOptions singletonOptions = StateOptions.Keep);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.

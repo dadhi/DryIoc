@@ -60,4 +60,6 @@ Because the disposal in this case is optional anyway and the instance may be col
 41. Obsoleting `WithDefaultReuseInsteadOfTransient` replaced by `WithDefaultReuse`
 42. Changed RegisterDelegate to accept Func{IResolverContext, object} instead of Func{IResolver, object}
 43. Obsoleting `WithAutoFallbackResolution` replaced by `WithAutoFallbackDynamicRegistration`
-44. Moved `IContainer.With..` methods to `ContainerTools` extension methods 
+44. Moved `IContainer.With..` methods to `ContainerTools` extension methods
+45. Obsoleting AutoFallback and ConcreteType resolution rules
+46. Changed `PropertiesAndFields.All` to include `withBase` parameter

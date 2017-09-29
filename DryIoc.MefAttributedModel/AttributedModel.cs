@@ -623,19 +623,19 @@ namespace DryIoc.MefAttributedModel
                 var serviceInfo = ParameterServiceInfo.Of(parameter);
                 var attrs = parameter.GetAttributes().ToArray();
                 return attrs.Length == 0 ? serviceInfo :
-                    serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
+                    serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request));
             };
         }
 
         private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
-            PropertiesAndFields.All(withInfo: GetImportedPropertiesAndFieldsOnly);
+            PropertiesAndFields.All(serviceInfo: GetImportedPropertiesAndFieldsOnly);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {
             var attributes = member.GetAttributes().ToArrayOrSelf();
             var details = attributes.Length == 0 ? null
                 : GetFirstImportDetailsOrNull(member.GetReturnTypeOrDefault(), attributes, request);
-            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
+            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details);
         }
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
