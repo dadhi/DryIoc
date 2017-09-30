@@ -12,25 +12,9 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v2.12.2:
-      - fixed: #519 Dependency of singleton not working when using "child" container
-      - fixed: #520 AccessViolationException on some machines
-      - fixed: #521 Rule ConcreteTypeDynamicRegistrations: Exception while resolving instance of class with constructor-injected generic instance of not registered class
-      v2.12.1:
-      - fixed: #512 InResolutionScopeOf in combination with SelectLastRegisteredFactory
-      - changed: Updated to FEC v1.4 - now all DryIoc expressions are covered by FEC. This means perf improvements for asResolutionCall injection
-      v2.12.0:
-      - added: #499: Add RegisterPlaceholder to enable delayed registration
-      - added: Setup.DecoratorOf{T}(key) and runtime version to simplify specifying condition for matching decoratee type and key
-      - added: Missing overload for Made.Of to consider request -> instance factory info.
-      - added: Rules.WithDynamicRegistrationsAsFallback
-      - changed: Updated FEC to v1.3.0
-      - fixed: #492: Lazy imports disguised as non-lazy
-      - fixed: #497: ConstructorWithResolvableArguments is not working properly
-      - fixed: #500: Rule WithConcreteTypeDynamicRegistrations disables allowDisposableTransient
-      - fixed: #506: Cannot resolve string[]
-      - fixed: #507: Resolved collection of mixed open and closed generics does not preserve order of registration
-      - fixed: #508: SelectLastRegisteredFactory and resolving collection of open-generic is not working as intended
+      v3.0.0-preview-01:
+      - See package README.md or BREAKING.md here https://bitbucket.org/dadhi/dryioc/src/07def5c7cce22ace7da86549603e25d2cc8b70ae/BREAKING.md?at=dev
+      - Major internals cleanup and future proofing
     </releaseNotes>
     <contentFiles>
       <files include="cs/any/*.*" buildAction="Compile" />
@@ -38,6 +22,7 @@
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
+    <file src="..\NuGetSpecs\README.md" />
 
     <!--net35-->
     <file src="..\DryIoc\Container.cs" target="content\net35\DryIoc" />

@@ -9044,14 +9044,22 @@ namespace DryIoc
     /// <summary>Holds the name for the resolution scope.</summary>
     public sealed class ResolutionScopeName : IScopeName
     {
-        internal static readonly ConstructorInfo Constructor = typeof(ResolutionScopeName)
-            .GetTypeInfo().DeclaredConstructors.First();
+        /// <summary>Creates scope with specified service type and key</summary>
+        public static ResolutionScopeName Of(Type serviceType = null, object serviceKey = null) =>
+            new ResolutionScopeName(serviceType, serviceKey);
+
+        /// <summary>Creates scope with specified service type and key.</summary>
+        public static ResolutionScopeName Of<TService>(object serviceKey = null) =>
+            new ResolutionScopeName(typeof(TService), serviceKey);
 
         /// <summary>Type of service opening the scope.</summary>
         public readonly Type ServiceType;
 
         /// <summary>Optional service key of service opening the scope.</summary>
         public readonly object ServiceKey;
+
+        internal static readonly ConstructorInfo Constructor = typeof(ResolutionScopeName)
+            .GetTypeInfo().DeclaredConstructors.First();
 
         /// <summary>Creates the key.</summary>
         public ResolutionScopeName(Type serviceType, object serviceKey)
@@ -9106,7 +9114,7 @@ namespace DryIoc
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo(Type assignableFromServiceType = null, object serviceKey = null) =>
             assignableFromServiceType == null && serviceKey == null ? Scoped
-            : new CurrentScopeReuse(new ResolutionScopeName(assignableFromServiceType, serviceKey));
+            : new CurrentScopeReuse(ResolutionScopeName.Of(assignableFromServiceType, serviceKey));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
@@ -9117,6 +9125,7 @@ namespace DryIoc
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
         /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
+        [Obsolete("Now it is the same as Reuse.Scoped, please prefer it or use Reuse.ScopedTo to specify bound service")]
         public static readonly IReuse InResolutionScope = Scoped;
 
         /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
@@ -9130,18 +9139,12 @@ namespace DryIoc
             ScopedTo(name);
 
         /// <summary>Creates reuse to search for <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/>
-        /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="InResolutionScope"/> will be returned.</summary>
-        /// <param name="assignableFromServiceType">(optional) To search for scope with service type assignable to type specified in parameter.</param>
-        /// <param name="serviceKey">(optional) Search for specified key.</param>
-        /// <returns>New reuse with specified parameters or <see cref="InResolutionScope"/> if nothing specified.</returns>
+        /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="Scoped"/> will be returned.</summary>
         public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
             ScopedTo(assignableFromServiceType, serviceKey);
 
         /// <summary>Creates reuse to search for <typeparamref name="TAssignableFromServiceType"/> and <paramref name="serviceKey"/>
         /// in existing resolution scope hierarchy.</summary>
-        /// <typeparam name="TAssignableFromServiceType">To search for scope with service type assignable to type specified in parameter.</typeparam>
-        /// <param name="serviceKey">(optional) Search for specified key.</param>
-        /// <returns>New reuse with specified parameters.</returns>
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
             ScopedTo<TAssignableFromServiceType>(serviceKey);
 

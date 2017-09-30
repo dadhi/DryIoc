@@ -92,7 +92,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>();
-            container.Register<Log>(Reuse.InResolutionScope);
+            container.Register<Log>(Reuse.Scoped);
 
             using (var scope = container.OpenScope())
             {
@@ -109,7 +109,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>(setup: Setup.With(openResolutionScope: true));
             container.Register<Account>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScope);
+            container.Register<Log>(Reuse.Scoped);
 
             var consumer = container.Resolve<Consumer>();
             var account = container.Resolve<Account>();
@@ -222,7 +222,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
-            container.Register<K>(Reuse.InResolutionScope);
+            container.Register<K>(Reuse.Scoped);
             container.Register<L>(setup: Setup.With(openResolutionScope: true));
 
             K k;
@@ -442,7 +442,7 @@ namespace DryIoc.UnitTests
             container.Register<ServiceWithResolutionAndSingletonDependencies>(
                 setup: Setup.With(openResolutionScope: true));
 
-            container.Register<SingletonDep>(Reuse.InResolutionScope);
+            container.Register<SingletonDep>(Reuse.Scoped);
             container.Register<ResolutionScopeDep>(Reuse.Singleton);
 
             var service = container.Resolve<ServiceWithResolutionAndSingletonDependencies>();
@@ -471,7 +471,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
             container.Register<Client>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
-            container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
+            container.Register<ILogger, FastLogger>(Reuse.Scoped);
 
             var client = container.Resolve<Client>();
 
@@ -483,7 +483,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<SomeDep>(Reuse.InResolutionScope);
+            container.Register<SomeDep>(Reuse.Scoped);
             container.Register<SomeRoot>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
             var root = container.Resolve<SomeRoot>();

@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<IDependency, Dependency>(Reuse.InResolutionScope);
+            container.Register<IDependency, Dependency>(Reuse.Scoped);
             container.Register<IService, Service>(setup: Setup.With(openResolutionScope: true));
             container.Register<ILazyService, LazyService>(setup: Setup.With(openResolutionScope: true));
 

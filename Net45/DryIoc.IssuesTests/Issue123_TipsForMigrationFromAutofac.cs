@@ -326,7 +326,7 @@ namespace DryIoc.IssuesTests
             container.Register(typeof(DryIocOwned<>), setup: Setup.WrapperWith(openResolutionScope: true));
 
             container.Register<My>();
-            container.Register<Cake>(Reuse.InResolutionScope);
+            container.Register<Cake>(Reuse.Scoped);
 
             var my = container.Resolve<My>();
             my.Dispose();
