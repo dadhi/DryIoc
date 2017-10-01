@@ -1,4 +1,4 @@
-# Breaking Changes in v3.0.0
+# DryIoc v3.0.0 Release Notes
 
 ## From user perspective
 
@@ -40,6 +40,39 @@ cause `IResolverContext` defines both methods.
 
 ### No more ImplicitOpenedRootScope
 
+This rule was added to conform to Microsoft.Extensions.DependencyInjection specification
+to enable the resolution of scoped service both from scoped and the root container.
+The latter means that the resolved service will be a singleton despite the fact it is registered as scoped.
+
+The rule instructed the DryIoc to open scope on container creation and most importantly, to dispose this scope
+together with container.
+
+As of DryIoc v2.12 the new hybrid `Reuse.ScopedOrSingleton` was added, so you may not need to open the scope
+to resolve such a service. This reuse means the `Rules.WithImplicitOpenedRootScope` is no longer neccessary.
+
+Old code:
+```
+    var container = new Container(rules => rules.WithImplicitOpenedRootScope());
+
+    container.Register<A>(Reuse.Scoped);
+    
+    container.Resolve<A>(); // Works, even without an open scope due the rule
+```
+
+New code:
+```
+    var container = new Container();
+
+    container.Register<A>(Reuse.ScopedOrSingleton);
+    
+    container.Resolve<A>(); // Works, and much more clean given the service reuse
+```
+
+
+### Reuse.InResolutionScope changes
+
+#### Resolution scope is no longer automatically created on Resolve
+
 Previosly for any registered service the call to `Resolve` may create the scope associated 
 with resolved service, as long the service had a dependency registered with `Reuse.InResolutionScope`.
 Now it is no longer happen. The scope will be created only if resolved service is registered
@@ -65,7 +98,7 @@ New code:
     container.Resolve<A>(); // opens scope and DepOfA is successfully injected
 ```
 
-### ResolutionScopeReuse not is just a Scoped reuse
+#### InResolutionScope reuse now is just a Scoped reuse
 
 Resolution scope reuse is the lifetime behavior accosiated with the node in service object graph.
 Previously resolution scope reuse was separate from scope reuse. It means that scope created
@@ -101,14 +134,14 @@ New code:
 ```
 
 
-### RegisterDelegate changes
+### RegisterDelegate parameter changes
 
 `IResolver` parameter in `RegisterDelegate((IResolver resolver) => ...)` was extended by `IResolverContext`.
 I said 'extended' because `IResolverContext` implements the `IResolver`. Because of this, there is a high chance
 that your code will compile as before. 
 
 Using `IResolverContext` in delegate will allow you to `OpenScope`, `UseInstance`, etc. without bringing the
-container inside.
+correct container instance inside delegate.
 
 Old code:
 ```
@@ -228,3 +261,4 @@ Because the disposal in this case is optional anyway and the instance may be col
 44. Moved `IContainer.With..` methods to `ContainerTools` extension methods
 45. Obsoleting AutoFallback and ConcreteType resolution rules
 46. Changed `PropertiesAndFields.All` to include `withBase` parameter
+47. Obsoleting the `Reuse.InResolutionScope`
