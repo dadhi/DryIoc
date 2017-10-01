@@ -86,7 +86,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.UseInstance("a");
 
-            container.UseInstance("x", IfAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.UseInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var s = container.Resolve<string>();
             Assert.AreEqual("a", s);
@@ -193,7 +193,7 @@ namespace DryIoc.UnitTests
             container.Register<DependencyA>();
 
             var aa = new DependencyA();
-            container.UseInstance(aa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(aa, ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
 
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(2, aas.Count());
@@ -206,8 +206,8 @@ namespace DryIoc.UnitTests
             container.Register<DependencyA>();
 
             var aa = new DependencyA();
-            container.UseInstance(aa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
-            container.UseInstance<DependencyA>(new AAA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(aa, ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance<DependencyA>(new AAA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(3, aas.Count());
 
@@ -222,8 +222,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.UseInstance<DependencyA>(new AAA(), serviceKey: "aaa");
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
 
             container.UseInstance<DependencyA>(new AAAA());
             Assert.IsInstanceOf<AAAA>(container.Resolve<DependencyA>());
@@ -236,7 +236,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.UseInstance(new DependencyA());
-            container.UseInstance(new DependencyA(), serviceKey: "keyed", IfAlreadyRegistered: IfAlreadyRegistered.Throw);
+            container.UseInstance(new DependencyA(), serviceKey: "keyed", ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(2, aas.Count());
@@ -248,8 +248,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.UseInstance(new DependencyA(), serviceKey: "aa");
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
 
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(3, aas.Count());
@@ -262,7 +262,7 @@ namespace DryIoc.UnitTests
 
             var aa = new DependencyA();
             container.UseInstance(aa);
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var x = container.Resolve<DependencyA>();
             Assert.AreSame(aa, x);
@@ -276,7 +276,7 @@ namespace DryIoc.UnitTests
             var aa = new DependencyA();
             container.UseInstance(aa);
             container.UseInstance(aa, serviceKey: "aa");
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
 
             var x = container.Resolve<DependencyA>();
             Assert.AreSame(aa, x);
@@ -323,14 +323,14 @@ namespace DryIoc.UnitTests
 
             var aa = new DependencyA();
             container.UseInstance(aa);
-            container.UseInstance<DependencyA>(new AAA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.UseInstance<DependencyA>(new AAA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
 
             Assert.AreEqual(2, container.ResolveMany<DependencyA>().Count());
 
             var newaaa = new AAA();
-            container.UseInstance<DependencyA>(newaaa, IfAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.UseInstance<DependencyA>(newaaa, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
 
-            container.UseInstance<DependencyA>(new AAAA(), IfAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.UseInstance<DependencyA>(new AAAA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
             Assert.AreEqual(3, container.ResolveMany<DependencyA>().Count());
         }
 

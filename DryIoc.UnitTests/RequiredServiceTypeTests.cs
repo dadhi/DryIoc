@@ -71,12 +71,13 @@ namespace DryIoc.UnitTests
         [Test]
         public void Resolve_Many_services_twice_with_different_required_types_should_work()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            using (var scope = container.OpenScope())
             {
                 container.Register<IService, Service>(Reuse.InCurrentScope);
 
-                var objects = container.Resolve<LazyEnumerable<object>>(typeof(IService));
-                var services = container.Resolve<LazyEnumerable<IService>>(typeof(IService));
+                var objects = scope.Resolve<LazyEnumerable<object>>(typeof(IService));
+                var services = scope.Resolve<LazyEnumerable<IService>>(typeof(IService));
 
                 CollectionAssert.AreEqual(objects.Items.Cast<IService>().ToArray(), services.Items.ToArray());             
             }

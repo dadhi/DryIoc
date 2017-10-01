@@ -407,33 +407,33 @@ namespace DryIoc.SpeedTestApp
             Console.WriteLine("Tree - " + treeGetTime);
         }
 
-        public static void GetHashTreeVsIndexedStore(int itemCount)
-        {
-            var key = itemCount;
-            var value = "hey";
+        //public static void GetHashTreeVsIndexedStore(int itemCount)
+        //{
+        //    var key = itemCount;
+        //    var value = "hey";
 
-            var keys = Enumerable.Range(0, itemCount).ToArray();
+        //    var keys = Enumerable.Range(0, itemCount).ToArray();
 
-            var tree = IntTree<string>.Empty;
-            var store = ImTreeArray.Empty;
+        //    var tree = IntTree<string>.Empty;
+        //    var store = ImTreeArray.Empty;
 
-            var treeAddTime = IntAdd(ref tree, keys, key, value);
-            var trieAddTime = IntAdd(ref store, keys, value);
+        //    var treeAddTime = IntAdd(ref tree, keys, key, value);
+        //    var trieAddTime = IntAdd(ref store, keys, value);
 
-            Console.WriteLine("Adding {0} items (ms):", itemCount);
-            Console.WriteLine("Tree - " + treeAddTime);
-            Console.WriteLine("Store - " + trieAddTime);
-            Console.WriteLine();
+        //    Console.WriteLine("Adding {0} items (ms):", itemCount);
+        //    Console.WriteLine("Tree - " + treeAddTime);
+        //    Console.WriteLine("Store - " + trieAddTime);
+        //    Console.WriteLine();
 
-            var getTimes = 1 * 1000 * 1000;
+        //    var getTimes = 1 * 1000 * 1000;
 
-            var treeGetTime = IntGet(tree, key, getTimes);
-            var trieGetTime = IntGet(store, key, getTimes);
+        //    var treeGetTime = IntGet(tree, key, getTimes);
+        //    var trieGetTime = IntGet(store, key, getTimes);
 
-            Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
-            Console.WriteLine("Tree - " + treeGetTime);
-            Console.WriteLine("Store - " + trieGetTime);
-        }
+        //    Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
+        //    Console.WriteLine("Tree - " + treeGetTime);
+        //    Console.WriteLine("Store - " + trieGetTime);
+        //}
 
         public static void GetDictVsHashTreeOfType(int itemCount)
         {
@@ -527,35 +527,35 @@ namespace DryIoc.SpeedTestApp
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long IntAdd(ref ImTreeArray store, int[] keys, string value)
-        {
-            const string ignored = "";
-            var treeTime = Stopwatch.StartNew();
+        //private static long IntAdd(ref ImTreeArray store, int[] keys, string value)
+        //{
+        //    const string ignored = "";
+        //    var treeTime = Stopwatch.StartNew();
 
-            for (var i = 0; i < keys.Length; i++)
-                Interlocked.Exchange(ref store, store.Append(ignored + i));
+        //    for (var i = 0; i < keys.Length; i++)
+        //        Interlocked.Exchange(ref store, store.Append(ignored + i));
 
-            Interlocked.Exchange(ref store, store.Append(value));
+        //    Interlocked.Exchange(ref store, store.Append(value));
 
-            treeTime.Stop();
-            GC.Collect();
-            return treeTime.ElapsedMilliseconds;
-        }
+        //    treeTime.Stop();
+        //    GC.Collect();
+        //    return treeTime.ElapsedMilliseconds;
+        //}
 
-        private static long IntAdd(ref IntTree<string> tree, int[] keys, int key, string value)
-        {
-            var ignored = "ignored";
-            var treeTime = Stopwatch.StartNew();
+        //private static long IntAdd(ref IntTree<string> tree, int[] keys, int key, string value)
+        //{
+        //    var ignored = "ignored";
+        //    var treeTime = Stopwatch.StartNew();
 
-            for (var i = 0; i < keys.Length; i++)
-                Interlocked.Exchange(ref tree, tree.AddOrUpdate(keys[i], ignored));
+        //    for (var i = 0; i < keys.Length; i++)
+        //        Interlocked.Exchange(ref tree, tree.AddOrUpdate(keys[i], ignored));
 
-            Interlocked.Exchange(ref tree, tree.AddOrUpdate(key, value));
+        //    Interlocked.Exchange(ref tree, tree.AddOrUpdate(key, value));
 
-            treeTime.Stop();
-            GC.Collect();
-            return treeTime.ElapsedMilliseconds;
-        }
+        //    treeTime.Stop();
+        //    GC.Collect();
+        //    return treeTime.ElapsedMilliseconds;
+        //}
 
         private static long IntTreeV2Add<V>(ref HashTreeV2<V> tree, int[] keys, int key, V value)
         {
@@ -614,19 +614,19 @@ namespace DryIoc.SpeedTestApp
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long IntGet(ImTreeArray store, int key, int times)
-        {
-            object ignored = "ignored";
-            var treeWatch = Stopwatch.StartNew();
+        //private static long IntGet(ImTreeArray store, int key, int times)
+        //{
+        //    object ignored = "ignored";
+        //    var treeWatch = Stopwatch.StartNew();
 
-            for (int i = 0; i < times; i++)
-                ignored = store.Get(key);
+        //    for (int i = 0; i < times; i++)
+        //        ignored = store.Get(key);
 
-            treeWatch.Stop();
-            GC.KeepAlive(ignored);
-            GC.Collect();
-            return treeWatch.ElapsedMilliseconds;
-        }
+        //    treeWatch.Stop();
+        //    GC.KeepAlive(ignored);
+        //    GC.Collect();
+        //    return treeWatch.ElapsedMilliseconds;
+        //}
 
         private static long IntTreeV2Get<V>(HashTreeV2<V> tree, int key, int times)
         {

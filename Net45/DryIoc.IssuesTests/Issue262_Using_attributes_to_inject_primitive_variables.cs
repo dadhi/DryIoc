@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests
                     var attr = p.GetCustomAttribute<ServiceKeyResolverAttribute>();
                     return attr == null ? null
                         : ParameterServiceInfo.Of(p)
-                            .WithDetails(ServiceDetails.Of(ConfigWrapper.GetValue(attr.Key)), request);
+                            .WithDetails(ServiceDetails.Of(ConfigWrapper.GetValue(attr.Key)));
                 }));
 
             container.Register<IService, Service>();
@@ -70,8 +70,7 @@ namespace DryIoc.IssuesTests
                         if (attr == null)
                             return null;
                         var value = ConfigWrapper.GetValue(attr.Key);
-                        return PropertyOrFieldServiceInfo.Of(member)
-                            .WithDetails(ServiceDetails.Of(value), request);
+                        return PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(value));
                     })));
 
             container.Register<IService, BlahService>();

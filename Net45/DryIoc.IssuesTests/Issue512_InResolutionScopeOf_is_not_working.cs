@@ -10,8 +10,8 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<TestScope1>();
-            container.Register<TestScope2>();
+            container.Register<TestScope1>(setup: Setup.With(openResolutionScope: true));
+            container.Register<TestScope2>(setup: Setup.With(openResolutionScope: true));
             container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope1>());
             container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope2>());
 
@@ -27,8 +27,8 @@ namespace DryIoc.IssuesTests
             var container = new Container(rules => rules
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory()));
 
-            container.Register<TestScope1>();
-            container.Register<TestScope2>();
+            container.Register<TestScope1>(setup: Setup.With(openResolutionScope: true));
+            container.Register<TestScope2>(setup: Setup.With(openResolutionScope: true));
             container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope1>());
             container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope2>());
 

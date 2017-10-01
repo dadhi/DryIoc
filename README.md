@@ -30,6 +30,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
+- Version 3 Preview 1 is out, check it out and read the [Release Notes](https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes)
+
 - Latest stable DryIoc version is __2.12.2__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
@@ -58,7 +60,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ## Reliability
 
-* Unit-test suite with ~850 tests.
+* Unit-test suite with ~950 tests.
 * Thread-safe and lock-free — registrations and resolutions may proceed in parallel without corrupting container state. 
 * Detects recursive dependencies aka cycles in object graph.
 * Throws exceptions as early as possible. Exception provides meaningful information about problem and context.

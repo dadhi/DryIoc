@@ -15,8 +15,8 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<B>(Reuse.InResolutionScopeOf<IA>());
-            container.Register<IA, A>(setup: Setup.With(asResolutionCall: true));
-            container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
+            container.Register<IA, A>();
+            container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true, openResolutionScope: true));
 
             var a = container.Resolve(typeof(IA));
 
@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<B>(Reuse.InResolutionScopeOf<IA>());
             container.Register<IA, A>();
-            container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true));
+            container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true, openResolutionScope: true));
 
             var a = container.ResolveMany(typeof(IA)).First();
 
@@ -75,8 +75,8 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<Aa>();
-            container.Register<Bb>();
+            container.Register<Aa>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Bb>(setup: Setup.With(openResolutionScope: true));
             container.Register<Dd>();
             container.Register<IXx, Xx>(Reuse.InResolutionScopeOf<Aa>());
             container.Register<IXx, Yy>(Reuse.InResolutionScopeOf<Bb>());
@@ -146,19 +146,19 @@ namespace DryIoc.IssuesTests
 
             c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
                        made: Parameters.Of.Type<IActionHandler>(serviceKey: "key1"),
-                       setup: Setup.DecoratorWith(r => true));
+                       setup: Setup.DecoratorWith(r => true, openResolutionScope: true));
 
             c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
                        made: Parameters.Of.Type<IActionHandler>(serviceKey: "key2"),
-                       setup: Setup.DecoratorWith(r => true));
+                       setup: Setup.DecoratorWith(r => true, openResolutionScope: true));
 
             c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
                        made: Parameters.Of.Type<IActionHandler>(serviceKey: "key3"),
-                       setup: Setup.DecoratorWith(r => true));
+                       setup: Setup.DecoratorWith(r => true, openResolutionScope: true));
 
             c.Register(typeof(IAsyncRequestHandler<,>), typeof(Decorator<,>),
                        made: Parameters.Of.Type<IActionHandler>(serviceKey: "key4"),
-                       setup: Setup.DecoratorWith(r => true));
+                       setup: Setup.DecoratorWith(r => true, openResolutionScope: true));
 
             c.Register<Command1>();
             c.Register<CommandFactory>();
@@ -167,6 +167,7 @@ namespace DryIoc.IssuesTests
             c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncNotificationHandler<>)));
 
             var mediator = c.Resolve<IMediator>();
+
             var x = mediator.SendAsync(new RequestCommand()).Result;
 
             Assert.AreEqual("success", x);

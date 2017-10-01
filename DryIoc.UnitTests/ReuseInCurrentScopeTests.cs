@@ -12,18 +12,19 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_reuse_instances_in_new_open_scope()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            container.Register<Log>(Reuse.InCurrentScope);
+
+            using (var scope = container.OpenScope())
             {
-                container.Register<Log>(Reuse.InCurrentScope);
-
-                var outerLog = container.Resolve<Log>();
-                using (var scope = container.OpenScope())
+                var outerLog = scope.Resolve<Log>();
+                using (var scope2 = scope.OpenScope())
                 {
-                    var scopedLog1 = scope.Resolve<Log>();
-                    var scopedLog2 = scope.Resolve<Log>();
+                    var scopedLog1 = scope2.Resolve<Log>();
+                    var scopedLog2 = scope2.Resolve<Log>();
 
-                    Assert.That(scopedLog1, Is.SameAs(scopedLog2));
-                    Assert.That(scopedLog1, Is.Not.SameAs(outerLog));
+                    Assert.AreSame(scopedLog1, scopedLog2);
+                    Assert.AreNotSame(scopedLog1, outerLog);
                 }
             }
         }
@@ -31,16 +32,17 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_reuse_instances_in_three_level_nested_scope()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            using (var scope = container.OpenScope())
             {
                 container.Register<Log>(Reuse.InCurrentScope);
 
-                var outerLog = container.Resolve<Log>();
-                using (var scope = container.OpenScope())
+                var outerLog = scope.Resolve<Log>();
+                using (var scope2 = scope.OpenScope())
                 {
-                    var scopedLog = scope.Resolve<Log>();
+                    var scopedLog = scope2.Resolve<Log>();
 
-                    using (var deepScope = scope.OpenScope())
+                    using (var deepScope = scope2.OpenScope())
                     {
                         var deepLog1 = deepScope.Resolve<Log>();
                         var deepLog2 = deepScope.Resolve<Log>();
@@ -99,12 +101,12 @@ namespace DryIoc.UnitTests
                 getLog = containerWithNewScope.Resolve<Func<Log>>();
 
             Assert.AreEqual(
-                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Error.ScopeIsDisposed),
                 Error.NameOf(Assert.Throws<ContainerException>(() => getLog()).Error));
 
             // the same error should be kept for further operations
             Assert.AreEqual(
-                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Error.ScopeIsDisposed),
                 Error.NameOf(Assert.Throws<ContainerException>(() => getLog()).Error));
         }
 
@@ -174,8 +176,9 @@ namespace DryIoc.UnitTests
             Assert.That(client.Dep, Is.InstanceOf<Dep>());
             Assert.That(client.Serv, Is.InstanceOf<Serv>());
 
-            using (var scoped = container.OpenScope(scopeName,
-                rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(scopeName))))
+            using (var scoped = container.With(rules => rules
+                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(scopeName)))
+                .OpenScope(scopeName))
             {
                 var scopedClient = scoped.Resolve<IClient>(scopeName);
 
@@ -353,104 +356,6 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(singleton.IsDisposed);
         }
 
-        [Test]
-        public void Exist_rule_to_open_scope_with_container()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            container.Register<Blah>(Reuse.InCurrentScope);
-
-            var blah = container.Resolve<Blah>();
-
-            container.Dispose();
-            container.Dispose();
-            Assert.IsTrue(blah.IsDisposed);
-        }
-
-        [Test]
-        public void Exist_rule_to_open_scope_with_container_and_scope_has_root_name()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            Assert.AreEqual(Container.NonAmbientRootScopeName, container.GetCurrentScope().Name);
-        }
-
-        [Test]
-        public void With_rule_to_open_implicit_scope_with_container_I_can_open_and_dispose_nested_scope()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            container.Register<Blah>(Reuse.InCurrentScope);
-
-            Blah blah;
-            using (var scope = container.OpenScope())
-                blah = scope.Resolve<Blah>();
-
-            Assert.IsTrue(blah.IsDisposed);
-
-            blah = container.Resolve<Blah>();
-            container.Dispose();
-            Assert.IsTrue(blah.IsDisposed);
-        }
-
-        [Test]
-        public void Transient_disposable_should_be_resolved_from_root_and_next_two_scopes()
-        {
-            var container = new Container(rules => rules
-            .WithTrackingDisposableTransients()
-            .WithImplicitRootOpenScope());
-
-            container.Register<Blah>();
-
-            var b = container.Resolve<Blah>();
-
-            Blah b1;
-            using (var scope = container.OpenScope())
-            {
-                b1 = scope.Resolve<Blah>();
-                Assert.AreNotSame(b1, b);
-            }
-            
-            Assert.IsTrue(b1.IsDisposed);
-
-            Blah b2;
-            using (var scope = container.OpenScope())
-            {
-                b2 = scope.Resolve<Blah>();
-                Assert.AreNotSame(b2, b);
-            }
-
-            Assert.IsTrue(b2.IsDisposed);
-        }
-
-        [Test]
-        public void Injected_into_scoped_service_transient_disposable_should_be_resolved_from_root_and_next_two_scopes()
-        {
-            var container = new Container(rules => rules
-            .WithTrackingDisposableTransients()
-            .WithImplicitRootOpenScope());
-
-            container.Register<Blah>();
-            container.Register<BlahConsumer>(Reuse.InCurrentScope);
-
-            var b = container.Resolve<BlahConsumer>().Blah;
-
-            Blah b1;
-            using (var scope = container.OpenScope())
-            {
-                b1 = scope.Resolve<BlahConsumer>().Blah;
-                Assert.AreNotSame(b1, b);
-            }
-
-            Assert.IsTrue(b1.IsDisposed);
-
-            Blah b2;
-            using (var scope = container.OpenScope())
-            {
-                b2 = scope.Resolve<BlahConsumer>().Blah;
-                Assert.AreNotSame(b2, b);
-            }
-
-            Assert.IsTrue(b2.IsDisposed);
-        }
-
         public class BlahConsumer
         {
             public Blah Blah { get; }
@@ -459,22 +364,6 @@ namespace DryIoc.UnitTests
             {
                 Blah = blah;
             }
-        }
-
-        [Test]
-        public void Rule_to_open_implicit_scope_with_container_Will_not_work_with_ambient_scope_context()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope(), new ThreadScopeContext());
-            Assert.IsNotNull(container.ScopeContext);
-
-            container.Register<Blah>(Reuse.InCurrentScope);
-
-            var ex = Assert.Throws<ContainerException>(() => 
-            container.Resolve<Blah>());
-
-            Assert.AreEqual(
-                Error.NameOf(Error.NoCurrentScope),
-                Error.NameOf(ex.Error));
         }
 
         public interface IAction { }

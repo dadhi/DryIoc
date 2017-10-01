@@ -62,7 +62,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 .Where(r => r.ServiceType.Name.Contains("Import"))
                 .ToArray();
 
-            var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
+            var roots = ImHashMap<KV<Type, object>, Expression>.Empty;
             foreach (var r in serviceRegistrations)
             {
                 var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
@@ -115,7 +115,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 .Where(r => r.Factory.Setup.AsResolutionRoot)
                 .ToArray();
 
-            var roots = ImTreeMap<KV<Type, object>, Expression>.Empty;
+            var roots = ImHashMap<KV<Type, object>, Expression>.Empty;
             foreach (var r in serviceRegistrations)
             {
                 var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);

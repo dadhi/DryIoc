@@ -8,8 +8,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var factory = new Container(rules => rules
-                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var factory = new Container(rules => rules.WithDefaultReuse(Reuse.InCurrentScope));
 
             factory.Register<IContractRepository, ContractRepository>();
             factory.Register<IRepositoryEntity<ntw_contract>, ContractRepository>();

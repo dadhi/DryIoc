@@ -33,7 +33,7 @@ namespace DryIoc.UnitTests
             container.Register<SomeBlah>(made: Made.Of(propertiesAndFields:
                 r => r.ImplementationType.GetTypeInfo().DeclaredProperties.Select(p =>
                     p.Name.Equals("Uses") ? PropertyOrFieldServiceInfo.Of(p)
-                        .WithDetails(ServiceDetails.Of(typeof(Service)), r) : null)));
+                        .WithDetails(ServiceDetails.Of(typeof(Service))) : null)));
             container.Register<Service>();
 
             var blah = container.Resolve<SomeBlah>();
@@ -247,7 +247,7 @@ namespace DryIoc.UnitTests
                     var targetType = request.Parent.ImplementationType;
                     var targetName = string.Format("{0}.{1}", targetType.Namespace, targetType.Name);
                     return ParameterServiceInfo.Of(parameter)
-                        .WithDetails(ServiceDetails.Of(defaultValue: targetName), request);
+                        .WithDetails(ServiceDetails.Of(defaultValue: targetName));
                 }));
 
 
@@ -269,7 +269,7 @@ namespace DryIoc.UnitTests
                 Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
-                made: Made.Of(r => GetType().GetMethodOrNull("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
+                made: Made.Of(r => GetType().Method("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
 
             var service = container.Resolve<MyService>();
 

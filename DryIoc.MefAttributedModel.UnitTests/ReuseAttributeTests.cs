@@ -34,15 +34,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_specify_current_scope_reuse()
         {
-            using (var container = new Container().WithMefAttributedModel().OpenScope()) 
+            var container = new Container().WithMefAttributedModel();
+            using (var scope = container.OpenScope()) 
             { 
                 container.RegisterExports(typeof(ServiceWithCurrentScopeReuse));
 
-                var one = container.Resolve<ServiceWithCurrentScopeReuse>();
-                using (var scope = container.OpenScope())
+                var one = scope.Resolve<ServiceWithCurrentScopeReuse>();
+                using (var scope2 = scope.OpenScope())
                 {
-                    var oneInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
-                    var anotherInScope = scope.Resolve<ServiceWithCurrentScopeReuse>();
+                    var oneInScope = scope2.Resolve<ServiceWithCurrentScopeReuse>();
+                    var anotherInScope = scope2.Resolve<ServiceWithCurrentScopeReuse>();
 
                     Assert.That(one, Is.Not.SameAs(oneInScope));
                     Assert.That(oneInScope, Is.SameAs(anotherInScope));
@@ -54,13 +55,14 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public void Can_specify_resolution_scope_reuse()
         {
             var container = new Container().WithMefAttributedModel();
-            container.RegisterExports(typeof(ServiceWithResolutionScopeReuse), typeof(UserOfServiceWithResolutionScopeReuse));
 
-            var one = container.Resolve<ServiceWithResolutionScopeReuse>();
+            container.RegisterExports(
+                typeof(ServiceWithResolutionScopeReuse), 
+                typeof(UserOfServiceWithResolutionScopeReuse));
+
             var user = container.Resolve<UserOfServiceWithResolutionScopeReuse>();
 
-            Assert.That(one, Is.Not.SameAs(user.One));
-            Assert.That(user.One, Is.SameAs(user.Another));
+            Assert.AreSame(user.One, user.Another);
         }
 
         [Test]

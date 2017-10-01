@@ -146,7 +146,7 @@ namespace DryIoc.UnitTests
 
         public class X
         {
-            public Y Dep { get; private set; }
+            public Y Dep { get; }
 
             public X(Y dep)
             {
@@ -243,7 +243,7 @@ namespace DryIoc.UnitTests
                 var import = (ImportAttribute)parameter.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
                 var details = import == null ? ServiceDetails.Default
                     : ServiceDetails.Of(import.ContractType, import.ContractName);
-                return ParameterServiceInfo.Of(parameter).WithDetails(details, request);
+                return ParameterServiceInfo.Of(parameter).WithDetails(details);
             };
         }
 
@@ -264,8 +264,7 @@ namespace DryIoc.UnitTests
                     .FirstOrDefault(kv => metadata.Equals(kv.Value.Setup.Metadata))
                     .ThrowIfNull();
 
-                return ParameterServiceInfo.Of(parameter)
-                    .WithDetails(ServiceDetails.Of(serviceType, factory.Key), request);
+                return ParameterServiceInfo.Of(parameter).WithDetails(ServiceDetails.Of(serviceType, factory.Key));
             };
         }
 
@@ -347,8 +346,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithItemToExpressionConverter(
                 (item, type) => type == typeof(ConnectionString)
-                ? Expression.New(type.GetSingleConstructorOrNull(),
-                    Expression.Constant(((ConnectionString)item).Value))
+                ? Expression.New(type.Constructor(), Expression.Constant(((ConnectionString)item).Value))
                 : null));
 
             var s = new ConnectionString("aaa");
@@ -518,84 +516,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_track_transient_service_in_implicit_open_scope()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope());
-            container.Register<AD>(setup: Setup.With(trackDisposableTransient: true));
-
-            var ad = container.Resolve<AD>();
-
-            container.Dispose();
-
-            Assert.IsTrue(ad.IsDisposed);
-        }
-
-        [Test]
-        public void Should_track_transient_service_in_nested_open_scope_if_present()
-        {
-            var container = new Container(rules => rules
-                .WithImplicitRootOpenScope()
-                .WithTrackingDisposableTransients());
-
-            container.Register<AD>();
-
-            AD ad;
-            using (var scope = container.OpenScope())
-                ad = scope.Resolve<AD>();
-
-            Assert.IsTrue(ad.IsDisposed);
-        }
-
-        [Test]
-        public void Can_prevent_tracking_for_registration_with_prevent_disposal_option()
-        {
-            var container = new Container(rules => rules
-                .WithImplicitRootOpenScope()
-                .WithTrackingDisposableTransients());
-
-            container.Register<AD>(setup: Setup.With(preventDisposal: true));
-
-            AD ad;
-            using (var scope = container.OpenScope())
-                ad = scope.Resolve<AD>();
-
-            Assert.IsFalse(ad.IsDisposed);
-        }
-
-        [Test]
-        public void Can_prevent_tracking_for_registration_with_allow_disposal_option()
-        {
-            var container = new Container(rules => rules
-                .WithImplicitRootOpenScope()
-                .WithTrackingDisposableTransients());
-            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true));
-
-            AD ad;
-            using (var scope = container.OpenScope())
-                ad = scope.Resolve<AD>();
-
-            Assert.IsFalse(ad.IsDisposed);
-        }
-
-        [Test]
-        public void Disposing_the_open_scope_should_not_dispose_the_implictly_open_root_scope()
-        {
-            var container = new Container(rules => rules.WithImplicitRootOpenScope());
-
-            container.Register<AD>(Reuse.InCurrentScope);
-
-            AD ad;
-            using (var scope = container.OpenScope())
-                ad = scope.Resolve<AD>();
-
-            Assert.IsTrue(ad.IsDisposed);
-
-            ad = container.Resolve<AD>();
-            container.Dispose();
-            Assert.IsTrue(ad.IsDisposed);
-        }
-
-        [Test]
         public void Should_track_transient_service_in_open_scope_of_any_name_if_present()
         {
             var container = new Container();
@@ -632,9 +552,9 @@ namespace DryIoc.UnitTests
 
         public class ADConsumer
         {
-            public AD Ad { get; private set; }
+            public AD Ad { get; }
 
-            public AD Ad2 { get; private set; }
+            public AD Ad2 { get; }
 
             public ADConsumer(AD ad, AD ad2)
             {
@@ -645,9 +565,9 @@ namespace DryIoc.UnitTests
 
         public class AResolutionScoped
         {
-            public ADConsumer Consumer { get; private set; }
+            public ADConsumer Consumer { get; }
 
-            public IDisposable Dependencies { get; private set; }
+            public IDisposable Dependencies { get; }
 
             public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
             {
@@ -658,9 +578,9 @@ namespace DryIoc.UnitTests
 
         public class AResolutionScopedConsumer
         {
-            public AResolutionScoped AScoped { get; private set; }
+            public AResolutionScoped AScoped { get; }
 
-            public IDisposable Dependencies { get; private set; }
+            public IDisposable Dependencies { get; }
 
             public AResolutionScopedConsumer(AResolutionScoped aScoped, IDisposable dependencies)
             {
@@ -671,7 +591,7 @@ namespace DryIoc.UnitTests
 
         public class ADFuncConsumer
         {
-            public AD Ad { get; private set; }
+            public AD Ad { get; }
 
             public ADFuncConsumer(Func<AD> ad)
             {
@@ -681,7 +601,7 @@ namespace DryIoc.UnitTests
 
         public class ADLazyConsumer
         {
-            public AD Ad { get; private set; }
+            public AD Ad { get; }
 
             public ADLazyConsumer(Lazy<AD> ad)
             {

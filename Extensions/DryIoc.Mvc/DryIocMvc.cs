@@ -166,13 +166,14 @@ namespace DryIoc.Mvc
             _throwIfUnresolved = throwIfUnresolved;
         }
 
-        /// <summary> Resolves singly registered services that support arbitrary object creation. </summary>
+        /// <summary> Resolves single registered services that support arbitrary object creation. </summary>
         /// <returns> The requested service or object. </returns>
         /// <param name="serviceType">The type of the requested service or object.</param>
         public object GetService(Type serviceType)
         {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return _resolver.Resolve(serviceType, ifUnresolvedReturnDefault);
+            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            return _resolver.Resolve(serviceType, ifUnresolved);
         }
 
         /// <summary> Resolves multiply registered services. </summary>

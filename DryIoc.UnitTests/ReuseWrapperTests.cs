@@ -35,13 +35,14 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_specify_do_Not_dispose_disposable_scoped_object()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            using (var scope = container.OpenScope())
             {
-                container.Register<IService, DisposableService>(Reuse.InCurrentScope, setup: Setup.With(preventDisposal: true));
+                container.Register<IService, DisposableService>(Reuse.Scoped, setup: Setup.With(preventDisposal: true));
 
-                var service = container.Resolve<IService>();
+                var service = scope.Resolve<IService>();
 
-                container.Dispose();
+                scope.Dispose();
 
                 Assert.That(((DisposableService)service).IsDisposed, Is.False);
             }
@@ -78,56 +79,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_store_disposable_as_WeakReference_and_dispose_it_if_alive()
-        {
-            var container = new Container();
-            container.Register<DisposableService>(Reuse.InCurrentScope, setup: Setup.With(weaklyReferenced: true));
-            var scope = container.OpenScope();
-
-            var service = scope.Resolve<DisposableService>();
-
-            scope.Dispose();
-            Assert.IsTrue(service.IsDisposed);
-        }
-
-        [Explicit]
-        public void Can_nest_Disposable_into_Weak_Referenced_wrapper()
-        {
-            var container = new Container();
-            container.Register<IService, DisposableService>(Reuse.InCurrentScope,
-                setup: Setup.With(preventDisposal: true, weaklyReferenced: true));
-
-            using (container.OpenScope())
-            {
-                var service = container.Resolve<IService>();
-                var serviceWeakRef = new WeakReference(service);
-                // ReSharper disable RedundantAssignment
-                service = null;
-                // ReSharper restore RedundantAssignment
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-                GC.KeepAlive(container);
-
-                Assert.That(serviceWeakRef.IsAlive, Is.False);
-            }
-        }
-
-        [Test, Explicit("GC bound")]
-        public void Can_nest_Disposable_into_WeakReference_reused_in_current_scope()
-        {
-            var container = new Container();
-            container.Register<IService, DisposableService>(Reuse.Singleton,
-                setup: Setup.With(preventDisposal: true, weaklyReferenced: true));
-
-            var service = container.Resolve<IService>();
-
-            Assert.IsInstanceOf<DisposableService>(service);
-            GC.KeepAlive(service);
-        }
-
-        [Test]
         public void Should_Not_throw_if_reused_wrappers_registered_without_reuse_because_of_possible_ReuseMapping_rules()
         {
             var container = new Container();
@@ -139,13 +90,14 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_resolve_func_with_args_of_reuse_wrapper()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            using (var scope = container.OpenScope())
             {
                 container.Register<Service>();
                 container.Register<ServiceWithParameterAndDependency>(
-                    Reuse.InCurrentScope, setup: Setup.With(weaklyReferenced: true));
+                    Reuse.Scoped, setup: Setup.With(weaklyReferenced: true));
 
-                var func = container.Resolve<Func<bool, ServiceWithParameterAndDependency>>();
+                var func = scope.Resolve<Func<bool, ServiceWithParameterAndDependency>>();
                 var service = func(true);
 
                 Assert.That(service, Is.InstanceOf<ServiceWithParameterAndDependency>());

@@ -14,10 +14,10 @@ namespace DryIoc.IssuesTests
             var a = parent.Resolve<A>(); // stores instance of A in parent singleton scope 
 
             B b;
-            using (var child = parent.CreateFacade())
+            using (var child = parent.CreateFacade().WithoutSingletonsAndCache())
             {
-                child.Register<B>(Reuse.Singleton);
-                b = child.Resolve<B>(); // stores B and B.A in child singleton scope. 
+                child.Register<B>(Reuse.Singleton, serviceKey: ContainerTools.FacadeKey);
+                b = child.Resolve<B>(); // stores B and B.A in child singleton scope.
             }
 
             Assert.IsTrue(b.IsDisposed);

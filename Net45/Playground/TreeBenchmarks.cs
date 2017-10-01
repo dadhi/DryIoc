@@ -72,10 +72,10 @@ namespace Playground
 
             var keys = Enumerable.Range(0, itemCount).ToArray();
 
-            var tree = ImTreeMap<int, string>.Empty;
+            var tree = ImHashMap<int, string>.Empty;
             var trie = IntHashTrie<string>.Empty;
 
-            var treeAddTime = ImTreeMapAddIntKey(ref tree, keys, key, value);
+            var treeAddTime = ImHashMapAddIntKey(ref tree, keys, key, value);
             var trieAddTime = IntHashTrieAdd(ref trie, keys, key, value);
 
             Console.WriteLine("Adding {0} items (ms):", itemCount);
@@ -85,7 +85,7 @@ namespace Playground
 
             var getTimes = 1 * 1000 * 1000;
 
-            var treeGetTime = ImTreeMapGetIntKey(tree, key, getTimes);
+            var treeGetTime = ImHashMapGetIntKey(tree, key, getTimes);
             var trieGetTime = IntHashTrieGet(trie, key, getTimes);
 
             Console.WriteLine("Getting one out of {0} items {1:N0} times (ms):", itemCount, getTimes);
@@ -100,7 +100,7 @@ namespace Playground
 
             var keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(itemCount).ToArray();
 
-            var tree = ImTreeMap<Type, string>.Empty;
+            var tree = ImHashMap<Type, string>.Empty;
             var trie = HashTrie<Type, string>.Empty;
 
             var treeAddTime = TreeAdd(ref tree, keys, key, value);
@@ -161,9 +161,9 @@ namespace Playground
 
         #endregion
 
-        #region DryIoc.ImTreeMap
+        #region DryIoc.ImHashMap
 
-        private static long ImTreeMapAddIntKey<V>(ref ImTreeMap<int, V> tree, int[] keys, int key, V value)
+        private static long ImHashMapAddIntKey<V>(ref ImHashMap<int, V> tree, int[] keys, int key, V value)
         {
             var ignored = default(V);
             var treeTime = Stopwatch.StartNew();
@@ -178,7 +178,7 @@ namespace Playground
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long ImTreeMapGetIntKey<V>(ImTreeMap<int, V> tree, int key, int times)
+        private static long ImHashMapGetIntKey<V>(ImHashMap<int, V> tree, int key, int times)
         {
             V ignored = default(V);
             var treeWatch = Stopwatch.StartNew();
@@ -192,7 +192,7 @@ namespace Playground
             return treeWatch.ElapsedMilliseconds;
         }
 
-        private static long TreeAdd<V>(ref ImTreeMap<Type, V> tree, Type[] keys, Type key, V value)
+        private static long TreeAdd<V>(ref ImHashMap<Type, V> tree, Type[] keys, Type key, V value)
         {
             var ignored = default(V);
             var treeTime = Stopwatch.StartNew();
@@ -211,7 +211,7 @@ namespace Playground
             return treeTime.ElapsedMilliseconds;
         }
 
-        private static long TreeGet<T>(ImTreeMap<Type, T> tree, Type key, int times)
+        private static long TreeGet<T>(ImHashMap<Type, T> tree, Type key, int times)
         {
             T ignored = default(T);
 

@@ -73,7 +73,7 @@ namespace DryIoc.IssuesTests
         }
 
         private static Made factoryMethod = Made.Of(
-            typeof(Issue357_MefRulesBreakMadeParameters).GetMethodOrNull("FactoryMethod", typeof(string)),
+            typeof(Issue357_MefRulesBreakMadeParameters).Method("FactoryMethod", typeof(string)),
             parameters: Parameters.Of.Type<string>(r => "b"));
     }
 }

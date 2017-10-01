@@ -397,7 +397,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(IA<>), made: Made.Of(GetType().GetSingleMethodOrNull("GetAOf", true)));
+            container.Register(typeof(IA<>), made: Made.Of(GetType().Method(nameof(GetAOf), true)));
 
             container.Resolve<IA<B>>();
         }

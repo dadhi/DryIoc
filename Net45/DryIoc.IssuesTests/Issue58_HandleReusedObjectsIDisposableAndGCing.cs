@@ -19,7 +19,7 @@ namespace DryIoc.IssuesTests
         {
             WeakReference @ref;
             var c = new Container();
-            c.Register<ITest, Test>(Reuse.InResolutionScope);
+            c.Register<ITest, Test>(Reuse.Scoped);
             var cx = c.OpenScope();
             RunTheTest(out @ref, cx);
             cx.Dispose();

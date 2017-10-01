@@ -52,7 +52,7 @@ namespace DryIoc.Owin
         /// then call <see cref="UseRegisteredMiddlewares"/>.</remarks>
         public static IAppBuilder UseDryIocOwinMiddleware(
             this IAppBuilder app, IContainer container,
-            Action<IContainer> registerInScope = null,
+            Action<IResolverContext> registerInScope = null,
             IScopeContext scopeContext = null)
         {
             var containerWithAmbientContext = container.InsertOpenScope(app, registerInScope, scopeContext);
@@ -64,13 +64,13 @@ namespace DryIoc.Owin
         /// Additionally may register external instance into open scope.</summary>
         /// <param name="app">App builder to use.</param>
         /// <param name="container">DryIoc container for opening scope.</param>
-        /// <param name="registerInScope">(optional) e.g. `container => container.UseInstance(someSettings)`</param>
+        /// <param name="registerInScope">(optional) e.g. `r => r.UseInstance(someSettings)`</param>
         /// <param name="scopeContext">(optional) Scope context to use. By default sets the <see cref="AsyncExecutionFlowScopeContext"/>.</param>
         /// <returns>IMPORTANT: if passed <paramref name="container"/> did not have a scope context,
         /// then the method will return NEW container with scope context set. 
         /// Use the returned container to pass to <see cref="UseRegisteredMiddlewares"/>.</returns>
         public static IContainer InsertOpenScope(this IContainer container, IAppBuilder app, 
-            Action<IContainer> registerInScope = null, 
+            Action<IResolverContext> registerInScope = null, 
             IScopeContext scopeContext = null)
         {
             if (container.ScopeContext == null)

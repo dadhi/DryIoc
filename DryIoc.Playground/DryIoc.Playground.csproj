@@ -54,7 +54,6 @@
     <Compile Include="GetInterfaceMapCustomImplTests.cs" />
     <Compile Include="HashTree.cs" />
     <Compile Include="HashTreeTests.cs" />
-    <Compile Include="ImTreeArray.cs" />
     <Compile Include="IntTree.cs" />
     <Compile Include="HashTreeAccessSpeedTests.cs" />
     <Compile Include="HashTreeEnumerationSpeedTests.cs" />

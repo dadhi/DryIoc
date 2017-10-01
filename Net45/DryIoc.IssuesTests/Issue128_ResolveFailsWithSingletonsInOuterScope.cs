@@ -9,6 +9,7 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container();
+
             container.RegisterMany<Layr1>(Reuse.InResolutionScopeOf<IComp>(), nonPublicServiceTypes: true);
             container.RegisterMany<Layr2>(Reuse.InResolutionScopeOf<IComp>(), nonPublicServiceTypes: true);
             container.RegisterMany<Comp1>(Reuse.Singleton, nonPublicServiceTypes: true, setup: Setup.With(openResolutionScope: true));

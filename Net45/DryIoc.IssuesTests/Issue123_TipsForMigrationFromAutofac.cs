@@ -322,10 +322,11 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Implement_Owned_in_DryIoc()
         {
-            var container = new Container();
-            container.Register(typeof(DryIocOwned<>), setup: Setup.Wrapper);
-            container.Register<My>(Reuse.InResolutionScope);
-            container.Register<Cake>(Reuse.InResolutionScopeOf<My>());
+            var container = new Container(r => r.WithTrackingDisposableTransients());
+            container.Register(typeof(DryIocOwned<>), setup: Setup.WrapperWith(openResolutionScope: true));
+
+            container.Register<My>();
+            container.Register<Cake>(Reuse.Scoped);
 
             var my = container.Resolve<My>();
             my.Dispose();

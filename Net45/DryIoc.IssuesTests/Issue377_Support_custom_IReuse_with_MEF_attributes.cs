@@ -25,15 +25,18 @@ namespace DryIoc.IssuesTests
         public class A { }
 
         /// <summary>Singleton with modified lifespan to pass the check.</summary>
-        public class CustomReuse : IReuse, IReuseV3
+        public class CustomReuse : IReuse
         {
             public static readonly CustomReuse Value = new CustomReuse();
 
             public int Lifespan { get { return 0; } }
 
-            public Expression Apply(Request request, bool trackTransientDisposable, Expression createItemExpr)
+            /// <inheritdoc />
+            public object Name { get { return null; } }
+
+            public Expression Apply(Request request, Expression serviceFactoryExpr)
             {
-                return ((IReuseV3)Reuse.Singleton).Apply(request, trackTransientDisposable, createItemExpr);
+                return Reuse.Singleton.Apply(request,serviceFactoryExpr);
             }
 
             public bool CanApply(Request request)

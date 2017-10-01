@@ -62,7 +62,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_instance_as_weak_reference_does_not_prevent_it_from_dispose()
+        public void Registering_instance_as_weak_reference_will_prevent_the_disposal()
         {
             var container = new Container();
             var instance = new DisposableService();
@@ -71,7 +71,7 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
 
-            Assert.IsTrue(instance.IsDisposed);
+            Assert.IsFalse(instance.IsDisposed);
             GC.KeepAlive(instance);
         }
 
@@ -92,21 +92,24 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<Consumer>();
             container.Register<Account>();
-            container.Register<Log>(Reuse.InResolutionScope);
+            container.Register<Log>(Reuse.Scoped);
 
-            var consumer = container.Resolve<Consumer>();
+            using (var scope = container.OpenScope())
+            {
+                var consumer = scope.Resolve<Consumer>();
 
-            Assert.That(consumer.Log, Is.Not.Null);
-            Assert.That(consumer.Log, Is.SameAs(consumer.Account.Log));
+                Assert.That(consumer.Log, Is.Not.Null);
+                Assert.That(consumer.Log, Is.SameAs(consumer.Account.Log));
+            }
         }
 
         [Test]
         public void In_different_resolution_scopes_Log_instances_should_be_different()
         {
             var container = new Container();
-            container.Register<Consumer>();
-            container.Register<Account>();
-            container.Register<Log>(Reuse.InResolutionScope);
+            container.Register<Consumer>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Account>(setup: Setup.With(openResolutionScope: true));
+            container.Register<Log>(Reuse.Scoped);
 
             var consumer = container.Resolve<Consumer>();
             var account = container.Resolve<Account>();
@@ -165,7 +168,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(Aaa<>));
+            container.Register(typeof(Aaa<>), setup: Setup.With(openResolutionScope: true));
             container.Register<Bbb>(Reuse.InResolutionScopeOf(typeof(Aaa<>)));
 
             var aaa = container.Resolve<Aaa<Bbb>>();
@@ -206,7 +209,7 @@ namespace DryIoc.UnitTests
         public void Can_use_resolution_scope_reuse_bound_to_resolution_root()
         {
             var container = new Container();
-            container.Register<ViewModel2>();
+            container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
             container.Register<Log>(Reuse.InResolutionScopeOf<ViewModel2>());
 
             var vm = container.Resolve<ViewModel2>();
@@ -215,28 +218,11 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_specify_to_resolve_corresponding_log_in_resolution_scope_automagically_Without_condition()
-        {
-            var container = new Container();
-            container.Register<ViewModel1Presenter>();
-            container.Register<ViewModel1>(setup: Setup.With(openResolutionScope: true));
-            container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
-
-            container.Register<Log>(Reuse.InResolutionScopeOf<IViewModel>(outermost: true));
-            container.Register<Log>(setup: Setup.With(
-                condition: request => request.Parent.IsResolutionRoot));
-
-            var presenter = container.Resolve<ViewModel1Presenter>();
-
-            Assert.AreSame(presenter.VM1.Log, presenter.VM1.VM2.Log);
-        }
-
-        [Test]
         public void Resolution_scope_can_be_tracked_as_disposable_transient_when_injected_as_IDisposable()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());
 
-            container.Register<K>(Reuse.InResolutionScope);
+            container.Register<K>(Reuse.Scoped);
             container.Register<L>(setup: Setup.With(openResolutionScope: true));
 
             K k;
@@ -355,47 +341,52 @@ namespace DryIoc.UnitTests
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same()
         {
-            using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
+            var container = new Container(scopeContext: new ThreadScopeContext());
+            using (container.OpenScope())
             {
                 container.Register<Service>(Reuse.InThread);
 
                 var one = container.Resolve<Service>();
                 var another = container.Resolve<Service>();
 
-                Assert.That(one, Is.SameAs(another));
+                Assert.AreSame(one, another);
             }
         }
 
         [Test]
         public void Given_Thread_reuse_Services_resolved_in_same_thread_should_be_the_same_In_nested_scope_too()
         {
-            using (var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope())
+            var container = new Container(scopeContext: new ThreadScopeContext());
+            using (var scope = container.OpenScope("root"))
             {
-                container.Register<Service>(Reuse.InThread);
+                container.Register<Service>(Reuse.ScopedTo("root"));
 
-                var one = container.Resolve<Service>();
+                var one = scope.Resolve<Service>();
 
-                using (var nested = container.OpenScope())
+                using (var nested = scope.OpenScope())
                 {
                     var two = nested.Resolve<Service>();
-                    Assert.That(one, Is.SameAs(two));
+                    Assert.AreSame(one, two);
                 }
 
                 var another = container.Resolve<Service>();
-                Assert.That(one, Is.SameAs(another));
+                Assert.AreSame(one, another);
             }
         }
 
         [Test]
         public void Given_Thread_reuse_Dependencies_injected_in_same_thread_should_be_the_same()
         {
-            var container = new Container(scopeContext: new ThreadScopeContext()).OpenScope();
+            var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<ServiceWithDependency>();
             container.Register<IDependency, Dependency>(Reuse.InThread);
 
-            var one = container.Resolve<ServiceWithDependency>();
-            var another = container.Resolve<ServiceWithDependency>();
-            Assert.That(one.Dependency, Is.SameAs(another.Dependency));
+            using (var scope = container.OpenScope())
+            {
+                var one = scope.Resolve<ServiceWithDependency>();
+                var another = scope.Resolve<ServiceWithDependency>();
+                Assert.AreSame(one.Dependency, another.Dependency);
+            }
         }
 
         [Test]
@@ -403,7 +394,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(scopeContext: new ThreadScopeContext());
             var mainThread = container.OpenScope();
-            mainThread.Register<Service>(Reuse.InThread);
+            container.Register<Service>(Reuse.InThread);
 
             Service one = null;
             var threadOne = new Thread(() =>
@@ -426,8 +417,8 @@ namespace DryIoc.UnitTests
         {
             var parent = new Container(scopeContext: new ThreadScopeContext());
             var container = parent.OpenScope();
-            container.Register<ServiceWithDependency>();
-            container.Register<IDependency, Dependency>(Reuse.InThread);
+            parent.Register<ServiceWithDependency>();
+            parent.Register<IDependency, Dependency>(Reuse.InThread);
 
             ServiceWithDependency one = null;
             var threadOne = new Thread(() =>
@@ -447,13 +438,16 @@ namespace DryIoc.UnitTests
         public void Can_use_both_resolution_scope_and_singleton_reuse_in_same_resolution_root()
         {
             var container = new Container();
-            container.Register<ServiceWithResolutionAndSingletonDependencies>();
-            container.Register<SingletonDep>(Reuse.InResolutionScope);
+
+            container.Register<ServiceWithResolutionAndSingletonDependencies>(
+                setup: Setup.With(openResolutionScope: true));
+
+            container.Register<SingletonDep>(Reuse.Scoped);
             container.Register<ResolutionScopeDep>(Reuse.Singleton);
 
             var service = container.Resolve<ServiceWithResolutionAndSingletonDependencies>();
 
-            Assert.That(service.ResolutionScopeDep, Is.SameAs(service.SingletonDep.ResolutionScopeDep));
+            Assert.AreSame(service.ResolutionScopeDep, service.SingletonDep.ResolutionScopeDep);
         }
 
         [Test]
@@ -476,8 +470,8 @@ namespace DryIoc.UnitTests
         public void Should_Not_throw_if_rule_is_off_and_dependency_lifespan_is_less_than_parents()
         {
             var container = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
-            container.Register<Client>(Reuse.Singleton);
-            container.Register<ILogger, FastLogger>(Reuse.InResolutionScope);
+            container.Register<Client>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
+            container.Register<ILogger, FastLogger>(Reuse.Scoped);
 
             var client = container.Resolve<Client>();
 
@@ -488,8 +482,9 @@ namespace DryIoc.UnitTests
         public void Can_dispose_resolution_reused_services()
         {
             var container = new Container();
-            container.Register<SomeDep>(Reuse.InResolutionScope);
-            container.Register<SomeRoot>(Reuse.Singleton);
+
+            container.Register<SomeDep>(Reuse.Scoped);
+            container.Register<SomeRoot>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
             var root = container.Resolve<SomeRoot>();
             root.Dispose();
@@ -641,8 +636,7 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_specify_default_reuse_per_Container_different_from_Transient()
         {
-            var container = new Container(r => r
-                .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+            var container = new Container(r => r.WithDefaultReuse(Reuse.Scoped));
 
             container.Register<Abc>();
 
@@ -685,7 +679,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            var count = SingletonScope.BucketSize * 2 + 1;
+            const int count = 32 * 2 + 1;
             for (var i = 0; i < count; i++)
             {
                 var serviceKey = new IntKey(i);
@@ -770,17 +764,41 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<O>();
+            container.Register<O>(setup: Setup.With(openResolutionScope: true));
             container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
 
             container.Resolve<object>(typeof(O));
+        }
+
+        [Test]
+        public void Scoped_service_can_open_resolution_scope()
+        {
+            var container = new Container();
+
+            container.Register<O>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
+            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+
+            using (var scope = container.OpenScope())
+            {
+                var o = scope.Resolve<O>();
+                var o2 = scope.Resolve<O>();
+                Assert.AreSame(o, o2);
+                Assert.AreSame(o.Ho, o.Ho2);
+            }
         }
 
         public class Ho {}
 
         public class O
         {
-            public O(Ho ho) { }
+            public Ho Ho { get; }
+            public Ho Ho2 { get; }
+
+            public O(Ho ho, Ho ho2)
+            {
+                Ho = ho;
+                Ho2 = ho2;
+            }
         }
 
         [Test]

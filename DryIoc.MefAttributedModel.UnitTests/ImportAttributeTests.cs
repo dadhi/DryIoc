@@ -165,10 +165,16 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var container = new Container().WithMefAttributedModel();
             container.Register<Service>();
+            container.Register<IService, AnotherService>();
 
             var client = container.InjectPropertiesAndFields(new ClientWithGenericWrapperProps());
+            Assert.IsInstanceOf<Service>(client.GetService());
+            Assert.IsNull(client.GetService2);
 
-            Assert.That(client.GetService(), Is.InstanceOf<Service>());
+            client = container.InjectPropertiesAndFields(new ClientWithGenericWrapperProps(),
+                nameof(ClientWithGenericWrapperProps.GetService2));
+            Assert.IsInstanceOf<AnotherService>(client.GetService2());
+            Assert.IsNull(client.GetService);
         }
 
         #region CUT
@@ -300,6 +306,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             [Import(typeof(Service))]
             public Func<IService> GetService { get; set; }
+
+            public Func<IService> GetService2 { get; set; }
         }
 
         #endregion

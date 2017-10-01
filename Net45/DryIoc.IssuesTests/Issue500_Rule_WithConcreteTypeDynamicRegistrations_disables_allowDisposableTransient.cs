@@ -63,7 +63,7 @@ namespace DryIoc.IssuesTests
             var sut = new Container();
             sut.Register<DbContext, MyDbContext>(setup: Setup.With(allowDisposableTransient: true));
             sut.Register<ServiceBase, ServiceWithResolve>();
-            sut.RegisterInstance(sut);
+            sut.UseInstance(sut);
 
             // Act
             var controller = sut.Resolve<ServiceBase>();

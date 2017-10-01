@@ -82,14 +82,14 @@
             IAllOpts opts;
             using (var s = container.OpenScope("b"))
             {
-                opts = s.Resolve<IAllOpts>(serviceKey: "a");
+                opts = s.Resolver.Resolve<IAllOpts>(serviceKey: "a");
                 Assert.IsNotNull(opts);
-                Assert.AreSame(opts, s.Resolve<IAllOpts>(serviceKey: "a"));
+                Assert.AreSame(opts, s.Resolver.Resolve<IAllOpts>(serviceKey: "a"));
 
                 IAllOpts opts2;
                 using (var ss = s.OpenScope())
                 {
-                    opts2 = ss.Resolve<IAllOpts>(serviceKey: "a");
+                    opts2 = ss.Resolver.Resolve<IAllOpts>(serviceKey: "a");
                     Assert.AreNotSame(opts, opts2);
                 }
 
@@ -98,15 +98,6 @@
 
             Assert.IsTrue(((AllOpts)opts).IsDisposed);
             container.Dispose();
-        }
-
-        [Test]
-        public void I_can_check_existense_of_open_scope()
-        {
-            using (var s = _container.OpenScope("a"))
-            {
-                Assert.IsNotNull(s.GetCurrentScope());
-            }
         }
 
         [Test]
@@ -124,7 +115,7 @@
             using (var s = _container.OpenScope())
             {
                 var ex = Assert.Throws<ContainerException>(() => 
-                    s.Resolve<NamedScopeService>());
+                    s.Resolver.Resolve<NamedScopeService>());
 
                 Assert.AreEqual(Error.NoMatchedScopeFound, ex.Error);
             }

@@ -8,21 +8,22 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Main()
         {
-            using (var container = new Container().OpenScope())
+            var container = new Container();
+            using (var scope = container.OpenScope())
             {
-                container.Register<Main>(Reuse.InCurrentScope);
-                container.Register<Class1>(Reuse.InCurrentScope);
-                container.Register<Class2>(Reuse.InCurrentScope);
-                container.Register<Class3>(Reuse.InCurrentScope);
+                container.Register<Main>  (Reuse.Scoped);
+                container.Register<Class1>(Reuse.Scoped);
+                container.Register<Class2>(Reuse.Scoped);
+                container.Register<Class3>(Reuse.Scoped);
 
                 Main mainScoped;
-                using (var scope = container.OpenScope())
+                using (var scope2 = scope.OpenScope())
                 {
-                    mainScoped = scope.Resolve<Main>();
+                    mainScoped = scope2.Resolve<Main>();
                     Assert.That(mainScoped.C1.C, Is.SameAs(mainScoped.C2.C));
                 }
 
-                var main = container.Resolve<Main>();
+                var main = scope.Resolve<Main>();
                 Assert.That(main, Is.Not.SameAs(mainScoped));
                 Assert.That(main.C1, Is.Not.SameAs(mainScoped.C1));
                 Assert.That(main.C1.C, Is.Not.SameAs(mainScoped.C1.C));

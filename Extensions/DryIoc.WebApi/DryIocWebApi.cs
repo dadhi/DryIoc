@@ -160,8 +160,9 @@ namespace DryIoc.WebApi
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
         public object GetService(Type serviceType)
         {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return Container.Resolve(serviceType, ifUnresolvedReturnDefault);
+            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            return Container.Resolve(serviceType, ifUnresolved);
         }
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
@@ -183,11 +184,11 @@ namespace DryIoc.WebApi
         private readonly Func<Type, bool> _throwIfUnresolved;
     }
 
-    /// <summary>Dependency scope adapter to scoped DryIoc container (created by <see cref="IContainer.OpenScope"/>).</summary>
+    /// <summary>Dependency scope adapter to scoped DryIoc container.</summary>
     public sealed class DryIocDependencyScope : IDependencyScope
     {
         /// <summary>Wrapped DryIoc container.</summary>
-        public readonly IContainer ScopedContainer;
+        public readonly IResolverContext ScopedContainer;
 
         private readonly Func<Type, bool> _throwIfUnresolved;
 
@@ -195,7 +196,7 @@ namespace DryIoc.WebApi
         /// <param name="scopedContainer">Container returned by OpenScope method.</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
-        public DryIocDependencyScope(IContainer scopedContainer, Func<Type, bool> throwIfUnresolved = null)
+        public DryIocDependencyScope(IResolverContext scopedContainer, Func<Type, bool> throwIfUnresolved = null)
         {
             ScopedContainer = scopedContainer;
             _throwIfUnresolved = throwIfUnresolved;
@@ -212,8 +213,9 @@ namespace DryIoc.WebApi
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
         public object GetService(Type serviceType)
         {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return ScopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault);
+            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            return ScopedContainer.Resolve(serviceType, ifUnresolved);
         }
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>

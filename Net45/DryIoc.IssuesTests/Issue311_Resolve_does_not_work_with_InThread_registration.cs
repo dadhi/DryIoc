@@ -31,8 +31,6 @@ namespace DryIoc.IssuesTests
 
     public class AutomaticThreadLocalScopeContext : IScopeContext
     {
-        public string RootScopeName { get { return ThreadScopeContext.ScopeContextName; } }
-
         ThreadLocal<IScope> _threadScope = 
             new ThreadLocal<IScope>(() => new Scope(name: ThreadScopeContext.ScopeContextName), trackAllValues: true);
 

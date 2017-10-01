@@ -141,7 +141,7 @@ namespace DryIoc.Playground
         {
             var tree = IntTree<KeyValuePair<Type, string>[]>.Empty;
 
-            var key = typeof(ImTreeArrayTests);
+            var key = typeof(IntTreeTests);
             var keyHash = key.GetHashCode();
             var value = "test";
 
@@ -196,9 +196,9 @@ namespace DryIoc.Playground
         [Test]
         public void Tree_should_support_arbitrary_keys_by_using_their_hash_code()
         {
-            var tree = ImTreeMap<Type, string>.Empty;
+            var tree = ImHashMap<Type, string>.Empty;
 
-            var key = typeof(ImTreeArrayTests);
+            var key = typeof(IntTreeTests);
             var value = "test";
 
             tree = tree.AddOrUpdate(key, value);
@@ -213,7 +213,7 @@ namespace DryIoc.Playground
             var key1 = new HashConflictingKey<string>("a");
             var key2 = new HashConflictingKey<string>("b");
             var key3 = new HashConflictingKey<string>("c");
-            var tree = ImTreeMap<HashConflictingKey<string>, int>.Empty
+            var tree = ImHashMap<HashConflictingKey<string>, int>.Empty
                 .AddOrUpdate(key1, 1)
                 .AddOrUpdate(key2, 2)
                 .AddOrUpdate(key3, 3);

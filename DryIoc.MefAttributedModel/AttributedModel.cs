@@ -38,12 +38,12 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
-        public static readonly ImTreeMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
-            ImTreeMap<ReuseType, Func<object, IReuse>>.Empty
+        public static readonly ImHashMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
+            ImHashMap<ReuseType, Func<object, IReuse>>.Empty
             .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
-            .AddOrUpdate(ReuseType.CurrentScope, Reuse.InCurrentNamedScope)
-            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.InResolutionScope)
+            .AddOrUpdate(ReuseType.CurrentScope, Reuse.ScopedTo)
+            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.Scoped)
             .AddOrUpdate(ReuseType.ScopedOrSingleton, _ => Reuse.ScopedOrSingleton);
 
         /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
@@ -55,7 +55,7 @@ namespace DryIoc.MefAttributedModel
                 GetImportedParameter, _getImportedPropertiesAndFields);
 
             return rules.With(importsMadeOf)
-                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton)
+                .WithDefaultReuse(Reuse.Singleton)
                 .WithTrackingDisposableTransients();
         }
 
@@ -82,8 +82,7 @@ namespace DryIoc.MefAttributedModel
                 GetImportedParameter, _getImportedPropertiesAndFields);
 
             // hello, Max!!! we are Martians.
-            return rules.With(importsMadeOf)
-                .WithDefaultReuseInsteadOfTransient(Reuse.Singleton);
+            return rules.With(importsMadeOf).WithDefaultReuse(Reuse.Singleton);
         }
 
         /// <summary>Applies the <see cref="WithMefAttributedModel(DryIoc.Rules)"/> to the container.</summary>
@@ -118,7 +117,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("NotifyImportsSatisfied", includeNonPublic: true));
+            typeof(AttributedModel).Method(nameof(NotifyImportsSatisfied), includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
             (Func<Request, bool>)(request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification))),
@@ -204,9 +203,7 @@ namespace DryIoc.MefAttributedModel
 
             return new ExportFactory<T>(() =>
             {
-                var scope = container.With(r => r
-                    .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope))
-                    .OpenScope();
+                var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
                 try
                 {
                     var it = scope.Resolve<T>();
@@ -221,7 +218,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryMethod = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactory", includeNonPublic: true),
+            typeof(AttributedModel).Method(nameof(CreateExportFactory), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.IfUnresolved));
 
         /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
@@ -233,9 +230,7 @@ namespace DryIoc.MefAttributedModel
         {
             return new ExportFactory<T, TMetadata>(() =>
             {
-                var scope = container.With(r => r
-                    .WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope))
-                    .OpenScope();
+                var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
                 try
                 {
                     var result = scope.Resolve<T>(serviceKey: metaFactory.Value.Key);
@@ -250,7 +245,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("CreateExportFactoryWithMetadata", includeNonPublic: true));
+            typeof(AttributedModel).Method(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
 
         /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
         /// <typeparam name="T">The type of the exported service.</typeparam>
@@ -264,7 +259,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createLazyWithMetadataMethod = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("CreateLazyWithMetadata", includeNonPublic: true));
+            typeof(AttributedModel).Method(nameof(CreateLazyWithMetadata), includeNonPublic: true));
 
         #endregion
 
@@ -286,7 +281,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _filterCollectionByMultiKey = Made.Of(
-            typeof(AttributedModel).GetSingleMethodOrNull("FilterCollectionByMultiKey", includeNonPublic: true),
+            typeof(AttributedModel).Method(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.ServiceKey));
 
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
@@ -557,7 +552,7 @@ namespace DryIoc.MefAttributedModel
             return (serviceType, serviceKey) =>
             {
                 IList<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                return otherServiceExports.TryGetValue(serviceType.FullName, out regs)
+                return otherServiceExports.TryGetValue(serviceType.FullName ?? serviceType.Name, out regs)
                     ? regs.Map(r => new DynamicRegistration(r.Value.CreateFactory(typeProvider), ifAlreadyRegistered, r.Key))
                     : null;
             };
@@ -628,19 +623,19 @@ namespace DryIoc.MefAttributedModel
                 var serviceInfo = ParameterServiceInfo.Of(parameter);
                 var attrs = parameter.GetAttributes().ToArray();
                 return attrs.Length == 0 ? serviceInfo :
-                    serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request), request);
+                    serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request));
             };
         }
 
         private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
-            PropertiesAndFields.All(withInfo: GetImportedPropertiesAndFieldsOnly);
+            PropertiesAndFields.All(serviceInfo: GetImportedPropertiesAndFieldsOnly);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {
             var attributes = member.GetAttributes().ToArrayOrSelf();
             var details = attributes.Length == 0 ? null
                 : GetFirstImportDetailsOrNull(member.GetReturnTypeOrDefault(), attributes, request);
-            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details, request);
+            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details);
         }
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
@@ -1042,8 +1037,8 @@ namespace DryIoc.MefAttributedModel
     public sealed class ServiceKeyStore
     {
         // Mapping of ServiceKey/ContractName to { ContractType, count }[]
-        private readonly Ref<ImTreeMap<object, KV<Type, int>[]>>
-            _store = Ref.Of(ImTreeMap<object, KV<Type, int>[]>.Empty);
+        private readonly Ref<ImHashMap<object, KV<Type, int>[]>>
+            _store = Ref.Of(ImHashMap<object, KV<Type, int>[]>.Empty);
 
         /// <summary>Stores the key with respective type,
         /// incrementing type count for multiple registrations with same key  and type.</summary>
@@ -1106,7 +1101,7 @@ namespace DryIoc.MefAttributedModel
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
             NoSingleCtorWithImportingAttr = Of(
-                "Unable to find single constructor: nor marked with " + typeof(ImportingConstructorAttribute) +
+                "Unable to find single constructor nor marked with " + typeof(ImportingConstructorAttribute) +
                 " nor default constructor in {0} when resolving: {1}"),
             UnsupportedMultipleFactoryTypes = Of(
                 "Found multiple factory types associated with exported {0}. Only single ExportAs.. attribute is supported, please remove the rest."),
@@ -1632,7 +1627,7 @@ namespace DryIoc.MefAttributedModel
                 else
                 {
                     // index custom metadata attributes with their type name
-                    metaKey = metaAttr.GetType().FullName;
+                    metaKey = metaAttr.GetType().FullName ?? metaAttr.GetType().Name;
                     addProperties = true;
                 }
 

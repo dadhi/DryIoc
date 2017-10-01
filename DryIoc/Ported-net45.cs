@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2013-2017 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -47,77 +47,70 @@ namespace System.Reflection
     {
         /// <summary>Wraps input type into <see cref="TypeInfo"/> structure.</summary>
         /// <param name="type">Input type.</param> <returns>Type info wrapper.</returns>
-        public static TypeInfo GetTypeInfo(this Type type)
-        {
-            return new TypeInfo(type);
-        }
+        public static TypeInfo GetTypeInfo(this Type type) => new TypeInfo(type);
     }
 
     /// <summary>Partial analog of TypeInfo existing in .NET 4.5 and higher.</summary>
     public struct TypeInfo
     {
+        private readonly Type _type;
+
         /// <summary>Creates type info by wrapping input type.</summary> <param name="type">Type to wrap.</param>
         public TypeInfo(Type type)
         {
             _type = type;
         }
+
 #pragma warning disable 1591 // "Missing XML-comment"
-        public Type AsType() { return _type; }
+        public Type AsType() => _type;
 
-        public Assembly Assembly { get { return _type.Assembly; } }
+        public Assembly Assembly => _type.Assembly;
 
-        public IEnumerable<ConstructorInfo> DeclaredConstructors
-        {
-            get { return _type.GetConstructors(ALL_DECLARED ^ BindingFlags.Static); }
-        }
+        public IEnumerable<ConstructorInfo> DeclaredConstructors =>
+            _type.GetConstructors(ALL_DECLARED ^ BindingFlags.Static);
 
-        public IEnumerable<MethodInfo> DeclaredMethods
-        {
-            get { return _type.GetMethods(ALL_DECLARED); }
-        }
+        public IEnumerable<MemberInfo> DeclaredMembers =>
+            _type.GetMembers(ALL_DECLARED);
 
-        public IEnumerable<FieldInfo> DeclaredFields
-        {
-            get { return _type.GetFields(ALL_DECLARED); }
-        }
+        public IEnumerable<MethodInfo> DeclaredMethods =>
+            _type.GetMethods(ALL_DECLARED);
 
-        public IEnumerable<PropertyInfo> DeclaredProperties
-        {
-            get { return _type.GetProperties(ALL_DECLARED); }
-        }
+        public IEnumerable<FieldInfo> DeclaredFields =>
+            _type.GetFields(ALL_DECLARED);
 
-        public IEnumerable<Type> ImplementedInterfaces { get { return _type.GetInterfaces(); } }
+        public IEnumerable<PropertyInfo> DeclaredProperties =>
+            _type.GetProperties(ALL_DECLARED);
 
-        public IEnumerable<Attribute> GetCustomAttributes(Type attributeType, bool inherit)
-        {
-            return _type.GetCustomAttributes(attributeType, inherit).Cast<Attribute>();
-        }
+        public IEnumerable<Type> ImplementedInterfaces => 
+            _type.GetInterfaces();
 
-        public Type BaseType { get { return _type.BaseType; } }
-        public bool IsGenericType { get { return _type.IsGenericType; } }
-        public bool IsGenericTypeDefinition { get { return _type.IsGenericTypeDefinition; } }
-        public bool ContainsGenericParameters { get { return _type.ContainsGenericParameters; } }
-        public Type[] GenericTypeParameters { get { return _type.GetGenericArguments(); } }
-        public Type[] GenericTypeArguments { get { return _type.GetGenericArguments(); } }
-        public Type[] GetGenericParameterConstraints() { return _type.GetGenericParameterConstraints(); }
-        public bool IsClass { get { return _type.IsClass; } }
-        public bool IsInterface { get { return _type.IsInterface; } }
-        public bool IsValueType { get { return _type.IsValueType; } }
-        public bool IsPrimitive { get { return _type.IsPrimitive; } }
-        public bool IsArray { get { return _type.IsArray; } }
-        public bool IsPublic { get { return _type.IsPublic; } }
-        public bool IsNestedPublic { get { return _type.IsNestedPublic; } }
-        public Type DeclaringType { get { return _type.DeclaringType; } }
-        public bool IsAbstract { get { return _type.IsAbstract; } }
-        public bool IsSealed { get { return _type.IsSealed; } }
-        public bool IsEnum { get { return _type.IsEnum; } }
+        public IEnumerable<Attribute> GetCustomAttributes(Type attributeType, bool inherit) =>
+            _type.GetCustomAttributes(attributeType, inherit).Cast<Attribute>();
 
-        public Type GetElementType() { return _type.GetElementType(); }
+        public Type BaseType => _type.BaseType;
+        public bool IsGenericType => _type.IsGenericType;
+        public bool IsGenericTypeDefinition => _type.IsGenericTypeDefinition;
+        public bool ContainsGenericParameters => _type.ContainsGenericParameters;
+        public Type[] GenericTypeParameters => _type.GetGenericArguments();
+        public Type[] GenericTypeArguments => _type.GetGenericArguments();
 
-        public bool IsAssignableFrom(TypeInfo typeInfo) { return _type.IsAssignableFrom(typeInfo.AsType()); }
+        public bool IsClass => _type.IsClass;
+        public bool IsInterface => _type.IsInterface;
+        public bool IsValueType => _type.IsValueType;
+        public bool IsPrimitive => _type.IsPrimitive;
+        public bool IsArray =>  _type.IsArray;
+        public bool IsPublic => _type.IsPublic;
+        public bool IsNestedPublic => _type.IsNestedPublic; 
+        public Type DeclaringType => _type.DeclaringType;
+        public bool IsAbstract => _type.IsAbstract;
+        public bool IsSealed => _type.IsSealed; 
+        public bool IsEnum => _type.IsEnum;
+
+        public Type[] GetGenericParameterConstraints() => _type.GetGenericParameterConstraints();
+        public Type GetElementType() => _type.GetElementType();
+
+        public bool IsAssignableFrom(TypeInfo typeInfo) => _type.IsAssignableFrom(typeInfo.AsType());
 #pragma warning restore 1591 // "Missing XML-comment"
-
-        private readonly Type _type;
 
         private const BindingFlags ALL_DECLARED =
             BindingFlags.Instance | BindingFlags.Static |

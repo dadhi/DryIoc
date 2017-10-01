@@ -400,20 +400,19 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<ICar, FastCar>(Reuse.InResolutionScope);
+            container.Register<ICar, FastCar>(Reuse.Scoped);
 
             // isResolutionRoot: true means that service will be injected as: `r => new Client(r.Resolve<Service>())`
             // rather then inline creation expression (which is default): `r => new Client(new Service(...))`
             // Direct use of `Resolve` method means that dependency treated by container as new resolution root,
             // and therefore has its own ResolutionScope! So every dependency (e.g. ICar) down the resolve method 
             // registered with `Reuse.InResolutionScope` will reside in the new resolution scope. 
-            container.Register<AreaWithOneCar>(
-                reuse: Reuse.InResolutionScope,
+            container.Register<AreaWithOneCar>(Reuse.Scoped,
                 setup: Setup.With(openResolutionScope: true)); // NOTE: remove setup parameter to see what happens
 
             container.Register<SomeTool>();
 
-            container.Register<AreaManager>();
+            container.Register<AreaManager>(setup: Setup.With(openResolutionScope: true));
 
             var manager = container.Resolve<AreaManager>();
             var area = manager.OneCarAreas[0];
@@ -454,10 +453,10 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<ICar, SmallCar>(Reuse.InResolutionScope);
-            container.Register<AreaWithOneCar>(Reuse.InResolutionScope, setup: Setup.With(openResolutionScope: true));
+            container.Register<ICar, SmallCar>(Reuse.Scoped);
+            container.Register<AreaWithOneCar>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
             container.Register<SomeTool>();
-            container.Register<CarefulAreaManager>(Reuse.InResolutionScope);
+            container.Register<CarefulAreaManager>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
             var manager = container.Resolve<CarefulAreaManager>();
             var area = manager.Areas.First();

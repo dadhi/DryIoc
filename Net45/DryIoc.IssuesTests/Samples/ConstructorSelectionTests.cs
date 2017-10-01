@@ -33,7 +33,7 @@ namespace DryIoc.IssuesTests.Samples
             var container = new Container();
             container.Register<IService, SomeService>();
 
-            container.Register<ClassWithInternalConstructor>(made: Made.Of(t => t.GetSingleConstructorOrNull(true)));
+            container.Register<ClassWithInternalConstructor>(made: Made.Of(t => t.Constructor(true)));
 
             var obj = container.Resolve<ClassWithInternalConstructor>();
             Assert.IsNotNull(obj);

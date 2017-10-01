@@ -136,7 +136,7 @@ namespace DryIocZero.WebApi
     public sealed class DryIocDependencyScope : IDependencyScope
     {
         /// <summary>Wrapped DryIoc container.</summary>
-        public readonly Container ScopedContainer;
+        public readonly IResolverContext ScopedContainer;
 
         private readonly Func<Type, bool> _throwIfUnresolved;
 
@@ -144,7 +144,7 @@ namespace DryIocZero.WebApi
         /// <param name="scopedContainer">Container returned by OpenScope method.</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
-        public DryIocDependencyScope(Container scopedContainer, Func<Type, bool> throwIfUnresolved = null)
+        public DryIocDependencyScope(IResolverContext scopedContainer, Func<Type, bool> throwIfUnresolved = null)
         {
             ScopedContainer = scopedContainer;
             _throwIfUnresolved = throwIfUnresolved;
@@ -162,7 +162,7 @@ namespace DryIocZero.WebApi
         public object GetService(Type serviceType)
         {
             var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return ScopedContainer.Resolve(serviceType, ifUnresolvedReturnDefault);
+            return ScopedContainer.Resolver.Resolve(serviceType, ifUnresolvedReturnDefault);
         }
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
@@ -170,7 +170,7 @@ namespace DryIocZero.WebApi
         /// <param name="serviceType">The collection of services to be retrieved.</param>
         public IEnumerable<object> GetServices(Type serviceType)
         {
-            return ScopedContainer.ResolveMany(serviceType);
+            return ScopedContainer.Resolver.ResolveMany(serviceType);
         }
     }
 
@@ -218,7 +218,7 @@ namespace DryIocZero.WebApi
         public void RegisterInDependencyScope(HttpRequestMessage request)
         {
             var dependencyScope = request.GetDependencyScope();
-            var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
+            var container = (Container)((DryIocDependencyScope)dependencyScope).ScopedContainer;
             container.UseInstance(request);
         }
     }

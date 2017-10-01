@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.12
+VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "Net45\DryIoc\DryIoc.csproj", "{B6C2FC35-7586-417B-AD35-32AED63ADFA9}"
 EndProject
@@ -25,6 +25,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "Net45\Playgro
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1D2F543C-CE8C-42B4-ABC2-6E0F9DBD76BE}"
 	ProjectSection(SolutionItems) = preProject
+		BREAKING.md = BREAKING.md
 		CONTRIBUTING.md = CONTRIBUTING.md
 		README.md = README.md
 	EndProjectSection
@@ -70,6 +71,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", 
 		NuGetSpecs\DryIocAttributes.dll.nuspec = NuGetSpecs\DryIocAttributes.dll.nuspec
 		NuGetSpecs\DryIocAttributes.nuspec = NuGetSpecs\DryIocAttributes.nuspec
 		NuGetSpecs\DryIocZero.nuspec = NuGetSpecs\DryIocZero.nuspec
+		NuGetSpecs\README.md = NuGetSpecs\README.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIocZero", "DryIocZero", "{FBFB74BB-0F74-4F21-B134-88418D36502C}"
