@@ -177,6 +177,7 @@
     <Compile Include="Issue512_InResolutionScopeOf_is_not_working.cs" />
     <Compile Include="Issue519_Dependency_of_singleton_not_working_when_using_child_container.cs" />
     <Compile Include="Issue522_IncorrectApplicationOfSingletonReuse.cs" />
+    <Compile Include="Issue527_ErrorResolvemManyAfterUregister.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

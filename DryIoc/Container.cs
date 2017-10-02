@@ -353,18 +353,18 @@ namespace DryIoc
 
             var container = (IContainer)this;
             IEnumerable<ServiceRegistrationInfo> items = container.GetAllServiceFactories(requiredItemType)
-                .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemType, f.Key))
-                .ToArray();
+                .Where(f => f.Value != null)
+                .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
+                    .Where(f => f.Value != null)
                     .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType,
                         // note: Special service key with info about open-generic service type
-                        new[] { requiredItemOpenGenericType, f.Key }))
-                    .ToArray();
+                        new[] {requiredItemOpenGenericType, f.Key}));
             }
 
             // Append registered generic types with compatible variance,
