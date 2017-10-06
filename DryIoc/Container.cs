@@ -715,19 +715,21 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IContainer With(Rules rules, IScopeContext scopeContext,
-            bool cloneRegistrations, bool preserveCache, StateOptions singletonOptions)
+            WithRegistrationsOptions registrations, WithSingletonOptions singleton)
         {
             ThrowIfContainerDisposed();
 
             rules = rules ?? Rules;
             scopeContext = scopeContext ?? _scopeContext;
 
-            var registry = !cloneRegistrations ? _registry :
-                preserveCache ? Ref.Of(_registry.Value) : Ref.Of(_registry.Value.WithoutCache());
+            var registry = 
+                registrations == WithRegistrationsOptions.Share ? _registry :
+                registrations == WithRegistrationsOptions.Clone ? Ref.Of(_registry.Value) 
+                : Ref.Of(_registry.Value.WithoutCache());
 
             var singletonScope =
-                singletonOptions == StateOptions.Keep ? _singletonScope :
-                singletonOptions == StateOptions.Drop ? new Scope() :
+                singleton == WithSingletonOptions.Keep ? _singletonScope :
+                singleton == WithSingletonOptions.Drop ? new Scope() :
                 _singletonScope.Clone();
 
             return new Container(rules, registry, singletonScope, scopeContext,
@@ -2167,24 +2169,26 @@ namespace DryIoc
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container, Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
-            container.With(configure?.Invoke(container.Rules), scopeContext, cloneRegistrations: true);
+            container.With(configure?.Invoke(container.Rules), scopeContext, 
+                WithRegistrationsOptions.CloneWithoutCache);
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
         public static IContainer WithoutCache(this IContainer container) =>
-            container.With(container.Rules, container.ScopeContext, cloneRegistrations: true);
+            container.With(container.Rules, container.ScopeContext, 
+                WithRegistrationsOptions.CloneWithoutCache);
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
         /// Dropping cache is required because singletons are cached in resolution state.</summary>
         public static IContainer WithoutSingletonsAndCache(this IContainer container) =>
             container.With(container.Rules, container.ScopeContext,
-                cloneRegistrations: true, singletonOptions: StateOptions.Drop);
+                WithRegistrationsOptions.CloneWithoutCache, WithSingletonOptions.Drop);
 
         /// <summary>Shares all parts with original container But copies registration, so the new registration
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
             container.With(container.Rules, container.ScopeContext,
-                cloneRegistrations: true, preserveCache: preserveCache);
+                WithRegistrationsOptions.Clone);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -9584,8 +9588,8 @@ namespace DryIoc
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
-    /// <summary>What to do with the state.</summary>
-    public enum StateOptions
+    /// <summary>What to do with scope.</summary>
+    public enum WithSingletonOptions
     {
         /// <summary>Keep state</summary>
         Keep = 0,
@@ -9593,6 +9597,17 @@ namespace DryIoc
         Drop,
         /// <summary>Clone or copy state</summary>
         Clone
+    }
+
+    /// <summary>What to do with registration.</summary>
+    public enum WithRegistrationsOptions
+    {
+        /// <summary>Both containers share the resgitrations, changed in one, will change in another.</summary>
+        Share = 0,
+        /// <summary>Both resgitrations and cache</summary>
+        Clone,
+        /// <summary>Clones registrations but drops the cache</summary>
+        CloneWithoutCache
     }
 
     /// <summary>Combines registrator and resolver roles, plus rules and scope management.</summary>
@@ -9606,9 +9621,8 @@ namespace DryIoc
 
         /// <summary>Creates new container from the current one.</summary>
         IContainer With(Rules rules, IScopeContext scopeContext,
-            bool cloneRegistrations = false,
-            bool preserveCache = false,
-            StateOptions singletonOptions = StateOptions.Keep);
+            WithRegistrationsOptions registrations,
+            WithSingletonOptions singletonOptions = WithSingletonOptions.Keep);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
