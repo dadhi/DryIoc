@@ -722,9 +722,9 @@ namespace DryIoc
             rules = rules ?? Rules;
             scopeContext = scopeContext ?? _scopeContext;
 
-            var registry = 
+            var registry =
                 registrations == WithRegistrationsOptions.Share ? _registry :
-                registrations == WithRegistrationsOptions.Clone ? Ref.Of(_registry.Value) 
+                registrations == WithRegistrationsOptions.Clone ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
             var singletonScope =
@@ -2169,13 +2169,13 @@ namespace DryIoc
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container, Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
-            container.With(configure?.Invoke(container.Rules), scopeContext, 
+            container.With(configure?.Invoke(container.Rules), scopeContext,
                 WithRegistrationsOptions.CloneWithoutCache);
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
         public static IContainer WithoutCache(this IContainer container) =>
-            container.With(container.Rules, container.ScopeContext, 
+            container.With(container.Rules, container.ScopeContext,
                 WithRegistrationsOptions.CloneWithoutCache);
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
@@ -3297,24 +3297,21 @@ namespace DryIoc
         /// before splitting the graph with Resolve calls.</summary>
         public int MaxObjectGraphSize { get; private set; }
 
-        /// <summary>Sets <see cref="MaxObjectGraphSize"/>.
+        /// <summary>Sets <see cref="MaxObjectGraphSize"/>. Everything low than 1 will be the 1.
         /// To disable the limit please use <see cref="WithoutMaxObjectGraphSize"/></summary>
-        public Rules WithMaxObjectGraphSize(int size)
-        {
-            Throw.If(size < 1);
-            var newRules = (Rules)MemberwiseClone();
-            newRules.MaxObjectGraphSize = size;
-            return newRules;
-        }
+        public Rules WithMaxObjectGraphSize(int size) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, size < 1 ? 1 : size,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Disables the <see cref="MaxObjectGraphSize"/> limitation,
         /// so that object graph won't be split due this setting.</summary>
-        public Rules WithoutMaxObjectGraphSize()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.MaxObjectGraphSize = -1;
-            return newRules;
-        }
+        public Rules WithoutMaxObjectGraphSize() =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, -1,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
@@ -3326,7 +3323,8 @@ namespace DryIoc
         public PropertiesAndFieldsSelector PropertiesAndFields => _made.PropertiesAndFields;
 
         /// <summary>Instructs to override per-registration made settings with these rules settings.</summary>
-        public bool OverrideRegistrationMade { get; private set; }
+        public bool OverrideRegistrationMade =>
+            (_settings & Settings.OverrideRegistrationMade) != 0;
 
         /// <summary>Returns new instance of the rules new Made composed out of
         /// provided factory method, parameters, propertiesAndFields.</summary>
@@ -3341,18 +3339,19 @@ namespace DryIoc
         /// <param name="made">New Made.Of rules.</param>
         /// <param name="overrideRegistrationMade">Instructs to override registration level Made.Of</param>
         /// <returns>New rules.</returns>
-        public Rules With(Made made, bool overrideRegistrationMade = false)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._made = _made == Made.Default
-                ? made
-                : Made.Of(
-                    made.FactoryMethod ?? _made.FactoryMethod,
-                    made.Parameters ?? _made.Parameters,
-                    made.PropertiesAndFields ?? _made.PropertiesAndFields);
-            newRules.OverrideRegistrationMade = overrideRegistrationMade;
-            return newRules;
-        }
+        public Rules With(Made made, bool overrideRegistrationMade = false) =>
+            new Rules(
+                _settings | (overrideRegistrationMade ? Settings.OverrideRegistrationMade : 0),
+                FactorySelector, DefaultReuse,
+                _made == Made.Default
+                    ? made
+                    : Made.Of(
+                        made.FactoryMethod ?? _made.FactoryMethod,
+                        made.Parameters ?? _made.Parameters,
+                        made.PropertiesAndFields ?? _made.PropertiesAndFields),
+                DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="request">Provides service request leading to factory selection.</param>
@@ -3366,12 +3365,11 @@ namespace DryIoc
         public FactorySelectorRule FactorySelector { get; private set; }
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
-        public Rules WithFactorySelector(FactorySelectorRule rule)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.FactorySelector = rule;
-            return newRules;
-        }
+        public Rules WithFactorySelector(FactorySelectorRule rule) =>
+            new Rules(_settings, rule, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Select last registered factory from multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => GetLastFactoryByKey;
@@ -3409,25 +3407,21 @@ namespace DryIoc
 
         /// <summary>Appends dynamic registration rules.</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
-        public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            // todo: Make it a default? only 5 tests are failing
-            //newRules._settings |= Settings.UseDynamicRegistrationsAsFallback;
-            newRules.DynamicRegistrationProviders = newRules.DynamicRegistrationProviders.Append(rules);
-            return newRules;
-        }
+        public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
+            // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
 
         /// <summary>Appends dynamic registration rules 
         /// And additionally specifies to use dynamic registrations only when no normal registrations found!</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
-        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.UseDynamicRegistrationsAsFallback;
-            newRules.DynamicRegistrationProviders = newRules.DynamicRegistrationProviders.Append(rules);
-            return newRules;
-        }
+        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
+            new Rules(_settings | Settings.UseDynamicRegistrationsAsFallback, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
 
         /// <summary>Specifies to use dynamic registrations only when no normal registrations found</summary>
         public bool UseDynamicRegistrationsAsFallback =>
@@ -3441,22 +3435,20 @@ namespace DryIoc
         public UnknownServiceResolver[] UnknownServiceResolvers { get; private set; }
 
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
-        public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Append(rules);
-            return newRules;
-        }
+        public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules));
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
         /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance,
         /// so it could be check for remove success or fail.</summary>
-        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.UnknownServiceResolvers = newRules.UnknownServiceResolvers.Remove(rule);
-            return newRules;
-        }
+        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule));
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
         /// Does not guard you from action throwing an exception. Actually can be used to throw your custom exception
@@ -3625,12 +3617,11 @@ namespace DryIoc
         public IReuse DefaultReuse { get; private set; }
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
-        public Rules WithDefaultReuse(IReuse reuse)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.DefaultReuse = reuse ?? Reuse.Transient;
-            return newRules;
-        }
+        public Rules WithDefaultReuse(IReuse reuse) =>
+            new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
         [Obsolete("Replaced by WithDefaultReuse because for some cases ..InsteadOfTransient does not make sense.", error: false)]
@@ -3651,12 +3642,11 @@ namespace DryIoc
         /// <summary>Specifies custom rule to convert non-primitive items to their expression representation.
         /// That may be required because DryIoc by default does not support non-primitive service keys and registration metadata.
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
-        public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.ItemToExpressionConverter = itemToExpressionOrDefault;
-            return newRules;
-        }
+        public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, itemToExpressionOrDefault,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
         public bool ThrowIfDependencyHasShorterReuseLifespan =>
@@ -3664,12 +3654,8 @@ namespace DryIoc
 
         /// <summary>Turns off throwing exception when dependency has shorter reuse lifespan than its parent or ancestor.</summary>
         /// <returns>New rules with new setting value.</returns>
-        public Rules WithoutThrowIfDependencyHasShorterReuseLifespan()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings &= ~Settings.ThrowIfDependencyHasShorterReuseLifespan;
-            return newRules;
-        }
+        public Rules WithoutThrowIfDependencyHasShorterReuseLifespan() =>
+            WithSettings(_settings & ~Settings.ThrowIfDependencyHasShorterReuseLifespan);
 
         /// <summary><see cref="WithoutThrowOnRegisteringDisposableTransient"/></summary>
         public bool ThrowOnRegisteringDisposableTransient =>
@@ -3679,13 +3665,8 @@ namespace DryIoc
         /// Allows to register disposable transient but it is up to you to handle their disposal.
         /// You can use <see cref="WithTrackingDisposableTransients"/> to actually track disposable transient in
         /// container, so that disposal will be handled by container.</summary>
-        /// <returns>New rules with setting turned off.</returns>
-        public Rules WithoutThrowOnRegisteringDisposableTransient()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
-            return newRules;
-        }
+        public Rules WithoutThrowOnRegisteringDisposableTransient() =>
+            WithSettings(_settings & ~Settings.ThrowOnRegisteringDisposableTransient);
 
         /// <summary><see cref="WithTrackingDisposableTransients"/></summary>
         public bool TrackingDisposableTransients =>
@@ -3702,40 +3683,28 @@ namespace DryIoc
         /// delegates that to user. Func here is the similar to Owned relationship type in Autofac library.
         /// </summary>
         /// <remarks>Turning this setting On automatically turns off <see cref="ThrowOnRegisteringDisposableTransient"/>.</remarks>
-        /// <returns>New rules with setting turned On.</returns>
-        public Rules WithTrackingDisposableTransients()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.TrackingDisposableTransients; // turning On
-            newRules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient; // turning Off
-            return newRules;
-        }
+        public Rules WithTrackingDisposableTransients() =>
+            WithSettings((_settings | Settings.TrackingDisposableTransients) 
+                & ~Settings.ThrowOnRegisteringDisposableTransient);
 
         /// <summary><see cref="WithoutEagerCachingSingletonForFasterAccess"/>.</summary>
         public bool EagerCachingSingletonForFasterAccess =>
             (_settings & Settings.EagerCachingSingletonForFasterAccess) != 0;
 
         /// <summary>Turns off optimization: creating singletons during resolution of object graph.</summary>
-        /// <returns>New rules with singleton optimization turned off.</returns>
-        public Rules WithoutEagerCachingSingletonForFasterAccess()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings &= ~Settings.EagerCachingSingletonForFasterAccess;
-            return newRules;
-        }
+        public Rules WithoutEagerCachingSingletonForFasterAccess() =>
+            WithSettings(_settings & ~Settings.EagerCachingSingletonForFasterAccess);
 
         /// <summary><see cref="WithDependencyResolutionCallExpressions"/>.</summary>
         public Ref<ImHashMap<RequestInfo, Expression>> DependencyResolutionCallExpressions { get; private set; }
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression
         /// and put it into collection.</summary>
-        /// <returns>New rules with resolution call expressions to be populated.</returns>
-        public Rules WithDependencyResolutionCallExpressions()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.DependencyResolutionCallExpressions = Ref.Of(ImHashMap<RequestInfo, Expression>.Empty);
-            return newRules;
-        }
+        public Rules WithDependencyResolutionCallExpressions() =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                Ref.Of(ImHashMap<RequestInfo, Expression>.Empty), ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         public bool ImplicitCheckForReuseMatchingScope =>
@@ -3743,26 +3712,16 @@ namespace DryIoc
 
         /// <summary>Removes implicit Factory <see cref="Setup.Condition"/> for non-transient service.
         /// The Condition filters out factory without matching scope.</summary>
-        /// <returns>Returns new rules with flag set.</returns>
-        public Rules WithoutImplicitCheckForReuseMatchingScope()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings &= ~Settings.ImplicitCheckForReuseMatchingScope;
-            return newRules;
-        }
+        public Rules WithoutImplicitCheckForReuseMatchingScope() =>
+            WithSettings(_settings & ~Settings.ImplicitCheckForReuseMatchingScope);
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
         public bool ResolveIEnumerableAsLazyEnumerable =>
             (_settings & Settings.ResolveIEnumerableAsLazyEnumerable) != 0;
 
         /// <summary>Specifies to resolve IEnumerable as LazyEnumerable.</summary>
-        /// <returns>Returns new rules with flag set.</returns>
-        public Rules WithResolveIEnumerableAsLazyEnumerable()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.ResolveIEnumerableAsLazyEnumerable;
-            return newRules;
-        }
+        public Rules WithResolveIEnumerableAsLazyEnumerable() =>
+            WithSettings(_settings | Settings.ResolveIEnumerableAsLazyEnumerable);
 
         /// <summary><see cref="WithoutVariantGenericTypesInResolvedCollection"/>.</summary>
         public bool VariantGenericTypesInResolvedCollection =>
@@ -3770,25 +3729,19 @@ namespace DryIoc
 
         /// <summary>Flag instructs to include covariant compatible types in resolved collection.</summary>
         /// <returns>Returns new rules with flag set.</returns>
-        public Rules WithoutVariantGenericTypesInResolvedCollection()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
-            return newRules;
-        }
+        public Rules WithoutVariantGenericTypesInResolvedCollection() =>
+            WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
         /// <summary><seew cref="WithDefaultIfAlreadyRegistered"/>.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
 
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
-        /// <param name="rule">New setting.</param> <returns>New rules.</returns>
-        public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule)
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules.DefaultIfAlreadyRegistered = rule;
-            return newRules;
-        }
+        public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, rule, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
@@ -3796,13 +3749,8 @@ namespace DryIoc
 
         /// <summary>Specifies to throw an exception in attempt to resolve service which require runtime state for resolution.
         /// Runtime state may be introduced by RegisterDelegate, RegisterInstance, or registering with non-primitive service key, or metadata.</summary>
-        /// <returns>Returns new rules with flag set.</returns>
-        public Rules WithThrowIfRuntimeStateRequired()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.ThrowIfRuntimeStateRequired;
-            return newRules;
-        }
+        public Rules WithThrowIfRuntimeStateRequired() =>
+            WithSettings(_settings | Settings.ThrowIfRuntimeStateRequired);
 
         /// <summary><see cref="WithCaptureContainerDisposeStackTrace"/>.</summary>
         public bool CaptureContainerDisposeStackTrace =>
@@ -3810,24 +3758,16 @@ namespace DryIoc
 
         /// <summary>Instructs to capture Dispose stack-trace to include it later into <see cref="Error.ContainerIsDisposed"/>
         /// exception for easy diagnostics.</summary>
-        public Rules WithCaptureContainerDisposeStackTrace()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.CaptureContainerDisposeStackTrace;
-            return newRules;
-        }
+        public Rules WithCaptureContainerDisposeStackTrace() =>
+            WithSettings(_settings | Settings.CaptureContainerDisposeStackTrace);
 
         /// <summary>Allows Func with args specify its own reuse (sharing) behavior.</summary>
         public bool IgnoringReuseForFuncWithArgs =>
             (_settings & Settings.IgnoringReuseForFuncWithArgs) != 0;
 
         /// <summary>Allows Func with args specify its own reuse (sharing) behavior.</summary>
-        public Rules WithIgnoringReuseForFuncWithArgs()
-        {
-            var newRules = (Rules)MemberwiseClone();
-            newRules._settings |= Settings.IgnoringReuseForFuncWithArgs;
-            return newRules;
-        }
+        public Rules WithIgnoringReuseForFuncWithArgs() =>
+            WithSettings(_settings | Settings.IgnoringReuseForFuncWithArgs);
 
         #region Implementation
 
@@ -3838,6 +3778,36 @@ namespace DryIoc
             DefaultReuse = Reuse.Transient;
             MaxObjectGraphSize = DefaultMaxObjectGraphSize;
         }
+
+        // full state constructor
+        private Rules(Settings settings,
+            FactorySelectorRule factorySelector,
+            IReuse defaultReuse,
+            Made made,
+            IfAlreadyRegistered defaultIfAlreadyRegistered,
+            int maxObjectGraphSize,
+            Ref<ImHashMap<RequestInfo, Expression>> dependencyResolutionCallExpressions,
+            ItemToExpressionConverterRule itemToExpressionConverter,
+            DynamicRegistrationProvider[] dynamicRegistrationProviders,
+            UnknownServiceResolver[] unknownServiceResolvers)
+        {
+            _settings = settings;
+            _made = made;
+            FactorySelector = factorySelector;
+            DefaultReuse = defaultReuse;
+            DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
+            MaxObjectGraphSize = maxObjectGraphSize;
+            DependencyResolutionCallExpressions = dependencyResolutionCallExpressions;
+            ItemToExpressionConverter = itemToExpressionConverter;
+            DynamicRegistrationProviders = dynamicRegistrationProviders;
+            UnknownServiceResolvers = unknownServiceResolvers;
+        }
+
+        private Rules WithSettings(Settings newSettings) =>
+            new Rules(newSettings,
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers);
 
         private Made _made;
 
@@ -3855,7 +3825,8 @@ namespace DryIoc
             ThrowIfRuntimeStateRequired = 1 << 9,
             CaptureContainerDisposeStackTrace = 1 << 10,
             UseDynamicRegistrationsAsFallback = 1 << 11,
-            IgnoringReuseForFuncWithArgs = 1 << 12
+            IgnoringReuseForFuncWithArgs = 1 << 12,
+            OverrideRegistrationMade = 1 << 13
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -7592,7 +7563,7 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault,
             GetServiceInfo serviceInfo = null)
         {
-            GetServiceInfo info = (m, r) => 
+            GetServiceInfo info = (m, r) =>
                 serviceInfo != null ? serviceInfo(m, r) :
                 PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved));
 
