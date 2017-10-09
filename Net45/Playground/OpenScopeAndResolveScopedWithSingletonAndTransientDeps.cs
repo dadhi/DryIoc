@@ -105,6 +105,12 @@ namespace PerformanceTests
             }
         }
 
+        //       Method |        Mean |    StdErr |    StdDev |      Median | Scaled | Scaled-StdDev |  Gen 0 | Allocated |
+        //------------- |------------ |---------- |---------- |------------ |------- |-------------- |------- |---------- |
+        // BmarkAutofac |  47.0789 us | 0.6439 us | 6.4390 us |  44.9588 us |   0.12 |          0.02 | 7.7637 |  14.39 kB |
+        //  BmarkDryIoc | 393.8075 us | 1.1701 us | 4.3782 us | 393.4204 us |   1.00 |          0.00 |      - |    6.4 kB |
+        //
+        [MemoryDiagnoser]
         public class BenchmarkRegistrationAndResolution
         {
             [Benchmark]
@@ -113,7 +119,7 @@ namespace PerformanceTests
                 return Measure(PrepareAutofac());
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(PrepareDryIoc());

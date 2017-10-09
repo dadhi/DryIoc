@@ -3290,6 +3290,13 @@ namespace DryIoc
         /// <summary>Default rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
+        /// <summary>Set of auto-magical rules.
+        /// Be warned that the rules might hide the issues in your container setup!</summary>
+        public static readonly Rules Relaxed = new Rules(DEFAULT_SETTINGS,
+            SelectLastRegisteredFactory(), Reuse.Transient, 
+            Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
+            IfAlreadyRegistered.AppendNotKeyed, DefaultMaxObjectGraphSize, null, null, null, null);
+
         /// <summary>Default value for <see cref="MaxObjectGraphSize"/></summary>
         public const int DefaultMaxObjectGraphSize = 32;
 
@@ -3779,7 +3786,6 @@ namespace DryIoc
             MaxObjectGraphSize = DefaultMaxObjectGraphSize;
         }
 
-        // full state constructor
         private Rules(Settings settings,
             FactorySelectorRule factorySelector,
             IReuse defaultReuse,
@@ -10716,45 +10722,5 @@ namespace DryIoc
         }
 
         static partial void GetCurrentManagedThreadID(ref int threadID);
-    }
-}
-
-namespace DryIoc.Experimental
-{
-    using System;
-    using System.Reflection;
-    using ImTools;
-
-    /// <summary>Succinct convention-based, LINQ like API to resolve resolution root at the end.</summary>
-    public static class DI
-    {
-        /// <summary>Pre-configured auto-magic rules.</summary>
-        public static readonly Rules Relaxed = Rules.Default
-            .With(FactoryMethod.ConstructorWithResolvableArguments)
-            .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-            .WithTrackingDisposableTransients()
-            .WithConcreteTypeDynamicRegistrations();
-
-        /// <summary>Creates new default configured container</summary>
-        public static IContainer New(Func<Rules, Rules> configure = null) =>
-            new Container(configure == null ? Relaxed : configure(Relaxed));
-
-        /// <summary>Auto-wired resolution of T from the container.</summary>
-        /// <typeparam name="T">Type of service to resolve.</typeparam>
-        /// <param name="assemblies">(optional) Assemblies to look for services implementations.</param>
-        /// <returns>Resolved service or throws.</returns>
-        public static T Get<T>(params Assembly[] assemblies) => New().Get<T>(assemblies);
-
-        /// <summary>Auto-wired resolution of T from the container.</summary>
-        /// <typeparam name="T">Type of service to resolve.</typeparam>
-        /// <param name="container">(optional) Container to resolve from.</param>
-        /// <param name="assemblies">(optional) Assemblies to look for service implementation and dependencies.</param>
-        /// <returns>Resolved service or throws.</returns>
-        public static T Get<T>(this IContainer container, params Assembly[] assemblies)
-        {
-            if (assemblies.IsNullOrEmpty())
-                assemblies = new[] { typeof(T).GetAssembly() };
-            return container.WithAutoFallbackDynamicRegistrations(assemblies).Resolve<T>();
-        }
     }
 }

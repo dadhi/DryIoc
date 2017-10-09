@@ -91,6 +91,7 @@ namespace PerformanceTests
 
         #endregion
 
+        [MemoryDiagnoser]
         public class BenchmarkResolution
         {
             private IContainer _autofac = PrepareAutofac();
@@ -103,13 +104,14 @@ namespace PerformanceTests
                 return Measure(_autofac);
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(_dryioc);
             }
         }
 
+        [MemoryDiagnoser]
         public class BenchmarkRegistrationAndResolution
         {
             [Benchmark]
@@ -118,7 +120,7 @@ namespace PerformanceTests
                 return Measure(PrepareAutofac());
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(PrepareDryIoc());
