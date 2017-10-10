@@ -38,7 +38,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithDependency : IService
     {
-        public IDependency Dependency { get; private set; }
+        public IDependency Dependency { get; }
 
         public ServiceWithDependency(IDependency dependency)
         {
@@ -48,7 +48,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class AnotherServiceWithDependency : IService
     {
-        public IDependency Dependency { get; private set; }
+        public IDependency Dependency { get; }
 
         public AnotherServiceWithDependency(IDependency dependency)
         {
@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithSingletonDependency : IService
     {
-        public ISingleton Singleton { get; private set; }
+        public ISingleton Singleton { get; }
 
         public ServiceWithSingletonDependency(ISingleton singleton)
         {
@@ -68,7 +68,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithEnumerableDependencies : IService
     {
-        public IEnumerable<IDependency> Foos { get; private set; }
+        public IEnumerable<IDependency> Foos { get; }
 
         public ServiceWithEnumerableDependencies(IEnumerable<IDependency> foos)
         {
@@ -78,7 +78,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithManyDependencies : IService
     {
-        public IEnumerable<IDependency> Foos { get; private set; }
+        public IEnumerable<IDependency> Foos { get; }
 
         public ServiceWithManyDependencies(LazyEnumerable<IDependency> foos)
         {
@@ -88,7 +88,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithLazyDependency : IService
     {
-        public Lazy<IDependency> LazyOne { get; private set; }
+        public Lazy<IDependency> LazyOne { get; }
 
         public ServiceWithLazyDependency(Lazy<IDependency> lazyOne)
         {
@@ -98,7 +98,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class AnotherServiceWithLazyDependency : IService
     {
-        public Lazy<IDependency> LazyOne { get; private set; }
+        public Lazy<IDependency> LazyOne { get; }
 
         public AnotherServiceWithLazyDependency(Lazy<IDependency> lazyOne)
         {
@@ -108,7 +108,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceClient
     {
-        public IService Service { get; private set; }
+        public IService Service { get; }
 
         public ServiceClient(IService service)
         {
@@ -148,7 +148,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithRecursiveDependency : IService
     {
-        public IDependency Dependency { get; private set; }
+        public IDependency Dependency { get; }
 
         public ServiceWithRecursiveDependency(IDependency dependency)
         {
@@ -158,7 +158,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithFuncOfRecursiveDependency : IService
     {
-        public Func<IDependency> FooFactory { get; private set; }
+        public Func<IDependency> FooFactory { get; }
 
         public ServiceWithFuncOfRecursiveDependency(Func<IDependency> fooFactory)
         {
@@ -168,7 +168,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class FooWithDependency : IDependency
     {
-        public IService Service { get; private set; }
+        public IService Service { get; }
 
         public FooWithDependency(IService service)
         {
@@ -178,7 +178,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class FooWithFuncOfDependency : IDependency
     {
-        public Func<IService> ServiceFactory { get; private set; }
+        public Func<IService> ServiceFactory { get; }
 
         public FooWithFuncOfDependency(Func<IService> serviceFactory)
         {
@@ -234,8 +234,8 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithTwoParameters
     {
-        public Service One { get; private set; }
-        public AnotherService Another { get; private set; }
+        public Service One { get; }
+        public AnotherService Another { get; }
 
         public ServiceWithTwoParameters(Service one, AnotherService another)
         {
@@ -246,7 +246,7 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithOnePrimitiveParameter : IService
     {
-        public string Message { get; private set; }
+        public string Message { get; }
 
         public ServiceWithOnePrimitiveParameter(string message)
         {
@@ -256,8 +256,8 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithTwoPrimitiveParameters : IService
     {
-        public string Message { get; private set; }
-        public bool Flag { get; private set; }
+        public string Message { get; }
+        public bool Flag { get; }
 
         public ServiceWithTwoPrimitiveParameters(bool flag, string message)
         {
@@ -286,8 +286,8 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithParameterAndDependency : IServiceWithParameterAndDependency
     {
-        public Service Dependency { get; private set; }
-        public bool Flag { get; private set; }
+        public Service Dependency { get; }
+        public bool Flag { get; }
 
         public ServiceWithParameterAndDependency(Service dependency, bool flag)
         {
@@ -298,8 +298,8 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithTwoParametersBothDependentOnSameService
     {
-        public ServiceWithDependency One { get; private set; }
-        public AnotherServiceWithDependency Another { get; private set; }
+        public ServiceWithDependency One { get; }
+        public AnotherServiceWithDependency Another { get; }
 
         public ServiceWithTwoParametersBothDependentOnSameService(ServiceWithDependency one, AnotherServiceWithDependency another)
         {
@@ -310,8 +310,8 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithTwoDependenciesWithLazySingletonDependency
     {
-        public ServiceWithLazyDependency One { get; private set; }
-        public AnotherServiceWithLazyDependency Another { get; private set; }
+        public ServiceWithLazyDependency One { get; }
+        public AnotherServiceWithLazyDependency Another { get; }
 
         public ServiceWithTwoDependenciesWithLazySingletonDependency(ServiceWithLazyDependency one, AnotherServiceWithLazyDependency another)
         {
@@ -415,8 +415,8 @@ namespace DryIoc.UnitTests.CUT
 
     public class ServiceWithMultipleCostructors
     {
-        public ITransientService Transient { get; private set; }
-        public ISingletonService Singleton { get; private set; }
+        public ITransientService Transient { get; }
+        public ISingletonService Singleton { get; }
 
         public ServiceWithMultipleCostructors(ISingletonService singleton)
         {

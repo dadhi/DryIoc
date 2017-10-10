@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -418,7 +419,67 @@ namespace DryIoc.UnitTests
             Assert.AreSame(bb, bb3);
         }
 
+        [Test]
+        public void Can_propagate_args_through_resolution_call()
+        {
+            var c = new Container();
+
+            c.Register<F>();
+            c.Register<L>();
+
+            var l = c.Resolve<Func<string, L>>();
+
+            Assert.AreEqual("hey", l("hey").F.S);
+        }
+
+        [Test]
+        public void Can_both_provide_args_and_resolve_as_Func_with_args()
+        {
+            var c = new Container();
+
+            c.Register<SS>();
+
+            var f = c.Resolve<Func<string, SS>>(new object[] { "b" });
+            var ss = f("a");
+
+            Assert.AreEqual("a", ss.A);
+            Assert.AreEqual("b", ss.B);
+        }
+
         #region CUT
+
+        class SS
+        {
+            public string A { get; }
+            public string B { get; }
+
+            public SS(string a, string b)
+            {
+                A = a;
+                B = b;
+            }
+        }
+
+        class F
+        {
+            public string S { get; }
+            public F(string s)
+            {
+                S = s;
+            }
+        }
+
+        class L
+        {
+            public F F => _f.Value;
+
+            public L(Lazy<F> f)
+            {
+                _f = f;
+            }
+
+            private Lazy<F> _f;
+        }
 
         public class BB
         {

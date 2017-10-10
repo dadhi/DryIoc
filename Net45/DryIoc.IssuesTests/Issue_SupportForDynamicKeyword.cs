@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
             container.Register<I, X>();
             container.Register<I, Y>();
 
-            var xy = container.Resolve<IEnumerable<dynamic>>(typeof(I));
+            var xy = container.Resolve<IEnumerable<dynamic>, I>();
 
             Assert.IsTrue(xy.Any());
         }

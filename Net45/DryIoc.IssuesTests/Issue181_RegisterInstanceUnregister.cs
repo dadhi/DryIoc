@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
 
             var test = new Test { N = 1 };
             container.UseInstance<ITest>(test);
-            var printer = container.Resolve<IPrinter>(typeof(Printer));
+            var printer = container.Resolve<IPrinter, Printer>();
             Assert.AreEqual("1", printer.Print()); // prints '1' as expected
 
             test = new Test { N = 2 };
@@ -22,7 +22,7 @@ namespace DryIoc.IssuesTests
 
             Assert.AreEqual(2, container.Resolve<ITest>().N); // does not throws, replaced dependency
 
-            printer = container.Resolve<IPrinter>(typeof(Printer));
+            printer = container.Resolve<IPrinter, Printer>();
             Assert.AreEqual("2", printer.Print()); // prints '1', I would expect this to print '2'
         }
         private class Printer : IPrinter

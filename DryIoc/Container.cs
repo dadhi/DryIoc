@@ -275,7 +275,9 @@ namespace DryIoc
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
 
-            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent);
+            var request = Request.Create(this,
+                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, args);
+
             var factory = ((IContainer)this).ResolveFactory(request);
 
             // Hack: may mutate to not null request service key.
@@ -434,7 +436,7 @@ namespace DryIoc
             foreach (var item in allItems.OrderBy(it => it.FactoryRegistrationOrder))
             {
                 var service = container.Resolve(serviceType, item.OptionalServiceKey,
-                    IfUnresolved.ReturnDefault, item.ServiceType, preResolveParent, null);
+                    IfUnresolved.ReturnDefault, item.ServiceType, preResolveParent, args);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -1003,7 +1005,7 @@ namespace DryIoc
             if (!decorators.IsNullOrEmpty())
                 decorators = decorators.Match(d =>
                 {
-                    for (var p = request.RawParent; !p.IsEmpty; p = p.RawParent)
+                    for (var p = request.RuntimeParent; !p.IsEmpty; p = p.RuntimeParent)
                         if (p.FactoryID == d.FactoryID)
                             return false;
                     return true;
@@ -3017,9 +3019,6 @@ namespace DryIoc
 
         private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
         {
-            if (request.IsWrappedInFuncWithArgs(immediateParent: true))
-                Throw.It(Error.NotPossibleToResolveLazyEnumerableInsideFuncWithArgs, request);
-
             var container = request.Container;
             var collectionType = request.ServiceType;
             var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericParamsAndArgs()[0];
@@ -3033,7 +3032,7 @@ namespace DryIoc
                 container.GetOrAddStateItemExpression(request.ServiceKey),
                 Expression.Constant(requiredItemType),
                 preResolveParentExpr,
-                Expression.Constant(null, typeof(object[])));
+                request.GetInputArgsExpr());
 
             if (itemType != typeof(object)) // cast to object is not required cause Resolve already return IEnumerable<object>
                 callResolveManyExpr = Expression.Call(typeof(Enumerable), "Cast", new[] { itemType }, callResolveManyExpr);
@@ -3047,20 +3046,14 @@ namespace DryIoc
         /// <returns>Expression: r => new Lazy{TService}(() => r.Resolver.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
         public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
         {
-            if (request.IsWrappedInFuncWithArgs(immediateParent: true))
-                Throw.It(Error.NotPossibleToResolveLazyInsideFuncWithArgs, request);
-
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
 
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
-            {
-                if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                    return Expression.Constant(null, lazyType);
-                return null;
-            }
+                return request.IfUnresolved == IfUnresolved.ReturnDefault
+                    ? Expression.Constant(null, lazyType) : null;
 
             serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
 
@@ -3108,8 +3101,7 @@ namespace DryIoc
                     argExprs[i] = Expression.Parameter(argType, argName);
                 }
 
-                request = request.WithArgs(argExprs);
-                flags |= RequestFlags.IsWrappedInFuncWithArgs;
+                request = request.WithInputArgs(argExprs);
             }
 
             var serviceRequest = request.Push(serviceType, flags: flags);
@@ -3293,8 +3285,8 @@ namespace DryIoc
         /// <summary>Set of auto-magical rules.
         /// Be warned that the rules might hide the issues in your container setup!</summary>
         public static readonly Rules Relaxed = new Rules(DEFAULT_SETTINGS,
-            SelectLastRegisteredFactory(), Reuse.Transient, 
-            Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
+            SelectLastRegisteredFactory(), Reuse.Transient,
+            Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments),
             IfAlreadyRegistered.AppendNotKeyed, DefaultMaxObjectGraphSize, null, null, null, null);
 
         /// <summary>Default value for <see cref="MaxObjectGraphSize"/></summary>
@@ -3691,7 +3683,7 @@ namespace DryIoc
         /// </summary>
         /// <remarks>Turning this setting On automatically turns off <see cref="ThrowOnRegisteringDisposableTransient"/>.</remarks>
         public Rules WithTrackingDisposableTransients() =>
-            WithSettings((_settings | Settings.TrackingDisposableTransients) 
+            WithSettings((_settings | Settings.TrackingDisposableTransients)
                 & ~Settings.ThrowOnRegisteringDisposableTransient);
 
         /// <summary><see cref="WithoutEagerCachingSingletonForFasterAccess"/>.</summary>
@@ -3919,7 +3911,7 @@ namespace DryIoc
                     .ToArray();
 
                 // First the check for normal resolution without Func<a, b, c>
-                if (!request.IsWrappedInFuncWithArgs(immediateParent: true))
+                if (!request.IsWrappedInFuncWithArgs())
                     return Of(ctorsWithMaxParamsFirst
                         .FindFirst(it => it
                             .GetParameters()
@@ -3928,8 +3920,8 @@ namespace DryIoc
 
                 // For Func<a, b, c> the constructor should contain all input arguments and
                 // the rest should be resolvable.
-                var funcType = !request.RawParent.IsEmpty
-                    ? request.RawParent.ServiceType
+                var funcType = !request.RuntimeParent.IsEmpty
+                    ? request.RuntimeParent.ServiceType
                     : request.PreResolveParent.ServiceType;
 
                 var inputArgTypes = funcType.GetGenericParamsAndArgs();
@@ -5241,58 +5233,94 @@ namespace DryIoc
         public static object Resolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved) =>
             resolver.Resolve(serviceType, ifUnresolved);
 
-        /// <summary>Resolves instance of service type from container.</summary>
-        public static object Resolve(this IResolver resolver, Type serviceType, bool ifUnresolvedReturnDefault) =>
-            resolver.Resolve(serviceType, ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw);
-
         /// <summary>Resolves instance of type TService from container.</summary>
         public static TService Resolve<TService>(this IResolver resolver,
             IfUnresolved ifUnresolved = IfUnresolved.Throw) =>
             (TService)resolver.Resolve(typeof(TService), ifUnresolved);
 
+        /// <summary>Tries to resolve instance of service type from container.</summary>
+        public static object Resolve(this IResolver resolver, Type serviceType, bool ifUnresolvedReturnDefault) =>
+            resolver.Resolve(serviceType, ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw);
+
+        /// <summary>Tries to resolve instance of TService from container.</summary>
+        public static object Resolve<TService>(this IResolver resolver, bool ifUnresolvedReturnDefault) =>
+            resolver.Resolve(typeof(TService), ifUnresolvedReturnDefault);
+
+        /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
+        /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
+        /// <paramref name="requiredServiceType"/> allow you to specify wrapped service type.</summary>
+        /// <example><code lang="cs"><![CDATA[
+        ///     container.Register<IService, Service>();
+        ///     var services = container.Resolve(typeof(IEnumerable<object>), typeof(IService));
+        /// ]]></code></example>
+        public static object Resolve(this IResolver resolver, Type serviceType, Type requiredServiceType,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object[] args = null, object serviceKey = null) =>
+            resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, RequestInfo.Empty, args);
+
         /// <summary>Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
         /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
         /// <paramref name="requiredServiceType"/> allow you to specify wrapped service type.</summary>
-        /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .NET 3.5</remarks>
         /// <example><code lang="cs"><![CDATA[
         ///     container.Register<IService, Service>();
         ///     var services = container.Resolve<IEnumerable<object>>(typeof(IService));
         /// ]]></code></example>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw) =>
-            (TService)resolver.Resolve(typeof(TService), null, ifUnresolved, requiredServiceType, null, null);
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object[] args = null, object serviceKey = null) =>
+            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType, RequestInfo.Empty, args);
+
+        /// <summary>Returns instance of <typeparamref name="TService"/> searching for <typeparamref name="TRequiredService"/>.
+        /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
+        /// <typeparamref name="TRequiredService"/> allow you to specify wrapped service type.</summary>
+        /// <example><code lang="cs"><![CDATA[
+        ///     container.Register<IService, Service>();
+        ///     var services = container.Resolve<IEnumerable<object>, IService>();
+        /// ]]></code></example>
+        public static TService Resolve<TService, TRequiredService>(this IResolver resolver,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object[] args = null, object serviceKey = null) =>
+            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, typeof(TRequiredService), 
+                RequestInfo.Empty, args);
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
         /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc., <paramref name="requiredServiceType"/>
         /// could specify wrapped service type.</summary>
-        /// <param name="serviceType">The type of the requested service.</param>
-        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
-        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
-        /// <param name="requiredServiceType">(optional) Service or wrapped type assignable to <paramref name="serviceType"/>.</param>
-        /// <returns>The requested service instance.</returns>
         /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         /// <example><code lang="cs"><![CDATA[
         ///     container.Register<IService, Service>();
         ///     var services = container.Resolve(typeof(Lazy<object>), "someKey", requiredServiceType: typeof(IService));
         /// ]]></code></example>
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null) =>
-            serviceKey == null && requiredServiceType == null
-                ? resolver.Resolve(serviceType, ifUnresolved)
-                : resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, null, null);
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null, 
+            object[] args = null) =>
+            resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType,
+                RequestInfo.Empty, args);
 
         /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
-        /// <param name="resolver">Any <see cref="IResolver"/> implementation, e.g. <see cref="Container"/>.</param>
-        /// <param name="serviceKey">Service key (any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/> defined).</param>
-        /// <param name="ifUnresolved">(optional) Says how to handle unresolved service.</param>
-        /// <param name="requiredServiceType">(optional) Service or wrapped type assignable to <typeparamref name="TService"/>.</param>
         /// <returns>The requested service instance.</returns>
         /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
         public static TService Resolve<TService>(this IResolver resolver, object serviceKey,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null) =>
-            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType);
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
+            object[] args = null) =>
+            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType,
+                RequestInfo.Empty, args);
+
+        /// <summary>Resolves the service supplying all or some of its dependencies 
+        /// (including nested) with the <paramref name="args"/>. The rest of dependencies is injected from
+        /// container.</summary>
+        public static object Resolve(this IResolver resolver, Type serviceType, object[] args,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
+            object serviceKey = null) =>
+            resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, 
+                RequestInfo.Empty, args);
+
+        /// <summary>Resolves the service supplying all or some of its dependencies 
+        /// (including nested) with the <paramref name="args"/>. The rest of dependencies is injected from
+        /// container.</summary>
+        public static TService Resolve<TService>(this IResolver resolver, object[] args,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
+            object serviceKey = null) =>
+            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType, 
+                RequestInfo.Empty, args);
 
         /// <summary>Returns all registered services instances including all keyed and default registrations.
         /// Use <paramref name="behavior"/> to return either all registered services at the moment of resolve (dynamic fresh view) or
@@ -5363,18 +5391,15 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
             var parentRequestInfo =
-                request.RawParent.IsEmpty
+                request.RuntimeParent.IsEmpty
                     ? request.PreResolveParent
-                    : request.RawParent.RequestInfo;
+                    : request.RuntimeParent.RequestInfo;
 
             var preResolveParentExpr = container.RequestInfoToExpression(
                 parentRequestInfo, openResolutionScope);
 
-            // todo: for future propagating of Func<args>
-            var argsExpr = Expression.Constant(null, typeof(object[]));
-
             var resolveCallExpr = Expression.Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
-                ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, argsExpr);
+                ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
 
             return Expression.Convert(resolveCallExpr, request.ServiceType);
         }
@@ -5387,7 +5412,7 @@ namespace DryIoc
             // 2. Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
             var preResolveParent = request.PreResolveParent;
             if (!preResolveParent.IsEmpty &&
-                (request.RawParent.IsEmpty || preResolveParent.EqualsWithoutParent(request.RawParent)))
+                (request.RuntimeParent.IsEmpty || preResolveParent.EqualsWithoutParent(request.RuntimeParent)))
                 return;
 
             var container = request.Container;
@@ -5975,8 +6000,6 @@ namespace DryIoc
         IsSingletonOrDependencyOfSingleton = 1 << 3,
         /// <summary>Inherited</summary>
         IsWrappedInFunc = 1 << 4,
-        /// <summary>Inherited</summary>
-        IsWrappedInFuncWithArgs = 1 << 5,
 
         /// <summary>Non inherited</summary>
         OpensResolutionScope = 1 << 6
@@ -6001,10 +6024,11 @@ namespace DryIoc
         /// <param name="ifUnresolved">(optional) How to handle unresolved service.</param>
         /// <param name="requiredServiceType">(optional) Actual registered or unwrapped service type to look for.</param>
         /// <param name="preResolveParent">(optional) Request info preceding Resolve call.</param>
+        /// <param name="args">(optional) Arguments provided by Resolve call.</param>
         /// <returns>New request with provided info.</returns>
         public static Request Create(IContainer container, Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
-            RequestInfo preResolveParent = null)
+            RequestInfo preResolveParent = null, object[] args = null)
         {
             serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
@@ -6025,25 +6049,27 @@ namespace DryIoc
                 flags = preResolveParent.Flags & ~NotInheritedFlags;
             }
 
+            var funcArgs = args?.Map(Expression.Constant);
+
             var resolverContext = new RequestContext(container, preResolveParent);
-            return new Request(resolverContext, _empty, serviceInfo, null, null, null, flags, null);
+            return new Request(resolverContext, _empty, serviceInfo, null, null, funcArgs, flags, null);
         }
 
         /// <summary>Indicates that request is empty initial request: there is no <see cref="RequestInfo"/> in such a request.</summary>
         public bool IsEmpty =>
-            RawParent == null;
+            RuntimeParent == null;
 
-        #region State carried wth each request (think how to minimize it)
+        #region State carried with each request (think how to minimize it)
 
         /// <summary>Request parent with all runtime info available.</summary>
-        public readonly Request RawParent;
+        public readonly Request RuntimeParent;
 
         /// <summary>Resolved factory, initially is null.</summary>
         public readonly Factory Factory;
 
-        /// <summary>User provided arguments: key tracks what args are still unused.</summary>
-        /// <remarks>Mutable: tracks used arguments</remarks>
-        public readonly KV<bool[], ParameterExpression[]> FuncArgs;
+        /// <summary>Func input type arguments.</summary>
+        /// <remarks>Mutable to track used arguments</remarks>
+        public readonly Expression[] InputArgs;
 
         // Shared info in requests in chain.
         private readonly RequestContext _requestContext;
@@ -6060,7 +6086,7 @@ namespace DryIoc
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
         public bool IsResolutionCall =>
-            !IsEmpty && RawParent.IsEmpty;
+            !IsEmpty && RuntimeParent.IsEmpty;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool IsResolutionRoot =>
@@ -6081,27 +6107,14 @@ namespace DryIoc
             (_flags & RequestFlags.IsWrappedInFunc) != 0;
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
-        /// <param name="immediateParent">If set indicate to check for immediate parent only,
-        /// otherwise will check whole parent chain.</param>
-        /// <returns>True if has Func with arguments ancestor.</returns>
-        public bool IsWrappedInFuncWithArgs(bool immediateParent = false)
-        {
-            if ((_flags & RequestFlags.IsWrappedInFuncWithArgs) == 0)
-                return false;
+        public bool IsWrappedInFuncWithArgs() => InputArgs != null;
 
-            if (!immediateParent)
-                return true; // skip other checks
-
-            // first run-time parent
-            if (!RawParent.IsEmpty)
-                return (RawParent._flags & RequestFlags.IsWrappedInFuncWithArgs) == 0;
-
-            // and if run-time parent does not exist then check the pre-resolve parent
-            if (!PreResolveParent.IsEmpty)
-                return (PreResolveParent.Flags & RequestFlags.IsWrappedInFuncWithArgs) != 0;
-
-            return false;
-        }
+        /// <summary>Returns expression for func arguments.</summary>
+        public Expression GetInputArgsExpr() =>
+            InputArgs == null
+            ? Expression.Constant(null, typeof(object[]))
+            : (Expression)Expression.NewArrayInit(typeof(object),
+                InputArgs.Map(it => it.Type.IsValueType() ? Expression.Convert(it, typeof(object)) : it));
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable =>
@@ -6219,7 +6232,7 @@ namespace DryIoc
             var inheritedInfo = info.InheritInfoFromDependencyOwner(parentInfo, Container, FactoryType);
             var inheritedFlags = _flags & ~NotInheritedFlags | flags;
 
-            return new Request(_requestContext, this, inheritedInfo, null, null, FuncArgs, inheritedFlags, null);
+            return new Request(_requestContext, this, inheritedInfo, null, null, InputArgs, inheritedFlags, null);
         }
 
         // todo: v3: review and remove if possible
@@ -6270,7 +6283,7 @@ namespace DryIoc
             var newInfo = getInfo(_serviceInfo);
             if (newInfo == _serviceInfo)
                 return this;
-            return new Request(_requestContext, RawParent, getInfo(_serviceInfo), Factory, _reuse, FuncArgs, _flags, _decoratedFactory);
+            return new Request(_requestContext, RuntimeParent, getInfo(_serviceInfo), Factory, _reuse, InputArgs, _flags, _decoratedFactory);
         }
 
         // todo: Try to remove in future versions as it mutates the request.
@@ -6285,15 +6298,12 @@ namespace DryIoc
             _serviceInfo = i.Create(i.ServiceType, newDetails);
         }
 
-        /// <summary>Adds input argument expression list to request.
-        /// The arguments are provided by Func and Action wrappers.</summary>
-        /// <param name="argExpressions">Argument parameter expressions.</param> <returns>New request.</returns>
-        public Request WithArgs(ParameterExpression[] argExpressions)
-        {
-            var argsUsed = new bool[argExpressions.Length];
-            var argsInfo = new KV<bool[], ParameterExpression[]>(argsUsed, argExpressions);
-            return new Request(_requestContext, RawParent, _serviceInfo, Factory, _reuse, argsInfo, _flags, _decoratedFactory);
-        }
+        /// <summary>Prepends input arguments ot existing arguments in request. The prepending is done because
+        /// nested Func/Action input argument has a priority over outer argument.
+        /// The arguments are provided by Func and Action wrappers, or by object array from Resolve call.</summary>
+        public Request WithInputArgs(Expression[] argExpressions) =>
+            new Request(_requestContext, RuntimeParent, _serviceInfo, Factory, _reuse,
+                argExpressions.Append(InputArgs), _flags, _decoratedFactory);
 
         /// <summary>Returns new request with set implementation details.</summary>
         /// <param name="factory">Factory to which request is resolved.</param>
@@ -6321,12 +6331,12 @@ namespace DryIoc
             }
 
             if (factory.FactoryType == FactoryType.Service && !skipRecursiveDependencyCheck)
-                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
+                for (var p = RuntimeParent; !p.IsEmpty; p = p.RuntimeParent)
                     if (p.FactoryID == factory.FactoryID)
                         Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
 
             IReuse reuse;
-            if (IsWrappedInFuncWithArgs(true) && Rules.IgnoringReuseForFuncWithArgs)
+            if (IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs)
                 reuse = DryIoc.Reuse.Transient;
             else
                 reuse = factory.Reuse ?? GetDefaultReuse(factory);
@@ -6350,7 +6360,7 @@ namespace DryIoc
 
             _requestContext.IncrementDependencyCount();
             return new Request(_requestContext,
-                RawParent, _serviceInfo, factory, reuse, FuncArgs, flags, decoratedFactory);
+                RuntimeParent, _serviceInfo, factory, reuse, InputArgs, flags, decoratedFactory);
         }
 
         private IReuse GetDefaultReuse(Factory factory)
@@ -6390,8 +6400,8 @@ namespace DryIoc
 
         private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
         {
-            if (!RawParent.IsEmpty)
-                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
+            if (!RuntimeParent.IsEmpty)
+                for (var p = RuntimeParent; !p.IsEmpty; p = p.RuntimeParent)
                 {
                     if (p.OpensResolutionScope ||
                         p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
@@ -6417,8 +6427,8 @@ namespace DryIoc
 
         private IReuse GetFirstParentNonTransientReuseUntilFunc()
         {
-            if (!RawParent.IsEmpty)
-                for (var p = RawParent; !p.IsEmpty; p = p.RawParent)
+            if (!RuntimeParent.IsEmpty)
+                for (var p = RuntimeParent; !p.IsEmpty; p = p.RuntimeParent)
                 {
                     if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
                         return DryIoc.Reuse.Transient;
@@ -6448,7 +6458,7 @@ namespace DryIoc
                 if (IsEmpty)
                     return PreResolveParent;
 
-                var parentRequestInfo = RawParent.IsEmpty ? PreResolveParent : RawParent.RequestInfo;
+                var parentRequestInfo = RuntimeParent.IsEmpty ? PreResolveParent : RuntimeParent.RequestInfo;
                 if (Factory == null)
                     return parentRequestInfo.Push(_serviceInfo);
 
@@ -6503,7 +6513,7 @@ namespace DryIoc
         /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
         {
-            for (var r = this; !r.IsEmpty; r = r.RawParent)
+            for (var r = this; !r.IsEmpty; r = r.RuntimeParent)
                 yield return r;
         }
 
@@ -6536,8 +6546,8 @@ namespace DryIoc
             if (_decoratedFactory != null)
                 s.Append(" of ").Append(_decoratedFactory);
 
-            if (FuncArgs != null)
-                s.AppendFormat(" with {0} arg(s) ", FuncArgs.Key.Count(k => k == false));
+            if (InputArgs != null)
+                s.AppendFormat(" with [{0}] Func args", InputArgs);
 
             return s;
         }
@@ -6554,7 +6564,7 @@ namespace DryIoc
             var s = PrintCurrent(new StringBuilder());
 
             s = recursiveFactoryID == -1 ? s : s.Append(" <--recursive");
-            foreach (var r in RawParent.Enumerate())
+            foreach (var r in RuntimeParent.Enumerate())
             {
                 s = r.PrintCurrent(s.AppendLine().Append("  in "));
                 if (r.FactoryID == recursiveFactoryID)
@@ -6572,17 +6582,16 @@ namespace DryIoc
 
         #region Implementation
 
-        private Request(RequestContext requestContext, Request parent, IServiceInfo serviceInfo,
-            Factory factory, IReuse reuse,
-            KV<bool[], ParameterExpression[]> funcArgs, RequestFlags flags,
+        private Request(RequestContext requestContext, Request runtimeParent, IServiceInfo serviceInfo,
+            Factory factory, IReuse reuse, Expression[] inputArgExprs, RequestFlags flags,
             Factory decoratedFactory)
         {
             _requestContext = requestContext;
-            RawParent = parent;
+            RuntimeParent = runtimeParent;
             _serviceInfo = serviceInfo;
             Factory = factory;
             _reuse = reuse;
-            FuncArgs = funcArgs;
+            InputArgs = inputArgExprs;
             _flags = flags;
             _decoratedFactory = decoratedFactory;
         }
@@ -7153,7 +7162,7 @@ namespace DryIoc
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
-        /// If <paramref name="request"/> has <see cref="Request.FuncArgs"/> specified, they could be used in expression.</summary>
+        /// If <paramref name="request"/> has <see cref="Request.InputArgs"/> specified, they could be used in expression.</summary>
         /// <param name="request">Service request.</param>
         /// <returns>Created expression.</returns>
         public abstract Expression CreateExpressionOrDefault(Request request);
@@ -7167,7 +7176,7 @@ namespace DryIoc
             && !Setup.UseParentReuse
             && !Setup.AsResolutionCall
 
-            && request.FuncArgs == null
+            && request.InputArgs == null
             && request.Reuse.Name == null
             && !request.TracksTransientDisposable
             && !request.IsResolutionRoot;
@@ -7181,7 +7190,8 @@ namespace DryIoc
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside Func with arguments,
                 // cause for now arguments are not propagated through resolve call
-                (request.ShouldSplitObjectGraph() || Setup.UseParentReuse) && !request.IsWrappedInFuncWithArgs())
+                request.ShouldSplitObjectGraph() || 
+                Setup.UseParentReuse)
                 && request.GetActualServiceType() != typeof(void);
             return shouldBe;
         }
@@ -7808,7 +7818,7 @@ namespace DryIoc
 
                     var parameterSelector = selectorSelector(request);
 
-                    var funcArgs = request.FuncArgs;
+                    var funcArgs = request.InputArgs;
                     var funcArgsUsedMask = 0;
 
                     for (var i = 0; i < parameters.Length; i++)
@@ -7818,15 +7828,14 @@ namespace DryIoc
 
                         if (funcArgs != null)
                         {
-                            for (var fa = 0; fa < funcArgs.Value.Length && paramExpr == null; ++fa)
+                            for (var fa = 0; fa < funcArgs.Length && paramExpr == null; ++fa)
                             {
-                                var funcArg = funcArgs.Value[fa];
-                                if ((funcArgsUsedMask & 1 << fa) == 0 &&              // not yet used func argument
-                                    funcArg.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
+                                var funcArgExpr = funcArgs[fa];
+                                if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
+                                    funcArgExpr.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
                                 {
-                                    paramExpr = funcArg;
+                                    paramExpr = funcArgExpr;
                                     funcArgsUsedMask |= 1 << fa;  // mark that argument was used
-                                    funcArgs.Key[fa] = true;      // mark that argument was used globally for Func<..> resolver.
                                 }
                             }
                         }
@@ -8673,7 +8682,7 @@ namespace DryIoc
                 item = TrackDisposable(createValue(), disposalIndex);
             }
 
-            // if _items were not changed so far then use them, otherwise (if changed) do ref swap;
+            // if _items were not changed so far, then use them, otherwise do ref swap
             var items = _items;
             if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
                 Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
@@ -9919,12 +9928,6 @@ namespace DryIoc
                 " or set the rule Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient())." +
                 " To enable tracking use Register<YourService>(setup: Setup.With(trackDisposableTransient: true)) " +
                 " or set the rule Container(rules => rules.WithTrackingDisposableTransients())"),
-            NotPossibleToResolveLazyInsideFuncWithArgs = Of(
-                "Unable to resolve Lazy service inside Func<args..> because arguments can't be passed through" +
-                " Lazy boundaries: {0}"),
-            NotPossibleToResolveLazyEnumerableInsideFuncWithArgs = Of(
-                "Unable to resolve LazyEnumerable service inside Func<args..> because arguments can't be passed through" +
-                " lazy boundaries: {0}"),
             UnableToUseInstanceForExistingNonInstanceFactory = Of(
                 "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
             NotFoundMetaCtorWithTwoArgs = Of(

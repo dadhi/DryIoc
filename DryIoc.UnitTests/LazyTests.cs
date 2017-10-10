@@ -29,7 +29,7 @@ namespace DryIoc.UnitTests
 
             var one = container.Resolve<Lazy<ISingleton>>();
             var another = container.Resolve<Lazy<ISingleton>>();
-            
+
             Assert.That(one, Is.Not.SameAs(another));
         }
 
@@ -118,21 +118,6 @@ namespace DryIoc.UnitTests
             Assert.That(me.Self.Value, Is.InstanceOf<Me>());
         }
 
-        [Explicit]
-        public void When_container_is_disposed_lazy_will_stop_working()
-        {
-            var container = new Container();
-            container.Register<Me>();
-            var me = container.Resolve<Lazy<Me>>();
-            var containerRef = new WeakReference(container);
-            
-            container = null;
-            GC.Collect();
-
-            Assert.That(containerRef.IsAlive, Is.False);
-            Assert.Throws<ContainerException>(() => { var _ = me.Value; });
-        }
-
         [Test]
         public void Resolving_Func_With_Args_of_Lazy_should_throw_for_missing_dependency()
         {
@@ -140,19 +125,16 @@ namespace DryIoc.UnitTests
             container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
             container.Register<Service>();
 
-            var ex = Assert.Throws<ContainerException>(() => 
-                container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>());
+            var f = container.Resolve<Func<bool, Lazy<IServiceWithParameterAndDependency>>>();
 
-            Assert.AreEqual(
-                Error.NameOf(Error.NotPossibleToResolveLazyInsideFuncWithArgs),
-                Error.NameOf(ex.Error));
+            Assert.AreEqual(true, f(true).Value.Flag);
         }
 
         [Test]
         public void Lazy_dependency_is_injected_as_nested_Resolve_method()
         {
             var container = new Container();
-            container.Register<Foo>();            
+            container.Register<Foo>();
             container.Register<IDependency, BarDependency>();
 
             var fooExpr = container.Resolve<LambdaExpression>(typeof(Foo));
@@ -160,7 +142,7 @@ namespace DryIoc.UnitTests
             Assert.That(fooExpr.ToString(), Is.StringContaining(".Resolve"));
         }
 
-        internal class BarDependency : IDependency {}
+        internal class BarDependency : IDependency { }
 
         internal class Foo
         {
