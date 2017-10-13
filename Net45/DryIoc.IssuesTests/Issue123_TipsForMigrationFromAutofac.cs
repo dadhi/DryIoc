@@ -245,6 +245,26 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void How_DryIoc_handles_missing_service()
+        {
+            var container = new Container();
+
+            var d = container.Resolve<NoDep>(IfUnresolved.ReturnDefaultIfNotRegistered);
+
+            Assert.IsNotNull(d);
+        }
+
+        [Test]
+        public void How_DryIoc_handles_service_with_missing_dependency()
+        {
+            var container = new Container();
+            container.Register<NoDep>();
+
+            Assert.Throws<ContainerException>(() =>
+                container.Resolve<NoDep>(IfUnresolved.ReturnDefaultIfNotRegistered));
+        }
+
+        [Test]
         public void How_DryIoc_IEnumerable_handles_service_with_missing_dependency()
         {
             var container = new Container();
@@ -256,7 +276,7 @@ namespace DryIoc.IssuesTests
 
         public class NoDep
         {
-            public ISomeDep Dep { get; private set; }
+            public ISomeDep Dep { get; }
             public NoDep(ISomeDep dep)
             {
                 Dep = dep;
@@ -277,7 +297,7 @@ namespace DryIoc.IssuesTests
 
         public class ADependency : IDisposable 
         {
-            public ANestedDep NestedDep { get; private set; }
+            public ANestedDep NestedDep { get; }
 
             public bool IsDisposed { get; private set; }
 
@@ -294,8 +314,8 @@ namespace DryIoc.IssuesTests
 
         public class AService
         {
-            public ADependency Dep { get; private set; }
-            public ANestedDep NestedDep { get; private set; }
+            public ADependency Dep { get; }
+            public ANestedDep NestedDep { get; }
 
             public AService(ADependency dep, ANestedDep nestedDep)
             {
@@ -306,7 +326,7 @@ namespace DryIoc.IssuesTests
 
         public class AClient : IDisposable
         {
-            public Owned<AService> Service { get; private set; }
+            public Owned<AService> Service { get; }
 
             public AClient(Owned<AService> service)
             {
@@ -346,7 +366,7 @@ namespace DryIoc.IssuesTests
 
         public class My : IDisposable
         {
-            public DryIocOwned<Cake> OwnedCake { get; private set; }
+            public DryIocOwned<Cake> OwnedCake { get; }
 
             public My(DryIocOwned<Cake> ownedCake)
             {
@@ -361,7 +381,7 @@ namespace DryIoc.IssuesTests
 
         public class DryIocOwned<TService> : IDisposable
         {
-            public TService Value { get; private set; }
+            public TService Value { get; }
             private readonly IDisposable _scope;
 
             public DryIocOwned(TService value, IDisposable scope)
@@ -528,7 +548,7 @@ namespace DryIoc.IssuesTests
 
         public class BB
         {
-            public B B { get; private set; }
+            public B B { get; }
 
             public BB(B b)
             {
@@ -538,7 +558,7 @@ namespace DryIoc.IssuesTests
 
         public class BLazy
         {
-            public Lazy<B> LazyB { get; private set; }
+            public Lazy<B> LazyB { get; }
 
             public BLazy(Lazy<B> lazyB)
             {
@@ -550,10 +570,10 @@ namespace DryIoc.IssuesTests
 
         public class A
         {
-            public B B { get; private set; }
-            public C C { get; private set; }
-            public bool IsCreatedWithB { get; private set; }
-            public bool IsCreatedWithC { get; private set; }
+            public B B { get; }
+            public C C { get; }
+            public bool IsCreatedWithB { get; }
+            public bool IsCreatedWithC { get; }
 
             public A(B b)
             {

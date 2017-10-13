@@ -319,7 +319,7 @@ namespace DryIoc
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).Resolve(serviceType, 
+                return ((IResolver)this).Resolve(serviceType,
                     request.ServiceKey, ifUnresolved, null, RequestInfo.Empty, null);
 
             var factoryDelegate = factory?.GetDelegateOrDefault(request);
@@ -356,18 +356,18 @@ namespace DryIoc
 
             var container = (IContainer)this;
             IEnumerable<ServiceRegistrationInfo> items = container.GetAllServiceFactories(requiredItemType)
-                .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemType, f.Key))
-                .ToArray();
+                .Where(f => f.Value != null)
+                .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
+                    .Where(f => f.Value != null)
                     .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType,
                         // note: Special service key with info about open-generic service type
-                        new[] { requiredItemOpenGenericType, f.Key }))
-                    .ToArray();
+                        new[] { requiredItemOpenGenericType, f.Key }));
             }
 
             // Append registered generic types with compatible variance,
@@ -433,11 +433,11 @@ namespace DryIoc
             if (variantGenericItems != null)
                 allItems = allItems.Concat(variantGenericItems);
 
-            // Resolve in resgitration order
+            // Resolve in registration order
             foreach (var item in allItems.OrderBy(it => it.FactoryRegistrationOrder))
             {
                 var service = container.Resolve(serviceType, item.OptionalServiceKey,
-                    IfUnresolved.ReturnDefault, item.ServiceType, preResolveParent, args);
+                    IfUnresolved.ReturnDefaultIfNotRegistered, item.ServiceType, preResolveParent, args);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -2825,19 +2825,19 @@ namespace DryIoc
             typeof(object[]).GetImplementedInterfaces()
                 .Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
 
-        /// <summary>Checks if passed type represents supported collection types.</summary>
-        /// <param name="type">Type to examine.</param> <returns>Check result.</returns>
-        public static bool IsSupportedCollectionType(this Type type)
-        {
-            if (type.IsArray) return true;
-            var genericDefinition = type.GetGenericDefinitionOrNull();
-            return genericDefinition != null && (
-                genericDefinition == typeof(LazyEnumerable<>) ||
-                ArrayInterfaces.Contains(genericDefinition));
-        }
+        // todo: remove if not used
+        ///// <summary>Checks if passed type represents supported collection types.</summary>
+        //public static bool IsSupportedCollectionType(this Type type)
+        //{
+        //    if (type.IsArray)
+        //        return true;
+        //    var genericDefinition = type.GetGenericDefinitionOrNull();
+        //    return genericDefinition != null && (
+        //        genericDefinition == typeof(LazyEnumerable<>) ||
+        //        ArrayInterfaces.Contains(genericDefinition));
+        //}
 
         /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
-        /// <param name="type">Type to check.</param><returns>True for func type, false otherwise.</returns>
         public static bool IsFunc(this Type type)
         {
             var genericDefinition = type.GetGenericDefinitionOrNull();
@@ -2998,7 +2998,7 @@ namespace DryIoc
                 {
                     var item = items[i];
                     var itemRequest = request.Push(itemType, item.OptionalServiceKey,
-                        IfUnresolved.ReturnDefault, requiredServiceType: item.ServiceType);
+                        IfUnresolved.ReturnDefaultIfNotRegistered, requiredServiceType: item.ServiceType);
 
                     var itemFactory = container.ResolveFactory(itemRequest);
                     if (itemFactory != null)
@@ -3048,8 +3048,8 @@ namespace DryIoc
 
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
-                return request.IfUnresolved == IfUnresolved.ReturnDefault
-                    ? Expression.Constant(null, lazyType) : null;
+                return request.IfUnresolved == IfUnresolved.Throw ? null 
+                    : Expression.Constant(null, lazyType);
 
             serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
 
@@ -5273,7 +5273,7 @@ namespace DryIoc
         /// ]]></code></example>
         public static TService Resolve<TService, TRequiredService>(this IResolver resolver,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object[] args = null, object serviceKey = null) =>
-            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, typeof(TRequiredService), 
+            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, typeof(TRequiredService),
                 RequestInfo.Empty, args);
 
         /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
@@ -5285,7 +5285,7 @@ namespace DryIoc
         ///     var services = container.Resolve(typeof(Lazy<object>), "someKey", requiredServiceType: typeof(IService));
         /// ]]></code></example>
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null, 
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             object[] args = null) =>
             resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType,
                 RequestInfo.Empty, args);
@@ -5306,7 +5306,7 @@ namespace DryIoc
         public static object Resolve(this IResolver resolver, Type serviceType, object[] args,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             object serviceKey = null) =>
-            resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, 
+            resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType,
                 RequestInfo.Empty, args);
 
         /// <summary>Resolves the service supplying all or some of its dependencies 
@@ -5315,7 +5315,7 @@ namespace DryIoc
         public static TService Resolve<TService>(this IResolver resolver, object[] args,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             object serviceKey = null) =>
-            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType, 
+            (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType,
                 RequestInfo.Empty, args);
 
         /// <summary>Returns all registered services instances including all keyed and default registrations.
@@ -5323,11 +5323,6 @@ namespace DryIoc
         /// the same services that were returned with first <see cref="ResolveMany{TService}"/> call (fixed view).</summary>
         /// <typeparam name="TService">Return collection item type. 
         /// It denotes registered service type if <paramref name="requiredServiceType"/> is not specified.</typeparam>
-        /// <param name="resolver">Usually <see cref="Container"/> object.</param>
-        /// <param name="requiredServiceType">(optional) Denotes registered service type. Should be assignable to <typeparamref name="TService"/>.</param>
-        /// <param name="behavior">(optional) Specifies new registered services awareness. Aware by default.</param>
-        /// <param name="serviceKey">(optional) Service key.</param>
-        /// <returns>Result collection of services.</returns>
         /// <remarks>The same result could be achieved by directly calling:
         /// <code lang="cs"><![CDATA[
         ///     container.Resolve<LazyEnumerable<IService>>();  // for dynamic result - default behavior
@@ -5337,22 +5332,16 @@ namespace DryIoc
         /// </remarks>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver,
             Type requiredServiceType = null, ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable,
-            object serviceKey = null) =>
+            object[] args = null, object serviceKey = null) =>
             behavior == ResolveManyBehavior.AsLazyEnumerable
-                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty, args: null).Cast<TService>()
-                : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType);
+                ? resolver.ResolveMany(typeof(TService), serviceKey, requiredServiceType, RequestInfo.Empty, args).Cast<TService>()
+                : resolver.Resolve<IEnumerable<TService>>(serviceKey, IfUnresolved.Throw, requiredServiceType, args);
 
         /// <summary>Returns all registered services as objects, including all keyed and default registrations.</summary>
-        /// <param name="resolver">Usually <see cref="Container"/> object.</param>
-        /// <param name="serviceType">Type of item to resolve.</param>
-        /// <param name="behavior">(optional) Specifies new registered services awareness. Aware by default.</param>
-        /// <param name="serviceKey">(optional) Service key.</param>
-        /// <returns>Result collection of services.</returns>
-        /// <returns></returns>
         public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType,
             ResolveManyBehavior behavior = ResolveManyBehavior.AsLazyEnumerable,
-            object serviceKey = null) =>
-            resolver.ResolveMany<object>(serviceType, behavior, serviceKey);
+            object[] args = null, object serviceKey = null) =>
+            resolver.ResolveMany<object>(serviceType, behavior, args, serviceKey);
 
         internal static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool isRuntimeDependency = false)
@@ -5460,34 +5449,31 @@ namespace DryIoc
         /// <summary>Default details if not specified, use default setting values, e.g. <see cref="DryIoc.IfUnresolved.Throw"/></summary>
         public static readonly ServiceDetails Default = Of();
 
-        /// <summary>The same as <see cref="Default"/> with only difference <see cref="IfUnresolved"/> set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
-        public static readonly ServiceDetails IfUnresolvedReturnDefault = Of(ifUnresolved: IfUnresolved.ReturnDefault);
+        /// <summary>Default details with <see cref="IfUnresolved.ReturnDefault"/> option.</summary>
+        public static readonly ServiceDetails IfUnresolvedReturnDefault =
+            Of(ifUnresolved: IfUnresolved.ReturnDefault);
+
+        /// <summary>Default details with <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> option.</summary>
+        public static readonly ServiceDetails IfUnresolvedReturnDefaultIfNotRegistered =
+            Of(ifUnresolved: IfUnresolved.ReturnDefaultIfNotRegistered);
 
         /// <summary>Creates new details out of provided settings, or returns default if all settings have default value.</summary>
-        /// <param name="requiredServiceType">Registered service type to search for.</param>
-        /// <param name="serviceKey">Service key.</param> <param name="ifUnresolved">If unresolved policy.</param>
-        /// <param name="defaultValue">Custom default value, if specified it will automatically set <paramref name="ifUnresolved"/> to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</param>
-        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or the value if key passed.</param>
-        /// <returns>New details.</returns>
         public static ServiceDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
             object defaultValue = null, string metadataKey = null, object metadata = null)
         {
+            // IfUnresolved.Throw does not make sense when default value is provided, so normalizing it to ReturnDefault
             if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
                 ifUnresolved = IfUnresolved.ReturnDefault;
 
             return new ServiceDetails(requiredServiceType, ifUnresolved,
-                serviceKey, metadataKey, metadata,
-                defaultValue, hasCustomValue: false);
+                serviceKey, metadataKey, metadata, defaultValue, hasCustomValue: false);
         }
 
-        /// <summary>Sets custom value for service. This setting is orthogonal to the rest.</summary>
-        /// <param name="value">Custom value.</param> <returns>Details with custom value.</returns>
-        public static ServiceDetails Of(object value)
-        {
-            // Using default value with invalid ifUnresolved state to indicate custom value.
-            return new ServiceDetails(null, IfUnresolved.Throw, null, null, null, value, hasCustomValue: true);
-        }
+        /// <summary>Sets custom value for service. This setting is orthogonal to the rest.
+        /// Using default value with invalid ifUnresolved.Throw option to indicate custom value.</summary>
+        public static ServiceDetails Of(object value) =>
+            new ServiceDetails(null, IfUnresolved.Throw, null, null, null, value, hasCustomValue: true);
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
         public readonly Type RequiredServiceType;
@@ -5510,11 +5496,11 @@ namespace DryIoc
         /// <summary>Either default or custom value depending on <see cref="IfUnresolved"/> setting.</summary>
         private readonly object _value;
 
-        /// <summary>Value to use in case <see cref="IfUnresolved"/> is set to <see cref="DryIoc.IfUnresolved.ReturnDefault"/>.</summary>
-        public object DefaultValue { get { return IfUnresolved == IfUnresolved.ReturnDefault ? _value : null; } }
+        /// <summary>Value to use in case <see cref="IfUnresolved"/> is set to not Throw.</summary>
+        public object DefaultValue => IfUnresolved != IfUnresolved.Throw ? _value : null;
 
-        /// <summary>Custom value specified for dependency.</summary>
-        public object CustomValue { get { return IfUnresolved != IfUnresolved.ReturnDefault ? _value : null; } }
+        /// <summary>Custom value specified for dependency. The IfUnresolved.Throw is the marker of custom value comparing to default value.</summary>
+        public object CustomValue => IfUnresolved == IfUnresolved.Throw ? _value : null;
 
         /// <summary>Pretty prints service details to string for debugging and errors.</summary> <returns>Details string.</returns>
         public override string ToString()
@@ -5571,10 +5557,12 @@ namespace DryIoc
                 return source;
 
             if (details == ServiceDetails.Default)
-                details = ServiceDetails.IfUnresolvedReturnDefault;
+                details = ifUnresolved == IfUnresolved.ReturnDefault 
+                    ? ServiceDetails.IfUnresolvedReturnDefault
+                    : ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
             else
                 details = ServiceDetails.Of(details.RequiredServiceType, details.ServiceKey,
-                ifUnresolved, details.DefaultValue, details.MetadataKey, details.Metadata);
+                    ifUnresolved, details.DefaultValue, details.MetadataKey, details.Metadata);
 
             return source.Create(source.ServiceType, details);
         }
@@ -5639,9 +5627,10 @@ namespace DryIoc
 
             var dependencyDetails = dependency.Details;
 
-            var ifUnresolved = ownerDetails.IfUnresolved == IfUnresolved.Throw
-                ? dependencyDetails.IfUnresolved
-                : ownerDetails.IfUnresolved;
+            var ownerIfUnresolved = ownerDetails.IfUnresolved;
+            var ifUnresolved = dependencyDetails.IfUnresolved;
+            if (ownerIfUnresolved == IfUnresolved.ReturnDefault) // ReturnDefault is always inherited
+                ifUnresolved = ownerIfUnresolved;
 
             var serviceType = dependency.ServiceType;
             var requiredServiceType = dependencyDetails.RequiredServiceType;
@@ -5651,16 +5640,16 @@ namespace DryIoc
             var metadataKey = dependencyDetails.MetadataKey;
             var metadata = dependencyDetails.Metadata;
 
-            // propagate key and meta to the actual service
+            // Inherit some things through wrappers and decorators
             if (ownerType == FactoryType.Wrapper ||
-                // for decorated dependency, but not for other decorator dependencies
                 ownerType == FactoryType.Decorator &&
                 container.GetWrappedType(serviceType, requiredServiceType).IsAssignableTo(owner.ServiceType))
             {
+                if (ownerIfUnresolved == IfUnresolved.ReturnDefaultIfNotRegistered)
+                    ifUnresolved = ownerIfUnresolved;
+
                 if (serviceKey == null)
-                {
                     serviceKey = ownerDetails.ServiceKey;
-                }
 
                 if (metadataKey == null && metadata == null)
                 {
@@ -5734,12 +5723,11 @@ namespace DryIoc
 
             return serviceKey == null && requiredServiceType == null
                 && metadataKey == null && metadata == null
-                ? (ifUnresolved == IfUnresolved.Throw
-                ? new ServiceInfo(serviceType)
+                ? (ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType)
+                    : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
+                    : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
                 : new WithDetails(serviceType,
-                    ServiceDetails.IfUnresolvedReturnDefault))
-                : new WithDetails(serviceType,
-                    ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
+                ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
@@ -6220,35 +6208,13 @@ namespace DryIoc
         {
             info.ThrowIfNull();
 
-            if (Factory == null)
+            if (Factory == null) // the check throw condition because this.ToString is too expensive
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            var parentInfo = ChangeIfUnresolvedForCollectionServiceDependency();
-
-            var inheritedInfo = info.InheritInfoFromDependencyOwner(parentInfo, Container, FactoryType);
+            var inheritedInfo = info.InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
             var inheritedFlags = _flags & ~NotInheritedFlags | flags;
 
             return new Request(_requestContext, this, inheritedInfo, null, null, InputArgs, inheritedFlags, null);
-        }
-
-        // todo: v3: review and remove if possible
-        // if service info is dependency of service wrapped in collection,
-        // then change policy to collection policy
-        private IServiceInfo ChangeIfUnresolvedForCollectionServiceDependency()
-        {
-            if (IfUnresolved == IfUnresolved.ReturnDefault && FactoryType == FactoryType.Service)
-            {
-                var p = RequestInfo;
-                while (!p.IsEmpty &&
-                       !(p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsSupportedCollectionType()))
-                    p = p.ParentOrWrapper;
-
-                if (!p.IsEmpty && p.IfUnresolved == IfUnresolved.Throw)
-                    return ServiceInfo.Of(ServiceType, RequiredServiceType, IfUnresolved.Throw, ServiceKey,
-                        MetadataKey, Metadata);
-            }
-
-            return _serviceInfo;
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
@@ -7186,7 +7152,7 @@ namespace DryIoc
                 (Setup.AsResolutionCall ||
                 // implicit split only when not inside Func with arguments,
                 // cause for now arguments are not propagated through resolve call
-                request.ShouldSplitObjectGraph() || 
+                request.ShouldSplitObjectGraph() ||
                 Setup.UseParentReuse)
                 && request.GetActualServiceType() != typeof(void);
             return shouldBe;
@@ -7559,7 +7525,8 @@ namespace DryIoc
 
         /// <summary>Public, declared, assignable, non-primitive properties.</summary>
         public static PropertiesAndFieldsSelector Properties(
-            bool withNonPublic = false, bool withBase = false, IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault) =>
+            bool withNonPublic = false, bool withBase = false,
+            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefaultIfNotRegistered) =>
             All(withNonPublic: withNonPublic, withPrimitive: false, withFields: false, withBase: withBase, ifUnresolved: ifUnresolved);
 
         /// <summary>Should return service info for input member (property or field).</summary>
@@ -7572,7 +7539,7 @@ namespace DryIoc
             bool withPrimitive = true,
             bool withFields = true,
             bool withBase = true,
-            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefault,
+            IfUnresolved ifUnresolved = IfUnresolved.ReturnDefaultIfNotRegistered,
             GetServiceInfo serviceInfo = null)
         {
             GetServiceInfo info = (m, r) =>
@@ -7772,10 +7739,7 @@ namespace DryIoc
                  || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
         }
 
-        /// <summary>Creates service expression, so for registered implementation type "Service",
-        /// you will get "new Service()". If there is <see cref="Reuse"/> specified, then expression will
-        /// contain call to <see cref="Scope"/> returned by reuse.</summary>
-        /// <param name="request">Request for service to resolve.</param> <returns>Created expression.</returns>
+        /// <summary>Creates service expression.</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryMethod = GetFactoryMethod(request);
@@ -7853,11 +7817,12 @@ namespace DryIoc
                             {
                                 var paramFactory = container.ResolveFactory(paramRequest);
                                 paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
+
                                 // Meant that parent Or parameter itself allows default value,
                                 // otherwise we did not get null but exception
                                 if (paramExpr == null)
                                 {
-                                    // Check if parameter itself (without propagated parent details)
+                                    // Check if parameter dependency itself (without propagated parent details)
                                     // does not allow default, then stop checking the rest of parameters.
                                     if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
                                         return null;
@@ -8276,7 +8241,7 @@ namespace DryIoc
             }
 
             if (!matchFound)
-                return ifErrorReturnDefault || request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
                     : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
                         openImplType, implementedTypes, request);
 
@@ -8284,7 +8249,7 @@ namespace DryIoc
 
             var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
             if (notMatchedIndex != -1)
-                return ifErrorReturnDefault || request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
                     : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
                         openImplType, implTypeParams[notMatchedIndex], request);
 
@@ -8326,7 +8291,6 @@ namespace DryIoc
             Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs,
             int resultCount = 0)
         {
-
             if (serviceArgs.Length != serviceParams.Length)
                 return false;
 
@@ -8389,7 +8353,7 @@ namespace DryIoc
                     implTypeParams, serviceTypeArgs);
 
                 if (!isFactoryImplTypeClosed)
-                    return shouldReturnOnError || request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                    return shouldReturnOnError || request.IfUnresolved != IfUnresolved.Throw ? null
                         : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs,
                             factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
 
@@ -8491,7 +8455,7 @@ namespace DryIoc
                     resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
 
                 if (!isMethodClosed)
-                    return shouldReturnOnError || request.IfUnresolved == IfUnresolved.ReturnDefault ? null
+                    return shouldReturnOnError || request.IfUnresolved != IfUnresolved.Throw ? null
                         : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodWithServiceTypeArgs,
                             openFactoryMethod, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "),
                             request);
@@ -9171,10 +9135,13 @@ namespace DryIoc
     /// <summary>Policy to handle unresolved service.</summary>
     public enum IfUnresolved
     {
-        /// <summary>Specifies to throw exception if no service found.</summary>
+        /// <summary>If service is unresolved for whatever means, it will throw the respective exception.</summary>
         Throw,
-        /// <summary>Specifies to return default value instead of throwing error.</summary>
-        ReturnDefault
+        /// <summary>If service is unresolved for whatever means, it will return default(serviceType) value</summary>
+        ReturnDefault,
+        /// <summary>If service is not registered, then it will return default, for other errors it will throw.
+        /// </summary>
+        ReturnDefaultIfNotRegistered,
     }
 
     /// <summary>Dependency request path information.</summary>
