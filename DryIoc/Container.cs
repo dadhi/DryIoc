@@ -244,7 +244,7 @@ namespace DryIoc
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            Type requiredServiceType, RequestInfo preResolveParent, object[] args) // todo: args are for the future Func<args> propagation through Resolve call boundaries
+            Type requiredServiceType, RequestInfo preResolveParent, object[] args)
         {
             preResolveParent = preResolveParent ?? RequestInfo.Empty;
 
@@ -319,7 +319,8 @@ namespace DryIoc
 
             // The situation is possible for multiple default services registered.
             if (request.ServiceKey != null)
-                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolved, null, null, null);
+                return ((IResolver)this).Resolve(serviceType, 
+                    request.ServiceKey, ifUnresolved, null, RequestInfo.Empty, null);
 
             var factoryDelegate = factory?.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
@@ -2453,13 +2454,10 @@ namespace DryIoc
                 ? (Func<ServiceRegistrationInfo, bool>)null
                 : registration => resolutionRoots.IndexOf(registration.ServiceType) != -1);
 
-        // todo: v3: rename to Validate, rename parameters too.
+        // todo: Mark as Obsolete.
         /// <summary>Used to find potential problems in service registration setup.
         /// Method tries to get expressions for Roots/All registrations, collects happened exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
-        /// <param name="container">for container</param>
-        /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.</param>
-        /// <returns>Exceptions happened for corresponding registrations.</returns>
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] VerifyResolutions(this IContainer container,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
@@ -2496,8 +2494,6 @@ namespace DryIoc
             var flags = request.Flags;
             if (opensResolutionScope)
                 flags |= RequestFlags.OpensResolutionScope;
-
-            //todo: Convert request.DecoratedFactoryID;
 
             var serviceTypeExpr = Expression.Constant(serviceType, typeof(Type));
             var factoryIdExpr = Expression.Constant(factoryID, typeof(int));
