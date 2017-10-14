@@ -4615,10 +4615,8 @@ namespace DryIoc
         public static void Register<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
-        {
+            object serviceKey = null) =>
             registrator.Register<TImplementation, TImplementation>(reuse, made, setup, ifAlreadyRegistered, serviceKey);
-        }
 
         /// <summary>Registers service type returned by Made expression.</summary>
         /// <typeparam name="TService">The type of service.</typeparam>
@@ -4632,11 +4630,9 @@ namespace DryIoc
         public static void Register<TService, TMadeResult>(this IRegistrator registrator,
             Made.TypedMade<TMadeResult> made, IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null) where TMadeResult : TService
-        {
-            var factory = new ReflectionFactory(default(Type), reuse, made, setup);
-            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-        }
+            object serviceKey = null) where TMadeResult : TService =>
+            registrator.Register(new ReflectionFactory(default(Type), reuse, made, setup), 
+                typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers service type returned by Made expression.</summary>
         /// <typeparam name="TService">The type of service.</typeparam>
@@ -4649,10 +4645,8 @@ namespace DryIoc
         public static void Register<TService>(this IRegistrator registrator,
             Made.TypedMade<TService> made, IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
-        {
+            object serviceKey = null) =>
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
-        }
 
         /// <summary>Action that could be used by User to customize register many default behavior.</summary>
         /// <param name="r">Registrator provided to do any arbitrary registration User wants.</param>
@@ -7306,11 +7300,8 @@ namespace DryIoc
                 serviceType.ThrowIfNull();
 
             var setup = Setup;
-            if (setup.FactoryType == FactoryType.Wrapper)
-            {
-                ((Setup.WrapperSetup)setup).ThrowIfInvalidRegistration(serviceType);
-            }
-            else
+
+            if (setup.FactoryType == FactoryType.Service)
             {
                 // Warn about registering disposable transient
                 var reuse = Reuse ?? containerRules.DefaultReuse;
@@ -7329,6 +7320,15 @@ namespace DryIoc
                 if (knownImplOrServiceType.IsAssignableTo(typeof(IDisposable)))
                     Throw.It(Error.RegisteredDisposableTransientWontBeDisposedByContainer,
                         serviceType, serviceKey ?? "{no key}", this);
+            }
+            else if (setup.FactoryType == FactoryType.Wrapper)
+            {
+                ((Setup.WrapperSetup)setup).ThrowIfInvalidRegistration(serviceType);
+            }
+            else if (setup.FactoryType == FactoryType.Decorator)
+            {
+                if (serviceKey != null)
+                    Throw.It(Error.DecoratorShouldNotBeRegisteredWithServiceKey, serviceKey);
             }
 
             return true;
@@ -9928,7 +9928,11 @@ namespace DryIoc
                 "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder."),
             UnableToFindSingletonInstance = Of(
                 "Expecting the instance to be stored in singleton scope, but unable to find anything here." + Environment.NewLine +
-                "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton.");
+                "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton."),
+            DecoratorShouldNotBeRegisteredWithServiceKey = Of(
+                "Registerring Decorator {0} with not-null service key {1} does not make sense," + Environment.NewLine + 
+                "because decorator may be applied to multiple service of any key." + Environment.NewLine + 
+                "If you wanted to apply decorator to services of specific key please use `setup: Setup.DecoratorOf(serviceKey: blah)`");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
