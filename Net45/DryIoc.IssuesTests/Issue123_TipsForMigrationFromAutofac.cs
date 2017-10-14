@@ -251,7 +251,7 @@ namespace DryIoc.IssuesTests
 
             var d = container.Resolve<NoDep>(IfUnresolved.ReturnDefaultIfNotRegistered);
 
-            Assert.IsNotNull(d);
+            Assert.IsNull(d);
         }
 
         [Test]

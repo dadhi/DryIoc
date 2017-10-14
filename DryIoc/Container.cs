@@ -2450,21 +2450,25 @@ namespace DryIoc
         /// <returns>Exceptions happened for corresponding registrations.</returns>
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] Validate(
             this IContainer container, params Type[] resolutionRoots) =>
-            container.VerifyResolutions(resolutionRoots.IsNullOrEmpty()
+            container.Validate(resolutionRoots.IsNullOrEmpty()
                 ? (Func<ServiceRegistrationInfo, bool>)null
                 : registration => resolutionRoots.IndexOf(registration.ServiceType) != -1);
 
-        // todo: Mark as Obsolete.
         /// <summary>Used to find potential problems in service registration setup.
-        /// Method tries to get expressions for Roots/All registrations, collects happened exceptions, and
+        /// Method tries to generate expressions for specified registrations, collects happened exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
-        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] VerifyResolutions(this IContainer container,
+        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
             KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] ignoredRoots;
             KeyValuePair<RequestInfo, Expression>[] ignoredDeps;
             return container.GenerateResolutionExpressions(out ignoredRoots, out ignoredDeps, whatRegistrations);
         }
+
+        /// <summary>Replaced with Validate</summary>
+        [Obsolete("Replaced with Validate", false)]
+        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] VerifyResolutions(this IContainer container,
+            Func<ServiceRegistrationInfo, bool> whatRegistrations = null) => container.Validate(whatRegistrations);
 
         /// <summary>Represents construction of whole request info stack as expression.</summary>
         /// <param name="container">Required to access container facilities for expression conversion.</param>
@@ -2824,18 +2828,6 @@ namespace DryIoc
         public static readonly Type[] ArrayInterfaces =
             typeof(object[]).GetImplementedInterfaces()
                 .Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
-
-        // todo: remove if not used
-        ///// <summary>Checks if passed type represents supported collection types.</summary>
-        //public static bool IsSupportedCollectionType(this Type type)
-        //{
-        //    if (type.IsArray)
-        //        return true;
-        //    var genericDefinition = type.GetGenericDefinitionOrNull();
-        //    return genericDefinition != null && (
-        //        genericDefinition == typeof(LazyEnumerable<>) ||
-        //        ArrayInterfaces.Contains(genericDefinition));
-        //}
 
         /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
         public static bool IsFunc(this Type type)
