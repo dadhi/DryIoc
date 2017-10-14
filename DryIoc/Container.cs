@@ -2789,7 +2789,7 @@ namespace DryIoc
             else
             {
                 for (; scope != null; scope = scope.Parent)
-                    if (name.Equals(scope.Name))
+                    if (ReferenceEquals(name, scope.Name) || name.Equals(scope.Name))
                         return scope;
             }
 
@@ -3270,9 +3270,8 @@ namespace DryIoc
         /// <summary>Default rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        /// <summary>Set of auto-magical rules.
-        /// Be warned that the rules might hide the issues in your container setup!</summary>
-        public static readonly Rules Relaxed = new Rules(DEFAULT_SETTINGS,
+        /// <summary>Set of rules reflecting the behavior of Microsoft.Extensions.DependencyInjection</summary>
+        public static readonly Rules MsDIDefault = new Rules(DEFAULT_SETTINGS,
             SelectLastRegisteredFactory(), Reuse.Transient,
             Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments),
             IfAlreadyRegistered.AppendNotKeyed, DefaultMaxObjectGraphSize, null, null, null, null);
@@ -5853,7 +5852,7 @@ namespace DryIoc
         public abstract Type ServiceType { get; }
 
         /// <summary>Optional details: service key, if-unresolved policy, required service type.</summary>
-        public virtual ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefault;
+        public virtual ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
 
         /// <summary>Creates info from service type and details.</summary>
         /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
@@ -8983,6 +8982,39 @@ namespace DryIoc
         bool Match(object scopeName);
     }
 
+    /// <summary>Represents multiple names</summary>
+    public sealed class CompositeScopeName : IScopeName
+    {
+        /// <summary>Wraps the multiple names</summary>
+        public static CompositeScopeName Of(object[] names) =>
+            new CompositeScopeName(names);
+
+        /// <summary>Matches all the name in a loop until first match is found, otherwise returns false.</summary>
+        public bool Match(object scopeName)
+        {
+            for (int i = 0; i < _names.Length; i++)
+            {
+                var name = _names[i];
+                if (name == scopeName)
+                    return true;
+                var sName = name as IScopeName;
+                if (sName != null && sName.Match(scopeName))
+                    return true;
+                if (scopeName != null && scopeName.Equals(name))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private CompositeScopeName(object[] names)
+        {
+            _names = names;
+        }
+
+        private readonly object[] _names;
+    }
+
     /// <summary>Holds the name for the resolution scope.</summary>
     public sealed class ResolutionScopeName : IScopeName
     {
@@ -9003,8 +9035,7 @@ namespace DryIoc
         internal static readonly ConstructorInfo Constructor = typeof(ResolutionScopeName)
             .GetTypeInfo().DeclaredConstructors.First();
 
-        /// <summary>Creates the key.</summary>
-        public ResolutionScopeName(Type serviceType, object serviceKey)
+        private ResolutionScopeName(Type serviceType, object serviceKey)
         {
             ServiceType = serviceType;
             ServiceKey = serviceKey;
@@ -9013,17 +9044,12 @@ namespace DryIoc
         /// <inheritdoc />
         public bool Match(object scopeName)
         {
-            var resolutionScopeName = scopeName as ResolutionScopeName;
-            if (resolutionScopeName == null)
-                return false;
-
-            if ((ServiceType == null ||
-                resolutionScopeName.ServiceType.IsAssignableTo(ServiceType) ||
-                 ServiceType.IsOpenGeneric() &&
-                 resolutionScopeName.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
-                (ServiceKey == null || ServiceKey.Equals(resolutionScopeName.ServiceKey)))
+            var resScopeName = scopeName as ResolutionScopeName;
+            if (resScopeName != null &&
+                (ServiceType == null || resScopeName.ServiceType.IsAssignableTo(ServiceType) ||
+                 ServiceType.IsOpenGeneric() && resScopeName.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
+                (ServiceKey == null || ServiceKey.Equals(resScopeName.ServiceKey)))
                 return true;
-
             return false;
         }
 
@@ -9052,6 +9078,10 @@ namespace DryIoc
 
         /// <summary>Same as InCurrentNamedScope. From now on will be the default name.</summary>
         public static IReuse ScopedTo(object name) => new CurrentScopeReuse(name);
+
+        /// <summary>Scoped to multiple names.</summary>
+        public static IReuse ScopedTo(params object[] names) =>
+            new CurrentScopeReuse(CompositeScopeName.Of(names));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo(Type assignableFromServiceType = null, object serviceKey = null) =>

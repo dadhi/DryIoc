@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var di = new Container(Rules.Relaxed.WithConcreteTypeDynamicRegistrations());
+            var di = new Container(Rules.MsDIDefault.WithConcreteTypeDynamicRegistrations());
 
             di.UseInstance("a", serviceKey: "x");
             di.UseInstance("b", serviceKey: "y");

@@ -180,7 +180,7 @@ namespace DryIoc.UnitTests
 
         public class Aaa<T>
         {
-            public T Ttt { get; private set; }
+            public T Ttt { get; }
 
             public Aaa(T t)
             {
@@ -247,8 +247,8 @@ namespace DryIoc.UnitTests
 
         public class L
         {
-            public K K { get; private set; }
-            public IDisposable Scope { get; private set; }
+            public K K { get; }
+            public IDisposable Scope { get; }
 
             public L(K k, IDisposable scope)
             {
@@ -293,7 +293,7 @@ namespace DryIoc.UnitTests
 
         internal class AccountUser
         {
-            public Account Account { get; private set; }
+            public Account Account { get; }
             public AccountUser(Account account)
             {
                 Account = account;
@@ -504,7 +504,7 @@ namespace DryIoc.UnitTests
 
         internal class X
         {
-            public Y Y { get; private set; }
+            public Y Y { get; }
             public X(Y y)
             {
                 Y = y;
@@ -513,7 +513,7 @@ namespace DryIoc.UnitTests
         internal class Y
         {
             // ReSharper disable once MemberHidesStaticFromOuterClass
-            public Lazy<X> X { get; private set; }
+            public Lazy<X> X { get; }
             public Y(Lazy<X> x)
             {
                 X = x;
@@ -617,7 +617,7 @@ namespace DryIoc.UnitTests
 
         internal class SomeRoot : IDisposable
         {
-            public SomeDep Dep { get; private set; }
+            public SomeDep Dep { get; }
 
             public SomeRoot(SomeDep dep, IDisposable scope)
             {
@@ -733,9 +733,9 @@ namespace DryIoc.UnitTests
 
         public class ADConsumer
         {
-            public AD Ad { get; private set; }
+            public AD Ad { get; }
 
-            public AD Ad2 { get; private set; }
+            public AD Ad2 { get; }
 
             public ADConsumer(AD ad, AD ad2)
             {
@@ -746,9 +746,9 @@ namespace DryIoc.UnitTests
 
         public class AResolutionScoped
         {
-            public ADConsumer Consumer { get; private set; }
+            public ADConsumer Consumer { get; }
 
-            public IDisposable Dependencies { get; private set; }
+            public IDisposable Dependencies { get; }
 
             public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
             {
@@ -822,6 +822,33 @@ namespace DryIoc.UnitTests
                 
             }
         }
+
+        [Test]
+        public void Can_specify_multiple_scope_names_in_one_reuse()
+        {
+            var c = new Container();
+
+            c.Register<Go>(Reuse.ScopedTo("a", "b"));
+
+            using (var a = c.OpenScope("a"))
+            {
+                var goA = a.Resolve<Go>();
+                using (var noname = a.OpenScope())
+                {
+                    var goNN = noname.Resolve<Go>();
+                    Assert.AreSame(goNN, goA);
+
+                    using (var b = noname.OpenScope("b"))
+                    {
+                        var goB = b.Resolve<Go>();
+                        Assert.AreNotSame(goB, goA); // different name
+                        Assert.AreSame(goB, b.Resolve<Go>());
+                    }
+                }
+            }
+        }
+
+        class Go {}
 
         #region CUT
 
