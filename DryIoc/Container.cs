@@ -184,19 +184,20 @@ namespace DryIoc
         /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
         /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
-        public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked)
+        public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked)
         {
             ThrowIfContainerDisposed();
             factory.ThrowIfNull().ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, Rules);
 
-            if (ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed)
+            if (!ifAlreadyRegistered.HasValue)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
             // Improves performance a bit by attempt to swapping registry while it is still unchanged,
             // if attempt fails then fallback to normal Swap with retry.
             var registry = _registry.Value;
-            if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered, serviceKey)))
-                _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered, serviceKey));
+            if (!_registry.TrySwapIfStillCurrent(registry, 
+                registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
+                _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
 
             _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache;
         }
@@ -2190,8 +2191,7 @@ namespace DryIoc
         /// <summary>Shares all parts with original container But copies registration, so the new registration
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
-            container.With(container.Rules, container.ScopeContext,
-                WithRegistrationsOptions.Clone);
+            container.With(container.Rules, container.ScopeContext, WithRegistrationsOptions.Clone);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -3719,7 +3719,7 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
         /// <summary><seew cref="WithDefaultIfAlreadyRegistered"/>.</summary>
-        public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
+        public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; }
 
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
@@ -3762,6 +3762,7 @@ namespace DryIoc
             _made = Made.Default;
             _settings = DEFAULT_SETTINGS;
             DefaultReuse = Reuse.Transient;
+            DefaultIfAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed;
             MaxObjectGraphSize = DefaultMaxObjectGraphSize;
         }
 
@@ -4543,11 +4544,8 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional Could be of any type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
-        {
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
-        }
 
         /// <summary>Registers service <paramref name="serviceType"/> with corresponding <paramref name="implementationType"/>.</summary>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -4560,13 +4558,10 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
-        {
-            var factory = new ReflectionFactory(implementationType, reuse, made, setup);
-            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
-        }
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
+            object serviceKey = null) =>
+            registrator.Register(new ReflectionFactory(implementationType, reuse, made, setup),
+                serviceType, serviceKey, ifAlreadyRegistered, false);
 
         /// <summary>Registers service of <paramref name="serviceAndMayBeImplementationType"/>. ServiceType will be the same as <paramref name="serviceAndMayBeImplementationType"/>.</summary>
         /// <param name="registrator">Any <see cref="IRegistrator"/> implementation, e.g. <see cref="Container"/>.</param>
@@ -4577,13 +4572,10 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register(this IRegistrator registrator, Type serviceAndMayBeImplementationType,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
-        {
-            var factory = new ReflectionFactory(serviceAndMayBeImplementationType, reuse, made, setup);
-            registrator.Register(factory, serviceAndMayBeImplementationType, serviceKey, ifAlreadyRegistered, false);
-        }
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
+            object serviceKey = null) => 
+            registrator.Register(new ReflectionFactory(serviceAndMayBeImplementationType, reuse, made, setup), 
+                serviceAndMayBeImplementationType, serviceKey, ifAlreadyRegistered, false);
 
         /// <summary>Registers service of <typeparamref name="TService"/> type implemented by <typeparamref name="TImplementation"/> type.</summary>
         /// <typeparam name="TService">The type of service.</typeparam>
@@ -4595,14 +4587,11 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register<TService, TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null)
-            where TImplementation : TService
-        {
-            var factory = new ReflectionFactory(typeof(TImplementation), reuse, made, setup);
-            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-        }
+            where TImplementation : TService =>
+            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, made, setup),
+                typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers implementation type <typeparamref name="TImplementation"/> with itself as service type.</summary>
         /// <typeparam name="TImplementation">The type of service.</typeparam>
@@ -4613,8 +4602,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
             registrator.Register<TImplementation, TImplementation>(reuse, made, setup, ifAlreadyRegistered, serviceKey);
 
@@ -4628,8 +4616,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register<TService, TMadeResult>(this IRegistrator registrator,
-            Made.TypedMade<TMadeResult> made, IReuse reuse = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            Made.TypedMade<TMadeResult> made, IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) where TMadeResult : TService =>
             registrator.Register(new ReflectionFactory(default(Type), reuse, made, setup), 
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
@@ -4643,8 +4630,7 @@ namespace DryIoc
         /// <param name="ifAlreadyRegistered">(optional) Policy to deal with case when service with such type and name is already registered.</param>
         /// <param name="serviceKey">(optional) Service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void Register<TService>(this IRegistrator registrator,
-            Made.TypedMade<TService> made, IReuse reuse = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            Made.TypedMade<TService> made, IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
@@ -4663,8 +4649,7 @@ namespace DryIoc
         /// <param name="setup">(optional)</param> <param name="ifAlreadyRegistered">(optional) By default <see cref="IfAlreadyRegistered.AppendNotKeyed"/></param>
         /// <param name="serviceKey">(optional)</param>
         public static void RegisterMany(this IRegistrator registrator, Type[] serviceTypes, Type implementationType,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null)
         {
             var factory = new ReflectionFactory(implementationType, reuse, made, setup);
@@ -4692,10 +4677,8 @@ namespace DryIoc
 
         /// <summary>Checks that type is not in the list of <see cref="ExcludedGeneralPurposeServiceTypes"/>.</summary>
         /// <param name="type">Type to check</param> <returns>True if not in the list.</returns>
-        public static bool IsExcludedGeneralPurposeServiceType(this Type type)
-        {
-            return ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
-        }
+        public static bool IsExcludedGeneralPurposeServiceType(this Type type) =>
+            ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
 
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
         /// for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
@@ -4724,28 +4707,22 @@ namespace DryIoc
         /// <param name="type">Source type, may be concrete, abstract or generic definition.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <returns>Array of types or empty.</returns>
-        public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false)
-        {
-            return GetImplementedServiceTypes(type, nonPublicServiceTypes)
+        public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false) =>
+            GetImplementedServiceTypes(type, nonPublicServiceTypes)
                 .Match(t => !t.IsGenericDefinition() || WrappersSupport.ArrayInterfaces.IndexOf(t) == -1);
-        }
 
         /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
         /// actually a non abstract and not compiler generated classes.</summary>
         /// <param name="assembly">Assembly to get types from.</param>
         /// <returns>Types.</returns>
-        public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly)
-        {
-            return Portable.GetAssemblyTypes(assembly).Where(IsImplementationType);
-        }
+        public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly) =>
+            Portable.GetAssemblyTypes(assembly).Where(IsImplementationType);
 
         /// <summary>Checks if type can be used as implementation type for reflection factory,
         /// and therefore registered to container. Usually used to discover implementation types from assembly.</summary>
         /// <param name="type">Type to check.</param> <returns>True if implementation type.</returns>
-        public static bool IsImplementationType(this Type type)
-        {
-            return type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
-        }
+        public static bool IsImplementationType(this Type type) =>
+            type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
 
         /// <summary>Checks if <paramref name="type"/> implements the <paramref name="serviceType"/>,
         /// along the line checking if <paramref name="type"/> and <paramref name="serviceType"/>
@@ -4810,11 +4787,9 @@ namespace DryIoc
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterMany(this IRegistrator registrator, IEnumerable<Type> implTypes,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
-            object serviceKey = null)
-        {
+            object serviceKey = null) =>
             registrator.RegisterMany(implTypes, (r, serviceTypes, implType) =>
             {
                 if (serviceTypeCondition != null)
@@ -4823,7 +4798,6 @@ namespace DryIoc
                     r.RegisterMany(serviceTypes, implType, reuse, made, setup, ifAlreadyRegistered, serviceKey);
             },
             nonPublicServiceTypes);
-        }
 
         /// <summary>Registers single registration for all implemented public interfaces and base classes.</summary>
         /// <typeparam name="TImplementation">The type to get service types from.</typeparam>
@@ -4836,8 +4810,7 @@ namespace DryIoc
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterMany<TImplementation>(this IRegistrator registrator,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
             object serviceKey = null)
         {
@@ -4862,14 +4835,11 @@ namespace DryIoc
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterMany<TMadeResult>(this IRegistrator registrator, Made.TypedMade<TMadeResult> made,
-            IReuse reuse = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             Func<Type, bool> serviceTypeCondition = null, bool nonPublicServiceTypes = false,
-            object serviceKey = null)
-        {
+            object serviceKey = null) =>
             registrator.RegisterMany<TMadeResult>(reuse, made.ThrowIfNull(), setup,
                 ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
-        }
 
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
@@ -4898,8 +4868,7 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) service key (name). Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
         public static void RegisterMany(this IRegistrator registrator,
             IEnumerable<Assembly> implTypeAssemblies, Func<Type, bool> serviceTypeCondition,
-            IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             bool nonPublicServiceTypes = false, object serviceKey = null)
         {
             var implTypes = implTypeAssemblies.ThrowIfNull().SelectMany(GetImplementationTypes);
@@ -4924,12 +4893,10 @@ namespace DryIoc
         /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
         /// </remarks>
         public static void RegisterDelegate<TService>(this IRegistrator registrator, Func<IResolverContext, TService> factoryDelegate,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            object serviceKey = null)
-        {
-            var factory = new DelegateFactory(r => factoryDelegate(r), reuse, setup);
-            registrator.Register(factory, typeof(TService), serviceKey, ifAlreadyRegistered, false);
-        }
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
+            object serviceKey = null) =>
+            registrator.Register(new DelegateFactory(r => factoryDelegate(r), reuse, setup), 
+                typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
         /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
@@ -4949,7 +4916,7 @@ namespace DryIoc
         /// </remarks>
         public static void RegisterDelegate(this IRegistrator registrator,
             Type serviceType, Func<IResolverContext, object> factoryDelegate,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null)
         {
             if (serviceType.IsOpenGeneric())
@@ -9540,7 +9507,7 @@ namespace DryIoc
         /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
         /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
-        void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered, bool isStaticallyChecked);
+        void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
 
         /// <summary>Returns true if expected factory is registered with specified service key and type.</summary>
         /// <param name="serviceType">Type to lookup.</param>
