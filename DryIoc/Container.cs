@@ -3320,7 +3320,6 @@ namespace DryIoc
             PropertiesAndFieldsSelector propertiesAndFields = null) =>
             With(Made.Of(factoryMethod, parameters, propertiesAndFields));
 
-        // todo: may be add a override with option, e.g. to fallback from made.FactoryMethod to previous FM, used by MEF at least
         /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
         /// <param name="made">New Made.Of rules.</param>
         /// <param name="overrideRegistrationMade">Instructs to override registration level Made.Of</param>
@@ -4854,7 +4853,8 @@ namespace DryIoc
             registrator.RegisterMany(implTypes, action, nonPublicServiceTypes);
         }
 
-        // todo: Add overload to specify list of service types to support case when I know contracts (service types) and provide implementation locations (assemblies)
+        // todo: Add overload to specify list of service types to support case when 
+        // I know contracts (service types) and provide implementation locations (assemblies)
         // and do not care about concrete implementation which is good principle.
         /// <summary>Registers many implementations with their auto-figured service types.</summary>
         /// <param name="registrator">Registrator/Container to register with.</param>
@@ -4895,7 +4895,7 @@ namespace DryIoc
         public static void RegisterDelegate<TService>(this IRegistrator registrator, Func<IResolverContext, TService> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new DelegateFactory(r => factoryDelegate(r), reuse, setup), 
+            registrator.Register(new DelegateFactory(r => factoryDelegate(r), reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
@@ -5520,7 +5520,7 @@ namespace DryIoc
         }
 
         // todo: Should be renamed or better to be removed, the whole operation should be hidden behind abstraction
-        // todo: Remove request parameter as it is not used anymore
+        // Remove request parameter as it is not used anymore
         /// <summary>Combines service info with details: the main task is to combine service and required service type.</summary>
         /// <typeparam name="T">Type of <see cref="IServiceInfo"/>.</typeparam>
         /// <param name="serviceInfo">Source info.</param> <param name="details">Details to combine with info.</param>
@@ -6554,15 +6554,28 @@ namespace DryIoc
         public abstract FactoryType FactoryType { get; }
 
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
-        public virtual Func<Request, bool> Condition { get; private set; }
+        public Func<Request, bool> Condition { get; private set; }
 
-        /// <summary>Arbitrary metadata object associated with Factory/Implementation.</summary>
-        public virtual object Metadata { get { return null; } }
+        /// <summary>Arbitrary metadata object associated with Factory/Implementation, may be a dictionary of key-values.</summary>
+        public virtual object Metadata => null;
+
+        /// <summary>Returns true if passed meta key and value match the setup metadata.</summary>
+        public bool MatchesMetadata(string metadataKey, object metadata)
+        {
+            if (metadataKey == null)
+                return Equals(metadata, Metadata);
+
+            object metaValue;
+            var metaDict = Metadata as IDictionary<string, object>;
+            return metaDict != null
+                   && metaDict.TryGetValue(metadataKey, out metaValue)
+                   && Equals(metadata, metaValue);
+        }
 
         /// <summary>Indicates that injected expression should be:
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
-        public bool AsResolutionCall { get { return (_settings & Settings.AsResolutionCall) != 0; } }
+        public bool AsResolutionCall => (_settings & Settings.AsResolutionCall) != 0;
 
         internal Setup WithAsResolutionCall()
         {
@@ -6581,41 +6594,18 @@ namespace DryIoc
         public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
 
         /// <summary>Stores reused instance as WeakReference.</summary>
-        public bool WeaklyReferenced { get { return (_settings & Settings.WeaklyReferenced) != 0; } }
+        public bool WeaklyReferenced => (_settings & Settings.WeaklyReferenced) != 0;
 
         /// <summary>Allows registering transient disposable.</summary>
-        public bool AllowDisposableTransient { get { return (_settings & Settings.AllowDisposableTransient) != 0; } }
+        public bool AllowDisposableTransient => (_settings & Settings.AllowDisposableTransient) != 0;
 
         /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
-        public bool TrackDisposableTransient { get { return (_settings & Settings.TrackDisposableTransient) != 0; } }
+        public bool TrackDisposableTransient => (_settings & Settings.TrackDisposableTransient) != 0;
 
         /// <summary>Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</summary>
-        public bool UseParentReuse { get { return (_settings & Settings.UseParentReuse) != 0; } }
-
-        /// <summary>Returns true if passed meta key and value match the setup metadata.</summary>
-        /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or the value if key passed.</param>
-        /// <returns>Check result.</returns>
-        public bool MatchesMetadata(string metadataKey, object metadata)
-        {
-            if (metadataKey == null)
-                return Equals(metadata, Metadata);
-
-            object metaValue;
-            var metaDict = Metadata as IDictionary<string, object>;
-            return metaDict != null
-                && metaDict.TryGetValue(metadataKey, out metaValue)
-                && Equals(metadata, metaValue);
-        }
-
-        /// <summary>Default setup for service factories.</summary>
-        public static readonly Setup Default = new ServiceSetup();
+        public bool UseParentReuse => (_settings & Settings.UseParentReuse) != 0;
 
         /// <summary>Sets the base settings.</summary>
-        /// <param name="condition"></param>
-        /// <param name="openResolutionScope"></param> <param name="asResolutionCall"></param>
-        /// <param name="asResolutionRoot"></param> <param name="preventDisposal"></param>
-        /// <param name="weaklyReferenced"></param> <param name="allowDisposableTransient"></param>
-        /// <param name="trackDisposableTransient"></param> <param name="useParentReuse"></param>
         private Setup(Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
@@ -6661,46 +6651,14 @@ namespace DryIoc
             UseParentReuse = 1 << 8
         }
 
-        private Settings _settings; // note: it is mutable because of setting the AsResolutionCall
+        private Settings _settings; // note: mutable because of setting the AsResolutionCall
 
-        /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
-        /// <param name="metadataOrFuncOfMetadata">(optional) Metadata object or Func returning metadata object.</param>
-        /// <param name="condition">(optional)</param>
-        /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
-        /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
-        /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-        /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
-        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
-        /// <param name="trackDisposableTransient">(optional) Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</param>
-        /// <param name="useParentReuse">(optional) Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</param>
-        /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
-        public static Setup With(
-            object metadataOrFuncOfMetadata = null, Func<RequestInfo, bool> condition = null,
-            bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
-            bool preventDisposal = false, bool weaklyReferenced = false,
-            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false)
-        {
-            var requestCondition = condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo));
-            return With(metadataOrFuncOfMetadata, requestCondition,
-                openResolutionScope, asResolutionCall, asResolutionRoot,
-                preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                useParentReuse);
-        }
+        /// <summary>Default setup for service factories.</summary>
+        public static readonly Setup Default = new ServiceSetup();
 
-        /// <summary>Constructs setup object out of specified settings. If all settings are default then <see cref="Setup.Default"/> setup will be returned.</summary>
-        /// <param name="metadataOrFuncOfMetadata">Metadata object or Func returning metadata object.</param>
-        /// <param name="condition"></param>
-        /// <param name="openResolutionScope">(optional) Same as <paramref name="asResolutionCall"/> but in addition opens new scope.</param>
-        /// <param name="asResolutionCall">(optional) If true dependency expression will be "r.Resolve(...)" instead of inline expression.</param>
-        /// <param name="asResolutionRoot">(optional) Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-        /// <param name="weaklyReferenced">(optional) Stores reused instance as WeakReference.</param>
-        /// <param name="allowDisposableTransient">(optional) Allows registering transient disposable.</param>
-        /// <param name="trackDisposableTransient">(optional) Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</param>
-        /// <param name="useParentReuse">(optional) Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</param>
-        /// <returns>New setup object or <see cref="Setup.Default"/>.</returns>
+        /// <summary>Constructs setup object out of specified settings.
+        /// If all settings are default then <see cref="Default"/> setup will be returned.
+        /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.</summary>
         public static Setup With(
             object metadataOrFuncOfMetadata, Func<Request, bool> condition,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
@@ -6721,6 +6679,22 @@ namespace DryIoc
                 useParentReuse);
         }
 
+        /// <summary>Constructs setup object out of specified settings.
+        /// If all settings are default then <see cref="Default"/> setup will be returned.
+        /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.
+        /// Uses the full <see cref="Request"/> in <paramref name="condition"/>.</summary>
+        public static Setup With(
+            object metadataOrFuncOfMetadata = null, Func<RequestInfo, bool> condition = null,
+            bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
+            bool preventDisposal = false, bool weaklyReferenced = false,
+            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+            bool useParentReuse = false) =>
+            With(metadataOrFuncOfMetadata, 
+                condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
+                openResolutionScope, asResolutionCall, asResolutionRoot,
+                preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
+                useParentReuse);
+
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
         public static readonly Setup Wrapper = new WrapperSetup();
 
@@ -6732,13 +6706,13 @@ namespace DryIoc
         /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
         /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-        /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
+        /// <returns>New setup or default <see cref="Wrapper"/>.</returns>
         public static Setup WrapperWith(Func<Request, bool> condition,
             int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false)
         {
-            if (wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-                && !openResolutionScope && !preventDisposal && condition == null)
+            if (wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null && 
+                !openResolutionScope && !preventDisposal && condition == null)
                 return Wrapper;
 
             return new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
@@ -6757,12 +6731,11 @@ namespace DryIoc
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
-            Func<RequestInfo, bool> condition = null)
-        {
-            return WrapperWith(condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
+            Func<RequestInfo, bool> condition = null) =>
+            WrapperWith(
+                condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
                 wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
                 openResolutionScope, asResolutionCall, preventDisposal);
-        }
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
@@ -6777,11 +6750,10 @@ namespace DryIoc
         /// <param name="openResolutionScope">The decorator opens resolution scope</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
         public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0,
-            bool useDecorateeReuse = false, bool openResolutionScope = false)
-        {
-            var requestCondition = condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo));
-            return DecoratorWith(requestCondition, order, useDecorateeReuse, openResolutionScope);
-        }
+            bool useDecorateeReuse = false, bool openResolutionScope = false) =>
+            DecoratorWith(
+                condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)), 
+                order, useDecorateeReuse, openResolutionScope);
 
         /// <summary>Creates setup with condition.</summary>
         /// <param name="condition">Applied to decorated service, if true then decorator is applied.</param>
@@ -6834,29 +6806,22 @@ namespace DryIoc
         /// - first registered are closer decoratee.</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
         public static Setup DecoratorOf<TDecoratee>(
-            int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null)
-        {
-            return DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, decorateeServiceKey);
-        }
+            int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null) =>
+            DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, decorateeServiceKey);
 
         /// <summary>Service setup.</summary>
         internal sealed class ServiceSetup : Setup
         {
             /// <inheritdoc />
-            public override FactoryType FactoryType { get { return FactoryType.Service; } }
+            public override FactoryType FactoryType => FactoryType.Service;
 
             /// <summary>Evaluates metadata if it specified as Func of object, and replaces Func with its result!.
             /// Otherwise just returns metadata object.</summary>
             /// <remarks>Invocation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
-            public override object Metadata
-            {
-                get
-                {
-                    return _metadataOrFuncOfMetadata is Func<object>
-                        ? (_metadataOrFuncOfMetadata = ((Func<object>)_metadataOrFuncOfMetadata).Invoke())
-                        : _metadataOrFuncOfMetadata;
-                }
-            }
+            public override object Metadata =>
+                _metadataOrFuncOfMetadata is Func<object>
+                    ? (_metadataOrFuncOfMetadata = ((Func<object>)_metadataOrFuncOfMetadata).Invoke())
+                    : _metadataOrFuncOfMetadata;
 
             /// <summary>All settings are set to defaults.</summary>
             public ServiceSetup() { }
@@ -6881,7 +6846,7 @@ namespace DryIoc
         internal sealed class WrapperSetup : Setup
         {
             /// <summary>Returns <see cref="DryIoc.FactoryType.Wrapper"/> type.</summary>
-            public override FactoryType FactoryType { get { return FactoryType.Wrapper; } }
+            public override FactoryType FactoryType => FactoryType.Wrapper;
 
             /// <summary>Delegate to get wrapped type from provided wrapper type.
             /// If wrapper is generic, then wrapped type is usually a generic parameter.</summary>
@@ -6962,7 +6927,7 @@ namespace DryIoc
         internal sealed class DecoratorSetup : Setup
         {
             /// <summary>Returns Decorator factory type.</summary>
-            public override FactoryType FactoryType { get { return FactoryType.Decorator; } }
+            public override FactoryType FactoryType => FactoryType.Decorator;
 
             /// <summary>If provided specifies relative decorator position in decorators chain.
             /// Greater number means further from decoratee - specify negative number to stay closer.
@@ -7261,7 +7226,7 @@ namespace DryIoc
             return Container.CompileToDelegate(expression);
         }
 
-        internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
+        internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
             if (!isStaticallyChecked)
                 serviceType.ThrowIfNull();
@@ -7271,12 +7236,12 @@ namespace DryIoc
             if (setup.FactoryType == FactoryType.Service)
             {
                 // Warn about registering disposable transient
-                var reuse = Reuse ?? containerRules.DefaultReuse;
+                var reuse = Reuse ?? rules.DefaultReuse;
                 if (reuse != DryIoc.Reuse.Transient)
                     return true;
 
                 if (setup.AllowDisposableTransient ||
-                    !containerRules.ThrowOnRegisteringDisposableTransient)
+                    !rules.ThrowOnRegisteringDisposableTransient)
                     return true;
 
                 if (setup.UseParentReuse ||
@@ -7418,14 +7383,15 @@ namespace DryIoc
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
 
         /// <summary>Specify parameter by name and set custom value to it.</summary>
-        /// <param name="source">Original parameters rules.</param> <param name="name">Parameter name.</param>
-        /// <param name="getCustomValue">Custom value provider.</param>
-        /// <returns>New parameters rules.</returns>
+        public static ParameterSelector Name(this ParameterSelector source,
+            string name, Func<Request, ParameterInfo, ServiceDetails> getServiceDetails) =>
+            source.Details((r, p) => p.Name.Equals(name) ? getServiceDetails(r, p) : null);
+
+        /// <summary>Specify parameter by name and set custom value to it.</summary>
         public static ParameterSelector Name(this ParameterSelector source,
             string name, Func<Request, object> getCustomValue) =>
-             source.Details((r, p) => p.Name.Equals(name) ? ServiceDetails.Of(getCustomValue(r)) : null);
+             source.Name(name, (r, p) => ServiceDetails.Of(getCustomValue(r)));
 
-        // todo: add overload with input ParameterInfo so that doing convention as in #443 would be more easy.
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
         /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
@@ -7440,13 +7406,14 @@ namespace DryIoc
             source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
 
+        /// <summary>Specify parameter by type and set its details.</summary>
+        public static ParameterSelector Type<T>(this ParameterSelector source, 
+            Func<Request, ParameterInfo, ServiceDetails> getServiceDetails) =>
+            source.Details((r, p) => p.ParameterType == typeof(T) ? getServiceDetails(r, p) : null);
+
         /// <summary>Specify parameter by type and set custom value to it.</summary>
-        /// <typeparam name="T">Parameter type.</typeparam>
-        /// <param name="source">Original parameters rules.</param>
-        /// <param name="getCustomValue">Custom value provider.</param>
-        /// <returns>New parameters rules.</returns>
         public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue) =>
-            source.Details((r, p) => p.ParameterType == typeof(T) ? ServiceDetails.Of(getCustomValue(r)) : null);
+            source.Type<T>((r, p) => ServiceDetails.Of(getCustomValue(r)));
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <paramref name="parameterType"/>.</summary>
         /// <param name="source">Source selector.</param> <param name="parameterType">The type of the parameter.</param>
@@ -7598,9 +7565,6 @@ namespace DryIoc
                 requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
 
         /// <summary>Specifies custom value for property/field with specific name.</summary>
-        /// <param name="source">Original property/field list.</param>
-        /// <param name="name">Target member name.</param> <param name="getCustomValue">Custom value provider.</param>
-        /// <returns>Return new combined selector.</returns>
         public static PropertiesAndFieldsSelector Name(this PropertiesAndFieldsSelector source,
             string name, Func<Request, object> getCustomValue) =>
             source.Details(name, r => ServiceDetails.Of(getCustomValue(r)));
@@ -7610,26 +7574,24 @@ namespace DryIoc
         /// <param name="withNonPublic">Says to include non public properties.</param>
         /// <param name="withPrimitive">Says to include properties of primitive type.</param>
         /// <returns>True if property is matched and false otherwise.</returns>
-        public static bool IsInjectable(this PropertyInfo property, bool withNonPublic = false, bool withPrimitive = false)
-        {
-            return property.CanWrite
+        public static bool IsInjectable(this PropertyInfo property, 
+            bool withNonPublic = false, bool withPrimitive = false) =>
+            property.CanWrite
                 && !property.IsStatic()
                 && !property.IsIndexer() // first checks that property is assignable in general and not an indexer
                 && (withNonPublic || property.GetSetMethodOrNull() != null)
                 && (withPrimitive || !property.PropertyType.IsPrimitive(orArrayOfPrimitives: true));
-        }
 
         /// <summary>Returns true if field matches flags provided.</summary>
         /// <param name="field">Field to match.</param>
         /// <param name="withNonPublic">Says to include non public fields.</param>
         /// <param name="withPrimitive">Says to include fields of primitive type.</param>
         /// <returns>True if property is matched and false otherwise.</returns>
-        public static bool IsInjectable(this FieldInfo field, bool withNonPublic = false, bool withPrimitive = false)
-        {
-            return !field.IsInitOnly && !field.IsBackingField()
+        public static bool IsInjectable(this FieldInfo field,
+            bool withNonPublic = false, bool withPrimitive = false) =>
+            !field.IsInitOnly && !field.IsBackingField()
                 && (withNonPublic || field.IsPublic)
                 && (withPrimitive || !field.FieldType.IsPrimitive(orArrayOfPrimitives: true));
-        }
     }
 
     /// <summary>Reflects on <see cref="ImplementationType"/> constructor parameters and members,
@@ -7648,16 +7610,14 @@ namespace DryIoc
         }
 
         /// <summary>False for lazy implementation type, to prevent its early materialization.</summary>
-        public override bool CanAccessImplementationType
-        {
-            get { return _implementationType != null || _implementationTypeProvider == null; }
-        }
+        public override bool CanAccessImplementationType =>
+            _implementationType != null || _implementationTypeProvider == null;
 
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
-        public override IConcreteFactoryGenerator FactoryGenerator { get { return _factoryGenerator; } }
+        public override IConcreteFactoryGenerator FactoryGenerator => _factoryGenerator;
 
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
-        public override Made Made { get { return _made; } }
+        public override Made Made => _made;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
@@ -7680,11 +7640,8 @@ namespace DryIoc
         }
 
         /// <summary>Add to base rules: do not cache if Made is context based.</summary>
-        /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
-        protected override bool IsFactoryExpressionCacheable(Request request)
-        {
-            // todo: review Made and may be move to IsContextDependent
-            return base.IsFactoryExpressionCacheable(request)
+        protected override bool IsFactoryExpressionCacheable(Request request) =>
+            base.IsFactoryExpressionCacheable(request)
                  && (Made == Made.Default
                  // Property injection.
                  || (Made.FactoryMethod == null
@@ -7695,7 +7652,6 @@ namespace DryIoc
                  // - We don't know the result returned by factory method - it depends on request
                  // - or even if we do know the result type, some dependency is using custom value which depends on request
                  || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
-        }
 
         /// <summary>Creates service expression.</summary>
         public override Expression CreateExpressionOrDefault(Request request)
@@ -7801,15 +7757,15 @@ namespace DryIoc
             return CreateServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
         }
 
-        internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules containerRules)
+        internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
-            base.ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, containerRules);
+            base.ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, rules);
 
             if (!CanAccessImplementationType)
                 return true;
 
             var implType = ImplementationType;
-            if (Made.FactoryMethod == null && containerRules.FactoryMethod == null)
+            if (Made.FactoryMethod == null && rules.FactoryMethod == null)
             {
                 var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
                 if (ctors.Length == 1)
@@ -7886,10 +7842,7 @@ namespace DryIoc
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
-            public ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories
-            {
-                get { return _generatedFactories.Value; }
-            }
+            public ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => _generatedFactories.Value;
 
             public ClosedGenericFactoryGenerator(ReflectionFactory openGenericFactory)
             {
@@ -8441,7 +8394,8 @@ namespace DryIoc
         /// <summary>Wraps provided delegate into factory.</summary>
         /// <param name="getServiceExpression">Delegate that will be used internally to create service expression.</param>
         /// <param name="reuse">(optional) Reuse.</param> <param name="setup">(optional) Setup.</param>
-        public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
+        public ExpressionFactory(Func<Request, Expression> getServiceExpression,
+            IReuse reuse = null, Setup setup = null)
             : base(reuse, setup)
         {
             _getServiceExpression = getServiceExpression.ThrowIfNull();
@@ -8449,10 +8403,8 @@ namespace DryIoc
 
         /// <summary>Creates service expression using wrapped delegate.</summary>
         /// <param name="request">Request to resolve.</param> <returns>Expression returned by stored delegate.</returns>
-        public override Expression CreateExpressionOrDefault(Request request)
-        {
-            return _getServiceExpression(request);
-        }
+        public override Expression CreateExpressionOrDefault(Request request) =>
+            _getServiceExpression(request);
 
         private readonly Func<Request, Expression> _getServiceExpression;
     }
@@ -8591,8 +8543,10 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed);
 
+            // todo: Broken. The other thread may create another item after lock freely,
+            // because it is not stored in _items yet
             object item;
-            lock (_locker)
+            lock (_locker) 
             {
                 item = _items.GetValueOrDefault(id);
                 if (item != null) // double check locking
@@ -8628,8 +8582,7 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed);
-            // todo: null may be a valid value, replace with TryGet
-            return (item = _items.GetValueOrDefault(id)) != null;
+            return _items.TryFind(id, out item);
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
@@ -9618,7 +9571,6 @@ namespace DryIoc
         /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
         Expression GetCachedFactoryExpressionOrDefault(int factoryID);
 
-        // todo: add the ValueType check to GetOrAddStateItemExpression
         /// <summary>Converts known items into custom expression or wraps in <see cref="ConstantExpression"/>.</summary>
         /// <param name="item">Item to convert.</param>
         /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
@@ -9929,7 +9881,6 @@ namespace DryIoc
         }
     }
 
-    // todo: V3: move into Throw as a nested enum
     /// <summary>Checked error condition, possible error sources.</summary>
     public enum ErrorCheck
     {
@@ -10147,7 +10098,6 @@ namespace DryIoc
             if (!openGenericType.IsOpenGeneric())
                 return false;
 
-            // todo: may be replaced with more lightweight Bits flags.
             var matchedParams = new Type[genericParameters.Length];
             Array.Copy(genericParameters, matchedParams, genericParameters.Length);
 
