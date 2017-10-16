@@ -8543,23 +8543,22 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed);
 
-            // todo: Broken. The other thread may create another item after lock freely,
-            // because it is not stored in _items yet
             object item;
-            lock (_locker) 
+            lock (_locker)
             {
                 item = _items.GetValueOrDefault(id);
                 if (item != null) // double check locking
                     return item;
-                item = TrackDisposable(createValue(), disposalIndex);
+
+                item = createValue();
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                var items = _items;
+                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                    Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
             }
 
-            // if _items were not changed so far, then use them, otherwise do ref swap
-            var items = _items;
-            if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
-
-            return item;
+            return TrackDisposable(item, disposalIndex);
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -8568,8 +8567,12 @@ namespace DryIoc
         {
             Throw.If(_disposed == 1, Error.ScopeIsDisposed);
             var items = _items;
+
+            // try to atomically replaced items with the one set item, if attempt failed then lock and replace
             if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
+                lock (_locker)
+                    _items = _items.AddOrUpdate(id, item);
+
             TrackDisposable(item);
         }
 
