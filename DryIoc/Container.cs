@@ -797,7 +797,7 @@ namespace DryIoc
             var registrations = container
                 .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
                 .Aggregate(new StringBuilder(), (s, f) =>
-                    (f.Value.HasMatchingReuseScope(request)
+                    (f.Value.Reuse?.CanApply(request) ?? true
                         ? s.Append("  ")
                         : s.Append("  without matching scope "))
                         .AppendLine(f.ToString()));
@@ -1434,7 +1434,7 @@ namespace DryIoc
                 var facs = sameLifespanGroups[0].ToArrayOrSelf();
                 if (facs.Length > 1)
                 {
-                    var fac = facs.Match(it => it.Value.HasMatchingReuseScope(request));
+                    var fac = facs.Match(it => it.Value.Reuse?.CanApply(request) ?? true);
                     if (fac.Length == 1)
                         matchedFactories = fac;
                 }
@@ -1444,7 +1444,7 @@ namespace DryIoc
                 for (int i = 0; i < sameLifespanGroups.Length; i++)
                 {
                     var facs = sameLifespanGroups[i].ToArrayOrSelf()
-                        .Match(it => it.Value.HasMatchingReuseScope(request));
+                        .Match(it => it.Value.Reuse?.CanApply(request) ?? true);
                     if (facs.Length == 1)
                     {
                         matchedFactories = facs;
@@ -2588,40 +2588,22 @@ namespace DryIoc
         internal static readonly MethodInfo OfMethod = typeof(DefaultKey).Method(nameof(Of));
 
         /// <summary>Create new default key with specified registration order.</summary>
-        public static DefaultKey Of(int registrationOrder)
-        {
-            return registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
-        }
+        public static DefaultKey Of(int registrationOrder) =>
+            registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
-        /// <returns>New key.</returns>
-        public DefaultKey Next()
-        {
-            return Of(RegistrationOrder + 1);
-        }
+        public DefaultKey Next() => Of(RegistrationOrder + 1);
 
-        /// <summary>Compares keys based on registration order.</summary>
-        /// <param name="key">Key to compare with.</param>
-        /// <returns>True if keys have the same order.</returns>
-        public override bool Equals(object key)
-        {
-            if (key == null) // to enable comparison with null (unspecified)
-                return true;
-            var defaultKey = key as DefaultKey;
-            return defaultKey != null && defaultKey.RegistrationOrder == RegistrationOrder;
-        }
+        /// <summary>Compares keys based on registration order. The null (represents default) key is considered equal.</summary>
+        public override bool Equals(object key) =>
+            key == null || (key as DefaultKey)?.RegistrationOrder == RegistrationOrder;
 
-        /// <summary>Returns registration order as hash.</summary> <returns>Hash code.</returns>
-        public override int GetHashCode()
-        {
-            return RegistrationOrder;
-        }
+        /// <summary>Returns registration order as hash.</summary>
+        public override int GetHashCode() => RegistrationOrder;
 
-        /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            return "DefaultKey(" + RegistrationOrder + ")";
-        }
+        /// <summary>Prints registration order to string.</summary>
+        public override string ToString() =>
+            "DefaultKey(" + RegistrationOrder + ")";
 
         private DefaultKey(int registrationOrder)
         {
@@ -2639,45 +2621,26 @@ namespace DryIoc
         public readonly int ID;
 
         /// <summary>Returns dynamic key with specified ID. The key itself may be non unique, and requested from pool.</summary>
-        /// <param name="id">Associated ID.</param> <returns>The key.</returns>
-        public static DefaultDynamicKey Of(int id)
-        {
-            return id == 0 ? Empty : new DefaultDynamicKey(id);
-        }
+        public static DefaultDynamicKey Of(int id) =>
+            id == 0 ? Empty : new DefaultDynamicKey(id);
 
-        /// <summary>Returns next dynamic key with increased <see cref="ID"/>.</summary> <returns>Next key.</returns>
-        public DefaultDynamicKey Next()
-        {
-            return Of(ID + 1);
-        }
+        /// <summary>Returns next dynamic key with increased <see cref="ID"/>.</summary> 
+        public DefaultDynamicKey Next() => Of(ID + 1);
 
-        /// <summary>Compares key's IDs.</summary> <param name="key">Key to compare with.</param>
-        /// <returns>True if keys have the same IDs.</returns>
-        public override bool Equals(object key)
-        {
-            if (key == null)
-                return true;
-            var other = key as DefaultDynamicKey;
-            return other != null && other.ID == ID;
-        }
+        /// <summary>Compares key's IDs. The null (default) key is considered equal!</summary>
+        public override bool Equals(object key) =>
+            key == null || (key as DefaultDynamicKey)?.ID == ID;
 
-        /// <summary>Returns key index as hash.</summary> <returns>Hash code.</returns>
-        public override int GetHashCode()
-        {
-            return ID;
-        }
+        /// <summary>Returns key index as hash.</summary>
+        public override int GetHashCode() => ID;
 
-        /// <summary>Prints registration order to string.</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            return "DefaultDynamicKey(" + ID + ")";
-        }
+        /// <summary>Prints registration order to string.</summary>
+        public override string ToString() =>
+            "DefaultDynamicKey(" + ID + ")";
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
-        {
-            return Expression.Call(typeof(DefaultDynamicKey), "Of", ArrayTools.Empty<Type>(), Expression.Constant(ID));
-        }
+        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
+            Expression.Call(typeof(DefaultDynamicKey).Method(nameof(Of)), Expression.Constant(ID));
 
         private DefaultDynamicKey(int id)
         {
@@ -6192,13 +6155,10 @@ namespace DryIoc
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
         /// <param name="getInfo">Gets new info to switch to.</param>
         /// <returns>New request with new service info but the same implementation and context.</returns>
-        public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
-        {
-            var newInfo = getInfo(_serviceInfo);
-            if (newInfo == _serviceInfo)
-                return this;
-            return new Request(_requestContext, RuntimeParent, getInfo(_serviceInfo), Factory, _reuse, InputArgs, _flags, _decoratedFactory);
-        }
+        public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo) =>
+            getInfo(_serviceInfo) == _serviceInfo ? this
+                : new Request(_requestContext, RuntimeParent, getInfo(_serviceInfo), 
+                    Factory, _reuse, InputArgs, _flags, _decoratedFactory);
 
         // todo: Try to remove in future versions as it mutates the request.
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -6424,7 +6384,6 @@ namespace DryIoc
 
         /// <summary>Enumerates all request stack parents.
         /// Last returned will <see cref="IsEmpty"/> empty parent.</summary>
-        /// <returns>Unfolding parents.</returns>
         public IEnumerable<Request> Enumerate()
         {
             for (var r = this; !r.IsEmpty; r = r.RuntimeParent)
@@ -7012,17 +6971,17 @@ namespace DryIoc
         public FactoryType FactoryType => Setup.FactoryType;
 
         /// <summary>Non-abstract closed implementation type. May be null if not known beforehand, e.g. in <see cref="DelegateFactory"/>.</summary>
-        public virtual Type ImplementationType { get { return null; } }
+        public virtual Type ImplementationType => null;
 
         /// <summary>Allow inheritors to define lazy implementation type</summary>
-        public virtual bool CanAccessImplementationType { get { return true; } }
+        public virtual bool CanAccessImplementationType => true;
 
         /// <summary>Indicates that Factory is factory provider and
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/>  to get concrete factory.</summary>
-        public virtual IConcreteFactoryGenerator FactoryGenerator { get { return null; } }
+        public virtual IConcreteFactoryGenerator FactoryGenerator => null;
 
         /// <summary>Settings <b>(if any)</b> to select Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
-        public virtual Made Made { get { return Made.Default; } }
+        public virtual Made Made => Made.Default;
 
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
@@ -7031,13 +6990,6 @@ namespace DryIoc
             FactoryID = GetNextID();
             _reuse = reuse;
             _setup = setup ?? Setup.Default;
-        }
-
-        /// <summary>Returns true if for factory Reuse exists matching resolution or current Scope.</summary>
-        /// <param name="request"></param> <returns>True if matching Scope exists.</returns>
-        public bool HasMatchingReuseScope(Request request)
-        {
-            return Reuse == null || Reuse.CanApply(request);
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
@@ -7060,20 +7012,16 @@ namespace DryIoc
             && !request.TracksTransientDisposable
             && !request.IsResolutionRoot;
 
-        private bool ShouldBeInjectedAsResolutionCall(Request request)
-        {
-            var shouldBe =
-                // prevents recursion on already split graph
-                !request.IsResolutionCall &&
-                // explicit aka user requested split
-                (Setup.AsResolutionCall ||
-                // implicit split only when not inside Func with arguments,
-                // cause for now arguments are not propagated through resolve call
-                request.ShouldSplitObjectGraph() ||
-                Setup.UseParentReuse)
-                && request.GetActualServiceType() != typeof(void);
-            return shouldBe;
-        }
+        private bool ShouldBeInjectedAsResolutionCall(Request request) =>
+            // prevents recursion on already split graph
+            !request.IsResolutionCall 
+            && // explicit aka user requested split
+                (Setup.AsResolutionCall 
+            || // implicit split only when not inside Func with arguments,
+               // cause for now arguments are not propagated through resolve call
+                request.ShouldSplitObjectGraph() 
+            || Setup.UseParentReuse)
+            && request.GetActualServiceType() != typeof(void); // exclude action
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
