@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_reregister_instance_with_different_reuse()
+        public void Can_re_register_instance_with_different_reuse()
         {
             var container = new Container();
 
@@ -405,26 +405,73 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceB>();
 
+            var singletonDep = new DependencyA();
+            container.UseInstance(singletonDep);
+
             using (var scope = container.OpenScope())
             {
-                var dep = new DependencyA();
-                scope.UseInstance(dep);
+                var scopedDep = new DependencyA();
+                scope.UseInstance(scopedDep);
         
-                var service = scope.Resolve<ServiceB>(); // will inject `a`
-                Assert.AreSame(dep, service.Dep);
+                var service = scope.Resolve<ServiceB>();
+                Assert.AreSame(scopedDep, service.Dep);
             }
 
-            var anotherDep = new DependencyA();
-            container.UseInstance(anotherDep);
-            var anotherBB = container.Resolve<ServiceB>(); // will inject `anotherA`
-            Assert.AreSame(anotherDep, anotherBB.Dep);
+            var anotherBB = container.Resolve<ServiceB>();
+            Assert.AreSame(singletonDep, anotherBB.Dep);
         }
 
         [Test]
-        public void Replacing_typed_registration_via_scoped_instance_should_do_WHAT()
+        public void Singleton_service_should_consume_singleton_instance_despite_presence_of_scoped_instance()
+        {
+            var container = new Container();
+            container.Register<ServiceB>(Reuse.Singleton);
+
+            var singletonDep = new DependencyA();
+            container.UseInstance(singletonDep);
+
+            using (var scope = container.OpenScope())
+            {
+                var scopedDep = new DependencyA();
+                scope.UseInstance(scopedDep);
+
+                var service = scope.Resolve<ServiceB>();
+                Assert.AreSame(singletonDep, service.Dep);
+            }
+
+            var anotherBB = container.Resolve<ServiceB>();
+            Assert.AreSame(singletonDep, anotherBB.Dep);
+        }
+
+        [Test]
+        public void UseInstance_wont_replace_existing_typed_registration_instead_will_append_to_it()
         {
             var container = new Container();
             container.Register<ServiceB>();
+            container.Register<DependencyA>();
+
+            var dependencyA = new DependencyA();
+            ServiceB service;
+
+            using (var scope = container.OpenScope())
+            {
+                scope.UseInstance(dependencyA);
+                service = scope.Resolve<ServiceB>();
+                Assert.AreSame(dependencyA, service.Dep);
+            }
+
+            service = container.Resolve<ServiceB>();
+            Assert.IsNotNull(service.Dep);
+            Assert.AreNotSame(dependencyA, service.Dep);
+        }
+
+        [Test]
+        public void UseInstance_wont_replace_existing_typed_registration_instead_will_append_to_it_In_presence_or_keyed_registration()
+        {
+            var container = new Container();
+            container.Register<ServiceB>();
+
+            container.Register<DependencyA>(serviceKey: "other");
             container.Register<DependencyA>();
 
             var dependencyA = new DependencyA();

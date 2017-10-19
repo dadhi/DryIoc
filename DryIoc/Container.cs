@@ -499,7 +499,6 @@ namespace DryIoc
                 parent: this, root: _root ?? this);
         }
 
-        // todo: Combine with normal Registry.WithServices
         void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
@@ -525,7 +524,7 @@ namespace DryIoc
                 if (entry == null)
                 {
                     // add new entry with instance factory
-                    var instanceFactory = GetInstanceFactory(instance, instanceType, scope);
+                    var instanceFactory = InstanceFactory.Of(instance, instanceType, scope, reuse);
                     entry = serviceKey == null
                         ? (object)instanceFactory
                         : FactoriesEntry.Empty.With(instanceFactory, serviceKey);
@@ -540,7 +539,7 @@ namespace DryIoc
                         {
                             // @ifAlreadyRegistered doe no make sense for keyed, because there are no other keyed
                             entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
+                                .With(InstanceFactory.Of(instance, instanceType, scope, reuse), serviceKey);
                         }
                         else // for default instance
                         {
@@ -560,7 +559,7 @@ namespace DryIoc
                                         // when nothing to replace treat it as Append
                                     }
                                     entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                        .With(GetInstanceFactory(instance, instanceType, scope, reuse));
+                                        .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                     break;
                                 case IfAlreadyRegistered.Throw:
                                     Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, singleDefaultFactory);
@@ -569,7 +568,7 @@ namespace DryIoc
                                     if (singleDefaultFactory.CanAccessImplementationType &&
                                         singleDefaultFactory.ImplementationType != instanceType)
                                         entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                            .With(GetInstanceFactory(instance, instanceType, scope));
+                                            .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                     break;
                                 default:
                                     break;
@@ -585,7 +584,7 @@ namespace DryIoc
                             if (keyedFactory == null)
                             {
                                 entry = singleKeyedOrManyFactories
-                                    .With(GetInstanceFactory(instance, instanceType, scope), serviceKey);
+                                    .With(InstanceFactory.Of(instance, instanceType, scope, reuse), serviceKey);
                             }
                             else // when keyed instance is found
                             {
@@ -595,7 +594,7 @@ namespace DryIoc
                                         var reusedFactory = keyedFactory as InstanceFactory;
                                         if (reusedFactory != null)
                                             scope.SetOrAdd(reusedFactory.FactoryID, instance);
-                                        else // todo: not possible for the moment, really?
+                                        else
                                             Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
                                                 KV.Of(serviceKey, instance), keyedFactory);
                                         break;
@@ -618,37 +617,36 @@ namespace DryIoc
                             if (defaultFactories.Length == 0) // no default factories among the multiple existing keyed factories
                             {
                                 entry = singleKeyedOrManyFactories
-                                    .With(GetInstanceFactory(instance, instanceType, scope));
+                                    .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                             }
                             else // there are existing default factories
                             {
                                 switch (ifAlreadyRegistered)
                                 {
-                                    case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                        // the special case for reusing of existing factory,
-                                        // we can just update scope with the new instance
+                                    case IfAlreadyRegistered.Replace:
                                         if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
                                             scope.SetOrAdd(defaultFactories[0].FactoryID, instance);
-                                        else
+                                        else // multiple default or a keyed factory
                                         {
                                             var keyedFactories = singleKeyedOrManyFactories.Factories.Enumerate()
                                                 .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
-                                            if (keyedFactories.Length == 0)
-                                                entry = GetInstanceFactory(instance, instanceType, scope);
+                                            if (keyedFactories.Length == 0) // replaces all default factories?
+                                                entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
                                             else
-                                            {
+                                            {   // currently replaces all default by keeping only the keyed
                                                 var factoriesEntry = FactoriesEntry.Empty;
                                                 for (int i = 0; i < keyedFactories.Length; i++)
                                                     factoriesEntry = factoriesEntry
                                                         .With(keyedFactories[i].Value, keyedFactories[i].Key);
-                                                entry = factoriesEntry.With(GetInstanceFactory(instance, instanceType, scope));
+                                                entry = factoriesEntry
+                                                    .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                             }
                                         }
 
                                         break;
                                     case IfAlreadyRegistered.AppendNotKeyed:
                                         entry = singleKeyedOrManyFactories
-                                            .With(GetInstanceFactory(instance, instanceType, scope));
+                                            .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                         break;
                                     case IfAlreadyRegistered.Throw:
                                         Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, defaultFactories);
@@ -659,7 +657,7 @@ namespace DryIoc
                                             it.ImplementationType == instanceType);
                                         if (duplicateImplIndex == -1) // add new implementation
                                             entry = singleKeyedOrManyFactories
-                                                .With(GetInstanceFactory(instance, instanceType, scope));
+                                                .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                         // otherwise do nothing - keep the old entry
                                         break;
                                     default: // IfAlreadyRegistered.Keep
@@ -1518,17 +1516,16 @@ namespace DryIoc
         private readonly IResolverContext _root;
         private readonly IResolverContext _parent;
 
-        private static InstanceFactory GetInstanceFactory(object instance, 
-            Type instanceType, IScope scope, IReuse reuse = null)
-        {
-            var instanceFactory = new InstanceFactory(instanceType, reuse);
-            scope.SetOrAdd(instanceFactory.FactoryID, instance);
-            return instanceFactory;
-        }
-
-        // Just a wrapper, with only goal to provide and expression for instance access bound to FactoryID
         internal sealed class InstanceFactory : Factory
         {
+            public static InstanceFactory Of(object instance,
+                Type instanceType, IScope scope, IReuse reuse)
+            {
+                var instanceFactory = new InstanceFactory(instanceType, reuse);
+                scope.SetOrAdd(instanceFactory.FactoryID, instance);
+                return instanceFactory;
+            }
+
             public override Type ImplementationType => _instanceType;
             private readonly Type _instanceType;
 
@@ -1551,11 +1548,9 @@ namespace DryIoc
             }
 
             /// <summary>Called for Injection as dependency.</summary>
-            public override Expression GetExpressionOrDefault(Request request)
-            {
-                return request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this))
-                    ?? CreateExpressionOrDefault(request);
-            }
+            public override Expression GetExpressionOrDefault(Request request) =>
+                request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this)) ??
+                CreateExpressionOrDefault(request);
 
             public override Expression CreateExpressionOrDefault(Request request) =>
                 Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
@@ -1814,7 +1809,6 @@ namespace DryIoc
                                                 removedFactories = removedFactories.AddOrUpdate(f.Key, f.Value);
                                             else
                                                 newFactories = newFactories.AddOrUpdate(f.Key, f.Value);
-
                                         replacedFactories = removedFactories;
                                     }
 
@@ -3975,7 +3969,8 @@ namespace DryIoc
             Func<ParameterInfo, ParameterServiceInfo> parameterSelector, Request request)
         {
             var parameterServiceInfo = parameterSelector(parameter) ?? ParameterServiceInfo.Of(parameter);
-            var parameterRequest = request.Push(parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault));
+            var parameterRequest = request.Push
+                (parameterServiceInfo.WithDetails(ServiceDetails.IfUnresolvedReturnDefault));
             if (parameterServiceInfo.Details.HasCustomValue)
             {
                 var customValue = parameterServiceInfo.Details.CustomValue;
@@ -5265,6 +5260,7 @@ namespace DryIoc
             object[] args = null, object serviceKey = null) =>
             resolver.ResolveMany<object>(serviceType, behavior, args, serviceKey);
 
+        // todo: what is this isRuntimeDependency, consult #517
         internal static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool isRuntimeDependency = false)
         {
@@ -6121,10 +6117,8 @@ namespace DryIoc
         public Type GetKnownImplementationOrServiceType() =>
             ImplementationType ?? GetActualServiceType();
 
-        /// <summary>Creates new request with provided info, and attaches current request as new request parent.</summary>
-        /// <param name="info">Info about service to resolve.</param>
-        /// <param name="flags">(optional) Pushed flags.</param>
-        /// <returns>New request for provided info.</returns>
+        /// <summary>Creates new request with provided info, and links current request as a parent.
+        /// Allows to set some additional flags.</summary>
         /// <remarks>Existing/parent request should be resolved to factory (<see cref="WithResolvedFactory"/>), before pushing info into it.</remarks>
         public Request Push(IServiceInfo info, RequestFlags flags = default(RequestFlags))
         {
@@ -6139,24 +6133,15 @@ namespace DryIoc
             return new Request(_requestContext, this, inheritedInfo, null, null, InputArgs, inheritedFlags, null);
         }
 
-        /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.</summary>
-        /// <param name="serviceType">Service type to resolve.</param>
-        /// <param name="serviceKey">(optional) Service key to resolve.</param>
-        /// <param name="ifUnresolved">(optional) Instructs how to handle unresolved service.</param>
-        /// <param name="requiredServiceType">(optional) Registered/unwrapped service type to find.</param>
-        /// <param name="scope">(optional) Resolution scope.</param>
-        /// <param name="preResolveParent">(optional) Request info preceding Resolve call.</param>
-        /// <param name="flags">(optional) Sets some flags.</param>
-        /// <returns>New request with provided info.</returns>
+        /// <summary>Composes service description into <see cref="IServiceInfo"/> and calls Push.
+        /// Allot to set some additional flags by caller.</summary>
         public Request Push(Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             IScope scope = null, RequestInfo preResolveParent = null, RequestFlags flags = default(RequestFlags))
         {
             serviceType.ThrowIfNull()
                 .ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
-
-            var serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
-            return Push(serviceInfo, flags);
+            return Push(ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), flags);
         }
 
         /// <summary>Allow to switch current service info to new one: for instance it is used be decorators.</summary>
@@ -6170,7 +6155,6 @@ namespace DryIoc
         // todo: Try to remove in future versions as it mutates the request.
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
         /// actual <see cref="DefaultKey"/></summary>
-        /// <param name="serviceKey">Key to set.</param>
         public void ChangeServiceKey(object serviceKey)
         {
             var i = _serviceInfo;
@@ -6190,7 +6174,7 @@ namespace DryIoc
         /// <param name="factory">Factory to which request is resolved.</param>
         /// <param name="skipRecursiveDependencyCheck">(optional) does not check for recursive dependency.
         /// Use with caution. Make sense for Resolution expression.</param>
-        /// <param name="skipCaptiveDependencyCheck">(optional) allows to skip captive dependency check.</param>
+        /// <param name="skipCaptiveDependencyCheck">(optional) allows to skip reuse mismatch aka captive dependency check.</param>
         /// <returns>New request with set factory.</returns>
         public Request WithResolvedFactory(Factory factory,
             bool skipRecursiveDependencyCheck = false,
@@ -8381,8 +8365,6 @@ namespace DryIoc
         }
 
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
-        /// <param name="request">Request to resolve. It will be stored in resolution state to be passed to delegate on actual resolve.</param>
-        /// <returns>Created delegate call expression.</returns>
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var factoryDelegateExpr = request.Container.GetOrAddStateItemExpression(_factoryDelegate);

@@ -58,6 +58,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>();
+            container.Register<IService, Service>();
             container.Register<IService, AnotherService>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var service = container.Resolve<IService>();
