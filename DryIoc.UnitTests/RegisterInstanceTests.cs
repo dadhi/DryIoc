@@ -127,6 +127,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => 
                 container.UseInstance("b", serviceKey: "x"));
+
             Assert.AreEqual(Error.NameOf(Error.UnableToUseInstanceForExistingNonInstanceFactory), Error.NameOf(ex.Error));
         }
 
@@ -419,7 +420,7 @@ namespace DryIoc.UnitTests
             Assert.AreSame(anotherDep, anotherBB.Dep);
         }
 
-        [Test, Ignore("Case relates to #494. Does not work. Fix is hard with current UseInstance impl or likely is impossible.")]
+        [Test]
         public void Replacing_typed_registration_via_scoped_instance_should_do_WHAT()
         {
             var container = new Container();

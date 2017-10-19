@@ -499,7 +499,8 @@ namespace DryIoc
                 parent: this, root: _root ?? this);
         }
 
-        void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
+        // todo: Combine with normal Registry.WithServices
+        void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
             ThrowIfContainerDisposed();
@@ -513,6 +514,7 @@ namespace DryIoc
                 instance = new HiddenDisposable(instance);
 
             var scope = _currentScope ?? _singletonScope;
+            var reuse = scope == _singletonScope ? Reuse.Singleton : Reuse.Scoped;
             var instanceType = instance == null ? typeof(object) : instance.GetType();
 
             _registry.Swap(r =>
@@ -542,20 +544,23 @@ namespace DryIoc
                         }
                         else // for default instance
                         {
-                            switch (IfAlreadyRegistered)
+                            switch (ifAlreadyRegistered)
                             {
-                                case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                    // the special case for re-use of existing factory,
-                                    // we can just update scope with the new instance
-                                    var reusedFactory = singleDefaultFactory as InstanceFactory;
-                                    if (reusedFactory != null)
-                                        scope.SetOrAdd(reusedFactory.FactoryID, instance);
-                                    else
-                                        entry = GetInstanceFactory(instance, instanceType, scope);
-                                    break;
+                                case IfAlreadyRegistered.Replace:
                                 case IfAlreadyRegistered.AppendNotKeyed:
+                                    if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
+                                    {
+                                        var reusedFactory = singleDefaultFactory as InstanceFactory;
+                                        if (reusedFactory != null)
+                                        {
+                                            scope.SetOrAdd(reusedFactory.FactoryID, instance);
+                                            break;
+                                        }
+
+                                        // when nothing to replace treat it as Append
+                                    }
                                     entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                        .With(GetInstanceFactory(instance, instanceType, scope));
+                                        .With(GetInstanceFactory(instance, instanceType, scope, reuse));
                                     break;
                                 case IfAlreadyRegistered.Throw:
                                     Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, singleDefaultFactory);
@@ -584,15 +589,13 @@ namespace DryIoc
                             }
                             else // when keyed instance is found
                             {
-                                switch (IfAlreadyRegistered)
+                                switch (ifAlreadyRegistered)
                                 {
-                                    case IfAlreadyRegistered.Replace: // the DEFAULT option
-                                        // the special case for re-use of existing factory,
-                                        // we can just update scope with the new instance
+                                    case IfAlreadyRegistered.Replace:
                                         var reusedFactory = keyedFactory as InstanceFactory;
                                         if (reusedFactory != null)
                                             scope.SetOrAdd(reusedFactory.FactoryID, instance);
-                                        else // note: not possible for the moment
+                                        else // todo: not possible for the moment, really?
                                             Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
                                                 KV.Of(serviceKey, instance), keyedFactory);
                                         break;
@@ -619,7 +622,7 @@ namespace DryIoc
                             }
                             else // there are existing default factories
                             {
-                                switch (IfAlreadyRegistered)
+                                switch (ifAlreadyRegistered)
                                 {
                                     case IfAlreadyRegistered.Replace: // the DEFAULT option
                                         // the special case for reusing of existing factory,
@@ -679,19 +682,19 @@ namespace DryIoc
             PropertiesAndFieldsSelector propertiesAndFields = null;
             if (!propertyAndFieldNames.IsNullOrEmpty())
             {
-                var matchedMembers = instanceType.GetTypeInfo().DeclaredMembers
-                    .Match(m => (m is PropertyInfo || m is FieldInfo)
-                                && propertyAndFieldNames.IndexOf(m.Name) != -1,
-                        PropertyOrFieldServiceInfo.Of);
+                var matchedMembers = instanceType.GetTypeInfo().DeclaredMembers.Match(
+                    m => (m is PropertyInfo || m is FieldInfo) && propertyAndFieldNames.IndexOf(m.Name) != -1,
+                    PropertyOrFieldServiceInfo.Of);
                 propertiesAndFields = _ => matchedMembers;
             }
 
-            propertiesAndFields = propertiesAndFields
-                                  ?? Rules.PropertiesAndFields
-                                  ?? PropertiesAndFields.Auto;
+            propertiesAndFields =
+                propertiesAndFields
+                ?? Rules.PropertiesAndFields
+                ?? PropertiesAndFields.Auto;
 
             var request = Request.Create(this, instanceType)
-                .WithResolvedFactory(new InstanceFactory(instanceType));
+                .WithResolvedFactory(new InstanceFactory(instanceType, Reuse.Transient));
 
             var requestInfo = request.RequestInfo;
             var resolver = (IResolver)this;
@@ -1419,8 +1422,10 @@ namespace DryIoc
             }
         }
 
-        private static KV<object, Factory>[] MatchFactoriesByReuse(KV<object, Factory>[] matchedFactories, Request request)
+        private static KV<object, Factory>[] MatchFactoriesByReuse(
+            KV<object, Factory>[] matchedFactories, Request request)
         {
+            // todo: optimize this group by
             var sameLifespanGroups = matchedFactories.GroupBy(it =>
                 {
                     var reuse = it.Value.Reuse ?? Reuse.Transient;
@@ -1457,7 +1462,8 @@ namespace DryIoc
 
             if (matchedFactories.Length == 1)
             {
-                // add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                // add asResolutionCall for the factory to prevent caching of 
+                // in-lined expression in context with not matching condition
                 // issue: #382
                 var factory = matchedFactories[0].Value;
                 if (factory.Reuse is CurrentScopeReuse && !factory.Setup.AsResolutionCall)
@@ -1512,9 +1518,10 @@ namespace DryIoc
         private readonly IResolverContext _root;
         private readonly IResolverContext _parent;
 
-        private static InstanceFactory GetInstanceFactory(object instance, Type instanceType, IScope scope)
+        private static InstanceFactory GetInstanceFactory(object instance, 
+            Type instanceType, IScope scope, IReuse reuse = null)
         {
-            var instanceFactory = new InstanceFactory(instanceType);
+            var instanceFactory = new InstanceFactory(instanceType, reuse);
             scope.SetOrAdd(instanceFactory.FactoryID, instance);
             return instanceFactory;
         }
@@ -1525,7 +1532,7 @@ namespace DryIoc
             public override Type ImplementationType => _instanceType;
             private readonly Type _instanceType;
 
-            public InstanceFactory(Type instanceType)
+            public InstanceFactory(Type instanceType, IReuse reuse) : base(reuse)
             {
                 _instanceType = instanceType;
             }
