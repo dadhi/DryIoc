@@ -3236,12 +3236,6 @@ namespace DryIoc
         /// <summary>Default rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        /// <summary>Set of rules reflecting the behavior of Microsoft.Extensions.DependencyInjection</summary>
-        public static readonly Rules MsDIDefault = new Rules(DEFAULT_SETTINGS,
-            SelectLastRegisteredFactory(), Reuse.Transient,
-            Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments),
-            IfAlreadyRegistered.AppendNotKeyed, DefaultMaxObjectGraphSize, null, null, null, null);
-
         /// <summary>Default value for <see cref="MaxObjectGraphSize"/></summary>
         public const int DefaultMaxObjectGraphSize = 32;
 
@@ -4383,69 +4377,69 @@ namespace DryIoc
         /// the method is just a placeholder to help detect constructor or factory method, and does not have additional meaning.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <returns>Returns some (ignored) value.</returns>
-        public static TRequired Of<TRequired>() { return default(TRequired); }
+        public static TRequired Of<TRequired>() => default(TRequired);
 
         /// <summary>Specifies both service and required service types.</summary>
         /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
         /// <returns>Ignored default of Service type.</returns>
-        public static TService Of<TService, TRequired>() { return default(TService); }
+        public static TService Of<TService, TRequired>() => default(TService);
 
         /// <summary>Specifies required service type of parameter or member. Plus specifies if-unresolved policy.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
         /// <returns>Returns some (ignored) value.</returns>
-        public static TRequired Of<TRequired>(IfUnresolved ifUnresolved) { return default(TRequired); }
+        public static TRequired Of<TRequired>(IfUnresolved ifUnresolved) => default(TRequired);
 
         /// <summary>Specifies both service and required service types.</summary>
         /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
         /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
         /// <returns>Ignored default of Service type.</returns>
-        public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved) { return default(TService); }
+        public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved) => default(TService);
 
         /// <summary>Specifies required service type of parameter or member. Plus specifies service key.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Returns some (ignored) value.</returns>
-        public static TRequired Of<TRequired>(object serviceKey) { return default(TRequired); }
+        public static TRequired Of<TRequired>(object serviceKey) => default(TRequired);
 
         /// <summary>Specifies both service and required service types.</summary>
         /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Ignored default of Service type.</returns>
-        public static TService Of<TService, TRequired>(object serviceKey) { return default(TService); }
+        public static TService Of<TService, TRequired>(object serviceKey) => default(TService);
 
         /// <summary>Specifies required service type of parameter or member. Plus specifies service key.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or value.</param>
         /// <returns>Returns some (ignored) value.</returns>
-        public static TRequired Of<TRequired>(string metadataKey, object metadata) { return default(TRequired); }
+        public static TRequired Of<TRequired>(string metadataKey, object metadata) => default(TRequired);
 
         /// <summary>Specifies both service and required service types.</summary>
         /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
         /// <param name="metadataKey">Required metadata key</param> <param name="metadata">Required metadata or value.</param>
         /// <returns>Ignored default of Service type.</returns>
-        public static TService Of<TService, TRequired>(string metadataKey, object metadata) { return default(TService); }
+        public static TService Of<TService, TRequired>(string metadataKey, object metadata) => default(TService);
 
         /// <summary>Specifies required service type of parameter or member. Plus specifies if-unresolved policy. Plus specifies service key.</summary>
         /// <typeparam name="TRequired">Required service type if different from parameter/member type.</typeparam>
         /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Returns some (ignored) value.</returns>
-        public static TRequired Of<TRequired>(IfUnresolved ifUnresolved, object serviceKey) { return default(TRequired); }
+        public static TRequired Of<TRequired>(IfUnresolved ifUnresolved, object serviceKey) => default(TRequired);
 
         /// <summary>Specifies both service and required service types.</summary>
         /// <typeparam name="TService">Service type.</typeparam> <typeparam name="TRequired">Required service type.</typeparam>
         /// <param name="ifUnresolved">Defines to throw or to return default if unresolved.</param>
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Ignored default of Service type.</returns>
-        public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved, object serviceKey) { return default(TService); }
+        public static TService Of<TService, TRequired>(IfUnresolved ifUnresolved, object serviceKey) => default(TService);
 
         /// <summary>Specifies required service type, default value and <see cref="IfUnresolved.ReturnDefault"/>.</summary>
         /// <typeparam name="TRequired">Required service type.</typeparam>
         /// <param name="defaultValue">Primitive default value.</param>
         /// <param name="ifUnresolved">Only the <see cref="IfUnresolved.ReturnDefault"/> value is accepted.</param>
         /// <returns>Ignored.</returns>
-        public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved) { return default(TRequired); }
+        public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved) => default(TRequired);
 
         /// <summary>Specifies required service type, default value and <see cref="IfUnresolved.ReturnDefault"/>.</summary>
         /// <typeparam name="TRequired">Required service type.</typeparam>
@@ -4453,13 +4447,13 @@ namespace DryIoc
         /// <param name="ifUnresolved">Only the <see cref="IfUnresolved.ReturnDefault"/> value is accepted.</param>
         /// <param name="serviceKey">Service key object.</param>
         /// <returns>Ignored.</returns>
-        public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved, object serviceKey) { return default(TRequired); }
+        public static TRequired Of<TRequired>(TRequired defaultValue, IfUnresolved ifUnresolved, object serviceKey) => default(TRequired);
 
         /// <summary>Specifies argument index starting from 0 to use corresponding custom value factory,
         /// similar to String.Format <c>"{0}, {1}, etc"</c>.</summary>
         /// <typeparam name="T">Type of dependency. Difference from actual parameter type is ignored.</typeparam>
         /// <param name="argIndex">Argument index starting from 0</param> <returns>Ignored.</returns>
-        public static T Index<T>(int argIndex) { return default(T); }
+        public static T Index<T>(int argIndex) => default(T);
 
         /// <summary>Name is close to method itself to not forget when renaming the method.</summary>
         public static string ArgIndexMethodName = "Index";

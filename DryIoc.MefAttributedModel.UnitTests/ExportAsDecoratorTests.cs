@@ -136,7 +136,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void Can_register_decorator_of_T_without_breaking_other_exports()
         {
-            var di = new Container(Rules.MsDIDefault).WithMef();
+            var di = new Container(Rules.Default).WithMef();
 
             di.RegisterExports(typeof(Y), typeof(X), typeof(DecoratorFactory));
 
