@@ -634,6 +634,8 @@ namespace DryIoc
                                                 entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
                                             else
                                             {   // currently replaces all default by keeping only the keyed
+                                                // todo: should replace only the used instance, and keep other
+
                                                 var factoriesEntry = FactoriesEntry.Empty;
                                                 for (int i = 0; i < keyedFactories.Length; i++)
                                                     factoriesEntry = factoriesEntry
@@ -3624,7 +3626,7 @@ namespace DryIoc
         /// <summary>Turns tracking of disposable transients in dependency parent scope, or in current scope if service
         /// is resolved directly.
         ///
-        /// If no open scope at the moment then resolved transient won't be tracked and it is up to you
+        /// If there is no open scope at the moment then resolved transient won't be tracked and it is up to you
         /// to dispose it! That's is similar situation to creating service by new - you have full control.
         ///
         /// If dependency wrapped in Func somewhere in parent chain then it also won't be tracked, because
@@ -3813,20 +3815,15 @@ namespace DryIoc
         /// <param name="methodOrMemberName">Name or method or member.</param>
         /// <typeparam name="TFactory">Class with static member.</typeparam>
         /// <returns>Factory method info.</returns>
-        public static FactoryMethod Of<TFactory>(string methodOrMemberName)
-        {
-            var methodOrMember = typeof(TFactory).GetAllMembers()
+        public static FactoryMethod Of<TFactory>(string methodOrMemberName) =>
+            Of(typeof(TFactory).GetAllMembers()
                 .SingleOrDefault(m => m.Name == methodOrMemberName)
-                .ThrowIfNull();
-            return Of(methodOrMember);
-        }
+                .ThrowIfNull());
 
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
-        public override string ToString()
-        {
-            return new StringBuilder().Print(ConstructorOrMethodOrMember.DeclaringType)
+        public override string ToString() =>
+            new StringBuilder().Print(ConstructorOrMethodOrMember.DeclaringType)
                 .Append("::").Append(ConstructorOrMethodOrMember).ToString();
-        }
 
         /// <summary>Easy way to specify non-public and most resolvable constructor.</summary>
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param>
@@ -4016,35 +4013,24 @@ namespace DryIoc
         public static readonly Made Default = new Made();
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethod">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(FactoryMethodSelector factoryMethod)
-        {
-            return Of(factoryMethod);
-        }
+        public static implicit operator Made(FactoryMethodSelector factoryMethod) =>
+            Of(factoryMethod);
 
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
-        /// <param name="parameters">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(ParameterSelector parameters)
-        {
-            return Of(parameters: parameters);
-        }
+        public static implicit operator Made(ParameterSelector parameters) =>
+            Of(parameters: parameters);
 
         /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
-        /// <param name="propertiesAndFields">To use.</param> <returns>New rules.</returns>
-        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields)
-        {
-            return Of(propertiesAndFields: propertiesAndFields);
-        }
+        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) =>
+            Of(propertiesAndFields: propertiesAndFields);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
         /// <returns>New injection rules or <see cref="Default"/>.</returns>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return factoryMethod == null && parameters == null && propertiesAndFields == null
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            factoryMethod == null && parameters == null && propertiesAndFields == null
                 ? Default : new Made(factoryMethod, parameters, propertiesAndFields);
-        }
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
@@ -4056,7 +4042,7 @@ namespace DryIoc
             var methodReturnType = factoryMethod.ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
 
             // Normalizes open-generic type to open-generic definition,
-            // because for base classes and return types it may not be the case.
+            // because for base classes and return types it may not be the case (they may be partialy closed).
             if (methodReturnType != null && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
@@ -4064,49 +4050,32 @@ namespace DryIoc
         }
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        /// <param name="factoryMethodOrMember">To create service.</param>
-        /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance member.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New rules.</returns>
         public static Made Of(MemberInfo factoryMethodOrMember, ServiceInfo factoryInfo = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
-        }
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
 
-        /// <summary>Creates factory specification with method or member selector based on request.</summary>
-        /// <param name="getMethodOrMember">Method, or constructor, or member selector.</param>
-        /// <param name="factoryInfo">(optional) Factory info to resolve in case of instance method/member.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New specification.</returns>
+        /// <summary>Creates factory specification with method or member selector based on request.
+        /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields);
-        }
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo),
+                parameters, propertiesAndFields);
 
-        /// <summary>Creates factory specification with method or member selector based on request.</summary>
-        /// <param name="getMethodOrMember">Method, or constructor, or member selector.</param>
-        /// <param name="factoryInfo">Factory info to resolve in case of instance method/member.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New specification.</returns>
+        /// <summary>Creates factory specification with method or member selector based on request.
+        /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), parameters, propertiesAndFields);
-        }
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), 
+                parameters, propertiesAndFields);
 
-        /// <summary>Defines how to select constructor from implementation type.</summary>
-        /// <param name="getConstructor">Delegate taking implementation type as input and returning selected constructor info.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New instance of <see cref="Made"/> with <see cref="FactoryMethod"/> set to specified delegate.</returns>
+        /// <summary>Defines how to select constructor from implementation type.
+        /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
+        /// and returning selected constructor info.</summary>
         public static Made Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null)
-        {
-            return Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType)
+            PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType)
                 .ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
                 parameters, propertiesAndFields);
-        }
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
         /// <typeparam name="TService">Type with constructor or static method.</typeparam>
@@ -4117,10 +4086,8 @@ namespace DryIoc
         /// <returns>New Made specification.</returns>
         public static TypedMade<TService> Of<TService>(
             Expression<Func<TService>> serviceReturningExpr,
-            params Func<RequestInfo, object>[] argValues)
-        {
-            return FromExpression<TService>(null, serviceReturningExpr, argValues);
-        }
+            params Func<RequestInfo, object>[] argValues) =>
+            FromExpression<TService>(null, serviceReturningExpr, argValues);
 
         /// <summary>Defines creation info from factory method call Expression without using strings.
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
