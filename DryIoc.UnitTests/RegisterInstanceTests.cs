@@ -466,7 +466,7 @@ namespace DryIoc.UnitTests
             Assert.AreNotSame(dependencyA, service.Dep);
         }
 
-        [Test, Ignore("todo: to fix")]
+        [Test]
         public void UseInstance_wont_replace_existing_typed_registration_instead_will_append_to_it_In_presence_or_keyed_registration()
         {
             var container = new Container();

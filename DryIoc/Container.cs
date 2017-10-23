@@ -556,7 +556,9 @@ namespace DryIoc
                                             break;
                                         }
 
-                                        // when nothing to replace treat it as Append
+                                        // for non-instance single registration we may replace with non-scoped instance only
+                                        if (reuse != Reuse.Scoped)
+                                            entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
                                     }
                                     entry = FactoriesEntry.Empty.With(singleDefaultFactory)
                                         .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
@@ -577,13 +579,13 @@ namespace DryIoc
                     }
                     else // for multiple existing or single keyed factory
                     {
-                        var singleKeyedOrManyFactories = (FactoriesEntry)entry;
+                        var singleKeyedOrManyDefaultFactories = (FactoriesEntry)entry;
                         if (serviceKey != null)
                         {
-                            var keyedFactory = singleKeyedOrManyFactories.Factories.GetValueOrDefault(serviceKey);
+                            var keyedFactory = singleKeyedOrManyDefaultFactories.Factories.GetValueOrDefault(serviceKey);
                             if (keyedFactory == null)
                             {
-                                entry = singleKeyedOrManyFactories
+                                entry = singleKeyedOrManyDefaultFactories
                                     .With(InstanceFactory.Of(instance, instanceType, scope, reuse), serviceKey);
                             }
                             else // when keyed instance is found
@@ -608,15 +610,15 @@ namespace DryIoc
                         }
                         else // for default instance
                         {
-                            var defaultFactories = singleKeyedOrManyFactories.LastDefaultKey == null
+                            var defaultFactories = singleKeyedOrManyDefaultFactories.LastDefaultKey == null
                                 ? ArrayTools.Empty<Factory>()
-                                : singleKeyedOrManyFactories.Factories.Enumerate()
+                                : singleKeyedOrManyDefaultFactories.Factories.Enumerate()
                                     .Match(it => it.Key is DefaultKey, it => it.Value)
                                     .ToArrayOrSelf();
 
                             if (defaultFactories.Length == 0) // no default factories among the multiple existing keyed factories
                             {
-                                entry = singleKeyedOrManyFactories
+                                entry = singleKeyedOrManyDefaultFactories
                                     .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                             }
                             else // there are existing default factories
@@ -624,18 +626,29 @@ namespace DryIoc
                                 switch (ifAlreadyRegistered)
                                 {
                                     case IfAlreadyRegistered.Replace:
+                                        // replace single 
                                         if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
+                                        {
                                             scope.SetOrAdd(defaultFactories[0].FactoryID, instance);
+                                        }
                                         else // multiple default or a keyed factory
                                         {
-                                            var keyedFactories = singleKeyedOrManyFactories.Factories.Enumerate()
+                                            // scoped instance may be appended only, and not replacing anything
+                                            if (reuse == Reuse.Scoped)
+                                            {
+                                                entry = singleKeyedOrManyDefaultFactories.With(
+                                                    InstanceFactory.Of(instance, instanceType, scope, reuse));
+                                                break;
+                                            }
+
+                                            // here is the replacement goes on
+                                            var keyedFactories = singleKeyedOrManyDefaultFactories.Factories.Enumerate()
                                                 .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
+
                                             if (keyedFactories.Length == 0) // replaces all default factories?
                                                 entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
                                             else
-                                            {   // currently replaces all default by keeping only the keyed
-                                                // todo: should replace only the used instance, and keep other
-
+                                            {
                                                 var factoriesEntry = FactoriesEntry.Empty;
                                                 for (int i = 0; i < keyedFactories.Length; i++)
                                                     factoriesEntry = factoriesEntry
@@ -647,7 +660,7 @@ namespace DryIoc
 
                                         break;
                                     case IfAlreadyRegistered.AppendNotKeyed:
-                                        entry = singleKeyedOrManyFactories
+                                        entry = singleKeyedOrManyDefaultFactories
                                             .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                         break;
                                     case IfAlreadyRegistered.Throw:
@@ -658,7 +671,7 @@ namespace DryIoc
                                             it => it.CanAccessImplementationType &&
                                             it.ImplementationType == instanceType);
                                         if (duplicateImplIndex == -1) // add new implementation
-                                            entry = singleKeyedOrManyFactories
+                                            entry = singleKeyedOrManyDefaultFactories
                                                 .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                         // otherwise do nothing - keep the old entry
                                         break;
