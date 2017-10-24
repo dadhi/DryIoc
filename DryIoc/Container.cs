@@ -8446,8 +8446,12 @@ namespace DryIoc
             typeof(IScope).Method(nameof(IScope.GetOrAdd));
 
         /// <inheritdoc />
-        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1) =>
-            _items.GetValueOrDefault(id) ?? TryGetOrAdd(id, createValue, disposalIndex);
+        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
+        {
+            object value;
+            return _items.TryFind(id, out value)
+                ? value : TryGetOrAdd(id, createValue, disposalIndex);
+        }
 
         private object TryGetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
         {
@@ -8457,8 +8461,7 @@ namespace DryIoc
             object item;
             lock (_locker)
             {
-                item = _items.GetValueOrDefault(id);
-                if (item != null) // double check locking
+                if (_items.TryFind(id, out item)) // double check locking
                     return item;
 
                 item = createValue();
@@ -8511,8 +8514,8 @@ namespace DryIoc
                 if (disposalIndex == -1)
                     disposalIndex = Interlocked.Decrement(ref _nextDisposalIndex);
 
-                var current = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, current.AddOrUpdate(disposalIndex, disp), current) != current)
+                var it = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, it.AddOrUpdate(disposalIndex, disp), it) != it)
                     Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalIndex, disp));
             }
             return item;
