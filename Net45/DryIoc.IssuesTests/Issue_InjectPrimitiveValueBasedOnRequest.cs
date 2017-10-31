@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
             _container.Register<ILog, Log>(
                 serviceKey: "normal",
                 made: Parameters.Of.Type(request =>
-                    request.Parent.Enumerate().First(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName));
+                    request.Parent.First(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName));
             
             _container.Register<ILog, LogWrapper>();
 
@@ -57,8 +57,7 @@ namespace DryIoc.IssuesTests
             _container.Register<ILog, Log>(
                 made: Made.Of(request => typeof(LoggerFactory)
                     .Method(nameof(LoggerFactory.GetLog))
-                    .MakeGenericMethod(request.Parent.Enumerate()
-                            .First(p => p.ServiceType != typeof(ILog)).ImplementationType)));
+                    .MakeGenericMethod(request.Parent.First(p => p.ServiceType != typeof(ILog)).ImplementationType)));
 
             // exercise
             var resolved = _container.Resolve<Target>();

@@ -1487,7 +1487,7 @@ namespace DryIoc.MefAttributedModel
             var ifUnresolved =
                 source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
 
-            return ConvertRequestInfo(source.ParentOrWrapper).Push(
+            return ConvertRequestInfo(source.DirectParent).Push(
                 source.ServiceType,
                 source.RequiredServiceType,
                 source.ServiceKey,
