@@ -77,19 +77,15 @@ namespace DryIoc.MefAttributedModel
         /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
-            var importsMadeOf = Made.Of(
-                request => GetImportingConstructor(request, rules.FactoryMethod),
-                GetImportedParameter, _getImportedPropertiesAndFields);
-
             // hello, Max!!! we are Martians.
-            return rules.With(importsMadeOf).WithDefaultReuse(Reuse.Singleton);
+            return rules.WithMefRules();
         }
 
         /// <summary>Applies the <see cref="WithMefAttributedModel(DryIoc.Rules)"/> to the container.</summary>
         /// <param name="container">source container</param><returns>New container with applied rules.</returns>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
-            return container.With(WithMefRules);
+            return container.With(WithMefAttributedModel);
         }
 
         #region IPartImportsSatisfiedNotification support
