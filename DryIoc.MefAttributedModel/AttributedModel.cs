@@ -286,7 +286,7 @@ namespace DryIoc.MefAttributedModel
                 ? source.Select(it => it.Value)
                 : source.Where(it =>
                 {
-                    if (it.Key is DefaultKey)
+                    if (it.Key is DefaultKey) // todo: consider the DynamicDefaultKey?
                         return false;
                     if (serviceKey.Equals(it.Key))
                         return true;

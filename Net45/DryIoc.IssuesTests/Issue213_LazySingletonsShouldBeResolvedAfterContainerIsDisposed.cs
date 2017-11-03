@@ -12,15 +12,16 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<Truc>(Reuse.Singleton, setup: Setup.With(preventDisposal: true));
-            container.Register<Machin>(Reuse.Singleton);
-            container.Register<Bidule>(Reuse.InWebRequest);
+            container.Register<Machine>(Reuse.Singleton);
+            container.Register<Bidule>(Reuse.Scoped);
 
-            Machin machine;
-            using (var reqContainer = container.OpenScope(Reuse.WebRequestScopeName))
+            Machine machine;
+            using (var scope = container.OpenScope())
             {
-                machine = reqContainer.Resolve<Bidule>().Machin;
+                machine = scope.Resolve<Bidule>().Machine;
                 Assert.IsNotNull(machine);
             }
+
             Assert.IsNotNull(machine.Truc);
         }
 
@@ -28,9 +29,9 @@ namespace DryIoc.IssuesTests
         {
         }
 
-        public class Machin
+        public class Machine
         {
-            public Machin(Lazy<Truc> truc)
+            public Machine(Lazy<Truc> truc)
             {
                 this.truc = truc;
             }
@@ -42,12 +43,12 @@ namespace DryIoc.IssuesTests
 
         public class Bidule
         {
-            public Bidule(Machin machin)
+            public Bidule(Machine machine)
             {
-                Machin = machin;
+                Machine = machine;
             }
 
-            public Machin Machin;
+            public Machine Machine;
         }
     }
 }

@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => factory());
 
             Assert.AreEqual(
-                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Error.ScopeIsDisposed),
                 Error.NameOf(ex.Error));
         }
 

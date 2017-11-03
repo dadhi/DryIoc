@@ -12,30 +12,78 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
-            c.Register<SingleThing>(Reuse.Singleton);
+            c.Register<SingletonWithScopedFactory>(Reuse.Singleton);
             c.Register<ScopedThing>(Reuse.Scoped);
 
-            var singleT = c.Resolve<SingleThing>();
+            var singleT = c.Resolve<SingletonWithScopedFactory>();
 
-            using (var scope = c.OpenScope()) // unused scope is clear indication of the problem
+            using (c.OpenScope()) // unused scope is clear indication of the problem
             {
                 Assert.Throws<ContainerException>(() => 
                     singleT.ScopedThing());
             }
         }
 
-        public class ScopedThing {}
+        [Test]
+        public void No_cache_problem_between_Resolved_singleton_and_scoped()
+        {
+            var c = new Container();
 
-        public class SingleThing
+            c.Register<IThing, SingleThing>(Reuse.Singleton);
+            c.Register<IThing, ScopedThing>(Reuse.Scoped);
+
+            Assert.IsInstanceOf<SingleThing>(c.Resolve<IThing>());
+
+            using (var scope = c.OpenScope())
+            {
+                Assert.IsInstanceOf<ScopedThing>(scope.Resolve<IThing>());
+            }
+
+            Assert.IsInstanceOf<SingleThing>(c.Resolve<IThing>());
+        }
+
+        [Test]
+        public void No_cache_problem_between_Injected_singleton_and_scoped()
+        {
+            var c = new Container();
+
+            c.Register<IThing, SingleThing>(Reuse.Singleton);
+            c.Register<IThing, ScopedThing>(Reuse.Scoped);
+            c.Register<ThingUser>();
+
+            Assert.IsInstanceOf<SingleThing>(c.Resolve<ThingUser>().Thing);
+
+            using (var scope = c.OpenScope())
+            {
+                Assert.IsInstanceOf<ScopedThing>(scope.Resolve<ThingUser>().Thing);
+            }
+
+            Assert.IsInstanceOf<SingleThing>(c.Resolve<ThingUser>().Thing);
+        }
+
+        public interface IThing {}
+        public class ScopedThing : IThing {}
+        public class SingleThing : IThing {}
+
+        public class ThingUser
+        {
+            public IThing Thing { get; }
+            public ThingUser(IThing thing)
+            {
+                Thing = thing;
+            }
+        }
+
+        public class SingletonWithScopedFactory
         {
             public Func<ScopedThing> ScopedThing { get; }
-            public SingleThing(Func<ScopedThing> scopedThing)
+            public SingletonWithScopedFactory(Func<ScopedThing> scopedThing)
             {
                 ScopedThing = scopedThing;
             }
         }
 
-        [Test]
+        [Test, Ignore]
         public void Sample_based_registration_condition_and_resolution_scope()
         {
             var c = new Container();
@@ -45,7 +93,7 @@ namespace DryIoc.IssuesTests
             c.Register<ITenant, BlueTenant>(serviceKey: TenantKey.Blue, setup: Setup.With(openResolutionScope: true));
 
             // green tenant services
-            var greenSetup = Setup.With(null, IsGreenTenant);
+            var greenSetup = Setup.With(null, req => IsTenant(req, TenantKey.Green));
 
             c.Register<ITransient, GreenTransient>(setup: greenSetup);
             c.Register<IScoped, GreenScoped>(Reuse.Scoped, setup: greenSetup);
@@ -54,33 +102,48 @@ namespace DryIoc.IssuesTests
             // default services
             c.Register<ISomeController, SomeController>(Reuse.Scoped);
             c.Register<ITransient, DefaultTransient>();
-            c.Register<ISingleton, DefaultSingleton>();
+            c.Register<IScoped, DefaultScoped>(Reuse.Scoped);
+            c.Register<ISingleton, DefaultSingleton>(Reuse.Singleton);
 
-            // set a tenant
-            var context = "green";
+            using (var reqScope = c.OpenScope())
+            {
+                GetAndAssertTenantServices(reqScope, TenantKey.Green, "Green");
+                GetAndAssertTenantServices(reqScope, TenantKey.Blue, "Default");
+            }
 
-            var tenant = context == "green"
-                ? c.Resolve<ITenant>(TenantKey.Green)
-                : c.Resolve<ITenant>(TenantKey.Blue);
-
-            var controller = tenant.GetController(context);
-            Assert.IsInstanceOf<GreenTransient>(controller.Transient);
-            Assert.IsInstanceOf<GreenScoped>(controller.Scoped);
-            Assert.IsInstanceOf<GreenSingleton>(controller.Singleton);
+            using (var reqScope = c.OpenScope())
+            {
+                GetAndAssertTenantServices(reqScope, TenantKey.Green, "Green");
+                GetAndAssertTenantServices(reqScope, TenantKey.Blue, "Default");
+            }
 
             var allTransients = c.ResolveMany<ITransient>();
             // will be 1 default, because tenant transients can be resolved only through a tenant
             Assert.AreEqual(1, allTransients.Count());
         }
 
+        private static void GetAndAssertTenantServices(IResolver resolver, TenantKey tenantKey, string expectedTypePart)
+        {
+            var tenant = resolver.Resolve<ITenant>(tenantKey);
+
+            var controller = tenant.GetController(tenantKey);
+
+            StringAssert.Contains(expectedTypePart, controller.Transient.GetType().Name);
+            StringAssert.Contains(expectedTypePart, controller.Scoped.GetType().Name);
+            StringAssert.Contains(expectedTypePart, controller.Singleton.GetType().Name);
+
+            Assert.AreSame(controller.Singleton, controller.Transient.Singleton);
+
+            Assert.AreNotSame(controller.Transient, controller.TransientFactory());
+        }
+
         public enum TenantKey { Green, Blue }
 
-        private static Func<Request, bool> IsGreenTenant = r =>
-            r.CurrentScope != null && 
-            r.CurrentScope.Any(scope => TenantKey.Green.Equals((scope.Name as ResolutionScopeName)?.ServiceKey));
+        private static bool IsTenant(Request request, TenantKey tenantKey) =>
+            request.CurrentScope != null && 
+            request.CurrentScope.Any(scope => tenantKey.Equals((scope.Name as ResolutionScopeName)?.ServiceKey));
 
-        private static bool InBlueTenant(RequestInfo r) =>
-            r.Parent.Any(p => TenantKey.Blue.Equals(p.ServiceKey));
+        #region Tenants
 
         public interface ITenant
         {
@@ -118,26 +181,57 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        // transients
-        public interface ITransient { }
-        public class GreenTransient : ITransient { }
-        public class BlueTransient : ITransient { }
-        public class DefaultTransient : ITransient { }
+        #endregion
 
-        // scoped
+        #region Transients
+
+        public interface ITransient
+        {
+            ISingleton Singleton { get; }
+        }
+
+        public class GreenTransient : ITransient
+        {
+            public ISingleton Singleton { get; }
+            public GreenTransient(ISingleton singleton) { Singleton = singleton; }
+        }
+
+        public class BlueTransient : ITransient
+        {
+            public ISingleton Singleton { get; }
+            public BlueTransient(ISingleton singleton) { Singleton = singleton; }
+        }
+
+        public class DefaultTransient : ITransient
+        {
+            public ISingleton Singleton { get; }
+            public DefaultTransient(ISingleton singleton) { Singleton = singleton; }
+        }
+
+        #endregion
+
+        #region Scoped services
+
         public interface IScoped { }
         public class GreenScoped : IScoped { }
+        public class DefaultScoped : IScoped { }
 
-        // singletons
+        #endregion
+
+        #region Singletons
+
         public interface ISingleton { }
         public class GreenSingleton : ISingleton { }
         public class DefaultSingleton : ISingleton { }
+
+        #endregion
 
         public interface ISomeController
         {
             ITransient Transient { get; }
             IScoped Scoped { get; }
             ISingleton Singleton { get; }
+            Func<ITransient> TransientFactory { get; }
         }
 
         public class SomeController : ISomeController
@@ -145,14 +239,16 @@ namespace DryIoc.IssuesTests
             public ITransient Transient { get; }
             public IScoped Scoped { get; }
             public ISingleton Singleton { get; }
+            public Func<ITransient> TransientFactory { get; }
 
-            public SomeController(ITransient transient, IScoped scoped, ISingleton singleton)
+            public SomeController(ITransient transient, IScoped scoped, ISingleton singleton,
+                Func<ITransient> transientFactory)
             {
                 Transient = transient;
                 Scoped = scoped;
                 Singleton = singleton;
+                TransientFactory = transientFactory;
             }
         }
     }
-
 }
