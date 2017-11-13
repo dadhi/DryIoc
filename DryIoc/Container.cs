@@ -251,80 +251,13 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var cachedFactory = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            if (cachedFactory != null)
-                return cachedFactory(this);
-            return ResolveAndCacheDefaultDelegate(serviceType, ifUnresolved);
+            var cachedDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
+            if (cachedDelegate != null)
+                return cachedDelegate(this);
+            return ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
         }
 
-        object IResolver.Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            Type requiredServiceType, RequestInfo preResolveParent, object[] args)
-        {
-            preResolveParent = preResolveParent ?? RequestInfo.Empty;
-
-            var cacheEntryKey = serviceKey == null
-                ? (object)serviceType
-                : new KV<object, object>(serviceType, serviceKey);
-
-            object cacheContextKey = requiredServiceType;
-            if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null
-                    ? (object)preResolveParent
-                    : KV.Of(cacheContextKey, preResolveParent);
-
-            // Check cache first:
-            var registry = _registry.Value;
-            var cacheRef = registry.KeyedFactoryDelegateCache;
-            var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
-            if (cacheEntry != null)
-            {
-                var cachedFactoryDelegate = cacheContextKey == null
-                    ? cacheEntry.Key
-                    : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
-
-                if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(this);
-            }
-
-            // Cache is missed, so get the factory and put it into cache:
-            ThrowIfContainerDisposed();
-
-            var request = Request.Create(this,
-                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, args);
-
-            var factory = ((IContainer)this).ResolveFactory(request);
-
-            // Hack: may mutate to not null request service key.
-            if (serviceKey == null && request.ServiceKey != null)
-                cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
-
-            var factoryDelegate = factory?.GetDelegateOrDefault(request);
-            if (factoryDelegate == null)
-                return null;
-
-            var service = factoryDelegate(this);
-
-            if (registry.Services.IsEmpty)
-                return service;
-
-            // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
-            // Additionally disable caching when no services registered, 
-            // so the service probably empty collection wrapper or alike.
-            var cachedContextFactories = cacheEntry?.Value ?? ImHashMap<object, FactoryDelegate>.Empty;
-
-            if (cacheContextKey == null)
-                cacheEntry = KV.Of(factoryDelegate, cachedContextFactories);
-            else
-                cacheEntry = KV.Of(cacheEntry?.Key, cachedContextFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
-
-            var cacheVal = cacheRef.Value;
-            if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(cacheEntryKey, cacheEntry)))
-                cacheRef.Swap(_ => _.AddOrUpdate(cacheEntryKey, cacheEntry));
-
-            return service;
-        }
-
-        private object ResolveAndCacheDefaultDelegate(Type serviceType, IfUnresolved ifUnresolved)
+        private object ResolveAndCacheDefaultFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
         {
             ThrowIfContainerDisposed();
 
@@ -343,14 +276,82 @@ namespace DryIoc
             var registryValue = _registry.Value;
             var service = factoryDelegate(this);
 
-            // Additionally disable caching when:
-            // no services registered, so the service probably empty collection wrapper or alike.
+            // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             if (!registryValue.Services.IsEmpty)
             {
                 var cacheRef = registryValue.DefaultFactoryDelegateCache;
-                var cacheVal = cacheRef.Value;
-                if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(serviceType, factoryDelegate)))
+                var cache = cacheRef.Value;
+                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
                     cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+            }
+
+            return service;
+        }
+
+        object IResolver.Resolve(Type serviceType, object serviceKey,
+            IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent, object[] args)
+        {
+            preResolveParent = preResolveParent ?? RequestInfo.Empty;
+
+            var cacheEntryKey = serviceKey == null ? (object)serviceType
+                : new KV<object, object>(serviceType, serviceKey);
+
+            object cacheContextKey = requiredServiceType;
+            if (!preResolveParent.IsEmpty)
+                cacheContextKey = cacheContextKey == null ? (object)preResolveParent
+                    : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
+
+            // Try get from cache first
+            var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
+            var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
+            if (cacheEntry != null)
+            {
+                var cachedFactoryDelegate = cacheContextKey == null ? cacheEntry.Key
+                    : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
+                if (cachedFactoryDelegate != null)
+                    return cachedFactoryDelegate(this);
+            }
+
+            // Cache is missed, so get the factory and put it into cache:
+            ThrowIfContainerDisposed();
+
+            var request = Request.Create(this,
+                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, args);
+
+            var factory = ((IContainer)this).ResolveFactory(request);
+
+            // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
+            if (serviceKey == null && request.ServiceKey != null)
+            {
+                cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
+                cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
+                if (cacheEntry != null)
+                {
+                    var cachedDelegate = cacheContextKey == null ? cacheEntry.Key
+                        : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
+                    if (cachedDelegate != null)
+                        return cachedDelegate(this);
+                }
+            }
+
+            var factoryDelegate = factory?.GetDelegateOrDefault(request);
+            if (factoryDelegate == null)
+                return null;
+
+            var service = factoryDelegate(this);
+
+            // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
+            // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
+            if (!_registry.Value.Services.IsEmpty)
+            {
+                var cachedFactories = cacheEntry?.Value ?? ImHashMap<object, FactoryDelegate>.Empty;
+                cacheEntry = cacheContextKey == null
+                    ? KV.Of(factoryDelegate, cachedFactories)
+                    : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
+
+                var cache = cacheRef.Value;
+                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(cacheEntryKey, cacheEntry)))
+                    cacheRef.Swap(it => it.AddOrUpdate(cacheEntryKey, cacheEntry));
             }
 
             return service;
