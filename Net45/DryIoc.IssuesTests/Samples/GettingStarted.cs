@@ -59,12 +59,14 @@ namespace DryIoc.IssuesTests.Samples
 #if DEBUG
 @"Unable to resolve IService as parameter ""service""
   in SomeClient: IClient
+  from container
 Where no service registrations found
   and no dynamic registrations found in 0 Rules.DynamicServiceProviders
   and nothing in 0 Rules.UnknownServiceResolvers";
 #else
 @"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
   in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient
+  from container
 Where no service registrations found
   and no dynamic registrations found in 0 Rules.DynamicServiceProviders
   and nothing in 0 Rules.UnknownServiceResolvers";

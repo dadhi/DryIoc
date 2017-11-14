@@ -19,7 +19,7 @@ namespace DryIoc.IssuesTests
 
             container.Resolve<ResolvedSingleton>();//I expect that container will remember this singleton
 
-            var factoryExprString = container.Resolve<LambdaExpression>(typeof(Func<string, SingletonDependant>)).ToString();
+            var factoryExprString = container.Resolve<LambdaExpression, Func<string, SingletonDependant>>().ToString();
 
             StringAssert.DoesNotContain("Dependency1", factoryExprString);
             StringAssert.DoesNotContain("Dependency2", factoryExprString);

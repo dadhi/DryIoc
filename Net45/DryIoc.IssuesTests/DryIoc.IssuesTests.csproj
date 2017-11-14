@@ -88,6 +88,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Issue287_Add_IfUnresolved_ReturnDefaultIfNotRegistered_policy.cs" />
     <Compile Include="Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended.cs" />
     <Compile Include="DotnetWeekBlogExample.cs" />
     <Compile Include="DryIocAdapterSpecificationTests.cs" />
@@ -178,6 +179,8 @@
     <Compile Include="Issue519_Dependency_of_singleton_not_working_when_using_child_container.cs" />
     <Compile Include="Issue522_IncorrectApplicationOfSingletonReuse.cs" />
     <Compile Include="Issue527_ErrorResolvemManyAfterUregister.cs" />
+    <Compile Include="Issue530_Multi_tenancy_support.cs" />
+    <Compile Include="Issue533_Exporting_WPF_UserControl_causes_NullReferenceException.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

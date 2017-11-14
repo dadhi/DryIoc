@@ -18,8 +18,9 @@ namespace DryIoc.IssuesTests
             var ex = Assert.Throws<ContainerException>(() =>
                 childContainer.Resolve<IService>());
 
+            // because the instance is registered into scope, but resolve from singleton
             Assert.AreEqual(
-                Error.NameOf(Error.UnableToFindSingletonInstance),
+                Error.NameOf(Error.DependencyHasShorterReuseLifespan),
                 Error.NameOf(ex.Error));
         }
 

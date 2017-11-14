@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<B>(Reuse.InResolutionScopeOf<IA>());
+            container.Register<B>(Reuse.ScopedTo<IA>());
             container.Register<IA, A>();
             container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true, openResolutionScope: true));
 
@@ -29,7 +29,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<B>(Reuse.InResolutionScopeOf<IA>());
+            container.Register<B>(Reuse.ScopedTo<IA>());
             container.Register<IA, A>();
             container.Register<IA, D>(setup: Setup.DecoratorWith(_ => true, openResolutionScope: true));
 
@@ -78,8 +78,8 @@ namespace DryIoc.IssuesTests
             container.Register<Aa>(setup: Setup.With(openResolutionScope: true));
             container.Register<Bb>(setup: Setup.With(openResolutionScope: true));
             container.Register<Dd>();
-            container.Register<IXx, Xx>(Reuse.InResolutionScopeOf<Aa>());
-            container.Register<IXx, Yy>(Reuse.InResolutionScopeOf<Bb>());
+            container.Register<IXx, Xx>(Reuse.ScopedTo<Aa>());
+            container.Register<IXx, Yy>(Reuse.ScopedTo<Bb>());
 
             var a = container.Resolve<Aa>();
             Assert.IsInstanceOf<Xx>(a.D.Xx);
@@ -163,8 +163,8 @@ namespace DryIoc.IssuesTests
             c.Register<Command1>();
             c.Register<CommandFactory>();
 
-            c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncRequestHandler<,>)));
-            c.Register<DbContext, Model1>(Reuse.InResolutionScopeOf(typeof(IAsyncNotificationHandler<>)));
+            c.Register<DbContext, Model1>(Reuse.ScopedTo(typeof(IAsyncRequestHandler<,>)));
+            c.Register<DbContext, Model1>(Reuse.ScopedTo(typeof(IAsyncNotificationHandler<>)));
 
             var mediator = c.Resolve<IMediator>();
 

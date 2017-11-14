@@ -185,12 +185,8 @@ namespace DryIoc.UnitTests
             container.Register<IServiceWithParameterAndDependency, ServiceWithParameterAndDependency>();
             container.Register(typeof(Service));
 
-            var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<Func<bool, LazyEnumerable<IServiceWithParameterAndDependency>>>());
-
-            Assert.AreEqual(
-                Error.NameOf(Error.NotPossibleToResolveLazyEnumerableInsideFuncWithArgs),
-                Error.NameOf(ex.Error));
+            var f = container.Resolve<Func<bool, LazyEnumerable<IServiceWithParameterAndDependency>>>();
+            Assert.AreEqual(true, f(true).First().Flag);
         }
 
         [Test]

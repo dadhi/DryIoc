@@ -21,7 +21,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => factory());
 
             Assert.AreEqual(
-                Error.NameOf(Error.ContainerIsDisposed),
+                Error.NameOf(Error.ScopeIsDisposed),
                 Error.NameOf(ex.Error));
         }
 
@@ -125,7 +125,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>();
             container.Register<Account>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
+            container.Register<Log>(Reuse.ScopedTo<Account>("account"));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AccountUser>());
@@ -142,7 +142,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
+            container.Register<Log>(Reuse.ScopedTo<Account>("account"));
 
             var user = container.Resolve<AccountUser>();
 
@@ -156,7 +156,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf(serviceKey: "account"));
+            container.Register<Log>(Reuse.ScopedTo(serviceKey: "account"));
 
             var user = container.Resolve<AccountUser>();
 
@@ -169,7 +169,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Aaa<>), setup: Setup.With(openResolutionScope: true));
-            container.Register<Bbb>(Reuse.InResolutionScopeOf(typeof(Aaa<>)));
+            container.Register<Bbb>(Reuse.ScopedTo(typeof(Aaa<>)));
 
             var aaa = container.Resolve<Aaa<Bbb>>();
 
@@ -180,7 +180,7 @@ namespace DryIoc.UnitTests
 
         public class Aaa<T>
         {
-            public T Ttt { get; private set; }
+            public T Ttt { get; }
 
             public Aaa(T t)
             {
@@ -195,7 +195,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>();
             container.Register<Account, CarefulAccount>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
-            container.Register<Log, DisposableLog>(Reuse.InResolutionScopeOf<Account>());
+            container.Register<Log, DisposableLog>(Reuse.ScopedTo<Account>());
 
             var user = container.Resolve<AccountUser>();
 
@@ -210,7 +210,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<ViewModel2>());
+            container.Register<Log>(Reuse.ScopedTo<ViewModel2>());
 
             var vm = container.Resolve<ViewModel2>();
 
@@ -247,10 +247,10 @@ namespace DryIoc.UnitTests
 
         public class L
         {
-            public K K { get; private set; }
-            public IDisposable Scope { get; private set; }
+            public K K { get; }
+            public IDisposable Scope { get; }
 
-            public L(K k, IDisposable scope)
+            public L(K k, IResolverContext scope)
             {
                 K = k;
                 Scope = scope;
@@ -293,7 +293,7 @@ namespace DryIoc.UnitTests
 
         internal class AccountUser
         {
-            public Account Account { get; private set; }
+            public Account Account { get; }
             public AccountUser(Account account)
             {
                 Account = account;
@@ -314,7 +314,7 @@ namespace DryIoc.UnitTests
         {
             private readonly IDisposable _scope;
 
-            public CarefulAccount(Log log, IDisposable scope) : base(log)
+            public CarefulAccount(Log log, IResolverContext scope) : base(log)
             {
                 _scope = scope;
             }
@@ -504,7 +504,7 @@ namespace DryIoc.UnitTests
 
         internal class X
         {
-            public Y Y { get; private set; }
+            public Y Y { get; }
             public X(Y y)
             {
                 Y = y;
@@ -513,7 +513,7 @@ namespace DryIoc.UnitTests
         internal class Y
         {
             // ReSharper disable once MemberHidesStaticFromOuterClass
-            public Lazy<X> X { get; private set; }
+            public Lazy<X> X { get; }
             public Y(Lazy<X> x)
             {
                 X = x;
@@ -617,9 +617,9 @@ namespace DryIoc.UnitTests
 
         internal class SomeRoot : IDisposable
         {
-            public SomeDep Dep { get; private set; }
+            public SomeDep Dep { get; }
 
-            public SomeRoot(SomeDep dep, IDisposable scope)
+            public SomeRoot(SomeDep dep, IResolverContext scope)
             {
                 _scope = scope;
                 Dep = dep;
@@ -652,7 +652,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AD>(Reuse.InResolutionScopeOf<AResolutionScoped>());
+            container.Register<AD>(Reuse.ScopedTo<AResolutionScoped>());
             container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
             container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
 
@@ -666,7 +666,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AD>(Reuse.InResolutionScopeOf<ADConsumer>());
+            container.Register<AD>(Reuse.ScopedTo<ADConsumer>());
             container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
             container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
 
@@ -733,9 +733,9 @@ namespace DryIoc.UnitTests
 
         public class ADConsumer
         {
-            public AD Ad { get; private set; }
+            public AD Ad { get; }
 
-            public AD Ad2 { get; private set; }
+            public AD Ad2 { get; }
 
             public ADConsumer(AD ad, AD ad2)
             {
@@ -746,14 +746,11 @@ namespace DryIoc.UnitTests
 
         public class AResolutionScoped
         {
-            public ADConsumer Consumer { get; private set; }
+            public ADConsumer Consumer { get; }
 
-            public IDisposable Dependencies { get; private set; }
-
-            public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
+            public AResolutionScoped(ADConsumer consumer)
             {
                 Consumer = consumer;
-                Dependencies = dependencies;
             }
         }
 
@@ -765,7 +762,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<O>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+            container.Register<Ho>(Reuse.ScopedTo<O>());
 
             container.Resolve<object>(typeof(O));
         }
@@ -776,13 +773,13 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<O>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
-            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+            container.Register<Ho>(Reuse.ScopedTo<O>());
 
             using (var scope = container.OpenScope())
             {
                 var o = scope.Resolve<O>();
                 var o2 = scope.Resolve<O>();
-                Assert.AreSame(o, o2);
+                Assert.AreNotSame(o, o2);
                 Assert.AreSame(o.Ho, o.Ho2);
             }
         }
@@ -822,6 +819,33 @@ namespace DryIoc.UnitTests
                 
             }
         }
+
+        [Test]
+        public void Can_specify_multiple_scope_names_in_one_reuse()
+        {
+            var c = new Container();
+
+            c.Register<Go>(Reuse.ScopedTo("a", "b"));
+
+            using (var a = c.OpenScope("a"))
+            {
+                var goA = a.Resolve<Go>();
+                using (var noname = a.OpenScope())
+                {
+                    var goNN = noname.Resolve<Go>();
+                    Assert.AreSame(goNN, goA);
+
+                    using (var b = noname.OpenScope("b"))
+                    {
+                        var goB = b.Resolve<Go>();
+                        Assert.AreNotSame(goB, goA); // different name
+                        Assert.AreSame(goB, b.Resolve<Go>());
+                    }
+                }
+            }
+        }
+
+        class Go {}
 
         #region CUT
 

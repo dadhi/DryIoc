@@ -220,19 +220,17 @@ namespace DryIoc.IssuesTests
             container.Register<IMainViewModel1, MainViewModel1>(
                 setup: Setup.With(openResolutionScope: true));
 
-            container.Register<IDatabase, Database>(
-                Reuse.InResolutionScopeOf<IArea>());
+            container.Register<IDatabase, Database>(Reuse.ScopedTo<IArea>());
 
             container.Register<ITwoVariants, FirstVariant>(
-                Reuse.InResolutionScopeOf<IArea1>(),
+                Reuse.ScopedTo<IArea1>(),
                 setup: Setup.With(openResolutionScope: true));
             
             container.Register<ITwoVariants, SecondVariant>(
-                Reuse.InResolutionScopeOf<IArea2>(),
+                Reuse.ScopedTo<IArea2>(),
                 setup: Setup.With(openResolutionScope: true));
 
-            container.Register<IViewModelPresenter, ViewModelPresenter>(
-                Reuse.InResolutionScopeOf<IMainViewModel>());
+            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.ScopedTo<IMainViewModel>());
 
             container.Register<IChildViewModelSimple, ChildViewModelSimple>();
             container.Register<IChildViewModelWithChildren, ChildViewModelWithChildren>();
@@ -295,7 +293,7 @@ namespace DryIoc.IssuesTests
                     .Type<ITwoVariants>(serviceKey: Areas.Second)
                     .Type<IMainViewModel1>(serviceKey: Areas.Second));
 
-            container.Register<IDatabase, Database>(Reuse.InResolutionScopeOf<IArea>());
+            container.Register<IDatabase, Database>(Reuse.ScopedTo<IArea>());
 
             container.Register<IMainViewModel1, MainViewModel1>(serviceKey: Areas.First,
                 setup: Setup.With(openResolutionScope: true),
@@ -308,7 +306,7 @@ namespace DryIoc.IssuesTests
             container.Register<ITwoVariants, FirstVariant>(serviceKey: Areas.First);
             container.Register<ITwoVariants, SecondVariant>(serviceKey: Areas.Second);
 
-            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.InResolutionScopeOf<IMainViewModel>());
+            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.ScopedTo<IMainViewModel>());
 
             container.Register<IChildViewModelSimple, ChildViewModelSimple>();
 
@@ -368,7 +366,7 @@ namespace DryIoc.IssuesTests
             public ICar Car { get; private set; }
             public SomeTool Tool { get; private set; }
 
-            public AreaWithOneCar(ICar car, SomeTool tool, IDisposable scope)
+            public AreaWithOneCar(ICar car, SomeTool tool, IResolverContext scope)
             {
                 _scope = scope;
                 Car = car;
@@ -406,7 +404,7 @@ namespace DryIoc.IssuesTests
             // rather then inline creation expression (which is default): `r => new Client(new Service(...))`
             // Direct use of `Resolve` method means that dependency treated by container as new resolution root,
             // and therefore has its own ResolutionScope! So every dependency (e.g. ICar) down the resolve method 
-            // registered with `Reuse.InResolutionScope` will reside in the new resolution scope. 
+            // registered with `Reuse.ScopedTo` will reside in the new resolution scope. 
             container.Register<AreaWithOneCar>(Reuse.Scoped,
                 setup: Setup.With(openResolutionScope: true)); // NOTE: remove setup parameter to see what happens
 
@@ -467,7 +465,7 @@ namespace DryIoc.IssuesTests
             manager.Dispose();
             Assert.IsTrue(((SmallCar)area.Car).IsDisposed);
             Assert.IsTrue(((SmallCar)area.Tool.Car).IsDisposed);
-            Assert.IsFalse(((SmallCar)manager.ReferenceCar).IsDisposed);
+            Assert.IsTrue(((SmallCar)manager.ReferenceCar).IsDisposed);
         }
 
         [Test]

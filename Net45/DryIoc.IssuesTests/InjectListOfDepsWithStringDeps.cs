@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using DryIoc.Experimental;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -12,7 +11,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var di = DI.New();
+            var di = new Container(Rules.Default.WithConcreteTypeDynamicRegistrations());
 
             di.UseInstance("a", serviceKey: "x");
             di.UseInstance("b", serviceKey: "y");
@@ -20,7 +19,7 @@ namespace DryIoc.IssuesTests
             di.Register(Made.Of(() => 
                 GetBs(Arg.Of<Func<string, B>>(), Arg.Of<KeyValuePair<string, string>[]>())));
 
-            var a = di.Get<A>();
+            var a = di.Resolve<A>();
             Assert.AreEqual(2, a.Bs.Count);
         }
 

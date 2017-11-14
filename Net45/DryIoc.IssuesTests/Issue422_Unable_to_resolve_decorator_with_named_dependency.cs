@@ -17,13 +17,13 @@ namespace DryIoc.IssuesTests
             container.Register(Made.Of(
                 x => ServiceInfo.Of<ClientFactory>(), 
                 f => f.CreateClient("a")), 
-                setup: Setup.With(condition: r => r.Parent.Enumerate().Any(p => p.ImplementationType == typeof(ControllerA))));
+                setup: Setup.With(condition: r => r.Parent.Any(p => p.ImplementationType == typeof(ControllerA))));
 
             // Another with condition to be resolved under ControllerB
             container.Register(Made.Of(
                 x => ServiceInfo.Of<ClientFactory>(),
                 f => f.CreateClient("b")),
-                setup: Setup.With(condition: r => r.Parent.Enumerate().Any(p => p.ImplementationType == typeof(ControllerB))));
+                setup: Setup.With(condition: r => r.Parent.Any(p => p.ImplementationType == typeof(ControllerB))));
 
             container.Register<IClient, ClientDecorator>(setup: Setup.Decorator, 
                 made: Made.Of(() => new ClientDecorator(Arg.Of<IClient>())));

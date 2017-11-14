@@ -9,8 +9,7 @@ namespace DryIoc.IssuesTests
         public void Can_globally_use_string_parameter_name_as_service_key()
         {
             var c = new Container(rules => rules
-                .With(parameters: Parameters.Of.Details(
-                    (_, p) => p.ParameterType == typeof(string) ? ServiceDetails.Of(serviceKey: p.Name) : ServiceDetails.Default)));
+                .With(parameters: Parameters.Of.Type<string>((_, p) => ServiceDetails.Of(serviceKey: p.Name))));
 
             c.Register<Blah>();
 

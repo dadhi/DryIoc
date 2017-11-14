@@ -12,8 +12,8 @@ namespace DryIoc.IssuesTests
 
             container.Register<TestScope1>(setup: Setup.With(openResolutionScope: true));
             container.Register<TestScope2>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope1>());
-            container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope2>());
+            container.Register<Test1>(Reuse.ScopedTo<TestScope1>());
+            container.Register<Test1>(Reuse.ScopedTo<TestScope2>());
 
             var t1 = container.Resolve<TestScope1>();
             var t2 = container.Resolve<TestScope2>();
@@ -29,8 +29,8 @@ namespace DryIoc.IssuesTests
 
             container.Register<TestScope1>(setup: Setup.With(openResolutionScope: true));
             container.Register<TestScope2>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope1>());
-            container.Register<Test1>(Reuse.InResolutionScopeOf<TestScope2>());
+            container.Register<Test1>(Reuse.ScopedTo<TestScope1>());
+            container.Register<Test1>(Reuse.ScopedTo<TestScope2>());
 
             var t1 = container.Resolve<TestScope1>();
             var t2 = container.Resolve<TestScope2>();

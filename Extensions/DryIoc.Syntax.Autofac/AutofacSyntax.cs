@@ -270,7 +270,7 @@ namespace Autofac.Features.OwnedInstances
         public T Value { get; private set; }
         private readonly IDisposable _lifetime;
 
-        public Owned(T value, IDisposable lifetime)
+        public Owned(T value, IResolverContext lifetime)
         {
             _lifetime = lifetime;
             Value = value;

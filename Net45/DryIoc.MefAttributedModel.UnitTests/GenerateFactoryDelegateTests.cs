@@ -75,7 +75,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(3, rootList.Length);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
-            Assert.AreEqual(2, depList.Length);
+            Assert.AreEqual(3, depList.Length);
         }
 
         [Test]
@@ -128,7 +128,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(3, rootList.Length);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
-            Assert.AreEqual(2, depList.Length);
+            Assert.AreEqual(3, depList.Length);
         }
 
         [Test]
@@ -149,7 +149,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, ContainerTools.SetupAsResolutionRoots);
 
             Assert.AreEqual(3, resolutionsRoots.Length);
-            Assert.AreEqual(2, resolutionCallDependencies.Length);
+            Assert.AreEqual(3, resolutionCallDependencies.Length);
         }
 
         [Test]

@@ -77,19 +77,15 @@ namespace DryIoc.MefAttributedModel
         /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
         public static Rules WithMefAttributedModel(this Rules rules)
         {
-            var importsMadeOf = Made.Of(
-                request => GetImportingConstructor(request, rules.FactoryMethod),
-                GetImportedParameter, _getImportedPropertiesAndFields);
-
             // hello, Max!!! we are Martians.
-            return rules.With(importsMadeOf).WithDefaultReuse(Reuse.Singleton);
+            return rules.WithMefRules();
         }
 
         /// <summary>Applies the <see cref="WithMefAttributedModel(DryIoc.Rules)"/> to the container.</summary>
         /// <param name="container">source container</param><returns>New container with applied rules.</returns>
         public static IContainer WithMefAttributedModel(this IContainer container)
         {
-            return container.With(WithMefRules);
+            return container.With(WithMefAttributedModel);
         }
 
         #region IPartImportsSatisfiedNotification support
@@ -290,7 +286,7 @@ namespace DryIoc.MefAttributedModel
                 ? source.Select(it => it.Value)
                 : source.Where(it =>
                 {
-                    if (it.Key is DefaultKey)
+                    if (it.Key is DefaultKey) // todo: consider the DynamicDefaultKey?
                         return false;
                     if (serviceKey.Equals(it.Key))
                         return true;
@@ -1487,7 +1483,7 @@ namespace DryIoc.MefAttributedModel
             var ifUnresolved =
                 source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
 
-            return ConvertRequestInfo(source.ParentOrWrapper).Push(
+            return ConvertRequestInfo(source.DirectParent).Push(
                 source.ServiceType,
                 source.RequiredServiceType,
                 source.ServiceKey,
