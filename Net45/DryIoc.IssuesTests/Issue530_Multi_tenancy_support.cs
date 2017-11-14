@@ -83,7 +83,7 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Test, Ignore]
+        [Test]
         public void Sample_based_registration_condition_and_resolution_scope()
         {
             var c = new Container();
@@ -141,7 +141,7 @@ namespace DryIoc.IssuesTests
 
         private static bool IsTenant(Request request, TenantKey tenantKey) =>
             request.CurrentScope != null && 
-            request.CurrentScope.Any(scope => tenantKey.Equals((scope.Name as ResolutionScopeName)?.ServiceKey));
+            request.CurrentScope.Any(scope => tenantKey.Equals((scope.Name as OwnScopeName)?.ServiceKey));
 
         #region Tenants
 
@@ -152,17 +152,17 @@ namespace DryIoc.IssuesTests
 
         public class GreenTenant : ITenant
         {
-            public IResolverContext Resolver { get; }
+            public IResolverContext ScopedResolver { get; }
 
-            public GreenTenant(IResolverContext resolver)
+            public GreenTenant(IResolverContext scopedResolver)
             {
-                Resolver = resolver;
+                ScopedResolver = scopedResolver;
             }
 
             public ISomeController GetController(object ctx)
             {
                 // can use ctx to route
-                return Resolver.Resolve<ISomeController>();
+                return ScopedResolver.Resolve<ISomeController>();
             }
         }
 

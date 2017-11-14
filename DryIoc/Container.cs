@@ -100,7 +100,7 @@ namespace DryIoc
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
             // nice to have, but we can leave without it if something goes wrong
@@ -297,9 +297,15 @@ namespace DryIoc
                 : new KV<object, object>(serviceType, serviceKey);
 
             object cacheContextKey = requiredServiceType;
+
             if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null ? (object)preResolveParent
+                cacheContextKey = cacheContextKey == null
+                    ? (object)preResolveParent
                     : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
+            else if (preResolveParent.OpensResolutionScope)
+                cacheContextKey = cacheContextKey == null
+                    ? (object)true
+                    : new KV<object, bool>(cacheContextKey, true);
 
             // Try get from cache first
             var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
@@ -872,14 +878,12 @@ namespace DryIoc
                 if (defaultFactories.Length > 1)
                 {
                     if (request.IsResolutionCall)
-                    {
                         request.ChangeServiceKey(factory.Key);
-                    }
-                    else if (request.Rules.ImplicitCheckForReuseMatchingScope &&
-                        request.Reuse is CurrentScopeReuse ||
-                        factory.Value.Setup.Condition != null)
+                    else
                     {
-                        factory.Value.Setup = factory.Value.Setup.WithAsResolutionCall();
+                        var setup = factory.Value.Setup;
+                        if (!setup.AsResolutionCall && setup.Condition != null)
+                            factory.Value.Setup = setup.WithAsResolutionCall();
                     }
                 }
 
@@ -1455,39 +1459,35 @@ namespace DryIoc
         private static KV<object, Factory>[] MatchFactoriesByReuse(
             KV<object, Factory>[] matchedFactories, Request request)
         {
-            // todo: optimize this group by
-            var sameLifespanGroups = matchedFactories.GroupBy(it =>
-                {
-                    var reuse = it.Value.Reuse ?? Reuse.Transient;
-                    return reuse.Lifespan == 0 ? int.MaxValue : reuse.Lifespan;
-                })
-                .OrderBy(it => it.Key)
-                .ToArray();
-
-            if (sameLifespanGroups.Length == 1)
+            var reuseMatchedFactories = matchedFactories.Match(it => it.Value.Reuse?.CanApply(request) ?? true);
+            if (reuseMatchedFactories.Length == 1)
             {
-                var facs = sameLifespanGroups[0].ToArrayOrSelf();
-                if (facs.Length > 1)
-                {
-                    var fac = facs.Match(it => it.Value.Reuse?.CanApply(request) ?? true);
-                    if (fac.Length == 1)
-                        matchedFactories = fac;
-                }
+                matchedFactories = reuseMatchedFactories;
             }
-            else if (sameLifespanGroups.Length > 1)
+            else if (reuseMatchedFactories.Length > 1)
             {
-                for (int i = 0; i < sameLifespanGroups.Length; i++)
+                var minLifespan = int.MaxValue;
+                bool multipleFactories = false;
+                KV<object, Factory> minLifespanFactory = null;
+                for (int i = 0; i < reuseMatchedFactories.Length; i++)
                 {
-                    var facs = sameLifespanGroups[i].ToArrayOrSelf()
-                        .Match(it => it.Value.Reuse?.CanApply(request) ?? true);
-                    if (facs.Length == 1)
+                    var factory = reuseMatchedFactories[i];
+                    var reuse = factory.Value.Reuse;
+                    var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
+                    if (lifespan < minLifespan)
                     {
-                        matchedFactories = facs;
-                        break;
+                        minLifespan = lifespan;
+                        minLifespanFactory = factory;
+                        multipleFactories = false;
                     }
-                    if (facs.Length > 1)
-                        break;
+                    else if (lifespan == minLifespan)
+                    {
+                        multipleFactories = true;
+                    }
                 }
+
+                if (!multipleFactories && minLifespanFactory != null)
+                    matchedFactories = new KV<object, Factory>[] { minLifespanFactory };
             }
 
             if (matchedFactories.Length == 1)
@@ -2745,7 +2745,7 @@ namespace DryIoc
         public static Expr GetRootOrSelfExpr(Request request) =>
             request.DirectRuntimeParent.IsSingletonOrDependencyOfSingleton &&
             !request.OpensResolutionScope
-                ? RootOrSelfExpr 
+                ? RootOrSelfExpr
                 : Container.ResolverContextParamExpr;
 
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
@@ -2880,14 +2880,12 @@ namespace DryIoc
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
                     setup: Setup.WrapperWith(unwrap: _ => typeof(void))));
 
-            wrappers = AddContainerInterfacesAndDisposableScope(wrappers);
-
+            wrappers = wrappers.AddContainerInterfaces();
             return wrappers;
         }
 
-        private static ImHashMap<Type, Factory> AddContainerInterfacesAndDisposableScope(ImHashMap<Type, Factory> wrappers)
+        private static ImHashMap<Type, Factory> AddContainerInterfaces(this ImHashMap<Type, Factory> wrappers)
         {
-            // Using @preventDisposal to not apply tracking disposable transient
             var asContainerWrapper = Setup.WrapperWith(preventDisposal: true);
 
             wrappers = wrappers.AddOrUpdate(typeof(IResolver),
@@ -2904,10 +2902,6 @@ namespace DryIoc
                 .AddOrUpdate(typeof(IContainer), containerFactory)
                 .AddOrUpdate(typeof(IRegistrator), containerFactory)
                 .AddOrUpdate(typeof(IResolverContext), containerFactory);
-
-            wrappers = wrappers.AddOrUpdate(typeof(IDisposable),
-                new ExpressionFactory(r => r.IsResolutionRoot ? null : ResolverContext.CurrentScopeExpr,
-                    setup: Setup.Wrapper));
 
             return wrappers;
         }
@@ -6068,6 +6062,9 @@ namespace DryIoc
         /// <summary>(optional) Made spec used for resolving request.</summary>
         public Made Made => Factory?.Made;
 
+        /// <summary>Current flags</summary>
+        public RequestFlags Flags => _flags;
+
         /// <summary>Requested service type.</summary>
         public Type ServiceType => _serviceInfo.ServiceType;
 
@@ -6479,10 +6476,7 @@ namespace DryIoc
                 PreResolveParent = preResolveParent;
             }
 
-            public void IncrementDependencyCount()
-            {
-                Interlocked.Increment(ref DependencyCount);
-            }
+            public void IncrementDependencyCount() => Interlocked.Increment(ref DependencyCount);
         }
 
         #endregion
@@ -6664,15 +6658,12 @@ namespace DryIoc
         /// <returns>New setup or default <see cref="Wrapper"/>.</returns>
         public static Setup WrapperWith(Func<Request, bool> condition,
             int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
-            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false)
-        {
-            if (wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
-                !openResolutionScope && !preventDisposal && condition == null)
-                return Wrapper;
-
-            return new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false) =>
+            wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
+            && !openResolutionScope && !preventDisposal && condition == null
+            ? Wrapper
+            : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
                 condition, openResolutionScope, asResolutionCall, preventDisposal);
-        }
 
         /// <summary>Returns generic wrapper setup.</summary>
         /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
@@ -6720,12 +6711,10 @@ namespace DryIoc
         /// <param name="openResolutionScope">The decorator opens resolution scope</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
         public static Setup DecoratorWith(Func<Request, bool> condition, int order, bool useDecorateeReuse,
-            bool openResolutionScope = false)
-        {
-            if (condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope)
-                return Decorator;
-            return new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope);
-        }
+            bool openResolutionScope = false) =>
+            condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope
+                ? Decorator
+                : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope);
 
         /// <summary>Creates setup with optional condition.</summary>
         /// <param name="decorateeType">(optional) Type that should be implemented by decorated service.</param>
@@ -7015,13 +7004,13 @@ namespace DryIoc
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
-        /// <param name="request">Request for service.</param> <returns>Service expression.</returns>
         public virtual Expr GetExpressionOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
 
-            if (Setup.OpenResolutionScope && !request.OpensResolutionScope ||
-                ShouldBeInjectedAsResolutionCall(request))
+            // preventing recursion
+            if (!request.OpensResolutionScope &&
+                (Setup.OpenResolutionScope || ShouldBeInjectedAsResolutionCall(request)))
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             var container = request.Container;
@@ -8533,6 +8522,9 @@ namespace DryIoc
         /// <inheritdoc />
         public object TrackDisposable(object item, int disposalIndex = -1)
         {
+            if (item == this)
+                return item;
+
             var disp = item as IDisposable;
             if (disp != null)
             {
@@ -8573,13 +8565,14 @@ namespace DryIoc
                 }
 
             _disposables = ImMap<IDisposable>.Empty;
+
             _items = ImMap<object>.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
         public override string ToString() =>
             (IsDisposed ? "disposed" : "") + "{"
-            + (Name != null ? "Name=" + Name : "")
+            + (Name != null ? "Name=" + Name : "no name")
             + (Parent != null ? ", Parent=" + Parent : "")
             + "}";
 
@@ -8694,7 +8687,7 @@ namespace DryIoc
         public bool CanApply(Request request) => true;
 
         /// <summary>Returns expression call to GetOrAddItem.</summary>
-        public Expr Apply(Request request, Expr serviceFactoryExpr) => 
+        public Expr Apply(Request request, Expr serviceFactoryExpr) =>
             request.TracksTransientDisposable
             ? Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
                 serviceFactoryExpr, _minusOneExpr)
@@ -8736,9 +8729,7 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expr Apply(Request request, Expr serviceFactoryExpr)
         {
-            Expr rExpr = request.OpensResolutionScope
-                ? ResolverContext.ParentExpr
-                : Container.ResolverContextParamExpr;
+            var rExpr = Container.ResolverContextParamExpr;
 
             if (request.TracksTransientDisposable)
             {
@@ -8856,8 +8847,7 @@ namespace DryIoc
     public sealed class CompositeScopeName : IScopeName
     {
         /// <summary>Wraps the multiple names</summary>
-        public static CompositeScopeName Of(object[] names) =>
-            new CompositeScopeName(names);
+        public static CompositeScopeName Of(object[] names) => new CompositeScopeName(names);
 
         /// <summary>Matches all the name in a loop until first match is found, otherwise returns false.</summary>
         public bool Match(object scopeName)
@@ -8867,8 +8857,8 @@ namespace DryIoc
                 var name = _names[i];
                 if (name == scopeName)
                     return true;
-                var sName = name as IScopeName;
-                if (sName != null && sName.Match(scopeName))
+                var aScopeName = name as IScopeName;
+                if (aScopeName != null && aScopeName.Match(scopeName))
                     return true;
                 if (scopeName != null && scopeName.Equals(name))
                     return true;
@@ -8914,11 +8904,14 @@ namespace DryIoc
         /// <inheritdoc />
         public bool Match(object scopeName)
         {
-            var resScopeName = scopeName as ResolutionScopeName;
-            if (resScopeName != null &&
-                (ServiceType == null || resScopeName.ServiceType.IsAssignableTo(ServiceType) ||
-                 ServiceType.IsOpenGeneric() && resScopeName.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
-                (ServiceKey == null || ServiceKey.Equals(resScopeName.ServiceKey)))
+            var name = scopeName as ResolutionScopeName;
+            if (name != null &&
+                (ServiceType == null ||
+                name.ServiceType.IsAssignableTo(ServiceType) ||
+                 ServiceType.IsOpenGeneric() &&
+                 name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
+                (ServiceKey == null ||
+                ServiceKey.Equals(name.ServiceKey)))
                 return true;
             return false;
         }
@@ -8926,7 +8919,7 @@ namespace DryIoc
         /// <summary>String representation for easy debugging and understood error messages.</summary>
         public override string ToString()
         {
-            var s = new StringBuilder("ResolutionScopeName(").Print(ServiceType);
+            var s = new StringBuilder(GetType().Name).Print(ServiceType);
             if (ServiceKey != null)
                 s.Append(',').Print(ServiceKey);
             return s.Append(")").ToString();
@@ -8954,9 +8947,9 @@ namespace DryIoc
             new CurrentScopeReuse(CompositeScopeName.Of(names));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
-        public static IReuse ScopedTo(Type assignableFromServiceType = null, object serviceKey = null) =>
-            assignableFromServiceType == null && serviceKey == null ? Scoped
-            : new CurrentScopeReuse(ResolutionScopeName.Of(assignableFromServiceType, serviceKey));
+        public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
+            serviceType == null && serviceKey == null ? Scoped
+            : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
@@ -9224,28 +9217,34 @@ namespace DryIoc
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         public bool EqualsWithoutParent(RequestInfo other) =>
             other.ServiceType == ServiceType
-                && other.RequiredServiceType == RequiredServiceType
-                && other.IfUnresolved == IfUnresolved
-                && Equals(other.ServiceKey, ServiceKey)
-                && other.MetadataKey == MetadataKey
-                && Equals(other.Metadata, Metadata)
 
-                && other.FactoryType == FactoryType
-                && other.ImplementationType == ImplementationType
-                && other.ReuseLifespan == ReuseLifespan;
+            && other.Flags == Flags
+
+            && other.RequiredServiceType == RequiredServiceType
+            && other.IfUnresolved == IfUnresolved
+            && Equals(other.ServiceKey, ServiceKey)
+            && other.MetadataKey == MetadataKey
+            && Equals(other.Metadata, Metadata)
+
+            && other.FactoryType == FactoryType
+            && other.ImplementationType == ImplementationType
+            && other.ReuseLifespan == ReuseLifespan;
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
         public bool EqualsWithoutParent(Request other) =>
             other.ServiceType == ServiceType
-                && other.RequiredServiceType == RequiredServiceType
-                && other.IfUnresolved == IfUnresolved
-                && Equals(other.ServiceKey, ServiceKey)
-                && other.MetadataKey == MetadataKey
-                && Equals(other.Metadata, Metadata)
 
-                && other.FactoryType == FactoryType
-                && other.ImplementationType == ImplementationType
-                && other.ReuseLifespan == ReuseLifespan;
+            && other.Flags == Flags
+
+            && other.RequiredServiceType == RequiredServiceType
+            && other.IfUnresolved == IfUnresolved
+            && Equals(other.ServiceKey, ServiceKey)
+            && other.MetadataKey == MetadataKey
+            && Equals(other.Metadata, Metadata)
+
+            && other.FactoryType == FactoryType
+            && other.ImplementationType == ImplementationType
+            && other.ReuseLifespan == ReuseLifespan;
 
         /// <summary>Returns hash code combined from info fields plus its parent.</summary>
         public override int GetHashCode()

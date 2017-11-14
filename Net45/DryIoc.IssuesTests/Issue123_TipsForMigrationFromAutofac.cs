@@ -384,7 +384,7 @@ namespace DryIoc.IssuesTests
             public TService Value { get; }
             private readonly IDisposable _scope;
 
-            public DryIocOwned(TService value, IDisposable scope)
+            public DryIocOwned(TService value, IResolverContext scope)
             {
                 Value = value;
                 _scope = scope;

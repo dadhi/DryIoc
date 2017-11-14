@@ -125,7 +125,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>();
             container.Register<Account>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
+            container.Register<Log>(Reuse.ScopedTo<Account>("account"));
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AccountUser>());
@@ -142,7 +142,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<Account>("account"));
+            container.Register<Log>(Reuse.ScopedTo<Account>("account"));
 
             var user = container.Resolve<AccountUser>();
 
@@ -156,7 +156,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf(serviceKey: "account"));
+            container.Register<Log>(Reuse.ScopedTo(serviceKey: "account"));
 
             var user = container.Resolve<AccountUser>();
 
@@ -169,7 +169,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Aaa<>), setup: Setup.With(openResolutionScope: true));
-            container.Register<Bbb>(Reuse.InResolutionScopeOf(typeof(Aaa<>)));
+            container.Register<Bbb>(Reuse.ScopedTo(typeof(Aaa<>)));
 
             var aaa = container.Resolve<Aaa<Bbb>>();
 
@@ -195,7 +195,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>();
             container.Register<Account, CarefulAccount>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
-            container.Register<Log, DisposableLog>(Reuse.InResolutionScopeOf<Account>());
+            container.Register<Log, DisposableLog>(Reuse.ScopedTo<Account>());
 
             var user = container.Resolve<AccountUser>();
 
@@ -210,7 +210,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ViewModel2>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.InResolutionScopeOf<ViewModel2>());
+            container.Register<Log>(Reuse.ScopedTo<ViewModel2>());
 
             var vm = container.Resolve<ViewModel2>();
 
@@ -250,7 +250,7 @@ namespace DryIoc.UnitTests
             public K K { get; }
             public IDisposable Scope { get; }
 
-            public L(K k, IDisposable scope)
+            public L(K k, IResolverContext scope)
             {
                 K = k;
                 Scope = scope;
@@ -314,7 +314,7 @@ namespace DryIoc.UnitTests
         {
             private readonly IDisposable _scope;
 
-            public CarefulAccount(Log log, IDisposable scope) : base(log)
+            public CarefulAccount(Log log, IResolverContext scope) : base(log)
             {
                 _scope = scope;
             }
@@ -619,7 +619,7 @@ namespace DryIoc.UnitTests
         {
             public SomeDep Dep { get; }
 
-            public SomeRoot(SomeDep dep, IDisposable scope)
+            public SomeRoot(SomeDep dep, IResolverContext scope)
             {
                 _scope = scope;
                 Dep = dep;
@@ -652,7 +652,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AD>(Reuse.InResolutionScopeOf<AResolutionScoped>());
+            container.Register<AD>(Reuse.ScopedTo<AResolutionScoped>());
             container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
             container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
 
@@ -666,7 +666,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<AD>(Reuse.InResolutionScopeOf<ADConsumer>());
+            container.Register<AD>(Reuse.ScopedTo<ADConsumer>());
             container.Register<ADConsumer>(setup: Setup.With(asResolutionCall: true));
             container.Register<AResolutionScoped>(setup: Setup.With(openResolutionScope: true));
 
@@ -748,12 +748,9 @@ namespace DryIoc.UnitTests
         {
             public ADConsumer Consumer { get; }
 
-            public IDisposable Dependencies { get; }
-
-            public AResolutionScoped(ADConsumer consumer, IDisposable dependencies)
+            public AResolutionScoped(ADConsumer consumer)
             {
                 Consumer = consumer;
-                Dependencies = dependencies;
             }
         }
 
@@ -765,7 +762,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<O>(setup: Setup.With(openResolutionScope: true));
-            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+            container.Register<Ho>(Reuse.ScopedTo<O>());
 
             container.Resolve<object>(typeof(O));
         }
@@ -776,13 +773,13 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<O>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
-            container.Register<Ho>(Reuse.InResolutionScopeOf<O>());
+            container.Register<Ho>(Reuse.ScopedTo<O>());
 
             using (var scope = container.OpenScope())
             {
                 var o = scope.Resolve<O>();
                 var o2 = scope.Resolve<O>();
-                Assert.AreSame(o, o2);
+                Assert.AreNotSame(o, o2);
                 Assert.AreSame(o.Ho, o.Ho2);
             }
         }
