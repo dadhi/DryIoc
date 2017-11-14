@@ -12,9 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v3.0.0-preview-01:
-      - See package README.md or Release Notes here https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
-      - Major internals cleanup and future proofing
+      v3.0.0-preview-02:
+      - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
     </releaseNotes>
     <contentFiles>
       <files include="cs/any/*.*" buildAction="Compile" />
