@@ -107,14 +107,28 @@ namespace DryIoc.IssuesTests
 
             using (var reqScope = c.OpenScope())
             {
-                GetAndAssertTenantServices(reqScope, TenantKey.Green, "Green");
-                GetAndAssertTenantServices(reqScope, TenantKey.Blue, "Default");
+                var tenants = new[]
+                {
+                    GetAndAssertTenantServices(reqScope, TenantKey.Green, "Green"),
+                    GetAndAssertTenantServices(reqScope, TenantKey.Blue, "Default")
+                };
+
+                // cross tenant resolution
+                var transients = tenants.Select(t => t.Resolver.Resolve<ITransient>().GetType()).ToArray();
+                CollectionAssert.AreEquivalent(new[] { typeof(GreenTransient), typeof(DefaultTransient) }, transients);
             }
 
             using (var reqScope = c.OpenScope())
             {
-                GetAndAssertTenantServices(reqScope, TenantKey.Green, "Green");
-                GetAndAssertTenantServices(reqScope, TenantKey.Blue, "Default");
+                var tenants = new[]
+                {
+                    GetAndAssertTenantServices(reqScope, TenantKey.Green, "Green"),
+                    GetAndAssertTenantServices(reqScope, TenantKey.Blue, "Default")
+                };
+
+                // cross tenant resolution
+                var transients = tenants.Select(t => t.Resolver.Resolve<ITransient>().GetType()).ToArray();
+                CollectionAssert.AreEquivalent(new[] { typeof(GreenTransient), typeof(DefaultTransient) }, transients);
             }
 
             var allTransients = c.ResolveMany<ITransient>();
@@ -122,7 +136,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(1, allTransients.Count());
         }
 
-        private static void GetAndAssertTenantServices(IResolver resolver, TenantKey tenantKey, string expectedTypePart)
+        private static ITenant GetAndAssertTenantServices(IResolver resolver, TenantKey tenantKey, string expectedTypePart)
         {
             var tenant = resolver.Resolve<ITenant>(tenantKey);
 
@@ -135,6 +149,8 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(controller.Singleton, controller.Transient.Singleton);
 
             Assert.AreNotSame(controller.Transient, controller.TransientFactory());
+
+            return tenant;
         }
 
         public enum TenantKey { Green, Blue }
@@ -147,22 +163,23 @@ namespace DryIoc.IssuesTests
 
         public interface ITenant
         {
+            IResolverContext Resolver { get; }
             ISomeController GetController(object ctx);
         }
 
         public class GreenTenant : ITenant
         {
-            public IResolverContext ScopedResolver { get; }
+            public IResolverContext Resolver { get; }
 
-            public GreenTenant(IResolverContext scopedResolver)
+            public GreenTenant(IResolverContext resolver)
             {
-                ScopedResolver = scopedResolver;
+                Resolver = resolver;
             }
 
             public ISomeController GetController(object ctx)
             {
                 // can use ctx to route
-                return ScopedResolver.Resolve<ISomeController>();
+                return Resolver.Resolve<ISomeController>();
             }
         }
 
