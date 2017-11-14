@@ -299,13 +299,16 @@ namespace DryIoc
             object cacheContextKey = requiredServiceType;
 
             if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null
-                    ? (object)preResolveParent
+                cacheContextKey = cacheContextKey == null ? (object)preResolveParent
                     : new KV<object, RequestInfo>(cacheContextKey, preResolveParent);
             else if (preResolveParent.OpensResolutionScope)
-                cacheContextKey = cacheContextKey == null
-                    ? (object)true
+                cacheContextKey = cacheContextKey == null ? (object)true
                     : new KV<object, bool>(cacheContextKey, true);
+
+            var currentScopeName = CurrentScope?.Name;
+            if (currentScopeName != null)
+                cacheContextKey = cacheContextKey == null ? currentScopeName
+                    : new KV<object, object>(cacheContextKey, currentScopeName);
 
             // Try get from cache first
             var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
@@ -8519,7 +8522,7 @@ namespace DryIoc
         internal static readonly MethodInfo TrackDisposableMethod =
             typeof(IScope).Method(nameof(IScope.TrackDisposable));
 
-        /// <inheritdoc />
+        /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalIndex = -1)
         {
             if (item == this)
