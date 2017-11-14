@@ -141,7 +141,7 @@ namespace DryIoc.IssuesTests
 
         private static bool IsTenant(Request request, TenantKey tenantKey) =>
             request.CurrentScope != null && 
-            request.CurrentScope.Any(scope => tenantKey.Equals((scope.Name as OwnScopeName)?.ServiceKey));
+            request.CurrentScope.Any(scope => tenantKey.Equals((scope.Name as ResolutionScopeName)?.ServiceKey));
 
         #region Tenants
 
