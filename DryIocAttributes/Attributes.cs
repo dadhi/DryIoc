@@ -368,10 +368,12 @@ namespace DryIocAttributes
     /// <summary>Policy to handle unresolved service.</summary>
     public enum IfUnresolved
     {
-        /// <summary>Specifies to throw exception if no service found.</summary>
+        /// <summary>If service is unresolved for whatever means, it will throw the respective exception.</summary>
         Throw,
-        /// <summary>Specifies to return default value instead of throwing error.</summary>
-        ReturnDefault
+        /// <summary>If service is unresolved for whatever means, it will return default(serviceType) value.</summary>
+        ReturnDefault,
+        /// <summary>If service is not registered, then it will return default, for other errors it will throw.</summary>
+        ReturnDefaultIfNotRegistered,
     }
 
     /// <summary>Dependency request path information.</summary>

@@ -98,35 +98,23 @@ namespace DryIocZero.WebApi
         }
 
         /// <summary>Disposes container.</summary>
-        public void Dispose()
-        {
-            if (Container != null)
-                Container.Dispose();
-        }
+        public void Dispose() => Container?.Dispose();
 
         /// <summary>Retrieves a service from the scope or null if unable to resolve service.</summary>
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
-        public object GetService(Type serviceType)
-        {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return Container.Resolve(serviceType, ifUnresolvedReturnDefault);
-        }
+        public object GetService(Type serviceType) => 
+            Container.Resolve(serviceType, _throwIfUnresolved == null || !_throwIfUnresolved(serviceType));
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
         /// <returns>The retrieved collection of services.</returns>
         /// <param name="serviceType">The collection of services to be retrieved.</param>
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            return Container.ResolveMany(serviceType);
-        }
+        public IEnumerable<object> GetServices(Type serviceType) => 
+            Container.ResolveMany(serviceType);
 
         /// <summary>Opens scope from underlying container.</summary>
         /// <returns>Opened scope wrapped in dependency scope.</returns>
-        public IDependencyScope BeginScope()
-        {
-            var scope = Container.OpenScope(Reuse.WebRequestScopeName);
-            return new DryIocDependencyScope(scope, _throwIfUnresolved);
-        }
+        public IDependencyScope BeginScope() => 
+            new DryIocDependencyScope(Container.OpenScope(), _throwIfUnresolved);
 
         private readonly Func<Type, bool> _throwIfUnresolved;
     }
@@ -151,27 +139,18 @@ namespace DryIocZero.WebApi
         }
 
         /// <summary>Disposed underlying scoped container.</summary>
-        public void Dispose()
-        {
-            if (ScopedContainer != null)
-                ScopedContainer.Dispose();
-        }
+        public void Dispose() => ScopedContainer?.Dispose();
 
         /// <summary>Retrieves a service from the scope or returns null if not resolved.</summary>
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
-        public object GetService(Type serviceType)
-        {
-            var ifUnresolvedReturnDefault = _throwIfUnresolved == null || !_throwIfUnresolved(serviceType);
-            return ScopedContainer.Resolver.Resolve(serviceType, ifUnresolvedReturnDefault);
-        }
+        public object GetService(Type serviceType) => 
+            ScopedContainer.Resolve(serviceType, _throwIfUnresolved == null || !_throwIfUnresolved(serviceType));
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
         /// <returns>The retrieved collection of services.</returns>
         /// <param name="serviceType">The collection of services to be retrieved.</param>
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            return ScopedContainer.Resolver.ResolveMany(serviceType);
-        }
+        public IEnumerable<object> GetServices(Type serviceType) =>
+            ScopedContainer.ResolveMany(serviceType);
     }
 
     /// <summary>Aggregated filter provider.</summary>

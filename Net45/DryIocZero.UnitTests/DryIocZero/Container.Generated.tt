@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016-2017 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -55,14 +55,18 @@ Func<object, string> code = null;
             + ", " + code(x.GetType().GetFieldOrNull("Value").GetValue(x)) +")"
         : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x))
         : x is Expression ? exprToCode.ToCode((Expression)x)
-            .Replace("DryIoc.RequestInfo", "RequestInfo")
+            .Replace("DryIoc.IfUnresolved", "IfUnresolved")
             .Replace("DryIoc.IReuse", "IReuse")
             .Replace("DryIoc.Reuse", "Reuse")
             .Replace("DryIoc.SingletonReuse", "SingletonReuse")
             .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
             .Replace("DryIoc.FactoryType", "FactoryType")
             .Replace("DryIoc.DefaultKey", "DefaultKey")
+            .Replace("DryIoc.RequestInfo", "RequestInfo")
             .Replace("DryIoc.RequestFlags", "RequestFlags")
+            .Replace("DryIoc.HiddenDisposable", "HiddenDisposable")
+            .Replace("DryIoc.ResolutionScopeName", "ResolutionScopeName")
+            .Replace("DryIoc.CompositeScopeName", "CompositeScopeName")
 
         : objectToCode.PlainObjectToCode(x) ?? code(x.GetType());
 
@@ -72,7 +76,7 @@ var roots = resolutionsRoots.Select((r, i) =>
           ServiceKey = code(r.Key.OptionalServiceKey),
           Expression = code(r.Value.Body) });
 
-var deps = resolutionCallDependencies.Select((r, i) => 
+var resolutionCalls = resolutionCallDependencies.Select((r, i) => 
     new { Index = i, 
           ServiceType = code(r.Key.ServiceType),
           ServiceKey = code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
@@ -93,12 +97,12 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-<#  if (errors.Length == 0) #>
+<# if (errors.Length == 0) { #>
 Generation is completed successfully.
-<#  else { #>
+<# } else { #>
 Generation is FAILED, please fix the errors below.
 Note: you may fix the error for unresolved service by adding `container.RegisterPlaceholder<...>()` into Registrations.tt and then registering service at runtime.
-<#  }#>
+<# } #>
 ---------------------------------------
 <#
     for(var i = 0; i < errors.Length; ++i)
@@ -138,7 +142,7 @@ Error: <#=e.Value.Message#>
 
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent)
+            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, object[] args)
         {
 <#
         index = 0;
@@ -168,7 +172,7 @@ Error: <#=e.Value.Message#>
 #>
 <#
         index = 0;
-        foreach (var depGroup in deps.GroupBy(x => x.ServiceType))
+        foreach (var depGroup in resolutionCalls.GroupBy(x => x.ServiceType))
         {
             if (index++ > 0) WriteLine(@"
             else");
@@ -250,7 +254,7 @@ Error: <#=e.Value.Message#>
     }
 #>
 <#
-    foreach (var dep in deps)
+    foreach (var dep in resolutionCalls)
     {
 #>
         // <#= dep.ServiceType #>

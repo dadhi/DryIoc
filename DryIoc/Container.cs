@@ -22,10 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using ConstantExpression = System.Linq.Expressions.ConstantExpression;
-using Expression = System.Linq.Expressions.Expression;
-using ParameterExpression = System.Linq.Expressions.ParameterExpression;
-
 namespace DryIoc
 {
     using System;
@@ -45,20 +41,18 @@ namespace DryIoc
 
     #region Expression usings
 
-    using static Expression;
-    using Expr = Expression;
-    using ConstExpr = ConstantExpression;
-    using ParamExpr = ParameterExpression;
+    using static System.Linq.Expressions.Expression;
+    using Expr = System.Linq.Expressions.Expression;
+    using ConstExpr = System.Linq.Expressions.ConstantExpression;
+    using ParamExpr = System.Linq.Expressions.ParameterExpression;
 
     #endregion
 
     /// <summary>IoC Container. Documentation is available at https://bitbucket.org/dadhi/dryioc. </summary>
     public sealed partial class Container : IContainer
     {
-        private const string SingletonScopeName = "<singletons>";
-
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
-        public Container() : this(Rules.Default, Ref.Of(Registry.Default), new Scope(name: SingletonScopeName))
+        public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope())
         { }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
@@ -66,7 +60,7 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), new Scope(name: SingletonScopeName), scopeContext)
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext)
         { }
 
         /// <summary>Creates new container with configured rules.</summary>
@@ -75,6 +69,9 @@ namespace DryIoc
         public Container(Func<Rules, Rules> configure, IScopeContext scopeContext = null)
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext)
         { }
+
+        /// <summary>Helper to create singleton scope</summary>
+        public static IScope NewSingletonScope() => new Scope(name: "<singletons>");
 
         /// <summary>Outputs info about container disposal state and current scopes.</summary>
         public override string ToString()
@@ -107,11 +104,10 @@ namespace DryIoc
             if (Rules.CaptureContainerDisposeStackTrace)
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
-            if (_parent != null) // scoped container
+            if (_currentScope != null) // scoped container
             {
-                // don't touch the context scope as it is was changed by someone else
-                _scopeContext?.SetCurrent(it => it == _currentScope ? it.Parent : it);
-                _currentScope?.Dispose();
+                _scopeContext?.SetCurrent(scope => scope == _currentScope ? scope.Parent : scope);
+                _currentScope.Dispose();
             }
             else // whole Container with singletons.
             {
@@ -120,9 +116,7 @@ namespace DryIoc
                 Rules = Rules.Default;
 
                 _singletonScope.Dispose(); // will also dispose any tracked scopes
-
                 _scopeContext?.Dispose();
-                _currentScope?.Dispose();
             }
         }
 
@@ -486,8 +480,8 @@ namespace DryIoc
         public IScope SingletonScope => _singletonScope;
 
         /// <inheritdoc />
-        public IScope CurrentScope
-            => _scopeContext == null ? _currentScope : _scopeContext.GetCurrentOrDefault();
+        public IScope CurrentScope => 
+            _scopeContext == null ? _currentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
         public IScopeContext ScopeContext => _scopeContext;
@@ -497,19 +491,18 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            var newScope = new Scope(_currentScope, name);
+            var openedScope = new Scope(_currentScope, name);
 
             // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
             if (_scopeContext != null)
                 _scopeContext.SetCurrent(scope =>
-                    newScope.ThrowIf(scope != _currentScope, Error.NotDirectScopeParent, _currentScope, scope));
+                    openedScope.ThrowIf(scope != _currentScope, Error.NotDirectScopeParent, _currentScope, scope));
 
-            // Track in either open scope or singleton scope
             if (trackInParent)
-                (_currentScope ?? _singletonScope).TrackDisposable(newScope);
+                (_currentScope ?? _singletonScope).TrackDisposable(openedScope);
 
             return new Container(Rules, _registry,
-                _singletonScope, _scopeContext, newScope, _disposed, _disposeStackTrace,
+                _singletonScope, _scopeContext, openedScope, _disposed, _disposeStackTrace,
                 parent: this, root: _root ?? this);
         }
 
@@ -763,7 +756,7 @@ namespace DryIoc
 
             var singletonScope =
                 singleton == WithSingletonOptions.Keep ? _singletonScope :
-                singleton == WithSingletonOptions.Drop ? new Scope(name: SingletonScopeName) :
+                singleton == WithSingletonOptions.Drop ? NewSingletonScope() :
                 _singletonScope.Clone();
 
             return new Container(rules, registry, singletonScope, scopeContext,
@@ -1320,7 +1313,7 @@ namespace DryIoc
 
             // assign unique continuous keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
-            var dynamicKey = DefaultDynamicKey.Empty;
+            var dynamicKey = DefaultDynamicKey.Value;
 
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
@@ -2625,7 +2618,7 @@ namespace DryIoc
 
         internal static readonly MethodInfo OfMethod = typeof(DefaultKey).Method(nameof(Of));
 
-        /// <summary>Create new default key with specified registration order.</summary>
+        /// <summary>Returns the default key with specified registration order.</summary>
         public static DefaultKey Of(int registrationOrder) =>
             registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
 
@@ -2640,8 +2633,7 @@ namespace DryIoc
         public override int GetHashCode() => RegistrationOrder;
 
         /// <summary>Prints registration order to string.</summary>
-        public override string ToString() =>
-            "DefaultKey(" + RegistrationOrder + ")";
+        public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
 
         private DefaultKey(int registrationOrder)
         {
@@ -2649,45 +2641,44 @@ namespace DryIoc
         }
     }
 
+    // todo: Simplify by either inheriting or composing with DefaultKey
     /// <summary>Represents default key for dynamic registrations</summary>
     public sealed class DefaultDynamicKey : IConvertibleToExpression
     {
         /// <summary>Default value.</summary>
-        public static readonly DefaultDynamicKey Empty = new DefaultDynamicKey(0);
+        public static readonly DefaultDynamicKey Value = new DefaultDynamicKey(0);
 
         /// <summary>Associated ID.</summary>
-        public readonly int ID;
+        public readonly int RegistrationOrder;
 
-        /// <summary>Returns dynamic key with specified ID. The key itself may be non unique, and requested from pool.</summary>
+        /// <summary>Returns dynamic key with specified ID.</summary>
         public static DefaultDynamicKey Of(int id) =>
-            id == 0 ? Empty : new DefaultDynamicKey(id);
+            id == 0 ? Value : new DefaultDynamicKey(id);
 
-        /// <summary>Returns next dynamic key with increased <see cref="ID"/>.</summary> 
-        public DefaultDynamicKey Next() => Of(ID + 1);
+        /// <summary>Returns next dynamic key with increased <see cref="RegistrationOrder"/>.</summary> 
+        public DefaultDynamicKey Next() => Of(RegistrationOrder + 1);
 
         /// <summary>Compares key's IDs. The null (default) key is considered equal!</summary>
         public override bool Equals(object key) =>
-            key == null || (key as DefaultDynamicKey)?.ID == ID;
+            key == null || (key as DefaultDynamicKey)?.RegistrationOrder == RegistrationOrder;
 
         /// <summary>Returns key index as hash.</summary>
-        public override int GetHashCode() => ID;
+        public override int GetHashCode() => RegistrationOrder;
 
         /// <summary>Prints registration order to string.</summary>
-        public override string ToString() =>
-            "DefaultDynamicKey(" + ID + ")";
+        public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
 
         /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
-            Call(typeof(DefaultDynamicKey).Method(nameof(Of)), Constant(ID));
+            Call(typeof(DefaultDynamicKey).Method(nameof(Of)), Constant(RegistrationOrder));
 
-        private DefaultDynamicKey(int id)
+        private DefaultDynamicKey(int registrationOrder)
         {
-            ID = id;
+            RegistrationOrder = registrationOrder;
         }
     }
 
-    /// <summary>Extends IResolver to provide an access to the container facilities 
-    /// for asResolutionCall dependencies.</summary>
+    /// <summary>Extends IResolver to provide an access to scope hierarchy.</summary>
     public interface IResolverContext : IResolver, IDisposable
     {
         /// <summary>True if container is disposed.</summary>
@@ -2734,20 +2725,18 @@ namespace DryIoc
     /// <summary>Provides the shortcuts to <see cref="IResolverContext"/></summary>
     public static class ResolverContext
     {
+        /// <summary>Just a sugar that allow to get root or self container.</summary>
+        public static IResolverContext RootOrSelf(this IResolverContext r) => r.Root ?? r;
+
         internal static readonly PropertyInfo ParentProperty =
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
             typeof(IResolverContext).Method(nameof(IResolverContext.OpenScope));
 
-        /// <summary>Just a sugar that allow to get root or self container.</summary>
-        public static IResolverContext RootOrSelf(this IResolverContext r) =>
-            r.Root ?? r;
-
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expr GetRootOrSelfExpr(Request request) =>
-            request.DirectRuntimeParent.IsSingletonOrDependencyOfSingleton &&
-            !request.OpensResolutionScope
+            request.DirectRuntimeParent.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope
                 ? RootOrSelfExpr
                 : Container.ResolverContextParamExpr;
 
@@ -5257,6 +5246,9 @@ namespace DryIoc
             object[] args = null, object serviceKey = null) =>
             resolver.ResolveMany<object>(serviceType, behavior, args, serviceKey);
 
+        internal static readonly ConstructorInfo ResolutionScopeNameCtor = 
+            typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
+
         // todo: what is this isRuntimeDependency, consult #517
         internal static Expr CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool isRuntimeDependency = false)
@@ -5279,9 +5271,9 @@ namespace DryIoc
             if (openResolutionScope)
             {
                 // Generates code:
-                // r => r.OpenScope(ResolutionScopeName.Of(serviceType, serviceKey)).Resolve(serviceType, serviceKey)
+                // r => r.OpenScope(new ResolutionScopeName(serviceType, serviceKey)).Resolve(serviceType, serviceKey)
                 var actualServiceTypeExpr = Constant(request.GetActualServiceType(), typeof(Type));
-                var scopeNameExpr = New(ResolutionScopeName.Constructor, actualServiceTypeExpr, serviceKeyExpr);
+                var scopeNameExpr = New(ResolutionScopeNameCtor, actualServiceTypeExpr, serviceKeyExpr);
                 var trackInParent = Constant(true);
 
                 resolverExpr = Call(Container.ResolverContextParamExpr,
@@ -8528,15 +8520,15 @@ namespace DryIoc
             if (item == this)
                 return item;
 
-            var disp = item as IDisposable;
-            if (disp != null)
+            var disposable = item as IDisposable;
+            if (disposable != null)
             {
                 if (disposalIndex == -1)
                     disposalIndex = Interlocked.Decrement(ref _nextDisposalIndex);
 
                 var it = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, it.AddOrUpdate(disposalIndex, disp), it) != it)
-                    Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalIndex, disp));
+                if (Interlocked.CompareExchange(ref _disposables, it.AddOrUpdate(disposalIndex, disposable), it) != it)
+                    Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalIndex, disposable));
             }
             return item;
         }
@@ -8895,9 +8887,6 @@ namespace DryIoc
         /// <summary>Optional service key of service opening the scope.</summary>
         public readonly object ServiceKey;
 
-        internal static readonly ConstructorInfo Constructor = typeof(ResolutionScopeName)
-            .GetTypeInfo().DeclaredConstructors.First();
-
         private ResolutionScopeName(Type serviceType, object serviceKey)
         {
             ServiceType = serviceType;
@@ -8908,15 +8897,14 @@ namespace DryIoc
         public bool Match(object scopeName)
         {
             var name = scopeName as ResolutionScopeName;
-            if (name != null &&
-                (ServiceType == null ||
+            if (name == null)
+                return false;
+
+            return (ServiceType == null ||
                 name.ServiceType.IsAssignableTo(ServiceType) ||
-                 ServiceType.IsOpenGeneric() &&
-                 name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
-                (ServiceKey == null ||
-                ServiceKey.Equals(name.ServiceKey)))
-                return true;
-            return false;
+                ServiceType.IsOpenGeneric() && name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
+                (ServiceKey == null || ServiceKey.Equals(name.ServiceKey));
+
         }
 
         /// <summary>String representation for easy debugging and understood error messages.</summary>
@@ -8947,6 +8935,8 @@ namespace DryIoc
 
         /// <summary>Scoped to multiple names.</summary>
         public static IReuse ScopedTo(params object[] names) =>
+            names.IsNullOrEmpty() ? Scoped :
+            names.Length == 1 ? ScopedTo(names[0]) :
             new CurrentScopeReuse(CompositeScopeName.Of(names));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
@@ -9025,10 +9015,9 @@ namespace DryIoc
     {
         /// <summary>If service is unresolved for whatever means, it will throw the respective exception.</summary>
         Throw,
-        /// <summary>If service is unresolved for whatever means, it will return default(serviceType) value</summary>
+        /// <summary>If service is unresolved for whatever means, it will return default(serviceType) value.</summary>
         ReturnDefault,
-        /// <summary>If service is not registered, then it will return default, for other errors it will throw.
-        /// </summary>
+        /// <summary>If service is not registered, then it will return default, for other errors it will throw.</summary>
         ReturnDefaultIfNotRegistered,
     }
 
@@ -9127,7 +9116,7 @@ namespace DryIoc
         public int ReuseLifespan =>
             Reuse == null ? 0 : Reuse.Lifespan;
 
-        /// <summary>Indicates the service opening resolution scope</summary>
+        /// <summary>Indicates the service opening resolution scope.</summary>
         public bool OpensResolutionScope =>
             (Flags & RequestFlags.OpensResolutionScope) != 0;
 
@@ -9249,6 +9238,7 @@ namespace DryIoc
             && other.ImplementationType == ImplementationType
             && other.ReuseLifespan == ReuseLifespan;
 
+        // todo: Calculate and persist the hash on Push
         /// <summary>Returns hash code combined from info fields plus its parent.</summary>
         public override int GetHashCode()
         {

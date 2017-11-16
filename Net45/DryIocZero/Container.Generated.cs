@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2017 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ Generation is completed successfully.
         [ExcludeFromCodeCoverage]
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
-            lastFactoryID = 28; // generated: equals to last used Factory.FactoryID 
+            lastFactoryID = 27; // generated: equals to last used Factory.FactoryID 
         }
 
         [ExcludeFromCodeCoverage]
@@ -59,7 +59,7 @@ Generation is completed successfully.
 
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent)
+            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, object[] args)
         {
         }
 
