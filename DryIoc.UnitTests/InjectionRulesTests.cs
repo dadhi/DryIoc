@@ -5,6 +5,12 @@ using DryIoc.UnitTests.CUT;
 using Me;
 using NUnit.Framework;
 
+#if NET45 || NETSTANDARD1_3
+    using static FastExpressionCompiler.ExpressionInfo;
+#else
+    using static System.Linq.Expressions.Expression;
+#endif
+
 #pragma warning disable 0649 // Field '...' is never assigned to, and will always have its default value null
 
 namespace DryIoc.UnitTests
@@ -207,10 +213,10 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Couldnot_specify_default_value_for_parameter_name_with_specific_rule()
+        public void Could_not_specify_default_value_for_parameter_name_with_specific_rule()
         {
             var container = new Container(r => r.WithItemToExpressionConverter((item, type) => 
-                type != typeof(Dep) ? null : Expression.New(typeof(Dep))));
+                type != typeof(Dep) ? null : New(typeof(Dep))));
             var defaultDep = new Dep();
             container.Register<Client>(made: Parameters.Of.Name("dep", defaultValue: defaultDep));
 

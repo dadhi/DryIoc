@@ -7,9 +7,8 @@
     public static class ExpressionCompiler
     {
         internal static TDelegate TryCompile<TDelegate>(Expression bodyExpr,
-            ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class
-        {
-            return null;
-        }
+            ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class => null;
+
+        internal static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
     }
 }

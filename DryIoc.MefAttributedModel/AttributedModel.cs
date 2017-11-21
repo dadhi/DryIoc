@@ -458,9 +458,8 @@ namespace DryIoc.MefAttributedModel
                 var method = member as MethodInfo;
                 if (method != null)
                 {
-                    factoryMethod.MethodParameterTypeFullNamesOrNames = method.GetParameters()
-                        .Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                        .ToArrayOrSelf();
+                    factoryMethod.MethodParameterTypeFullNamesOrNames =
+                        method.GetParameters().Map(p => p.ParameterType.FullName ?? p.ParameterType.Name);
 
                     // the only possibility (for now) for registering completely generic T service
                     // is registering it as an Object
@@ -554,10 +553,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static bool CanBeExported(Type type)
-        {
-            return type.IsClass() && !type.IsCompilerGenerated();
-        }
+        private static bool CanBeExported(Type type) => type.IsClass() && !type.IsCompilerGenerated();
 
         private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute)
         {
