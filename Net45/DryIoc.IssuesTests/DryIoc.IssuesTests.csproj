@@ -194,6 +194,7 @@
     <Compile Include="Issue_Can_resolve_singleton_with_Func_of_scoped_dependency.cs" />
     <Compile Include="MetadataProxies\MetadataViewProxyGeneration.cs" />
     <Compile Include="MetadataProxies\MetadataViewTests.cs" />
+    <Compile Include="Samples\PrismXamarinForms.cs" />
     <Compile Include="SO_Open_Generics_Registration.cs" />
     <Compile Include="Issue_HandleVariance.cs" />
     <Compile Include="Issue_InjectingSerilogLogger.cs" />

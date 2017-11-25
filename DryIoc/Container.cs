@@ -3465,7 +3465,7 @@ namespace DryIoc
             });
 
         /// <summary>Obsolete: Replaced by ConcreteTypeDynamicRegistrations</summary>
-        [Obsolete("Replaced by ConcreteTypeDynamicRegistration", false)]
+        [Obsolete("Replaced by " + nameof(ConcreteTypeDynamicRegistrations), false)]
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null) =>
             request =>
             {
@@ -3497,7 +3497,7 @@ namespace DryIoc
         /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
         /// The resolution creates transient services.</summary>
         /// <param name="condition">(optional) Condition for requested service type and key.</param>
-        /// <param name="reuse">(optional) Reuse.</param>
+        /// <param name="reuse">(optional) Reuse for concrete types.</param>
         /// <returns>New rule.</returns>
         public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null)
@@ -3525,7 +3525,7 @@ namespace DryIoc
                     made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
 
                     // condition checks that factory is resolvable
-                    setup: Setup.With(null, condition: req =>
+                    setup: Setup.WithFullRequestCondition(req =>
                         null != factory.GetExpressionOrDefault(
                             req.WithChangedServiceInfo(r => r.WithIfUnresolved(IfUnresolved.ReturnDefault)))));
 
@@ -6595,8 +6595,8 @@ namespace DryIoc
         /// <summary>Constructs setup object out of specified settings.
         /// If all settings are default then <see cref="Default"/> setup will be returned.
         /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.</summary>
-        public static Setup With(
-            object metadataOrFuncOfMetadata, Func<Request, bool> condition,
+        public static Setup WithFullRequestCondition(
+            Func<Request, bool> condition, object metadataOrFuncOfMetadata = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
@@ -6625,8 +6625,9 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
             bool useParentReuse = false) =>
-            With(metadataOrFuncOfMetadata,
+            WithFullRequestCondition(
                 condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
+                metadataOrFuncOfMetadata,
                 openResolutionScope, asResolutionCall, asResolutionRoot,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
                 useParentReuse);
