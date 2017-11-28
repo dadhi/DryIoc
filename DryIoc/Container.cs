@@ -3525,7 +3525,7 @@ namespace DryIoc
                     made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
 
                     // condition checks that factory is resolvable
-                    setup: Setup.WithFullRequestCondition(req =>
+                    setup: Setup.With(condition: req =>
                         null != factory.GetExpressionOrDefault(
                             req.WithChangedServiceInfo(r => r.WithIfUnresolved(IfUnresolved.ReturnDefault)))));
 
@@ -4877,7 +4877,7 @@ namespace DryIoc
         /// <param name="getDecorator">Delegate returning decorating function.</param>
         /// <param name="condition">(optional) Condition for decorator application.</param>
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
-            Func<IResolverContext, Func<TService, TService>> getDecorator, Func<RequestInfo, bool> condition = null)
+            Func<IResolverContext, Func<TService, TService>> getDecorator, Func<Request, bool> condition = null)
         {
             getDecorator.ThrowIfNull();
 
@@ -4980,7 +4980,7 @@ namespace DryIoc
         /// <see cref="IResolver"/> to resolve additional services required by initializer.</param>
         /// <param name="condition">(optional) Additional condition to select required target.</param>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
-            Action<TTarget, IResolver> initialize, Func<RequestInfo, bool> condition = null)
+            Action<TTarget, IResolver> initialize, Func<Request, bool> condition = null)
         {
             initialize.ThrowIfNull();
             registrator.Register<object>(
@@ -5012,7 +5012,7 @@ namespace DryIoc
         /// <param name="dispose">Actual dispose action to be invoke when scope is disposed.</param>
         /// <param name="condition">(optional) Additional way to identify the service.</param>
         public static void RegisterDisposer<TService>(this IRegistrator registrator,
-            Action<TService> dispose, Func<RequestInfo, bool> condition = null)
+            Action<TService> dispose, Func<Request, bool> condition = null)
         {
             dispose.ThrowIfNull();
 
@@ -6595,8 +6595,8 @@ namespace DryIoc
         /// <summary>Constructs setup object out of specified settings.
         /// If all settings are default then <see cref="Default"/> setup will be returned.
         /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.</summary>
-        public static Setup WithFullRequestCondition(
-            Func<Request, bool> condition, object metadataOrFuncOfMetadata = null,
+        public static Setup With(
+            object metadataOrFuncOfMetadata = null, Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
@@ -6615,43 +6615,8 @@ namespace DryIoc
                 useParentReuse);
         }
 
-        /// <summary>Constructs setup object out of specified settings.
-        /// If all settings are default then <see cref="Default"/> setup will be returned.
-        /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.
-        /// Uses the full <see cref="Request"/> in <paramref name="condition"/>.</summary>
-        public static Setup With(
-            object metadataOrFuncOfMetadata = null, Func<RequestInfo, bool> condition = null,
-            bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
-            bool preventDisposal = false, bool weaklyReferenced = false,
-            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false) =>
-            WithFullRequestCondition(
-                condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
-                metadataOrFuncOfMetadata,
-                openResolutionScope, asResolutionCall, asResolutionRoot,
-                preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                useParentReuse);
-
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
         public static readonly Setup Wrapper = new WrapperSetup();
-
-        /// <summary>Returns generic wrapper setup.</summary>
-        /// <param name="condition">(optional)</param>
-        /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
-        /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-        /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
-        /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
-        /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-        /// <returns>New setup or default <see cref="Wrapper"/>.</returns>
-        public static Setup WrapperWith(Func<Request, bool> condition,
-            int wrappedServiceTypeArgIndex = -1, bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
-            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false) =>
-            wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-            && !openResolutionScope && !preventDisposal && condition == null
-            ? Wrapper
-            : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
-                condition, openResolutionScope, asResolutionCall, preventDisposal);
 
         /// <summary>Returns generic wrapper setup.</summary>
         /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
@@ -6665,11 +6630,12 @@ namespace DryIoc
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
-            Func<RequestInfo, bool> condition = null) =>
-            WrapperWith(
-                condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
-                wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
-                openResolutionScope, asResolutionCall, preventDisposal);
+            Func<Request, bool> condition = null) 
+            => wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
+            && !openResolutionScope && !preventDisposal && condition == null
+                ? Wrapper
+                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+                    condition, openResolutionScope, asResolutionCall, preventDisposal);
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
@@ -6683,36 +6649,13 @@ namespace DryIoc
         /// - first registered are closer decoratee.</param>
         /// <param name="openResolutionScope">The decorator opens resolution scope</param>
         /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<RequestInfo, bool> condition = null, int order = 0,
+        public static Setup DecoratorWith(Func<Request, bool> condition = null, int order = 0,
             bool useDecorateeReuse = false, bool openResolutionScope = false) =>
-            DecoratorWith(
-                condition == null ? null : new Func<Request, bool>(r => condition(r.RequestInfo)),
-                order, useDecorateeReuse, openResolutionScope);
-
-        /// <summary>Creates setup with condition.</summary>
-        /// <param name="condition">Applied to decorated service, if true then decorator is applied.</param>
-        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
-        /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order
-        /// - first registered are closer decoratee.</param>
-        /// <param name="openResolutionScope">The decorator opens resolution scope</param>
-        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
-        public static Setup DecoratorWith(Func<Request, bool> condition, int order, bool useDecorateeReuse,
-            bool openResolutionScope = false) =>
             condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope
                 ? Decorator
                 : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope);
 
-        /// <summary>Creates setup with optional condition.</summary>
-        /// <param name="decorateeType">(optional) Type that should be implemented by decorated service.</param>
-        /// <param name="decorateeServiceKey">(optional) Identifies keyed decorated service.</param>
-        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
-        /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order
-        /// - first registered are closer decoratee.</param>
-        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
+        /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>
         public static Setup DecoratorOf(Type decorateeType = null,
             int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null)
         {
@@ -6728,15 +6671,7 @@ namespace DryIoc
             return DecoratorWith(condition, order, useDecorateeReuse);
         }
 
-        /// <summary>Creates setup with optional condition.</summary>
-        /// <typeparam name="TDecoratee">Type that should be implemented by decorated service.</typeparam>
-        /// <param name="decorateeServiceKey">(optional) Identifies keyed decorated service.</param>
-        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
-        /// Greater number means further from decoratee - specify negative number to stay closer.
-        /// Decorators without order (Order is 0) or with equal order are applied in registration order
-        /// - first registered are closer decoratee.</param>
-        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
+        /// <summary>Setup for decorator of type <typeparamref name="TDecoratee"/>.</summary>
         public static Setup DecoratorOf<TDecoratee>(
             int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null) =>
             DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, decorateeServiceKey);

@@ -1444,7 +1444,7 @@ namespace DryIoc.MefAttributedModel
                     ? new Func<object>(() => CollectExportedMetadata(CollectMetadataAttributes(made)))
                     : (object)CollectExportedMetadata(CollectMetadataAttributes(made));
 
-            return Setup.WithFullRequestCondition(condition, metadata,
+            return Setup.With(metadata, condition,
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
