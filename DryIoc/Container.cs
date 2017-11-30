@@ -39,7 +39,7 @@ namespace DryIoc
     using ImTools;
     using FastExpressionCompiler;
 
-#if NET45 || NETSTANDARD1_3
+#if FEC_EXPRESSION_INFO
 
     using static FastExpressionCompiler.ExpressionInfo;
     using Expr = FastExpressionCompiler.ExpressionInfo;
@@ -172,7 +172,7 @@ namespace DryIoc
             // or just in case when some expression is not supported (did not found one yet)
             var lambdaExpr = Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs);
 
-#if NET45 || NETSTANDARD1_3
+#if FEC_EXPRESSION_INFO
             return lambdaExpr.ToLambdaExpression().Compile();
 #else
             return lambdaExpr.Compile();
@@ -980,9 +980,9 @@ namespace DryIoc
 
         private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry) =>
             entry == null
-                ? Enumerable.Empty<KV<object, Factory>>()
+                ? ArrayTools.Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
-                    : ((FactoriesEntry)entry).Factories.Enumerate();
+                : ((FactoriesEntry)entry).Factories.Enumerate();
 
         Expr IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
@@ -2456,7 +2456,7 @@ namespace DryIoc
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] GenerateResolutionExpressions(
             this IContainer container,
             out KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutions,
-            out KeyValuePair<RequestInfo, Expr>[] resolutionCallDependencies,
+            out KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
             var generatingContainer = container.With(rules => rules
@@ -2480,11 +2480,12 @@ namespace DryIoc
                     var request = Request.Create(generatingContainer, registration.ServiceType, registration.OptionalServiceKey);
                     var factoryExpr = Container.WrapInFactoryExpression(registration.Factory.GetExpressionOrDefault(request));
 
-#if NET45 || NETSTANDARD1_3
-                    exprs.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(registration, factoryExpr.ToLambdaExpression()));
-#else
-                    exprs.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(registration, factoryExpr));
+                    exprs.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(registration, factoryExpr
+#if FEC_EXPRESSION_INFO
+                        .ToLambdaExpression()
 #endif
+                    ));
+
                 }
                 catch (ContainerException ex)
                 {
@@ -2494,8 +2495,14 @@ namespace DryIoc
 
             resolutions = exprs.ToArray();
 
-            resolutionCallDependencies = generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
-                .Select(r => new KeyValuePair<RequestInfo, Expr>(r.Key, Container.OptimizeExpression(r.Value))).ToArray();
+            resolutionCallDependencies = 
+                generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
+                .Select(r => new KeyValuePair<RequestInfo, Expression>(r.Key, Container.OptimizeExpression(r.Value)
+#if FEC_EXPRESSION_INFO
+                            .ToExpression()
+#endif               
+                ))
+                .ToArray();
 
             return errors.ToArray();
         }
@@ -2519,7 +2526,7 @@ namespace DryIoc
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
             KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] ignoredRoots;
-            KeyValuePair<RequestInfo, Expr>[] ignoredDeps;
+            KeyValuePair<RequestInfo, Expression>[] ignoredDeps;
             return container.GenerateResolutionExpressions(out ignoredRoots, out ignoredDeps, whatRegistrations);
         }
 
@@ -2997,12 +3004,11 @@ namespace DryIoc
             if (metadataKey != null || metadata != null)
                 items = items.Match(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
 
-            List<Expr> itemExprList = null;
+            var itemExprs = ArrayTools.Empty<Expr>();
             if (!items.IsNullOrEmpty())
             {
                 Array.Sort(items); // to resolve the items in order of registration
 
-                itemExprList = new List<Expr>(items.Length);
                 for (var i = 0; i < items.Length; i++)
                 {
                     var item = items[i];
@@ -3014,12 +3020,12 @@ namespace DryIoc
                     {
                         var itemExpr = itemFactory.GetExpressionOrDefault(itemRequest);
                         if (itemExpr != null)
-                            itemExprList.Add(itemExpr);
+                            itemExprs = itemExprs.AppendOrUpdate(itemExpr);
                     }
                 }
             }
 
-            return NewArrayInit(itemType, itemExprList ?? Enumerable.Empty<Expr>());
+            return NewArrayInit(itemType, itemExprs);
         }
 
         private static Expr GetLazyEnumerableExpressionOrDefault(Request request)
@@ -3077,7 +3083,7 @@ namespace DryIoc
             if (serviceExpr.Type != serviceType)
                 serviceExpr = Convert(serviceExpr, serviceType);
 
-            var factoryExpr = Lambda(serviceExpr, null);
+            var factoryExpr = Lambda(serviceExpr, ArrayTools.Empty<ParamExpr>());
             var serviceFuncType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = lazyType.GetConstructorOrNull(args: serviceFuncType);
             return New(wrapperCtor, factoryExpr);
@@ -3126,7 +3132,7 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            // Note: the conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
             if (!isAction && serviceExpr.Type != serviceType)
                 serviceExpr = Convert(serviceExpr, serviceType);
@@ -3138,10 +3144,16 @@ namespace DryIoc
         {
             var serviceType = request.RequiredServiceType
                 .ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request);
-            var serviceRequest = request.Push(serviceType);
-            var factory = request.Container.ResolveFactory(serviceRequest);
-            var expr = factory == null ? null : factory.GetExpressionOrDefault(serviceRequest);
-            return expr == null ? null : Constant(Container.WrapInFactoryExpression(expr), typeof(LambdaExpression));
+            request = request.Push(serviceType);
+            var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+            if (expr == null)
+                return null;
+            return Constant(
+                Container.WrapInFactoryExpression(expr)
+#if FEC_EXPRESSION_INFO
+                .ToLambdaExpression()
+#endif
+                , typeof(LambdaExpression));
         }
 
         private static Expr GetKeyValuePairExpressionOrDefault(Request request)
@@ -7828,13 +7840,15 @@ namespace DryIoc
                     : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
                     : (Expr)Field(factoryExpr, (FieldInfo)ctorOrMember);
 
-                var returnType = ctorOrMember.GetReturnTypeOrDefault().ThrowIfNull();
+                var returnType = serviceExpr.Type;
+                var serviceType = request.GetActualServiceType();
 
-                if (!returnType.IsAssignableTo(request.ServiceType))
-                    return Throw.IfThrows<InvalidOperationException, Expr>(
-                        () => Convert(serviceExpr, request.ServiceType),
-                        request.IfUnresolved == IfUnresolved.Throw,
-                        Error.ServiceIsNotAssignableFromFactoryMethod, request.ServiceType, ctorOrMember, request);
+                if (returnType == typeof(object))
+                    return Convert(serviceExpr, serviceType);
+
+                if (!returnType.IsAssignableTo(serviceType))
+                    return request.IfUnresolved != IfUnresolved.Throw ? null :
+                        Throw.For<Expr>(Error.ServiceIsNotAssignableFromFactoryMethod, serviceType, ctorOrMember, request);
 
                 return serviceExpr;
             }
@@ -10475,7 +10489,7 @@ namespace DryIoc
 
             Expr typesExpr;
 
-            var definedTypeInfosProperty = typeof(Assembly).Property("DefinedTypes");
+            var definedTypeInfosProperty = typeof(Assembly).GetPropertyOrNull("DefinedTypes");
             if (definedTypeInfosProperty == null)
             {
                 var getTypesMethod = typeof(Assembly).Method("GetTypes");
@@ -10515,11 +10529,11 @@ namespace DryIoc
                 return null;
 
             var lambdaExpr = Lambda<Func<int>>(Call(method, ArrayTools.Empty<Expr>()), ArrayTools.Empty<ParamExpr>());
-#if NET45 || NETSTANDARD1_3
-            return lambdaExpr.ToLambdaExpression().Compile();
-#else
-            return lambdaExpr.Compile();
+            return lambdaExpr
+#if FEC_EXPRESSION_INFO
+                .ToLambdaExpression()
 #endif
+                .Compile();
         });
 
         /// <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>

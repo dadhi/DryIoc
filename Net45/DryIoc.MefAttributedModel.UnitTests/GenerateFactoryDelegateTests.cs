@@ -7,6 +7,12 @@ using ExpressionToCodeLib.Unstable_v2_Api;
 using NUnit.Framework;
 using ImTools;
 
+#if FEC_EXPRESSION_INFO
+using Expr = FastExpressionCompiler.ExpressionInfo;
+#else
+using Expr = System.Linq.Expressions.Expression;
+#endif
+
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
@@ -62,7 +68,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 .Where(r => r.ServiceType.Name.Contains("Import"))
                 .ToArray();
 
-            var roots = ImHashMap<KV<Type, object>, Expression>.Empty;
+            var roots = ImHashMap<KV<Type, object>, Expr>.Empty;
             foreach (var r in serviceRegistrations)
             {
                 var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);
@@ -115,7 +121,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 .Where(r => r.Factory.Setup.AsResolutionRoot)
                 .ToArray();
 
-            var roots = ImHashMap<KV<Type, object>, Expression>.Empty;
+            var roots = ImHashMap<KV<Type, object>, Expr>.Empty;
             foreach (var r in serviceRegistrations)
             {
                 var request = Request.Create(container, r.ServiceType, r.OptionalServiceKey, IfUnresolved.ReturnDefault);

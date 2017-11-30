@@ -51,7 +51,7 @@ namespace DryIoc.IssuesTests.Samples
 
         internal class ViewModel
         {
-            public INavigationService NavService { get; }
+            public INavigationService NavService { get; private set; }
             public ViewModel(INavigationService navigationService)
             {
                 NavService = navigationService;

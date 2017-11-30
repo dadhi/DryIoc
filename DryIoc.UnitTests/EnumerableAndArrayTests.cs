@@ -282,7 +282,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Lazy_enumerable_of_enumerable_of_meta_dep_should_throw_for_nested_enumarable_of_ResolveThrow()
+        public void Lazy_enumerable_of_enumerable_of_meta_dep_should_throw_for_nested_enumerable_of_ResolveThrow()
         {
             var container = new Container(rules =>
                 rules.WithResolveIEnumerableAsLazyEnumerable());

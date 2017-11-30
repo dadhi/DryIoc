@@ -6,6 +6,12 @@ using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
+#if FEC_EXPRESSION_INFO
+using static FastExpressionCompiler.ExpressionInfo;
+#else
+using static System.Linq.Expressions.Expression;
+#endif
+
 namespace DryIoc.UnitTests
 {
     [TestFixture]
@@ -346,7 +352,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithItemToExpressionConverter(
                 (item, type) => type == typeof(ConnectionString)
-                ? Expression.New(type.Constructor(), Expression.Constant(((ConnectionString)item).Value))
+                ? New(type.Constructor(), Constant(((ConnectionString)item).Value))
                 : null));
 
             var s = new ConnectionString("aaa");
