@@ -29,7 +29,8 @@ namespace DryIoc.IssuesTests.Samples
 
         internal static INavigationService SetPage(INavigationService navigationService, Page page)
         {
-            if (navigationService is IPageAware pageAware)
+            var pageAware = navigationService as IPageAware;
+            if (pageAware != null)
                 pageAware.Page = page;
 
             return navigationService;
