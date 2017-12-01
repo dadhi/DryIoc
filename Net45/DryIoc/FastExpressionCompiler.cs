@@ -3156,6 +3156,9 @@ namespace FastExpressionCompiler
         /// <summary>Converts back to respective expression so you may Compile it by usual means.</summary>
         public abstract Expression ToExpression();
 
+        /// <summary>Converts to Expression and outputs its as string</summary>
+        public override string ToString() => ToExpression().ToString();
+
         /// <summary>Analog of Expression.Parameter</summary>
         /// <remarks>For now it is return just an `Expression.Parameter`</remarks>
         public static ParameterExpressionInfo Parameter(Type type, string name = null) =>

@@ -1190,28 +1190,38 @@ namespace DryIoc
             _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID);
 
         /// <summary>Converts known items into custom expression or wraps it in a constant expression.</summary>
-        public Expr GetItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
+        public Expr GetItemExpression(object item, Type itemType = null, 
+            bool throwIfStateRequired = false)
         {
             if (item == null)
                 return itemType == null ? Constant(null) : Constant(null, itemType);
 
-            var defaultKey = item as DefaultKey;
-            if (defaultKey != null)
-                return Call(DefaultKey.OfMethod, Constant(defaultKey.RegistrationOrder));
+            var convertible = item as IConvertibleToExpression;
+            if (convertible != null)
+                return convertible.ToExpression(it => GetItemExpression(it));
 
             var actualItemType = item.GetType();
-            if (actualItemType.IsPrimitive() || actualItemType.IsAssignableTo(typeof(Type)))
+            if (actualItemType.GetGenericDefinitionOrNull() == typeof(KV<,>))
+            {
+                var kvArgTypes = actualItemType.GetGenericParamsAndArgs();
+                var kvOfMethod = _kvOfMethod.MakeGenericMethod(kvArgTypes);
+                return Call(kvOfMethod,
+                    GetItemExpression(actualItemType.Field("Key").GetValue(item),
+                        kvArgTypes[0], throwIfStateRequired),
+                    GetItemExpression(actualItemType.Field("Value").GetValue(item),
+                        kvArgTypes[1], throwIfStateRequired));
+            }
+
+            if (actualItemType.IsPrimitive() || 
+                actualItemType.IsAssignableTo(typeof(Type)))
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (actualItemType.IsArray)
             {
-                var elems = ((object[])item).Map(it => GetItemExpression(it, null, throwIfStateRequired));
+                var elems = ((object[])item)
+                    .Map(it => GetItemExpression(it, null, throwIfStateRequired));
                 return NewArrayInit(actualItemType.GetElementType().ThrowIfNull(), elems);
             }
-
-            var convertible = item as IConvertibleToExpression;
-            if (convertible != null)
-                return convertible.ToExpression(it => GetItemExpression(it));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
@@ -1223,9 +1233,11 @@ namespace DryIoc
             return itemType == null ? Constant(item) : Constant(item, itemType);
         }
 
+        private static readonly MethodInfo _kvOfMethod = typeof(KV).Method(nameof(KV.Of));
+
 #endregion
 
-#region Factories Add/Get
+        #region Factories Add/Get
 
         internal sealed class FactoriesEntry
         {
@@ -2497,11 +2509,7 @@ namespace DryIoc
 
             resolutionCallDependencies = 
                 generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
-                .Select(r => new KeyValuePair<RequestInfo, Expression>(r.Key, Container.OptimizeExpression(r.Value)
-#if FEC_EXPRESSION_INFO
-                            .ToExpression()
-#endif               
-                ))
+                .Select(r => new KeyValuePair<RequestInfo, Expression>(r.Key, r.Value))
                 .ToArray();
 
             return errors.ToArray();
@@ -2533,7 +2541,16 @@ namespace DryIoc
         /// <summary>Replaced with Validate</summary>
         [Obsolete("Replaced with Validate", false)]
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] VerifyResolutions(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> whatRegistrations = null) => container.Validate(whatRegistrations);
+            Func<ServiceRegistrationInfo, bool> whatRegistrations = null) => 
+            container.Validate(whatRegistrations);
+
+        /// <summary>Converts to self or system expression</summary>
+        public static Expression ToSystemExpression(this Expr expr) =>
+            expr
+#if FEC_EXPRESSION_INFO
+            .ToExpression()
+#endif
+            ;
 
         /// <summary>Represents construction of whole request info stack as expression.</summary>
         /// <param name="container">Required to access container facilities for expression conversion.</param>
@@ -2642,7 +2659,7 @@ namespace DryIoc
 
     /// <summary>Used to represent multiple default service keys.
     /// Exposes <see cref="RegistrationOrder"/> to determine order of service added.</summary>
-    public sealed class DefaultKey
+    public sealed class DefaultKey : IConvertibleToExpression
     {
         /// <summary>Default value.</summary>
         public static readonly DefaultKey Value = new DefaultKey(0);
@@ -2650,11 +2667,16 @@ namespace DryIoc
         /// <summary>Allows to determine service registration order.</summary>
         public readonly int RegistrationOrder;
 
-        internal static readonly MethodInfo OfMethod = typeof(DefaultKey).Method(nameof(Of));
-
         /// <summary>Returns the default key with specified registration order.</summary>
         public static DefaultKey Of(int registrationOrder) =>
             registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
+
+        private static readonly MethodInfo _ofMethod = 
+            typeof(DefaultKey).Method(nameof(Of));
+
+        /// <inheritdoc />
+        public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
+            Call(_ofMethod, Constant(RegistrationOrder));
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
         public DefaultKey Next() => Of(RegistrationOrder + 1);
@@ -2667,7 +2689,8 @@ namespace DryIoc
         public override int GetHashCode() => RegistrationOrder;
 
         /// <summary>Prints registration order to string.</summary>
-        public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
+        public override string ToString() => 
+            GetType().Name + "(" + RegistrationOrder + ")";
 
         private DefaultKey(int registrationOrder)
         {
@@ -2686,8 +2709,15 @@ namespace DryIoc
         public readonly int RegistrationOrder;
 
         /// <summary>Returns dynamic key with specified ID.</summary>
-        public static DefaultDynamicKey Of(int id) =>
-            id == 0 ? Value : new DefaultDynamicKey(id);
+        public static DefaultDynamicKey Of(int registrationOrder) =>
+            registrationOrder == 0 ? Value : new DefaultDynamicKey(registrationOrder);
+
+        private static readonly MethodInfo _ofMethod =
+            typeof(DefaultDynamicKey).Method(nameof(Of));
+
+        /// <inheritdoc />
+        public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
+            Call(_ofMethod, Constant(RegistrationOrder));
 
         /// <summary>Returns next dynamic key with increased <see cref="RegistrationOrder"/>.</summary> 
         public DefaultDynamicKey Next() => Of(RegistrationOrder + 1);
@@ -2701,10 +2731,6 @@ namespace DryIoc
 
         /// <summary>Prints registration order to string.</summary>
         public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
-
-        /// <inheritdoc />
-        public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
-            Call(typeof(DefaultDynamicKey).Method(nameof(Of)), Constant(RegistrationOrder));
 
         private DefaultDynamicKey(int registrationOrder)
         {
@@ -3712,14 +3738,14 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.EagerCachingSingletonForFasterAccess);
 
         /// <summary><see cref="WithDependencyResolutionCallExpressions"/>.</summary>
-        public Ref<ImHashMap<RequestInfo, Expr>> DependencyResolutionCallExpressions { get; private set; }
+        public Ref<ImHashMap<RequestInfo, Expression>> DependencyResolutionCallExpressions { get; private set; }
 
-        /// <summary>Specifies to generate ResolutionCall dependency creation expression
-        /// and put it into collection.</summary>
+        /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
+        /// in the-per rules collection.</summary>
         public Rules WithDependencyResolutionCallExpressions() =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
-                Ref.Of(ImHashMap<RequestInfo, Expr>.Empty), ItemToExpressionConverter,
+                Ref.Of(ImHashMap<RequestInfo, Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
@@ -3802,7 +3828,7 @@ namespace DryIoc
             Made made,
             IfAlreadyRegistered defaultIfAlreadyRegistered,
             int maxObjectGraphSize,
-            Ref<ImHashMap<RequestInfo, Expr>> dependencyResolutionCallExpressions,
+            Ref<ImHashMap<RequestInfo, Expression>> dependencyResolutionCallExpressions,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders,
             UnknownServiceResolver[] unknownServiceResolvers)
@@ -5308,7 +5334,8 @@ namespace DryIoc
             // 2. Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
             var preResolveParent = request.PreResolveParent;
             if (!preResolveParent.IsEmpty &&
-                (request.DirectRuntimeParent.IsEmpty || preResolveParent.EqualsWithoutParent(request.DirectRuntimeParent)))
+                (request.DirectRuntimeParent.IsEmpty || 
+                preResolveParent.EqualsWithoutParent(request.DirectRuntimeParent)))
                 return;
 
             var container = request.Container;
@@ -5325,7 +5352,8 @@ namespace DryIoc
                 return;
 
             container.Rules.DependencyResolutionCallExpressions
-                .Swap(it => it.AddOrUpdate(newRequest.RequestInfo, factoryExpr));
+                .Swap(it => it.AddOrUpdate(newRequest.RequestInfo,
+                    Container.OptimizeExpression(factoryExpr).ToSystemExpression()));
         }
     }
 
@@ -8997,7 +9025,8 @@ namespace DryIoc
         /// <summary>Returns true if request is the first in a chain.</summary>
         public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
 
-        /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="DirectParent"/>.</summary>
+        /// <summary>Returns service parent skipping wrapper if any. 
+        /// To get direct parent use <see cref="DirectParent"/>.</summary>
         public RequestInfo Parent
         {
             get
@@ -9139,7 +9168,6 @@ namespace DryIoc
         }
 
         /// <summary>Prints request with all its parents.</summary>
-        /// <param name="s">Where to print.</param><returns><paramref name="s"/> with appended info.</returns>
         public StringBuilder Print(StringBuilder s)
         {
             s = PrintCurrent(s);
@@ -9153,7 +9181,6 @@ namespace DryIoc
             Print(new StringBuilder()).ToString();
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
-        /// <param name="obj"></param> <returns></returns>
         public override bool Equals(object obj) =>
             Equals(obj as RequestInfo);
 
@@ -9196,7 +9223,7 @@ namespace DryIoc
             && other.ReuseLifespan == ReuseLifespan;
 
         // todo: Calculate and persist the hash on Push
-        /// <summary>Returns hash code combined from info fields plus its parent.</summary>
+        /// <summary>Calculates the combined hash code based on factory IDs.</summary>
         public override int GetHashCode()
         {
             if (IsEmpty)

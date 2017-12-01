@@ -174,8 +174,6 @@
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "ContractName", null },
-            { "ContractType", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations) },
             { "DisplayName", "One" },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), "One") },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), \"One\")" },
@@ -218,8 +216,6 @@
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "ContractName", null },
-            { "ContractType", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata) },
             { "DisplayName", "Up" },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), "Up") },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Up\")" },
@@ -244,8 +240,6 @@
         FactoryType = DryIoc.FactoryType.Service,
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
-            { "ContractName", null },
-            { "ContractType", typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata) },
             { "DisplayName", "Down" },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), "Down") },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMetadata), \"Down\")" },
@@ -729,8 +723,7 @@
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.UserOfServiceWithResolutionScopeReuse), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.ResolutionScope },
-        OpenResolutionScope = false,
+        OpenResolutionScope = true,
         AsResolutionCall = false,
         AsResolutionRoot = false,
         PreventDisposal = false,

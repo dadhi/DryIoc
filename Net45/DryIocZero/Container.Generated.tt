@@ -38,64 +38,46 @@ THE SOFTWARE.
 
 <#@ include File="Registrations.ttinclude" #><#
 
-        var container = GetContainerWithRegistrations()
-            .With(rules => rules.WithThrowIfRuntimeStateRequired());
+var container = GetContainerWithRegistrations()
+    .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
-        KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
-        KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
-        var errors =
-            container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies,
-                IsResolutionRoot);
+KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
+KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, IsResolutionRoot);
 
-        var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
-        var objectToCode = ObjectStringify.WithFullTypeNames;
-        Func<object, string> code = null;
-        code = x => x == null
-            ? "null"
-            : x is DefaultKey
-            ? "DefaultKey.Of(" + ((DefaultKey)x).RegistrationOrder + ")"
-            : (x.GetType().GetGenericDefinitionOrNull() ?? x.GetType()).Name == "KV`2"
-                ? "KV.Of(" + code(x.GetType().GetFieldOrNull("Key").GetValue(x))
-                  + ", " + code(x.GetType().GetFieldOrNull("Value").GetValue(x)) + ")"
-                : x is RequestInfo
-            ? code(container.RequestInfoToExpression((RequestInfo)x))
-            : x is Expression
-            ? exprToCode.ToCode((Expression)x)
-                .Replace("DryIoc.IfUnresolved", "IfUnresolved")
-                .Replace("DryIoc.IReuse", "IReuse")
-                .Replace("DryIoc.Reuse", "Reuse")
-                .Replace("DryIoc.SingletonReuse", "SingletonReuse")
-                .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
-                .Replace("DryIoc.FactoryType", "FactoryType")
-                .Replace("DryIoc.DefaultKey", "DefaultKey")
-                .Replace("DryIoc.RequestInfo", "RequestInfo")
-                .Replace("DryIoc.RequestFlags", "RequestFlags")
-                .Replace("DryIoc.HiddenDisposable", "HiddenDisposable")
-                .Replace("DryIoc.ResolutionScopeName", "ResolutionScopeName")
-                .Replace("DryIoc.CompositeScopeName", "CompositeScopeName")
+var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
+Func<object, string> code = null;
+    code = x => x == null ? "null"
+        : x is Expression ? exprToCode.ToCode((Expression)x)
+            .Replace("DryIoc.IfUnresolved", "IfUnresolved")
+            .Replace("DryIoc.IReuse", "IReuse")
+            .Replace("DryIoc.Reuse", "Reuse")
+            .Replace("DryIoc.SingletonReuse", "SingletonReuse")
+            .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
+            .Replace("DryIoc.FactoryType", "FactoryType")
+            .Replace("DryIoc.DefaultKey", "DefaultKey")
+            .Replace("DryIoc.RequestInfo", "RequestInfo")
+            .Replace("DryIoc.RequestFlags", "RequestFlags")
+            .Replace("DryIoc.HiddenDisposable", "HiddenDisposable")
+            .Replace("DryIoc.ResolutionScopeName", "ResolutionScopeName")
+            .Replace("DryIoc.CompositeScopeName", "CompositeScopeName")
+        : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x).ToSystemExpression())
+        : code(container.GetItemExpression(x, x.GetType(), true).ToSystemExpression());
 
-            : objectToCode.PlainObjectToCode(x) ?? code(x.GetType());
+var roots = resolutionsRoots.Select((r, i) => 
+    new { Index = i, 
+          ServiceType = code(r.Key.ServiceType),
+          ServiceKey = code(r.Key.OptionalServiceKey),
+          Expression = code(r.Value.Body) });
 
-        var roots = resolutionsRoots.Select((r, i) =>
-            new
-            {
-                Index = i,
-                ServiceType = code(r.Key.ServiceType),
-                ServiceKey = code(r.Key.OptionalServiceKey),
-                Expression = code(r.Value.Body)
-            });
-
-        var resolutionCalls = resolutionCallDependencies.Select((r, i) =>
-            new
-            {
-                Index = i,
-                ServiceType = code(r.Key.ServiceType),
-                ServiceKey = code(r.Key.ServiceKey),
-                ServiceKeyObject = r.Key.ServiceKey,
-                Expression = code(r.Value),
-                RequiredServiceType = code(r.Key.RequiredServiceType),
-                PreResolveParent = code(r.Key.Parent)
-            });
+var resolutionCalls = resolutionCallDependencies.Select((r, i) => 
+    new { Index = i, 
+          ServiceType = code(r.Key.ServiceType),
+          ServiceKey = code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
+          Expression = code(r.Value),
+          RequiredServiceType = code(r.Key.RequiredServiceType),
+          PreResolveParent = code(r.Key.Parent)
+    });
 #>
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
@@ -183,7 +165,6 @@ Error: <#=e.Value.Message#>
         }
 #>
 <#
-        index = 0;
         foreach (var depGroup in resolutionCalls.GroupBy(x => x.ServiceType))
         {
             if (index++ > 0) WriteLine(@"

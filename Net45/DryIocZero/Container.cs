@@ -22,9 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+
 namespace DryIocZero
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
@@ -148,8 +150,8 @@ namespace DryIocZero
             }
 
             // if not resolved from generated fallback to check runtime registrations first
-            return service ??
-                   ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, 
+            return service 
+                ?? ResolveFromRuntimeRegistrationsFirst(serviceType, serviceKey, 
                    ifUnresolved == IfUnresolved.ReturnDefault, requiredServiceType, preResolveParent, args);
         }
 
@@ -491,8 +493,6 @@ namespace DryIocZero
 
     /// <summary>Service factory delegate which accepts resolver and resolution scope as parameters and should return service object.
     /// It is stateless because does not include state parameter as <c>DryIoc.FactoryDelegate</c>.</summary>
-    /// <param name="r">Provides access to <see cref="IResolver"/> to enable dynamic dependency resolution inside factory delegate.</param>
-    /// <returns>Created service object.</returns>
     public delegate object FactoryDelegate(IResolverContext r);
 
     /// <summary>Provides methods to register default or keyed factory delegates.</summary>
@@ -1133,7 +1133,7 @@ namespace DryIocZero
             r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(item);
     }
 
-    /// <summary>Memorized checks and conditions of two kinds: inherited down dependency chain and not.</summary>
+    /// <summary>Stored check results of two kinds: inherited down dependency chain and not.</summary>
     [Flags]
     public enum RequestFlags
     {
@@ -1146,8 +1146,9 @@ namespace DryIocZero
         IsSingletonOrDependencyOfSingleton = 1 << 3,
         /// <summary>Inherited</summary>
         IsWrappedInFunc = 1 << 4,
-        /// <summary>Inherited</summary>
-        IsWrappedInFuncWithArgs = 1 << 5,
+
+        /// <summary>Non inherited</summary>
+        OpensResolutionScope = 1 << 6
     }
 
     /// <summary>Type of services supported by Container.</summary>
@@ -1173,31 +1174,34 @@ namespace DryIocZero
     }
 
     /// <summary>Dependency request path information.</summary>
-    public sealed class RequestInfo
+    public sealed class RequestInfo : IEnumerable<RequestInfo>
     {
         /// <summary>Represents empty info.</summary>
         public static readonly RequestInfo Empty = new RequestInfo();
+
+        /// <summary>Represents an empty info and indicates an open resolution scope.</summary>
+        public static readonly RequestInfo EmptyOpensResolutionScope = new RequestInfo(opensResolutionScope: true);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty => ServiceType == null;
 
         /// <summary>Returns true if request is the first in a chain.</summary>
-        public bool IsResolutionRoot => !IsEmpty && ParentOrWrapper.IsEmpty;
+        public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
 
         /// <summary>Parent request or null for root resolution request.</summary>
-        public readonly RequestInfo ParentOrWrapper;
+        public readonly RequestInfo DirectParent;
 
-        /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="ParentOrWrapper"/>.</summary>
+        /// <summary>Returns service parent skipping wrappers if any. 
+        /// To get direct parent use <see cref="DirectParent"/>.</summary>
         public RequestInfo Parent
         {
             get
             {
                 if (IsEmpty)
                     return Empty;
-
-                var p = ParentOrWrapper;
+                var p = DirectParent;
                 while (!p.IsEmpty && p.FactoryType == FactoryType.Wrapper)
-                    p = p.ParentOrWrapper;
+                    p = p.DirectParent;
                 return p;
             }
         }
@@ -1238,59 +1242,42 @@ namespace DryIocZero
         /// <summary><see cref="RequestFlags"/>.</summary>
         public readonly RequestFlags Flags;
 
-        /// <summary>Simplified version of Push with most common properties.</summary>
-        public RequestInfo Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        public RequestInfo Push(Type serviceType,
+            int factoryID, Type implementationType, IReuse reuse) =>
             Push(serviceType, null, null, null, null, IfUnresolved.Throw,
                 factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param><param name="flags"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-        {
-            return Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
                 factoryID, factoryType, implementationType, reuse, flags);
-        }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="ifUnresolved"></param>
-        /// <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param>
-        /// <param name="flags"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-        {
-            return Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
                 factoryID, factoryType, implementationType, reuse, flags);
-        }
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param>
-        /// <param name="ifUnresolved"></param>
-        /// <param name="factoryType"></param> <param name="factoryID"></param>
-        /// <param name="implementationType"></param> <param name="reuse"></param>
-        /// <param name="flags"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags)
-        {
-            return new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
                 factoryID, factoryType, implementationType, reuse, flags, this);
-        }
 
-        /// <summary>Returns all request until the root - parent is null.</summary>
-        /// <returns>Requests from the last to first.</returns>
-        public IEnumerable<RequestInfo> Enumerate()
+        /// <summary>Obsolete: now request is directly implements the <see cref="IEnumerable{T}"/>.</summary>
+        public IEnumerable<RequestInfo> Enumerate() => this;
+
+        /// <summary>Returns all non-empty requests starting from the current request and ending with the root parent.
+        /// Returns empty sequence for an empty request.</summary>
+        public IEnumerator<RequestInfo> GetEnumerator()
         {
-            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
+            for (var i = this; !i.IsEmpty; i = i.DirectParent)
                 yield return i;
         }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         /// <summary>Prints request with all its parents to string.</summary> <returns>The string.</returns>
         public override string ToString()
@@ -1323,78 +1310,59 @@ namespace DryIocZero
             if (ReuseLifespan != 0)
                 s.Append(" with ReuseLifespan=").Append(ReuseLifespan);
 
-            if (!ParentOrWrapper.IsEmpty)
-                s.AppendLine().Append("  in ").Append(ParentOrWrapper);
+            if (!DirectParent.IsEmpty)
+                s.AppendLine().Append("  in ").Append(DirectParent);
 
             return s.ToString();
         }
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
-        /// <param name="obj"></param> <returns></returns>
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as RequestInfo);
-        }
+        public override bool Equals(object obj) =>
+            Equals(obj as RequestInfo);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
-        /// <param name="other"></param> <returns></returns>
-        public bool Equals(RequestInfo other)
-        {
-            return other != null && EqualsWithoutParent(other)
-                && (ParentOrWrapper == null && other.ParentOrWrapper == null
-                || (ParentOrWrapper != null && ParentOrWrapper.EqualsWithoutParent(other.ParentOrWrapper)));
-        }
+        public bool Equals(RequestInfo other) =>
+            other != null && EqualsWithoutParent(other)
+            && (DirectParent == null && other.DirectParent == null
+                || (DirectParent != null && DirectParent.EqualsWithoutParent(other.DirectParent)));
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
-        /// <param name="other">Info to compare for equality.</param> <returns></returns>
-        /// <remarks>Ignores the FactoryID.</remarks>
-        public bool EqualsWithoutParent(RequestInfo other)
-        {
-            return other.ServiceType == ServiceType
-                && other.RequiredServiceType == RequiredServiceType
-                && other.IfUnresolved == IfUnresolved
-                && other.ServiceKey == ServiceKey
+        public bool EqualsWithoutParent(RequestInfo other) =>
+            other.ServiceType == ServiceType
 
-                && other.FactoryType == FactoryType
-                && other.ImplementationType == ImplementationType
-                && other.ReuseLifespan == ReuseLifespan;
-        }
+            && other.Flags == Flags
 
-        /// <summary>Returns hash code combined from info fields plus its parent.</summary>
-        /// <returns>Combined hash code.</returns>
+            && other.RequiredServiceType == RequiredServiceType
+            && other.IfUnresolved == IfUnresolved
+            && Equals(other.ServiceKey, ServiceKey)
+            && other.MetadataKey == MetadataKey
+            && Equals(other.Metadata, Metadata)
+
+            && other.FactoryType == FactoryType
+            && other.ImplementationType == ImplementationType
+            && other.ReuseLifespan == ReuseLifespan;
+
+        /// <summary>Calculates the combined hash code based on factory IDs.</summary>
         public override int GetHashCode()
         {
-            var hash = 0;
-            for (var i = this; !i.IsEmpty; i = i.ParentOrWrapper)
+            if (IsEmpty)
+                return 0;
+
+            var hash = FactoryID;
+            var parent = DirectParent;
+            while (!parent.IsEmpty)
             {
-                var currentHash = i.ServiceType.GetHashCode();
-
-                if (i.RequiredServiceType != null)
-                    currentHash = CombineHashCodes(currentHash, i.RequiredServiceType.GetHashCode());
-
-                if (i.ServiceKey != null)
-                    currentHash = CombineHashCodes(currentHash, i.ServiceKey.GetHashCode());
-
-                if (i.IfUnresolved != IfUnresolved.Throw)
-                    currentHash = CombineHashCodes(currentHash, i.IfUnresolved.GetHashCode());
-
-                if (i.FactoryType != FactoryType.Service)
-                    currentHash = CombineHashCodes(currentHash, i.FactoryType.GetHashCode());
-
-                if (i.ImplementationType != null && i.ImplementationType != i.ServiceType)
-                    currentHash = CombineHashCodes(currentHash, i.ImplementationType.GetHashCode());
-
-                if (i.ReuseLifespan != 0)
-                    currentHash = CombineHashCodes(currentHash, i.ReuseLifespan);
-
-                hash = hash == 0 ? currentHash : CombineHashCodes(hash, currentHash);
+                hash = CombineHashCodes(hash, parent.FactoryID);
+                parent = parent.DirectParent;
             }
+
             return hash;
         }
 
-        private RequestInfo()
+        private RequestInfo(bool opensResolutionScope = false)
         {
-            FactoryID = -1;
+            if (opensResolutionScope)
+                Flags = RequestFlags.OpensResolutionScope;
         }
 
         private RequestInfo(
@@ -1402,9 +1370,9 @@ namespace DryIocZero
             string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
             RequestFlags flags,
-            RequestInfo parentOrWrapper)
+            RequestInfo directParent)
         {
-            ParentOrWrapper = parentOrWrapper;
+            DirectParent = directParent;
 
             // Service info:
             ServiceType = serviceType;
