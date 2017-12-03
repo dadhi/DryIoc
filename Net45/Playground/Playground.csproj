@@ -82,6 +82,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AutoConcreteTypeResolutionBenchmark.cs" />
     <Compile Include="FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark.cs" />
     <Compile Include="FECvsManualEmit.cs" />
     <Compile Include="HashArrayMappedTrieTests.cs" />

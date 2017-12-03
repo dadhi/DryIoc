@@ -82,14 +82,14 @@
             IAllOpts opts;
             using (var s = container.OpenScope("b"))
             {
-                opts = s.Resolver.Resolve<IAllOpts>(serviceKey: "a");
+                opts = s.Resolve<IAllOpts>(serviceKey: "a");
                 Assert.IsNotNull(opts);
-                Assert.AreSame(opts, s.Resolver.Resolve<IAllOpts>(serviceKey: "a"));
+                Assert.AreSame(opts, s.Resolve<IAllOpts>(serviceKey: "a"));
 
                 IAllOpts opts2;
                 using (var ss = s.OpenScope())
                 {
-                    opts2 = ss.Resolver.Resolve<IAllOpts>(serviceKey: "a");
+                    opts2 = ss.Resolve<IAllOpts>(serviceKey: "a");
                     Assert.AreNotSame(opts, opts2);
                 }
 
@@ -114,8 +114,7 @@
         {
             using (var s = _container.OpenScope())
             {
-                var ex = Assert.Throws<ContainerException>(() => 
-                    s.Resolver.Resolve<NamedScopeService>());
+                var ex = Assert.Throws<ContainerException>(() => s.Resolve<NamedScopeService>());
 
                 Assert.AreEqual(Error.NoMatchedScopeFound, ex.Error);
             }

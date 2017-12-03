@@ -48,7 +48,7 @@ namespace DryIocZero.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve(typeof(Potato), null));
+                container.Resolve(typeof(Potato)));
 
             Assert.AreEqual(Error.UnableToResolveDefaultService, ex.Error);
         }
@@ -86,7 +86,7 @@ namespace DryIocZero.UnitTests
             container.RegisterDelegate(_ => new Potato());
             using (var scope = container.OpenScope())
             {
-                var potato = scope.Resolver.Resolve(typeof(Potato), false);
+                var potato = scope.Resolve(typeof(Potato), IfUnresolved.Throw);
                 Assert.IsNotNull(potato);
             }
         }
@@ -100,9 +100,9 @@ namespace DryIocZero.UnitTests
 
             using (var scope = container.OpenScope())
             {
-                var potato = scope.Resolver.Resolve<Potato>();
+                var potato = scope.Resolve<Potato>();
                 Assert.IsNotNull(potato);
-                Assert.AreSame(potato, scope.Resolver.Resolve<Potato>());
+                Assert.AreSame(potato, scope.Resolve<Potato>());
             }
 
             var ex = Assert.Throws<ContainerException>(() => 
@@ -122,7 +122,7 @@ namespace DryIocZero.UnitTests
             using (var scope = container.OpenScope())
             {
                 Assert.IsNotNull(potato);
-                Assert.AreSame(potato, scope.Resolver.Resolve<Potato>());
+                Assert.AreSame(potato, scope.Resolve<Potato>());
             }
 
             Assert.AreSame(potato, container.Resolve<Potato>());

@@ -33,7 +33,7 @@ IContainer GetContainerWithRegistrations()
 	// placeholder using run-time `DryIocZero.RegisterDelegate` and `DryIocZero.UseInstance`
 
     // TODO: Add registrations
-    // container.Register<IMyServive, MyService>();
+    // container.Register<IMyService, MyService>();
 
     return container;
 }

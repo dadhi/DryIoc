@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
         // Base class for testing service using Disposable DbContext.
         abstract class ServiceBase
         {
-            public string SeviceTypeName { get; set; }
+            public string ServiceTypeName { get; set; }
             public abstract void UseDbContext();
         }
 
@@ -33,7 +33,7 @@ namespace DryIoc.IssuesTests
             {
                 using (var context = _createDbContext())
                 {
-                    SeviceTypeName = context.GetType().Name;
+                    ServiceTypeName = context.GetType().Name;
                 }
             }
         }
@@ -51,7 +51,7 @@ namespace DryIoc.IssuesTests
             {
                 using (var context = _container.Resolve<DbContext>())
                 {
-                    SeviceTypeName = context.GetType().Name;
+                    ServiceTypeName = context.GetType().Name;
                 }
             }
         }
@@ -70,10 +70,10 @@ namespace DryIoc.IssuesTests
             controller.UseDbContext();
 
             // Assert
-            Assert.AreEqual(typeof(MyDbContext).Name, controller.SeviceTypeName);
+            Assert.AreEqual(typeof(MyDbContext).Name, controller.ServiceTypeName);
         }
 
-        [Test] // Fixed!
+        [Test]
         public void ContainerWithConcreteTypeDynamicRegistrations_ServiceWithResolve()
         {
             // Arrange
@@ -87,7 +87,7 @@ namespace DryIoc.IssuesTests
             controller.UseDbContext();
 
             // Assert
-            Assert.AreEqual(typeof(MyDbContext).Name, controller.SeviceTypeName);
+            Assert.AreEqual(typeof(MyDbContext).Name, controller.ServiceTypeName);
         }
 
         [Test]  // Passes
@@ -103,7 +103,7 @@ namespace DryIoc.IssuesTests
             controller.UseDbContext();
 
             // Assert
-            Assert.AreEqual(typeof(MyDbContext).Name, controller.SeviceTypeName);
+            Assert.AreEqual(typeof(MyDbContext).Name, controller.ServiceTypeName);
         }
 
         [Test]// Fixed!
@@ -119,7 +119,7 @@ namespace DryIoc.IssuesTests
             controller.UseDbContext();
 
             // Assert
-            Assert.AreEqual(typeof(MyDbContext).Name, controller.SeviceTypeName);
+            Assert.AreEqual(typeof(MyDbContext).Name, controller.ServiceTypeName);
         }
     }
 }

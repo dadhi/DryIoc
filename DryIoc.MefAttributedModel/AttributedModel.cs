@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013-2016 Maksim Volkau
+Copyright (c) 2013 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -46,47 +46,46 @@ namespace DryIoc.MefAttributedModel
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.Scoped)
             .AddOrUpdate(ReuseType.ScopedOrSingleton, _ => Reuse.ScopedOrSingleton);
 
+        private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
+            PropertiesAndFields.All(serviceInfo: GetImportedPropertiesAndFieldsOnly);
+
+        private static readonly Made _defaultImportMadeOf = Made.Of(
+            request => GetImportingConstructor(request),
+            GetImportedParameter,
+            _getImportedPropertiesAndFields);
+
         /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
         /// <param name="rules">Source rules.</param> <returns>New rules.</returns>
         public static Rules WithMefRules(this Rules rules)
         {
-            var importsMadeOf = Made.Of(
-                request => GetImportingConstructor(request, rules.FactoryMethod),
-                GetImportedParameter, _getImportedPropertiesAndFields);
+            var importMadeOf = rules.FactoryMethod == null ? _defaultImportMadeOf :
+                Made.Of(request => GetImportingConstructor(request, rules.FactoryMethod),
+                    GetImportedParameter, _getImportedPropertiesAndFields);
 
-            return rules.With(importsMadeOf)
+            return rules.With(importMadeOf)
                 .WithDefaultReuse(Reuse.Singleton)
                 .WithTrackingDisposableTransients();
         }
 
         /// <summary>Add to container rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
         /// In addition registers the MEF specific wrappers, and adds support for <see cref="IPartImportsSatisfiedNotification"/>.</summary>
-        /// <param name="container">Source container.</param> <returns>New container.</returns>
-        public static IContainer WithMef(this IContainer container)
-        {
-            return container
+        public static IContainer WithMef(this IContainer container) => 
+            container
                 .With(WithMefRules)
                 .WithImportsSatisfiedNotification()
                 .WithMefSpecificWrappers()
                 .WithMultipleSameContractNamesSupport();
-        }
 
+        // hello, Max!!! we are Martians.
         /// <summary>The basic rules to support MEF/DryIoc Attributes for
         /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
         /// and for specifying injected dependencies via Import attributes.</summary>
-        /// <param name="rules">Original container rules.</param><returns>New rules.</returns>
-        public static Rules WithMefAttributedModel(this Rules rules)
-        {
-            // hello, Max!!! we are Martians.
-            return rules.WithMefRules();
-        }
+        public static Rules WithMefAttributedModel(this Rules rules) => 
+            rules.WithMefRules();
 
-        /// <summary>Applies the <see cref="WithMefAttributedModel(DryIoc.Rules)"/> to the container.</summary>
-        /// <param name="container">source container</param><returns>New container with applied rules.</returns>
-        public static IContainer WithMefAttributedModel(this IContainer container)
-        {
-            return container.With(WithMefAttributedModel);
-        }
+        /// <summary>Applies the <see cref="WithMefAttributedModel(Rules)"/> to the container.</summary>
+        public static IContainer WithMefAttributedModel(this IContainer container) => 
+            container.With(WithMefAttributedModel);
 
         #region IPartImportsSatisfiedNotification support
 
@@ -387,13 +386,10 @@ namespace DryIoc.MefAttributedModel
         /// attributes, and create serializable DTO with all information required for registering of exported types.</summary>
         /// <param name="assemblies">Assemblies to scan.</param>
         /// <returns>Lazy collection of registration info DTOs.</returns>
-        public static IEnumerable<ExportedRegistrationInfo> Scan(IEnumerable<Assembly> assemblies)
-        {
-            return assemblies
-                .Distinct()
-                .SelectMany(Portable.GetAssemblyTypes)
-                .SelectMany(GetExportedRegistrations);
-        }
+        public static IEnumerable<ExportedRegistrationInfo> Scan(IEnumerable<Assembly> assemblies) =>
+            assemblies.Distinct()
+            .SelectMany(Portable.GetAssemblyTypes)
+            .SelectMany(GetExportedRegistrations);
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
@@ -458,9 +454,8 @@ namespace DryIoc.MefAttributedModel
                 var method = member as MethodInfo;
                 if (method != null)
                 {
-                    factoryMethod.MethodParameterTypeFullNamesOrNames = method.GetParameters()
-                        .Select(p => p.ParameterType.FullName ?? p.ParameterType.Name)
-                        .ToArrayOrSelf();
+                    factoryMethod.MethodParameterTypeFullNamesOrNames =
+                        method.GetParameters().Map(p => p.ParameterType.FullName ?? p.ParameterType.Name);
 
                     // the only possibility (for now) for registering completely generic T service
                     // is registering it as an Object
@@ -554,10 +549,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static bool CanBeExported(Type type)
-        {
-            return type.IsClass() && !type.IsCompilerGenerated();
-        }
+        private static bool CanBeExported(Type type) => type.IsClass() && !type.IsCompilerGenerated();
 
         private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute)
         {
@@ -622,9 +614,6 @@ namespace DryIoc.MefAttributedModel
                     serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request));
             };
         }
-
-        private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
-            PropertiesAndFields.All(serviceInfo: GetImportedPropertiesAndFieldsOnly);
 
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
         {
@@ -831,10 +820,10 @@ namespace DryIoc.MefAttributedModel
                 }
                 else if (attribute is ReuseAttribute)
                 {
-                    var resueAttr = (ReuseAttribute)attribute;
-                    info.Reuse = resueAttr.CustomReuseType == null
-                        ? new ReuseInfo { ReuseType = resueAttr.ReuseType, ScopeName = resueAttr.ScopeName }
-                        : new ReuseInfo { CustomReuseType = resueAttr.CustomReuseType, ScopeName = resueAttr.ScopeName };
+                    var reuseAttr = (ReuseAttribute)attribute;
+                    info.Reuse = reuseAttr.CustomReuseType == null
+                        ? new ReuseInfo { ReuseType = reuseAttr.ReuseType, ScopeName = reuseAttr.ScopeName }
+                        : new ReuseInfo { CustomReuseType = reuseAttr.CustomReuseType, ScopeName = reuseAttr.ScopeName };
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
                 {
@@ -1052,8 +1041,8 @@ namespace DryIoc.MefAttributedModel
                       {
                           var typeAndCount = types[typeAndCountIndex];
 
-                      // Change the serviceKey only when multiple same types are registered with the same key
-                      serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                          // Change the serviceKey only when multiple same types are registered with the same key
+                          serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
                           typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
                           return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
@@ -1188,7 +1177,7 @@ namespace DryIoc.MefAttributedModel
             return x == null ? code.Append("null") : code.Append('"').Append(x.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n")).Append('"');
         }
 
-        /// <summary>Prints valid c# Type literal: typeof(Namespace.Type).</summary>
+        /// <summary>Prints valid c# Type literal: <c>typeof(Namespace.Type)</c>.</summary>
         /// <param name="code">Code to print to.</param> <param name="x">Value to print.</param> <returns>Code with appended literal.</returns>
         public static StringBuilder AppendType(this StringBuilder code, Type x)
         {
@@ -1577,7 +1566,7 @@ namespace DryIoc.MefAttributedModel
                     // ReSharper disable PossibleNullReferenceException
                     // ReSharper disable AssignNullToNotNullAttribute
                     Key = item.Constructor.DeclaringType.FullName,
-                        Value = string.Format("new {0}({1})",
+                    Value = string.Format("new {0}({1})",
                             item.Constructor.DeclaringType.FullName,
                             string.Join(", ", item.ConstructorArguments.Map(a => a.ToString()).ToArrayOrSelf())) +
                             (item.NamedArguments.Any() ?

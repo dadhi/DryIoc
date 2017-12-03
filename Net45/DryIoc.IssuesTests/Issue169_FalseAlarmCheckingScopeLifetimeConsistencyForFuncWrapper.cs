@@ -1,7 +1,14 @@
 ﻿using System;
-using System.Linq.Expressions;
 using NUnit.Framework;
 using ImTools;
+
+#if FEC_EXPRESSION_INFO
+using static FastExpressionCompiler.ExpressionInfo;
+using Expr = FastExpressionCompiler.ExpressionInfo;
+#else
+using static System.Linq.Expressions.Expression;
+using Expr = System.Linq.Expressions.Expression;
+#endif
 
 namespace DryIoc.IssuesTests
 {
@@ -45,7 +52,7 @@ namespace DryIoc.IssuesTests
 
         public object Name { get { return null; } }
 
-        public Expression Apply(Request request, Expression serviceFactoryExpr)
+        public Expr Apply(Request request, Expr serviceFactoryExpr)
         {
             return Reuse.Singleton.Apply(request, serviceFactoryExpr);
         }
@@ -55,9 +62,9 @@ namespace DryIoc.IssuesTests
             return true;
         }
 
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
+        public Expr ToExpression(Func<object, Expr> fallbackConverter)
         {
-            return Expression.New(GetType().GetConstructors()[0], ArrayTools.Empty<Expression>());
+            return New(GetType().GetConstructors()[0], ArrayTools.Empty<Expr>());
         }
     }
 }
