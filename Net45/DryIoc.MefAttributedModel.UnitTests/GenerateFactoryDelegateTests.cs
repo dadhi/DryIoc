@@ -177,6 +177,41 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(0, resolutionCallDependencies.Length);
         }
 
+        [Test]
+        public void Instance_and_Delegate_should_be_converted_to_Resolve_calls()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(_ => "a string message");
+            var n = new N();
+            container.UseInstance(n);
+
+            container.Register<K>(setup: Setup.With(asResolutionRoot: true));
+
+            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
+            KeyValuePair<RequestInfo, Expression>[] calls;
+            var errors = container.GenerateResolutionExpressions(out roots, out calls,
+                r => r.Factory.Setup.AsResolutionRoot);
+
+            Assert.IsEmpty(errors);
+            Assert.AreEqual(1, roots.Length);
+            Assert.AreEqual(0, calls.Length);
+        }
+
+        public class K
+        {
+            public string M { get; }
+            public N N { get; }
+
+            public K(N n, string m)
+            {
+                M = m;
+                N = n;
+            }
+        }
+
+        public class N { }
+
         public class LazyUser
         {
             public LazyUser(Lazy<LazyDep> s) {}

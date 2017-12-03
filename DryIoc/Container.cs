@@ -1593,6 +1593,8 @@ namespace DryIoc
             public override Type ImplementationType => _instanceType;
             private readonly Type _instanceType;
 
+            public override bool HasRuntimeState => true;
+
             public InstanceFactory(Type instanceType, IReuse reuse) : base(reuse)
             {
                 _instanceType = instanceType;
@@ -1612,12 +1614,15 @@ namespace DryIoc
             }
 
             /// <summary>Called for Injection as dependency.</summary>
-            public override Expr GetExpressionOrDefault(Request request) =>
-                request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this)) ??
-                CreateExpressionOrDefault(request);
+            public override Expr GetExpressionOrDefault(Request request)
+            {
+                request = request.WithResolvedFactory(this);
+                return request.Container.GetDecoratorExpressionOrDefault(request) 
+                    ?? CreateExpressionOrDefault(request);
+            }
 
             public override Expr CreateExpressionOrDefault(Request request) =>
-                Resolver.CreateResolutionExpression(request, isRuntimeDependency: true);
+                Resolver.CreateResolutionExpression(request);
 
 #region Implementation
 
@@ -2461,14 +2466,14 @@ namespace DryIoc
         /// <summary>Generates all resolution root and calls expressions.</summary>
         /// <param name="container">For container</param>
         /// <param name="resolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
-        /// <param name="resolutionCallDependencies">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
+        /// <param name="resolutionCalls">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
         /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.
         /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations with <see cref="Setup.AsResolutionRoot"/>.</param>
         /// <returns>Errors happened when resolving corresponding registrations.</returns>
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] GenerateResolutionExpressions(
             this IContainer container,
             out KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutions,
-            out KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies,
+            out KeyValuePair<RequestInfo, Expression>[] resolutionCalls,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
             var generatingContainer = container.With(rules => rules
@@ -2476,14 +2481,14 @@ namespace DryIoc
                 .WithoutImplicitCheckForReuseMatchingScope()
                 .WithDependencyResolutionCallExpressions());
 
+            // ignore open-generic registrations because they may be resolved only when closed.
             var registrations = generatingContainer.GetServiceRegistrations()
-                // ignore open-generic registrations because they may be resolved only when closed.
                 .Where(r => !r.ServiceType.IsOpenGeneric());
 
             if (whatRegistrations != null)
                 registrations = registrations.Where(whatRegistrations);
 
-            var exprs = new List<KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>>();
+            var roots = new List<KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>>();
             var errors = new List<KeyValuePair<ServiceRegistrationInfo, ContainerException>>();
             foreach (var registration in registrations)
             {
@@ -2492,7 +2497,7 @@ namespace DryIoc
                     var request = Request.Create(generatingContainer, registration.ServiceType, registration.OptionalServiceKey);
                     var factoryExpr = Container.WrapInFactoryExpression(registration.Factory.GetExpressionOrDefault(request));
 
-                    exprs.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(registration, factoryExpr
+                    roots.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(registration, factoryExpr
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
@@ -2505,9 +2510,9 @@ namespace DryIoc
                 }
             }
 
-            resolutions = exprs.ToArray();
+            resolutions = roots.ToArray();
 
-            resolutionCallDependencies = 
+            resolutionCalls = 
                 generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
                 .Select(r => new KeyValuePair<RequestInfo, Expression>(r.Key, r.Value))
                 .ToArray();
@@ -5279,15 +5284,13 @@ namespace DryIoc
         internal static readonly ConstructorInfo ResolutionScopeNameCtor = 
             typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
 
-        // todo: what is this isRuntimeDependency, consult #517
-        internal static Expr CreateResolutionExpression(Request request,
-            bool openResolutionScope = false, bool isRuntimeDependency = false)
+        internal static Expr CreateResolutionExpression(Request request, bool openResolutionScope = false)
         {
             request.ContainsNestedResolutionCall = true;
 
             var container = request.Container;
 
-            if (!isRuntimeDependency &&
+            if (!request.Factory.HasRuntimeState &&
                 container.Rules.DependencyResolutionCallExpressions != null)
                 PopulateDependencyResolutionCallExpressions(request);
 
@@ -6931,6 +6934,9 @@ namespace DryIoc
         /// <summary>Settings <b>(if any)</b> to select Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public virtual Made Made => Made.Default;
 
+        /// <summary>The factory inserts the runtime-state into result expression, e.g. delegate or pre-created instance.</summary>
+        public virtual bool HasRuntimeState => false;
+
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
         protected Factory(IReuse reuse = null, Setup setup = null)
@@ -8299,10 +8305,13 @@ namespace DryIoc
         /// <summary>Non-abstract closed implementation type.</summary>
         public override Type ImplementationType => _knownImplementationType;
 
+        /// <inheritdoc />
+        public override bool HasRuntimeState => true;
+
         /// <summary>Creates factory.</summary>
         public DelegateFactory(FactoryDelegate factoryDelegate,
            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
-           : base(reuse, setup)
+           : base(reuse, (setup ?? Setup.Default).WithAsResolutionCall())
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
             _knownImplementationType = knownImplementationType;
@@ -8311,10 +8320,9 @@ namespace DryIoc
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
         public override Expr CreateExpressionOrDefault(Request request)
         {
-            var factoryDelegateExpr = request.Container.GetItemExpression(_factoryDelegate);
+            var delegateExpr = request.Container.GetItemExpression(_factoryDelegate);
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
-            var invokeExpr = Invoke(factoryDelegateExpr, resolverExpr);
-            return Convert(invokeExpr, request.GetActualServiceType());
+            return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -8327,7 +8335,8 @@ namespace DryIoc
 
             // Wrap the delegate in respective expression for non-simple use
             if (request.Reuse != DryIoc.Reuse.Transient ||
-                FactoryType == FactoryType.Service && request.Container.GetDecoratorExpressionOrDefault(request) != null)
+                FactoryType == FactoryType.Service && 
+                request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
             // Otherwise just use delegate as-is
