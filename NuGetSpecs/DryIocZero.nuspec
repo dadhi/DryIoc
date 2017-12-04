@@ -12,8 +12,9 @@
     <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
-      v4.0.0-preview-02:
-      - updated to DryIoc v2 APIs
+      v4.0.0-preview-03:
+      - updated: to DryIoc v3 API
+      - fixed: references to compile-time dependencies in NuGet package
       v3.0.0:
       - fixed: Nuget package, so that DryIocZero compiles successfully right after install
       - changed: Fixed versions of DryIoc and ExpressionToCodeLib dependencies located in package/tools folder
