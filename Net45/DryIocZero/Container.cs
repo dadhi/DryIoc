@@ -162,7 +162,8 @@ namespace DryIocZero
         {
             serviceType = requiredServiceType ?? serviceType;
 
-            if (serviceKey == null && requiredServiceType == null && preResolveParent == null && args == null)
+            // ignore the rest of arguments, e.g. preResolveParent when resolving the runtime substitutes
+            if (serviceKey == null) 
                 return ResolveDefaultFromRuntimeRegistrationsFirst(serviceType, ifUnresolvedReturnDefault);
 
             FactoryDelegate factory;
