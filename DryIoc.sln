@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.12
+VisualStudioVersion = 15.0.27004.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SpeedTestApp", "DryIoc.SpeedTestApp\DryIoc.SpeedTestApp.csproj", "{A9C4E2CC-3CA9-4F04-8544-A2837B045643}"
 EndProject
@@ -146,21 +146,39 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Syntax.Autofac", "Ex
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "Net45\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{EE366065-BF63-44D1-BD65-75A214C1EE8E}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{4F9A7CB4-3952-466D-ACD7-0993EA952741}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc", "Net40\Extensions\DryIoc.Mvc\DryIoc.Mvc.csproj", "{9C80779E-EDBA-4ADC-B455-53C61E5B0308}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Web", "Net40\Extensions\DryIoc.Web\DryIoc.Web.csproj", "{A720975E-B7BA-451E-B318-3E452215B081}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{B6C2802B-3E3F-4195-A15E-8B7C7E50CA6A}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CommonServiceLocator", "PCL\Extensions\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj", "{72F28648-4AE6-484B-BAE1-D406224C50A9}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero.WebApi", "Extensions\DryIocZero.WebApi\DryIocZero.WebApi.csproj", "{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "PCL-Net45\DryIocZero\DryIocZero.csproj", "{3B9FA7C3-844E-41B4-8B57-ADA9F3431469}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIocZero", "PCL\DryIocZero\DryIocZero.csproj", "{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", "{D3F49DBC-5E5C-4416-88F7-0D9A28B057EA}"
+	ProjectSection(SolutionItems) = preProject
+		NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec
+		NuGetSpecs\DryIoc.CommonServiceLocator.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.nuspec
+		NuGetSpecs\DryIoc.dll.nuspec = NuGetSpecs\DryIoc.dll.nuspec
+		NuGetSpecs\DryIoc.Internal.nuspec = NuGetSpecs\DryIoc.Internal.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.nuspec
+		NuGetSpecs\DryIoc.Mvc.dll.nuspec = NuGetSpecs\DryIoc.Mvc.dll.nuspec
+		NuGetSpecs\DryIoc.Mvc.nuspec = NuGetSpecs\DryIoc.Mvc.nuspec
+		NuGetSpecs\DryIoc.nuspec = NuGetSpecs\DryIoc.nuspec
+		NuGetSpecs\DryIoc.Owin.dll.nuspec = NuGetSpecs\DryIoc.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.Owin.nuspec = NuGetSpecs\DryIoc.Owin.nuspec
+		NuGetSpecs\DryIoc.SignalR.dll.nuspec = NuGetSpecs\DryIoc.SignalR.dll.nuspec
+		NuGetSpecs\DryIoc.SignalR.nuspec = NuGetSpecs\DryIoc.SignalR.nuspec
+		NuGetSpecs\DryIoc.snk = NuGetSpecs\DryIoc.snk
+		NuGetSpecs\DryIoc.Web.dll.nuspec = NuGetSpecs\DryIoc.Web.dll.nuspec
+		NuGetSpecs\DryIoc.Web.nuspec = NuGetSpecs\DryIoc.Web.nuspec
+		NuGetSpecs\DryIoc.WebApi.dll.nuspec = NuGetSpecs\DryIoc.WebApi.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.nuspec = NuGetSpecs\DryIoc.WebApi.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.nuspec
+		NuGetSpecs\DryIocAttributes.dll.nuspec = NuGetSpecs\DryIocAttributes.dll.nuspec
+		NuGetSpecs\DryIocAttributes.nuspec = NuGetSpecs\DryIocAttributes.nuspec
+		NuGetSpecs\DryIocZero.nuspec = NuGetSpecs\DryIocZero.nuspec
+		NuGetSpecs\README.md = NuGetSpecs\README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -384,18 +402,6 @@ Global
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9C80779E-EDBA-4ADC-B455-53C61E5B0308}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9C80779E-EDBA-4ADC-B455-53C61E5B0308}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9C80779E-EDBA-4ADC-B455-53C61E5B0308}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9C80779E-EDBA-4ADC-B455-53C61E5B0308}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A720975E-B7BA-451E-B318-3E452215B081}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A720975E-B7BA-451E-B318-3E452215B081}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A720975E-B7BA-451E-B318-3E452215B081}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A720975E-B7BA-451E-B318-3E452215B081}.Release|Any CPU.Build.0 = Release|Any CPU
-		{72F28648-4AE6-484B-BAE1-D406224C50A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{72F28648-4AE6-484B-BAE1-D406224C50A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{72F28648-4AE6-484B-BAE1-D406224C50A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{72F28648-4AE6-484B-BAE1-D406224C50A9}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -459,11 +465,6 @@ Global
 		{9A903363-6925-4C9F-9A19-F751F4987604} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{67A2615C-34B5-41AC-B5C9-CE82C5D28368} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{EE366065-BF63-44D1-BD65-75A214C1EE8E} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
-		{4F9A7CB4-3952-466D-ACD7-0993EA952741} = {84205448-1773-45D6-8D42-548A7997A7E1}
-		{9C80779E-EDBA-4ADC-B455-53C61E5B0308} = {4F9A7CB4-3952-466D-ACD7-0993EA952741}
-		{A720975E-B7BA-451E-B318-3E452215B081} = {4F9A7CB4-3952-466D-ACD7-0993EA952741}
-		{B6C2802B-3E3F-4195-A15E-8B7C7E50CA6A} = {CE5E598E-5A34-40EA-9110-AD2663BAD177}
-		{72F28648-4AE6-484B-BAE1-D406224C50A9} = {B6C2802B-3E3F-4195-A15E-8B7C7E50CA6A}
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469} = {C8C71EEF-0C64-4A33-96F8-D22C6E429741}
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA} = {CE5E598E-5A34-40EA-9110-AD2663BAD177}

@@ -11,7 +11,7 @@ set COVERAGE="%REPORTS%\Coverage.xml"
 if not exist %REPORTS% md %REPORTS% 
 
 REM Excluded the "PCL-Net45" because .NETPortable test assemblies are not yet supported by the engine
-for %%P in ("."; "Net40"; "Net45"; "Extensions"; "Net40\Extensions") do (
+for %%P in ("."; "Net40"; "Net45"; "Extensions") do (
 	for %%T in ("%%P\bin\Release\*Tests.dll") do (
 		set TESTLIBS=!TESTLIBS! %%T
 ))

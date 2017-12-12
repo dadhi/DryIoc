@@ -3,10 +3,15 @@ setlocal EnableDelayedExpansion
 
 set SLN="..\DryIoc.sln"
 set OUTDIR="..\bin\Release"
+set NUGET="..\.nuget\NuGet.exe"
 
 set MSBUILDVER=%2
 if "%MSBUILDVER%"=="" set MSBUILDVER=14
 echo:MsBuild version: %MSBUILDVER%
+
+echo:
+echo:Restoring packages for solution %SLN% . . .
+%NUGET% restore %SLN%
 
 echo:
 echo:Building %SLN% into %OUTDIR% . . .
@@ -21,9 +26,8 @@ for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuil
 		"%%T\MSBuild.exe" %SLN% /t:Rebuild /v:minimal /m /fl /flp:LogFile=MSBuild.log ^
    			/p:OutDir=%OUTDIR% ^
    			/p:GenerateProjectSpecificOutputFolder=false ^
-   			/p:Configuration=Release ^ 
-   			/p:RestorePackages=false ^ 
-			/p:BuildInParallel=true 
+   			/p:Configuration=Release ^
+   			/p:RestorePackages=false 
 
 		find /C "Build succeeded." MSBuild.log
     )
