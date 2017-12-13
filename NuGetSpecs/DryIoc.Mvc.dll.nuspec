@@ -4,7 +4,7 @@
         <id>DryIoc.Mvc.dll</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014-2017 Maksim Volkau and Contributors</copyright>
+        <copyright>Copyright © 2014 Maksim Volkau and Contributors</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -12,7 +12,7 @@
         <tags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
           v2.2.2:
-          - added: Ablity to handle HttpContextScopeContext errors via User handler to find reason for #433
+          - added: Ability to handle HttpContextScopeContext errors via User handler to find reason for #433
           v2.2.1:
           - More robust HttpContextScopeContext to prevent possible concurrency errors
           v2.2.0:
@@ -54,11 +54,6 @@
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.dll" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.pdb" target="lib\net45" />
         <file src="..\Extensions\bin\Release\DryIoc.Mvc.xml" target="lib\net45" />
-
-        <!-- net40 -->
-        <file src="..\Net40\Extensions\bin\Release\DryIoc.Mvc.dll" target="lib\net40" />
-        <file src="..\Net40\Extensions\bin\Release\DryIoc.Mvc.pdb" target="lib\net40" />
-        <file src="..\Net40\Extensions\bin\Release\DryIoc.Mvc.xml" target="lib\net40" />
     
     </files>
 </package>

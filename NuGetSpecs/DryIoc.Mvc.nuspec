@@ -4,7 +4,7 @@
         <id>DryIoc.Mvc</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014-2017 Maksim Volkau and Contributors</copyright>
+        <copyright>Copyright © 2014 Maksim Volkau and Contributors</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -49,9 +49,6 @@
 
         <!-- net45 -->
         <file src="..\Extensions\DryIoc.Mvc\DryIocMvc.cs" target="content\net45\DryIoc\Mvc" />
-
-        <!-- net40 -->
-        <file src="..\Extensions\DryIoc.Mvc\DryIocMvc.cs" target="content\net40\DryIoc\Mvc" />
 
     </files>
 </package>
