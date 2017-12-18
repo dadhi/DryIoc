@@ -6,9 +6,9 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue545_Func_Of_Scoped
     {
-        public interface IScopedComponent {}
+        public interface IScopedComponent { }
 
-        public class ScopedComponent : IScopedComponent {}
+        public class ScopedComponent : IScopedComponent { }
 
         public interface ISingletonComponent
         {
