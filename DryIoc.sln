@@ -180,8 +180,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", 
 		NuGetSpecs\README.md = NuGetSpecs\README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UnitTests.Core", "DryIoc.UnitTests.Core\DryIoc.UnitTests.Core.csproj", "{303572E4-44F3-4E5A-834F-591756EA7D50}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -646,14 +644,6 @@ Global
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|x86.ActiveCfg = Release|Any CPU
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|x86.Build.0 = Release|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Debug|x86.Build.0 = Debug|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Release|Any CPU.Build.0 = Release|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Release|x86.ActiveCfg = Release|Any CPU
-		{303572E4-44F3-4E5A-834F-591756EA7D50}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
