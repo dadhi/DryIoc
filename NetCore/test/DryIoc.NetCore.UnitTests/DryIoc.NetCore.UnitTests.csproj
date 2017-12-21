@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Remove="..\..\..\DryIoc.UnitTests\ThrowTests.cs;..\..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs" />
     <Compile Include="..\..\..\DryIoc.UnitTests\*.cs" Exclude="bin\**;obj\**;**\*.xproj;packages\**;..\..\..\DryIoc.UnitTests\ThrowTests.cs;..\..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs" />
+    <Compile Include="..\..\..\Net45\DryIoc.IssuesTests\Issue545_Func_Of_Scoped.cs" />
   </ItemGroup>
 
   <ItemGroup>

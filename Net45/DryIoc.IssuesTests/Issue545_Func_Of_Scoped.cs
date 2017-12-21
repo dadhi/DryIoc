@@ -29,18 +29,19 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Func_of_scoped_thing_should_return_object_from_a_new_scope_when_singleton_is_resolved_within_the_scope()
         {
-            var c = new Container();
+            var c = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
 
             c.Register<ISingletonComponent, SingletonComponentWithScopedFunc>(Reuse.Singleton);
             var scopeName = "myScope";
             c.Register<IScopedComponent, ScopedComponent>(Reuse.InCurrentNamedScope(scopeName));
 
-            IScopedComponent scoped1, scoped2;
+            IScopedComponent scoped1a, scoped1b, scoped2;
 
             using (var scope = c.OpenScope(scopeName))
             {
                 var singleton = scope.Resolve<ISingletonComponent>();
-                scoped1 = singleton.Scoped;
+                scoped1a = singleton.Scoped;
+                scoped1b = singleton.Scoped;
             }
 
             using (var scope = c.OpenScope(scopeName))
@@ -49,24 +50,26 @@ namespace DryIoc.IssuesTests
                 scoped2 = singleton.Scoped;
             }
 
-            Assert.AreNotSame(scoped1, scoped2);
+            Assert.AreSame(scoped1b, scoped1a);
+            Assert.AreNotSame(scoped1a, scoped2);
         }
 
         [Test]
         public void Func_of_scoped_thing_should_return_object_from_a_new_scope_when_singleton_is_resolved_out_of_the_scope()
         {
-            var c = new Container();
+            var c = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
 
             c.Register<ISingletonComponent, SingletonComponentWithScopedFunc>(Reuse.Singleton);
             var scopeName = "myScope";
             c.Register<IScopedComponent, ScopedComponent>(Reuse.InCurrentNamedScope(scopeName));
 
             var singleton = c.Resolve<ISingletonComponent>();
-            IScopedComponent scoped1, scoped2;
+            IScopedComponent scoped1a, scoped1b, scoped2;
 
             using (c.OpenScope(scopeName))
             {
-                scoped1 = singleton.Scoped;
+                scoped1a = singleton.Scoped;
+                scoped1b = singleton.Scoped;
             }
 
             using (c.OpenScope(scopeName))
@@ -74,7 +77,8 @@ namespace DryIoc.IssuesTests
                 scoped2 = singleton.Scoped;
             }
 
-            Assert.AreNotSame(scoped1, scoped2);
+            Assert.AreSame(scoped1b, scoped1a);
+            Assert.AreNotSame(scoped1a, scoped2);
         }
     }
 }
