@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2017 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -632,6 +632,14 @@ namespace ImTools
         {
             return new KV<K, V>(source.Key, value);
         }
+    }
+
+    /// <summary>Simple helper for creation of the pair of two parts.</summary>
+    public static class KeyValuePair
+    {
+        /// <summary>Pairs key with value.</summary>
+        public static KeyValuePair<K, V> PairWith<K, V>(this K key, V value) =>
+            new KeyValuePair<K, V>(key, value);
     }
 
     /// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>

@@ -223,6 +223,38 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Can_specify_resolution_root_with_Service_type_and_key_instead_of_predicate()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(_ => "a string message");
+            var n = new N();
+            container.UseInstance(n);
+
+            container.Register(typeof(K<>));
+
+            KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] roots;
+            KeyValuePair<RequestInfo, Expression>[] calls;
+            var errors = container.GenerateResolutionExpressions(out roots, out calls, ServiceInfo.Of<K<N>>());
+
+            Assert.IsEmpty(errors);
+            Assert.AreEqual(1, roots.Length);
+            Assert.AreEqual(0, calls.Length);
+        }
+
+        public class K<T>
+        {
+            public string M { get; }
+            public T N { get; }
+
+            public K(T n, string m)
+            {
+                M = m;
+                N = n;
+            }
+        }
+
+        [Test]
         public void No_errors_for_registered_placeholders()
         {
             var c = new Container();

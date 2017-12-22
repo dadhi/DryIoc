@@ -1464,8 +1464,7 @@ namespace DryIoc
             if (matchedFactories.Length == 0)
                 return null;
 
-            var factory = factorySelector(request,
-                matchedFactories.Map(f => new KeyValuePair<object, Factory>(f.Key, f.Value)));
+            var factory = factorySelector(request, matchedFactories.Map(f => f.Key.PairWith(f.Value)));
             if (factory == null)
                 return null;
 
@@ -2459,21 +2458,77 @@ namespace DryIoc
                 propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields)),
                 overrideRegistrationMade: true));
 
-        /// <summary>Pre-defined what-registrations predicate for <seealso cref="GenerateResolutionExpressions"/>.</summary>
+        /// <summary>Returns true if service registration was marked as resolution root.</summary>
         public static Func<ServiceRegistrationInfo, bool> SetupAsResolutionRoots =
             r => r.Factory.Setup.AsResolutionRoot;
 
+        // todo: Cosolidate with other GenerateResolutionExpressions method
         /// <summary>Generates all resolution root and calls expressions.</summary>
         /// <param name="container">For container</param>
-        /// <param name="resolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
-        /// <param name="resolutionCalls">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
+        /// <param name="rootResolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
+        /// <param name="dependencyResolutions">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
+        /// <param name="rootServices">The services to generate registrations for.</param>
+        /// <returns>Errors happened when resolving corresponding registrations.</returns>
+        public static KeyValuePair<IServiceInfo, ContainerException>[] GenerateResolutionExpressions(
+            this IContainer container,
+            out KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] rootResolutions,
+            out KeyValuePair<RequestInfo, Expression>[] dependencyResolutions,
+            params IServiceInfo[] rootServices)
+        {
+            Throw.If(rootServices.IsNullOrEmpty());
+                
+            var generatingContainer = container.With(rules => rules
+                .WithoutEagerCachingSingletonForFasterAccess()
+                .WithoutImplicitCheckForReuseMatchingScope()
+                .WithDependencyResolutionCallExpressions());
+
+            var roots = new List<KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>>();
+            var errors = new List<KeyValuePair<IServiceInfo, ContainerException>>();
+            foreach (var rootService in rootServices)
+            {
+                try
+                {
+                    var request = Request.Create(generatingContainer, rootService.ServiceType, rootService.Details.ServiceKey);
+                    var factory = generatingContainer.ResolveFactory(request);
+                    var expression = factory?.GetExpressionOrDefault(request);
+                    if (expression == null)
+                        continue;
+
+
+                    roots.Add(rootService.PairWith(Container.WrapInFactoryExpression(expression)
+#if FEC_EXPRESSION_INFO
+                        .ToLambdaExpression()
+#endif
+                    ));
+
+                }
+                catch (ContainerException ex)
+                {
+                    errors.Add(rootService.PairWith(ex));
+                }
+            }
+
+            rootResolutions = roots.ToArray();
+
+            dependencyResolutions =
+                generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
+                .Select(r => r.Key.PairWith(r.Value))
+                .ToArray();
+
+            return errors.ToArray();
+        }
+
+        /// <summary>Generates all resolution root and calls expressions.</summary>
+        /// <param name="container">For container</param>
+        /// <param name="rootResolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
+        /// <param name="dependencyResolutions">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
         /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.
         /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations with <see cref="Setup.AsResolutionRoot"/>.</param>
         /// <returns>Errors happened when resolving corresponding registrations.</returns>
         public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] GenerateResolutionExpressions(
             this IContainer container,
-            out KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutions,
-            out KeyValuePair<RequestInfo, Expression>[] resolutionCalls,
+            out KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] rootResolutions,
+            out KeyValuePair<RequestInfo, Expression>[] dependencyResolutions,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
             var generatingContainer = container.With(rules => rules
@@ -2495,9 +2550,12 @@ namespace DryIoc
                 try
                 {
                     var request = Request.Create(generatingContainer, registration.ServiceType, registration.OptionalServiceKey);
-                    var factoryExpr = Container.WrapInFactoryExpression(registration.Factory.GetExpressionOrDefault(request));
+                    var factory = generatingContainer.ResolveFactory(request);
+                    var expression = factory?.GetExpressionOrDefault(request);
+                    if (expression == null)
+                        continue;
 
-                    roots.Add(new KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>(registration, factoryExpr
+                    roots.Add(registration.PairWith(Container.WrapInFactoryExpression(expression)
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
@@ -2506,20 +2564,21 @@ namespace DryIoc
                 }
                 catch (ContainerException ex)
                 {
-                    errors.Add(new KeyValuePair<ServiceRegistrationInfo, ContainerException>(registration, ex));
+                    errors.Add(registration.PairWith(ex));
                 }
             }
 
-            resolutions = roots.ToArray();
+            rootResolutions = roots.ToArray();
 
-            resolutionCalls = 
+            dependencyResolutions = 
                 generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
-                .Select(r => new KeyValuePair<RequestInfo, Expression>(r.Key, r.Value))
+                .Select(r => r.Key.PairWith(r.Value))
                 .ToArray();
 
             return errors.ToArray();
         }
 
+        // todo: Type[] for resolution roots is not enough, align with GenerateResolutionExpressions
         /// <summary>Used to find potential problems when resolving the passed services <paramref name="resolutionRoots"/>.
         /// Method will collect the exceptions when resolving or injecting the specific registration.
         /// Does not create any actual service objects.</summary>
@@ -3452,10 +3511,9 @@ namespace DryIoc
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
+        // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
         /// <summary>Appends dynamic registration rules.</summary>
-        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
-            // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
@@ -5369,8 +5427,8 @@ namespace DryIoc
         AsFixedArray
     }
 
-    /// <summary>Provides information required for service resolution: service type,
-    /// and optional <see cref="ServiceDetails"/>: key, what to do if service unresolved, and required service type.</summary>
+    /// <summary>Provides information required for service resolution: service type
+    /// and optional <see cref="ServiceDetails"/></summary>
     public interface IServiceInfo
     {
         /// <summary>The required piece of info: service type.</summary>
@@ -5380,7 +5438,6 @@ namespace DryIoc
         ServiceDetails Details { get; }
 
         /// <summary>Creates info from service type and details.</summary>
-        /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
         IServiceInfo Create(Type serviceType, ServiceDetails details);
     }
 
@@ -5458,9 +5515,10 @@ namespace DryIoc
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
             if (MetadataKey != null || Metadata != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", "))
-                    .Append("Metadata=").Append(new KeyValuePair<string, object>(MetadataKey, Metadata));
+                    .Append("Metadata=").Append(MetadataKey.PairWith(Metadata));
             if (IfUnresolved != IfUnresolved.Throw)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
+
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
@@ -5489,9 +5547,6 @@ namespace DryIoc
 
         /// <summary>Creates new info with new IfUnresolved behavior or returns the original info if behavior is not different,
         /// or the passed info is not a <see cref="ServiceDetails.HasCustomValue"/>.</summary>
-        /// <param name="source">Registered service type to search for.</param>
-        /// <param name="ifUnresolved">New If unresolved behavior.</param>
-        /// <returns>New info if the new details are different from the old one, and original info otherwise.</returns>
         public static IServiceInfo WithIfUnresolved(this IServiceInfo source, IfUnresolved ifUnresolved)
         {
             var details = source.Details;
@@ -5533,12 +5588,6 @@ namespace DryIoc
                     details.IfUnresolved, defaultValue, metadataKey, metadata);
             }
 
-            return WithRequiredServiceType(serviceInfo, details);
-        }
-
-        internal static T WithRequiredServiceType<T>(T serviceInfo, ServiceDetails details)
-            where T : IServiceInfo
-        {
             var serviceType = serviceInfo.ServiceType;
             var requiredServiceType = details.RequiredServiceType;
 
@@ -5547,10 +5596,11 @@ namespace DryIoc
                     details.ServiceKey, details.IfUnresolved, details.DefaultValue,
                     details.MetadataKey, details.Metadata);
 
+            // if service type unchanged and details absent, or details are the same return original info, otherwise create new one
             return serviceType == serviceInfo.ServiceType
-                   && (details == null || details == serviceInfo.Details)
-                ? serviceInfo // if service type unchanged and details absent, or details are the same return original info.
-                : (T)serviceInfo.Create(serviceType, details); // otherwise: create new.
+                && (details == null || details == serviceInfo.Details)
+                ? serviceInfo 
+                : (T)serviceInfo.Create(serviceType, details);
         }
 
         /// <summary>Enables propagation/inheritance of info between dependency and its owner:
@@ -6236,7 +6286,7 @@ namespace DryIoc
                 Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
-            var flags = _flags;
+            var flags = _flags & ~RequestFlags.TracksTransientDisposable;
             if (reuse == DryIoc.Reuse.Singleton)
             {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
@@ -6955,16 +7005,16 @@ namespace DryIoc
         /// <summary>Allows derived factories to override or reuse caching policy used by
         /// GetExpressionOrDefault. By default only service setup and no  user passed arguments may be cached.</summary>
         /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
-        protected virtual bool IsFactoryExpressionCacheable(Request request)
-            => Setup.FactoryType == FactoryType.Service
-            && Setup.Condition == null
-            && !Setup.UseParentReuse
-            && !Setup.AsResolutionCall
+        protected virtual bool IsFactoryExpressionCacheable(Request request) => false;
+            //=> Setup.FactoryType == FactoryType.Service
+            //&& Setup.Condition == null
+            //&& !Setup.UseParentReuse
+            //&& !Setup.AsResolutionCall
 
-            && request.InputArgs == null
-            && !request.IsResolutionCall
-            && !(request.Reuse is CurrentScopeReuse)
-            && !request.TracksTransientDisposable;
+            //&& request.InputArgs == null
+            //&& !request.IsResolutionCall
+            //&& !(request.Reuse is CurrentScopeReuse)
+            //&& !request.TracksTransientDisposable;
 
         private bool ShouldBeInjectedAsResolutionCall(Request request) =>
             !request.IsResolutionCall // is not already a resolution call
@@ -9302,7 +9352,7 @@ namespace DryIoc
         /// <param name="requiredServiceType">(optional) Registered or wrapped service type to use instead of <paramref name="serviceType"/>,
         ///     or wrapped type for generic wrappers.  The type should be assignable to return <paramref name="serviceType"/>.</param>
         /// <param name="preResolveParent">(optional) Dependency chain info.</param>
-        /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
+        /// <param name="args">(optional) To specify the depedency objects to use instead of resolving them from container.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> parameter.</returns>
         object Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent, object[] args);
@@ -9314,7 +9364,7 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
         /// <param name="preResolveParent">Dependency resolution path info.</param>
-        /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
+        /// <param name="args">(optional) To specify the depedency objects to use instead of resolving them from container.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey,
             Type requiredServiceType, RequestInfo preResolveParent, object[] args);
@@ -9350,16 +9400,14 @@ namespace DryIoc
 
         /// <summary>Provides registration order across all factory registrations in container.</summary>
         /// <remarks>May be repeated for factory registered with multiple services.</remarks>
-        public int FactoryRegistrationOrder;
+        public int FactoryRegistrationOrder => Factory.FactoryID;
 
         /// <summary>Creates info. Registration order is figured out automatically based on Factory.</summary>
-        /// <param name="factory"></param> <param name="serviceType"></param> <param name="optionalServiceKey"></param>
         public ServiceRegistrationInfo(Factory factory, Type serviceType, object optionalServiceKey)
         {
             ServiceType = serviceType;
             OptionalServiceKey = optionalServiceKey;
             Factory = factory;
-            FactoryRegistrationOrder = factory.FactoryID;
         }
 
         /// <inheritdoc />
@@ -9376,7 +9424,8 @@ namespace DryIoc
             if (OptionalServiceKey != null)
                 s.Append(" with ServiceKey=").Print(OptionalServiceKey, "\"");
 
-            s.Append(" registered as factory ").Append(Factory);
+            if (Factory != null)
+                s.Append(" registered as factory ").Append(Factory);
 
             return s.ToString();
         }

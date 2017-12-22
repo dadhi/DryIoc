@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016-2017 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -156,10 +156,8 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
-                // note: RegisterDelegate instead of UseInstance because of #381 (may be multiple instances)
-                container.RegisterDelegate(descriptor.ServiceType,
-                    _ => descriptor.ImplementationInstance,
-                    Reuse.Singleton);
+                container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance,
+                    IfAlreadyRegistered.AppendNotKeyed);
             }
         }
 
