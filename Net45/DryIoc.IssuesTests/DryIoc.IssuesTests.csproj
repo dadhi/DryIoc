@@ -178,11 +178,13 @@
     <Compile Include="Issue512_InResolutionScopeOf_is_not_working.cs" />
     <Compile Include="Issue519_Dependency_of_singleton_not_working_when_using_child_container.cs" />
     <Compile Include="Issue522_IncorrectApplicationOfSingletonReuse.cs" />
+    <Compile Include="Issue527_ErrorResolvemManyAfterUregister.cs" />
     <Compile Include="Issue530_Multi_tenancy_support.cs" />
     <Compile Include="Issue533_Exporting_WPF_UserControl_causes_NullReferenceException.cs" />
     <Compile Include="Issue541_Dynamic_Registrations_dont_detect_circular_dependencies.cs" />
     <Compile Include="Issue543_Dynamic_Registrations_dont_respect_shared_creation_policy.cs" />
     <Compile Include="Issue544_WithTrackingDisposableTransients_may_downgrade_Singletons_to_Transients.cs" />
+    <Compile Include="Issue545_Func_Of_Scoped.cs" />
     <Compile Include="Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
