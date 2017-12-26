@@ -67,7 +67,12 @@ namespace DryIoc.Microsoft.DependencyInjection
             var adapter = container.With(rules => rules
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithTrackingDisposableTransients());
+                .WithTrackingDisposableTransients()
+
+#if NETSTANDARD2_0
+                , new AsyncExecutionFlowScopeContext()
+#endif
+                );
 
             adapter.RegisterMany<DryIocServiceProvider>(
                 setup: Setup.With(useParentReuse: true),
@@ -221,18 +226,41 @@ namespace DryIoc.Microsoft.DependencyInjection
     public sealed class DryIocServiceScopeFactory: IServiceScopeFactory
     {
         /// <summary>Stores passed scoped container to open nested scope.</summary>
-        /// <param name="scopedContainer">Scoped container to be used to create nested scope.</param>
-        public DryIocServiceScopeFactory(IContainer scopedContainer)
+        /// <param name="scopedResolver">Scoped container to be used to create nested scope.</param>
+        public DryIocServiceScopeFactory(IResolverContext scopedResolver)
         {
-            _scopedContainer = scopedContainer;
+            _scopedResolver = scopedResolver;
         }
 
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
         /// <remarks>The scope name is defaulted to <see cref="Reuse.WebRequestScopeName"/>.</remarks>
         public IServiceScope CreateScope() => 
-            _scopedContainer.OpenScope(Reuse.WebRequestScopeName).Resolve<IServiceScope>();
+            _scopedResolver.OpenScope(Reuse.WebRequestScopeName).Resolve<IServiceScope>();
 
-        private readonly IContainer _scopedContainer;
+        private readonly IResolverContext _scopedResolver;
     }
+
+#if NETSTANDARD2_0
+
+    /// <summary>Stores scopes propagating through async-await boundaries.</summary>
+    sealed class AsyncExecutionFlowScopeContext : IScopeContext
+    {
+        /// <summary>Statically known name of root scope in this context.</summary>
+        public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
+
+        private static readonly System.Threading.AsyncLocal<IScope>
+            _ambientScope = new System.Threading.AsyncLocal<IScope>();
+
+        /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
+        public IScope GetCurrentOrDefault() => _ambientScope.Value;
+
+        /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
+        public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) =>
+            _ambientScope.Value = changeCurrentScope(GetCurrentOrDefault());
+
+        /// <summary>Nothing to dispose. Each scope should be disposed individually</summary>
+        public void Dispose() { }
+    }
+#endif
 }

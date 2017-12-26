@@ -24,5 +24,4 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Specification.Tests" Version="2.0.0" />
   </ItemGroup>
 
-
 </Project>

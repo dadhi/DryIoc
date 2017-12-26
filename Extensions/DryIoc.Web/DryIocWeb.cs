@@ -59,7 +59,7 @@ namespace DryIoc.Web
         private static int _initialized;
     }
 
-    /// <summary>Hooks up <see cref="Container.OpenScope"/> on request beginning and scope dispose on request end.</summary>
+    /// <summary>Hooks up <see cref="ResolverContext.OpenScope"/> on request beginning and scope dispose on request end.</summary>
     public sealed class DryIocHttpModule : IHttpModule
     {
         /// <summary>Initializes a module and prepares it to handle requests. </summary>

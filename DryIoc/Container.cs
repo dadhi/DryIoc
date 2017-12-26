@@ -507,22 +507,11 @@ namespace DryIoc
         public IScopeContext ScopeContext => _scopeContext;
 
         /// <inheritdoc />
-        public IResolverContext OpenScope(object name = null, bool trackInParent = false)
+        public IResolverContext WithScope(IScope scope)
         {
             ThrowIfContainerDisposed();
-
-            var openedScope = new Scope(_currentScope, name);
-
-            // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            if (_scopeContext != null)
-                _scopeContext.SetCurrent(scope =>
-                    openedScope.ThrowIf(scope != _currentScope, Error.NotDirectScopeParent, _currentScope, scope));
-
-            if (trackInParent)
-                (_currentScope ?? _singletonScope).TrackDisposable(openedScope);
-
-            return new Container(Rules, _registry,
-                _singletonScope, _scopeContext, openedScope, _disposed, _disposeStackTrace,
+            return new Container(Rules, _registry, _singletonScope, _scopeContext,
+                scope, _disposed, _disposeStackTrace,
                 parent: this, root: _root ?? this);
         }
 
@@ -2823,20 +2812,8 @@ namespace DryIoc
         /// <summary>Optional scope context associated with container.</summary>
         IScopeContext ScopeContext { get; }
 
-        /// <summary>Opens scope with optional name.</summary>
-        /// <param name="name">(optional)</param>
-        /// <param name="trackInParent">(optional) Instructs to additionally store the opened scope in parent, 
-        /// so it will be disposed when parent is disposed. If no parent scope is available the scope will be tracked by Singleton scope.
-        /// Used to dispose a resolution scope.</param>
-        /// <returns>Scoped resolver context.</returns>
-        /// <example><code lang="cs"><![CDATA[
-        /// using (var scope = container.OpenScope())
-        /// {
-        ///     var handler = scope.Resolve<IHandler>();
-        ///     handler.Handle(data);
-        /// }
-        /// ]]></code></example>
-        IResolverContext OpenScope(object name = null, bool trackInParent = false);
+        /// <summary>Wraps the scope in resolver context (or container which implements the context).</summary>
+        IResolverContext WithScope(IScope scope);
 
         /// <summary>Allows to put instance into the scope.</summary>
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
@@ -2856,7 +2833,7 @@ namespace DryIoc
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
-            typeof(IResolverContext).Method(nameof(IResolverContext.OpenScope));
+            typeof(ResolverContext).Method(nameof(OpenScope));
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expr GetRootOrSelfExpr(Request request) =>
@@ -2911,6 +2888,32 @@ namespace DryIoc
             }
 
             return throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, scope, name) : null;
+        }
+
+        /// <summary>Opens scope with optional name.</summary>
+        /// <param name="r">Parent context to use.</param>
+        /// <param name="name">(optional)</param>
+        /// <param name="trackInParent">(optional) Instructs to additionally store the opened scope in parent, 
+        /// so it will be disposed when parent is disposed. If no parent scope is available the scope will be tracked by Singleton scope.
+        /// Used to dispose a resolution scope.</param>
+        /// <returns>Scoped resolver context.</returns>
+        /// <example><code lang="cs"><![CDATA[
+        /// using (var scope = container.OpenScope())
+        /// {
+        ///     var handler = scope.Resolve<IHandler>();
+        ///     handler.Handle(data);
+        /// }
+        /// ]]></code></example>
+        public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
+        {
+            var openedScope = r.ScopeContext == null
+                ? new Scope(r.CurrentScope, name)
+                : r.ScopeContext.SetCurrent(currentScope => new Scope(currentScope, name));
+
+            if (trackInParent)
+                (openedScope.Parent ?? r.SingletonScope).TrackDisposable(openedScope);
+
+            return r.WithScope(openedScope);
         }
     }
 
@@ -5367,8 +5370,8 @@ namespace DryIoc
                 var scopeNameExpr = New(ResolutionScopeNameCtor, actualServiceTypeExpr, serviceKeyExpr);
                 var trackInParent = Constant(true);
 
-                resolverExpr = Call(Container.ResolverContextParamExpr,
-                    ResolverContext.OpenScopeMethod, scopeNameExpr, trackInParent);
+                resolverExpr = Call(ResolverContext.OpenScopeMethod,
+                    Container.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
             // Only parent is converted to be passed to Resolve.
@@ -9771,10 +9774,6 @@ namespace DryIoc
                 "No current scope available: probably you are registering to, or resolving from outside of scope."),
             ContainerIsDisposed = Of(
                 "Container is disposed and should not be used: {0}"),
-            NotDirectScopeParent = Of(
-                "Unable to OpenScope [{0}] because parent scope [{1}] is not current context scope [{2}]." +
-                Environment.NewLine +
-                "It is probably other scope was opened in between OR you forgot to Dispose some other scope!"),
             NoMatchedScopeFound = Of(
                 "Unable to find matching scope with name {1} starting from the current scope {0}."),
             NotSupportedMadeExpression = Of(

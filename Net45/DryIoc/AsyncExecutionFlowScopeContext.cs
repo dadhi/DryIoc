@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2014-2016 Maksim Volkau
+Copyright (c) 2014 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -55,7 +55,7 @@ namespace DryIoc
             return _ambientScope.Value;
 #else
             var scopeEntry = (ScopeEntry<IScope>)System.Runtime.Remoting.Messaging.CallContext.LogicalGetData(_scopeEntryKey);
-            return scopeEntry == null ? null : scopeEntry.Value;
+            return scopeEntry?.Value;
 #endif
         }
 
