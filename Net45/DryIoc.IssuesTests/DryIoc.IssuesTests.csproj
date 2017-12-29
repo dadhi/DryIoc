@@ -186,6 +186,7 @@
     <Compile Include="Issue544_WithTrackingDisposableTransients_may_downgrade_Singletons_to_Transients.cs" />
     <Compile Include="Issue545_Func_Of_Scoped.cs" />
     <Compile Include="Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs.cs" />
+    <Compile Include="Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
