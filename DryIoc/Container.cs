@@ -135,7 +135,7 @@ namespace DryIoc
             }
         }
 
-#region Static state
+        #region Static state
 
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParamExpr ResolverContextParamExpr =
@@ -192,7 +192,7 @@ namespace DryIoc
 
 #endregion
 
-#region IRegistrator
+        #region IRegistrator
 
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
         /// <returns>Existing registrations.</returns>
@@ -261,7 +261,7 @@ namespace DryIoc
 
 #endregion
 
-#region IResolver
+        #region IResolver
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -488,7 +488,7 @@ namespace DryIoc
 
 #endregion
 
-#region IResolverContext
+        #region IResolverContext
 
         /// <inheritdoc />
         public IResolverContext Parent => _parent;
@@ -741,7 +741,7 @@ namespace DryIoc
 
 #endregion
 
-#region IContainer
+        #region IContainer
 
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
@@ -1553,7 +1553,7 @@ namespace DryIoc
 
 #endregion
 
-#region Implementation
+        #region Implementation
 
         private int _disposed;
         private StackTrace _disposeStackTrace;
@@ -2597,24 +2597,12 @@ namespace DryIoc
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null) => 
             container.Validate(whatRegistrations);
 
-        /// <summary>Converts to self or system expression</summary>
-        public static Expression ToSystemExpression(this Expr expr) =>
-            expr
-#if FEC_EXPRESSION_INFO
-            .ToExpression()
-#endif
-            ;
-
-        /// <summary>Represents construction of whole request info stack as expression.</summary>
-        /// <param name="container">Required to access container facilities for expression conversion.</param>
-        /// <param name="request">Request info to convert to expression.</param>
-        /// <param name="opensResolutionScope">(optional) Will add <see cref="RequestFlags.OpensResolutionScope"/> to result expression.</param>
-        /// <returns>Returns result expression.</returns>
-        public static Expr RequestInfoToExpression(this IContainer container,
-            RequestInfo request, bool opensResolutionScope = false)
+        /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
+        public static Expr RequestInfoToExpression(this IContainer container, RequestInfo request,
+            RequestFlags requestParentFlags = default(RequestFlags))
         {
             if (request.IsEmpty)
-                return opensResolutionScope
+                return (requestParentFlags & RequestFlags.OpensResolutionScope) != 0
                     ? _emptyOpensResolutionScopeRequestInfoExpr.Value
                     : _emptyRequestInfoExpr.Value;
 
@@ -2630,9 +2618,8 @@ namespace DryIoc
             var metadata = request.Metadata;
             var factoryType = request.FactoryType;
             var ifUnresolved = request.IfUnresolved;
-            var flags = request.Flags;
-            if (opensResolutionScope)
-                flags |= RequestFlags.OpensResolutionScope;
+
+            var flags = request.Flags | requestParentFlags;
 
             var serviceTypeExpr = Constant(serviceType, typeof(Type));
             var factoryIdExpr = Constant(factoryID, typeof(int));
@@ -3164,8 +3151,7 @@ namespace DryIoc
                     ? null
                     : Constant(null, lazyType);
 
-            serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory,
-                skipRecursiveDependencyCheck: true);
+            serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
@@ -5165,46 +5151,30 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Returns true if <paramref name="serviceType"/> is registered in container or its open generic definition is registered in container.</summary>
-        /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="serviceType">The type of the registered service.</param>
-        /// <param name="serviceKey">(optional) Identifies registration via service key.
-        /// Not provided or <c>null</c> service key means to check the <paramref name="serviceType"/> alone with any service key.</param>
-        /// <param name="factoryType">(optional) factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
-        /// <param name="condition">(optional) condition to specify what registered factory do you expect.</param>
-        /// <returns>True if <paramref name="serviceType"/> is registered, false - otherwise.</returns>
+        /// <summary>Returns true if <paramref name="serviceType"/> is registered in container OR
+        /// its open generic definition is registered in container.
+        /// The additional implementation factory <paramref name="condition"/> may be specified to narrow the search.</summary>
         public static bool IsRegistered(this IRegistrator registrator, Type serviceType,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.IsRegistered(serviceType, serviceKey, factoryType, condition);
 
-        /// <summary>Returns true if <typeparamref name="TService"/> type is registered in container or its open generic definition is registered in container.</summary>
-        /// <typeparam name="TService">The type of service.</typeparam>
-        /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="serviceKey">(optional) Identifies registration via service key.
-        /// Not provided or <c>null</c> service key means to check the <typeparamref name="TService"/> alone with any service key.</param>
-        /// <param name="factoryType">(optional) factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
-        /// <param name="condition">(optional) condition to specify what registered factory do you expect.</param>
-        /// <returns>True if <typeparamref name="TService"/> name="serviceType"/> is registered, false - otherwise.</returns>
+        /// <summary>Returns true if <typeparamref name="TService"/> is registered in container OR
+        /// its open generic definition is registered in container.
+        /// The additional implementation factory <paramref name="condition"/> may be specified to narrow the search.</summary>
         public static bool IsRegistered<TService>(this IRegistrator registrator,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.IsRegistered(typeof(TService), serviceKey, factoryType, condition);
 
-        /// <summary>Removes specified registration from container.</summary>
-        /// <param name="registrator">Usually <see cref="Container"/> to explore or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="serviceType">Type of service to remove.</param>
-        /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        /// <param name="factoryType">(optional) Factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
-        /// <param name="condition">(optional) Condition for Factory to be removed.</param>
+        /// <summary>Removes specified registration from container.
+        /// It also tries to remove the cached resolutions for the removed registration, But it may not work depending on context.
+        /// Check the docs for more info: https://bitbucket.org/dadhi/dryioc/wiki/UnregisterAndResolutionCache </summary>
         public static void Unregister(this IRegistrator registrator, Type serviceType,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(serviceType, serviceKey, factoryType, condition);
 
-        /// <summary>Removes specified registration from container.</summary>
-        /// <typeparam name="TService">The type of service to remove.</typeparam>
-        /// <param name="registrator">Usually <see cref="Container"/> or any other <see cref="IRegistrator"/> implementation.</param>
-        /// <param name="serviceKey">(optional) Could be of any of type with overridden <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>.</param>
-        /// <param name="factoryType">(optional) Factory type to lookup, <see cref="FactoryType.Service"/> by default.</param>
-        /// <param name="condition">(optional) Condition for Factory to be removed.</param>
+        /// <summary>Removes specified registration from container.
+        /// It also tries to remove the cached resolutions for the removed registration, But it may not work depending on context.
+        /// Check the docs for more info: https://bitbucket.org/dadhi/dryioc/wiki/UnregisterAndResolutionCache </summary>
         public static void Unregister<TService>(this IRegistrator registrator,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(typeof(TService), serviceKey, factoryType, condition);
@@ -5345,7 +5315,7 @@ namespace DryIoc
         internal static readonly ConstructorInfo ResolutionScopeNameCtor = 
             typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
 
-        internal static Expr CreateResolutionExpression(Request request, bool openResolutionScope = false)
+        internal static Expr CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
             request.ContainsNestedResolutionCall = true;
 
@@ -5362,7 +5332,7 @@ namespace DryIoc
 
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
 
-            if (openResolutionScope)
+            if (opensResolutionScope)
             {
                 // Generates code:
                 // r => r.OpenScope(new ResolutionScopeName(serviceType, serviceKey)).Resolve(serviceType, serviceKey)
@@ -5376,13 +5346,16 @@ namespace DryIoc
 
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
-            var parentRequestInfo =
-                request.DirectRuntimeParent.IsEmpty
-                    ? request.PreResolveParent
-                    : request.DirectRuntimeParent.RequestInfo;
+            var runtimeParent = request.DirectRuntimeParent;
+            var parent = runtimeParent.IsEmpty ? request.PreResolveParent : runtimeParent.RequestInfo;
 
-            var preResolveParentExpr = container.RequestInfoToExpression(
-                parentRequestInfo, openResolutionScope);
+            var parentFlags = default(RequestFlags);
+            if (opensResolutionScope)
+                parentFlags |= RequestFlags.OpensResolutionScope;
+            if ((request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                parentFlags |= RequestFlags.StopRecursiveDependencyCheck;
+
+            var preResolveParentExpr = container.RequestInfoToExpression(parent, parentFlags);
 
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
@@ -5392,32 +5365,35 @@ namespace DryIoc
 
         private static void PopulateDependencyResolutionCallExpressions(Request request)
         {
-            // Actually calls nested Resolution Call and stores produced expression in collection
-            // if the collection to accumulate call expressions is defined and:
-            // 1. Resolve call is the first nested in chain
-            // 2. Resolve call is not repeated for recursive dependency, e.g. new A(new Lazy<r => r.Resolve<B>()>) and new B(new A())
-            var preResolveParent = request.PreResolveParent;
-            if (!preResolveParent.IsEmpty &&
-                (request.DirectRuntimeParent.IsEmpty || 
-                preResolveParent.EqualsWithoutParent(request.DirectRuntimeParent)))
+            // Actually calls nested Resolve and stores produced expression in collection inside the container Rules.
+            // Does this if only
+            // - Resolve call is the first in chain, not a nested Resolve
+            // - Resolve call is not repeated for recursive dependency,
+            // e.g. new A(new Lazy<B>(r => r.Resolve<B>()) and new B(new A())
+            if (!request.PreResolveParent.IsEmpty &&
+                (request.DirectRuntimeParent.IsEmpty ||
+                request.PreResolveParent.EqualsWithoutParent(request.DirectRuntimeParent)))
                 return;
 
             var container = request.Container;
 
-            var newRequest = Request.Create(container, request.ServiceType, request.ServiceKey,
+            request = Request.Create(container, request.ServiceType, request.ServiceKey,
                 request.IfUnresolved, request.RequiredServiceType, request.DirectParent);
 
-            var factory = container.ResolveFactory(newRequest);
+            var factory = container.ResolveFactory(request);
             if (factory == null || factory is FactoryPlaceholder)
                 return;
 
-            var factoryExpr = factory.GetExpressionOrDefault(newRequest);
+            var factoryExpr = factory.GetExpressionOrDefault(request);
             if (factoryExpr == null)
                 return;
 
             container.Rules.DependencyResolutionCallExpressions
-                .Swap(it => it.AddOrUpdate(newRequest.RequestInfo,
-                    Container.OptimizeExpression(factoryExpr).ToSystemExpression()));
+                .Swap(it => it.AddOrUpdate(request.RequestInfo, Container.OptimizeExpression(factoryExpr)
+#if FEC_EXPRESSION_INFO
+                        .ToExpression()
+#endif
+                ));
         }
     }
 
@@ -5972,16 +5948,21 @@ namespace DryIoc
     {
         /// <summary>Not inherited</summary>
         TracksTransientDisposable = 1 << 1,
+
         /// <summary>Not inherited</summary>
         IsServiceCollection = 1 << 2,
 
         /// <summary>Inherited</summary>
         IsSingletonOrDependencyOfSingleton = 1 << 3,
+
         /// <summary>Inherited</summary>
         IsWrappedInFunc = 1 << 4,
 
         /// <summary>Non inherited</summary>
-        OpensResolutionScope = 1 << 6
+        OpensResolutionScope = 1 << 6,
+
+        /// <summary>Non inherited</summary>
+        StopRecursiveDependencyCheck = 1 << 7
     }
 
     /// <summary>Tracks the requested service and resolved factory details in a chain of nested dependencies.</summary>
@@ -5990,21 +5971,15 @@ namespace DryIoc
         /// <summary>Not inherited down dependency chain.</summary>
         public static readonly RequestFlags NotInheritedFlags
             = RequestFlags.TracksTransientDisposable
-            | RequestFlags.IsServiceCollection;
+            | RequestFlags.IsServiceCollection
+            | RequestFlags.StopRecursiveDependencyCheck;
 
         private static readonly Request _empty =
             new Request(null, null, ServiceInfo.Empty, null, null, null, default(RequestFlags), null);
 
         /// <summary>Creates empty request associated with container.
-        /// The shared part of request is stored in request context. Pre-request info is also store once in shared context.</summary>
-        /// <param name="container">Associated container - part of request context.</param>
-        /// <param name="serviceType">Service type to resolve.</param>
-        /// <param name="serviceKey">(optional) Service key to resolve.</param>
-        /// <param name="ifUnresolved">(optional) How to handle unresolved service.</param>
-        /// <param name="requiredServiceType">(optional) Actual registered or unwrapped service type to look for.</param>
-        /// <param name="preResolveParent">(optional) Request info preceding Resolve call.</param>
-        /// <param name="args">(optional) Arguments provided by Resolve call.</param>
-        /// <returns>New request with provided info.</returns>
+        /// The shared part of request is stored in request context.
+        /// Pre-request info is also stored once in shared context.</summary>
         public static Request Create(IContainer container, Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             RequestInfo preResolveParent = null, object[] args = null)
@@ -6017,8 +5992,9 @@ namespace DryIoc
 
             IServiceInfo serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
 
-            // inherit some flags and service details from parent (if any)
             var flags = default(RequestFlags);
+
+            // inherit some flags and service details from parent (if any)
             if (!preResolveParent.IsEmpty)
             {
                 serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(
@@ -6273,23 +6249,31 @@ namespace DryIoc
                     decoratedFactory = Factory;
             }
 
-            if (factory.FactoryType == FactoryType.Service && !skipRecursiveDependencyCheck)
-                for (var p = DirectRuntimeParent; !p.IsEmpty; p = p.DirectRuntimeParent)
+            if (!skipRecursiveDependencyCheck && factory.FactoryType == FactoryType.Service)
+            {
+                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                {
+                    if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                        break; // stop on specifically marked request
                     if (p.FactoryID == factory.FactoryID)
                         Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
+                }
+            }
 
-            IReuse reuse;
-            if (IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs)
-                reuse = DryIoc.Reuse.Transient;
-            else
-                reuse = factory.Reuse ?? GetDefaultReuse(factory);
+            // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
+            var flags = _flags & ~RequestFlags.TracksTransientDisposable;
+            if (skipRecursiveDependencyCheck)
+                flags |= RequestFlags.StopRecursiveDependencyCheck;
+
+            var reuse = IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs
+                ? DryIoc.Reuse.Transient
+                : factory.Reuse ?? GetDefaultReuse(factory);
 
             if (reuse.Lifespan != 0 &&
                 !skipCaptiveDependencyCheck &&
                 Rules.ThrowIfDependencyHasShorterReuseLifespan)
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
 
-            var flags = _flags & ~RequestFlags.TracksTransientDisposable;
             if (reuse == DryIoc.Reuse.Singleton)
             {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
@@ -6302,6 +6286,7 @@ namespace DryIoc
             }
 
             _requestContext.IncrementDependencyCount();
+
             return new Request(_requestContext,
                 DirectRuntimeParent, _serviceInfo, factory, reuse, InputArgs, flags, decoratedFactory);
         }

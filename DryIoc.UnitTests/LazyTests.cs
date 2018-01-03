@@ -115,7 +115,7 @@ namespace DryIoc.UnitTests
 
             var me = container.Resolve<Me>();
 
-            Assert.That(me.Self.Value, Is.InstanceOf<Me>());
+            Assert.IsInstanceOf<Me>(me.Self.Value);
         }
 
         [Test]

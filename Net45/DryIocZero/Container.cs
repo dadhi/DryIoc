@@ -465,7 +465,7 @@ namespace DryIocZero
         }
 
         /// <summary>Allows to open scope with the provided name and specified tracking option.</summary>
-        public static IResolverContext OpenScope(IResolverContext r, object name = null, bool trackInParent = false)
+        public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
             var openedScope = r.ScopeContext == null
                 ? new Scope(r.CurrentScope, name)

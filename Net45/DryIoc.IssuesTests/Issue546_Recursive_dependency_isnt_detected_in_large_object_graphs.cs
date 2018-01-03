@@ -9,7 +9,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs
     {
-        [Test, Ignore("Fails")]
+        [Test]
         public void Circular_dependencies_in_large_object_graphs_should_be_detected()
         {
             // ordinary registration — simulate large object graph by lowering the max size
@@ -24,7 +24,7 @@ namespace DryIoc.IssuesTests
             });
         }
 
-        [Test, Ignore("Fails")]
+        [Test]
         public void Circular_dependencies_in_large_object_graphs_should_be_detected_even_for_dynamic_registrations()
         {
             // register dynamically
