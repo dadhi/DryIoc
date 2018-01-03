@@ -115,7 +115,7 @@ namespace DryIoc.MefAttributedModel
             typeof(AttributedModel).Method(nameof(NotifyImportsSatisfied), includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            (Func<Request, bool>)(request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification))),
+            r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(),
             order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
             useDecorateeReuse: true);
 
@@ -158,7 +158,7 @@ namespace DryIoc.MefAttributedModel
         {
             /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
             public static implicit operator KeyValuePair<TPart, Action>(PartAndDisposeActionPair<TPart> source) =>
-                source.Part.PairWith(source.DisposeAction);
+                source.Part.Pair(source.DisposeAction);
 
             /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
             public static implicit operator Tuple<TPart, Action>(PartAndDisposeActionPair<TPart> source) =>
@@ -535,7 +535,7 @@ namespace DryIoc.MefAttributedModel
                         otherServiceExports[e.ServiceTypeFullName] =
                             expRegs = new List<KeyValuePair<object, ExportedRegistrationInfo>>();
 
-                    expRegs.Add(e.ServiceKey.PairWith(reg));
+                    expRegs.Add(e.ServiceKey.Pair(reg));
                 }
             }
 
@@ -713,7 +713,7 @@ namespace DryIoc.MefAttributedModel
                 : withMetadataAttr.MetadataKey == null ? Constants.ExportMetadataDefaultKey
                 : withMetadataAttr.MetadataKey;
 
-            return metadataKey.PairWith(metadata);
+            return metadataKey.Pair(metadata);
         }
 
         private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
@@ -739,7 +739,7 @@ namespace DryIoc.MefAttributedModel
 
             if (serviceKey != null)
             {
-                var serviceKeyMetadata = (serviceKey.GetHashCode() + ":" + serviceType.FullName).PairWith(serviceKey);
+                var serviceKeyMetadata = (serviceKey.GetHashCode() + ":" + serviceType.FullName).Pair(serviceKey);
 
                 setupMetadata = setupMetadata ?? new Dictionary<string, object>();
                 setupMetadata.Add(serviceKeyMetadata.Key, serviceKeyMetadata.Value);
@@ -1418,7 +1418,7 @@ namespace DryIoc.MefAttributedModel
             var condition = ConditionType == null
                 ? (Func<Request, bool>)null
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
-                    .Evaluate(ConvertRequestInfo(r.RequestInfo));
+                    .Evaluate(ConvertRequestInfo(r));
 
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
@@ -1451,7 +1451,7 @@ namespace DryIoc.MefAttributedModel
             return metaAttrs;
         }
 
-        private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo source)
+        private static RequestInfo ConvertRequestInfo(Request source)
         {
             if (source.IsEmpty)
                 return RequestInfo.Empty;

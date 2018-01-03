@@ -638,7 +638,7 @@ namespace ImTools
     public static class KeyValuePair
     {
         /// <summary>Pairs key with value.</summary>
-        public static KeyValuePair<K, V> PairWith<K, V>(this K key, V value) =>
+        public static KeyValuePair<K, V> Pair<K, V>(this K key, V value) =>
             new KeyValuePair<K, V>(key, value);
     }
 

@@ -203,7 +203,7 @@ namespace DryIoc.UnitTests
 
             registrator.RegisterInitializer<object>(
                 (service, r) => r.Resolve<TransientDisposablesTracker>().Track((IDisposable)service),
-                r => r.ReuseLifespan == 0 && r.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IDisposable)));
+                r => r.ReuseLifespan == 0 && r.GetKnownImplementationOrServiceType().IsAssignableTo<IDisposable>());
         }
 
         public class TransientDisposablesTracker : IDisposable
