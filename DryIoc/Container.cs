@@ -3594,9 +3594,6 @@ namespace DryIoc
 
         /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// The resolution creates Transient services.</summary>
-        /// <param name="condition">(optional) Condition for requested service type and key.</param>
-        /// <param name="reuse">(optional) Reuse.</param>
-        /// <returns>New rules.</returns>
         public Rules WithConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
@@ -3652,7 +3649,7 @@ namespace DryIoc
         }
 
         /// <summary>Obsolete: replaced by <see cref="AutoFallbackDynamicRegistrations"/></summary>
-        [Obsolete("Replaced by AutoFallbackDynamicRegistrations", false)]
+        [Obsolete("Replaced by " + nameof(AutoFallbackDynamicRegistrations), false)]
         public static UnknownServiceResolver AutoRegisterUnknownServiceRule(IEnumerable<Type> implTypes,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null, Func<Request, bool> condition = null) =>
             request =>
@@ -3694,9 +3691,6 @@ namespace DryIoc
         /// without side-effects or external dependencies.
         /// e.g. for string "blah" <code lang="cs"><![CDATA[]]>Expression.Constant("blah", typeof(string))</code>.
         /// If unable to convert should return null.</summary>
-        /// <param name="item">Item object. Item is not null.</param>
-        /// <param name="itemType">Item type. Item type is not null.</param>
-        /// <returns>Expression or null.</returns>
         public delegate Expr ItemToExpressionConverterRule(object item, Type itemType);
 
         /// <summary><see cref="WithItemToExpressionConverter"/>.</summary>
