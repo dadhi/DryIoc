@@ -352,7 +352,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules.WithItemToExpressionConverter(
                 (item, type) => type == typeof(ConnectionString)
-                ? New(type.Constructor(), Constant(((ConnectionString)item).Value))
+                ? New(type.SingleConstructor(), Constant(((ConnectionString)item).Value))
                 : null));
 
             var s = new ConnectionString("aaa");

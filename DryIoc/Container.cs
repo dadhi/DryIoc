@@ -1166,16 +1166,15 @@ namespace DryIoc
         public Expr GetCachedFactoryExpressionOrDefault(int factoryID) =>
             _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID);
 
-        /// <summary>Converts known items into custom expression or wraps it in a constant expression.</summary>
-        public Expr GetItemExpression(object item, Type itemType = null,
-            bool throwIfStateRequired = false)
+        /// <summary>Converts known item into literal expression or wraps it in a constant expression.</summary>
+        public Expr GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
                 return itemType == null ? Constant(null) : Constant(null, itemType);
 
             var convertible = item as IConvertibleToExpression;
             if (convertible != null)
-                return convertible.ToExpression(it => GetItemExpression(it));
+                return convertible.ToExpression(it => GetConstantExpression(it));
 
             var actualItemType = item.GetType();
             if (actualItemType.GetGenericDefinitionOrNull() == typeof(KV<,>))
@@ -1183,9 +1182,9 @@ namespace DryIoc
                 var kvArgTypes = actualItemType.GetGenericParamsAndArgs();
                 var kvOfMethod = _kvOfMethod.MakeGenericMethod(kvArgTypes);
                 return Call(kvOfMethod,
-                    GetItemExpression(actualItemType.Field("Key").GetValue(item),
+                    GetConstantExpression(actualItemType.Field("Key").GetValue(item),
                         kvArgTypes[0], throwIfStateRequired),
-                    GetItemExpression(actualItemType.Field("Value").GetValue(item),
+                    GetConstantExpression(actualItemType.Field("Value").GetValue(item),
                         kvArgTypes[1], throwIfStateRequired));
             }
 
@@ -1196,7 +1195,7 @@ namespace DryIoc
             if (actualItemType.IsArray)
             {
                 var elems = ((object[])item)
-                    .Map(it => GetItemExpression(it, null, throwIfStateRequired));
+                    .Map(it => GetConstantExpression(it, null, throwIfStateRequired));
                 return NewArrayInit(actualItemType.GetElementType().ThrowIfNull(), elems);
             }
 
@@ -1210,7 +1209,7 @@ namespace DryIoc
             return itemType == null ? Constant(item) : Constant(item, itemType);
         }
 
-        private static readonly MethodInfo _kvOfMethod = typeof(KV).Method(nameof(KV.Of));
+        private static readonly MethodInfo _kvOfMethod = typeof(KV).SingleMethod(nameof(KV.Of));
 
         #endregion
 
@@ -2609,7 +2608,7 @@ namespace DryIoc
             var implTypeExpr = Constant(implementationType, typeof(Type));
             var reuseExpr = request.Reuse == null
                 ? Constant(null, typeof(IReuse))
-                : request.Reuse.ToExpression(it => container.GetItemExpression(it));
+                : request.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (ifUnresolved == IfUnresolved.Throw &&
                 requiredServiceType == null && serviceKey == null && metadataKey == null && metadata == null &&
@@ -2618,7 +2617,7 @@ namespace DryIoc
                     serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
 
             var requiredServiceTypeExpr = Constant(requiredServiceType, typeof(Type));
-            var servicekeyExpr = Convert(container.GetItemExpression(serviceKey), typeof(object));
+            var servicekeyExpr = Convert(container.GetConstantExpression(serviceKey), typeof(object));
             var factoryTypeExpr = Constant(factoryType, typeof(FactoryType));
             var flagsExpr = Constant(flags, typeof(RequestFlags));
 
@@ -2637,7 +2636,7 @@ namespace DryIoc
                     factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr, decoratedFactoryIDExpr);
 
             var metadataKeyExpr = Constant(metadataKey, typeof(string));
-            var metadataExpr = Convert(container.GetItemExpression(metadata), typeof(object));
+            var metadataExpr = Convert(container.GetConstantExpression(metadata), typeof(object));
 
             return Call(parentExpr, Request.PushMethodWith12Args.Value,
                 serviceTypeExpr, requiredServiceTypeExpr, servicekeyExpr, metadataKeyExpr, metadataExpr, ifUnresolvedExpr,
@@ -2680,7 +2679,7 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
-            typeof(DefaultKey).Method(nameof(Of));
+            typeof(DefaultKey).SingleMethod(nameof(Of));
 
         /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
@@ -2721,7 +2720,7 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultDynamicKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
-            typeof(DefaultDynamicKey).Method(nameof(Of));
+            typeof(DefaultDynamicKey).SingleMethod(nameof(Of));
 
         /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
@@ -2788,7 +2787,7 @@ namespace DryIoc
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
-            typeof(ResolverContext).Method(nameof(OpenScope));
+            typeof(ResolverContext).SingleMethod(nameof(OpenScope));
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expr GetRootOrSelfExpr(Request request) =>
@@ -2802,7 +2801,7 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expr RootOrSelfExpr =
-            Call(typeof(ResolverContext).Method(nameof(RootOrSelf)), Container.ResolverContextParamExpr);
+            Call(typeof(ResolverContext).SingleMethod(nameof(RootOrSelf)), Container.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expr SingletonScopeExpr =
@@ -2982,7 +2981,7 @@ namespace DryIoc
         }
 
         internal static readonly Lazy<MethodInfo> ToArrayMethod =
-            new Lazy<MethodInfo>(() => typeof(Enumerable).Method(nameof(Enumerable.ToArray)));
+            new Lazy<MethodInfo>(() => typeof(Enumerable).SingleMethod(nameof(Enumerable.ToArray)));
 
         private static Expr GetArrayExpression(Request request)
         {
@@ -3089,7 +3088,7 @@ namespace DryIoc
 
             var callResolveManyExpr = Call(resolverExpr, Resolver.ResolveManyMethod,
                 Constant(itemType),
-                container.GetItemExpression(request.ServiceKey),
+                container.GetConstantExpression(request.ServiceKey),
                 Constant(requiredItemType),
                 preResolveParentExpr,
                 request.GetInputArgsExpr());
@@ -3097,11 +3096,11 @@ namespace DryIoc
             // cast to object is not required cause Resolve already return IEnumerable<object>
             if (itemType != typeof(object))
             {
-                var castMethod = typeof(Enumerable).Method(nameof(Enumerable.Cast));
+                var castMethod = typeof(Enumerable).SingleMethod(nameof(Enumerable.Cast));
                 callResolveManyExpr = Call(castMethod.MakeGenericMethod(itemType), callResolveManyExpr);
             }
 
-            return New(typeof(LazyEnumerable<>).MakeGenericType(itemType).Constructor(), callResolveManyExpr);
+            return New(typeof(LazyEnumerable<>).MakeGenericType(itemType).SingleConstructor(), callResolveManyExpr);
         }
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
@@ -3221,8 +3220,8 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            var keyExpr = request.Container.GetItemExpression(serviceKey, serviceKeyType);
-            var pairExpr = New(keyValueType.Constructor(), keyExpr, serviceExpr);
+            var keyExpr = request.Container.GetConstantExpression(serviceKey, serviceKeyType);
+            var pairExpr = New(keyValueType.SingleConstructor(), keyExpr, serviceExpr);
             return pairExpr;
         }
 
@@ -3317,7 +3316,7 @@ namespace DryIoc
                     resultMetadata = resultMetadataDict.Values.FirstOrDefault(m => metadataType.IsTypeOf(m));
             }
 
-            var metadataExpr = request.Container.GetItemExpression(resultMetadata, metadataType);
+            var metadataExpr = request.Container.GetConstantExpression(resultMetadata, metadataType);
             return New(metaCtor, serviceExpr, metadataExpr);
         }
     }
@@ -3913,6 +3912,16 @@ namespace DryIoc
         /// <returns>New factory method wrapper.</returns>
         public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
         {
+            ctorOrMethodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
+
+            if (!(ctorOrMethodOrMember is ConstructorInfo) && !ctorOrMethodOrMember.IsStatic())
+            {
+                if (factoryInfo == null)
+                    Throw.It(Error.PassedMemberIsNotStaticButInstanceFactoryIsNull, ctorOrMethodOrMember);
+            }
+            else if (factoryInfo != null)
+                Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+
             return new FactoryMethod(ctorOrMethodOrMember, factoryInfo);
         }
 
@@ -3929,7 +3938,7 @@ namespace DryIoc
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString() =>
             new StringBuilder().Print(ConstructorOrMethodOrMember.DeclaringType)
-                .Append("::").Append(ConstructorOrMethodOrMember).ToString();
+                .Append('.').Append(ConstructorOrMethodOrMember).ToString();
 
         /// <summary>Easy way to specify non-public and most resolvable constructor.</summary>
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param>
@@ -3942,7 +3951,7 @@ namespace DryIoc
                 var implType = request.ImplementationType
                     .ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
 
-                var ctors = implType.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
+                var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
                 if (ctors.Length == 0)
                     return null;
 
@@ -4161,23 +4170,21 @@ namespace DryIoc
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo),
-                parameters, propertiesAndFields);
+            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)),
-                parameters, propertiesAndFields);
+            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), parameters, propertiesAndFields);
 
         /// <summary>Defines how to select constructor from implementation type.
         /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
         /// and returning selected constructor info.</summary>
         public static Made Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType)
-                .ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
+            Of(r => DryIoc.FactoryMethod.Of(
+                getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
                 parameters, propertiesAndFields);
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
@@ -4245,7 +4252,7 @@ namespace DryIoc
             {
                 var invokeExpr = (InvocationExpression)callExpr;
                 var invokedDelegateExpr = invokeExpr.Expression;
-                var invokeMethod = invokedDelegateExpr.Type.Method("Invoke");
+                var invokeMethod = invokedDelegateExpr.Type.SingleMethod("Invoke");
                 ctorOrMethodOrMember = invokeMethod;
                 parameters = invokeMethod.GetParameters();
                 argExprs = invokeExpr.Arguments;
@@ -4261,7 +4268,7 @@ namespace DryIoc
             else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeExpression, callExpr);
 
             FactoryMethodSelector factoryMethod = request =>
-                DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo == null ? null : getFactoryInfo(request));
+                DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo?.Invoke(request));
 
             var hasCustomValue = false;
 
@@ -5038,7 +5045,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _initializerMethod =
-            typeof(Registrator).Method(nameof(Initializer), includeNonPublic: true);
+            typeof(Registrator).SingleMethod(nameof(Initializer), includeNonPublic: true);
 
         internal static TService Initializer<TTarget, TService>(
             TService service, IResolver resolver, Action<TTarget, IResolver> initialize) where TService : TTarget
@@ -5139,7 +5146,7 @@ namespace DryIoc
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
 
         internal static readonly MethodInfo ResolveManyMethod =
-            typeof(IResolver).Method(nameof(IResolver.ResolveMany));
+            typeof(IResolver).SingleMethod(nameof(IResolver.ResolveMany));
 
         /// <summary>Resolves instance of service type from container. Throws exception if unable to resolve.</summary>
         public static object Resolve(this IResolver resolver, Type serviceType) =>
@@ -5274,7 +5281,7 @@ namespace DryIoc
             var serviceTypeExpr = Constant(request.ServiceType, typeof(Type));
             var ifUnresolvedExpr = Constant(request.IfUnresolved, typeof(IfUnresolved));
             var requiredServiceTypeExpr = Constant(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = container.GetItemExpression(request.ServiceKey, typeof(object));
+            var serviceKeyExpr = container.GetConstantExpression(request.ServiceKey, typeof(object));
 
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
 
@@ -7149,7 +7156,7 @@ namespace DryIoc
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
                 serviceExpr = Call(
-                    typeof(ThrowInGeneratedCode).Method(nameof(ThrowInGeneratedCode.ThrowNewErrorIfNull)),
+                    typeof(ThrowInGeneratedCode).SingleMethod(nameof(ThrowInGeneratedCode.ThrowNewErrorIfNull)),
                     Property(Convert(serviceExpr, typeof(WeakReference)),
                         typeof(WeakReference).Property(nameof(WeakReference.Target))),
                     Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
@@ -7673,7 +7680,7 @@ namespace DryIoc
                                 var customValue = paramInfo.Details.CustomValue;
                                 if (customValue != null)
                                     customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
-                                paramExpr = container.GetItemExpression(customValue, paramRequest.ServiceType);
+                                paramExpr = container.GetConstantExpression(customValue, paramRequest.ServiceType);
                             }
                             else
                             {
@@ -7691,7 +7698,7 @@ namespace DryIoc
 
                                     var defaultValue = paramInfo.Details.DefaultValue;
                                     paramExpr = defaultValue != null
-                                        ? container.GetItemExpression(defaultValue)
+                                        ? container.GetConstantExpression(defaultValue)
                                         : paramRequest.ServiceType.GetDefaultValueExpression();
                                 }
                             }
@@ -7715,7 +7722,7 @@ namespace DryIoc
             var implType = ImplementationType;
             if (Made.FactoryMethod == null && rules.FactoryMethod == null)
             {
-                var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
+                var ctors = implType.PublicConstructors().ToArrayOrSelf();
                 if (ctors.Length == 1)
                     _knownSingleCtor = ctors[0];
                 else if (ctors.Length == 0)
@@ -7993,7 +8000,7 @@ namespace DryIoc
                     var customValue = member.Details.CustomValue;
                     if (customValue != null)
                         customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                    memberExpr = container.GetItemExpression(customValue, memberRequest.ServiceType);
+                    memberExpr = container.GetConstantExpression(customValue, memberRequest.ServiceType);
                 }
                 else
                 {
@@ -8047,27 +8054,9 @@ namespace DryIoc
         {
             var implType = request.ImplementationType;
             var factoryMethodSelector = Made.FactoryMethod ?? request.Rules.FactoryMethod;
-            if (factoryMethodSelector == null)
-            {
-                // there is a guarantee of single constructor, which was checked on factory registration
-                var ctor = _knownSingleCtor ?? implType.GetPublicInstanceConstructors().First();
-                return FactoryMethod.Of(ctor);
-            }
-
-            var factoryMethod = factoryMethodSelector(request);
-            if (factoryMethod != null && !(factoryMethod.ConstructorOrMethodOrMember is ConstructorInfo))
-            {
-                var member = factoryMethod.ConstructorOrMethodOrMember;
-                var isStaticMember = member.IsStatic();
-
-                Throw.If(isStaticMember && factoryMethod.FactoryServiceInfo != null,
-                    Error.FactoryObjProvidedButMethodIsStatic, factoryMethod.FactoryServiceInfo, factoryMethod, request);
-
-                Throw.If(!isStaticMember && factoryMethod.FactoryServiceInfo == null,
-                    Error.FactoryObjIsNullInFactoryMethod, factoryMethod, request);
-            }
-
-            return factoryMethod.ThrowIfNull(Error.UnableToGetConstructorFromSelector, implType, request);
+            return factoryMethodSelector != null
+                ? factoryMethodSelector(request).ThrowIfNull(Error.UnableToSelectCtor, implType, request)
+                : FactoryMethod.Of(_knownSingleCtor ?? implType.SingleConstructor());
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
@@ -8373,7 +8362,7 @@ namespace DryIoc
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
         public override Expr CreateExpressionOrDefault(Request request)
         {
-            var delegateExpr = request.Container.GetItemExpression(_factoryDelegate);
+            var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate);
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
         }
@@ -8474,7 +8463,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
-            typeof(IScope).Method(nameof(IScope.GetOrAdd));
+            typeof(IScope).SingleMethod(nameof(IScope.GetOrAdd));
 
         /// <inheritdoc />
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
@@ -8535,7 +8524,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
-            typeof(IScope).Method(nameof(IScope.TrackDisposable));
+            typeof(IScope).SingleMethod(nameof(IScope.TrackDisposable));
 
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalIndex = -1)
@@ -8758,7 +8747,7 @@ namespace DryIoc
                 if (Name == null)
                     return Call(_trackScopedMethod, rExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
-                var nameExpr = request.Container.GetItemExpression(Name, typeof(object));
+                var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
                 return Call(_trackNameScopedMethod, rExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
@@ -8773,7 +8762,7 @@ namespace DryIoc
                 if (Name == null)
                     return Call(_getScopedMethod, rExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
 
-                var nameExpr = request.Container.GetItemExpression(Name, typeof(object));
+                var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
                 return Call(_getNameScopedMethod, rExpr, nameExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
             }
         }
@@ -8808,41 +8797,41 @@ namespace DryIoc
             (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
 
         private static readonly MethodInfo _trackScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).Method(nameof(TrackScopedOrSingleton), true);
+            typeof(CurrentScopeReuse).SingleMethod(nameof(TrackScopedOrSingleton), true);
 
         internal static object GetScopedOrSingleton(IResolverContext r,
             int id, CreateScopedValue createValue, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
 
         private static readonly MethodInfo _getScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).Method(nameof(GetScopedOrSingleton), true);
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedOrSingleton), true);
 
         internal static object GetScoped(IResolverContext r,
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
         private static readonly MethodInfo _getScopedMethod =
-            typeof(CurrentScopeReuse).Method(nameof(GetScoped), true);
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScoped), true);
 
         internal static object GetNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
         private static readonly MethodInfo _getNameScopedMethod =
-            typeof(CurrentScopeReuse).Method(nameof(GetNameScoped), true);
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScoped), true);
 
         internal static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
             r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);
 
         private static readonly MethodInfo _trackScopedMethod =
-            typeof(CurrentScopeReuse).Method(nameof(TrackScoped), true);
+            typeof(CurrentScopeReuse).SingleMethod(nameof(TrackScoped), true);
 
         internal static object TrackNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, object item) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(item);
 
         private static readonly MethodInfo _trackNameScopedMethod =
-            typeof(CurrentScopeReuse).Method(nameof(TrackNameScoped), true);
+            typeof(CurrentScopeReuse).SingleMethod(nameof(TrackNameScoped), true);
 
         private readonly Lazy<Expr> _scopedExpr = new Lazy<Expr>(() =>
             Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
@@ -9271,7 +9260,7 @@ namespace DryIoc
         /// <param name="throwIfStateRequired">(optional) Throws for non-primitive and not-recognized items,
         /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
-        Expr GetItemExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
+        Expr GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
 
         /// <summary>Clears cache for specified service(s). But does not clear instances of already resolved/created singletons and scoped services!</summary>
         /// <param name="serviceType">Target service type.</param>
@@ -9438,7 +9427,7 @@ namespace DryIoc
                 "Scope {0} is disposed and scoped instances are disposed and no longer available."),
             NotFoundOpenGenericImplTypeArgInService = Of(
                 "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
-            UnableToGetConstructorFromSelector = Of(
+            UnableToSelectCtor = Of(
                 "Unable to get constructor of {0} using provided constructor selector when resolving {1}."),
             UnableToFindCtorWithAllResolvableArgs = Of(
                 "Unable to find constructor with all resolvable parameters when resolving {0}."),
@@ -9464,10 +9453,6 @@ namespace DryIoc
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
             ServiceIsNotAssignableFromFactoryMethod = Of(
                 "Service of {0} is not assignable from factory method {1} when resolving: {2}."),
-            FactoryObjIsNullInFactoryMethod = Of(
-                "Unable to use null factory object with *instance* factory method {0} when resolving: {1}."),
-            FactoryObjProvidedButMethodIsStatic = Of(
-                "Factory instance provided {0} But factory method is static {1} when resolving: {2}."),
             GotNullConstructorFromFactoryMethod = Of(
                 "Got null constructor when resolving {0}"),
             UnableToRegisterDuplicateDefault = Of(
@@ -9542,7 +9527,13 @@ namespace DryIoc
                 "because decorator may be applied to multiple service of any key." + Environment.NewLine +
                 "If you wanted to apply decorator to services of specific key please use `setup: Setup.DecoratorOf(serviceKey: blah)`"),
             RuntimeInfoIsNotAvailableInRequest = Of(
-                "Runtime information (including `Container`) is not available in request: {0}");
+                "Runtime information (including `Container`) is not available in request: {0}"),
+            PassedCtorOrMemberIsNull = Of(
+                "The costructor of member info passed to `Made.Of` or `FactoryMethod.Of` is null"),
+            PassedMemberIsNotStaticButInstanceFactoryIsNull = Of(
+                "The member info {0} passed to `Made.Of` or `FactoryMethod.Of` is NOT static, but instance factory is not provided or null"),
+            PassedMemberIsStaticButInstanceFactoryIsNotNull = Of(
+                "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing an INSTANCE factory: {1}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
@@ -9940,48 +9931,44 @@ namespace DryIoc
         }
 
         /// <summary>Returns all public instance constructors for the type</summary>
-        public static IEnumerable<ConstructorInfo> GetPublicInstanceConstructors(this Type type) =>
+        public static IEnumerable<ConstructorInfo> PublicConstructors(this Type type) =>
             type.GetTypeInfo().DeclaredConstructors.Match(c => c.IsPublic && !c.IsStatic);
 
         /// <summary>Enumerates all constructors from input type.</summary>
-        public static IEnumerable<ConstructorInfo> GetAllConstructors(this Type type,
+        public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
         {
             var ctors = type.GetTypeInfo().DeclaredConstructors;
-            if (!includeNonPublic) ctors = ctors.Where(c => c.IsPublic);
-            if (!includeStatic) ctors = ctors.Where(c => !c.IsStatic);
+            if (!includeNonPublic) ctors = ctors.Match(c => c.IsPublic);
+            if (!includeStatic) ctors = ctors.Match(c => !c.IsStatic);
             return ctors;
         }
 
         /// <summary>Searches and returns constructor by its signature.</summary>
-        public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args) =>
-            type.GetAllConstructors(includeNonPublic)
-                .FirstOrDefault(c => c.GetParameters().Select(p => p.ParameterType).SequenceEqual(args));
+        public static ConstructorInfo GetConstructorOrNull(this Type type,
+            bool includeNonPublic = false, params Type[] args) =>
+            type.Constructors(includeNonPublic).FindFirst(c => c.GetParameters().Map(p => p.ParameterType).SequenceEqual(args));
 
-        /// <summary>Returns single constructor otherwise (if no or more than one) throws an exception</summary>
-        public static ConstructorInfo Constructor(this Type type, bool includeNonPublic = false) =>
-            type.GetSingleConstructorOrNull(includeNonPublic) ??
-            Throw.For<ConstructorInfo>(
-                Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
+        /// <summary>Searches and returns constructor by its signature.</summary>
+        public static ConstructorInfo GetConstructorOrNull(this Type type, params Type[] args) =>
+            type.GetConstructorOrNull(true, args);
 
-        /// <summary>Returns single constructor otherwise (if no or more than one) returns null.</summary>
+        /// <summary>Searches and returns constructor by its signature, or throws if not found</summary>
+        public static ConstructorInfo Constructor(this Type type, params Type[] args) =>
+            type.GetConstructorOrNull(includeNonPublic: true, args: args).ThrowIfNull(
+                Error.Of("Unable to find a constructor in Type {0} with args: {1}"), type, args);
+
+        /// <summary>Returns single constructor otherwise (if no constructor or more than one) returns null.</summary>
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
-            var ctors = type.GetAllConstructors(includeNonPublic).ToArrayOrSelf();
+            var ctors = type.Constructors(includeNonPublic).ToArrayOrSelf();
             return ctors.Length == 1 ? ctors[0] : null;
         }
 
-        /// <summary>Returns single declared (not inherited) method by name, or null if not found.</summary>
-        public static MethodInfo Method(this Type type, string name, bool includeNonPublic = false) =>
-            type.GetSingleMethodOrNull(name, includeNonPublic) ??
-            Throw.For<MethodInfo>(
-                Error.Of("Undefined Method '{0}' in Type {1} (including non-public={2})"), name, type, includeNonPublic);
-
-        /// <summary>Looks up for method with and specified parameter types.</summary>
-        public static MethodInfo Method(this Type type, string name, params Type[] paramTypes) =>
-            type.GetMethodOrNull(name, paramTypes) ??
-            Throw.For<MethodInfo>(
-                Error.Of("Undefined Method '{0}' in Type {1} with parameters {2}."), name, type, paramTypes);
+        /// <summary>Returns single constructor otherwise (if no or more than one) throws an exception</summary>
+        public static ConstructorInfo SingleConstructor(this Type type, bool includeNonPublic = false) =>
+            type.GetSingleConstructorOrNull(includeNonPublic).ThrowIfNull(
+                Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
 
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
@@ -9991,6 +9978,16 @@ namespace DryIoc
                 .ToArrayOrSelf();
             return methods.Length == 1 ? methods[0] : null;
         }
+
+        /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
+        public static MethodInfo SingleMethod(this Type type, string name, bool includeNonPublic = false) =>
+            type.GetSingleMethodOrNull(name, includeNonPublic).ThrowIfNull(
+                Error.Of("Undefined Method '{0}' in Type {1} (including non-public={2})"), name, type, includeNonPublic);
+
+        /// <summary>Looks up for method with and specified parameter types.</summary>
+        public static MethodInfo Method(this Type type, string name, params Type[] args) =>
+            type.GetMethodOrNull(name, args).ThrowIfNull(
+                Error.Of("Undefined Method '{0}' in Type {1} with parameters {2}."), name, type, args);
 
         /// <summary>Looks up for method with and specified parameter types.</summary>
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
@@ -10174,7 +10171,7 @@ namespace DryIoc
         internal static T GetDefault<T>() => default(T);
 
         private static readonly Lazy<MethodInfo> _getDefaultMethod = new Lazy<MethodInfo>(() =>
-            typeof(ReflectionTools).Method(nameof(GetDefault), true));
+            typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true));
 
         #endregion
     }
@@ -10288,7 +10285,7 @@ namespace DryIoc
             var definedTypeInfosProperty = typeof(Assembly).GetPropertyOrNull("DefinedTypes");
             if (definedTypeInfosProperty == null)
             {
-                var getTypesMethod = typeof(Assembly).Method("GetTypes");
+                var getTypesMethod = typeof(Assembly).SingleMethod("GetTypes");
                 typesExpr = Call(assemblyParamExpr, getTypesMethod, ArrayTools.Empty<Expr>());
             }
             else
@@ -10298,7 +10295,7 @@ namespace DryIoc
                 {
                     var typeInfoParamExpr = Parameter(typeof(TypeInfo), "typeInfo");
                     var selectMethod = typeof(Enumerable).Method(nameof(Enumerable.Select), typeof(IEnumerable<>), typeof(Func<,>));
-                    var asTypeMethod = typeof(TypeInfo).Method(nameof(TypeInfo.AsType));
+                    var asTypeMethod = typeof(TypeInfo).SingleMethod(nameof(TypeInfo.AsType));
                     typesExpr = Call(selectMethod.MakeGenericMethod(typeof(TypeInfo), typeof(Type)),
                         typesExpr,
                         Lambda<Func<TypeInfo, Type>>(

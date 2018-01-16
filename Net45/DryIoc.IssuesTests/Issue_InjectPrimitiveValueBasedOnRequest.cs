@@ -56,7 +56,7 @@ namespace DryIoc.IssuesTests
             _container.Register<Target>();
             _container.Register<ILog, Log>(
                 made: Made.Of(request => typeof(LoggerFactory)
-                    .Method(nameof(LoggerFactory.GetLog))
+                    .SingleMethod(nameof(LoggerFactory.GetLog))
                     .MakeGenericMethod(request.Parent.First(p => p.ServiceType != typeof(ILog)).ImplementationType)));
 
             // exercise

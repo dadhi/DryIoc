@@ -23,7 +23,7 @@ namespace DryIoc.UnitTests
         public void Can_use_any_type_static_method_for_service_creation()
         {
             var container = new Container();
-            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).Method("CreateService")));
+            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).SingleMethod("CreateService")));
 
             var service = container.Resolve<IService>();
 
@@ -158,13 +158,12 @@ namespace DryIoc.UnitTests
         public void Should_throw_for_instance_method_without_factory()
         {
             var container = new Container();
-            container.Register<IService>(made: 
-                Made.Of(typeof(ServiceFactory).Method("Create", ArrayTools.Empty<Type>())));
+            var ex = Assert.Throws<ContainerException>(() =>
+            container.Register<IService>(made: Made.Of(typeof(ServiceFactory).Method("Create"))));
 
-            var ex = Assert.Throws<ContainerException>(() => 
-                container.Resolve<IService>());
-
-            Assert.AreEqual(Error.FactoryObjIsNullInFactoryMethod, ex.Error);
+            Assert.AreEqual(
+                Error.NameOf(Error.PassedMemberIsNotStaticButInstanceFactoryIsNull),
+                Error.NameOf(ex.Error));
         }
 
         [Test]
@@ -186,7 +185,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Register<SomeService>(made: Made.Of(typeof(BadFactory).Method("Create"))));
+                container.Register<SomeService>(made: Made.Of(typeof(BadFactory).SingleMethod("Create"))));
 
             Assert.AreEqual(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, ex.Error);
         }

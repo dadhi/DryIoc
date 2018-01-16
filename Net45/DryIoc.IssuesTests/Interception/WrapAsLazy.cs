@@ -64,7 +64,7 @@ namespace DryIoc.IssuesTests.Interception
             registrator.Register(interfaceType, proxyType,
                 Reuse.Transient,
                 setup: decoratorSetup,
-                made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
+                made: Made.Of(type => type.PublicConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
                     Parameters.Of
                         .Type(typeof(IInterceptor[]), lazyInterceptorArrayType)
                         .Type(interfaceType, r => null)));
@@ -88,7 +88,7 @@ namespace DryIoc.IssuesTests.Interception
         /// <param name="serviceKey">Optional service key.</param>
         public static IRegistrator ResolveAsLazy(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
         {
-            var method = typeof(WrapAsLazy).Method(nameof(CreateLazyProxy), includeNonPublic: true)
+            var method = typeof(WrapAsLazy).SingleMethod(nameof(CreateLazyProxy), includeNonPublic: true)
                 .MakeGenericMethod(interfaceType);
             var decoratorSetup = GetDecoratorSetup(serviceKey);
             registrator.Register(interfaceType, Reuse.Transient, Made.Of(method), decoratorSetup);

@@ -22,7 +22,7 @@ namespace DryIoc.UnitTests
             c.Register<User2>();
 
             c.Register<ILogger>(made: Made.Of(r => 
-                typeof(LogFactory).Method(nameof(LogFactory.GetLog))
+                typeof(LogFactory).SingleMethod(nameof(LogFactory.GetLog))
                     .MakeGenericMethod(r.Parent.ImplementationType)));
 
             Assert.IsInstanceOf<Logger<User2>>(c.Resolve<User2>().Logger);

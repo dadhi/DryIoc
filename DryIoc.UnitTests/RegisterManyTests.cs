@@ -167,7 +167,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.RegisterMany(new[] { GetType().GetAssembly() }, (r, types, type) =>
             {
-                if (type.GetAllConstructors().Count() == 1)
+                if (type.Constructors().Count() == 1)
                     r.RegisterMany(types, type, Reuse.Singleton);
             });
 

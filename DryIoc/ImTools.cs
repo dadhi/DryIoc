@@ -194,7 +194,7 @@ namespace ImTools
             return default(T);
         }
 
-        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or `default(T)` value.</summary>
         /// <typeparam name="T">item type</typeparam>
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>

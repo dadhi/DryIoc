@@ -112,7 +112,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(NotifyImportsSatisfied), includeNonPublic: true));
+            typeof(AttributedModel).SingleMethod(nameof(NotifyImportsSatisfied), includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
             r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(),
@@ -209,7 +209,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(CreateExportFactory), includeNonPublic: true),
+            typeof(AttributedModel).SingleMethod(nameof(CreateExportFactory), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.IfUnresolved));
 
         /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
@@ -236,7 +236,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
+            typeof(AttributedModel).SingleMethod(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
 
         /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
         /// <typeparam name="T">The type of the exported service.</typeparam>
@@ -250,7 +250,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createLazyWithMetadataMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(CreateLazyWithMetadata), includeNonPublic: true));
+            typeof(AttributedModel).SingleMethod(nameof(CreateLazyWithMetadata), includeNonPublic: true));
 
         #endregion
 
@@ -272,7 +272,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _filterCollectionByMultiKey = Made.Of(
-            typeof(AttributedModel).Method(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
+            typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.ServiceKey));
 
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
@@ -581,7 +581,7 @@ namespace DryIoc.MefAttributedModel
         private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector = null)
         {
             var implType = request.ImplementationType;
-            var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
+            var ctors = implType.PublicConstructors().ToArrayOrSelf();
             var ctor = ctors.Length == 1 ? ctors[0]
                 : ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
 

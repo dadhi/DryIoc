@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register(typeof(Factory<>));
             container.Register(typeof(IService<,>), 
-                made: Made.Of(typeof(Factory<>).Method(nameof(Factory<object>.Create)), 
+                made: Made.Of(typeof(Factory<>).SingleMethod(nameof(Factory<object>.Create)), 
                 ServiceInfo.Of(typeof(Factory<>))));
 
             container.RegisterMany(new [] { typeof(Foo) });
