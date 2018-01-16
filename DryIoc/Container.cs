@@ -115,7 +115,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            // nice to have, but we can leave without it if something goes wrong
+            // nice to have, but we can live without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
@@ -134,63 +134,6 @@ namespace DryIoc
                 _scopeContext?.Dispose();
             }
         }
-
-        #region Static state
-
-        /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
-        public static readonly ParamExpr ResolverContextParamExpr =
-            Parameter(typeof(IResolverContext), "r");
-
-        private static readonly Type[] _factoryDelegateParamTypes = { typeof(IResolverContext) };
-        private static readonly ParamExpr[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
-
-        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
-        public static FactoryDelegateExpr WrapInFactoryExpression(Expr expression) =>
-            Lambda<FactoryDelegate>(OptimizeExpression(expression), _factoryDelegateParamExprs);
-
-        /// <summary>First wraps the input service expression into lambda expression and
-        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        /// <param name="expression">Service creation expression.</param>
-        /// <returns>Compiled factory delegate to use for service resolution.</returns>
-        public static FactoryDelegate CompileToDelegate(Expr expression)
-        {
-            expression = OptimizeExpression(expression);
-
-            // Optimization: just extract singleton from expression without compiling
-            if (expression.NodeType == ExpressionType.Constant)
-            {
-                var value = ((ConstExpr)expression).Value;
-                return _ => value;
-            }
-
-            var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
-                expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
-            if (factoryDelegate != null)
-                return factoryDelegate;
-
-            // fallback for platforms when FastExpressionCompiler is not supported,
-            // or just in case when some expression is not supported (did not found one yet)
-            var lambdaExpr = Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs);
-
-#if FEC_EXPRESSION_INFO
-            return lambdaExpr.ToLambdaExpression().Compile();
-#else
-            return lambdaExpr.Compile();
-#endif
-        }
-
-        /// <summary>Strips the unnecessary or adds the necessary cast to expression return result.</summary>
-        /// <param name="expression">Expression to process.</param> <returns>Processed expression.</returns>
-        public static Expr OptimizeExpression(Expr expression)
-        {
-            if (expression.NodeType == ExpressionType.Convert)
-                expression = ((UnaryExpr)expression).Operand;
-            else if (expression.Type.IsValueType())
-                expression = Convert(expression, typeof(object));
-            return expression;
-        }
-
-        #endregion
 
         #region IRegistrator
 
@@ -246,12 +189,8 @@ namespace DryIoc
         }
 
         /// <summary>Removes specified factory from registry.
-        /// Factory is removed only from registry, if there is relevant cache, it will be kept.
+        /// Factory is removed only from registry, if there is a relevant cache, it will be kept.
         /// Use <see cref="ContainerTools.WithoutCache"/> to remove all the cache.</summary>
-        /// <param name="serviceType">Service type to look for.</param>
-        /// <param name="serviceKey">Service key to look for.</param>
-        /// <param name="factoryType">Expected factory type.</param>
-        /// <param name="condition">Expected factory condition.</param>
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
@@ -286,13 +225,13 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            var registryValue = _registry.Value;
             var service = factoryDelegate(this);
 
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            if (!registryValue.Services.IsEmpty)
+            var registry = _registry.Value;
+            if (!registry.Services.IsEmpty)
             {
-                var cacheRef = registryValue.DefaultFactoryDelegateCache;
+                var cacheRef = registry.DefaultFactoryDelegateCache;
                 var cache = cacheRef.Value;
                 if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
                     cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
@@ -714,13 +653,11 @@ namespace DryIoc
                 var matchedMembers = instanceType.GetTypeInfo().DeclaredMembers.Match(
                     m => (m is PropertyInfo || m is FieldInfo) && propertyAndFieldNames.IndexOf(m.Name) != -1,
                     PropertyOrFieldServiceInfo.Of);
+                // todo: Should we throw when no props are found?
                 propertiesAndFields = _ => matchedMembers;
             }
 
-            propertiesAndFields =
-                propertiesAndFields
-                ?? Rules.PropertiesAndFields
-                ?? PropertiesAndFields.Auto;
+            propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
             var request = Request.Create(this, instanceType)
                 .WithResolvedFactory(new InstanceFactory(instanceType, Reuse.Transient));
@@ -1091,7 +1028,7 @@ namespace DryIoc
             var appliedIDs = ArrayTools.Empty<int>();
             for (var p = request.DirectParent; !p.IsEmpty && p.FactoryType != FactoryType.Service; p = p.DirectParent)
             {
-                if (p.FactoryType == FactoryType.Decorator && 
+                if (p.FactoryType == FactoryType.Decorator &&
                     p.DecoratedFactoryID == request.FactoryID)
                     appliedIDs = appliedIDs.AppendOrUpdate(p.FactoryID);
             }
@@ -1582,7 +1519,7 @@ namespace DryIoc
                 {
                     var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                     if (decoratedExpr != null)
-                        return CompileToDelegate(decoratedExpr);
+                        return decoratedExpr.CompileToFactoryDelegate();
                 }
 
                 return GetInstanceFromScopeChainOrSingletons;
@@ -2205,6 +2142,56 @@ namespace DryIoc
         }
     }
 
+    /// <summary>Compiles expression to factory delegate.</summary>
+    public static class FactoryDelegateCompiler
+    {
+        /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
+        public static readonly ParamExpr ResolverContextParamExpr =
+            Parameter(typeof(IResolverContext), "r");
+
+        private static readonly Type[] _factoryDelegateParamTypes = { typeof(IResolverContext) };
+        private static readonly ParamExpr[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
+
+        /// <summary>Strips the unnecessary or adds the necessary cast to expression return result.</summary>
+        public static Expr NormalizeExpression(this Expr expression) =>
+            expression.NodeType == ExpressionType.Convert ? ((UnaryExpr)expression).Operand :
+            expression.Type.IsValueType() ? Convert(expression, typeof(object)) :
+            expression;
+
+        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
+        public static FactoryDelegateExpr WrapInFactoryExpression(this Expr expression) =>
+            Lambda<FactoryDelegate>(expression.NormalizeExpression(), _factoryDelegateParamExprs);
+
+        /// <summary>First wraps the input service expression into lambda expression and
+        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
+        public static FactoryDelegate CompileToFactoryDelegate(this Expr expression)
+        {
+            expression = expression.NormalizeExpression();
+
+            // Optimization: just extract singleton from expression without compiling
+            if (expression.NodeType == ExpressionType.Constant)
+            {
+                var value = ((ConstExpr)expression).Value;
+                return _ => value;
+            }
+
+            var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
+                expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+            if (factoryDelegate != null)
+                return factoryDelegate;
+
+            // fallback for platforms when FastExpressionCompiler is not supported,
+            // or just in case when some expression is not supported (did not found one yet)
+            var lambdaExpr = Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs);
+
+#if FEC_EXPRESSION_INFO
+            return lambdaExpr.ToLambdaExpression().Compile();
+#else
+            return lambdaExpr.Compile();
+#endif
+        }
+    }
+
     /// <summary>Container extended features.</summary>
     public static class ContainerTools
     {
@@ -2467,7 +2454,7 @@ namespace DryIoc
             {
                 try
                 {
-                    var request = Request.Create(generatingContainer, 
+                    var request = Request.Create(generatingContainer,
                         rootService.ServiceType, rootService.Details.ServiceKey);
 
                     var expression = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
@@ -2475,7 +2462,7 @@ namespace DryIoc
                         continue;
 
 
-                    roots.Add(rootService.Pair(Container.WrapInFactoryExpression(expression)
+                    roots.Add(rootService.Pair(expression.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
@@ -2527,7 +2514,7 @@ namespace DryIoc
                     if (expression == null)
                         continue;
 
-                    roots.Add(registration.Pair(Container.WrapInFactoryExpression(expression)
+                    roots.Add(registration.Pair(expression.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
@@ -2793,24 +2780,24 @@ namespace DryIoc
         public static Expr GetRootOrSelfExpr(Request request) =>
             request.DirectParent.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope
                 ? RootOrSelfExpr
-                : Container.ResolverContextParamExpr;
+                : FactoryDelegateCompiler.ResolverContextParamExpr;
 
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly Expr ParentExpr =
-            Property(Container.ResolverContextParamExpr, ParentProperty);
+            Property(FactoryDelegateCompiler.ResolverContextParamExpr, ParentProperty);
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expr RootOrSelfExpr =
-            Call(typeof(ResolverContext).SingleMethod(nameof(RootOrSelf)), Container.ResolverContextParamExpr);
+            Call(typeof(ResolverContext).SingleMethod(nameof(RootOrSelf)), FactoryDelegateCompiler.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expr SingletonScopeExpr =
-            Property(Container.ResolverContextParamExpr,
+            Property(FactoryDelegateCompiler.ResolverContextParamExpr,
                 typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
 
         /// <summary>Access to scopes in FactoryDelegate.</summary>
         public static readonly Expr CurrentScopeExpr =
-            Property(Container.ResolverContextParamExpr,
+            Property(FactoryDelegateCompiler.ResolverContextParamExpr,
                 typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
 
         /// <summary>Provides access to the current scope.</summary>
@@ -2841,7 +2828,7 @@ namespace DryIoc
                         return s;
             }
 
-            return throwIfNotFound ? 
+            return throwIfNotFound ?
                 Throw.For<IScope>(Error.NoMatchedScopeFound, name, currentScope) : null;
         }
 
@@ -2995,7 +2982,7 @@ namespace DryIoc
             {
                 var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request);
                 return collectionType.GetGenericDefinitionOrNull() != typeof(IEnumerable<>)
-                    ? Call(ToArrayMethod.Value.MakeGenericMethod(itemType), lazyEnumerableExpr) 
+                    ? Call(ToArrayMethod.Value.MakeGenericMethod(itemType), lazyEnumerableExpr)
                     : lazyEnumerableExpr;
             }
 
@@ -3195,8 +3182,7 @@ namespace DryIoc
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
-            return Constant(
-                Container.WrapInFactoryExpression(expr)
+            return Constant(expr.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                 .ToLambdaExpression()
 #endif
@@ -3216,7 +3202,7 @@ namespace DryIoc
             var serviceType = typeArgs[1];
             var serviceRequest = request.Push(serviceType, serviceKey);
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            var serviceExpr = serviceFactory == null ? null : serviceFactory.GetExpressionOrDefault(serviceRequest);
+            var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
@@ -3335,10 +3321,7 @@ namespace DryIoc
         public readonly object ServiceKey;
 
         /// <summary>Constructs the info</summary>
-        /// <param name="factory"></param>
-        /// <param name="ifAlreadyRegistered">(optional) Defines how to combine with normal registrations.
-        /// Will use <see cref="DryIoc.IfAlreadyRegistered.AppendNotKeyed"/> by default.</param>
-        /// <param name="serviceKey">(optional) Service key.</param>
+
         public DynamicRegistration(Factory factory,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
         {
@@ -3541,11 +3524,8 @@ namespace DryIoc
 
                 // try resolve expression first and return null,
                 // to enable fallback to other rules if unresolved
-                var requestOrDefault = request
-                    .WithChangedServiceInfo(_ => _.WithIfUnresolved(IfUnresolved.ReturnDefault));
-
-                var factoryExpr = factory.GetExpressionOrDefault(requestOrDefault);
-                if (factoryExpr == null)
+                if (null == factory.GetExpressionOrDefault(request.WithChangedServiceInfo(info =>
+                        info.WithIfUnresolved(IfUnresolved.ReturnDefault))))
                     return null;
 
                 return factory;
@@ -3584,8 +3564,8 @@ namespace DryIoc
 
                     // condition checks that factory is resolvable
                     setup: Setup.With(condition: req =>
-                        null != factory.GetExpressionOrDefault(
-                            req.WithChangedServiceInfo(r => r.WithIfUnresolved(IfUnresolved.ReturnDefault)))));
+                        null != factory.GetExpressionOrDefault(req.WithChangedServiceInfo(info =>
+                            info.WithIfUnresolved(IfUnresolved.ReturnDefault)))));
 
                 return factory;
             });
@@ -5297,7 +5277,7 @@ namespace DryIoc
                 var trackInParent = Constant(true);
 
                 resolverExpr = Call(ResolverContext.OpenScopeMethod,
-                    Container.ResolverContextParamExpr, scopeNameExpr, trackInParent);
+                    FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
             // Only parent is converted to be passed to Resolve.
@@ -5343,7 +5323,7 @@ namespace DryIoc
                 return;
 
             container.Rules.DependencyResolutionCallExpressions
-                .Swap(it => it.AddOrUpdate(request, Container.OptimizeExpression(factoryExpr)
+                .Swap(it => it.AddOrUpdate(request, factoryExpr.NormalizeExpression()
 #if FEC_EXPRESSION_INFO
                         .ToExpression()
 #endif
@@ -6187,7 +6167,7 @@ namespace DryIoc
             int decoratedFactoryID) =>
             new Request(_sharedRuntimeInfo, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
-                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, 
+                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse,
                 decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = new Lazy<MethodInfo>(() =>
@@ -6265,7 +6245,7 @@ namespace DryIoc
                 ? DryIoc.Reuse.Transient
                 : factory.Reuse ?? GetDefaultReuse(factory);
 
-            if (!skipCaptiveDependencyCheck && 
+            if (!skipCaptiveDependencyCheck &&
                 !DirectParent.IsEmpty &&
                 !factory.Setup.OpenResolutionScope &&
                 reuse.Lifespan != 0 &&
@@ -7043,7 +7023,7 @@ namespace DryIoc
 
             var container = request.Container;
 
-            // First look for decorators
+            // First look for decorators if it is not already a decorator
             if (FactoryType != FactoryType.Decorator)
             {
                 var decoratorExpr = container.GetDecoratorExpressionOrDefault(request);
@@ -7126,7 +7106,7 @@ namespace DryIoc
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var factoryDelegate = Container.CompileToDelegate(serviceExpr);
+                var factoryDelegate = serviceExpr.CompileToFactoryDelegate();
 
                 if (Setup.WeaklyReferenced)
                 {
@@ -7168,17 +7148,9 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// <summary>Creates factory delegate from service expression and returns it.
-        /// to compile delegate from expression but could be overridden by concrete factory type: e.g. <see cref="DelegateFactory"/></summary>
-        /// <param name="request">Service request.</param>
-        /// <returns>Factory delegate created from service expression.</returns>
-        public virtual FactoryDelegate GetDelegateOrDefault(Request request)
-        {
-            var expression = GetExpressionOrDefault(request);
-            if (expression == null)
-                return null;
-            return Container.CompileToDelegate(expression);
-        }
+        /// <summary>Creates factory delegate from service expression and returns it.</summary>
+        public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
+            GetExpressionOrDefault(request)?.CompileToFactoryDelegate();
 
         internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
@@ -8736,7 +8708,7 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expr Apply(Request request, Expr serviceFactoryExpr)
         {
-            var rExpr = Container.ResolverContextParamExpr;
+            var rExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
 
             if (request.TracksTransientDisposable)
             {
