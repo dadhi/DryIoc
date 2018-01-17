@@ -8526,9 +8526,11 @@ namespace DryIoc
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and empties item storage.</summary>
-        /// <remarks>If item disposal throws exception, then it won't be propagated outside,
-        /// so the rest of the items may proceed to be disposed.</remarks>
+        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and empties item storage.
+        /// The disposal happens in REVERSE resolution / injection order, consumer first, dependency next.
+        /// It will allow consumer to do something with its dependency before it is disposed.</summary>
+        /// <remarks>All disposal exceptions are swallowed except the ContainerException,
+        /// which may indicate container misconfiguration.</remarks>
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
@@ -8539,7 +8541,11 @@ namespace DryIoc
                 foreach (var disposable in disposables.Enumerate())
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal
-                    try { disposable.Value.Dispose(); }
+                    try
+                    {
+                        disposable.Value.Dispose();
+                    }
+                    catch (ContainerException) { throw; }
                     catch (Exception) { }
                 }
 

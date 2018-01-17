@@ -784,7 +784,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class Ho {}
+        public class Ho { }
 
         public class O
         {
@@ -816,7 +816,7 @@ namespace DryIoc.UnitTests
         {
             public P(Ho ho, O o)
             {
-                
+
             }
         }
 
@@ -845,7 +845,60 @@ namespace DryIoc.UnitTests
             }
         }
 
-        class Go {}
+        class Go { }
+
+        [Test]
+        public void Default_dispose_is_in_reverse_resolution_order_SO_I_can_break_it_by_deferring_dependency_injection()
+        {
+            var c = new Container();
+
+            c.Register<Duck>(Reuse.Singleton);
+            c.Register<Quack>(Reuse.Singleton);
+
+            var d = c.Resolve<Duck>();
+            var q = c.Resolve<Quack>();
+
+            Assert.AreSame(q, d.Quack.Value); // extract lazy value
+            c.Dispose();
+
+            Assert.IsTrue(d.IsDisposed);
+            Assert.IsTrue(q.IsDisposed);
+
+            Assert.IsFalse(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
+        }
+
+        public class Duck : IDisposable
+        {
+            public Lazy<Quack> Quack { get; private set; }
+
+            public Duck(Lazy<Quack> quack)
+            {
+                Quack = quack;
+            }
+
+            public bool IsDisposed { get; private set; }
+            public void Dispose()
+            {
+                Quack.Value.LastTime();
+                IsDisposed = true;
+            }
+        }
+
+        public class Quack : IDisposable
+        {
+            public bool LastTimeQuacked { get; private set; }
+            public void LastTime()
+            {
+                if (!IsDisposed)
+                    LastTimeQuacked = true;
+            }
+
+            public bool IsDisposed { get; private set; }
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
 
         #region CUT
 

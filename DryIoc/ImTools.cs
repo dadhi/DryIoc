@@ -918,6 +918,12 @@ namespace ImTools
             return RemoveImpl(key);
         }
 
+        /// <summary>Outputs key value pair</summary>
+        public override string ToString()
+        {
+            return Key + " : " + Value;
+        }
+
         #region Implementation
 
         private ImMap() { }
@@ -1216,6 +1222,12 @@ namespace ImTools
         public ImHashMap<K, V> Remove(K key)
         {
             return Remove(key.GetHashCode(), key);
+        }
+
+        /// <summary>Outputs key value pair</summary>
+        public override string ToString()
+        {
+            return Key + " : " + Value;
         }
 
         #region Implementation
