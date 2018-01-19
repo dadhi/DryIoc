@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue_HandleVariance
     {
-        [Test, Explicit]
+        [Test, Ignore("todo: look later")]
         public void CommandHandlers_CanBeResolved_From_IoC()
         {
             var container = new Container();

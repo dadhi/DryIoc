@@ -394,9 +394,9 @@ namespace DryIoc
 
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems
-                        .Where(it => !it.Factory.FactoryGenerator.GeneratedFactories.Enumerate()
+                        .Where(it => !it.Factory.FactoryGenerator?.GeneratedFactories.Enumerate()
                             .Any(f => f.Value.FactoryID == parent.FactoryID
-                                && f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey));
+                                && f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey) ?? false);
 
                 if (variantGenericItems != null)
                     variantGenericItems = variantGenericItems
@@ -4651,8 +4651,8 @@ namespace DryIoc
         public static bool IsExcludedGeneralPurposeServiceType(this Type type) =>
             ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
 
-        /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>. It means that
-        /// for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
+        /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>.
+        /// It means that for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
         /// <param name="type">Source type: may be concrete, abstract or generic definition.</param>
         /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
         /// <returns>Array of types or empty.</returns>
@@ -4674,10 +4674,8 @@ namespace DryIoc
         }
 
         /// <summary>Returns the sensible services automatically discovered for RegisterMany implementation type.
-        /// Excludes the collection wrapper interfaces.</summary>
-        /// <param name="type">Source type, may be concrete, abstract or generic definition.</param>
-        /// <param name="nonPublicServiceTypes">(optional) Include non public service types.</param>
-        /// <returns>Array of types or empty.</returns>
+        /// Excludes the collection wrapper interfaces. The <paramref name="type"/> may be concrete, abstract or
+        /// generic definition.</summary>
         public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false) =>
             GetImplementedServiceTypes(type, nonPublicServiceTypes)
                 .Match(t => !t.IsGenericDefinition() || WrappersSupport.ArrayInterfaces.IndexOf(t) == -1);
@@ -7712,8 +7710,9 @@ namespace DryIoc
                     Throw.It(Error.RegisteringNotAGenericTypedefImplType,
                         implType, implType.GetGenericDefinitionOrNull());
 
-                else if (implType != serviceType && serviceType != typeof(object) &&
-                    implType.GetImplementedTypes().IndexOf(t => t == serviceType) == -1)
+                else if (implType != serviceType && serviceType != typeof(object)
+                      && implType.GetImplementedTypes().IndexOf(t =>
+                        t == serviceType || t.GetGenericDefinitionOrNull() == serviceType) == -1)
                     Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
             else if (implType != serviceType)
@@ -9737,10 +9736,7 @@ namespace DryIoc
         public static Type[] GetImplementedInterfaces(this Type type) =>
             type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
 
-        /// <summary>Gets all declared and base members.</summary>
-        /// <param name="type">Type to get members from.</param>
-        /// <param name="includeBase">(optional) When set looks into base members.</param>
-        /// <returns>All members.</returns>
+        /// <summary>Gets all declared and if specified, the base members too.</summary>
         public static IEnumerable<MemberInfo> GetAllMembers(this Type type, bool includeBase = false) =>
             type.GetMembers(t =>
                 t.DeclaredMethods.Cast<MemberInfo>().Concat(
@@ -9750,9 +9746,6 @@ namespace DryIoc
 
         /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters
         /// from <paramref name="genericParameters"/>.</summary>
-        /// <param name="openGenericType">Expected to be open-generic type, throws otherwise.</param>
-        /// <param name="genericParameters">Generic parameters.</param>
-        /// <returns>Returns true if contains, and false otherwise.</returns>
         public static bool ContainsAllGenericTypeParameters(this Type openGenericType, Type[] genericParameters)
         {
             if (!openGenericType.IsOpenGeneric())
