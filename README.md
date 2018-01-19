@@ -32,7 +32,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 - Version 3 Preview 3 is out, check it out and read the [Release Notes](https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes)
 
-- Latest stable DryIoc version is __2.12.6__
+- Latest stable DryIoc version is __2.12.7__
     - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
