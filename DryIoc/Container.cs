@@ -2206,7 +2206,7 @@ namespace DryIoc
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container, Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
             container.With(configure?.Invoke(container.Rules), scopeContext,
-                WithRegistrationsOptions.CloneWithoutCache);
+                WithRegistrationsOptions.CloneWithoutCache, WithSingletonOptions.Keep);
 
         /// <summary>Prepares container for expression generation.</summary>
         public static IContainer ForExpressionGeneration(this IContainer container) =>
@@ -2219,7 +2219,7 @@ namespace DryIoc
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
         public static IContainer WithoutCache(this IContainer container) =>
             container.With(container.Rules, container.ScopeContext,
-                WithRegistrationsOptions.CloneWithoutCache);
+                WithRegistrationsOptions.CloneWithoutCache, WithSingletonOptions.Keep);
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
         /// Dropping cache is required because singletons are cached in resolution state.</summary>
@@ -2230,7 +2230,8 @@ namespace DryIoc
         /// <summary>Shares all parts with original container But copies registration, so the new registration
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
-            container.With(container.Rules, container.ScopeContext, WithRegistrationsOptions.Clone);
+            container.With(container.Rules, container.ScopeContext,
+                WithRegistrationsOptions.Clone, WithSingletonOptions.Keep);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -2247,6 +2248,11 @@ namespace DryIoc
             return instance;
         }
 
+        // todo: Opt-in for not creating the container copy for performance reasons. 
+        // todo: Can we create a "invisible" keyw that should be excluded from collections.
+        // then we can just Register with that key into current container or somthing.
+        // May be also useful by itself, like registering invisible factories, or open-generic service (#554) in RegisterMany
+        //
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
         /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
@@ -4608,20 +4614,11 @@ namespace DryIoc
             object serviceKey = null) =>
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// <summary>Action that could be used by User to customize register many default behavior.</summary>
-        /// <param name="r">Registrator provided to do any arbitrary registration User wants.</param>
-        /// <param name="serviceTypes">Valid service type that could be used with <paramref name="implType"/>.</param>
-        /// <param name="implType">Concrete or open-generic implementation type.</param>
+        /// <summary>Action that could be used by User to customize RegisterMany default behavior.</summary>
         public delegate void RegisterManyAction(IRegistrator r, Type[] serviceTypes, Type implType);
 
         // todo: Perf: Add optional @isStaticallyChecked to skip check for implemented types.
         /// <summary>Registers many service types with the same implementation.</summary>
-        /// <param name="registrator">Registrator/Container</param>
-        /// <param name="serviceTypes">1 or more service types.</param>
-        /// <param name="implementationType">Should implement service types. Will throw if not.</param>
-        /// <param name="reuse">(optional)</param> <param name="made">(optional) How to create implementation instance.</param>
-        /// <param name="setup">(optional)</param> <param name="ifAlreadyRegistered">(optional) By default <see cref="IfAlreadyRegistered.AppendNotKeyed"/></param>
-        /// <param name="serviceKey">(optional)</param>
         public static void RegisterMany(this IRegistrator registrator, Type[] serviceTypes, Type implementationType,
             IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null)
@@ -4694,12 +4691,8 @@ namespace DryIoc
             type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
 
         /// <summary>Checks if <paramref name="type"/> implements the <paramref name="serviceType"/>,
-        /// along the line checking if <paramref name="type"/> and <paramref name="serviceType"/>
+        /// along the checking if <paramref name="type"/> and <paramref name="serviceType"/>
         /// are valid implementation and service types.</summary>
-        /// <param name="type">Implementation type.</param>
-        /// <param name="serviceType">Service type.</param>
-        /// <param name="checkIfOpenGenericImplementsClosedGeneric">(optional)</param>
-        /// <returns>Check result.</returns>
         public static bool ImplementsServiceType(this Type type, Type serviceType,
             bool checkIfOpenGenericImplementsClosedGeneric = false)
         {
@@ -9158,7 +9151,7 @@ namespace DryIoc
     {
         /// <summary>Both containers share the resgitrations, changed in one, will change in another.</summary>
         Share = 0,
-        /// <summary>Both resgitrations and cache</summary>
+        /// <summary>Both registrations and cache</summary>
         Clone,
         /// <summary>Clones registrations but drops the cache</summary>
         CloneWithoutCache
@@ -9172,8 +9165,7 @@ namespace DryIoc
 
         /// <summary>Creates new container from the current one.</summary>
         IContainer With(Rules rules, IScopeContext scopeContext,
-            WithRegistrationsOptions registrations,
-            WithSingletonOptions singletonOptions = WithSingletonOptions.Keep);
+            WithRegistrationsOptions registrations, WithSingletonOptions singletonOptions);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.

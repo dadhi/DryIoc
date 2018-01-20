@@ -864,7 +864,7 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(d.IsDisposed);
             Assert.IsTrue(q.IsDisposed);
 
-            Assert.IsFalse(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
+            Assert.IsTrue(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
         }
 
         public class Duck : IDisposable

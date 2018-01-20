@@ -58,5 +58,55 @@ namespace DryIoc.IssuesTests.Samples
                 NavService = navigationService;
             }
         }
+
+        [Test]
+        public void Replace_singleton_dependency_with_asResolutionCall()
+        {
+            var c = new Container(rules => rules.WithoutEagerCachingSingletonForFasterAccess());
+
+            c.Register<Foo>();
+            //c.Register<Foo>(Reuse.Singleton); // !!! If the consumer of replaced dependency is singleton, it won't work
+                                                // cause the consumer singleton should be replaced too
+
+            c.Register<IBar, Bar>(Reuse.Singleton,
+                setup: Setup.With(asResolutionCall: true));        // required
+
+            var foo = c.Resolve<Foo>();
+            Assert.IsInstanceOf<Bar>(foo.Bar);
+
+            c.Register<IBar, Bar2>(Reuse.Singleton,
+                setup: Setup.With(asResolutionCall: true),         // required
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace); // required
+
+            var foo2 = c.Resolve<Foo>();
+            Assert.IsInstanceOf<Bar2>(foo2.Bar);
+        }
+
+        [Test]
+        public void Replace_singleton_dependency_with_UseInstance()
+        {
+            var c = new Container();
+
+            c.Register<Foo>();
+            //c.Register<Foo>(Reuse.Singleton); // !!! If the consumer of replaced dependency is singleton, it won't work
+                                                // cause the consumer singleton should be replaced too
+            c.UseInstance<IBar>(new Bar());
+            var foo = c.Resolve<Foo>();
+            Assert.IsInstanceOf<Bar>(foo.Bar);
+
+            c.UseInstance<IBar>(new Bar2());
+            var foo2 = c.Resolve<Foo>();
+            Assert.IsInstanceOf<Bar2>(foo2.Bar);
+        }
+
+        public class Foo
+        {
+            public IBar Bar { get; private set; }
+            public Foo(IBar bar) { Bar = bar; }
+        }
+
+        public interface IBar {}
+        public class Bar : IBar {}
+        public class Bar2 : IBar { }
     }
 }
