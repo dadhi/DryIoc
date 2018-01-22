@@ -848,11 +848,11 @@ namespace DryIoc.UnitTests
         class Go { }
 
         [Test]
-        public void Default_dispose_is_in_reverse_resolution_order_SO_I_can_break_it_by_deferring_dependency_injection()
+        public void Can_specify_to_dispose_something_earlier()
         {
             var c = new Container();
 
-            c.Register<Duck>(Reuse.Singleton);
+            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
             c.Register<Quack>(Reuse.Singleton);
 
             var d = c.Resolve<Duck>();
@@ -865,6 +865,26 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(q.IsDisposed);
 
             Assert.IsTrue(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
+        }
+
+        [Test]
+        public void Can_specify_to_dispose_something_later()
+        {
+            var c = new Container();
+
+            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: -1));
+            c.Register<Quack>(Reuse.Singleton, setup: Setup.With(disposalOrder: -2));
+
+            var d = c.Resolve<Duck>();
+            var q = c.Resolve<Quack>();
+
+            Assert.AreSame(q, d.Quack.Value); // extract lazy value
+            c.Dispose();
+
+            Assert.IsTrue(d.IsDisposed);
+            Assert.IsTrue(q.IsDisposed);
+
+            Assert.IsFalse(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
         }
 
         public class Duck : IDisposable

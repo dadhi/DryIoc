@@ -1,1 +1,0 @@
-.\BuildScripts\_main.bat -MSB15

@@ -696,7 +696,7 @@ namespace DryIoc
 
             var registry =
                 registrations == WithRegistrationsOptions.Share ? _registry :
-                registrations == WithRegistrationsOptions.Clone ? Ref.Of(_registry.Value)
+                registrations == WithRegistrationsOptions.CloneWithCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
             var singletonScope =
@@ -2196,7 +2196,7 @@ namespace DryIoc
     public static class ContainerTools
     {
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
-        public const string FacadeKey = "<facade-key>";
+        public const string FacadeKey = "<facade-key>"; // todo: use invisible keys #555
 
         /// <summary>Allows to register new specially keyed services which will facade the same default service,
         /// registered earlier. May be used to "override" resgitrations when testing the container</summary>
@@ -2231,7 +2231,8 @@ namespace DryIoc
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
             container.With(container.Rules, container.ScopeContext,
-                WithRegistrationsOptions.Clone, WithSingletonOptions.Keep);
+                preserveCache ? WithRegistrationsOptions.CloneWithCache : WithRegistrationsOptions.CloneWithoutCache, 
+                WithSingletonOptions.Keep);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -2249,9 +2250,6 @@ namespace DryIoc
         }
 
         // todo: Opt-in for not creating the container copy for performance reasons. 
-        // todo: Can we create a "invisible" keyw that should be excluded from collections.
-        // then we can just Register with that key into current container or somthing.
-        // May be also useful by itself, like registering invisible factories, or open-generic service (#554) in RegisterMany
         //
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
@@ -2260,11 +2258,15 @@ namespace DryIoc
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Made made = null)
         {
-            var containerCopy = container.WithRegistrationsCopy();
-            var implType = containerCopy.GetWrappedType(concreteType, null);
-            containerCopy.Register(implType, made: made);
+            var containerClone = container.With(container.Rules, container.ScopeContext,
+                WithRegistrationsOptions.CloneWithCache, WithSingletonOptions.Keep);
+
+            var implType = containerClone.GetWrappedType(concreteType, null);
+
+            containerClone.Register(implType, made: made);
+            
             // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
-            return containerCopy.Resolve(concreteType, IfUnresolved.Throw);
+            return containerClone.Resolve(concreteType, IfUnresolved.Throw);
         }
 
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
@@ -2805,6 +2807,9 @@ namespace DryIoc
         public static readonly Expr CurrentScopeExpr =
             Property(FactoryDelegateCompiler.ResolverContextParamExpr,
                 typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
+
+        /// <summary>Indicates that context is scoped, have an open scope</summary>
+        public static bool IsScoped(this IResolverContext r) => r.CurrentScope != null;
 
         /// <summary>Provides access to the current scope.</summary>
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
@@ -6562,6 +6567,9 @@ namespace DryIoc
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
         public Func<Request, bool> Condition { get; private set; }
 
+        /// <summary>Relative disposal order when defined. Greater number, later dispose.</summary>
+        public int DisposalOrder { get; private set; }
+
         /// <summary>Arbitrary metadata object associated with Factory/Implementation, may be a dictionary of key-values.</summary>
         public virtual object Metadata => null;
 
@@ -6618,9 +6626,10 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false)
+            bool useParentReuse = false, int disposalOrder = 0)
         {
             Condition = condition;
+            DisposalOrder = disposalOrder;
 
             if (asResolutionCall)
                 _settings |= Settings.AsResolutionCall;
@@ -6672,19 +6681,19 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false)
+            bool useParentReuse = false, int disposalOrder = 0)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
                 openResolutionScope == false && asResolutionCall == false && asResolutionRoot == false &&
                 preventDisposal == false && weaklyReferenced == false &&
                 allowDisposableTransient == false && trackDisposableTransient == false &&
-                useParentReuse == false)
+                useParentReuse == false && disposalOrder == 0)
                 return Default;
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                useParentReuse);
+                useParentReuse, disposalOrder);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -6698,38 +6707,37 @@ namespace DryIoc
         /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
         /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
         /// <param name="condition">(optional)</param>
+        /// <param name="disposalOrder">(optional)</param>
         /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
-            Func<Request, bool> condition = null)
+            Func<Request, bool> condition = null, int disposalOrder = 0)
             => wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-            && !openResolutionScope && !preventDisposal && condition == null
+            && !openResolutionScope && !preventDisposal && condition == null && disposalOrder == 0
                 ? Wrapper
                 : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
-                    condition, openResolutionScope, asResolutionCall, preventDisposal);
+                    condition, openResolutionScope, asResolutionCall, preventDisposal, disposalOrder);
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
 
-        /// <summary>Creates setup with optional condition.</summary>
-        /// <param name="condition">Applied to decorated service, if true then decorator is applied.</param>
-        /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.</param>
-        /// <param name="useDecorateeReuse">If provided specifies relative decorator position in decorators chain.
+        // todo: Make decorateeResue a default?
+        /// <summary>Creates setup with optional condition.
+        /// The <paramref name="order" /> specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
         /// Decorators without order (Order is 0) or with equal order are applied in registration order
-        /// - first registered are closer decoratee.</param>
-        /// <param name="openResolutionScope">The decorator opens resolution scope</param>
-        /// <returns>New setup with condition or <see cref="Decorator"/>.</returns>
+        /// - first registered are closer decoratee.</summary>
         public static Setup DecoratorWith(Func<Request, bool> condition = null, int order = 0,
-            bool useDecorateeReuse = false, bool openResolutionScope = false) =>
-            condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope
+            bool useDecorateeReuse = false, bool openResolutionScope = false, int disposalOrder = 0) =>
+            condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope && disposalOrder == 0
                 ? Decorator
-                : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope);
+                : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope, disposalOrder);
 
         /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>
         public static Setup DecoratorOf(Type decorateeType = null,
-            int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null)
+            int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, int disposalOrder = 0,
+            object decorateeServiceKey = null)
         {
             Func<Request, bool> condition
                 = decorateeType == null
@@ -6740,13 +6748,14 @@ namespace DryIoc
                     decorateeServiceKey.Equals(r.ServiceKey) &&
                     r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType));
 
-            return DecoratorWith(condition, order, useDecorateeReuse);
+            return DecoratorWith(condition, order, useDecorateeReuse, openResolutionScope, disposalOrder);
         }
 
         /// <summary>Setup for decorator of type <typeparamref name="TDecoratee"/>.</summary>
         public static Setup DecoratorOf<TDecoratee>(
-            int order = 0, bool useDecorateeReuse = false, object decorateeServiceKey = null) =>
-            DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, decorateeServiceKey);
+            int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, int disposalOrder = 0,
+            object decorateeServiceKey = null) =>
+            DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, openResolutionScope, disposalOrder, decorateeServiceKey);
 
         /// <summary>Service setup.</summary>
         internal sealed class ServiceSetup : Setup
@@ -6770,10 +6779,10 @@ namespace DryIoc
                 bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
                 bool preventDisposal, bool weaklyReferenced,
                 bool allowDisposableTransient, bool trackDisposableTransient,
-                bool useParentReuse)
+                bool useParentReuse, int disposalOrder)
                 : base(condition, openResolutionScope, asResolutionCall, asResolutionRoot,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                    useParentReuse)
+                    useParentReuse, disposalOrder)
             {
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
             }
@@ -6812,9 +6821,12 @@ namespace DryIoc
             /// <param name="openResolutionScope">Opens the new scope.</param><param name="asResolutionCall"></param>
             /// <param name="preventDisposal">Prevents disposal of reused instance if it is disposable.</param>
             /// <param name="condition">Predicate to check if factory could be used for resolved request.</param>
+            /// <param name="disposalOrder">Disposal order</param>
             public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
-                Func<Request, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal)
-                : base(condition, openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall, preventDisposal: preventDisposal)
+                Func<Request, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal,
+                int disposalOrder)
+                : base(condition, openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall,
+                    preventDisposal: preventDisposal, disposalOrder: disposalOrder)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
@@ -6891,8 +6903,10 @@ namespace DryIoc
             /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
             /// Decorated service may be decorator itself.</param>
             /// <param name="openResolutionScope">Opens resolution scope</param>
+            /// <param name="disposalOrder">Disposal order</param>
             public DecoratorSetup(Func<Request, bool> condition, int order, bool useDecorateeReuse,
-                bool openResolutionScope = false) : base(condition, openResolutionScope)
+                bool openResolutionScope, int disposalOrder)
+                : base(condition, openResolutionScope, disposalOrder: disposalOrder)
             {
                 Order = order;
                 UseDecorateeReuse = useDecorateeReuse;
@@ -7111,14 +7125,14 @@ namespace DryIoc
                 }
 
                 var singleton = request.SingletonScope
-                    .GetOrAdd(FactoryID, () => factoryDelegate(request.Container));
+                    .GetOrAdd(FactoryID, () => factoryDelegate(request.Container), Setup.DisposalOrder);
 
                 serviceExpr = Constant(singleton);
             }
             else
             {
                 if (Setup.WeaklyReferenced)
-                    serviceExpr = New(typeof(WeakReference).GetConstructorOrNull(args: typeof(object)), serviceExpr);
+                    serviceExpr = New(typeof(WeakReference).Constructor(typeof(object)), serviceExpr);
                 else if (Setup.PreventDisposal)
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
                 serviceExpr = reuse.Apply(request, serviceExpr);
@@ -7933,7 +7947,7 @@ namespace DryIoc
                 var singletonFactory = GetActivator(ctor.DeclaringType, paramExprs);
                 if (singletonFactory != null)
                 {
-                    var singleton = request.SingletonScope.GetOrAdd(FactoryID, singletonFactory);
+                    var singleton = request.SingletonScope.GetOrAdd(FactoryID, singletonFactory, Setup.DisposalOrder);
                     return Constant(singleton);
                 }
             }
@@ -8385,11 +8399,11 @@ namespace DryIoc
         bool TryGet(out object item, int id);
 
         /// <summary>Creates, stores, and returns stored disposable by id.</summary>
-        object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1);
+        object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
 
         /// <summary>Tracked item will be disposed with the scope. 
-        /// Smaller <paramref name="disposalIndex"/> will be disposed first.</summary>
-        object TrackDisposable(object item, int disposalIndex = -1);
+        /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
+        object TrackDisposable(object item, int disposalOrder = 0);
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         void SetOrAdd(int id, object item);
@@ -8430,14 +8444,14 @@ namespace DryIoc
             typeof(IScope).SingleMethod(nameof(IScope.GetOrAdd));
 
         /// <inheritdoc />
-        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
+        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             object value;
             return _items.TryFind(id, out value)
-                ? value : TryGetOrAdd(id, createValue, disposalIndex);
+                ? value : TryGetOrAdd(id, createValue, disposalOrder);
         }
 
-        private object TryGetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
+        private object TryGetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
@@ -8491,7 +8505,7 @@ namespace DryIoc
             typeof(IScope).SingleMethod(nameof(IScope.TrackDisposable));
 
         /// <summary>Can be used to manually add service for disposal</summary>
-        public object TrackDisposable(object item, int disposalIndex = -1)
+        public object TrackDisposable(object item, int disposalOrder = 0)
         {
             if (item == this)
                 return item;
@@ -8499,12 +8513,12 @@ namespace DryIoc
             var disposable = item as IDisposable;
             if (disposable != null)
             {
-                if (disposalIndex == -1)
-                    disposalIndex = Interlocked.Decrement(ref _nextDisposalIndex);
+                if (disposalOrder == 0)
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
 
                 var it = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, it.AddOrUpdate(disposalIndex, disposable), it) != it)
-                    Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalIndex, disposable));
+                if (Interlocked.CompareExchange(ref _disposables, it.AddOrUpdate(disposalOrder, disposable), it) != it)
+                    Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalOrder, disposable));
             }
             return item;
         }
@@ -8667,11 +8681,10 @@ namespace DryIoc
         public Expr Apply(Request request, Expr serviceFactoryExpr) =>
             request.TracksTransientDisposable
             ? Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
-                serviceFactoryExpr, _minusOneExpr)
+                serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder))
             : Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddMethod,
-                Constant(request.FactoryID), Lambda<CreateScopedValue>(serviceFactoryExpr), _minusOneExpr);
-
-        private static readonly ConstExpr _minusOneExpr = Constant(-1);
+                Constant(request.FactoryID), Lambda<CreateScopedValue>(serviceFactoryExpr),
+                    Constant(request.Factory.Setup.DisposalOrder));
 
         private static readonly Lazy<Expr> _singletonReuseExpr = new Lazy<Expr>(() =>
             Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
@@ -8706,34 +8719,34 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expr Apply(Request request, Expr serviceFactoryExpr)
         {
-            var rExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
+            var resolverExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
 
             if (request.TracksTransientDisposable)
             {
                 if (_scopedOrSingleton)
-                    return Call(_trackScopedOrSingletonMethod, rExpr, serviceFactoryExpr);
+                    return Call(_trackScopedOrSingletonMethod, resolverExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(_trackScopedMethod, rExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                    return Call(_trackScopedMethod, resolverExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(_trackNameScopedMethod, rExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                return Call(_trackNameScopedMethod, resolverExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
             {
                 var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
                 var idExpr = Constant(request.FactoryID);
-                var disposalIndexExpr = Constant(-1);
+                var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
                 if (_scopedOrSingleton)
-                    return Call(_getScopedOrSingletonMethod, rExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
+                    return Call(_getScopedOrSingletonMethod, resolverExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(_getScopedMethod, rExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
+                    return Call(_getScopedMethod, resolverExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(_getNameScopedMethod, rExpr, nameExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalIndexExpr);
+                return Call(_getNameScopedMethod, resolverExpr, nameExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
             }
         }
 
@@ -9152,7 +9165,7 @@ namespace DryIoc
         /// <summary>Both containers share the resgitrations, changed in one, will change in another.</summary>
         Share = 0,
         /// <summary>Both registrations and cache</summary>
-        Clone,
+        CloneWithCache,
         /// <summary>Clones registrations but drops the cache</summary>
         CloneWithoutCache
     }
