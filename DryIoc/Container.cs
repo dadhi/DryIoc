@@ -119,10 +119,10 @@ namespace DryIoc
             if (Rules.CaptureContainerDisposeStackTrace)
                 try { _disposeStackTrace = new StackTrace(); } catch { }
 
-            if (_currentScope != null) // scoped container
+            if (_ownCurrentScope != null) // scoped container
             {
-                _scopeContext?.SetCurrent(scope => scope == _currentScope ? scope.Parent : scope);
-                _currentScope.Dispose();
+                _scopeContext?.SetCurrent(scope => scope == _ownCurrentScope ? scope.Parent : scope);
+                _ownCurrentScope.Dispose();
             }
             else // whole Container with singletons.
             {
@@ -162,8 +162,7 @@ namespace DryIoc
             if (!ifAlreadyRegistered.HasValue)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
-            // Improves performance a bit by attempt to swapping registry while it is still unchanged,
-            // if attempt fails then fallback to normal Swap with retry.
+            // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
             var registry = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(registry,
                 registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
@@ -172,15 +171,7 @@ namespace DryIoc
             _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache;
         }
 
-        /// <summary>Returns true if there is registered factory with the service type and key.
-        /// To check if only default factory is registered specify <see cref="DefaultKey.Value"/> as <paramref name="serviceKey"/>.
-        /// Otherwise, if no <paramref name="serviceKey"/> specified then True will returned for any registered factories, even keyed.
-        /// Additionally you can specify <paramref name="condition"/> to be applied to registered factories.</summary>
-        /// <param name="serviceType">Service type to look for.</param>
-        /// <param name="serviceKey">Service key to look for.</param>
-        /// <param name="factoryType">Expected registered factory type.</param>
-        /// <param name="condition">Expected factory condition.</param>
-        /// <returns>True if factory is registered, false if not.</returns>
+        /// <inheritdoc />
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
@@ -188,9 +179,7 @@ namespace DryIoc
             return !factories.IsNullOrEmpty();
         }
 
-        /// <summary>Removes specified factory from registry.
-        /// Factory is removed only from registry, if there is a relevant cache, it will be kept.
-        /// Use <see cref="ContainerTools.WithoutCache"/> to remove all the cache.</summary>
+        /// <inheritdoc />
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
@@ -440,7 +429,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IScope CurrentScope =>
-            _scopeContext == null ? _currentScope : _scopeContext.GetCurrentOrDefault();
+            _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
         public IScopeContext ScopeContext => _scopeContext;
@@ -450,8 +439,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules, _registry, _singletonScope, _scopeContext,
-                scope, _disposed, _disposeStackTrace,
-                parent: this, root: _root ?? this);
+                scope, _disposed, _disposeStackTrace, parent: this, root: _root ?? this);
         }
 
         void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
@@ -467,7 +455,7 @@ namespace DryIoc
             else if (preventDisposal)
                 instance = new HiddenDisposable(instance);
 
-            var scope = _currentScope ?? _singletonScope;
+            var scope = _ownCurrentScope ?? _singletonScope;
             var reuse = scope == _singletonScope ? Reuse.Singleton : Reuse.Scoped;
             var instanceType = instance == null ? typeof(object) : instance.GetType();
 
@@ -682,30 +670,29 @@ namespace DryIoc
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
+        /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
+        public IScope OwnCurrentScope => _ownCurrentScope;
+
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed;
 
         /// <inheritdoc />
-        public IContainer With(Rules rules, IScopeContext scopeContext,
-            WithRegistrationsOptions registrations, WithSingletonOptions singleton)
+        public IContainer With(Rules rules, IScopeContext scopeContext, IScope currentScope,
+            IScope singletonScope, RegistrySharing registrySharing)
         {
             ThrowIfContainerDisposed();
 
-            rules = rules ?? Rules;
-            scopeContext = scopeContext ?? _scopeContext;
+            // the checks to prevent invalid state of container
+            rules = rules ?? Rules.Default;
+            singletonScope = singletonScope ?? NewSingletonScope();
 
             var registry =
-                registrations == WithRegistrationsOptions.Share ? _registry :
-                registrations == WithRegistrationsOptions.CloneWithCache ? Ref.Of(_registry.Value)
+                registrySharing == RegistrySharing.Share ? _registry :
+                registrySharing == RegistrySharing.CloneWithCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
-            var singletonScope =
-                singleton == WithSingletonOptions.Keep ? _singletonScope :
-                singleton == WithSingletonOptions.Drop ? NewSingletonScope() :
-                _singletonScope.Clone();
-
             return new Container(rules, registry, singletonScope, scopeContext,
-                _currentScope, _disposed, _disposeStackTrace, _parent, _root);
+                currentScope, _disposed, _disposeStackTrace, _parent, _root);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -716,7 +703,7 @@ namespace DryIoc
         {
             var readonlyRegistry = Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow));
             return new Container(Rules, readonlyRegistry,
-                _singletonScope, _scopeContext, _currentScope,
+                _singletonScope, _scopeContext, _ownCurrentScope,
                 _disposed, _disposeStackTrace, _parent, _root);
         }
 
@@ -1486,7 +1473,7 @@ namespace DryIoc
         private Ref<ImHashMap<Type, FactoryDelegate>[]> _defaultFactoryDelegateCache;
 
         private readonly IScope _singletonScope;
-        private readonly IScope _currentScope;
+        private readonly IScope _ownCurrentScope;
         private readonly IScopeContext _scopeContext;
 
         private readonly IResolverContext _root;
@@ -1586,15 +1573,6 @@ namespace DryIoc
             private enum IsChangePermitted { Permitted, Error, Ignored }
             private readonly IsChangePermitted _isChangePermitted;
 
-            public Registry WithoutCache()
-            {
-                return new Registry(Services, Decorators, Wrappers,
-                    Ref.Of(FactoryDelegateCache.Empty()),
-                    Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImMap<Expr>.Empty),
-                    _isChangePermitted);
-            }
-
             private Registry(ImHashMap<Type, Factory> wrapperFactories = null)
                 : this(ImHashMap<Type, object>.Empty,
                     ImHashMap<Type, Factory[]>.Empty,
@@ -1623,29 +1601,30 @@ namespace DryIoc
                 _isChangePermitted = isChangePermitted;
             }
 
-            internal Registry WithServices(ImHashMap<Type, object> services)
-            {
-                return services == Services ? this :
-                    new Registry(services, Decorators, Wrappers,
-                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), _isChangePermitted);
-            }
+            public Registry WithoutCache() =>
+                new Registry(Services, Decorators, Wrappers,
+                    Ref.Of(FactoryDelegateCache.Empty()),
+                    Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImMap<Expr>.Empty),
+                    _isChangePermitted);
 
-            private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators)
-            {
-                return decorators == Decorators ? this :
-                    new Registry(Services, decorators, Wrappers,
-                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), _isChangePermitted);
-            }
+            internal Registry WithServices(ImHashMap<Type, object> services) => 
+                services == Services ? this :
+                new Registry(services, Decorators, Wrappers,
+                    DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                    FactoryExpressionCache.NewRef(), _isChangePermitted);
 
-            private Registry WithWrappers(ImHashMap<Type, Factory> wrappers)
-            {
-                return wrappers == Wrappers ? this :
-                    new Registry(Services, Decorators, wrappers,
-                        DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), _isChangePermitted);
-            }
+            private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) => 
+                decorators == Decorators ? this :
+                new Registry(Services, decorators, Wrappers,
+                    DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                    FactoryExpressionCache.NewRef(), _isChangePermitted);
+
+            private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) => 
+                wrappers == Wrappers ? this :
+                new Registry(Services, Decorators, wrappers,
+                    DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                    FactoryExpressionCache.NewRef(), _isChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -2033,7 +2012,7 @@ namespace DryIoc
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
-            IScopeContext scopeContext = null, IScope currentScope = null,
+            IScopeContext scopeContext = null, IScope ownCurrentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null, IResolverContext root = null)
         {
@@ -2050,7 +2029,7 @@ namespace DryIoc
 
             _singletonScope = singletonScope;
 
-            _currentScope = currentScope;
+            _ownCurrentScope = ownCurrentScope;
             _scopeContext = scopeContext;
         }
 
@@ -2206,7 +2185,7 @@ namespace DryIoc
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container, Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
             container.With(configure?.Invoke(container.Rules), scopeContext,
-                WithRegistrationsOptions.CloneWithoutCache, WithSingletonOptions.Keep);
+                container.OwnCurrentScope, container.SingletonScope, RegistrySharing.CloneWithoutCache);
 
         /// <summary>Prepares container for expression generation.</summary>
         public static IContainer ForExpressionGeneration(this IContainer container) =>
@@ -2218,21 +2197,20 @@ namespace DryIoc
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
         public static IContainer WithoutCache(this IContainer container) =>
-            container.With(container.Rules, container.ScopeContext,
-                WithRegistrationsOptions.CloneWithoutCache, WithSingletonOptions.Keep);
+            container.With(container.Rules, container.ScopeContext, container.OwnCurrentScope, 
+                container.SingletonScope, RegistrySharing.CloneWithoutCache);
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
         /// Dropping cache is required because singletons are cached in resolution state.</summary>
         public static IContainer WithoutSingletonsAndCache(this IContainer container) =>
-            container.With(container.Rules, container.ScopeContext,
-                WithRegistrationsOptions.CloneWithoutCache, WithSingletonOptions.Drop);
+            container.With(container.Rules, container.ScopeContext, container.OwnCurrentScope,
+                Container.NewSingletonScope(), RegistrySharing.CloneWithoutCache);
 
-        /// <summary>Shares all parts with original container But copies registration, so the new registration
+        /// <summary>Shares all parts with original container But copies registrations, so the new registrations
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
-            container.With(container.Rules, container.ScopeContext,
-                preserveCache ? WithRegistrationsOptions.CloneWithCache : WithRegistrationsOptions.CloneWithoutCache, 
-                WithSingletonOptions.Keep);
+            container.With(container.Rules, container.ScopeContext, container.OwnCurrentScope, container.SingletonScope,
+                preserveCache ? RegistrySharing.CloneWithCache : RegistrySharing.CloneWithoutCache);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -2259,7 +2237,7 @@ namespace DryIoc
         public static object New(this IContainer container, Type concreteType, Made made = null)
         {
             var containerClone = container.With(container.Rules, container.ScopeContext,
-                WithRegistrationsOptions.CloneWithCache, WithSingletonOptions.Keep);
+                container.OwnCurrentScope, container.SingletonScope, RegistrySharing.CloneWithCache);
 
             var implType = containerClone.GetWrappedType(concreteType, null);
 
@@ -2857,8 +2835,10 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
+        public static IResolverContext OpenScope(this IResolverContext r,
+            object name = null, bool trackInParent = false)
         {
+            // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
             var openedScope = r.ScopeContext == null
                 ? new Scope(r.CurrentScope, name)
                 : r.ScopeContext.SetCurrent(currentScope => new Scope(currentScope, name));
@@ -6045,7 +6025,7 @@ namespace DryIoc
         /// but could be changed along the way: for instance when resolving from parent container.</summary>
         public IContainer Container => SharedInfo.Container;
 
-        /// <summary>Currne scope</summary>
+        /// <summary>Current scope</summary>
         public IScope CurrentScope => Container.CurrentScope;
 
         /// <summary>Singletons</summary>
@@ -9126,41 +9106,24 @@ namespace DryIoc
         /// <param name="serviceType">Service type as unique key in registry for lookup.</param>
         /// <param name="serviceKey">Service key as complementary lookup for the same service type.</param>
         /// <param name="ifAlreadyRegistered">Policy how to deal with already registered factory with same service type and key.</param>
-        /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
+        /// <param name="isStaticallyChecked">[performance] Confirms that service and implementation types are statically checked by compiler.</param>
         /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
         void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
 
-        /// <summary>Returns true if expected factory is registered with specified service key and type.</summary>
-        /// <param name="serviceType">Type to lookup.</param>
-        /// <param name="serviceKey">(optional) Identifies registration via service key.
-        /// Not provided or <c>null</c> service key means to check the <paramref name="serviceType"/> alone with any service key.</param>
-        /// <param name="factoryType">Expected factory type.</param>
-        /// <param name="condition">Expected factory condition.</param>
-        /// <returns>True if expected factory found in registry.</returns>
+        /// <summary>Returns true if expected factory is registered with specified service key and type.
+        /// Not provided or <c>null</c> <paramref name="serviceKey"/> means to check the <paramref name="serviceType"/> 
+        /// alone with any service key.</summary>
         bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
 
-        /// <summary>Removes factory with specified service type and key from registry.</summary>
-        /// <param name="serviceType">Type to lookup.</param>
-        /// <param name="serviceKey">Key to lookup for the same type.</param>
-        /// <param name="factoryType">Expected factory type.</param>
-        /// <param name="condition">Expected factory condition.</param>
+        /// <summary>Removes factory with specified service type and key from registry and cache.
+        /// BUT consuming services may still hold on the resolved service instance.
+        /// The cache of consuming services may also hold on the unregistered service. Use `IContainer.ClearCache` to clear all cache.</summary>
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
     }
 
-    /// <summary>What to do with scope.</summary>
-    public enum WithSingletonOptions
-    {
-        /// <summary>Keep state</summary>
-        Keep = 0,
-        /// <summary>Remove state</summary>
-        Drop,
-        /// <summary>Clone or copy state</summary>
-        Clone
-    }
-
-    /// <summary>What to do with registration.</summary>
-    public enum WithRegistrationsOptions
+    /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
+    public enum RegistrySharing
     {
         /// <summary>Both containers share the resgitrations, changed in one, will change in another.</summary>
         Share = 0,
@@ -9176,9 +9139,12 @@ namespace DryIoc
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
+        /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
+        IScope OwnCurrentScope { get; }
+
         /// <summary>Creates new container from the current one.</summary>
-        IContainer With(Rules rules, IScopeContext scopeContext,
-            WithRegistrationsOptions registrations, WithSingletonOptions singletonOptions);
+        IContainer With(Rules rules, 
+            IScopeContext scopeContext, IScope currentScope, IScope singletonScope, RegistrySharing registrySharing);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
