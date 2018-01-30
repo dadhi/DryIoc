@@ -427,6 +427,9 @@ namespace DryIoc
         public IScope SingletonScope => _singletonScope;
 
         /// <inheritdoc />
+        public IScopeContext ScopeContext => _scopeContext;
+
+        /// <inheritdoc />
         public IScope CurrentScope =>
             _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
 
@@ -436,17 +439,6 @@ namespace DryIoc
             ThrowIfContainerDisposed();
             return new Container(Rules, _registry, _singletonScope, _scopeContext,
                 scope, _disposed, _disposeStackTrace, parent: this, root: _root ?? this);
-        }
-
-        /// <inheritdoc />
-        public IScopeContext ScopeContext => _scopeContext;
-
-        /// <inheritdoc />
-        public IResolverContext WithScopeContext(IScopeContext scopeContext)
-        {
-            ThrowIfContainerDisposed();
-            return new Container(Rules, _registry, _singletonScope, scopeContext,
-                _ownCurrentScope, _disposed, _disposeStackTrace, parent: this, root: _root ?? this);
         }
 
         void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
@@ -2741,18 +2733,15 @@ namespace DryIoc
         /// <summary>Singleton scope, always associated with root scope.</summary>
         IScope SingletonScope { get; }
 
-        /// <summary>Current opened scope. Fixed and bound to resolver, cannot be changed underneath.</summary>
+        /// <summary>Optional ambient scope context.</summary>
+        IScopeContext ScopeContext { get; }
+
+        /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
         IScope CurrentScope { get; }
 
         /// <summary>Creates resolver context with specified current scope (or container which implements the context).</summary>
         IResolverContext WithCurrentScope(IScope scope);
-
-        /// <summary>Optional ambient scope context.</summary>
-        IScopeContext ScopeContext { get; }
-
-        /// <summary>Creates resolver context with specified ambient scope context</summary>
-        IResolverContext WithScopeContext(IScopeContext scopeContext);
-
+        
         /// <summary>Allows to put instance into the scope.</summary>
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
@@ -2851,7 +2840,7 @@ namespace DryIoc
             // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
             var openedScope = r.ScopeContext == null
                 ? new Scope(r.CurrentScope, name)
-                : r.ScopeContext.SetCurrent(currentScope => new Scope(currentScope, name));
+                : r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
 
             if (trackInParent)
                 (openedScope.Parent ?? r.SingletonScope).TrackDisposable(openedScope);
