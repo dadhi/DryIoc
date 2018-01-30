@@ -649,10 +649,10 @@ namespace ImTools
         public static implicit operator Opt<T>(T value) => new Opt<T>(value);
 
         /// <summary>Argument value.</summary>
-        public readonly T Value;
+        public T Value;
 
         /// <summary>Indicates that value is provided.</summary>
-        public readonly bool HasValue;
+        public bool HasValue;
 
         /// <summary>Wraps passed value in structure. Sets the flag that value is present.</summary>
         public Opt(T value)
