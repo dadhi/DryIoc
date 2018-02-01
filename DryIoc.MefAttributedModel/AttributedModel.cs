@@ -112,10 +112,10 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(NotifyImportsSatisfied), includeNonPublic: true));
+            typeof(AttributedModel).SingleMethod(nameof(NotifyImportsSatisfied), includeNonPublic: true));
 
         private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            (Func<Request, bool>)(request => request.GetKnownImplementationOrServiceType().IsAssignableTo(typeof(IPartImportsSatisfiedNotification))),
+            r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(),
             order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
             useDecorateeReuse: true);
 
@@ -157,16 +157,12 @@ namespace DryIoc.MefAttributedModel
         public sealed class PartAndDisposeActionPair<TPart>
         {
             /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
-            public static implicit operator KeyValuePair<TPart, Action>(PartAndDisposeActionPair<TPart> source)
-            {
-                return new KeyValuePair<TPart, Action>(source.Part, source.DisposeAction);
-            }
+            public static implicit operator KeyValuePair<TPart, Action>(PartAndDisposeActionPair<TPart> source) =>
+                source.Part.Pair(source.DisposeAction);
 
             /// <summary>Conversion operator.</summary> <param name="source">to be converted</param>
-            public static implicit operator Tuple<TPart, Action>(PartAndDisposeActionPair<TPart> source)
-            {
-                return Tuple.Create(source.Part, source.DisposeAction);
-            }
+            public static implicit operator Tuple<TPart, Action>(PartAndDisposeActionPair<TPart> source) =>
+                Tuple.Create(source.Part, source.DisposeAction);
 
             /// <summary>Created export part.</summary>
             public readonly TPart Part;
@@ -213,7 +209,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(CreateExportFactory), includeNonPublic: true),
+            typeof(AttributedModel).SingleMethod(nameof(CreateExportFactory), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.IfUnresolved));
 
         /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
@@ -240,7 +236,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
+            typeof(AttributedModel).SingleMethod(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
 
         /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
         /// <typeparam name="T">The type of the exported service.</typeparam>
@@ -254,7 +250,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _createLazyWithMetadataMethod = Made.Of(
-            typeof(AttributedModel).Method(nameof(CreateLazyWithMetadata), includeNonPublic: true));
+            typeof(AttributedModel).SingleMethod(nameof(CreateLazyWithMetadata), includeNonPublic: true));
 
         #endregion
 
@@ -276,7 +272,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         private static readonly Made _filterCollectionByMultiKey = Made.Of(
-            typeof(AttributedModel).Method(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
+            typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.ServiceKey));
 
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
@@ -526,25 +522,28 @@ namespace DryIoc.MefAttributedModel
             otherServiceExports = otherServiceExports
                 ?? new Dictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>>();
 
+            // Creating index or adding new registrations to the index.
             foreach (var reg in lazyRegistrations)
             {
                 var exports = reg.Exports;
                 for (var i = 0; i < exports.Length; i++)
                 {
                     var e = exports[i];
+
                     IList<KeyValuePair<object, ExportedRegistrationInfo>> expRegs;
                     if (!otherServiceExports.TryGetValue(e.ServiceTypeFullName, out expRegs))
                         otherServiceExports[e.ServiceTypeFullName] =
                             expRegs = new List<KeyValuePair<object, ExportedRegistrationInfo>>();
-                    expRegs.Add(new KeyValuePair<object, ExportedRegistrationInfo>(e.ServiceKey, reg));
+
+                    expRegs.Add(e.ServiceKey.Pair(reg));
                 }
             }
 
-            return (serviceType, serviceKey) =>
+            return (serviceType, _) =>
             {
                 IList<KeyValuePair<object, ExportedRegistrationInfo>> regs;
-                return otherServiceExports.TryGetValue(serviceType.FullName ?? serviceType.Name, out regs)
-                    ? regs.Map(r => new DynamicRegistration(r.Value.CreateFactory(typeProvider), ifAlreadyRegistered, r.Key))
+                return otherServiceExports.TryGetValue(serviceType.FullName.ThrowIfNull(), out regs)
+                    ? regs.Map(r => new DynamicRegistration(r.Value.GetOrCreateFactory(typeProvider), ifAlreadyRegistered, r.Key))
                     : null;
             };
         }
@@ -582,7 +581,7 @@ namespace DryIoc.MefAttributedModel
         private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector = null)
         {
             var implType = request.ImplementationType;
-            var ctors = implType.GetPublicInstanceConstructors().ToArrayOrSelf();
+            var ctors = implType.PublicConstructors().ToArrayOrSelf();
             var ctor = ctors.Length == 1 ? ctors[0]
                 : ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
 
@@ -706,13 +705,6 @@ namespace DryIoc.MefAttributedModel
             return null;
         }
 
-        internal static KeyValuePair<string, object> ComposeServiceKeyMetadata(object serviceKey, Type serviceType)
-        {
-            return new KeyValuePair<string, object>(
-                string.Concat(serviceKey.GetHashCode(), ":", serviceType.FullName),
-                serviceKey);
-        }
-
         private static KeyValuePair<string, object> GetRequiredMetadata(Attribute[] attributes)
         {
             var withMetadataAttr = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
@@ -721,7 +713,7 @@ namespace DryIoc.MefAttributedModel
                 : withMetadataAttr.MetadataKey == null ? Constants.ExportMetadataDefaultKey
                 : withMetadataAttr.MetadataKey;
 
-            return new KeyValuePair<string, object>(metadataKey, metadata);
+            return metadataKey.Pair(metadata);
         }
 
         private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
@@ -747,7 +739,7 @@ namespace DryIoc.MefAttributedModel
 
             if (serviceKey != null)
             {
-                var serviceKeyMetadata = ComposeServiceKeyMetadata(serviceKey, serviceType);
+                var serviceKeyMetadata = (serviceKey.GetHashCode() + ":" + serviceType.FullName).Pair(serviceKey);
 
                 setupMetadata = setupMetadata ?? new Dictionary<string, object>();
                 setupMetadata.Add(serviceKeyMetadata.Key, serviceKeyMetadata.Value);
@@ -1402,18 +1394,18 @@ namespace DryIoc.MefAttributedModel
             return new ReflectionFactory(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
         }
 
-        private Made GetMade(Func<string, Type> typeProvider = null)
-        {
-            if (FactoryMethodInfo == null)
-                return Made.Default;
-            return FactoryMethodInfo.CreateMade(typeProvider);
-        }
+        // todo: fix multi-threading
+        /// <summary>Returns the already created factory if any.</summary>
+        public ReflectionFactory GetOrCreateFactory(Func<string, Type> typeProvider = null) =>
+            _createdFactory ?? (_createdFactory = CreateFactory(typeProvider));
+
+        private ReflectionFactory _createdFactory;
+
+        private Made GetMade(Func<string, Type> typeProvider = null) =>
+            FactoryMethodInfo == null ? Made.Default : FactoryMethodInfo.CreateMade(typeProvider);
 
         /// <summary>Gets the <see cref="IReuse"/> instance.</summary>
-        public IReuse GetReuse()
-        {
-            return AttributedModel.GetReuse(Reuse);
-        }
+        public IReuse GetReuse() => AttributedModel.GetReuse(Reuse);
 
         /// <summary>Create factory setup from registration DTO.</summary>
         /// <param name="made">(optional) Used for collecting metadata from factory method attributes if any.</param>
@@ -1426,7 +1418,7 @@ namespace DryIoc.MefAttributedModel
             var condition = ConditionType == null
                 ? (Func<Request, bool>)null
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
-                    .Evaluate(ConvertRequestInfo(r.RequestInfo));
+                    .Evaluate(ConvertRequestInfo(r));
 
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
@@ -1459,7 +1451,7 @@ namespace DryIoc.MefAttributedModel
             return metaAttrs;
         }
 
-        private static DryIocAttributes.RequestInfo ConvertRequestInfo(DryIoc.RequestInfo source)
+        private static RequestInfo ConvertRequestInfo(Request source)
         {
             if (source.IsEmpty)
                 return RequestInfo.Empty;

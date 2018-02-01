@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2017 Maksim Volkau
+Copyright (c) 2016 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,31 +31,34 @@ namespace ImTools
     using System.Threading;
     using System.Runtime.CompilerServices; // For [MethodImpl(AggressiveInlining)]
 
+    /// <summary>Helpers for functional composition</summary>
+    public static class Fun
+    {
+        /// <summary>Always a true condition.</summary>
+        public static bool Always<T>(T _) => true;
+    }
+
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools
     {
+        /// <summary>Returns singleton empty array of provided type.</summary> 
+        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
+        public static T[] Empty<T>() => EmptyArray<T>.Value;
+
         private static class EmptyArray<T>
         {
             public static readonly T[] Value = new T[0];
         }
 
-        /// <summary>Returns singleton empty array of provided type.</summary> 
-        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
-        public static T[] Empty<T>()
-        {
-            return EmptyArray<T>.Value;
-        }
+        /// <summary>Wraps item in array.</summary>
+        public static T[] One<T>(this T one) => new[] { one };
 
         /// <summary>Returns true if array is null or have no items.</summary> <typeparam name="T">Type of array item.</typeparam>
         /// <param name="source">Source array to check.</param> <returns>True if null or has no items, false otherwise.</returns>
-        public static bool IsNullOrEmpty<T>(this T[] source)
-        {
-            return source == null || source.Length == 0;
-        }
+        public static bool IsNullOrEmpty<T>(this T[] source) => source == null || source.Length == 0;
 
         /// <summary>Returns empty array instead of null, or source array otherwise.</summary> <typeparam name="T">Type of array item.</typeparam>
-        public static T[] EmptyIfNull<T>(this T[] source) =>
-            source ?? Empty<T>();
+        public static T[] EmptyIfNull<T>(this T[] source) => source ?? Empty<T>();
 
         /// <summary>Returns source enumerable if it is array, otherwise converts source to array.</summary>
         public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source) =>
@@ -194,7 +197,7 @@ namespace ImTools
             return default(T);
         }
 
-        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or `default(T)` value.</summary>
         /// <typeparam name="T">item type</typeparam>
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>
@@ -634,6 +637,14 @@ namespace ImTools
         }
     }
 
+    /// <summary>Simple helper for creation of the pair of two parts.</summary>
+    public static class KeyValuePair
+    {
+        /// <summary>Pairs key with value.</summary>
+        public static KeyValuePair<K, V> Pair<K, V>(this K key, V value) =>
+            new KeyValuePair<K, V>(key, value);
+    }
+
     /// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>
     public struct Opt<T>
     {
@@ -641,10 +652,10 @@ namespace ImTools
         public static implicit operator Opt<T>(T value) => new Opt<T>(value);
 
         /// <summary>Argument value.</summary>
-        public readonly T Value;
+        public T Value;
 
         /// <summary>Indicates that value is provided.</summary>
-        public readonly bool HasValue;
+        public bool HasValue;
 
         /// <summary>Wraps passed value in structure. Sets the flag that value is present.</summary>
         public Opt(T value)
@@ -908,6 +919,12 @@ namespace ImTools
         public ImMap<V> Remove(int key)
         {
             return RemoveImpl(key);
+        }
+
+        /// <summary>Outputs key value pair</summary>
+        public override string ToString()
+        {
+            return Key + " : " + Value;
         }
 
         #region Implementation
@@ -1210,6 +1227,12 @@ namespace ImTools
             return Remove(key.GetHashCode(), key);
         }
 
+        /// <summary>Outputs key value pair</summary>
+        public override string ToString()
+        {
+            return Key + " : " + Value;
+        }
+
         #region Implementation
 
         private sealed class Data
@@ -1464,20 +1487,20 @@ namespace ImTools
 
             if (Conflicts.Length == 1)
                 return new ImHashMap<K, V>(new Data(Hash, Key, Value), Left, Right);
-            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
+            var shrinkConflicts = new KV<K, V>[Conflicts.Length - 1];
             var newIndex = 0;
             for (var i = 0; i < Conflicts.Length; ++i)
-                if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
-            return new ImHashMap<K, V>(new Data(Hash, Key, Value, shrinkedConflicts), Left, Right);
+                if (i != index) shrinkConflicts[newIndex++] = Conflicts[i];
+            return new ImHashMap<K, V>(new Data(Hash, Key, Value, shrinkConflicts), Left, Right);
         }
 
         private ImHashMap<K, V> ReplaceRemovedWithConflicted()
         {
             if (Conflicts.Length == 1)
                 return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value), Left, Right);
-            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
-            Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
-            return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts), Left, Right);
+            var shrinkConflicts = new KV<K, V>[Conflicts.Length - 1];
+            Array.Copy(Conflicts, 1, shrinkConflicts, 0, shrinkConflicts.Length);
+            return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkConflicts), Left, Right);
         }
 
         #endregion

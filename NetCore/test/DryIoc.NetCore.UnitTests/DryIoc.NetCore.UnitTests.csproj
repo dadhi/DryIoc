@@ -1,18 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp1.1</TargetFramework>
+    <TargetFrameworks>netcoreapp1.1;netcoreapp2.0</TargetFrameworks>
     <NoWarn>$(NoWarn);CS0618</NoWarn>
     <AssemblyName>DryIoc.NetCore.UnitTests</AssemblyName>
     <PackageId>DryIoc.NetCore.UnitTests</PackageId>
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
-    <RuntimeFrameworkVersion>1.1.1</RuntimeFrameworkVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="..\..\..\DryIoc.UnitTests\ThrowTests.cs;..\..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs" />
     <Compile Include="..\..\..\DryIoc.UnitTests\*.cs" Exclude="bin\**;obj\**;**\*.xproj;packages\**;..\..\..\DryIoc.UnitTests\ThrowTests.cs;..\..\..\DryIoc.UnitTests\FastExpressionCompilerTests.cs" />
-    <Compile Include="..\..\..\Net45\DryIoc.IssuesTests\Issue545_Func_Of_Scoped.cs" />
   </ItemGroup>
 
   <ItemGroup>

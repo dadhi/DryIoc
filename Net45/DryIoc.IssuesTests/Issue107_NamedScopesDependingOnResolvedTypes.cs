@@ -230,7 +230,8 @@ namespace DryIoc.IssuesTests
                 Reuse.ScopedTo<IArea2>(),
                 setup: Setup.With(openResolutionScope: true));
 
-            container.Register<IViewModelPresenter, ViewModelPresenter>(Reuse.ScopedTo<IMainViewModel>());
+            container.Register<IViewModelPresenter, ViewModelPresenter>(
+                Reuse.ScopedTo<IMainViewModel>());
 
             container.Register<IChildViewModelSimple, ChildViewModelSimple>();
             container.Register<IChildViewModelWithChildren, ChildViewModelWithChildren>();
@@ -361,6 +362,8 @@ namespace DryIoc.IssuesTests
             }
         }
 
+        internal class AreaWithOneCarSimplified { }
+
         internal class AreaWithOneCar : IDisposable
         {
             public ICar Car { get; private set; }
@@ -428,6 +431,15 @@ namespace DryIoc.IssuesTests
             }
         }
 
+        internal class CarefulAreaManagerSimplified
+        {
+            public AreaWithOneCarSimplified Area { get; private set; }
+            public CarefulAreaManagerSimplified(AreaWithOneCarSimplified area)
+            {
+                Area = area;
+            }
+        }
+
         internal class CarefulAreaManager : IDisposable
         {
             public AreaWithOneCar[] Areas { get; private set; }
@@ -447,14 +459,16 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Service_scoped_to_dynamic_dependency_could_be_disposed()
+        public void Service_scoped_to_resolve_dependency_should_be_disposed()
         {
             var container = new Container();
 
             container.Register<ICar, SmallCar>(Reuse.Scoped);
-            container.Register<AreaWithOneCar>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
+            container.Register<AreaWithOneCar>(Reuse.Scoped,
+                setup: Setup.With(openResolutionScope: true));
             container.Register<SomeTool>();
-            container.Register<CarefulAreaManager>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
+            container.Register<CarefulAreaManager>(Reuse.Singleton,
+                setup: Setup.With(openResolutionScope: true));
 
             var manager = container.Resolve<CarefulAreaManager>();
             var area = manager.Areas.First();
@@ -463,9 +477,26 @@ namespace DryIoc.IssuesTests
             Assert.AreNotSame(manager.ReferenceCar, area.Car);
 
             manager.Dispose();
+
             Assert.IsTrue(((SmallCar)area.Car).IsDisposed);
             Assert.IsTrue(((SmallCar)area.Tool.Car).IsDisposed);
             Assert.IsTrue(((SmallCar)manager.ReferenceCar).IsDisposed);
+        }
+
+        [Test]
+        public void Service_scoped_to_resolve_dependency_should_be_disposed_simplified()
+        {
+            var container = new Container();
+
+            container.Register<AreaWithOneCarSimplified>(Reuse.Scoped,
+                setup: Setup.With(openResolutionScope: true));
+
+            container.Register<CarefulAreaManagerSimplified>(Reuse.Singleton,
+                setup: Setup.With(openResolutionScope: true));
+
+            var manager = container.Resolve<CarefulAreaManagerSimplified>();
+
+            Assert.IsNotNull(manager.Area);
         }
 
         [Test]

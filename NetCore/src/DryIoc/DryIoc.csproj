@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <VersionPrefix>2.12.1</VersionPrefix>
+    <VersionPrefix>3.0.0-preview-04</VersionPrefix>
     <TargetFramework>netstandard1.0</TargetFramework>
     <AssemblyName>DryIoc</AssemblyName>
     <PackageId>DryIoc</PackageId>

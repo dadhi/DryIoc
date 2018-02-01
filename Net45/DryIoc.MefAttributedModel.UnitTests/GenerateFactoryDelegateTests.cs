@@ -85,7 +85,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
-        public void Can_generate_expression_with_recursive_Lazy_dependency()
+        public void Can_generate_expression_with_recursive_Lazy_dependency_by_hand()
         {
             IContainer container = new Container(rules => rules
                 .WithoutEagerCachingSingletonForFasterAccess()
@@ -95,10 +95,27 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<LazyDep>();
 
             var request = Request.Create(container, typeof(LazyUser));
-            container.GetServiceFactoryOrDefault(request).GetExpressionOrDefault(request);
+            var factory = container.GetServiceFactoryOrDefault(request);
+            factory.GetExpressionOrDefault(request);
 
             var depList = container.Rules.DependencyResolutionCallExpressions.Value.Enumerate().ToArray();
             Assert.AreEqual(1, depList.Length);
+        }
+
+        [Test]
+        public void Can_generate_expression_with_recursive_Lazy_dependency()
+        {
+            var container = new Container();
+
+            container.Register<LazyUser>();
+            container.Register<LazyDep>();
+
+            KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] roots;
+            KeyValuePair<Request, Expression>[] deps;
+            container.GenerateResolutionExpressions(out roots, out deps, ServiceInfo.Of<LazyUser>());
+
+            Assert.AreEqual(1, roots.Length);
+            Assert.AreEqual(1, deps.Length);
         }
 
         [Test]
@@ -151,7 +168,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 typeof(ExportConditionalObject3));
 
             KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
-            KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+            KeyValuePair<Request, Expression>[] resolutionCallDependencies;
             container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, ContainerTools.SetupAsResolutionRoots);
 
             Assert.AreEqual(3, resolutionsRoots.Length);
@@ -168,7 +185,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.RegisterDelegate(resolver => "runtime state");
 
             KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
-            KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
+            KeyValuePair<Request, Expression>[] resolutionCallDependencies;
             var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies);
 
             Assert.AreEqual(1, errors.Length);
@@ -189,7 +206,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<K>(setup: Setup.With(asResolutionRoot: true));
 
             KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<RequestInfo, Expression>[] calls;
+            KeyValuePair<Request, Expression>[] calls;
             var errors = container.GenerateResolutionExpressions(out roots, out calls,
                 r => r.Factory.Setup.AsResolutionRoot);
 
@@ -223,6 +240,38 @@ namespace DryIoc.MefAttributedModel.UnitTests
         }
 
         [Test]
+        public void Can_specify_resolution_root_with_Service_type_and_key_instead_of_predicate()
+        {
+            var container = new Container();
+
+            container.RegisterDelegate(_ => "a string message");
+            var n = new N();
+            container.UseInstance(n);
+
+            container.Register(typeof(K<>));
+
+            KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] roots;
+            KeyValuePair<Request, Expression>[] calls;
+            var errors = container.GenerateResolutionExpressions(out roots, out calls, ServiceInfo.Of<K<N>>());
+
+            Assert.IsEmpty(errors);
+            Assert.AreEqual(1, roots.Length);
+            Assert.AreEqual(0, calls.Length);
+        }
+
+        public class K<T>
+        {
+            public string M { get; }
+            public T N { get; }
+
+            public K(T n, string m)
+            {
+                M = m;
+                N = n;
+            }
+        }
+
+        [Test]
         public void No_errors_for_registered_placeholders()
         {
             var c = new Container();
@@ -231,7 +280,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             c.RegisterPlaceholder(typeof(IN));
 
             KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<RequestInfo, Expression>[] deps;
+            KeyValuePair<Request, Expression>[] deps;
             var errors = c.GenerateResolutionExpressions(out roots, out deps, 
                 r => r.ServiceType == typeof(M));
             Assert.IsEmpty(errors);

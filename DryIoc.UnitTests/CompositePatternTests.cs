@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -95,14 +96,12 @@ namespace DryIoc.UnitTests
             container.Register<IOperation, OperationOne>(serviceKey: nameof(OperationOne));
             container.Register<IOperation, OperationTwo>(serviceKey: nameof(OperationTwo));
 
-            container.RegisterMany(
-                new[] {typeof(IOperation), typeof(IAction)},
-                typeof(CompositeOpertaion));
+            container.RegisterMany(typeof(CompositeOperation).One(), _ => new[]{ typeof(IOperation), typeof(IAction) });
             container.Register<Service>(made: Parameters.Of.Type<IAction>(typeof(IOperation)));
 
             var service = container.Resolve<Service>();
             Assert.IsNotNull(service);
-            Assert.IsInstanceOf<CompositeOpertaion>(service.Action);
+            Assert.IsInstanceOf<CompositeOperation>(service.Action);
         }
 
         [Test]
@@ -112,14 +111,12 @@ namespace DryIoc.UnitTests
             container.Register<IOperation, OperationOne>(serviceKey: nameof(OperationOne));
             container.Register<IOperation, OperationTwo>(serviceKey: nameof(OperationTwo));
 
-            container.RegisterMany(
-                new[] { typeof(IOperation), typeof(IAction) },
-                typeof(CompositeOpertaion));
+            container.RegisterMany(typeof(CompositeOperation).One(), _ => new[] { typeof(IOperation), typeof(IAction) });
             container.Register<Service>(made: Parameters.Of.Type<IAction>(typeof(IOperation)));
 
             var service = container.Resolve<Service>();
             Assert.IsNotNull(service);
-            Assert.IsInstanceOf<CompositeOpertaion>(service.Action);
+            Assert.IsInstanceOf<CompositeOperation>(service.Action);
         }
 
         public interface IAction
@@ -138,11 +135,11 @@ namespace DryIoc.UnitTests
         {
         }
 
-        public class CompositeOpertaion : IOperation
+        public class CompositeOperation : IOperation
         {
             public readonly IEnumerable<IOperation> Operations;
 
-            public CompositeOpertaion(IEnumerable<IOperation> operations)
+            public CompositeOperation(IEnumerable<IOperation> operations)
             {
                 Operations = operations.ToArray();
             }

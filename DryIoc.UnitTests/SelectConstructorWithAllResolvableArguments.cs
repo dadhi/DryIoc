@@ -147,7 +147,7 @@ namespace DryIoc.UnitTests
                 container.Resolve<Ac>());
 
             Assert.AreEqual(
-                Error.NameOf(Error.UnableToGetConstructorFromSelector), 
+                Error.NameOf(Error.UnableToSelectCtor), 
                 Error.NameOf(ex.Error));
         }
 

@@ -41,9 +41,9 @@ THE SOFTWARE.
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
-KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
-KeyValuePair<RequestInfo, Expression>[] resolutionCallDependencies;
-var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, IsResolutionRoot);
+KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
+KeyValuePair<RequestInfo, Expression>[] dependencies;
+var errors = container.GenerateResolutionExpressions(out roots, out dependencies, IsResolutionRoot);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 Func<object, string> code = null;
@@ -64,13 +64,13 @@ Func<object, string> code = null;
         : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x).ToSystemExpression())
         : code(container.GetItemExpression(x, x.GetType(), true).ToSystemExpression());
 
-var roots = resolutionsRoots.Select((r, i) => 
+var rootCodes = roots.Select((r, i) => 
     new { Index = i, 
           ServiceType = code(r.Key.ServiceType),
           ServiceKey = code(r.Key.OptionalServiceKey),
           Expression = code(r.Value.Body) });
 
-var resolutionCalls = resolutionCallDependencies.Select((r, i) => 
+var dependencyCodes = dependencies.Select((r, i) => 
     new { Index = i, 
           ServiceType = code(r.Key.ServiceType),
           ServiceKey = code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
@@ -122,7 +122,7 @@ Error: <#=e.Value.Message#>
         {
 <#
         var index = 0;
-        foreach (var factory in roots.Where(f => f.ServiceKey == "null"))
+        foreach (var factory in rootCodes.Where(f => f.ServiceKey == "null"))
         {
             if (index++ > 0) WriteLine(@"
             else");
@@ -140,7 +140,7 @@ Error: <#=e.Value.Message#>
         {
 <#
         index = 0;
-        foreach (var rootGroup in roots.Where(f => f.ServiceKey != "null").GroupBy(f => f.ServiceType))
+        foreach (var rootGroup in rootCodes.Where(f => f.ServiceKey != "null").GroupBy(f => f.ServiceType))
         {
             if (index++ > 0) WriteLine(@"
             else");
@@ -165,7 +165,7 @@ Error: <#=e.Value.Message#>
         }
 #>
 <#
-        foreach (var depGroup in resolutionCalls.GroupBy(x => x.ServiceType))
+        foreach (var depGroup in dependencyCodes.GroupBy(x => x.ServiceType))
         {
             if (index++ > 0) WriteLine(@"
             else");
@@ -204,7 +204,7 @@ Error: <#=e.Value.Message#>
         private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
         {
 <#
-        if (!roots.Any())
+        if (!rootCodes.Any())
         {
 #>
             yield break;
@@ -212,7 +212,7 @@ Error: <#=e.Value.Message#>
         }
         else 
         {
-            foreach (var rootGroup in roots.GroupBy(f => f.ServiceType))
+            foreach (var rootGroup in rootCodes.GroupBy(f => f.ServiceType))
             {
 #>
             if (serviceType == <#= rootGroup.Key #>)
@@ -234,7 +234,7 @@ Error: <#=e.Value.Message#>
         }
 
 <#
-    foreach (var root in roots)
+    foreach (var root in rootCodes)
     {
 #>
         // <#= root.ServiceType #>
@@ -247,7 +247,7 @@ Error: <#=e.Value.Message#>
     }
 #>
 <#
-    foreach (var dep in resolutionCalls)
+    foreach (var dep in dependencyCodes)
     {
 #>
         // <#= dep.ServiceType #>

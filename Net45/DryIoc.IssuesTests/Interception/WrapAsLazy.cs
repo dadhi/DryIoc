@@ -8,9 +8,6 @@ namespace DryIoc.IssuesTests.Interception
     // Extension methods for wrapping dependencies as forcible lazy using Castle Dynamic Proxy.
     public static class WrapAsLazy
     {
-        // proxy builder caches the created types internally
-        private static DefaultProxyBuilder ProxyBuilder { get; } = new DefaultProxyBuilder();
-
         /// <summary>
         /// Registers a service that is always resolved as lazy wrapper.
         /// </summary>
@@ -67,7 +64,7 @@ namespace DryIoc.IssuesTests.Interception
             registrator.Register(interfaceType, proxyType,
                 Reuse.Transient,
                 setup: decoratorSetup,
-                made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
+                made: Made.Of(type => type.PublicConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
                     Parameters.Of
                         .Type(typeof(IInterceptor[]), lazyInterceptorArrayType)
                         .Type(interfaceType, r => null)));
@@ -91,7 +88,7 @@ namespace DryIoc.IssuesTests.Interception
         /// <param name="serviceKey">Optional service key.</param>
         public static IRegistrator ResolveAsLazy(this IRegistrator registrator, Type interfaceType, object serviceKey = null)
         {
-            var method = typeof(WrapAsLazy).Method(nameof(CreateLazyProxy), includeNonPublic: true)
+            var method = typeof(WrapAsLazy).SingleMethod(nameof(CreateLazyProxy), includeNonPublic: true)
                 .MakeGenericMethod(interfaceType);
             var decoratorSetup = GetDecoratorSetup(serviceKey);
             registrator.Register(interfaceType, Reuse.Transient, Made.Of(method), decoratorSetup);

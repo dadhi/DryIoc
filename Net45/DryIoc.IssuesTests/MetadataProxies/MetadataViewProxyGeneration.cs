@@ -54,6 +54,6 @@ namespace DryIoc.IssuesTests.MetadataProxies
         }
 
         private static Made _createLazyWithMetadataMethod { get; } = Made.Of(
-            typeof(MetadataViewProxyGeneration).Method(nameof(CreateLazyWithMetadata), includeNonPublic: true));
+            typeof(MetadataViewProxyGeneration).SingleMethod(nameof(CreateLazyWithMetadata), includeNonPublic: true));
     }
 }

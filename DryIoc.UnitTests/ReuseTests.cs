@@ -784,7 +784,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class Ho {}
+        public class Ho { }
 
         public class O
         {
@@ -816,7 +816,7 @@ namespace DryIoc.UnitTests
         {
             public P(Ho ho, O o)
             {
-                
+
             }
         }
 
@@ -845,7 +845,80 @@ namespace DryIoc.UnitTests
             }
         }
 
-        class Go {}
+        class Go { }
+
+        [Test]
+        public void Can_specify_to_dispose_something_earlier()
+        {
+            var c = new Container();
+
+            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
+            c.Register<Quack>(Reuse.Singleton);
+
+            var d = c.Resolve<Duck>();
+            var q = c.Resolve<Quack>();
+
+            Assert.AreSame(q, d.Quack.Value); // extract lazy value
+            c.Dispose();
+
+            Assert.IsTrue(d.IsDisposed);
+            Assert.IsTrue(q.IsDisposed);
+
+            Assert.IsTrue(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
+        }
+
+        [Test]
+        public void Can_specify_to_dispose_something_later()
+        {
+            var c = new Container();
+
+            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: -1));
+            c.Register<Quack>(Reuse.Singleton, setup: Setup.With(disposalOrder: -2));
+
+            var d = c.Resolve<Duck>();
+            var q = c.Resolve<Quack>();
+
+            Assert.AreSame(q, d.Quack.Value); // extract lazy value
+            c.Dispose();
+
+            Assert.IsTrue(d.IsDisposed);
+            Assert.IsTrue(q.IsDisposed);
+
+            Assert.IsFalse(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
+        }
+
+        public class Duck : IDisposable
+        {
+            public Lazy<Quack> Quack { get; private set; }
+
+            public Duck(Lazy<Quack> quack)
+            {
+                Quack = quack;
+            }
+
+            public bool IsDisposed { get; private set; }
+            public void Dispose()
+            {
+                Quack.Value.LastTime();
+                IsDisposed = true;
+            }
+        }
+
+        public class Quack : IDisposable
+        {
+            public bool LastTimeQuacked { get; private set; }
+            public void LastTime()
+            {
+                if (!IsDisposed)
+                    LastTimeQuacked = true;
+            }
+
+            public bool IsDisposed { get; private set; }
+            public void Dispose()
+            {
+                IsDisposed = true;
+            }
+        }
 
         #region CUT
 

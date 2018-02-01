@@ -215,7 +215,7 @@ namespace DryIoc.UnitTests
         public void Could_not_specify_default_value_for_parameter_name_with_specific_rule()
         {
             var container = new Container(r => r.WithItemToExpressionConverter((item, type) => 
-                type != typeof(Dep) ? null : New(typeof(Dep).Constructor())));
+                type != typeof(Dep) ? null : New(typeof(Dep).SingleConstructor())));
             var defaultDep = new Dep();
             container.Register<Client>(made: Parameters.Of.Name("dep", defaultValue: defaultDep));
 
@@ -274,7 +274,7 @@ namespace DryIoc.UnitTests
                 Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
-                made: Made.Of(r => GetType().Method("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
+                made: Made.Of(r => GetType().SingleMethod("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));
 
             var service = container.Resolve<MyService>();
 
@@ -297,6 +297,30 @@ namespace DryIoc.UnitTests
                 B = b;
             }
         }
+
+        [Test]
+        public void MadeOf_should_inform_on_absence_of_member()
+        {
+            var c = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                c.Register<Blah>(made: Made.Of(typeof(Blah).GetConstructorOrNull(typeof(int)))));
+
+            Assert.AreSame(Error.NameOf(Error.PassedCtorOrMemberIsNull), Error.NameOf(ex.Error));
+        }
+
+        [Test]
+        public void MadeOf_should_inform_on_presence_of_factory_info_for_static_member()
+        {
+            var c = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                c.Register<Blah>(made: Made.Of(typeof(Blah).Constructor(), ServiceInfo.Of<Blah>())));
+
+            Assert.AreSame(Error.NameOf(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull), Error.NameOf(ex.Error));
+        }
+
+        class Blah { }
 
         #region CUT
 

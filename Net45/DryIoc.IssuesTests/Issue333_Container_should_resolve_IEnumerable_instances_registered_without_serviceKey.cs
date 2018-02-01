@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register(typeof(IEnumerable<>),
-                made: Made.Of(typeof(Decorators).Method(nameof(Decorators.SkipKeyedServices))),
+                made: Made.Of(typeof(Decorators).SingleMethod(nameof(Decorators.SkipKeyedServices))),
                 setup: Setup.Decorator);
 
             container.Register<IAction, ActionOne>();
@@ -29,7 +29,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register(typeof(IEnumerable<>),
-                made: Made.Of(typeof(Decorators).Method(nameof(Decorators.SkipKeyedServices))),
+                made: Made.Of(typeof(Decorators).SingleMethod(nameof(Decorators.SkipKeyedServices))),
                 setup: Setup.Decorator);
 
             container.Register<IActionUser, ActionUserOne>(serviceKey: nameof(ActionUserOne));

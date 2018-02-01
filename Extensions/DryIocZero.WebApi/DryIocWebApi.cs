@@ -119,8 +119,7 @@ namespace DryIocZero.WebApi
         private readonly Func<Type, bool> _throwIfUnresolved;
     }
 
-    /// <summary>Dependency scope adapter to scoped DryIoc container 
-    /// (created by <see cref="Container.OpenScope"/>).</summary>
+    /// <summary>Dependency scope adapter to scoped DryIoc container.</summary>
     public sealed class DryIocDependencyScope : IDependencyScope
     {
         /// <summary>Wrapped DryIoc container.</summary>

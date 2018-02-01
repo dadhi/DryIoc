@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using System.Reflection;
+using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples
@@ -31,19 +32,13 @@ namespace DryIoc.IssuesTests.Samples
         public void Convention_setup_example()
         {
             var container = new Container();
-            container.RegisterMany(new[] { Assembly.GetExecutingAssembly() },
-                (r, types, type) =>
-                {
-                    if (!types.Contains(typeof(IPlugin)))
-                        return;
-
-                    if (type == typeof(AnotherPlugin)) // custom registration of specific type
-                        r.Register<IPlugin, AnotherPlugin>(Reuse.Singleton, serviceKey: "another");
-                    else
-                        r.RegisterMany(types, type);
-                });
+            container.RegisterMany(Assembly.GetExecutingAssembly().One(),
+                t => t.ImplementsServiceType<IPlugin>() ? typeof(IPlugin).One() : null,
+                t => t.ToFactory(t == typeof(AnotherPlugin) ? Reuse.Singleton   : null),
+                (t, _) =>        t == typeof(AnotherPlugin) ? "another"         : null);
 
             var plugin = container.Resolve<IPlugin>("another");
+
             Assert.IsNotNull(plugin);
             Assert.AreSame(plugin, container.Resolve<IPlugin>("another"));
             Assert.AreEqual(2, container.Resolve<IPlugin[]>().Length);

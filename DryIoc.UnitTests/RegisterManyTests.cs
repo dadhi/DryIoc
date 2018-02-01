@@ -98,7 +98,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { typeof(IBlah<,>).GetAssembly() }, typeof(IBlah<,>).Equals);
+            container.RegisterMany(typeof(IBlah<,>).GetAssembly().One(), t => t == typeof(IBlah<,>));
 
             var services = container.Resolve<IBlah<string, bool>[]>();
 
@@ -120,12 +120,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { GetType().GetAssembly() },
-                (r, serviceTypes, implType) => // for only A and its implementations
-                {
-                    if (serviceTypes.IndexOf(typeof(A)) != -1)
-                        r.Register(typeof(A), implType, Reuse.Singleton);
-                });
+            // for only A and its implementations
+            container.RegisterMany(GetType().GetAssembly().One(),
+                t => t == typeof(A) ? t.One() : null,
+                t => t.ToFactory(Reuse.Singleton));
         }
 
         internal class A { }
@@ -135,10 +133,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(new[] { GetType().GetAssembly() }, (r, serviceTypes, implType) =>
-            {
-                Assert.IsFalse(implType.FullName.Contains("_DisplayClass"));
-            });
+            container.RegisterMany(GetType().GetAssembly().GetImplementationTypes()
+                .Where(t => t.Name.Contains("_DisplayClass")));
         }
 
         internal class MyClass
@@ -165,11 +161,9 @@ namespace DryIoc.UnitTests
         public void Can_get_all_service_registrations()
         {
             var container = new Container();
-            container.RegisterMany(new[] { GetType().GetAssembly() }, (r, types, type) =>
-            {
-                if (type.GetAllConstructors().Count() == 1)
-                    r.RegisterMany(types, type, Reuse.Singleton);
-            });
+            container.RegisterMany(GetType().GetAssembly().One(),
+                t => t.Constructors().Count() == 1 ? t.GetRegisterManyImplementedServiceTypes() : null,
+                t => t.ToFactory(Reuse.Singleton));
 
             var registrations = container.GetServiceRegistrations().Select(r => r.ServiceType).ToArray();
             Assert.IsTrue(registrations.Contains(typeof(RegisterManyTests)));
@@ -181,8 +175,8 @@ namespace DryIoc.UnitTests
             var container = new Container(r => r
                 .With(FactoryMethod.ConstructorWithResolvableArguments));
 
-            container.RegisterMany(new[] { typeof(InternalMe).GetAssembly() }, nonPublicServiceTypes: true, 
-                action: (registrator, types, type) => registrator.RegisterMany(types, type, Reuse.Singleton));
+            container.RegisterMany(typeof(InternalMe).One(),
+                t => t.GetRegisterManyImplementedServiceTypes(true));
             
             var service = container.Resolve<IPublicMe>();
 

@@ -29,7 +29,7 @@ namespace DryIoc.Interception
                 : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
 
             registrator.Register(serviceType, proxyType,
-                made: Made.Of(type => type.GetPublicInstanceConstructors().SingleOrDefault(c => c.GetParameters().Length != 0),
+                made: Made.Of(type => type.PublicConstructors().SingleOrDefault(c => c.GetParameters().Length != 0),
                     Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))),
                 setup: decoratorSetup);
         }

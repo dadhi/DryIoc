@@ -254,7 +254,7 @@ namespace DryIoc.IssuesTests.Samples
             public IEnumerable<Lazy<ICommand, ICommandMetadata>> Commands { get; set; }
         }
 
-        [Test, Ignore("Fails with StackOverflowException at line #302")]
+        [Test]
         public void Lazy_import_should_detect_circular_dependencies()
         {
             // ordinary registration

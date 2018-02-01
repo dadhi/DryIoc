@@ -284,27 +284,12 @@ namespace DryIocZero
         /// <summary>Scope context or null of not necessary.</summary>
         public IScopeContext ScopeContext { get; }
 
-        /// <inheritdoc />
-        public IResolverContext OpenScope(object name = null, bool trackInParent = false)
+        /// <summary>Specifies to wrap the scope in a resolver context.</summary>
+        public IResolverContext WithScope(IScope scope)
         {
             ThrowIfContainerDisposed();
-
-            var openedScope = new Scope(_currentScope, name);
-
-            // Replacing current context scope with new nested only if current is the same as nested parent, otherwise throw.
-            if (ScopeContext != null)
-                ScopeContext.SetCurrent(scope =>
-                {
-                    Throw.If(scope != _currentScope, Error.NotDirectScopeParent, _currentScope, scope);
-                    return openedScope;
-                });
-
-            if (trackInParent)
-                (_currentScope ?? SingletonScope).TrackDisposable(openedScope);
-
-            return new Container(_defaultFactories, _keyedFactories,
-                SingletonScope, ScopeContext, openedScope, _disposed, 
-                parent: this, root: Root ?? this);
+            return new Container(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext,
+                scope, _disposed, parent: this, root: Root ?? this);
         }
 
         /// <summary>Disposes opened scope or root container with Singletons and ScopeContext.</summary>
@@ -438,20 +423,8 @@ namespace DryIocZero
         /// <summary>Optional scope context associated with container.</summary>
         IScopeContext ScopeContext { get; }
 
-        /// <summary>Opens scope with optional name.</summary>
-        /// <param name="name">(optional)</param>
-        /// <param name="trackInParent">(optional) Instructs to additionally store the opened scope in parent, 
-        /// so it will be disposed when parent is disposed. If no parent scope is available the scope will be tracked by Singleton scope.
-        /// Used to dispose a resolution scope.</param>
-        /// <returns>Scoped resolver context.</returns>
-        /// <example><code lang="cs"><![CDATA[
-        /// using (var scope = container.OpenScope())
-        /// {
-        ///     var handler = scope.Resolve<IHandler>();
-        ///     handler.Handle(data);
-        /// }
-        /// ]]></code></example>
-        IResolverContext OpenScope(object name = null, bool trackInParent = false);
+        /// <summary>Wraps the scope in resolver context (or container which implements the context).</summary>
+        IResolverContext WithScope(IScope scope);
     }
 
     /// <summary>Provides APIs used by resolution generated factory delegates.</summary>
@@ -489,6 +462,19 @@ namespace DryIocZero
             }
 
             return (IScope)Throw.If(throwIfNotFound, Error.NoMatchedScopeFound, name, r);
+        }
+
+        /// <summary>Allows to open scope with the provided name and specified tracking option.</summary>
+        public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
+        {
+            var openedScope = r.ScopeContext == null
+                ? new Scope(r.CurrentScope, name)
+                : r.ScopeContext.SetCurrent(currentScope => new Scope(currentScope, name));
+            
+            if (trackInParent)
+                (openedScope.Parent ?? r.SingletonScope).TrackDisposable(openedScope);
+
+            return r.WithScope(openedScope);
         }
     }
 
@@ -847,10 +833,6 @@ namespace DryIocZero
                 "No current scope is available in {0}. Probably you are resolving from outside of scope."),
             NoMatchedScopeFound = Of(
                 "Unable to find scope with name '{0}' in {1}."),
-            NotDirectScopeParent = Of(
-                "Unable to OpenScope [{0}] because parent scope [{1}] is not a current context scope [{2}]." +
-                Environment.NewLine +
-                "It is probably other scope was opened in between OR you've forgot to Dispose the other scope!"),
             ContainerIsDisposed = Of(
                 "Container is disposed and not in operation state: {0}."),
             ScopeIsDisposed = Of(
