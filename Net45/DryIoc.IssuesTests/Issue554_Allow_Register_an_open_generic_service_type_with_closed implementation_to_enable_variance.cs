@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using ImTools;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -12,8 +13,8 @@ namespace DryIoc.IssuesTests
 
             c.Register(typeof(IQuery<,>), typeof(FakeRepo));
 
-            var x = c.Resolve<IQuery<string, object>>(); // resolve reverse type of what implemented by FakeRepo
-            Assert.IsNotNull(x);
+            var q = c.Resolve<IQuery<string, object>>(); // resolve reverse type of what implemented by FakeRepo
+            Assert.IsNotNull(q);
         }
 
         [Test]
@@ -21,10 +22,10 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
-            c.RegisterMany<FakeRepo>();
+            c.RegisterMany(typeof(FakeRepo).One(), _ => typeof(IQuery<,>).One());
 
-            Assert.Throws<ContainerException>(() => 
-                c.Resolve<IQuery<string, object>>()); // resolve reverse type of what implemented by FakeRepo
+            var q = c.Resolve<IQuery<string, object>>(); // resolve reverse type of what implemented by FakeRepo
+            Assert.IsNotNull(q);
         }
 
         public interface IQuery<in T, out R> { }
