@@ -239,6 +239,16 @@ namespace DryIoc.WebApi.UnitTests
             Assert.IsInstanceOf<DummyContext>(container.ScopeContext);
         }
 
+        [Test]
+        public void One_and_only_one_filter_provider_registered()
+        {
+            var config = new HttpConfiguration();
+            var container = new Container().WithWebApi(config);
+            var services = config.Services.GetFilterProviders().OfType<DryIocFilterProvider>();
+            if (services.Count() > 1) Assert.Fail("More than one provider registered");
+            else if (services.Count() == 0) Assert.Fail("No provider registered.");
+        }
+
         public class Blah { }
 
         public class Fooh { }

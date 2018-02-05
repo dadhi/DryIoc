@@ -119,7 +119,6 @@ namespace DryIoc.WebApi
             var providers = services.GetFilterProviders();
             services.RemoveAll(typeof(IFilterProvider), _ => true);
             var filterProvider = new DryIocFilterProvider(container, providers);
-            services.Add(typeof(IFilterProvider), filterProvider);
             container.UseInstance<IFilterProvider>(filterProvider);
         }
 
