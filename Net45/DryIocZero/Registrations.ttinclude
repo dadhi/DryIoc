@@ -23,7 +23,7 @@
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>
 
 <#+
-// TODO: Specify your container and registrations
+// TODO: Specify the container and registrations
 IContainer GetContainerWithRegistrations()
 {
     var container = new Container();
@@ -39,7 +39,7 @@ IContainer GetContainerWithRegistrations()
 }
 
 // TODO: Identify resolution roots services. Return true for the service you'll expect to Resolve from container.
-bool IsResolutionRoot(ServiceRegistrationInfo info)
+bool YourResolutionRoots(ServiceRegistrationInfo info)
 {
     // EXAMPLE: The `SetupAsResolutionRoots` will select services registered with `Setup.With(asResolutionRo1ot: true)`
     return ContainerTools.SetupAsResolutionRoots(info);

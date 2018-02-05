@@ -377,11 +377,11 @@ namespace DryIocAttributes
     }
 
     /// <summary>Dependency request path information.</summary>
-    public sealed class RequestInfo
+    public sealed class Request
     {
         /// <summary>Represents empty info (indicated by null <see cref="ServiceType"/>).</summary>
-        public static readonly RequestInfo Empty =
-            new RequestInfo(null, null, null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, 0, null);
+        public static readonly Request Empty =
+            new Request(null, null, null, null, null, IfUnresolved.Throw, -1, FactoryType.Service, null, 0, null);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty => ServiceType == null;
@@ -390,21 +390,15 @@ namespace DryIocAttributes
         public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
 
         /// <summary>Parent request or null for root resolution request.</summary>
-        public readonly RequestInfo DirectParent;
+        public readonly Request DirectParent;
 
         /// <summary>Returns service parent skipping wrapper if any. To get immediate parent us <see cref="DirectParent"/>.</summary>
-        public RequestInfo Parent
-        {
-            get
-            {
-                return IsEmpty ? Empty : DirectParent.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper);
-            }
-        }
+        public Request Parent => IsEmpty ? Empty : DirectParent.FirstOrEmpty(p => p.FactoryType != FactoryType.Wrapper);
 
         /// <summary>Gets first request info starting with itself which satisfies the condition, or empty otherwise.</summary>
         /// <param name="condition">Condition to stop on. Should not be null.</param>
         /// <returns>Request info of found parent.</returns>
-        public RequestInfo FirstOrEmpty(Func<RequestInfo, bool> condition)
+        public Request FirstOrEmpty(Func<Request, bool> condition)
         {
             var r = this;
             while (!r.IsEmpty && !condition(r))
@@ -448,16 +442,16 @@ namespace DryIocAttributes
         ///  <param name="factoryID"></param><param name="factoryType"></param>
         /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
         /// <returns>Created info chain to current (parent) info.</returns>
-        public RequestInfo Push(
+        public Request Push(
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan) => 
-            new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
+            new Request(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
                 factoryID, factoryType, implementationType, reuseLifespan, this);
 
-        private RequestInfo(
+        private Request(
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan,
-            RequestInfo directParent)
+            Request directParent)
         {
             DirectParent = directParent;
 
@@ -478,7 +472,7 @@ namespace DryIocAttributes
 
         /// <summary>Returns all request until the root - parent is null.</summary>
         /// <returns>Requests from the last to first.</returns>
-        public IEnumerable<RequestInfo> Enumerate()
+        public IEnumerable<Request> Enumerate()
         {
             for (var i = this; !i.IsEmpty; i = i.DirectParent)
                 yield return i;
@@ -524,16 +518,16 @@ namespace DryIocAttributes
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
         public override bool Equals(object obj) => 
-            Equals(obj as RequestInfo);
+            Equals(obj as Request);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
-        public bool Equals(RequestInfo other) =>
+        public bool Equals(Request other) =>
             other != null && EqualsWithoutParent(other)
             && (DirectParent == null && other.DirectParent == null
             || (DirectParent != null && DirectParent.EqualsWithoutParent(other.DirectParent)));
 
         /// <summary>Compares with other info taking into account the properties but not the parents and their properties.</summary>
-        public bool EqualsWithoutParent(RequestInfo other) =>
+        public bool EqualsWithoutParent(Request other) =>
             other.ServiceType == ServiceType
 
             && other.RequiredServiceType == RequiredServiceType
@@ -581,7 +575,7 @@ namespace DryIocAttributes
     {
         /// <summary>Returns true to use exported service for request.</summary>
         /// <param name="request"></param> <returns>True to use exported service for request.</returns>
-        public abstract bool Evaluate(RequestInfo request);
+        public abstract bool Evaluate(Request request);
     }
 
     /// <summary>Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>

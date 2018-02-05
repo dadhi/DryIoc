@@ -44,7 +44,7 @@ IContainer GetContainerWithRegistrations()
 }
 
 // Specify what resolution roots should be generated
-bool IsResolutionRoot(ServiceRegistrationInfo info) 
+bool YourResolutionRoots(ServiceRegistrationInfo info) 
 {
     // TODO: By default the resolution roots set to container. You may adjust the condition to your need.
     return ControllerResolver.Default.IsController(info.ServiceType);

@@ -30,53 +30,52 @@ THE SOFTWARE.
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
 
-<#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="System.Linq" #>
-<#@ import Namespace="System.Collections.Generic" #>
+<#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 
-<#@ include File="Registrations.ttinclude" #><#
+<#@ include File="Registrations.ttinclude" #>
+<#
 
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
-KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
-KeyValuePair<RequestInfo, Expression>[] dependencies;
-var errors = container.GenerateResolutionExpressions(out roots, out dependencies, IsResolutionRoot);
+var result = container.GenerateResolutionExpressions(YourResolutionRoots);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
-Func<object, string> code = null;
-    code = x => x == null ? "null"
-        : x is Expression ? exprToCode.ToCode((Expression)x)
-            .Replace("DryIoc.IfUnresolved", "IfUnresolved")
-            .Replace("DryIoc.IReuse", "IReuse")
-            .Replace("DryIoc.Reuse", "Reuse")
-            .Replace("DryIoc.SingletonReuse", "SingletonReuse")
-            .Replace("DryIoc.CurrentScopeReuse", "CurrentScopeReuse")
-            .Replace("DryIoc.FactoryType", "FactoryType")
-            .Replace("DryIoc.DefaultKey", "DefaultKey")
-            .Replace("DryIoc.RequestInfo", "RequestInfo")
-            .Replace("DryIoc.RequestFlags", "RequestFlags")
-            .Replace("DryIoc.HiddenDisposable", "HiddenDisposable")
-            .Replace("DryIoc.ResolutionScopeName", "ResolutionScopeName")
-            .Replace("DryIoc.CompositeScopeName", "CompositeScopeName")
-        : x is RequestInfo ? code(container.RequestInfoToExpression((RequestInfo)x).ToSystemExpression())
-        : code(container.GetItemExpression(x, x.GetType(), true).ToSystemExpression());
 
-var rootCodes = roots.Select((r, i) => 
-    new { Index = i, 
-          ServiceType = code(r.Key.ServiceType),
-          ServiceKey = code(r.Key.OptionalServiceKey),
-          Expression = code(r.Value.Body) });
+string Code(object x) => x == null ? "null"
+    : x is Expression ? exprToCode.ToCode((Expression)x)
+        .Replace("DryIoc." + nameof(IfUnresolved), nameof(IfUnresolved))
+        .Replace("DryIoc." + nameof(IReuse), nameof(IReuse))
+        .Replace("DryIoc." + nameof(Reuse), nameof(Reuse))
+        .Replace("DryIoc." + nameof(SingletonReuse), nameof(SingletonReuse))
+        .Replace("DryIoc." + nameof(CurrentScopeReuse), nameof(CurrentScopeReuse))
+        .Replace("DryIoc." + nameof(FactoryType), nameof(FactoryType))
+        .Replace("DryIoc." + nameof(DefaultKey), nameof(DefaultKey))
+        .Replace("DryIoc." + nameof(DefaultDynamicKey), nameof(DefaultDynamicKey))
+        .Replace("DryIoc." + nameof(Request), nameof(Request))
+        .Replace("DryIoc." + nameof(RequestFlags), nameof(RequestFlags))
+        .Replace("DryIoc." + nameof(HiddenDisposable), nameof(HiddenDisposable))
+        .Replace("DryIoc." + nameof(ResolutionScopeName), nameof(ResolutionScopeName))
+        .Replace("DryIoc." + nameof(CompositeScopeName), nameof(CompositeScopeName))
+    : x is Request ? Code(container.GetRequestExpression((Request)x).ToExpression())
+    : Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
 
-var dependencyCodes = dependencies.Select((r, i) => 
+var rootCodes = result.Roots.Select((r, i) => 
     new { Index = i, 
-          ServiceType = code(r.Key.ServiceType),
-          ServiceKey = code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
-          Expression = code(r.Value),
-          RequiredServiceType = code(r.Key.RequiredServiceType),
-          PreResolveParent = code(r.Key.Parent)
+          ServiceType = Code(r.Key.ServiceType),
+          ServiceKey = Code(r.Key.ServiceKey),
+          Expression = Code(r.Value.Body) });
+
+var depCodes = result.ResolveDependencies.Select((r, i) => 
+    new { Index = i, 
+          ServiceType = Code(r.Key.ServiceType),
+          ServiceKey = Code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
+          Expression = Code(r.Value),
+          RequiredServiceType = Code(r.Key.RequiredServiceType),
+          PreResolveParent = Code(r.Key.Parent)
     });
 #>
 //========================================================================================================
@@ -91,24 +90,20 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-<# if (errors.Length == 0) { #>
+<# if (result.Errors.Count == 0) { #>
 Generation is completed successfully.
 <# } else { #>
-Generation is FAILED, please fix the errors below.
+Generation is FAILED with the errors:
 Note: you may fix the error for unresolved service by adding `container.RegisterPlaceholder<...>()` into Registrations.tt and then registering service at runtime.
 <# } #>
----------------------------------------
-<#
-    for(var i = 0; i < errors.Length; ++i)
-    {
-        var e = errors[i];
-#>
-<#=i+1#>. <#=e.Key#>
+-------------------------------------
+<#  var eNum = 0;
+    foreach(var e in result.Errors) { #>
+<#=++eNum#>. <#=e.Key#>
 Error: <#=e.Value.Message#>
 <#  } #>
 
 */
-
     partial class Container
     {
         [ExcludeFromCodeCoverage]
@@ -136,7 +131,7 @@ Error: <#=e.Value.Message#>
 
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, object[] args)
+            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
 <#
         index = 0;
@@ -165,7 +160,7 @@ Error: <#=e.Value.Message#>
         }
 #>
 <#
-        foreach (var depGroup in dependencyCodes.GroupBy(x => x.ServiceType))
+        foreach (var depGroup in depCodes.GroupBy(x => x.ServiceType))
         {
             if (index++ > 0) WriteLine(@"
             else");
@@ -247,7 +242,7 @@ Error: <#=e.Value.Message#>
     }
 #>
 <#
-    foreach (var dep in dependencyCodes)
+    foreach (var dep in depCodes)
     {
 #>
         // <#= dep.ServiceType #>

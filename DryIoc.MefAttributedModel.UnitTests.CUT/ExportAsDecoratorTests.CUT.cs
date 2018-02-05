@@ -4,7 +4,7 @@ using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
-    using RequestInfo = DryIocAttributes.RequestInfo;
+    using Request = DryIocAttributes.Request;
 
     public interface IHandler
     {
@@ -70,7 +70,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
         public sealed class ForSlowHandler : ExportConditionAttribute
         {
-            public override bool Evaluate(RequestInfo request)
+            public override bool Evaluate(Request request)
             {
                 return request.ImplementationType == typeof(SlowHandler);
             }

@@ -27,6 +27,7 @@ THE SOFTWARE.
 
 
 
+
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
@@ -40,10 +41,9 @@ namespace DryIocZero
 {
 /* 
 Generation is completed successfully.
----------------------------------------
+-------------------------------------
 
 */
-
     partial class Container
     {
         [ExcludeFromCodeCoverage]
@@ -59,7 +59,7 @@ Generation is completed successfully.
 
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, object[] args)
+            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
         }
 

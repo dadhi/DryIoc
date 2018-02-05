@@ -1606,19 +1606,19 @@ namespace DryIoc
                     Ref.Of(ImMap<Expr>.Empty),
                     _isChangePermitted);
 
-            internal Registry WithServices(ImHashMap<Type, object> services) => 
+            internal Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
                     FactoryExpressionCache.NewRef(), _isChangePermitted);
 
-            private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) => 
+            private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) =>
                 decorators == Decorators ? this :
                 new Registry(Services, decorators, Wrappers,
                     DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
                     FactoryExpressionCache.NewRef(), _isChangePermitted);
 
-            private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) => 
+            private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) =>
                 wrappers == Wrappers ? this :
                 new Registry(Services, Decorators, wrappers,
                     DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
@@ -2034,16 +2034,17 @@ namespace DryIoc
         #endregion
     }
 
-    // Hides/wraps object with disposable interface.
-    internal sealed class HiddenDisposable
+    ///<summary>Hides/wraps object with disposable interface.</summary> 
+    public sealed class HiddenDisposable
     {
-        public static ConstructorInfo Ctor = typeof(HiddenDisposable).GetTypeInfo().DeclaredConstructors.First();
+        internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetTypeInfo().DeclaredConstructors.First();
         internal static FieldInfo ValueField = typeof(HiddenDisposable).GetTypeInfo().DeclaredFields.First();
+
+        /// <summary>Wrapped value</summary>
         public readonly object Value;
-        public HiddenDisposable(object value)
-        {
-            Value = value;
-        }
+
+        /// <summary>Wraps the value</summary>
+        public HiddenDisposable(object value) { Value = value; }
     }
 
     internal static class FactoryDelegateCache
@@ -2187,7 +2188,7 @@ namespace DryIoc
                 RegistrySharing.CloneWithoutCache, container.SingletonScope);
 
         /// <summary>Prepares container for expression generation.</summary>
-        public static IContainer ForExpressionGeneration(this IContainer container) =>
+        public static IContainer WithExpressionGeneration(this IContainer container) =>
             container.With(rules => rules
                 .WithoutEagerCachingSingletonForFasterAccess()
                 .WithoutImplicitCheckForReuseMatchingScope()
@@ -2242,7 +2243,7 @@ namespace DryIoc
             var implType = containerClone.GetWrappedType(concreteType, null);
 
             containerClone.Register(implType, made: made);
-            
+
             // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
             return containerClone.Resolve(concreteType, IfUnresolved.Throw);
         }
@@ -2418,69 +2419,83 @@ namespace DryIoc
         public static Func<ServiceRegistrationInfo, bool> SetupAsResolutionRoots =
             r => r.Factory.Setup.AsResolutionRoot;
 
-        /// <summary>Generates all resolution root and calls expressions.</summary>
-        /// <param name="container">For container</param>
-        /// <param name="rootResolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
-        /// <param name="dependencyResolutions">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
-        /// <param name="rootServices">The services to generate registrations for.</param>
-        /// <returns>Errors happened when resolving corresponding registrations.</returns>
-        public static KeyValuePair<IServiceInfo, ContainerException>[] GenerateResolutionExpressions(
-            this IContainer container,
-            out KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] rootResolutions,
-            out KeyValuePair<Request, Expression>[] dependencyResolutions,
+        /// <summary>Packs service Type and Key together.</summary>
+        public struct ServiceTypeKey
+        {
+            /// <summary>Service type</summary>
+            public Type ServiceType;
+
+            /// <summary>Optional service key</summary>
+            public object ServiceKey;
+
+            /// <summary>Creates the pair</summary>
+            public ServiceTypeKey(Type serviceType, object serviceKey)
+            {
+                ServiceType = serviceType;
+                ServiceKey = serviceKey;
+            }
+        }
+
+        /// <summary>Result of GenerateResolutionExpressions methods</summary>
+        public class GeneratedExpressionsResult
+        {
+            /// <summary>Resolutions roots</summary>
+            public readonly List<KeyValuePair<ServiceTypeKey, Expression<FactoryDelegate>>>
+                Roots = new List<KeyValuePair<ServiceTypeKey, Expression<FactoryDelegate>>>();
+
+            /// <summary>Dependency of Resolve calls</summary>
+            public readonly List<KeyValuePair<Request, Expression>>
+                ResolveDependencies = new List<KeyValuePair<Request, Expression>>();
+
+            /// <summary>Errors</summary>
+            public readonly List<KeyValuePair<ServiceTypeKey, ContainerException>>
+                Errors = new List<KeyValuePair<ServiceTypeKey, ContainerException>>();
+        }
+
+        /// <summary>Generates all resolution root and calls expressions by actually resolving the service expressions.</summary>
+        public static GeneratedExpressionsResult GenerateResolutionExpressions(this IContainer container,
             params IServiceInfo[] rootServices)
         {
             Throw.If(rootServices.IsNullOrEmpty());
 
-            var generatingContainer = container.ForExpressionGeneration();
+            var generatingContainer = container.WithExpressionGeneration();
 
-            var roots = new List<KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>>();
-            var errors = new List<KeyValuePair<IServiceInfo, ContainerException>>();
-            foreach (var rootService in rootServices)
+            var result = new GeneratedExpressionsResult();
+            foreach (var root in rootServices)
             {
                 try
                 {
-                    var request = Request.Create(generatingContainer,
-                        rootService.ServiceType, rootService.Details.ServiceKey);
-
+                    var request = Request.Create(generatingContainer, root.ServiceType, root.Details.ServiceKey);
                     var expression = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expression == null)
                         continue;
 
-
-                    roots.Add(rootService.Pair(expression.WrapInFactoryExpression()
+                    result.Roots.Add(new ServiceTypeKey(root.ServiceType, root.Details.ServiceKey)
+                        .Pair(expression.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
                     ));
-
                 }
                 catch (ContainerException ex)
                 {
-                    errors.Add(rootService.Pair(ex));
+                    result.Errors.Add(new ServiceTypeKey(root.ServiceType, root.Details.ServiceKey).Pair(ex));
                 }
             }
 
-            rootResolutions = roots.ToArray();
-            dependencyResolutions = generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
-                    .Select(r => r.Key.Pair(r.Value)).ToArray();
-            return errors.ToArray();
+            var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
+            result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
+
+            return result;
         }
 
-        /// <summary>Generates all resolution root and calls expressions.</summary>
-        /// <param name="container">For container</param>
-        /// <param name="rootResolutions">Result resolution factory expressions. They could be compiled and used for actual service resolution.</param>
-        /// <param name="dependencyResolutions">Resolution call dependencies (implemented via Resolve call): e.g. dependencies wrapped in Lazy{T}.</param>
-        /// <param name="whatRegistrations">(optional) Allow to filter what registration to resolve. By default applies to all registrations.
-        /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations with <see cref="Setup.AsResolutionRoot"/>.</param>
-        /// <returns>Errors happened when resolving corresponding registrations.</returns>
-        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] GenerateResolutionExpressions(
-            this IContainer container,
-            out KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] rootResolutions,
-            out KeyValuePair<Request, Expression>[] dependencyResolutions,
+        /// <summary>Generates all resolution root and Resolve calls expressions.
+        /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations 
+        /// with <see cref="Setup.AsResolutionRoot"/>.</summary>
+        public static GeneratedExpressionsResult GenerateResolutionExpressions(this IContainer container,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
         {
-            var generatingContainer = container.ForExpressionGeneration();
+            var generatingContainer = container.WithExpressionGeneration();
 
             // ignore open-generic registrations because they may be resolved only when closed.
             var registrations = generatingContainer.GetServiceRegistrations()
@@ -2489,66 +2504,48 @@ namespace DryIoc
             if (whatRegistrations != null)
                 registrations = registrations.Where(whatRegistrations);
 
-            var roots = new List<KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>>();
-            var errors = new List<KeyValuePair<ServiceRegistrationInfo, ContainerException>>();
-            foreach (var registration in registrations)
+            var result = new GeneratedExpressionsResult();
+            foreach (var reg in registrations)
             {
                 try
                 {
-                    var request = Request.Create(generatingContainer, registration.ServiceType, registration.OptionalServiceKey);
-                    var expression = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
-                    if (expression == null)
+                    var request = Request.Create(generatingContainer, reg.ServiceType, reg.OptionalServiceKey);
+                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    if (expr == null)
                         continue;
 
-                    roots.Add(registration.Pair(expression.WrapInFactoryExpression()
+                    result.Roots.Add(new ServiceTypeKey(reg.ServiceType, reg.OptionalServiceKey)
+                        .Pair(expr.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
                     ));
-
                 }
                 catch (ContainerException ex)
                 {
-                    errors.Add(registration.Pair(ex));
+                    result.Errors.Add(new ServiceTypeKey(reg.ServiceType, reg.OptionalServiceKey).Pair(ex));
                 }
             }
 
-            rootResolutions = roots.ToArray();
-            dependencyResolutions = generatingContainer.Rules.DependencyResolutionCallExpressions.Value.Enumerate()
-                .Select(r => r.Key.Pair(r.Value)).ToArray();
-            return errors.ToArray();
+            var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
+            result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
+
+            return result;
         }
 
         /// <summary>Used to find potential problems when resolving the passed services <paramref name="rootServices"/>.
         /// Method will collect the exceptions when resolving or injecting the specific registration.
         /// Does not create any actual service objects.</summary>
-        /// <param name="container">for container</param>
-        /// <param name="rootServices">(optional) Examined resolved services. If empty will try to resolve every service in container.</param>
-        /// <returns>Exceptions happened for corresponding registrations.</returns>
-        public static KeyValuePair<IServiceInfo, ContainerException>[] Validate(
-            this IContainer container, params IServiceInfo[] rootServices)
-        {
-            KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<Request, Expression>[] deps;
-            return container.GenerateResolutionExpressions(out roots, out deps, rootServices);
-        }
+        public static KeyValuePair<ServiceTypeKey, ContainerException>[] Validate(
+            this IContainer container, params IServiceInfo[] rootServices) =>
+            container.GenerateResolutionExpressions(rootServices).Errors.ToArray();
 
         /// <summary>Used to find potential problems in service registration setup.
         /// Method tries to generate expressions for specified registrations, collects happened exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
-        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] Validate(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
-        {
-            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<Request, Expression>[] deps;
-            return container.GenerateResolutionExpressions(out roots, out deps, whatRegistrations);
-        }
-
-        /// <summary>Replaced with Validate</summary>
-        [Obsolete("Replaced with Validate", false)]
-        public static KeyValuePair<ServiceRegistrationInfo, ContainerException>[] VerifyResolutions(this IContainer container,
+        public static KeyValuePair<ServiceTypeKey, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> whatRegistrations = null) =>
-            container.Validate(whatRegistrations);
+            container.GenerateResolutionExpressions(whatRegistrations).Errors.ToArray();
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
         public static Expr GetRequestExpression(this IContainer container, Request request,
@@ -2741,7 +2738,7 @@ namespace DryIoc
 
         /// <summary>Creates resolver context with specified current scope (or container which implements the context).</summary>
         IResolverContext WithCurrentScope(IScope scope);
-        
+
         /// <summary>Allows to put instance into the scope.</summary>
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
@@ -4599,6 +4596,11 @@ namespace DryIoc
         public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly) =>
             Portable.GetAssemblyTypes(assembly).Where(IsImplementationType);
 
+        /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
+        /// actually a non abstract and not compiler generated classes.</summary>
+        public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly, Func<Type, bool> condition) =>
+            Portable.GetAssemblyTypes(assembly).Where(t => condition(t) && t.IsImplementationType());
+
         /// <summary>Checks if type can be used as implementation type for reflection factory,
         /// and therefore registered to container. Usually used to discover implementation types from assembly.</summary>
         public static bool IsImplementationType(this Type type) =>
@@ -4610,35 +4612,16 @@ namespace DryIoc
         /// <summary>Checks if <paramref name="type"/> implements a service type,
         /// along the checking if <paramref name="type"/> and service type
         /// are valid implementation and service types.</summary>
-        public static bool ImplementsServiceType(this Type type, Type serviceType,
-            bool checkIfOpenGenericImplementsClosedGeneric = false)
-        {
-            if (!type.IsImplementationType())
-                return false;
-
-            var serviceTypes = type.GetImplementedServiceTypes(nonPublicServiceTypes: true);
-            if (serviceTypes.Length == 0)
-                return false;
-
-            if (!type.IsOpenGeneric())
-                return serviceTypes.IndexOf(serviceType) != -1;
-
-            if (!checkIfOpenGenericImplementsClosedGeneric &&
-                !serviceType.IsOpenGeneric())
-                return false;
-
-            if (!serviceType.IsGeneric()) // should be generic to supply arguments to implType
-                return false;
-
-            return serviceTypes.IndexOf(serviceType.GetGenericTypeDefinition()) != -1;
-        }
+        public static bool ImplementsServiceType(this Type type, Type serviceType) =>
+            type.IsImplementationType() &&
+            type.GetImplementedServiceTypes(nonPublicServiceTypes: true)
+                .IndexOf(serviceType) != -1;
 
         /// <summary>Checks if <paramref name="type"/> implements a service type,
         /// along the checking if <paramref name="type"/> and service type
         /// are valid implementation and service types.</summary>
-        public static bool ImplementsServiceType<TService>(this Type type,
-            bool checkIfOpenGenericImplementsClosedGeneric = false) =>
-            type.ImplementsServiceType(typeof(TService), checkIfOpenGenericImplementsClosedGeneric);
+        public static bool ImplementsServiceType<TService>(this Type type) =>
+            type.ImplementsServiceType(typeof(TService));
 
         /// <summary>Wraps the implementation type in factory.</summary>
         public static Factory ToFactory(this Type implType) => new ReflectionFactory(implType);
@@ -5959,10 +5942,10 @@ namespace DryIoc
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
-            int decorateFactoryID) =>
+            int decoratedFactoryID) =>
             new Request(_sharedRuntimeInfo, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
-                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, decorateFactoryID);
+                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith10Args = new Lazy<MethodInfo>(() =>
             typeof(Request).Method(nameof(Push),
@@ -6807,20 +6790,21 @@ namespace DryIoc
         /// <returns>Created expression.</returns>
         public abstract Expr CreateExpressionOrDefault(Request request);
 
-        // todo: Remove its completely if there is a chance together with supporting structures
+        // todo: !!!! BIG THING - Remove its completely if there is a chance together with supporting structures
         /// <summary>Allows derived factories to override or reuse caching policy used by
         /// GetExpressionOrDefault. By default only service setup and no  user passed arguments may be cached.</summary>
         /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
-        protected virtual bool IsFactoryExpressionCacheable(Request request) => false;
-        //=> Setup.FactoryType == FactoryType.Service
-        //&& Setup.Condition == null
-        //&& !Setup.UseParentReuse
-        //&& !Setup.AsResolutionCall
+        protected virtual bool IsFactoryExpressionCacheable(Request request)
+            => Setup.FactoryType == FactoryType.Service
 
-        //&& request.InputArgs == null
-        //&& !request.IsResolutionCall
-        //&& !(request.Reuse is CurrentScopeReuse)
-        //&& !request.TracksTransientDisposable;
+            && Setup.Condition == null
+            && !Setup.UseParentReuse
+            && !Setup.AsResolutionCall
+
+            && request.InputArgs == null
+            && !request.IsResolutionCall
+            && !(request.Reuse is CurrentScopeReuse)
+            && !request.TracksTransientDisposable;
 
         private bool ShouldBeInjectedAsResolutionCall(Request request) =>
             !request.IsResolutionCall // is not already a resolution call
@@ -9492,9 +9476,6 @@ namespace DryIoc
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
         /// Specify <paramref name="asImplementedType"/> to include <paramref name="sourceType"/> itself as first item and
         /// <see cref="object"/> type as the last item.</summary>
-        /// <param name="sourceType">Source type for discovery.</param>
-        /// <param name="asImplementedType">Additional types to include into result collection.</param>
-        /// <returns>Array of found types, empty if nothing found.</returns>
         public static Type[] GetImplementedTypes(this Type sourceType, AsImplementedType asImplementedType = AsImplementedType.None)
         {
             Type[] results;
