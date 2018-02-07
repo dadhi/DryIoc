@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 using ImTools;
 
@@ -586,6 +587,24 @@ namespace DryIoc.UnitTests
         {
             public AA(string msg) { }
         }
+
+        [Test]
+        public void Can_generate_expressions_from_many_open_generic_registrations()
+        {
+            var c = new Container();
+
+            c.RegisterMany(new[] { typeof(OG1<>), typeof(OG2<>) }, serviceTypeCondition: Registrator.Interfaces);
+
+            var result = c.GenerateResolutionExpressions(
+                closeOpenGenericService: type => type == typeof(IG<>) ? typeof(IG<int>) : null);
+
+            Assert.IsEmpty(result.Errors);
+            CollectionAssert.AreEquivalent(new[] { typeof(OG1<int>), typeof(OG2<int>) }, result.Roots.Select(e => e.Value.Body.Type));
+        }
+
+        public interface IG<T> { }
+        public class OG1<T> : IG<T> { }
+        public class OG2<T> : IG<T> { }
 
         [Test]
         public void Container_ToString_should_output_scope_info_for_open_scope()

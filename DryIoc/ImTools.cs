@@ -34,8 +34,11 @@ namespace ImTools
     /// <summary>Helpers for functional composition</summary>
     public static class Fun
     {
-        /// <summary>Always a true condition.</summary>
+        /// <summary>Predicated always returning a true.</summary>
         public static bool Always<T>(T _) => true;
+
+        /// <summary>Identity function returning passed argument as result.</summary>
+        public static T Itself<T>(T x) => x;
     }
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>

@@ -2300,8 +2300,9 @@ namespace DryIoc
         /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
         /// That means, instead of placing service instance into graph expression we put here redirecting call to
         /// container Resolve.</remarks>
-        public static void RegisterPlaceholder(this IContainer container, Type serviceType, object serviceKey = null) =>
-            container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, IfAlreadyRegistered.AppendNotKeyed, true);
+        public static void RegisterPlaceholder(this IContainer container, Type serviceType,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
@@ -2311,8 +2312,9 @@ namespace DryIoc
         /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
         /// That means, instead of placing service instance into graph expression we put here redirecting call to
         /// container Resolve.</remarks>
-        public static void RegisterPlaceholder<TService>(this IContainer container, object serviceKey = null) =>
-            container.RegisterPlaceholder(typeof(TService), serviceKey);
+        public static void RegisterPlaceholder<TService>(this IContainer container,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            container.RegisterPlaceholder(typeof(TService), ifAlreadyRegistered, serviceKey);
 
         /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
         [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
@@ -2493,28 +2495,34 @@ namespace DryIoc
         /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations 
         /// with <see cref="Setup.AsResolutionRoot"/>.</summary>
         public static GeneratedExpressionsResult GenerateResolutionExpressions(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> whatRegistrations = null)
+            Func<ServiceRegistrationInfo, bool> filter = null,  Func<Type, Type> closeOpenGenericService = null)
         {
             var generatingContainer = container.WithExpressionGeneration();
-
-            // ignore open-generic registrations because they may be resolved only when closed.
-            var registrations = generatingContainer.GetServiceRegistrations()
-                .Where(r => !r.ServiceType.IsOpenGeneric());
-
-            if (whatRegistrations != null)
-                registrations = registrations.Where(whatRegistrations);
+            var regs = generatingContainer.GetServiceRegistrations();
+            if (filter != null)
+                regs = regs.Where(filter);
 
             var result = new GeneratedExpressionsResult();
-            foreach (var reg in registrations)
+            foreach (var reg in regs)
             {
+                var serviceType = reg.ServiceType;
                 try
                 {
-                    var request = Request.Create(generatingContainer, reg.ServiceType, reg.OptionalServiceKey);
+                    if (serviceType.IsOpenGeneric())
+                    {
+                        if (closeOpenGenericService == null)
+                            continue;
+                        serviceType = closeOpenGenericService(serviceType);
+                        if (serviceType == null || serviceType.IsOpenGeneric())
+                            continue;
+                    }
+
+                    var request = Request.Create(generatingContainer, serviceType, reg.OptionalServiceKey);
                     var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
 
-                    result.Roots.Add(new ServiceTypeKey(reg.ServiceType, reg.OptionalServiceKey)
+                    result.Roots.Add(new ServiceTypeKey(serviceType, reg.OptionalServiceKey)
                         .Pair(expr.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
@@ -2523,7 +2531,7 @@ namespace DryIoc
                 }
                 catch (ContainerException ex)
                 {
-                    result.Errors.Add(new ServiceTypeKey(reg.ServiceType, reg.OptionalServiceKey).Pair(ex));
+                    result.Errors.Add(new ServiceTypeKey(serviceType, reg.OptionalServiceKey).Pair(ex));
                 }
             }
 
@@ -8862,7 +8870,7 @@ namespace DryIoc
         AppendNewImplementation
     }
 
-    /// <summary>Define registered service structure.</summary>
+    /// <summary>Existing registration info.</summary>
     public struct ServiceRegistrationInfo : IComparable<ServiceRegistrationInfo>
     {
         /// <summary>Required service type.</summary>
@@ -8875,7 +8883,7 @@ namespace DryIoc
         public Factory Factory;
 
         /// <summary>Provides registration order across all factory registrations in container.</summary>
-        /// <remarks>May be repeated for factory registered with multiple services.</remarks>
+        /// <remarks>May be the same for factory registered with multiple services.</remarks>
         public int FactoryRegistrationOrder => Factory.FactoryID;
 
         /// <summary>Creates info. Registration order is figured out automatically based on Factory.</summary>
