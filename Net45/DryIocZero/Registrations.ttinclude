@@ -15,15 +15,13 @@
 //
 //=======================================================================
 #>
-
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ import Namespace="DryIoc" #>
-
-<#// TODO: Insert assemblies and namespaces with your services to register in container #>
-
+<#@ import Namespace="System.Collections.Generic" #>
+<#// TODO: Insert assemblies and namespaces of your services to be registered in container #>
 <#+
-// TODO: Specify the container and registrations
+// TODO: Specify the container and registrations ...
 IContainer GetContainerWithRegistrations()
 {
     var container = new Container();
@@ -32,16 +30,16 @@ IContainer GetContainerWithRegistrations()
     // Instead you can use `RegisterPlaceholder` to fix object graph generation, then fill in
 	// placeholder using run-time `DryIocZero.RegisterDelegate` and `DryIocZero.UseInstance`
 
-    // TODO: Add registrations
+    // TODO: Add registrations ...
     // container.Register<IMyService, MyService>();
 
     return container;
 }
 
-// TODO: Identify resolution roots services. Return true for the service you'll expect to Resolve from container.
-bool YourResolutionRoots(ServiceRegistrationInfo info)
+// TODO: Identify the root services to generate expressions for ...
+IEnumerable<ServiceName> GetResolutionRoots(IEnumerable<ServiceRegistrationInfo> registrations)
 {
     // EXAMPLE: The `SetupAsResolutionRoots` will select services registered with `Setup.With(asResolutionRo1ot: true)`
-    return ContainerTools.SetupAsResolutionRoots(info);
+    return ContainerTools.SetupAsResolutionRoots(registrations);
 }
 #>

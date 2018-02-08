@@ -5,17 +5,18 @@
     <version>0.0.0</version>
     <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2016-2017 Maksim Volkau</copyright>
+    <copyright>Copyright © 2016 Maksim Volkau</copyright>
     <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
     <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
-      v4.0.0-preview-05:
-      - updated: to DryIoc v3-preview-05 API
+      v4.0.0-preview-06:
+      - updated: to DryIoc v3-preview-06 API
       - fixed: references to compile-time dependencies in NuGet package
       - fixed: runtime registrations fallback
+      - added: More compact and clean generation output, including type names in resolve methods
       v3.0.0:
       - fixed: Nuget package, so that DryIocZero compiles successfully right after install
       - changed: Fixed versions of DryIoc and ExpressionToCodeLib dependencies located in package/tools folder

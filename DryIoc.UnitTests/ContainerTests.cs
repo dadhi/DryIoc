@@ -595,8 +595,8 @@ namespace DryIoc.UnitTests
 
             c.RegisterMany(new[] { typeof(OG1<>), typeof(OG2<>) }, serviceTypeCondition: Registrator.Interfaces);
 
-            var result = c.GenerateResolutionExpressions(
-                closeOpenGenericService: type => type == typeof(IG<>) ? typeof(IG<int>) : null);
+            var result = c.GenerateResolutionExpressions(regs => 
+                regs.Select(r => r.ServiceType == typeof(IG<>) ? ServiceName.Of<IG<int>>(r.OptionalServiceKey) : r.ServiceName));
 
             Assert.IsEmpty(result.Errors);
             CollectionAssert.AreEquivalent(new[] { typeof(OG1<int>), typeof(OG2<int>) }, result.Roots.Select(e => e.Value.Body.Type));

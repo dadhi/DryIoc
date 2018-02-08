@@ -13,16 +13,15 @@
 //=======================================================================
 #>
 <#@ assembly Name="System.Core" #>
+<#@ import Namespace="System.Collections.Generic" #>
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ import Namespace="DryIoc" #>
-
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIocAttributes.dll" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
-
 <#+
 // TODO: Setup container and add service registrations
 IContainer GetContainerWithRegistrations()
@@ -36,10 +35,10 @@ IContainer GetContainerWithRegistrations()
     return container;
 }
 
-// TODO: Identify resolution roots services. Return true for the service you'll expect to Resolve from container.
-bool YourResolutionRoots(ServiceRegistrationInfo info)
+// TODO: Identify the root services to generate expressions for ...
+IEnumerable<ServiceName> GetResolutionRoots(IEnumerable<ServiceRegistrationInfo> registrations)
 {
     // EXAMPLE: The `SetupAsResolutionRoots` will select services registered with `Setup.With(asResolutionRo1ot: true)`
-    return ContainerTools.SetupAsResolutionRoots(info);
+    return ContainerTools.SetupAsResolutionRoots(registrations);
 }
 #>

@@ -25,23 +25,18 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
 <#@ assembly Name="System.Core" #>
-
-<# // TODO: Replace DryIocZero.version in 2 paths below with the installed version of DryIocZero #>
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
-
-<#@ import Namespace="System.Linq" #>
-<#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
-
+<#@ import Namespace="System.Linq" #>
+<#@ import Namespace="System.Linq.Expressions" #>
 <#@ include File="Registrations.ttinclude" #>
 <#
-
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
-var result = container.GenerateResolutionExpressions(YourResolutionRoots);
+var result = container.GenerateResolutionExpressions(GetResolutionRoots);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 
@@ -64,19 +59,18 @@ string Code(object x) => x == null ? "null"
     : Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
 
 var rootCodes = result.Roots.Select((r, i) => 
-    new { Index = i, 
+    new { CreateMethodName = "Get" + i + "_" + r.Key.ServiceType.Name,
           ServiceType = Code(r.Key.ServiceType),
-          ServiceKey = Code(r.Key.ServiceKey),
+          ServiceKey = Code(r.Key.OptionalServiceKey),
           Expression = Code(r.Value.Body) });
 
 var depCodes = result.ResolveDependencies.Select((r, i) => 
-    new { Index = i, 
+    new { CreateMethodName = "GetDep" + i + "_" + r.Key.ServiceType.Name,
           ServiceType = Code(r.Key.ServiceType),
           ServiceKey = Code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
           Expression = Code(r.Value),
           RequiredServiceType = Code(r.Key.RequiredServiceType),
-          PreResolveParent = Code(r.Key.Parent)
-    });
+          PreResolveParent = Code(r.Key.Parent) });
 #>
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
@@ -90,13 +84,14 @@ using ImTools;
 namespace DryIocZero
 {
 /* 
-<# if (result.Errors.Count == 0) { #>
+<#  var errCount = result.Errors.Count;
+    if (errCount == 0) { #>
 Generation is completed successfully.
 <# } else { #>
-Generation is FAILED with the errors:
-Note: you may fix the error for unresolved service by adding `container.RegisterPlaceholder<...>()` into Registrations.tt and then registering service at runtime.
+Generation is FAILED with <#=errCount#> errors:
+Note: You may try to register failing service with `container.RegisterPlaceholder<...>()` in Registrations.tt and then register ACTUAL service at runtime.
 <# } #>
--------------------------------------
+-------------------------------------------
 <#  var eNum = 0;
     foreach(var e in result.Errors) { #>
 <#=++eNum#>. <#=e.Key#>
@@ -109,7 +104,7 @@ Error: <#=e.Value.Message#>
         [ExcludeFromCodeCoverage]
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
-            lastFactoryID = <#= Factory.GetNextID()  #>; // generated: equals to last used Factory.FactoryID 
+            lastFactoryID = <#=Factory.GetNextID()#>; // generated: equals to last used Factory.FactoryID 
         }
 
         [ExcludeFromCodeCoverage]
@@ -117,13 +112,13 @@ Error: <#=e.Value.Message#>
         {
 <#
         var index = 0;
-        foreach (var factory in rootCodes.Where(f => f.ServiceKey == "null"))
+        foreach (var root in rootCodes.Where(f => f.ServiceKey == "null"))
         {
             if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#= factory.ServiceType #>)
-                service = Create_<#= factory.Index #>(this);
+            if (serviceType == <#=root.ServiceType#>)
+                service = <#=root.CreateMethodName#>(this);
 <#
         }
 #>
@@ -135,12 +130,12 @@ Error: <#=e.Value.Message#>
         {
 <#
         index = 0;
-        foreach (var rootGroup in rootCodes.Where(f => f.ServiceKey != "null").GroupBy(f => f.ServiceType))
+        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKey != "null").GroupBy(x => x.ServiceType))
         {
             if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#= rootGroup.Key #>) 
+            if (serviceType == <#=rootGroup.Key#>) 
             {
 <#
             var innerIndex = 0;
@@ -149,8 +144,8 @@ Error: <#=e.Value.Message#>
                 if (innerIndex++ > 0) WriteLine(@"
                 else");
 #>
-                if (<#= root.ServiceKey #>.Equals(serviceKey))
-                    service = Create_<#= root.Index #>(this);
+                if (<#=root.ServiceKey#>.Equals(serviceKey))
+                    service = <#=root.CreateMethodName#>(this);
 <#
             }
 
@@ -165,7 +160,7 @@ Error: <#=e.Value.Message#>
             if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#= depGroup.Key #>) 
+            if (serviceType == <#=depGroup.Key#>) 
             {
 <#
             var innerIndex = 0;
@@ -179,7 +174,7 @@ Error: <#=e.Value.Message#>
                      : dep.ServiceKey + ".Equals(serviceKey)"#> &&
                     requiredServiceType == <#= dep.RequiredServiceType #> &&
                     Equals(preRequestParent, <#= dep.PreResolveParent #>)) 
-                    service = CreateDependency_<#= dep.Index #>(this);
+                    service = <#=dep.CreateMethodName#>(this);
 <#
             }
 #>
@@ -207,16 +202,16 @@ Error: <#=e.Value.Message#>
         }
         else 
         {
-            foreach (var rootGroup in rootCodes.GroupBy(f => f.ServiceType))
+            foreach (var rootGroup in rootCodes.GroupBy(x => x.ServiceType))
             {
 #>
-            if (serviceType == <#= rootGroup.Key #>)
+            if (serviceType == <#=rootGroup.Key#>)
             {
 <#
-                foreach (var factory in rootGroup)
+                foreach (var root in rootGroup)
                 {
 #>
-                yield return new KV<object, FactoryDelegate>(<#= factory.ServiceKey #>, Create_<#= factory.Index #>);
+                yield return kv(<#=root.CreateMethodName#><#=root.ServiceKey=="null" ? "" : ", " + root.ServiceKey#>);
 <#
                 }
 #>
@@ -232,10 +227,10 @@ Error: <#=e.Value.Message#>
     foreach (var root in rootCodes)
     {
 #>
-        // <#= root.ServiceType #>
-        internal static object Create_<#=root.Index#>(IResolverContext r)
+        // <#=root.ServiceType#>
+        internal static object <#=root.CreateMethodName#>(IResolverContext r)
         {
-            return <#= root.Expression #>;
+            return <#=root.Expression#>;
         }
 
 <#        
@@ -245,14 +240,16 @@ Error: <#=e.Value.Message#>
     foreach (var dep in depCodes)
     {
 #>
-        // <#= dep.ServiceType #>
-        internal static object CreateDependency_<#=dep.Index#>(IResolverContext r)
+        // <#=dep.ServiceType#>
+        internal static object <#=dep.CreateMethodName#>(IResolverContext r)
         {
-            return <#= dep.Expression #>;
+            return <#=dep.Expression#>;
         }
 
 <#
     }
 #>
+
+        private static KV<object, FactoryDelegate> kv(FactoryDelegate f, object key = null) => new KV<object, FactoryDelegate>(key, f);
     }
 }

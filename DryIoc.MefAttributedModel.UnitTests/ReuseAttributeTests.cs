@@ -73,7 +73,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             var service = container.Resolve<WeaklyReferencedService>();
 
-            Assert.That(service, Is.InstanceOf<WeaklyReferencedService>());
+            Assert.IsInstanceOf<WeaklyReferencedService>(service);
             GC.KeepAlive(service);
         }
 

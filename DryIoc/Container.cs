@@ -311,6 +311,10 @@ namespace DryIoc
             Type requiredServiceType, Request preResolveParent, object[] args)
         {
             var requiredItemType = requiredServiceType ?? serviceType;
+            if (requiredItemType == null)
+            {
+                ;
+            }
 
             // Emulating the collection parent so that collection related rules and conditions were applied
             // the same way as if resolving IEnumerable<T>
@@ -2417,112 +2421,54 @@ namespace DryIoc
                 propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields)),
                 overrideRegistrationMade: true));
 
-        /// <summary>Returns true if service registration was marked as resolution root.</summary>
-        public static Func<ServiceRegistrationInfo, bool> SetupAsResolutionRoots =
-            r => r.Factory.Setup.AsResolutionRoot;
-
-        /// <summary>Packs service Type and Key together.</summary>
-        public struct ServiceTypeKey
-        {
-            /// <summary>Service type</summary>
-            public Type ServiceType;
-
-            /// <summary>Optional service key</summary>
-            public object ServiceKey;
-
-            /// <summary>Creates the pair</summary>
-            public ServiceTypeKey(Type serviceType, object serviceKey)
-            {
-                ServiceType = serviceType;
-                ServiceKey = serviceKey;
-            }
-        }
-
         /// <summary>Result of GenerateResolutionExpressions methods</summary>
-        public class GeneratedExpressionsResult
+        public class GeneratedExpressions
         {
             /// <summary>Resolutions roots</summary>
-            public readonly List<KeyValuePair<ServiceTypeKey, Expression<FactoryDelegate>>>
-                Roots = new List<KeyValuePair<ServiceTypeKey, Expression<FactoryDelegate>>>();
+            public readonly List<KeyValuePair<ServiceName, Expression<FactoryDelegate>>>
+                Roots = new List<KeyValuePair<ServiceName, Expression<FactoryDelegate>>>();
 
             /// <summary>Dependency of Resolve calls</summary>
             public readonly List<KeyValuePair<Request, Expression>>
                 ResolveDependencies = new List<KeyValuePair<Request, Expression>>();
 
             /// <summary>Errors</summary>
-            public readonly List<KeyValuePair<ServiceTypeKey, ContainerException>>
-                Errors = new List<KeyValuePair<ServiceTypeKey, ContainerException>>();
+            public readonly List<KeyValuePair<ServiceName, ContainerException>>
+                Errors = new List<KeyValuePair<ServiceName, ContainerException>>();
         }
 
-        /// <summary>Generates all resolution root and calls expressions by actually resolving the service expressions.</summary>
-        public static GeneratedExpressionsResult GenerateResolutionExpressions(this IContainer container,
-            params IServiceInfo[] rootServices)
+        /// <summary>Strips registration info from factory part</summary>
+        public static IEnumerable<ServiceName> ServiceNames(this IEnumerable<ServiceRegistrationInfo> regs) =>
+            regs.Select(r => r.ServiceName);
+
+        /// <summary>Returns true if service registration was marked as resolution root.</summary>
+        public static Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceName>> SetupAsResolutionRoots =
+            regs => regs.Where(r => r.Factory.Setup.AsResolutionRoot).ServiceNames();
+
+        /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
+        /// Wraps exceptions into errors. You may use <see cref="SetupAsResolutionRoots"/> to select
+        /// registrations with <see cref="Setup.AsResolutionRoot"/>.
+        /// The method does not create any actual services.</summary>
+        public static GeneratedExpressions GenerateResolutionExpressions(this IContainer container,
+            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceName>> getRoots = null)
         {
-            Throw.If(rootServices.IsNullOrEmpty());
-
-            var generatingContainer = container.WithExpressionGeneration();
-
-            var result = new GeneratedExpressionsResult();
-            foreach (var root in rootServices)
+            var genContainer = container.WithExpressionGeneration();
+            var regs = genContainer.GetServiceRegistrations();
+            var roots = getRoots != null ? getRoots(regs).Distinct() : regs.ServiceNames();
+            var result = new GeneratedExpressions();
+            foreach (var root in roots)
             {
                 try
                 {
-                    var request = Request.Create(generatingContainer, root.ServiceType, root.Details.ServiceKey);
-                    var expression = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
-                    if (expression == null)
+                    if (root.ServiceType.IsOpenGeneric())
                         continue;
 
-                    result.Roots.Add(new ServiceTypeKey(root.ServiceType, root.Details.ServiceKey)
-                        .Pair(expression.WrapInFactoryExpression()
-#if FEC_EXPRESSION_INFO
-                        .ToLambdaExpression()
-#endif
-                    ));
-                }
-                catch (ContainerException ex)
-                {
-                    result.Errors.Add(new ServiceTypeKey(root.ServiceType, root.Details.ServiceKey).Pair(ex));
-                }
-            }
-
-            var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
-            result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
-
-            return result;
-        }
-
-        /// <summary>Generates all resolution root and Resolve calls expressions.
-        /// You may use <see cref="SetupAsResolutionRoots"/> to generate only for registrations 
-        /// with <see cref="Setup.AsResolutionRoot"/>.</summary>
-        public static GeneratedExpressionsResult GenerateResolutionExpressions(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> filter = null,  Func<Type, Type> closeOpenGenericService = null)
-        {
-            var generatingContainer = container.WithExpressionGeneration();
-            var regs = generatingContainer.GetServiceRegistrations();
-            if (filter != null)
-                regs = regs.Where(filter);
-
-            var result = new GeneratedExpressionsResult();
-            foreach (var reg in regs)
-            {
-                var serviceType = reg.ServiceType;
-                try
-                {
-                    if (serviceType.IsOpenGeneric())
-                    {
-                        if (closeOpenGenericService == null)
-                            continue;
-                        serviceType = closeOpenGenericService(serviceType);
-                        if (serviceType == null || serviceType.IsOpenGeneric())
-                            continue;
-                    }
-
-                    var request = Request.Create(generatingContainer, serviceType, reg.OptionalServiceKey);
-                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    var request = Request.Create(genContainer, root.ServiceType, root.OptionalServiceKey);
+                    var expr = genContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
 
-                    result.Roots.Add(new ServiceTypeKey(serviceType, reg.OptionalServiceKey)
+                    result.Roots.Add(new ServiceName(root.ServiceType, root.OptionalServiceKey)
                         .Pair(expr.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
@@ -2531,29 +2477,36 @@ namespace DryIoc
                 }
                 catch (ContainerException ex)
                 {
-                    result.Errors.Add(new ServiceTypeKey(serviceType, reg.OptionalServiceKey).Pair(ex));
+                    result.Errors.Add(new ServiceName(root.ServiceType, root.OptionalServiceKey).Pair(ex));
                 }
             }
 
-            var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
+            var depExprs = genContainer.Rules.DependencyResolutionCallExpressions.Value;
             result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
 
             return result;
         }
 
-        /// <summary>Used to find potential problems when resolving the passed services <paramref name="rootServices"/>.
-        /// Method will collect the exceptions when resolving or injecting the specific registration.
-        /// Does not create any actual service objects.</summary>
-        public static KeyValuePair<ServiceTypeKey, ContainerException>[] Validate(
-            this IContainer container, params IServiceInfo[] rootServices) =>
-            container.GenerateResolutionExpressions(rootServices).Errors.ToArray();
+        /// <summary>Generates expressions for provided root services</summary>
+        public static GeneratedExpressions GenerateResolutionExpressions(
+            this IContainer container, params ServiceName[] roots) =>
+            container.GenerateResolutionExpressions(_ => roots);
 
-        /// <summary>Used to find potential problems in service registration setup.
-        /// Method tries to generate expressions for specified registrations, collects happened exceptions, and
+        /// <summary>Helps to find potential problems in service registration setup.
+        /// Method tries to resolve the specified registrations, collects exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
-        public static KeyValuePair<ServiceTypeKey, ContainerException>[] Validate(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> whatRegistrations = null) =>
-            container.GenerateResolutionExpressions(whatRegistrations).Errors.ToArray();
+        public static KeyValuePair<ServiceName, ContainerException>[] Validate(this IContainer container,
+            Func<ServiceRegistrationInfo, bool> condition = null) =>
+            container.GenerateResolutionExpressions(regs => 
+                (condition == null ? regs : regs.Where(condition))
+                .Select(r => r.ServiceName)).Errors.ToArray();
+
+        /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
+        /// Method will collect the exceptions when resolving or injecting the specific root.
+        /// Does not create any actual service objects.</summary>
+        public static KeyValuePair<ServiceName, ContainerException>[] Validate(
+            this IContainer container, params ServiceName[] roots) =>
+            container.GenerateResolutionExpressions(roots).Errors.ToArray();
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
         public static Expr GetRequestExpression(this IContainer container, Request request,
@@ -8842,8 +8795,7 @@ namespace DryIoc
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
-        /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
-        /// this type.</summary>
+        /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with this type.</summary>
         /// <param name="serviceType">Return type of an service item.</param>
         /// <param name="serviceKey">(optional) Resolve only single service registered with the key.</param>
         /// <param name="requiredServiceType">(optional) Actual registered service to search for.</param>
@@ -8870,17 +8822,50 @@ namespace DryIoc
         AppendNewImplementation
     }
 
+    /// <summary>Packs service Type and optional Key together.</summary>
+    public struct ServiceName
+    {
+        /// <summary>Helps to construct from the statically known <typeparamref name="TService"/>.</summary>
+        public static ServiceName Of<TService>(object serviceKey = null) =>
+            new ServiceName(typeof(TService), serviceKey);
+
+        /// <summary>Service type</summary>
+        public Type ServiceType;
+
+        /// <summary>Optional service key</summary>
+        public object OptionalServiceKey;
+
+        /// <summary>Creates the pair</summary>
+        public ServiceName(Type serviceType, object optionalServiceKey)
+        {
+            ServiceType = serviceType;
+            OptionalServiceKey = optionalServiceKey;
+        }
+
+        /// <summary>Pretty-prints type with key</summary>
+        public override string ToString()
+        {
+            var s = new StringBuilder().Print(ServiceType);
+            if (OptionalServiceKey != null)
+                s.Append(" with ServiceKey=").Print(OptionalServiceKey, "\"");
+            return s.ToString();
+        }
+    }
+
     /// <summary>Existing registration info.</summary>
     public struct ServiceRegistrationInfo : IComparable<ServiceRegistrationInfo>
     {
-        /// <summary>Required service type.</summary>
-        public Type ServiceType;
-
-        /// <summary>Is null single default service, or actual service key, or <see cref="DefaultKey"/> for multiple default services.</summary>
-        public object OptionalServiceKey;
+        /// <summary>Pair of service type and key</summary>
+        public ServiceName ServiceName;
 
         /// <summary>Registered factory.</summary>
         public Factory Factory;
+
+        /// <summary>Required service type.</summary>
+        public Type ServiceType => ServiceName.ServiceType;
+
+        /// <summary>May be <c>null</c> for single default service, or <see cref="DefaultKey"/> for multiple default services.</summary>
+        public object OptionalServiceKey => ServiceName.OptionalServiceKey;
 
         /// <summary>Provides registration order across all factory registrations in container.</summary>
         /// <remarks>May be the same for factory registered with multiple services.</remarks>
@@ -8889,38 +8874,22 @@ namespace DryIoc
         /// <summary>Creates info. Registration order is figured out automatically based on Factory.</summary>
         public ServiceRegistrationInfo(Factory factory, Type serviceType, object optionalServiceKey)
         {
-            ServiceType = serviceType;
-            OptionalServiceKey = optionalServiceKey;
+            ServiceName = new ServiceName(serviceType, optionalServiceKey);
             Factory = factory;
         }
 
-        /// <inheritdoc />
-        public int CompareTo(ServiceRegistrationInfo other) =>
-            FactoryRegistrationOrder - other.FactoryRegistrationOrder;
+        /// <summary>Orders by registration</summary>
+        public int CompareTo(ServiceRegistrationInfo other) => Factory.FactoryID - other.Factory.FactoryID;
 
-        /// <summary>Pretty-prints info to string.</summary> <returns>The string.</returns>
-        public override string ToString()
-        {
-            var s = new StringBuilder();
-
-            s.Print(ServiceType);
-
-            if (OptionalServiceKey != null)
-                s.Append(" with ServiceKey=").Print(OptionalServiceKey, "\"");
-
-            if (Factory != null)
-                s.Append(" registered as factory ").Append(Factory);
-
-            return s.ToString();
-        }
+        /// <summary>Pretty-prints info to string.</summary>
+        public override string ToString() => ServiceName + " with factory " + Factory;
     }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
     public interface IRegistrator
     {
-        /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
-        /// <returns>Existing registrations.</returns>
-        /// <remarks>Decorator and Wrapper types are not included.</remarks>
+        /// <summary>Returns all registered service factories with their Type and optional Key.
+        /// Decorator and Wrapper types are not included.</summary>
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
 
         /// <summary>Registers factory in registry with specified service type and key for lookup.

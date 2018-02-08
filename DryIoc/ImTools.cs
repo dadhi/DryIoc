@@ -34,8 +34,11 @@ namespace ImTools
     /// <summary>Helpers for functional composition</summary>
     public static class Fun
     {
-        /// <summary>Predicated always returning a true.</summary>
+        /// <summary>Always a true condition.</summary>
         public static bool Always<T>(T _) => true;
+
+        /// <summary>Always a false condition.</summary>
+        public static bool Never<T>(T _) => false;
 
         /// <summary>Identity function returning passed argument as result.</summary>
         public static T Itself<T>(T x) => x;

@@ -22,12 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-
-
-
-
-
-
 //========================================================================================================
 // NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
 //========================================================================================================
@@ -41,7 +35,7 @@ namespace DryIocZero
 {
 /* 
 Generation is completed successfully.
--------------------------------------
+-------------------------------------------
 
 */
     partial class Container
@@ -75,5 +69,7 @@ Generation is completed successfully.
             yield break;
         }
 
+
+        private static KV<object, FactoryDelegate> kv(FactoryDelegate f, object key = null) => new KV<object, FactoryDelegate>(key, f);
     }
 }
