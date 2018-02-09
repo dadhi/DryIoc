@@ -58,14 +58,16 @@ string Code(object x) => x == null ? "null"
     : x is Request ? Code(container.GetRequestExpression((Request)x).ToExpression())
     : Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
 
+string GetTypePrefix(Type t) => t.Print(x => x.Name).Split('<')[0];
+
 var rootCodes = result.Roots.Select((r, i) => 
-    new { CreateMethodName = "Get" + i + "_" + r.Key.ServiceType.Print(t => t.Name),
+    new { CreateMethodName = "Get" + i + "_" + GetTypePrefix(r.Key.ServiceType),
           ServiceType = Code(r.Key.ServiceType),
           ServiceKey = Code(r.Key.OptionalServiceKey),
           Expression = Code(r.Value.Body) });
 
 var depCodes = result.ResolveDependencies.Select((r, i) => 
-    new { CreateMethodName = "GetDep" + i + "_" + r.Key.ServiceType.Print(t => t.Name),
+    new { CreateMethodName = "GetDep" + i + "_" + GetTypePrefix(r.Key.ServiceType),
           ServiceType = Code(r.Key.ServiceType),
           ServiceKey = Code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
           Expression = Code(r.Value),
