@@ -18,7 +18,6 @@
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="System.Collections.Generic" #>
 <#// TODO: Insert assemblies and namespaces of your services to be registered in container #>
 <#+
 // TODO: Specify the container and registrations ...
@@ -36,10 +35,12 @@ IContainer GetContainerWithRegistrations()
     return container;
 }
 
-// TODO: Identify the root services to generate expressions for ...
-IEnumerable<ServiceName> GetResolutionRoots(IEnumerable<ServiceRegistrationInfo> registrations)
+// TODO: Filter the root services to generate expressions for ...
+ServiceName[] FilterResolutionRoots(ServiceRegistrationInfo registration)
 {
-    // EXAMPLE: The `SetupAsResolutionRoots` will select services registered with `Setup.With(asResolutionRo1ot: true)`
-    return ContainerTools.SetupAsResolutionRoots(registrations);
+    return ContainerTools.IsSetupAsResolutionRoot(registration);
 }
+
+// TODO: Additional roots to generate ...
+ServiceName[] CustomResolutionRoots = {};
 #>

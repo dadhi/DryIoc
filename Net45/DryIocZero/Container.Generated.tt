@@ -36,7 +36,7 @@ THE SOFTWARE.
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
-var result = container.GenerateResolutionExpressions(GetResolutionRoots);
+var result = container.GenerateResolutionExpressions(FilterResolutionRoots, CustomResolutionRoots);
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 
@@ -59,13 +59,13 @@ string Code(object x) => x == null ? "null"
     : Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
 
 var rootCodes = result.Roots.Select((r, i) => 
-    new { CreateMethodName = "Get" + i + "_" + r.Key.ServiceType.Name,
+    new { CreateMethodName = "Get" + i + "_" + r.Key.ServiceType.Print(t => t.Name),
           ServiceType = Code(r.Key.ServiceType),
           ServiceKey = Code(r.Key.OptionalServiceKey),
           Expression = Code(r.Value.Body) });
 
 var depCodes = result.ResolveDependencies.Select((r, i) => 
-    new { CreateMethodName = "GetDep" + i + "_" + r.Key.ServiceType.Name,
+    new { CreateMethodName = "GetDep" + i + "_" + r.Key.ServiceType.Print(t => t.Name),
           ServiceType = Code(r.Key.ServiceType),
           ServiceKey = Code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
           Expression = Code(r.Value),

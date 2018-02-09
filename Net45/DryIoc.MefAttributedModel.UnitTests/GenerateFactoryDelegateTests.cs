@@ -164,7 +164,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 typeof(ExportConditionalObject2),
                 typeof(ExportConditionalObject3));
 
-            var result = container.GenerateResolutionExpressions(ContainerTools.SetupAsResolutionRoots);
+            var result = container.GenerateResolutionExpressions(
+                r => r.Factory.Setup.AsResolutionRoot ? r.ServiceName.One() : null, null);
 
             Assert.AreEqual(3, result.Roots.Count);
             Assert.AreEqual(3, result.ResolveDependencies.Count);
@@ -198,7 +199,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.Register<K>(setup: Setup.With(asResolutionRoot: true));
 
-            var result = container.GenerateResolutionExpressions(ContainerTools.SetupAsResolutionRoots);
+            var result = container.GenerateResolutionExpressions(ContainerTools.IsSetupAsResolutionRoot);
 
             Assert.IsEmpty(result.Errors);
             Assert.AreEqual(1, result.Roots.Count);

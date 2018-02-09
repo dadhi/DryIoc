@@ -2437,24 +2437,15 @@ namespace DryIoc
                 Errors = new List<KeyValuePair<ServiceName, ContainerException>>();
         }
 
-        /// <summary>Strips registration info from factory part</summary>
-        public static IEnumerable<ServiceName> ServiceNames(this IEnumerable<ServiceRegistrationInfo> regs) =>
-            regs.Select(r => r.ServiceName);
-
-        /// <summary>Returns true if service registration was marked as resolution root.</summary>
-        public static Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceName>> SetupAsResolutionRoots =
-            regs => regs.Where(r => r.Factory.Setup.AsResolutionRoot).ServiceNames();
-
         /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
-        /// Wraps exceptions into errors. You may use <see cref="SetupAsResolutionRoots"/> to select
-        /// registrations with <see cref="Setup.AsResolutionRoot"/>.
-        /// The method does not create any actual services.</summary>
+        /// Wraps exceptions into errors. The method does not create any actual services.
+        /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(this IContainer container,
             Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceName>> getRoots = null)
         {
             var genContainer = container.WithExpressionGeneration();
             var regs = genContainer.GetServiceRegistrations();
-            var roots = getRoots != null ? getRoots(regs).Distinct() : regs.ServiceNames();
+            var roots = getRoots != null ? getRoots(regs).Distinct() : regs.Select(r => r.ServiceName);
             var result = new GeneratedExpressions();
             foreach (var root in roots)
             {
@@ -2486,6 +2477,16 @@ namespace DryIoc
 
             return result;
         }
+
+        /// <summary>Simplifies filtering of the setup resolution roots</summary>
+        public static Func<ServiceRegistrationInfo, ServiceName[]> IsSetupAsResolutionRoot =
+            reg => reg.Factory.Setup.AsResolutionRoot ? reg.ServiceName.One() : null;
+
+        /// <summary>Generates expressions from combined filter and roots</summary>
+        public static GeneratedExpressions GenerateResolutionExpressions(
+            this IContainer container, Func<ServiceRegistrationInfo, ServiceName[]> filter, ServiceName[] roots = null) =>
+            container.GenerateResolutionExpressions(regs =>
+                regs.SelectMany(r => filter.ThrowIfNull()(r).EmptyIfNull().Union(roots.EmptyIfNull())));
 
         /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
@@ -2612,7 +2613,7 @@ namespace DryIoc
         private static readonly MethodInfo _ofMethod =
             typeof(DefaultKey).SingleMethod(nameof(Of));
 
-        /// <inheritdoc />
+        /// <summary>Converts to experession</summary>
         public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
             Call(_ofMethod, Constant(RegistrationOrder));
 
@@ -2627,8 +2628,7 @@ namespace DryIoc
         public override int GetHashCode() => RegistrationOrder;
 
         /// <summary>Prints registration order to string.</summary>
-        public override string ToString() =>
-            GetType().Name + "(" + RegistrationOrder + ")";
+        public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
 
         private DefaultKey(int registrationOrder)
         {
@@ -2653,7 +2653,7 @@ namespace DryIoc
         private static readonly MethodInfo _ofMethod =
             typeof(DefaultDynamicKey).SingleMethod(nameof(Of));
 
-        /// <inheritdoc />
+        /// <summary>Converts to experession</summary>
         public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
             Call(_ofMethod, Constant(RegistrationOrder));
 
@@ -9970,14 +9970,13 @@ namespace DryIoc
         /// <summary>Appends type details to string builder.</summary>
         /// <param name="s">String builder to append output to.</param>
         /// <param name="type">Input type to print.</param>
-        /// <param name="getTypeName">(optional) Delegate to provide custom type details.</param>
+        /// <param name="getTypeName">(optional) Can specify to use either Name or FullName</param>
         /// <returns>String builder with appended output.</returns>
         public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
         {
             if (type == null) return s;
 
-            getTypeName = getTypeName ?? GetTypeNameDefault;
-            var typeName = getTypeName(type);
+            var typeName = (getTypeName ?? GetTypeNameDefault).Invoke(type);
 
             var isArray = type.IsArray;
             if (isArray)
@@ -10001,6 +10000,10 @@ namespace DryIoc
 
             return s;
         }
+
+        /// <summary>Pretty-prints the type</summary>
+        public static string Print(this Type type, Func<Type, string> getTypeName = null) =>
+            new StringBuilder().Print(type, getTypeName).ToString();
     }
 
     /// <summary>Ports some methods from .Net 4.0/4.5</summary>

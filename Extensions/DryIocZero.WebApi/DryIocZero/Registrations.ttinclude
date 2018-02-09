@@ -18,11 +18,9 @@
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ assembly Name="System.Core" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import namespace="System.Collections.Generic" #>
-<#@ import namespace="System.Linq" #>
-<#@ import Namespace="System.Reflection" #>
 <#@ assembly Name="$(SolutionDir)packages\Microsoft.AspNet.WebApi.Core.5.2.3\lib\net45\System.Web.Http.dll" #>
 <#@ import Namespace="System.Web.Http.Dispatcher" #>
+<#@ import namespace="ImTools" #>
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>
 
 <#+
@@ -41,11 +39,14 @@ IContainer GetContainerWithRegistrations()
     return container;
 }
 
-// TODO: Identify the root services to generate expressions for ...
-IEnumerable<ServiceName> GetResolutionRoots(IEnumerable<ServiceRegistrationInfo> registrations)
+// TODO: Filter the root services to generate expressions for ...
+ServiceName[] FilterResolutionRoots(ServiceRegistrationInfo registration)
 {
-    return registrations.Where(r => ControllerResolver.Default.IsController(r.ServiceType)).ServiceNames();
+    return ControllerResolver.Default.IsController(registration.ServiceType) ? registration.ServiceName.One() : null;
 }
+
+// TODO: Additional roots to generate ...
+ServiceName[] CustomResolutionRoots = {};
 
 // Helps to recognize controller types
 class ControllerResolver : DefaultHttpControllerTypeResolver
