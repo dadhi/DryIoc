@@ -22,9 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-//========================================================================================================
-// NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
-//========================================================================================================
+/*
+========================================================================================================
+NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+========================================================================================================
+Generation is completed successfully.
+--------------------------------------------------------------------------------------------------------
+*/
+
 using System;
 using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
@@ -33,11 +38,6 @@ using ImTools;
 
 namespace DryIocZero
 {
-/* 
-Generation is completed successfully.
--------------------------------------------
-
-*/
     partial class Container
     {
         [ExcludeFromCodeCoverage]

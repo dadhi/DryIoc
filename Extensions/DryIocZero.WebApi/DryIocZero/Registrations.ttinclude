@@ -34,19 +34,19 @@ IContainer GetContainerWithRegistrations()
 	// placeholder using run-time `DryIocZero.RegisterDelegate` and `DryIocZero.UseInstance`
 
     // TODO: Add registrations
-    // container.Register<IMyServive, MyService>();
+    // container.Register<IMyService, MyService>();
 
     return container;
 }
 
 // TODO: Filter the root services to generate expressions for ...
-ServiceName[] FilterResolutionRoots(ServiceRegistrationInfo registration)
+ServiceInfo[] FilterResolutionRoots(ServiceRegistrationInfo registration)
 {
-    return ControllerResolver.Default.IsController(registration.ServiceType) ? registration.ServiceName.One() : null;
+    return ControllerResolver.Default.IsController(registration.ServiceType) ? registration.ToServiceInfo().One() : null;
 }
 
 // TODO: Additional roots to generate ...
-ServiceName[] CustomResolutionRoots = {};
+ServiceInfo[] CustomResolutionRoots = {};
 
 // Helps to recognize controller types
 class ControllerResolver : DefaultHttpControllerTypeResolver

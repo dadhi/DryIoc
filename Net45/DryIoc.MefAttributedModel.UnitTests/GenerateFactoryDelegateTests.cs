@@ -109,7 +109,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<LazyUser>();
             container.Register<LazyDep>();
 
-            var result = container.GenerateResolutionExpressions(ServiceName.Of<LazyUser>());
+            var result = container.GenerateResolutionExpressions(ServiceInfo.Of<LazyUser>());
 
             Assert.AreEqual(1, result.Roots.Count);
             Assert.AreEqual(1, result.ResolveDependencies.Count);
@@ -164,8 +164,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 typeof(ExportConditionalObject2),
                 typeof(ExportConditionalObject3));
 
-            var result = container.GenerateResolutionExpressions(
-                r => r.Factory.Setup.AsResolutionRoot ? r.ServiceName.One() : null, null);
+            var result = container.GenerateResolutionExpressions(r => r.AsResolutionRoot);
 
             Assert.AreEqual(3, result.Roots.Count);
             Assert.AreEqual(3, result.ResolveDependencies.Count);
@@ -199,7 +198,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.Register<K>(setup: Setup.With(asResolutionRoot: true));
 
-            var result = container.GenerateResolutionExpressions(ContainerTools.IsSetupAsResolutionRoot);
+            var result = container.GenerateResolutionExpressions(r => r.AsResolutionRoot);
 
             Assert.IsEmpty(result.Errors);
             Assert.AreEqual(1, result.Roots.Count);
@@ -241,7 +240,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.Register(typeof(K<>));
 
-            var result = container.GenerateResolutionExpressions(ServiceName.Of<K<N>>());
+            var result = container.GenerateResolutionExpressions(ServiceInfo.Of<K<N>>());
 
             Assert.IsEmpty(result.Errors);
             Assert.AreEqual(1, result.Roots.Count);
@@ -268,7 +267,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             c.Register<M>();
             c.RegisterPlaceholder(typeof(IN));
 
-            var result = c.GenerateResolutionExpressions(_ => ServiceName.Of<M>().One());
+            var result = c.GenerateResolutionExpressions(ServiceInfo.Of<M>());
             Assert.IsEmpty(result.Errors);
         }
 

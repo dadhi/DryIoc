@@ -596,15 +596,45 @@ namespace DryIoc.UnitTests
             c.RegisterMany(new[] { typeof(OG1<>), typeof(OG2<>) }, serviceTypeCondition: Registrator.Interfaces);
 
             var result = c.GenerateResolutionExpressions(regs => 
-                regs.Select(r => r.ServiceType == typeof(IG<>) ? ServiceName.Of<IG<int>>(r.OptionalServiceKey) : r.ServiceName));
+                regs.Select(r => r.ServiceType == typeof(IG<>) ? r.ToServiceInfo<IG<int>>() : r.ToServiceInfo()));
 
             Assert.IsEmpty(result.Errors);
-            CollectionAssert.AreEquivalent(new[] { typeof(OG1<int>), typeof(OG2<int>) }, result.Roots.Select(e => e.Value.Body.Type));
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(OG1<int>), typeof(OG2<int>) }, 
+                result.Roots.Select(e => e.Value.Body.Type));
         }
 
         public interface IG<T> { }
         public class OG1<T> : IG<T> { }
         public class OG2<T> : IG<T> { }
+
+        public class CS: IG<string> { }
+
+        [Test]
+        public void Resolving_closed_generic_with_wrong_type()
+        {
+            var c = new Container();
+            c.RegisterMany(new[] { typeof(CS) }, serviceTypeCondition: Registrator.Interfaces);
+
+            Assert.Throws<ContainerException>(() =>
+            c.Resolve<IG<int>>(typeof(CS)));
+        }
+
+        [Test]
+        public void Can_generate_expressions_from_closed_and_open_generic_registrations_via_required_service_type()
+        {
+            var c = new Container();
+
+            c.RegisterMany(new[] { typeof(CS), typeof(OG1<>) }, serviceTypeCondition: Registrator.Interfaces);
+
+            var result = c.GenerateResolutionExpressions(regs =>
+                regs.Select(r => r.ServiceType == typeof(IG<>) ? r.ToServiceInfo<IG<string>>() : r.ToServiceInfo()));
+
+            Assert.IsEmpty(result.Errors);
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(CS), typeof(OG1<string>) },
+                result.Roots.Select(e => e.Value.Body.Type));
+        }
 
         [Test]
         public void Container_ToString_should_output_scope_info_for_open_scope()

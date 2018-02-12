@@ -121,5 +121,21 @@ namespace DryIoc.UnitTests
         }
 
         public class A<T> { }
+
+        [Test]
+        public void Can_specify_to_Resolve_open_over_closed_generic()
+        {
+            var container = new Container();
+            container.Register(typeof(IMa<string>), typeof(Sa));
+            container.Register(typeof(IMa<>), typeof(Ta<>));
+
+            var ma = container.Resolve<IMa<string>>(typeof(IMa<>));
+
+            Assert.IsInstanceOf<Ta<string>>(ma);
+        }
+
+        public interface IMa<T> { }
+        public class Sa : IMa<string> { }
+        public class Ta<T> : IMa<T> { }
     }
 }

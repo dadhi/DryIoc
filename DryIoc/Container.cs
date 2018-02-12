@@ -311,10 +311,6 @@ namespace DryIoc
             Type requiredServiceType, Request preResolveParent, object[] args)
         {
             var requiredItemType = requiredServiceType ?? serviceType;
-            if (requiredItemType == null)
-            {
-                ;
-            }
 
             // Emulating the collection parent so that collection related rules and conditions were applied
             // the same way as if resolving IEnumerable<T>
@@ -2425,42 +2421,39 @@ namespace DryIoc
         public class GeneratedExpressions
         {
             /// <summary>Resolutions roots</summary>
-            public readonly List<KeyValuePair<ServiceName, Expression<FactoryDelegate>>>
-                Roots = new List<KeyValuePair<ServiceName, Expression<FactoryDelegate>>>();
+            public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>>
+                Roots = new List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>>();
 
             /// <summary>Dependency of Resolve calls</summary>
             public readonly List<KeyValuePair<Request, Expression>>
                 ResolveDependencies = new List<KeyValuePair<Request, Expression>>();
 
             /// <summary>Errors</summary>
-            public readonly List<KeyValuePair<ServiceName, ContainerException>>
-                Errors = new List<KeyValuePair<ServiceName, ContainerException>>();
+            public readonly List<KeyValuePair<ServiceInfo, ContainerException>>
+                Errors = new List<KeyValuePair<ServiceInfo, ContainerException>>();
         }
 
         /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
         /// Wraps exceptions into errors. The method does not create any actual services.
         /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(this IContainer container,
-            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceName>> getRoots = null)
+            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null)
         {
-            var genContainer = container.WithExpressionGeneration();
-            var regs = genContainer.GetServiceRegistrations();
-            var roots = getRoots != null ? getRoots(regs).Distinct() : regs.Select(r => r.ServiceName);
+            var generatingContainer = container.WithExpressionGeneration();
+            var regs = generatingContainer.GetServiceRegistrations();
+            var roots = getRoots != null ? getRoots(regs) : regs.Select(r => r.ToServiceInfo());
+
             var result = new GeneratedExpressions();
             foreach (var root in roots)
             {
                 try
                 {
-                    if (root.ServiceType.IsOpenGeneric())
-                        continue;
-
-                    var request = Request.Create(genContainer, root.ServiceType, root.OptionalServiceKey);
-                    var expr = genContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    var request = Request.Create(generatingContainer, root);
+                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
 
-                    result.Roots.Add(new ServiceName(root.ServiceType, root.OptionalServiceKey)
-                        .Pair(expr.WrapInFactoryExpression()
+                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()
 #if FEC_EXPRESSION_INFO
                         .ToLambdaExpression()
 #endif
@@ -2468,45 +2461,39 @@ namespace DryIoc
                 }
                 catch (ContainerException ex)
                 {
-                    result.Errors.Add(new ServiceName(root.ServiceType, root.OptionalServiceKey).Pair(ex));
+                    result.Errors.Add(root.Pair(ex));
                 }
             }
 
-            var depExprs = genContainer.Rules.DependencyResolutionCallExpressions.Value;
+            var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
             result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
 
             return result;
         }
 
-        /// <summary>Simplifies filtering of the setup resolution roots</summary>
-        public static Func<ServiceRegistrationInfo, ServiceName[]> IsSetupAsResolutionRoot =
-            reg => reg.Factory.Setup.AsResolutionRoot ? reg.ServiceName.One() : null;
-
-        /// <summary>Generates expressions from combined filter and roots</summary>
+        /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
-            this IContainer container, Func<ServiceRegistrationInfo, ServiceName[]> filter, ServiceName[] roots = null) =>
+            this IContainer container, Func<ServiceRegistrationInfo, bool> condition) =>
             container.GenerateResolutionExpressions(regs =>
-                regs.SelectMany(r => filter.ThrowIfNull()(r).EmptyIfNull().Union(roots.EmptyIfNull())));
+                regs.Where(condition.ThrowIfNull()).Select(r => r.ToServiceInfo()));
 
         /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
-            this IContainer container, params ServiceName[] roots) =>
+            this IContainer container, params ServiceInfo[] roots) =>
             container.GenerateResolutionExpressions(_ => roots);
 
         /// <summary>Helps to find potential problems in service registration setup.
         /// Method tries to resolve the specified registrations, collects exceptions, and
         /// returns them to user. Does not create any actual service objects.</summary>
-        public static KeyValuePair<ServiceName, ContainerException>[] Validate(this IContainer container,
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> condition = null) =>
-            container.GenerateResolutionExpressions(regs => 
-                (condition == null ? regs : regs.Where(condition))
-                .Select(r => r.ServiceName)).Errors.ToArray();
+            container.GenerateResolutionExpressions(condition ?? Fun.Always).Errors.ToArray();
 
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
         /// Method will collect the exceptions when resolving or injecting the specific root.
         /// Does not create any actual service objects.</summary>
-        public static KeyValuePair<ServiceName, ContainerException>[] Validate(
-            this IContainer container, params ServiceName[] roots) =>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(
+            this IContainer container, params ServiceInfo[] roots) =>
             container.GenerateResolutionExpressions(roots).Errors.ToArray();
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
@@ -4575,8 +4562,7 @@ namespace DryIoc
         /// are valid implementation and service types.</summary>
         public static bool ImplementsServiceType(this Type type, Type serviceType) =>
             type.IsImplementationType() &&
-            type.GetImplementedServiceTypes(nonPublicServiceTypes: true)
-                .IndexOf(serviceType) != -1;
+            type.GetImplementedServiceTypes(nonPublicServiceTypes: true).IndexOf(serviceType) != -1;
 
         /// <summary>Checks if <paramref name="type"/> implements a service type,
         /// along the checking if <paramref name="type"/> and service type
@@ -5358,6 +5344,7 @@ namespace DryIoc
         /// <summary>Empty service info for convenience.</summary>
         public static readonly IServiceInfo Empty = new ServiceInfo(null);
 
+        // todo: Should we change IfUnresolved to IfUnresolved?
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
@@ -5397,7 +5384,10 @@ namespace DryIoc
         }
 
         /// <summary>Type of service to create. Indicates registered service in registry.</summary>
-        public Type ServiceType { get; private set; }
+        public Type ServiceType { get; }
+
+        /// <summary>Shortcut access to service key</summary>
+        public object ServiceKey => Details.ServiceKey;
 
         /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
         public virtual ServiceDetails Details => ServiceDetails.Default;
@@ -5676,20 +5666,16 @@ namespace DryIoc
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
-        public static Request Create(IContainer container, Type serviceType,
-            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
+        public static Request Create(IContainer container, IServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null)
         {
-            serviceType.ThrowIfNull()
-                .ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
-
-            preResolveParent = preResolveParent ?? Empty;
-
-            IServiceInfo serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey);
+            serviceInfo.ThrowIfNull().ServiceType.ThrowIfNull()
+                .ThrowIf(serviceInfo.ServiceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
 
             flags |= RequestFlags.IsResolutionCall;
 
             // inherit some flags and service details from parent (if any)
+            preResolveParent = preResolveParent ?? Empty;
             if (!preResolveParent.IsEmpty)
             {
                 serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(
@@ -5702,6 +5688,13 @@ namespace DryIoc
             var inputArgExprs = inputArgs?.Map(a => Constant(a));
             return new Request(sharedInfo, preResolveParent, flags, serviceInfo, inputArgExprs);
         }
+
+        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
+        public static Request Create(IContainer container, Type serviceType,
+            object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
+            Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
+            Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
+                preResolveParent, flags, inputArgs);
 
         #region State carried with each request
 
@@ -8822,67 +8815,57 @@ namespace DryIoc
         AppendNewImplementation
     }
 
-    /// <summary>Packs service Type and optional Key together.</summary>
-    public struct ServiceName
-    {
-        /// <summary>Helps to construct from the statically known <typeparamref name="TService"/>.</summary>
-        public static ServiceName Of<TService>(object serviceKey = null) =>
-            new ServiceName(typeof(TService), serviceKey);
-
-        /// <summary>Service type</summary>
-        public Type ServiceType;
-
-        /// <summary>Optional service key</summary>
-        public object OptionalServiceKey;
-
-        /// <summary>Creates the pair</summary>
-        public ServiceName(Type serviceType, object optionalServiceKey)
-        {
-            ServiceType = serviceType;
-            OptionalServiceKey = optionalServiceKey;
-        }
-
-        /// <summary>Pretty-prints type with key</summary>
-        public override string ToString()
-        {
-            var s = new StringBuilder().Print(ServiceType);
-            if (OptionalServiceKey != null)
-                s.Append(" with ServiceKey=").Print(OptionalServiceKey, "\"");
-            return s.ToString();
-        }
-    }
-
     /// <summary>Existing registration info.</summary>
     public struct ServiceRegistrationInfo : IComparable<ServiceRegistrationInfo>
     {
-        /// <summary>Pair of service type and key</summary>
-        public ServiceName ServiceName;
-
         /// <summary>Registered factory.</summary>
         public Factory Factory;
 
         /// <summary>Required service type.</summary>
-        public Type ServiceType => ServiceName.ServiceType;
+        public Type ServiceType;
 
         /// <summary>May be <c>null</c> for single default service, or <see cref="DefaultKey"/> for multiple default services.</summary>
-        public object OptionalServiceKey => ServiceName.OptionalServiceKey;
+        public object OptionalServiceKey;
 
         /// <summary>Provides registration order across all factory registrations in container.</summary>
         /// <remarks>May be the same for factory registered with multiple services.</remarks>
         public int FactoryRegistrationOrder => Factory.FactoryID;
 
+        /// <summary>Implementation type if available.</summary>
+        public Type ImplementationType => Factory.CanAccessImplementationType ? ImplementationType : null;
+
+        /// <summary>Shortcut to <see cref="Setup.AsResolutionRoot"/> property, useful to find all roots</summary>
+        public bool AsResolutionRoot => Factory.Setup.AsResolutionRoot;
+
+        /// <summary>Shortcut to service info.</summary>
+        public ServiceInfo ToServiceInfo() => ServiceInfo.Of(ServiceType, serviceKey: OptionalServiceKey);
+
+        /// <summary>Overrides the service type and pushes the original service type to required service type</summary>
+        public ServiceInfo ToServiceInfo(Type serviceType) =>
+            ServiceInfo.Of(serviceType, ServiceType, IfUnresolved.Throw, OptionalServiceKey);
+
+        /// <summary>Overrides the service type and pushes the original service type to required service type</summary>
+        public ServiceInfo ToServiceInfo<TService>() => ToServiceInfo(typeof(TService));
+
         /// <summary>Creates info. Registration order is figured out automatically based on Factory.</summary>
         public ServiceRegistrationInfo(Factory factory, Type serviceType, object optionalServiceKey)
         {
-            ServiceName = new ServiceName(serviceType, optionalServiceKey);
             Factory = factory;
+            ServiceType = serviceType;
+            OptionalServiceKey = optionalServiceKey;
         }
 
         /// <summary>Orders by registration</summary>
         public int CompareTo(ServiceRegistrationInfo other) => Factory.FactoryID - other.Factory.FactoryID;
 
         /// <summary>Pretty-prints info to string.</summary>
-        public override string ToString() => ServiceName + " with factory " + Factory;
+        public override string ToString()
+        {
+            var s = new StringBuilder().Print(ServiceType);
+            if (OptionalServiceKey != null)
+                s.Append(" with ServiceKey=").Print(OptionalServiceKey, "\"");
+            return s.Append(" with factory ").Append(Factory).ToString();
+        }
     }
 
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
@@ -9121,7 +9104,7 @@ namespace DryIoc
             ExpectedSingleDefaultFactory = Of(
                 "Expecting single default registration but found many:" + Environment.NewLine + "{0}" +
                 Environment.NewLine +
-                "When resolving {1}." + Environment.NewLine +
+                "when resolving {1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
             RegisteringImplementationNotAssignableToServiceType = Of(

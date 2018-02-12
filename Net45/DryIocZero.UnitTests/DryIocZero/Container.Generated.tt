@@ -28,6 +28,7 @@ THE SOFTWARE.
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
 <#@ import Namespace="DryIoc" #>
+<#@ import Namespace="ImTools" #>
 <#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
@@ -36,7 +37,10 @@ THE SOFTWARE.
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
 
-var result = container.GenerateResolutionExpressions(FilterResolutionRoots, CustomResolutionRoots);
+var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
+
+var result = container.GenerateResolutionExpressions(regs => regs.SelectMany(r =>
+    FilterResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
 
 var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
 
@@ -61,22 +65,40 @@ string Code(object x) => x == null ? "null"
 string GetTypePrefix(Type t) => t.Print(x => x.Name).Split('<')[0];
 
 var rootCodes = result.Roots.Select((r, i) => 
-    new { CreateMethodName = "Get" + i + "_" + GetTypePrefix(r.Key.ServiceType),
-          ServiceType = Code(r.Key.ServiceType),
-          ServiceKey = Code(r.Key.OptionalServiceKey),
-          Expression = Code(r.Value.Body) });
+    new { ServiceType = r.Key.ServiceType,
+          ServiceTypeCode = Code(r.Key.ServiceType),
+          ServiceKeyCode = Code(r.Key.ServiceKey),
+          ExpressionCode = Code(r.Value.Body),
+          CreateMethodName = "Get" + i + "_" + GetTypePrefix(r.Key.ServiceType) });
 
 var depCodes = result.ResolveDependencies.Select((r, i) => 
-    new { CreateMethodName = "GetDep" + i + "_" + GetTypePrefix(r.Key.ServiceType),
-          ServiceType = Code(r.Key.ServiceType),
+    new { ServiceType = Code(r.Key.ServiceType),
           ServiceKey = Code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
           Expression = Code(r.Value),
           RequiredServiceType = Code(r.Key.RequiredServiceType),
-          PreResolveParent = Code(r.Key.Parent) });
+          PreResolveParent = Code(r.Key.Parent),
+          CreateMethodName = "GetDep" + i + "_" + GetTypePrefix(r.Key.ServiceType) });
 #>
-//========================================================================================================
-// NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
-//========================================================================================================
+/*
+========================================================================================================
+NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+========================================================================================================
+<#  var errCount = result.Errors.Count;
+    if (errCount == 0) { #>
+Generation is completed successfully.
+<# } else { #>
+Generation is FAILED with <#=errCount#> error(s):
+You may try to register failing service with `container.RegisterPlaceholder<...>()` in Registrations.tt
+and then register ACTUAL service at runtime.
+<# } #>
+--------------------------------------------------------------------------------------------------------
+<#  var eNum = 0;
+    foreach(var e in result.Errors) { #>
+<#=++eNum#>. <#=e.Key#>
+Error: <#=e.Value.Message#>
+<#  } #>
+*/
+
 using System;
 using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
@@ -85,22 +107,6 @@ using ImTools;
 
 namespace DryIocZero
 {
-/* 
-<#  var errCount = result.Errors.Count;
-    if (errCount == 0) { #>
-Generation is completed successfully.
-<# } else { #>
-Generation is FAILED with <#=errCount#> errors:
-Note: You may try to register failing service with `container.RegisterPlaceholder<...>()` in Registrations.tt and then register ACTUAL service at runtime.
-<# } #>
--------------------------------------------
-<#  var eNum = 0;
-    foreach(var e in result.Errors) { #>
-<#=++eNum#>. <#=e.Key#>
-Error: <#=e.Value.Message#>
-<#  } #>
-
-*/
     partial class Container
     {
         [ExcludeFromCodeCoverage]
@@ -114,12 +120,12 @@ Error: <#=e.Value.Message#>
         {
 <#
         var index = 0;
-        foreach (var root in rootCodes.Where(f => f.ServiceKey == "null"))
+        foreach (var root in rootCodes.Where(f => f.ServiceKeyCode == "null"))
         {
             if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#=root.ServiceType#>)
+            if (serviceType == <#=root.ServiceTypeCode#>)
                 service = <#=root.CreateMethodName#>(this);
 <#
         }
@@ -132,7 +138,7 @@ Error: <#=e.Value.Message#>
         {
 <#
         index = 0;
-        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKey != "null").GroupBy(x => x.ServiceType))
+        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKeyCode != "null").GroupBy(x => x.ServiceTypeCode))
         {
             if (index++ > 0) WriteLine(@"
             else");
@@ -146,7 +152,7 @@ Error: <#=e.Value.Message#>
                 if (innerIndex++ > 0) WriteLine(@"
                 else");
 #>
-                if (<#=root.ServiceKey#>.Equals(serviceKey))
+                if (<#=root.ServiceKeyCode#>.Equals(serviceKey))
                     service = <#=root.CreateMethodName#>(this);
 <#
             }
@@ -207,14 +213,29 @@ Error: <#=e.Value.Message#>
             foreach (var rootGroup in rootCodes.GroupBy(x => x.ServiceType))
             {
 #>
-            if (serviceType == <#=rootGroup.Key#>)
+            if (serviceType == <#=rootGroup.First().ServiceTypeCode#>)
             {
 <#
                 foreach (var root in rootGroup)
                 {
 #>
-                yield return kv(<#=root.CreateMethodName#><#=root.ServiceKey=="null" ? "" : ", " + root.ServiceKey#>);
+                yield return kv(<#=root.CreateMethodName#><#=root.ServiceKeyCode=="null" ? "" : ", " + root.ServiceKeyCode#>);
 <#
+                }
+
+                if (includeVariants && rootGroup.Key.IsGeneric())
+                {
+                    var sourceType = rootGroup.Key;
+                    var variants = rootCodes
+                        .Where(x => x.ServiceType.IsGeneric() &&
+                            x.ServiceType.GetGenericTypeDefinition() == sourceType.GetGenericTypeDefinition() &&
+                            x.ServiceType != sourceType && x.ServiceType.IsAssignableTo(sourceType));
+                    foreach (var variant in variants)
+                    {
+#>
+                yield return kv(<#=variant.CreateMethodName#><#=variant.ServiceKeyCode=="null" ? "" : ", " + variant.ServiceKeyCode#>); // covariant
+<#
+                    }
                 }
 #>
             }
@@ -229,10 +250,10 @@ Error: <#=e.Value.Message#>
     foreach (var root in rootCodes)
     {
 #>
-        // <#=root.ServiceType#>
+        // <#=root.ServiceTypeCode#>
         internal static object <#=root.CreateMethodName#>(IResolverContext r)
         {
-            return <#=root.Expression#>;
+            return <#=root.ExpressionCode#>;
         }
 
 <#        

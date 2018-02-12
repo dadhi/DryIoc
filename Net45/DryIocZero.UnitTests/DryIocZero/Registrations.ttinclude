@@ -21,6 +21,7 @@
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
 <#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
+<#@ import namespace="ImTools" #>
 <#+
 // TODO: Setup container and add service registrations
 IContainer GetContainerWithRegistrations()
@@ -35,11 +36,11 @@ IContainer GetContainerWithRegistrations()
 }
 
 // TODO: Filter the root services to generate expressions for ...
-ServiceName[] FilterResolutionRoots(ServiceRegistrationInfo registration)
+ServiceInfo[] FilterResolutionRoots(ServiceRegistrationInfo reg)
 {
-    return ContainerTools.IsSetupAsResolutionRoot(registration);
+    return reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
 }
 
 // TODO: Additional roots to generate ...
-ServiceName[] CustomResolutionRoots = {};
+ServiceInfo[] CustomResolutionRoots = {};
 #>
