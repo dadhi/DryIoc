@@ -2924,7 +2924,7 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
             var items = container.GetAllServiceFactories(requiredItemType)
-                .Map(kv => new ServiceRegistrationInfo(kv.Value, requiredItemType, kv.Key))
+                .Map(x => new ServiceRegistrationInfo(x.Value, requiredItemType, x.Key))
                 .ToArrayOrSelf();
 
             if (requiredItemType.IsClosedGeneric())
@@ -3037,9 +3037,7 @@ namespace DryIoc
 
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             if (serviceFactory == null)
-                return request.IfUnresolved == IfUnresolved.Throw
-                    ? null
-                    : Constant(null, lazyType);
+                return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
 
             serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
 
@@ -3441,7 +3439,6 @@ namespace DryIoc
             });
 
         /// <summary>Obsolete: Replaced by ConcreteTypeDynamicRegistrations</summary>
-        [Obsolete("Replaced by " + nameof(ConcreteTypeDynamicRegistrations), false)]
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null) =>
             request =>
             {
@@ -3513,7 +3510,6 @@ namespace DryIoc
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
         /// <summary>Replaced with WithConcreteTypeDynamicRegistrations</summary>
-        [Obsolete("Replaced with WithConcreteTypeDynamicRegistrations", false)]
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
 
@@ -3699,7 +3695,6 @@ namespace DryIoc
             (_settings & Settings.VariantGenericTypesInResolvedCollection) != 0;
 
         /// <summary>Flag instructs to include covariant compatible types in resolved collection.</summary>
-        /// <returns>Returns new rules with flag set.</returns>
         public Rules WithoutVariantGenericTypesInResolvedCollection() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
@@ -9544,10 +9539,8 @@ namespace DryIoc
         /// <summary>Returns generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsGenericTypeDefinition
-                ? typeInfo.GenericTypeParameters
-                : typeInfo.GenericTypeArguments;
+            var ti = type.GetTypeInfo();
+            return ti.IsGenericTypeDefinition ? ti.GenericTypeParameters : ti.GenericTypeArguments;
         }
 
         /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
@@ -9569,8 +9562,8 @@ namespace DryIoc
         /// <summary>Checks if type is public or nested public in public type.</summary>
         public static bool IsPublicOrNestedPublic(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsPublic || typeInfo.IsNestedPublic && typeInfo.DeclaringType.IsPublicOrNestedPublic();
+            var ti = type.GetTypeInfo();
+            return ti.IsPublic || ti.IsNestedPublic && ti.DeclaringType.IsPublicOrNestedPublic();
         }
 
         /// <summary>Returns true if type is class.</summary>

@@ -38,7 +38,9 @@ IContainer GetContainerWithRegistrations()
 // TODO: Filter the root services to generate expressions for ...
 ServiceInfo[] FilterResolutionRoots(ServiceRegistrationInfo reg)
 {
-    return reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
+    return !reg.AsResolutionRoot ? null
+        : reg.ServiceType == typeof(IOpGen<>) ? reg.ToServiceInfo<IOpGen<string>>().One()
+        : reg.ToServiceInfo().One();
 }
 
 // TODO: Additional roots to generate ...

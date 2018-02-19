@@ -72,10 +72,7 @@ namespace DryIocAttributes
     public class ExportExAttribute : ExportAttribute
     {
         /// <summary>Creates attribute.</summary>
-        /// <param name="contractKey">Service key object, should implement <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/></param>
-        /// <param name="contractType">(optional) Service type.</param>
-        /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
-        public ExportExAttribute(object contractKey, Type contractType = null,
+        public ExportExAttribute(object contractKey = null, Type contractType = null,
             IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed)
             : base(contractKey as string, contractType)
         {
@@ -83,8 +80,7 @@ namespace DryIocAttributes
             IfAlreadyExported = ifAlreadyExported;
         }
 
-        /// <summary>Creates export with specified service type.</summary> <param name="contractType">Service type.</param>
-        /// <param name="ifAlreadyExported">(optional) Handles export when other such export is already exist.</param>
+        /// <summary>Creates export with specified service type.</summary>
         public ExportExAttribute(Type contractType,
             IfAlreadyExported ifAlreadyExported = IfAlreadyExported.AppendNotKeyed) :
             this(null, contractType, ifAlreadyExported)

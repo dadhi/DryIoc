@@ -24,12 +24,13 @@ THE SOFTWARE.
 <#@ template debug="false" hostspecific="true" language="C#" #>
 <#@ output extension=".cs" #>
 <#@ CleanupBehavior processor="T4VSHost" CleanupAfterProcessingtemplate="true" #>
-<#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ assembly Name="$(ExpressionToCodeLibAssembly)" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ImTools" #>
-<#@ import Namespace="ExpressionToCodeLib.Unstable_v2_Api" #>
+<#@ import Namespace="ExpressionToCodeLib" #>
+<#@ assembly Name="System.Core" #>
+<#@ assembly Name="System.Runtime" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ include File="Registrations.ttinclude" #>
@@ -42,10 +43,12 @@ var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 var result = container.GenerateResolutionExpressions(regs => regs.SelectMany(r =>
     FilterResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
 
-var exprToCode = ExpressionStringify.With(fullTypeNames: true, explicitMethodTypeArgs: true);
+var exprToCode = ExpressionToCodeConfiguration.DefaultCodeGenConfiguration
+    .WithObjectStringifier(ObjectStringify.WithFullTypeNames);
 
-string Code(object x) => x == null ? "null"
-    : x is Expression ? exprToCode.ToCode((Expression)x)
+string Code(object x) =>
+    x == null ? "null" :
+    x is Expression ? exprToCode.ToCode((Expression)x)
         .Replace("DryIoc." + nameof(IfUnresolved), nameof(IfUnresolved))
         .Replace("DryIoc." + nameof(IReuse), nameof(IReuse))
         .Replace("DryIoc." + nameof(Reuse), nameof(Reuse))
@@ -62,14 +65,17 @@ string Code(object x) => x == null ? "null"
     : x is Request ? Code(container.GetRequestExpression((Request)x).ToExpression())
     : Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
 
-string GetTypePrefix(Type t) => t.Print(x => x.Name).Split('<')[0];
+string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
+
+string OptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
 var rootCodes = result.Roots.Select((r, i) => 
     new { ServiceType = r.Key.ServiceType,
           ServiceTypeCode = Code(r.Key.ServiceType),
           ServiceKeyCode = Code(r.Key.ServiceKey),
+          RequiredServiceTypeCode = Code(r.Key.Details.RequiredServiceType),
           ExpressionCode = Code(r.Value.Body),
-          CreateMethodName = "Get" + i + "_" + GetTypePrefix(r.Key.ServiceType) });
+          CreateMethodName = "Get" + i + "_" + GetTypeNameOnly(r.Key.ServiceType.Name) });
 
 var depCodes = result.ResolveDependencies.Select((r, i) => 
     new { ServiceType = Code(r.Key.ServiceType),
@@ -77,7 +83,7 @@ var depCodes = result.ResolveDependencies.Select((r, i) =>
           Expression = Code(r.Value),
           RequiredServiceType = Code(r.Key.RequiredServiceType),
           PreResolveParent = Code(r.Key.Parent),
-          CreateMethodName = "GetDep" + i + "_" + GetTypePrefix(r.Key.ServiceType) });
+          CreateMethodName = "GetDep" + i + "_" + GetTypeNameOnly(r.Key.ServiceType.Name) });
 #>
 /*
 ========================================================================================================
@@ -104,6 +110,7 @@ using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
 using ImTools;
+using static DryIocZero.ResolveManyResult;
 
 namespace DryIocZero
 {
@@ -193,13 +200,13 @@ namespace DryIocZero
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType) 
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
         [ExcludeFromCodeCoverage]
-        private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
+        private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
         {
 <#
         if (!rootCodes.Any())
@@ -219,7 +226,7 @@ namespace DryIocZero
                 foreach (var root in rootGroup)
                 {
 #>
-                yield return kv(<#=root.CreateMethodName#><#=root.ServiceKeyCode=="null" ? "" : ", " + root.ServiceKeyCode#>);
+                yield return Of(<#=root.CreateMethodName#><#=OptArg(root.ServiceKeyCode)#><#=OptArg(root.RequiredServiceTypeCode)#>);
 <#
                 }
 
@@ -233,7 +240,7 @@ namespace DryIocZero
                     foreach (var variant in variants)
                     {
 #>
-                yield return kv(<#=variant.CreateMethodName#><#=variant.ServiceKeyCode=="null" ? "" : ", " + variant.ServiceKeyCode#>); // covariant
+                yield return Of(<#=variant.CreateMethodName#><#=OptArg(variant.ServiceKeyCode)#><#=OptArg(variant.RequiredServiceTypeCode)#>); // co-variant
 <#
                     }
                 }
@@ -272,7 +279,5 @@ namespace DryIocZero
 <#
     }
 #>
-
-        private static KV<object, FactoryDelegate> kv(FactoryDelegate f, object key = null) => new KV<object, FactoryDelegate>(key, f);
     }
 }

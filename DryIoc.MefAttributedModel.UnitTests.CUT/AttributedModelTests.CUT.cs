@@ -549,4 +549,21 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public class WithExportMetadataOnlyKeyValue
     {
     }
+
+    public interface IOpGen<out T> { }
+    
+    [ExportMany, AsResolutionRoot]
+    public class ClGen : IOpGen<string> { }
+
+    [ExportMany, AsResolutionRoot]
+    public class OpGen<T> : IOpGen<T> { }
+
+    public class Aa { }
+    public class Bb : Aa { }
+
+    [ExportMany, AsResolutionRoot]
+    public class ClGenA : IOpGen<Aa> { }
+
+    [ExportMany, AsResolutionRoot]
+    public class ClGenB : IOpGen<Bb> { }
 }

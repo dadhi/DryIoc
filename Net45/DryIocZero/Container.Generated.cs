@@ -35,6 +35,7 @@ using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
 using ImTools;
+using static DryIocZero.ResolveManyResult;
 
 namespace DryIocZero
 {
@@ -58,18 +59,16 @@ namespace DryIocZero
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType) 
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
         [ExcludeFromCodeCoverage]
-        private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
+        private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
         {
             yield break;
         }
 
-
-        private static KV<object, FactoryDelegate> kv(FactoryDelegate f, object key = null) => new KV<object, FactoryDelegate>(key, f);
     }
 }

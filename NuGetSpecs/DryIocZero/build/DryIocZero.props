@@ -3,7 +3,7 @@
 
   <PropertyGroup>
     <!-- TODO: Automate using the DryIocZero version specified in AssemblyInfo -->
-    <DryIocZeroVersion>4.0.0-preview-09</DryIocZeroVersion>
+    <DryIocZeroVersion>4.0.0-preview-10</DryIocZeroVersion>
     
     <NugetPackageCache>$(USERPROFILE)/.nuget/packages</NugetPackageCache>
     
@@ -11,7 +11,7 @@
     <DryIocZeroCompileTimeDeps Condition="!Exists('$(NugetPackageCache)')">$(SolutionDir)/packages/DryIocZero.$(DryIocZeroVersion)/tools</DryIocZeroCompileTimeDeps>
 
     <DryIocAssembly>$(DryIocZeroCompileTimeDeps)/DryIoc.dll.3.0.0/net45/DryIoc.dll</DryIocAssembly>
-    <ExpressionToCodeLibAssembly>$(DryIocZeroCompileTimeDeps)/ExpressionToCodeLib.1.5.4/net40-Client/ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
+    <ExpressionToCodeLibAssembly>$(DryIocZeroCompileTimeDeps)/ExpressionToCodeLib.2.6.0/net452/ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
 
   </PropertyGroup>
 

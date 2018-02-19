@@ -179,15 +179,13 @@ namespace DryIocZero
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
                 Error.UnableToResolveKeyedService, serviceType, serviceKey, factories == null ? string.Empty : "non-");
         }
-
-        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType);
+        
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
 
         /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
-        /// <param name="serviceType">Service type.</param>
-        /// <returns>Collection of service key - service pairs.</returns>
-        public IEnumerable<KV<object, FactoryDelegate>> ResolveManyGeneratedOrGetEmpty(Type serviceType)
+        public IEnumerable<ResolveManyResult> ResolveManyGeneratedOrGetEmpty(Type serviceType)
         {
-            var manyGenerated = Enumerable.Empty<KV<object, FactoryDelegate>>();
+            var manyGenerated = Enumerable.Empty<ResolveManyResult>();
             ResolveManyGenerated(ref manyGenerated, serviceType);
             return manyGenerated;
         }
@@ -198,13 +196,15 @@ namespace DryIocZero
         {
             serviceType = requiredServiceType ?? serviceType;
 
-            var manyGeneratedFactories = Enumerable.Empty<KV<object, FactoryDelegate>>();
-            ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
+            var generatedFactories = Enumerable.Empty<ResolveManyResult>();
+            ResolveManyGenerated(ref generatedFactories, serviceType);
             if (serviceKey != null)
-                manyGeneratedFactories = manyGeneratedFactories.Where(kv => serviceKey.Equals(kv.Key));
+                generatedFactories = generatedFactories.Where(x => serviceKey.Equals(x.ServiceKey));
+            if (requiredServiceType != null)
+                generatedFactories = generatedFactories.Where(x => requiredServiceType == x.RequiredServiceType);
 
-            foreach (var generated in manyGeneratedFactories)
-                yield return generated.Value(this);
+            foreach (var generated in generatedFactories)
+                yield return generated.FactoryDelegate(this);
 
             if (serviceKey == null)
             {
@@ -335,6 +335,29 @@ namespace DryIocZero
 
             return scopeStr;
         }
+    }
+
+    /// <summary>Identifies the service when resolving collection</summary>
+    public struct ResolveManyResult
+    {
+        /// <summary>Factory, the required part</summary>
+        public FactoryDelegate FactoryDelegate;
+
+        /// <summary>Optional key</summary>
+        public object ServiceKey;
+
+        /// <summary>Optional required service type, can be an open-generic type.</summary>
+        public Type RequiredServiceType;
+
+        /// <summary>Constructs the struct.</summary>
+        public static ResolveManyResult Of(FactoryDelegate factoryDelegate,
+            object serviceKey = null, Type requiredServiceType = null) =>
+            new ResolveManyResult
+            {
+                FactoryDelegate = factoryDelegate,
+                ServiceKey = serviceKey,
+                RequiredServiceType = requiredServiceType
+            };
     }
 
     /// <summary>Should return value stored in scope.</summary>
