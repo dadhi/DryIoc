@@ -43,7 +43,7 @@
 
     <!--Compile-time dependencies-->
     <file src="..\NuGetSpecs\DryIocZero\tools\DryIoc.dll.3.0.0\net45\DryIoc.dll" target="tools\DryIoc.dll.3.0.0\net45" />
-    <file src="..\NuGetSpecs\DryIocZero\tools\ExpressionToCodeLib.1.5.4\net40-Client\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.1.5.4\net40-Client" />
+    <file src="..\NuGetSpecs\DryIocZero\tools\ExpressionToCodeLib.2.6.0\net452\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.2.6.0\net452" />
     <file src="..\NuGetSpecs\DryIocZero\build\DryIocZero.props" target="build" />
 	
     <!--net45-->

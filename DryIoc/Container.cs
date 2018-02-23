@@ -193,9 +193,8 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             var cachedDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            if (cachedDelegate != null)
-                return cachedDelegate(this);
-            return ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
+            return cachedDelegate != null ? cachedDelegate(this) 
+                : ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
         }
 
         private object ResolveAndCacheDefaultFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
@@ -206,8 +205,9 @@ namespace DryIoc
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
             // The situation is possible for multiple default services registered.
-            if (request.ServiceKey != null)
-                return ((IResolver)this).Resolve(serviceType, request.ServiceKey, ifUnresolved, null, Request.Empty, null);
+            var serviceKey = request.ServiceKey;
+            if (serviceKey != null)
+                return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
 
             var factoryDelegate = factory?.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
@@ -231,8 +231,8 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            var cacheEntryKey = serviceKey == null ? (object)serviceType
-                : new KV<object, object>(serviceType, serviceKey);
+            var cacheEntryKey = serviceKey == null ? serviceType
+                : (object)new KV<object, object>(serviceType, serviceKey);
 
             object cacheContextKey = requiredServiceType;
 
@@ -252,8 +252,8 @@ namespace DryIoc
                     : new KV<object, object>(cacheContextKey, currentScopeName);
 
             // Try get from cache first
-            var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
-            var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
+            var keyedCache = _registry.Value.KeyedFactoryDelegateCache;
+            var cacheEntry = keyedCache.Value.GetValueOrDefault(cacheEntryKey);
             if (cacheEntry != null)
             {
                 var cachedFactoryDelegate = cacheContextKey == null ? cacheEntry.Key
@@ -274,7 +274,7 @@ namespace DryIoc
             if (serviceKey == null && request.ServiceKey != null)
             {
                 cacheEntryKey = new KV<object, object>(serviceType, request.ServiceKey);
-                cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
+                cacheEntry = keyedCache.Value.GetValueOrDefault(cacheEntryKey);
                 if (cacheEntry != null)
                 {
                     var cachedDelegate = cacheContextKey == null ? cacheEntry.Key
@@ -299,9 +299,9 @@ namespace DryIoc
                     ? KV.Of(factoryDelegate, cachedFactories)
                     : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
 
-                var cache = cacheRef.Value;
-                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(cacheEntryKey, cacheEntry)))
-                    cacheRef.Swap(it => it.AddOrUpdate(cacheEntryKey, cacheEntry));
+                var cache = keyedCache.Value;
+                if (!keyedCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(cacheEntryKey, cacheEntry)))
+                    keyedCache.Swap(it => it.AddOrUpdate(cacheEntryKey, cacheEntry));
             }
 
             return service;
@@ -737,14 +737,17 @@ namespace DryIoc
             if (factory != null && factory.FactoryGenerator != null)
                 factory = factory.FactoryGenerator.GetGeneratedFactory(request);
 
-            if (factory == null && request.IfUnresolved == IfUnresolved.Throw)
-                ThrowUnableToResolve(request);
+            if (factory == null)
+                MayBeThrowUnableToResolve(request);
 
             return factory;
         }
 
-        internal static void ThrowUnableToResolve(Request request)
+        internal static void MayBeThrowUnableToResolve(Request request)
         {
+            if (request.IfUnresolved != IfUnresolved.Throw)
+                return;
+
             var container = request.Container;
 
             var registrations = container
@@ -1067,26 +1070,6 @@ namespace DryIoc
             return wrappedType == null ? serviceType
                 : ((IContainer)this).GetWrappedType(wrappedType, null);
         }
-
-        /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
-        /// <param name="factoryID">Key in cache.</param>
-        /// <param name="factoryExpression">Value to cache.</param>
-        public void CacheFactoryExpression(int factoryID, Expr factoryExpression)
-        {
-            var registry = _registry.Value;
-            if (!registry.Services.IsEmpty)
-            {
-                var cacheRef = registry.FactoryExpressionCache;
-                var cacheVal = cacheRef.Value;
-                if (!cacheRef.TrySwapIfStillCurrent(cacheVal, cacheVal.AddOrUpdate(factoryID, factoryExpression)))
-                    cacheRef.Swap(val => val.AddOrUpdate(factoryID, factoryExpression));
-            }
-        }
-
-        /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
-        /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
-        public Expr GetCachedFactoryExpressionOrDefault(int factoryID) =>
-            _registry.Value.FactoryExpressionCache.Value.GetValueOrDefault(factoryID);
 
         /// <summary>Converts known item into literal expression or wraps it in a constant expression.</summary>
         public Expr GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
@@ -1559,9 +1542,7 @@ namespace DryIoc
             public readonly ImHashMap<Type, Factory[]> Decorators;
             public readonly ImHashMap<Type, Factory> Wrappers;
 
-            // Cache:
-            public readonly Ref<ImMap<Expr>> FactoryExpressionCache;
-
+            // Resolved Delegate Cache:
             public readonly Ref<ImHashMap<Type, FactoryDelegate>[]> DefaultFactoryDelegateCache;
 
             // key: KV where Key is ServiceType and object is ServiceKey
@@ -1577,7 +1558,6 @@ namespace DryIoc
                     wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
                     Ref.Of(FactoryDelegateCache.Empty()),
                     Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImMap<Expr>.Empty),
                     IsChangePermitted.Permitted)
             { }
 
@@ -1587,7 +1567,6 @@ namespace DryIoc
                 ImHashMap<Type, Factory> wrappers,
                 Ref<ImHashMap<Type, FactoryDelegate>[]> defaultFactoryDelegateCache,
                 Ref<ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
-                Ref<ImMap<Expr>> factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
                 Services = services;
@@ -1595,7 +1574,6 @@ namespace DryIoc
                 Wrappers = wrappers;
                 DefaultFactoryDelegateCache = defaultFactoryDelegateCache;
                 KeyedFactoryDelegateCache = keyedFactoryDelegateCache;
-                FactoryExpressionCache = factoryExpressionCache;
                 _isChangePermitted = isChangePermitted;
             }
 
@@ -1603,26 +1581,25 @@ namespace DryIoc
                 new Registry(Services, Decorators, Wrappers,
                     Ref.Of(FactoryDelegateCache.Empty()),
                     Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
-                    Ref.Of(ImMap<Expr>.Empty),
                     _isChangePermitted);
 
             internal Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                    FactoryExpressionCache.NewRef(), _isChangePermitted);
+                    _isChangePermitted);
 
             private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) =>
                 decorators == Decorators ? this :
                 new Registry(Services, decorators, Wrappers,
                     DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                    FactoryExpressionCache.NewRef(), _isChangePermitted);
+                    _isChangePermitted);
 
             private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) =>
                 wrappers == Wrappers ? this :
                 new Registry(Services, Decorators, wrappers,
                     DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                    FactoryExpressionCache.NewRef(), _isChangePermitted);
+                    _isChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -1833,7 +1810,7 @@ namespace DryIoc
                 {
                     registry = new Registry(services, Decorators, Wrappers,
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
-                        FactoryExpressionCache.NewRef(), _isChangePermitted);
+                        _isChangePermitted);
 
                     if (replacedFactory != null)
                         registry = registry.WithoutFactoryCache(replacedFactory, serviceType, serviceKey);
@@ -1986,9 +1963,6 @@ namespace DryIoc
                 }
                 else
                 {
-                    // clean expression cache using FactoryID as key
-                    FactoryExpressionCache.Swap(_ => _.Update(factory.FactoryID, null));
-
                     // clean default factory cache
                     DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
 
@@ -2000,13 +1974,10 @@ namespace DryIoc
                 return this;
             }
 
-            public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow)
-            {
-                var isChangePermitted = ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error;
-                return new Registry(Services, Decorators, Wrappers,
-                    DefaultFactoryDelegateCache, KeyedFactoryDelegateCache, FactoryExpressionCache,
-                    isChangePermitted);
-            }
+            public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow) =>
+                new Registry(Services, Decorators, Wrappers,
+                    DefaultFactoryDelegateCache, KeyedFactoryDelegateCache,
+                    ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
@@ -3275,7 +3246,7 @@ namespace DryIoc
 
         /// <summary>Max number of dependencies including nested ones,
         /// before splitting the graph with Resolve calls.</summary>
-        public int MaxObjectGraphSize { get; private set; }
+        public int MaxObjectGraphSize { get; private set; } // todo: replace with dependencyDepth?
 
         /// <summary>Sets <see cref="MaxObjectGraphSize"/>. Everything low than 1 will be the 1.
         /// To disable the limit please use <see cref="WithoutMaxObjectGraphSize"/></summary>
@@ -3285,13 +3256,8 @@ namespace DryIoc
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
-        /// <summary>Disables the <see cref="MaxObjectGraphSize"/> limitation,
-        /// so that object graph won't be split due this setting.</summary>
-        public Rules WithoutMaxObjectGraphSize() =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, -1,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+        /// <summary>Disables the <see cref="MaxObjectGraphSize"/> limitation.</summary>
+        public Rules WithoutMaxObjectGraphSize() => WithMaxObjectGraphSize(-1);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
@@ -4983,8 +4949,6 @@ namespace DryIoc
 
         internal static Expr CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
-            request.ContainsNestedResolutionCall = true;
-
             var container = request.Container;
 
             if (!request.Factory.HasRuntimeState &&
@@ -5770,14 +5734,6 @@ namespace DryIoc
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton => (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
-        /// <summary>Gathers the info from resolved dependency graph.
-        /// If dependency injected <c>asResolutionCall</c> the whole graph is not cacheable (issue #416).</summary>
-        internal bool ContainsNestedResolutionCall
-        {
-            get { return SharedInfo.ContainsNestedResolutionCall; }
-            set { if (value) SharedInfo.ContainsNestedResolutionCall = true; }
-        }
-
         /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.MaxObjectGraphSize"/> setting.</summary>
         public bool ShouldSplitObjectGraph() =>
             FactoryType == FactoryType.Service &&
@@ -6276,15 +6232,13 @@ namespace DryIoc
             public readonly IContainer Container;
 
             // Mutable state
-            public bool ContainsNestedResolutionCall;
-            public int DependencyCount;
+            public int DependencyCount; // todo: replace with dependency depth, makes more sense to split a very deep object grapths
+            public void IncrementDependencyCount() => Interlocked.Increment(ref DependencyCount);
 
             public SharedRuntimeInfo(IContainer container)
             {
                 Container = container;
             }
-
-            public void IncrementDependencyCount() => Interlocked.Increment(ref DependencyCount);
         }
 
         #endregion
@@ -6678,6 +6632,7 @@ namespace DryIoc
     /// <item>Through reflection - <see cref="ReflectionFactory"/></item>
     /// <item>Using custom delegate - <see cref="DelegateFactory"/></item>
     /// <item>Using custom expression - <see cref="ExpressionFactory"/></item>
+    /// <item>A placeholder for future actual implementation - <see cref="FactoryPlaceholder"/></item>
     /// </list>
     /// For all of the types Factory should provide result as <see cref="Expr"/> and <see cref="FactoryDelegate"/>.
     /// Factories are supposed to be immutable and stateless.
@@ -6739,22 +6694,6 @@ namespace DryIoc
         /// <returns>Created expression.</returns>
         public abstract Expr CreateExpressionOrDefault(Request request);
 
-        // todo: !!!! BIG THING - Remove its completely if there is a chance together with supporting structures
-        /// <summary>Allows derived factories to override or reuse caching policy used by
-        /// GetExpressionOrDefault. By default only service setup and no  user passed arguments may be cached.</summary>
-        /// <param name="request">Context.</param> <returns>True if factory expression could be cached.</returns>
-        protected virtual bool IsFactoryExpressionCacheable(Request request)
-            => Setup.FactoryType == FactoryType.Service
-
-            && Setup.Condition == null
-            && !Setup.UseParentReuse
-            && !Setup.AsResolutionCall
-
-            && request.InputArgs == null
-            && !request.IsResolutionCall
-            && !(request.Reuse is CurrentScopeReuse)
-            && !request.TracksTransientDisposable;
-
         private bool ShouldBeInjectedAsResolutionCall(Request request) =>
             !request.IsResolutionCall // is not already a resolution call
             && (Setup.AsResolutionCall || request.ShouldSplitObjectGraph() || Setup.UseParentReuse)
@@ -6792,23 +6731,12 @@ namespace DryIoc
                     return Constant(singleton, request.ServiceType);
             }
 
-            // Then check the expression cache
-            var isCacheable = IsFactoryExpressionCacheable(request);
-            if (isCacheable)
-            {
-                var cachedExpr = container.GetCachedFactoryExpressionOrDefault(FactoryID);
-                if (cachedExpr != null)
-                    return cachedExpr;
-            }
-
             // Then create new expression
             var serviceExpr = CreateExpressionOrDefault(request);
-            if (serviceExpr != null)
+            if (serviceExpr == null)
+                Container.MayBeThrowUnableToResolve(request);
+            else
             {
-                // can be checked only after expression is created
-                if (request.ContainsNestedResolutionCall)
-                    isCacheable = false;
-
                 if (request.Reuse != DryIoc.Reuse.Transient &&
                     request.GetActualServiceType() != typeof(void))
                 {
@@ -6816,20 +6744,9 @@ namespace DryIoc
 
                     serviceExpr = ApplyReuse(serviceExpr, request);
 
-                    if (serviceExpr.NodeType == ExpressionType.Constant)
-                        isCacheable = false;
-
-                    if (serviceExpr.Type != originalServiceExprType)
+                    if (serviceExpr.Type != originalServiceExprType) // todo: do I need this convert, test!
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
-
-                if (isCacheable)
-                    container.CacheFactoryExpression(FactoryID, serviceExpr);
-
-            }
-            else if (request.IfUnresolved == IfUnresolved.Throw)
-            {
-                Container.ThrowUnableToResolve(request);
             }
 
             return serviceExpr;
@@ -7315,20 +7232,6 @@ namespace DryIoc
             _made = made ?? Made.Default;
             _implementationTypeProvider = implementationTypeProvider.ThrowIfNull();
         }
-
-        /// <summary>Add to base rules: do not cache if Made is context based.</summary>
-        protected override bool IsFactoryExpressionCacheable(Request request) =>
-            base.IsFactoryExpressionCacheable(request)
-                 && (Made == Made.Default
-                 // Property injection.
-                 || (Made.FactoryMethod == null
-                    && Made.Parameters == null
-                    && (Made.PropertiesAndFields == PropertiesAndFields.Auto ||
-                        Made.PropertiesAndFields == PropertiesAndFields.Of))
-                 // No caching for context dependent Made which is:
-                 // - We don't know the result returned by factory method - it depends on request
-                 // - or even if we do know the result type, some dependency is using custom value which depends on request
-                 || (Made.FactoryMethodKnownResultType != null && !Made.HasCustomDependencyValue));
 
         /// <summary>Creates service expression.</summary>
         public override Expr CreateExpressionOrDefault(Request request)
@@ -8965,15 +8868,6 @@ namespace DryIoc
         /// <param name="requiredServiceType">Required service type or null if don't care.</param>
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type GetWrappedType(Type serviceType, Type requiredServiceType);
-
-        /// <summary>Adds factory expression to cache identified by factory ID (<see cref="Factory.FactoryID"/>).</summary>
-        /// <param name="factoryID">Key in cache.</param>
-        /// <param name="factoryExpression">Value to cache.</param>
-        void CacheFactoryExpression(int factoryID, Expr factoryExpression);
-
-        /// <summary>Searches and returns cached factory expression, or null if not found.</summary>
-        /// <param name="factoryID">Factory ID to lookup by.</param> <returns>Found expression or null.</returns>
-        Expr GetCachedFactoryExpressionOrDefault(int factoryID);
 
         /// <summary>Converts known items into custom expression or wraps in a constant expression.</summary>
         /// <param name="item">Item to convert.</param>
