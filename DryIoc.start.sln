@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.16
+VisualStudioVersion = 15.0.27130.2036
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc", "Net45\DryIoc\DryIoc.csproj", "{B6C2FC35-7586-417B-AD35-32AED63ADFA9}"
 EndProject
@@ -74,6 +74,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIocZero", "DryIocZero", "{FBFB74BB-0F74-4F21-B134-88418D36502C}"
+	ProjectSection(SolutionItems) = preProject
+		NuGetSpecs\DryIocZero\readme.txt = NuGetSpecs\DryIocZero\readme.txt
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{70B242BC-350D-48D5-807D-3F046FE96C85}"
 	ProjectSection(SolutionItems) = preProject
