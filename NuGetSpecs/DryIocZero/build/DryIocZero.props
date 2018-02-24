@@ -3,7 +3,7 @@
 
   <PropertyGroup>
     <!-- TODO: Automate using the DryIocZero version specified in AssemblyInfo -->
-    <DryIocZeroVersion>4.0.0-preview-12</DryIocZeroVersion>
+    <DryIocZeroVersion>4.0.0-preview-13</DryIocZeroVersion>
     
     <NugetPackageCache>$(USERPROFILE)/.nuget/packages</NugetPackageCache>
     

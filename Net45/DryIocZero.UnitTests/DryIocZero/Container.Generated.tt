@@ -33,7 +33,7 @@ THE SOFTWARE.
 <#@ assembly Name="System.Runtime" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
-<#@ include File="Registrations.ttinclude" #>
+<#@ include File="$(ProjectDir)\DryIocZero\Registrations.ttinclude" #>
 <#
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());
@@ -41,7 +41,7 @@ var container = GetContainerWithRegistrations()
 var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 
 var result = container.GenerateResolutionExpressions(regs => regs.SelectMany(r =>
-    FilterResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
+    SpecifyResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
 
 var exprToCode = ExpressionToCodeConfiguration.DefaultCodeGenConfiguration
     .WithObjectStringifier(ObjectStringify.WithFullTypeNames);

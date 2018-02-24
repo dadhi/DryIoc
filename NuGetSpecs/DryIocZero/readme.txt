@@ -1,17 +1,16 @@
 ﻿<#
 //
-// TODO: PLEASE ADD TO YOUR PROJECT 
-// a new Text Template file "Registrations.ttinclude"
-// and copy the contents of this file into it.
-// 
-//=============================================================================================
-// TODO: Change the code below to
-// 1. Configure DryIoc.container with your rules and conventions.
-// 2. Register your services.
-// 3. Identify the resolution roots: the services to be Resolved, rather then injected.
-// 4. Save the DryIocZero/Container.Generated.tt class. Confirm the VisualStudio prompt if any.
-// 5. Check the Container.Generated.cs for general compilation and listed resolution errors.
-//=============================================================================================
+// TODO: ADD TO THE PROJECT A NEW FILE "Registrations.ttinclude" WITH THE CONTENTS OF THIS WHOLE FILE
+//
+// "*.ttinclude" is T4 Text Template include file.
+// Given you have ReSharper with ForTea extension installed you will get 
+// intellisense and most of the refactorings working.
+//
+// TODO: Next steps
+// 1. Fill-in the methods below with your registrations and resolution roots.
+// 4. Re-save the "Container.Generated.tt" file. Confirm the Visual Studio prompt if any.
+// 5. Check the "Container.Generated.cs" for the resolution errors.
+//
 #>
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(DryIocAssembly)" #>
@@ -30,12 +29,13 @@ IContainer GetContainerWithRegistrations()
 
     // TODO: Add registrations ...
     // container.Register<IMyService, MyService>();
+    // container.RegisterMany(new[] { MyAssembly });
 
     return container;
 }
 
-// TODO: Filter the root services to generate expressions for ...
-ServiceInfo[] FilterResolutionRoots(ServiceRegistrationInfo reg)
+// TODO: For each passed registration specify what resolution roots it provides, null if none
+ServiceInfo[] SpecifyResolutionRoots(ServiceRegistrationInfo reg)
 {
     return reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
 }
