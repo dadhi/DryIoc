@@ -3241,23 +3241,23 @@ namespace DryIoc
         /// <summary>Default rules as staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        /// <summary>Default value for <see cref="MaxObjectGraphSize"/></summary>
-        public const int DefaultMaxObjectGraphSize = 32;
+        /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
+        public const int DefaultDependencyDepthToSplitObjectGraph = 8;
 
-        /// <summary>Max number of dependencies including nested ones,
-        /// before splitting the graph with Resolve calls.</summary>
-        public int MaxObjectGraphSize { get; private set; } // todo: replace with dependencyDepth?
+        /// <summary>Nested dependency depth to split an object graph</summary>
+        public int DependencyDepthToSplitObjectGraph { get; private set; }
 
-        /// <summary>Sets <see cref="MaxObjectGraphSize"/>. Everything low than 1 will be the 1.
-        /// To disable the limit please use <see cref="WithoutMaxObjectGraphSize"/></summary>
-        public Rules WithMaxObjectGraphSize(int size) =>
+        /// <summary>Sets <see cref="DependencyDepthToSplitObjectGraph"/>.
+        /// Set <see cref="int.MaxValue"/> to prevent split.
+        /// To disable the limit please use <see cref="WithoutDependencyDepthToSplitObjectGraph"/></summary>
+        public Rules WithDependencyDepthToSplitObjectGraph(int depth) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, size < 1 ? 1 : size,
+                _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
-        /// <summary>Disables the <see cref="MaxObjectGraphSize"/> limitation.</summary>
-        public Rules WithoutMaxObjectGraphSize() => WithMaxObjectGraphSize(-1);
+        /// <summary>Disables the <see cref="DependencyDepthToSplitObjectGraph"/> limitation.</summary>
+        public Rules WithoutDependencyDepthToSplitObjectGraph() => WithDependencyDepthToSplitObjectGraph(int.MaxValue);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
@@ -3294,7 +3294,7 @@ namespace DryIoc
                         made.FactoryMethod ?? _made.FactoryMethod,
                         made.Parameters ?? _made.Parameters,
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
-                DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -3312,7 +3312,7 @@ namespace DryIoc
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
             new Rules(_settings, rule, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -3354,7 +3354,7 @@ namespace DryIoc
         /// <summary>Appends dynamic registration rules.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
 
@@ -3363,7 +3363,7 @@ namespace DryIoc
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallback, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
 
@@ -3381,7 +3381,7 @@ namespace DryIoc
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules));
 
@@ -3390,7 +3390,7 @@ namespace DryIoc
         /// so it could be check for remove success or fail.</summary>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule));
 
@@ -3555,7 +3555,7 @@ namespace DryIoc
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -3577,7 +3577,7 @@ namespace DryIoc
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, itemToExpressionOrDefault,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -3635,7 +3635,7 @@ namespace DryIoc
         /// in the-per rules collection.</summary>
         public Rules WithDependencyResolutionCallExpressions() =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 Ref.Of(ImHashMap<Request, Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -3671,7 +3671,7 @@ namespace DryIoc
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, rule, DefaultMaxObjectGraphSize,
+                _made, rule, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -3709,7 +3709,7 @@ namespace DryIoc
             _settings = DEFAULT_SETTINGS;
             DefaultReuse = Reuse.Transient;
             DefaultIfAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed;
-            MaxObjectGraphSize = DefaultMaxObjectGraphSize;
+            DependencyDepthToSplitObjectGraph = DefaultDependencyDepthToSplitObjectGraph;
         }
 
         private Rules(Settings settings,
@@ -3717,7 +3717,7 @@ namespace DryIoc
             IReuse defaultReuse,
             Made made,
             IfAlreadyRegistered defaultIfAlreadyRegistered,
-            int maxObjectGraphSize,
+            int dependencyDepthToSplitObjectGraph,
             Ref<ImHashMap<Request, Expression>> dependencyResolutionCallExpressions,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders,
@@ -3728,7 +3728,7 @@ namespace DryIoc
             FactorySelector = factorySelector;
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
-            MaxObjectGraphSize = maxObjectGraphSize;
+            DependencyDepthToSplitObjectGraph = dependencyDepthToSplitObjectGraph;
             DependencyResolutionCallExpressions = dependencyResolutionCallExpressions;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
@@ -3737,7 +3737,7 @@ namespace DryIoc
 
         private Rules WithSettings(Settings newSettings) =>
             new Rules(newSettings,
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultMaxObjectGraphSize,
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExpressions, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
@@ -5610,16 +5610,14 @@ namespace DryIoc
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(default(SharedRuntimeInfo), default(Request),
-                DefaultFlags, ServiceInfo.Empty, inputArgs: null);
+            new Request(null, null, DefaultFlags, ServiceInfo.Empty, null);
 
         internal static readonly Expr EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(default(SharedRuntimeInfo), default(Request),
-                DefaultFlags | RequestFlags.OpensResolutionScope, ServiceInfo.Empty, inputArgs: null);
+            new Request(null, null, DefaultFlags | RequestFlags.OpensResolutionScope, ServiceInfo.Empty, null);
 
         internal static readonly Expr EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
@@ -5643,9 +5641,8 @@ namespace DryIoc
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
 
-            var sharedInfo = new SharedRuntimeInfo(container);
             var inputArgExprs = inputArgs?.Map(a => Constant(a));
-            return new Request(sharedInfo, preResolveParent, flags, serviceInfo, inputArgExprs);
+            return new Request(container, preResolveParent, flags, serviceInfo, inputArgExprs);
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
@@ -5657,7 +5654,8 @@ namespace DryIoc
 
         #region State carried with each request
 
-        private readonly SharedRuntimeInfo _sharedRuntimeInfo;
+        /// <summary>Available in runtime only, provides access to container initiated request.</summary>
+        public readonly IContainer Container;
 
         /// <summary>Request immediate parent.</summary>
         public readonly Request DirectParent;
@@ -5694,10 +5692,10 @@ namespace DryIoc
         /// <summary>ID of decorated factory in case of decorator factory type</summary>
         public readonly int DecoratedFactoryID;
 
-        #endregion
+        /// <summary>Number of nested dependenies. Set with each new request Push.</summary>
+        public readonly int DependencyDepth;
 
-        internal SharedRuntimeInfo SharedInfo =>
-            _sharedRuntimeInfo.ThrowIfNull(Error.RuntimeInfoIsNotAvailableInRequest, this);
+        #endregion
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -5734,16 +5732,9 @@ namespace DryIoc
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton => (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
-        /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.MaxObjectGraphSize"/> setting.</summary>
+        /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.DependencyDepthToSplitObjectGraph"/> setting.</summary>
         public bool ShouldSplitObjectGraph() =>
-            FactoryType == FactoryType.Service &&
-            Rules.MaxObjectGraphSize != -1 &&
-            _sharedRuntimeInfo.DependencyCount > Rules.MaxObjectGraphSize;
-
-        /// <summary>Provides access to container currently bound to request.
-        /// By default it is container initiated request by calling resolve method,
-        /// but could be changed along the way: for instance when resolving from parent container.</summary>
-        public IContainer Container => SharedInfo.Container;
+            FactoryType == FactoryType.Service && DependencyDepth > Rules.DependencyDepthToSplitObjectGraph;
 
         /// <summary>Current scope</summary>
         public IScope CurrentScope => Container.CurrentScope;
@@ -5811,7 +5802,7 @@ namespace DryIoc
             var flags = Flags & InheritedFlags | additionalFlags;
             var serviceInfo = info.InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
 
-            return new Request(_sharedRuntimeInfo, this, flags, serviceInfo, InputArgs);
+            return new Request(Container, this, flags, serviceInfo, InputArgs);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and Pushes the new request.</summary>
@@ -5827,7 +5818,7 @@ namespace DryIoc
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
-            new Request(_sharedRuntimeInfo, this, DefaultFlags, ServiceInfo.Of(serviceType),
+            new Request(Container, this, DefaultFlags, ServiceInfo.Of(serviceType),
                 InputArgs, /*factory:*/null, factoryID, FactoryType.Service, implementationType, reuse, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith4Args = new Lazy<MethodInfo>(() =>
@@ -5836,7 +5827,7 @@ namespace DryIoc
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
-            new Request(_sharedRuntimeInfo, this, flags,
+            new Request(Container, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, IfUnresolved.Throw, serviceKey),
                 InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, 0);
 
@@ -5848,7 +5839,7 @@ namespace DryIoc
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
             int decoratedFactoryID) =>
-            new Request(_sharedRuntimeInfo, this, flags,
+            new Request(Container, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, decoratedFactoryID);
 
@@ -5861,7 +5852,7 @@ namespace DryIoc
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
             int decoratedFactoryID) =>
-            new Request(_sharedRuntimeInfo, this, flags,
+            new Request(Container, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
                 InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse,
                 decoratedFactoryID);
@@ -5880,7 +5871,7 @@ namespace DryIoc
         {
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
-                : new Request(_sharedRuntimeInfo, DirectParent, Flags, newServiceInfo, InputArgs,
+                : new Request(Container, DirectParent, Flags, newServiceInfo, InputArgs,
                     Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
         }
 
@@ -5899,7 +5890,7 @@ namespace DryIoc
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expr[] inputArgs) =>
-            new Request(_sharedRuntimeInfo, DirectParent, Flags, _serviceInfo, inputArgs.Append(InputArgs),
+            new Request(Container, DirectParent, Flags, _serviceInfo, inputArgs.Append(InputArgs),
                 Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -5959,9 +5950,7 @@ namespace DryIoc
                     flags |= RequestFlags.TracksTransientDisposable;
             }
 
-            _sharedRuntimeInfo.IncrementDependencyCount();
-
-            return new Request(_sharedRuntimeInfo, DirectParent, flags, _serviceInfo, InputArgs,
+            return new Request(Container, DirectParent, flags, _serviceInfo, InputArgs,
                 factory, factory.FactoryID, factory.FactoryType,
                 null/*providing `null`, so that implementation type can be lazily retrieved from `factory`*/,
                 reuse, decoratedFactoryID);
@@ -6149,7 +6138,7 @@ namespace DryIoc
                     s = s.Append(" <--recursive");
             }
 
-            if (_sharedRuntimeInfo != null)
+            if (Container != null)
                 s.AppendLine().Append("  from ").Append(Container.ToString());
 
             return s;
@@ -6199,23 +6188,23 @@ namespace DryIoc
             }
         }
 
-        #region Implementation
-
-        private Request(SharedRuntimeInfo sharedRuntimeInfo, Request parent, RequestFlags flags,
+        private Request(IContainer container, Request parent, RequestFlags flags,
             IServiceInfo serviceInfo, Expr[] inputArgs)
         {
-            _sharedRuntimeInfo = sharedRuntimeInfo;
+            Container = container;
             DirectParent = parent;
             Flags = flags;
             _serviceInfo = serviceInfo;
             InputArgs = inputArgs; // runtime state
+            if (parent != null)
+                DependencyDepth = parent.DependencyDepth + 1;
         }
 
         // Request with resolved factory
-        private Request(SharedRuntimeInfo sharedRuntimeInfo, Request parent, RequestFlags flags, IServiceInfo serviceInfo, Expr[] inputArgs,
+        private Request(IContainer container, Request parent, RequestFlags flags, IServiceInfo serviceInfo, Expr[] inputArgs,
             Factory factory, int factoryID, FactoryType factoryType, Type factoryImplType, IReuse reuse,
             int decoratedFactoryID)
-            : this(sharedRuntimeInfo, parent, flags, serviceInfo, inputArgs)
+            : this(container, parent, flags, serviceInfo, inputArgs)
         {
             Factory = factory; // runtime state
             FactoryID = factoryID;
@@ -6225,23 +6214,6 @@ namespace DryIoc
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
         }
-
-        // Used for tracking shared state in request chain
-        internal sealed class SharedRuntimeInfo
-        {
-            public readonly IContainer Container;
-
-            // Mutable state
-            public int DependencyCount; // todo: replace with dependency depth, makes more sense to split a very deep object grapths
-            public void IncrementDependencyCount() => Interlocked.Increment(ref DependencyCount);
-
-            public SharedRuntimeInfo(IContainer container)
-            {
-                Container = container;
-            }
-        }
-
-        #endregion
     }
 
     /// <summary>Type of services supported by Container.</summary>
@@ -9141,8 +9113,6 @@ namespace DryIoc
                 "Registerring Decorator {0} with not-null service key {1} does not make sense," + Environment.NewLine +
                 "because decorator may be applied to multiple service of any key." + Environment.NewLine +
                 "If you wanted to apply decorator to services of specific key please use `setup: Setup.DecoratorOf(serviceKey: blah)`"),
-            RuntimeInfoIsNotAvailableInRequest = Of(
-                "Runtime information (including `Container`) is not available in request: {0}"),
             PassedCtorOrMemberIsNull = Of(
                 "The costructor of member info passed to `Made.Of` or `FactoryMethod.Of` is null"),
             PassedMemberIsNotStaticButInstanceFactoryIsNull = Of(
