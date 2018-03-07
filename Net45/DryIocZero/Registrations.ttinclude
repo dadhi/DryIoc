@@ -1,15 +1,8 @@
-﻿<#
-//
-// TODO: ADD TO THE PROJECT A NEW FILE "Registrations.ttinclude" WITH THE CONTENTS OF THIS WHOLE FILE
-//
-// "*.ttinclude" is T4 Text Template include file.
-// Given you have ReSharper with ForTea extension installed you will get 
-// intellisense and most of the refactorings working.
-//
-// TODO: Next steps
+﻿//
+// TODO:
 // 1. Fill-in the methods below with your registrations and resolution roots.
-// 4. Re-save the "Container.Generated.tt" file. Confirm the Visual Studio prompt if any.
-// 5. Check the "Container.Generated.cs" for the resolution errors.
+// 2. Re-save the "Container.Generated.tt" file. Confirm the Visual Studio prompt if any.
+// 3. Check the "Container.Generated.cs" for the resolution errors.
 //
 #>
 <#@ assembly Name="System.Core" #>

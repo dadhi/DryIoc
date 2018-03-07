@@ -93,9 +93,12 @@ NOTE: The code below is generated automatically at compile-time and not supposed
     if (errCount == 0) { #>
 Generation is completed successfully.
 <# } else { #>
-Generation is FAILED with <#=errCount#> error(s):
-You may try to register failing service with `container.RegisterPlaceholder<...>()` in Registrations.tt
-and then register ACTUAL service at runtime.
+There are <#=errCount#> generation issues (may be not an error dependent on context):
+
+The issues with run-time registrations may be solved by `container.RegisterPlaceholder<T>()` 
+in Registrations.ttinclude. Then you can replace placeholders using `DryIocZero.Container.Register`
+at runtime.
+
 <# } #>
 --------------------------------------------------------------------------------------------------------
 <#  var eNum = 0;

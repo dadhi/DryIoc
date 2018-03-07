@@ -2594,7 +2594,6 @@ namespace DryIoc
         }
     }
 
-    // todo: Simplify by either inheriting or composing with DefaultKey
     /// <summary>Represents default key for dynamic registrations</summary>
     public sealed class DefaultDynamicKey : IConvertibleToExpression
     {
