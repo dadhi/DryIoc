@@ -5,17 +5,21 @@
     <version>0.0.0</version>
     <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2016-2017 Maksim Volkau</copyright>
+    <copyright>Copyright © 2016 Maksim Volkau</copyright>
     <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
     <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
+    <description>Lightweight IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes>
-      v4.0.0-preview-04:
-      - updated: to DryIoc v3 API
+      v4.0.0-preview-13:
+      - updated: DryIoc to v3-preview-09 API
+      - updated: ExpressionToCodeLib to v2.6.0
+      - fixed: #559: Add covariant collection support for generated collection
       - fixed: references to compile-time dependencies in NuGet package
       - fixed: runtime registrations fallback
+      - added: More compact and clean generation output, including type names in resolve methods
+        changed: Open-generics in generation now is a error
       v3.0.0:
       - fixed: Nuget package, so that DryIocZero compiles successfully right after install
       - changed: Fixed versions of DryIoc and ExpressionToCodeLib dependencies located in package/tools folder
@@ -28,25 +32,29 @@
     <dependencies>
       <!--no run-time dependencies-->
     </dependencies>
+
+    <!-- NOTE: Until SDK Project System works with content packages
     <contentFiles>
       <files include="cs/any/*.cs" buildAction="Compile" />
       <files include="cs/any/*.tt" buildAction="None" />
       <files include="cs/any/*.ttinclude" buildAction="None" />
     </contentFiles>
+    -->
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
-
+    <file src="..\NuGetSpecs\DryIocZero\readme.txt" target="." />
+    
     <!--Compile-time dependencies-->
     <file src="..\NuGetSpecs\DryIocZero\tools\DryIoc.dll.3.0.0\net45\DryIoc.dll" target="tools\DryIoc.dll.3.0.0\net45" />
-    <file src="..\NuGetSpecs\DryIocZero\tools\ExpressionToCodeLib.1.5.4\net40-Client\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.1.5.4\net40-Client" />
+    <file src="..\NuGetSpecs\DryIocZero\tools\ExpressionToCodeLib.2.6.0\net452\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.2.6.0\net452" />
     <file src="..\NuGetSpecs\DryIocZero\build\DryIocZero.props" target="build" />
 	
     <!--net45-->
     <file src="..\Net45\DryIocZero\Container.cs" target="content\net45\DryIocZero" />
     <file src="..\Net45\DryIocZero\Container.Generated.tt" target="content\net45\DryIocZero" />
-    <file src="..\Net45\DryIocZero\Registrations.ttinclude" target="content\net45\DryIocZero" />
     <file src="..\Net45\DryIocZero\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIocZero" />
+    <file src="..\Net45\DryIocZero\Registrations.ttinclude" target="content\net45\DryIocZero" />
     <file src="..\DryIoc\ImTools.cs" target="content\net45\DryIocZero" />
 
     <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
@@ -69,10 +77,17 @@
     <file src="..\DryIoc\ImTools.cs" target="content\xamarinmac20\DryIocZero" />
 
     <!--uap10.0: Universal Windows Platform-->
+    <!-- NOTE: Until SDK Project System works with content packages
     <file src="..\Net45\DryIocZero\Container.cs" target="contentFiles\cs\any" />
     <file src="..\Net45\DryIocZero\Container.Generated.tt" target="contentFiles\cs\any" />
-    <file src="..\Net45\DryIocZero\Registrations.ttinclude" target="contentFiles\cs\any" />
     <file src="..\DryIoc\ImTools.cs" target="contentFiles\cs\any" />
+    -->
+
+    <!-- Workaround for SDK Project System -->
+    <file src="..\Net45\DryIocZero\Container.cs" target="tools\content" />
+    <file src="..\Net45\DryIocZero\Container.Generated.tt" target="tools\content" />
+    <file src="..\Net45\DryIocZero\Registrations.ttinclude" target="tools\content" />
+    <file src="..\DryIoc\ImTools.cs" target="tools\content" />
 
   </files>
 </package>

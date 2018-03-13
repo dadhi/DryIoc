@@ -6,7 +6,7 @@ using DryIocAttributes;
 
 namespace DryIoc.MefAttributedModel.UnitTests.CUT
 {
-    using RequestInfo = DryIocAttributes.RequestInfo;
+    using Request = DryIocAttributes.Request;
 
     public interface IService { }
 
@@ -291,7 +291,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     public abstract class ForParentImplementationAttribute : ExportConditionAttribute
     {
-        public override bool Evaluate(RequestInfo request)
+        public override bool Evaluate(Request request)
         {
             return request.Enumerate().Any(r => r.ImplementationType == _parentImplementationType);
         }
@@ -549,4 +549,21 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     public class WithExportMetadataOnlyKeyValue
     {
     }
+
+    public interface IOpGen<out T> { }
+    
+    [ExportMany, AsResolutionRoot]
+    public class ClGen : IOpGen<string> { }
+
+    [ExportMany, AsResolutionRoot]
+    public class OpGen<T> : IOpGen<T> { }
+
+    public class Aa { }
+    public class Bb : Aa { }
+
+    [ExportMany, AsResolutionRoot]
+    public class ClGenA : IOpGen<Aa> { }
+
+    [ExportMany, AsResolutionRoot]
+    public class ClGenB : IOpGen<Bb> { }
 }

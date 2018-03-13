@@ -7,6 +7,6 @@ using System.Runtime.CompilerServices;
 
 [assembly: AssemblyVersion(             "4.0.0")]
 [assembly: AssemblyFileVersion(         "4.0.0")]
-[assembly: AssemblyInformationalVersion("4.0.0-preview-01")]
+[assembly: AssemblyInformationalVersion("4.0.0-preview-03")]
 
 [assembly: InternalsVisibleTo("DryIoc.MefAttributedModel.UnitTests")]

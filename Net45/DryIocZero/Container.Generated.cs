@@ -22,28 +22,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+/*
+========================================================================================================
+NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+========================================================================================================
+Generation is completed successfully.
+--------------------------------------------------------------------------------------------------------
+*/
 
-
-
-
-
-//========================================================================================================
-// NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
-//========================================================================================================
 using System;
 using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
 using ImTools;
+using static DryIocZero.ResolveManyResult;
 
 namespace DryIocZero
 {
-/* 
-Generation is completed successfully.
----------------------------------------
-
-*/
-
     partial class Container
     {
         [ExcludeFromCodeCoverage]
@@ -59,18 +54,18 @@ Generation is completed successfully.
 
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, object[] args)
+            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
         }
 
         [ExcludeFromCodeCoverage]
-        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType) 
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
         [ExcludeFromCodeCoverage]
-        private IEnumerable<KV<object, FactoryDelegate>> ResolveManyGenerated(Type serviceType)
+        private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
         {
             yield break;
         }

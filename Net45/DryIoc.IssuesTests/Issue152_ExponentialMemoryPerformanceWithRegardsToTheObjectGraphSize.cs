@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Main()
         {
-            var c = new Container();
+            var c = new Container(rules => rules.WithDependencyDepthToSplitObjectGraph(3));
             c.Register<AggQ>(Reuse.InCurrentScope);
             c.Register<AggP>(Reuse.InCurrentScope);
             c.Register<Root>(Reuse.InCurrentScope);
@@ -26,10 +26,10 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Test, Explicit]
+        [Test]
         public void Main_negative()
         {
-            var c = new Container(rules => rules.WithoutMaxObjectGraphSize());
+            var c = new Container(rules => rules.WithoutDependencyDepthToSplitObjectGraph());
             c.Register<AggQ>(Reuse.InCurrentScope);
             c.Register<AggP>(Reuse.InCurrentScope);
             c.Register<Root>(Reuse.InCurrentScope);

@@ -120,7 +120,7 @@ namespace DryIocZero
 
         // todo: May be replace with TryResolveGenerated to accommodate for the possible null service
         partial void ResolveGenerated(ref object service, 
-            Type serviceType, object serviceKey, Type requiredServiceType, RequestInfo preRequestParent, object[] args);
+            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
 
         /// <summary>Directly uses generated factories to resolve service. Or returns default if service does not have generated factory.</summary>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
@@ -137,7 +137,7 @@ namespace DryIocZero
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         object IResolver.Resolve(Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent, object[] args)
+            IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
             // if no runtime registrations, then fast resolve from generated delegates
             object service = null;
@@ -158,7 +158,7 @@ namespace DryIocZero
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ConstantNullCoalescingCondition", Justification = "Per design")]
         private object ResolveFromRuntimeRegistrationsFirst(Type serviceType, object serviceKey,
-            bool ifUnresolvedReturnDefault, Type requiredServiceType, RequestInfo preResolveParent, object[] args)
+            bool ifUnresolvedReturnDefault, Type requiredServiceType, Request preResolveParent, object[] args)
         {
             serviceType = requiredServiceType ?? serviceType;
 
@@ -174,37 +174,37 @@ namespace DryIocZero
             // If not resolved from runtime registration then try resolve generated
             object service = null;
             ResolveGenerated(ref service, serviceType, 
-                serviceKey, requiredServiceType, preResolveParent ?? RequestInfo.Empty, args);
+                serviceKey, requiredServiceType, preResolveParent ?? Request.Empty, args);
 
             return service ?? Throw.If(!ifUnresolvedReturnDefault,
                 Error.UnableToResolveKeyedService, serviceType, serviceKey, factories == null ? string.Empty : "non-");
         }
-
-        partial void ResolveManyGenerated(ref IEnumerable<KV<object, FactoryDelegate>> services, Type serviceType);
+        
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
 
         /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
-        /// <param name="serviceType">Service type.</param>
-        /// <returns>Collection of service key - service pairs.</returns>
-        public IEnumerable<KV<object, FactoryDelegate>> ResolveManyGeneratedOrGetEmpty(Type serviceType)
+        public IEnumerable<ResolveManyResult> ResolveManyGeneratedOrGetEmpty(Type serviceType)
         {
-            var manyGenerated = Enumerable.Empty<KV<object, FactoryDelegate>>();
+            var manyGenerated = Enumerable.Empty<ResolveManyResult>();
             ResolveManyGenerated(ref manyGenerated, serviceType);
             return manyGenerated;
         }
 
         /// <inheritdoc />
         public IEnumerable<object> ResolveMany(Type serviceType, object serviceKey = null, 
-            Type requiredServiceType = null, RequestInfo preResolveParent = null, object[] args = null)
+            Type requiredServiceType = null, Request preResolveParent = null, object[] args = null)
         {
             serviceType = requiredServiceType ?? serviceType;
 
-            var manyGeneratedFactories = Enumerable.Empty<KV<object, FactoryDelegate>>();
-            ResolveManyGenerated(ref manyGeneratedFactories, serviceType);
+            var generatedFactories = Enumerable.Empty<ResolveManyResult>();
+            ResolveManyGenerated(ref generatedFactories, serviceType);
             if (serviceKey != null)
-                manyGeneratedFactories = manyGeneratedFactories.Where(kv => serviceKey.Equals(kv.Key));
+                generatedFactories = generatedFactories.Where(x => serviceKey.Equals(x.ServiceKey));
+            if (requiredServiceType != null)
+                generatedFactories = generatedFactories.Where(x => requiredServiceType == x.RequiredServiceType);
 
-            foreach (var generated in manyGeneratedFactories)
-                yield return generated.Value(this);
+            foreach (var generated in generatedFactories)
+                yield return generated.FactoryDelegate(this);
 
             if (serviceKey == null)
             {
@@ -285,7 +285,7 @@ namespace DryIocZero
         public IScopeContext ScopeContext { get; }
 
         /// <summary>Specifies to wrap the scope in a resolver context.</summary>
-        public IResolverContext WithScope(IScope scope)
+        public IResolverContext WithCurrentScope(IScope scope)
         {
             ThrowIfContainerDisposed();
             return new Container(_defaultFactories, _keyedFactories, SingletonScope, ScopeContext,
@@ -335,6 +335,29 @@ namespace DryIocZero
 
             return scopeStr;
         }
+    }
+
+    /// <summary>Identifies the service when resolving collection</summary>
+    public struct ResolveManyResult
+    {
+        /// <summary>Factory, the required part</summary>
+        public FactoryDelegate FactoryDelegate;
+
+        /// <summary>Optional key</summary>
+        public object ServiceKey;
+
+        /// <summary>Optional required service type, can be an open-generic type.</summary>
+        public Type RequiredServiceType;
+
+        /// <summary>Constructs the struct.</summary>
+        public static ResolveManyResult Of(FactoryDelegate factoryDelegate,
+            object serviceKey = null, Type requiredServiceType = null) =>
+            new ResolveManyResult
+            {
+                FactoryDelegate = factoryDelegate,
+                ServiceKey = serviceKey,
+                RequiredServiceType = requiredServiceType
+            };
     }
 
     /// <summary>Should return value stored in scope.</summary>
@@ -387,7 +410,7 @@ namespace DryIocZero
         /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
         /// <returns>Created service object or default based on <paramref name="ifUnresolved"/> parameter.</returns>
         object Resolve(Type serviceType, object serviceKey,
-            IfUnresolved ifUnresolved, Type requiredServiceType, RequestInfo preResolveParent, object[] args);
+            IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args);
 
         /// <summary>Resolves all services registered for specified <paramref name="serviceType"/>, or if not found returns
         /// empty enumerable. If <paramref name="serviceType"/> specified then returns only (single) service registered with
@@ -399,7 +422,7 @@ namespace DryIocZero
         /// <param name="args">(optional) For Func{args} propagation through Resolve call boundaries.</param>
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey,
-            Type requiredServiceType, RequestInfo preResolveParent, object[] args);
+            Type requiredServiceType, Request preResolveParent, object[] args);
     }
 
     /// <summary>Extends IResolver to provide an access Scope hierarchy</summary>
@@ -424,7 +447,7 @@ namespace DryIocZero
         IScopeContext ScopeContext { get; }
 
         /// <summary>Wraps the scope in resolver context (or container which implements the context).</summary>
-        IResolverContext WithScope(IScope scope);
+        IResolverContext WithCurrentScope(IScope scope);
     }
 
     /// <summary>Provides APIs used by resolution generated factory delegates.</summary>
@@ -469,12 +492,12 @@ namespace DryIocZero
         {
             var openedScope = r.ScopeContext == null
                 ? new Scope(r.CurrentScope, name)
-                : r.ScopeContext.SetCurrent(currentScope => new Scope(currentScope, name));
+                : r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
             
             if (trackInParent)
                 (openedScope.Parent ?? r.SingletonScope).TrackDisposable(openedScope);
 
-            return r.WithScope(openedScope);
+            return r.WithCurrentScope(openedScope);
         }
     }
 
@@ -567,7 +590,7 @@ namespace DryIocZero
 
         /// <summary>Resolves service of specified service type.</summary>
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
-            Type requiredServiceType = null, RequestInfo preResolveParent = null, object[] args = null) =>
+            Type requiredServiceType = null, Request preResolveParent = null, object[] args = null) =>
             resolver.Resolve(serviceType, serviceKey, IfUnresolved.Throw, requiredServiceType, preResolveParent, args);
 
         /// <summary>Resolves service of specified service type.</summary>
@@ -581,7 +604,7 @@ namespace DryIocZero
         /// <summary>Resolves service of specified service type.</summary>
         public static TService Resolve<TService>(this IResolver resolver, object serviceKey) =>
             (TService)resolver.Resolve(typeof(TService), serviceKey, IfUnresolved.Throw, 
-                requiredServiceType: null, preResolveParent: RequestInfo.Empty, args: null);
+                requiredServiceType: null, preResolveParent: Request.Empty, args: null);
 
         /// <summary>Resolves service of <typeparamref name="TService"/> type.</summary>
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType,
@@ -591,15 +614,15 @@ namespace DryIocZero
                     ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw)
                 : resolver.Resolve(typeof(TService), serviceKey,
                     ifUnresolvedReturnDefault ? IfUnresolved.ReturnDefault : IfUnresolved.Throw,
-                    requiredServiceType, RequestInfo.Empty, null));
+                    requiredServiceType, Request.Empty, null));
 
         /// <summary>Resolves collection of services of specified service type.</summary>
         public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType) =>
-            resolver.ResolveMany(serviceType, null, null, RequestInfo.Empty, null);
+            resolver.ResolveMany(serviceType, null, null, Request.Empty, null);
 
         /// <summary>Resolves collection of services of specified service type.</summary>
         public static IEnumerable<object> ResolveMany(this IResolver resolver, Type serviceType, object serviceKey) =>
-            resolver.ResolveMany(serviceType, serviceKey, null, RequestInfo.Empty, null);
+            resolver.ResolveMany(serviceType, serviceKey, null, Request.Empty, null);
 
         /// <summary>Resolves collection of services of specified service type.</summary>
         public static IEnumerable<TService> ResolveMany<TService>(this IResolver resolver) =>
@@ -1122,16 +1145,24 @@ namespace DryIocZero
     {
         /// <summary>Not inherited</summary>
         TracksTransientDisposable = 1 << 1,
+
         /// <summary>Not inherited</summary>
         IsServiceCollection = 1 << 2,
 
         /// <summary>Inherited</summary>
         IsSingletonOrDependencyOfSingleton = 1 << 3,
+
         /// <summary>Inherited</summary>
         IsWrappedInFunc = 1 << 4,
 
+        /// <summary>Indicates that the request the one from Resolve call.</summary>
+        IsResolutionCall = 1 << 5,
+
         /// <summary>Non inherited</summary>
-        OpensResolutionScope = 1 << 6
+        OpensResolutionScope = 1 << 6,
+
+        /// <summary>Non inherited</summary>
+        StopRecursiveDependencyCheck = 1 << 7
     }
 
     /// <summary>Type of services supported by Container.</summary>
@@ -1157,13 +1188,13 @@ namespace DryIocZero
     }
 
     /// <summary>Dependency request path information.</summary>
-    public sealed class RequestInfo : IEnumerable<RequestInfo>
+    public sealed class Request : IEnumerable<Request>
     {
         /// <summary>Represents empty info.</summary>
-        public static readonly RequestInfo Empty = new RequestInfo();
+        public static readonly Request Empty = new Request();
 
         /// <summary>Represents an empty info and indicates an open resolution scope.</summary>
-        public static readonly RequestInfo EmptyOpensResolutionScope = new RequestInfo(opensResolutionScope: true);
+        public static readonly Request EmptyOpensResolutionScope = new Request(opensResolutionScope: true);
 
         /// <summary>Returns true for an empty request.</summary>
         public bool IsEmpty => ServiceType == null;
@@ -1172,11 +1203,11 @@ namespace DryIocZero
         public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
 
         /// <summary>Parent request or null for root resolution request.</summary>
-        public readonly RequestInfo DirectParent;
+        public readonly Request DirectParent;
 
-        /// <summary>Returns service parent skipping wrappers if any. 
+        /// <summary>Returns service parent skipping wrappers if any.
         /// To get direct parent use <see cref="DirectParent"/>.</summary>
-        public RequestInfo Parent
+        public Request Parent
         {
             get
             {
@@ -1225,36 +1256,40 @@ namespace DryIocZero
         /// <summary><see cref="RequestFlags"/>.</summary>
         public readonly RequestFlags Flags;
 
-        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        public RequestInfo Push(Type serviceType,
-            int factoryID, Type implementationType, IReuse reuse) =>
-            Push(serviceType, null, null, null, null, IfUnresolved.Throw,
-                factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags));
+        /// <summary>Decorated factory ID for decorator request</summary>
+        public readonly int DecoratedFactoryID;
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey,
+        public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
+            Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+                factoryID, FactoryType.Service, implementationType, reuse, default(RequestFlags), 0);
+
+        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        public Request Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
             Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
-                factoryID, factoryType, implementationType, reuse, flags);
+                factoryID, factoryType, implementationType, reuse, flags, 0);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
+        public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
+            int decoratedFactoryID) =>
             Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
-                factoryID, factoryType, implementationType, reuse, flags);
+                factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        public RequestInfo Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
-            new RequestInfo(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
-                factoryID, factoryType, implementationType, reuse, flags, this);
+        public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
+            int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
+            int decoratedFactoryID) =>
+            new Request(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
+                factoryID, factoryType, implementationType, reuse, flags, this, decoratedFactoryID);
 
         /// <summary>Obsolete: now request is directly implements the <see cref="IEnumerable{T}"/>.</summary>
-        public IEnumerable<RequestInfo> Enumerate() => this;
+        public IEnumerable<Request> Enumerate() => this;
 
         /// <summary>Returns all non-empty requests starting from the current request and ending with the root parent.
         /// Returns empty sequence for an empty request.</summary>
-        public IEnumerator<RequestInfo> GetEnumerator()
+        public IEnumerator<Request> GetEnumerator()
         {
             for (var i = this; !i.IsEmpty; i = i.DirectParent)
                 yield return i;
@@ -1285,7 +1320,7 @@ namespace DryIocZero
                 s.Append(" with ServiceKey=").Append('{').Append(ServiceKey).Append('}');
 
             if (MetadataKey != null || Metadata != null)
-                s.Append(" with Metadata=").Append(new KeyValuePair<string, object>(MetadataKey, Metadata));
+                s.Append(" with Metadata=").Append(MetadataKey.Pair(Metadata));
 
             if (IfUnresolved != IfUnresolved.Throw)
                 s.Append(" if unresolved ").Append(Enum.GetName(typeof(IfUnresolved), IfUnresolved));
@@ -1301,16 +1336,16 @@ namespace DryIocZero
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         public override bool Equals(object obj) =>
-            Equals(obj as RequestInfo);
+            Equals(obj as Request);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
-        public bool Equals(RequestInfo other) =>
+        public bool Equals(Request other) =>
             other != null && EqualsWithoutParent(other)
             && (DirectParent == null && other.DirectParent == null
                 || (DirectParent != null && DirectParent.EqualsWithoutParent(other.DirectParent)));
 
         /// <summary>Compares info's regarding properties but not their parents.</summary>
-        public bool EqualsWithoutParent(RequestInfo other) =>
+        public bool EqualsWithoutParent(Request other) =>
             other.ServiceType == ServiceType
 
             && other.Flags == Flags
@@ -1342,18 +1377,18 @@ namespace DryIocZero
             return hash;
         }
 
-        private RequestInfo(bool opensResolutionScope = false)
+        private Request(bool opensResolutionScope = false)
         {
             if (opensResolutionScope)
                 Flags = RequestFlags.OpensResolutionScope;
         }
 
-        private RequestInfo(
+        private Request(
             Type serviceType, Type requiredServiceType, object serviceKey,
             string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse,
-            RequestFlags flags,
-            RequestInfo directParent)
+            RequestFlags flags, Request directParent,
+            int decorateFactoryID)
         {
             DirectParent = directParent;
 
@@ -1370,6 +1405,8 @@ namespace DryIocZero
             FactoryType = factoryType;
             ImplementationType = implementationType;
             Reuse = reuse;
+
+            DecoratedFactoryID = decorateFactoryID;
 
             Flags = flags;
         }

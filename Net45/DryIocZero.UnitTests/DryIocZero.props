@@ -5,7 +5,7 @@
     <DryIocZeroCompileTimeDeps>$(SolutionDir)/NuGetSpecs/DryIocZero/tools</DryIocZeroCompileTimeDeps>
     
     <DryIocAssembly>$(DryIocZeroCompileTimeDeps)/DryIoc.dll.3.0.0/net45/DryIoc.dll</DryIocAssembly>
-    <ExpressionToCodeLibAssembly>$(DryIocZeroCompileTimeDeps)/ExpressionToCodeLib.1.5.4/net40-Client/ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
+    <ExpressionToCodeLibAssembly>$(DryIocZeroCompileTimeDeps)/ExpressionToCodeLib.2.6.0/net452/ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
   </PropertyGroup>
 
 </Project>

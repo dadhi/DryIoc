@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using DryIoc.MefAttributedModel.UnitTests.CUT;
@@ -110,12 +109,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
             container.Register<LazyUser>();
             container.Register<LazyDep>();
 
-            KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<Request, Expression>[] deps;
-            container.GenerateResolutionExpressions(out roots, out deps, ServiceInfo.Of<LazyUser>());
+            var result = container.GenerateResolutionExpressions(ServiceInfo.Of<LazyUser>());
 
-            Assert.AreEqual(1, roots.Length);
-            Assert.AreEqual(1, deps.Length);
+            Assert.AreEqual(1, result.Roots.Count);
+            Assert.AreEqual(1, result.ResolveDependencies.Count);
         }
 
         [Test]
@@ -167,12 +164,10 @@ namespace DryIoc.MefAttributedModel.UnitTests
                 typeof(ExportConditionalObject2),
                 typeof(ExportConditionalObject3));
 
-            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
-            KeyValuePair<Request, Expression>[] resolutionCallDependencies;
-            container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies, ContainerTools.SetupAsResolutionRoots);
+            var result = container.GenerateResolutionExpressions(r => r.AsResolutionRoot);
 
-            Assert.AreEqual(3, resolutionsRoots.Length);
-            Assert.AreEqual(3, resolutionCallDependencies.Length);
+            Assert.AreEqual(3, result.Roots.Count);
+            Assert.AreEqual(3, result.ResolveDependencies.Count);
         }
 
         [Test]
@@ -184,14 +179,12 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.RegisterDelegate(resolver => "runtime state");
 
-            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] resolutionsRoots;
-            KeyValuePair<Request, Expression>[] resolutionCallDependencies;
-            var errors = container.GenerateResolutionExpressions(out resolutionsRoots, out resolutionCallDependencies);
+            var result = container.GenerateResolutionExpressions();
 
-            Assert.AreEqual(1, errors.Length);
-            Assert.AreEqual(DryIoc.Error.StateIsRequiredToUseItem, errors[0].Value.Error);
-            Assert.AreEqual(0, resolutionsRoots.Length);
-            Assert.AreEqual(0, resolutionCallDependencies.Length);
+            Assert.AreEqual(1, result.Errors.Count);
+            Assert.AreEqual(DryIoc.Error.StateIsRequiredToUseItem, result.Errors[0].Value.Error);
+            Assert.AreEqual(0, result.Roots.Count);
+            Assert.AreEqual(0, result.ResolveDependencies.Count);
         }
 
         [Test]
@@ -205,14 +198,11 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.Register<K>(setup: Setup.With(asResolutionRoot: true));
 
-            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<Request, Expression>[] calls;
-            var errors = container.GenerateResolutionExpressions(out roots, out calls,
-                r => r.Factory.Setup.AsResolutionRoot);
+            var result = container.GenerateResolutionExpressions(r => r.AsResolutionRoot);
 
-            Assert.IsEmpty(errors);
-            Assert.AreEqual(1, roots.Length);
-            Assert.AreEqual(0, calls.Length);
+            Assert.IsEmpty(result.Errors);
+            Assert.AreEqual(1, result.Roots.Count);
+            Assert.AreEqual(0, result.ResolveDependencies.Count);
         }
 
         public class K
@@ -250,13 +240,11 @@ namespace DryIoc.MefAttributedModel.UnitTests
 
             container.Register(typeof(K<>));
 
-            KeyValuePair<IServiceInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<Request, Expression>[] calls;
-            var errors = container.GenerateResolutionExpressions(out roots, out calls, ServiceInfo.Of<K<N>>());
+            var result = container.GenerateResolutionExpressions(ServiceInfo.Of<K<N>>());
 
-            Assert.IsEmpty(errors);
-            Assert.AreEqual(1, roots.Length);
-            Assert.AreEqual(0, calls.Length);
+            Assert.IsEmpty(result.Errors);
+            Assert.AreEqual(1, result.Roots.Count);
+            Assert.AreEqual(0, result.ResolveDependencies.Count);
         }
 
         public class K<T>
@@ -279,11 +267,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             c.Register<M>();
             c.RegisterPlaceholder(typeof(IN));
 
-            KeyValuePair<ServiceRegistrationInfo, Expression<FactoryDelegate>>[] roots;
-            KeyValuePair<Request, Expression>[] deps;
-            var errors = c.GenerateResolutionExpressions(out roots, out deps, 
-                r => r.ServiceType == typeof(M));
-            Assert.IsEmpty(errors);
+            var result = c.GenerateResolutionExpressions(ServiceInfo.Of<M>());
+            Assert.IsEmpty(result.Errors);
         }
 
         class M

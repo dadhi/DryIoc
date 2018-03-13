@@ -36,6 +36,12 @@ namespace ImTools
     {
         /// <summary>Always a true condition.</summary>
         public static bool Always<T>(T _) => true;
+
+        /// <summary>Always a false condition.</summary>
+        public static bool Never<T>(T _) => false;
+
+        /// <summary>Identity function returning passed argument as result.</summary>
+        public static T Itself<T>(T x) => x;
     }
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>

@@ -1,4 +1,5 @@
-﻿using DryIoc.UnitTests.CUT;
+﻿using System.Linq;
+using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 using ImTools;
 
@@ -8,7 +9,7 @@ namespace DryIoc.UnitTests
     public class ContainerTests
     {
         [Test]
-        public void Resolving_service_should_return_registered_impelementation()
+        public void Resolving_service_should_return_registered_implementation()
         {
             var container = new Container();
             container.Register(typeof(IService), typeof(Service));
@@ -19,7 +20,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_named_and_default_registerations_Resolving_without_name_returns_default()
+        public void Given_named_and_default_registrations_Resolving_without_name_returns_default()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -31,7 +32,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_named_and_default_registerations_Resolving_with_name_should_return_correspondingly_named_service()
+        public void Given_named_and_default_registrations_Resolving_with_name_should_return_correspondingly_named_service()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -343,7 +344,7 @@ namespace DryIoc.UnitTests
 
         [Test]
         //[Description("https://github.com/ashmind/net-feature-tests/issues/23")]
-        public void ReRegister_singleton_without_recycleable()
+        public void ReRegister_singleton_without_recyclable()
         {
             var container = new Container();
             // before request
@@ -409,7 +410,7 @@ namespace DryIoc.UnitTests
             Assert.AreSame(user1, user12);
             Assert.IsInstanceOf<Logger1>(user12.Logger);
 
-            // To change that, you you need reregister the singleton to re-create it with new ILogger.
+            // To change that, you you need re-register the singleton to re-create it with new ILogger.
             c.Register<UseLogger1>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             var u13 = c.Resolve<UseLogger1>();
             Assert.AreNotSame(user12, u13);
@@ -520,13 +521,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Using_ArrayTools_Append_with_mulitple_items_appendee()
-        {
-            var ar = new[] { 2, 1 }.Append(0, -1);
-            CollectionAssert.AreEqual(new[] { 2, 1, 0, -1 }, ar);
-        }
-
-        [Test]
         public void Disposed_container_should_throw_on_attempt_to_register()
         {
             var container = new Container();
@@ -580,11 +574,79 @@ namespace DryIoc.UnitTests
             container.UseInstance("bb");
 
             var errors = container.Validate();
+            Assert.AreEqual(0, errors.Length);
         }
 
         public class AA
         {
             public AA(string msg) { }
+        }
+
+        [Test]
+        public void Can_generate_expressions_from_many_open_generic_registrations()
+        {
+            var c = new Container();
+
+            c.RegisterMany(new[] { typeof(OG1<>), typeof(OG2<>) }, serviceTypeCondition: Registrator.Interfaces);
+
+            var result = c.GenerateResolutionExpressions(regs => 
+                regs.Select(r => r.ServiceType == typeof(IG<>) ? r.ToServiceInfo<IG<int>>() : r.ToServiceInfo()));
+
+            Assert.IsEmpty(result.Errors);
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(OG1<int>), typeof(OG2<int>) }, 
+                result.Roots.Select(e => e.Value.Body.Type));
+        }
+
+        public interface IG<out T> { }
+        public class OG1<T> : IG<T> { }
+        public class OG2<T> : IG<T> { }
+
+        public class CS: IG<string> { }
+
+        public class Aa { }
+        public class Bb : Aa { }
+
+        public class OgAa : IG<Aa> { }
+        public class OgBb : IG<Bb> { }
+
+        [Test]
+        public void Resolving_covariant_collection()
+        {
+            var c = new Container();
+
+            c.Register<IG<Aa>, OgAa>();
+            c.Register<IG<Bb>, OgBb>();
+
+            var igs = c.Resolve<IG<Aa>[]>();
+
+            Assert.AreEqual(2, igs.Length);
+        }
+
+        [Test]
+        public void Resolving_closed_generic_with_wrong_type()
+        {
+            var c = new Container();
+            c.RegisterMany(new[] { typeof(CS) }, serviceTypeCondition: Registrator.Interfaces);
+
+            Assert.Throws<ContainerException>(() =>
+            c.Resolve<IG<int>>(typeof(CS)));
+        }
+
+        [Test]
+        public void Can_generate_expressions_from_closed_and_open_generic_registrations_via_required_service_type()
+        {
+            var c = new Container();
+
+            c.RegisterMany(new[] { typeof(CS), typeof(OG1<>) }, serviceTypeCondition: Registrator.Interfaces);
+
+            var result = c.GenerateResolutionExpressions(regs =>
+                regs.Select(r => r.ServiceType == typeof(IG<>) ? r.ToServiceInfo<IG<string>>() : r.ToServiceInfo()));
+
+            Assert.IsEmpty(result.Errors);
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(CS), typeof(OG1<string>) },
+                result.Roots.Select(e => e.Value.Body.Type));
         }
 
         [Test]

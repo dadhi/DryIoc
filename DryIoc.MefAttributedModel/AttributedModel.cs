@@ -578,7 +578,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(Request request, FactoryMethodSelector fallbackSelector = null)
+        private static FactoryMethod GetImportingConstructor(DryIoc.Request request, FactoryMethodSelector fallbackSelector = null)
         {
             var implType = request.ImplementationType;
             var ctors = implType.PublicConstructors().ToArrayOrSelf();
@@ -603,7 +603,7 @@ namespace DryIoc.MefAttributedModel
             return FactoryMethod.Of(ctor);
         }
 
-        private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(Request request)
+        private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(DryIoc.Request request)
         {
             return parameter =>
             {
@@ -614,7 +614,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, Request request)
+        private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, DryIoc.Request request)
         {
             var attributes = member.GetAttributes().ToArrayOrSelf();
             var details = attributes.Length == 0 ? null
@@ -622,13 +622,13 @@ namespace DryIoc.MefAttributedModel
             return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details);
         }
 
-        private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, Request request)
+        private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, DryIoc.Request request)
         {
             return GetImportDetails(type, attributes, request)
                 ?? GetImportExternalDetails(type, attributes, request);
         }
 
-        private static ServiceDetails GetImportDetails(Type type, Attribute[] attributes, Request request)
+        private static ServiceDetails GetImportDetails(Type type, Attribute[] attributes, DryIoc.Request request)
         {
             object serviceKey;
             Type requiredServiceType;
@@ -668,7 +668,7 @@ namespace DryIoc.MefAttributedModel
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadata.Key, metadata.Value);
         }
 
-        private static Type FindRequiredServiceTypeByServiceKey(Type type, Request request, object serviceKey)
+        private static Type FindRequiredServiceTypeByServiceKey(Type type, DryIoc.Request request, object serviceKey)
         {
             var contractNameStore = request.Container.Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault);
             if (contractNameStore == null)
@@ -716,7 +716,7 @@ namespace DryIoc.MefAttributedModel
             return metadataKey.Pair(metadata);
         }
 
-        private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, Request request)
+        private static ServiceDetails GetImportExternalDetails(Type serviceType, Attribute[] attributes, DryIoc.Request request)
         {
             var import = GetSingleAttributeOrDefault<ImportExternalAttribute>(attributes);
             if (import == null)
@@ -1416,7 +1416,7 @@ namespace DryIoc.MefAttributedModel
                 return Wrapper == null ? Setup.Wrapper : Wrapper.GetSetup();
 
             var condition = ConditionType == null
-                ? (Func<Request, bool>)null
+                ? (Func<DryIoc.Request, bool>)null
                 : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
                     .Evaluate(ConvertRequestInfo(r));
 
@@ -1451,10 +1451,10 @@ namespace DryIoc.MefAttributedModel
             return metaAttrs;
         }
 
-        private static RequestInfo ConvertRequestInfo(Request source)
+        private static Request ConvertRequestInfo(DryIoc.Request source)
         {
             if (source.IsEmpty)
-                return RequestInfo.Empty;
+                return Request.Empty;
 
             var factoryType =
                 source.FactoryType == DryIoc.FactoryType.Decorator ? DryIocAttributes.FactoryType.Decorator :
@@ -1921,7 +1921,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Converts info to corresponding decorator setup.</summary>
         /// <param name="condition">(optional) <see cref="Setup.Condition"/>.</param>
         /// <returns>Decorator setup.</returns>
-        public Setup GetSetup(Func<Request, bool> condition = null)
+        public Setup GetSetup(Func<DryIoc.Request, bool> condition = null)
         {
             if (DecoratedServiceKey == null && condition == null && Order == 0 && !UseDecorateeReuse)
                 return Setup.Decorator;

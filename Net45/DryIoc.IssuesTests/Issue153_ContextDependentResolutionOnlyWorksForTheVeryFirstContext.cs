@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -16,6 +17,12 @@ namespace DryIoc.IssuesTests
 
             var x = c.Resolve<C>();
             var y = c.Resolve<D>();
+
+            var cExpr = c.Resolve<LambdaExpression>(typeof(C));
+            StringAssert.DoesNotContain("Resolve(", cExpr.ToString());
+
+            var dExpr = c.Resolve<LambdaExpression>(typeof(D));
+            StringAssert.DoesNotContain("Resolve(", dExpr.ToString());
 
             Assert.AreEqual("C", x.S.S);
             Assert.AreEqual("D", y.S.S);
@@ -36,7 +43,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Lazy_expression_should_not_be_exessively_compiled()
+        public void Lazy_expression_should_not_be_excessively_compiled()
         {
             var c = new Container();
             c.Register<A>();
