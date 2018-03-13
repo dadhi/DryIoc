@@ -686,7 +686,7 @@ namespace DryIoc
 
             var registry =
                 registrySharing == RegistrySharing.Share ? _registry :
-                registrySharing == RegistrySharing.CloneWithCache ? Ref.Of(_registry.Value)
+                registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
             return new Container(rules, registry, singletonScope, scopeContext,
@@ -808,10 +808,10 @@ namespace DryIoc
                 {
                     if (request.IsResolutionCall)
                         request.ChangeServiceKey(factory.Key);
-                    else
+                    else // for injected dependency
                     {
                         var setup = factory.Value.Setup;
-                        if (!setup.AsResolutionCall && setup.Condition != null)
+                        if (setup.Condition != null)
                             factory.Value.Setup = setup.WithAsResolutionCall();
                     }
                 }
@@ -1406,10 +1406,10 @@ namespace DryIoc
                 // in-lined expression in context with not matching condition
                 // issue: #382
                 var matchedFactory = matchedFactories[0];
-                if (!request.IsResolutionCall)
-                    matchedFactory.Value.Setup = matchedFactory.Value.Setup.WithAsResolutionCall();
-                else
+                if (request.IsResolutionCall)
                     request.ChangeServiceKey(matchedFactory.Key);
+                else // for injected dependency
+                    matchedFactory.Value.Setup = matchedFactory.Value.Setup.WithAsResolutionCall();
             }
 
             return matchedFactories;
@@ -2156,7 +2156,7 @@ namespace DryIoc
         public static IContainer With(this IContainer container,
             Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
             container.With(configure?.Invoke(container.Rules) ?? container.Rules, scopeContext ?? container.ScopeContext,
-                RegistrySharing.CloneWithoutCache, container.SingletonScope);
+                RegistrySharing.CloneAndDropCache, container.SingletonScope);
 
         /// <summary>Prepares container for expression generation.</summary>
         public static IContainer WithExpressionGeneration(this IContainer container) =>
@@ -2169,19 +2169,19 @@ namespace DryIoc
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
         public static IContainer WithoutCache(this IContainer container) =>
             container.With(container.Rules, container.ScopeContext,
-                RegistrySharing.CloneWithoutCache, container.SingletonScope);
+                RegistrySharing.CloneAndDropCache, container.SingletonScope);
 
         /// <summary>Creates new container with state shared with original except singletons and cache.
         /// Dropping cache is required because singletons are cached in resolution state.</summary>
         public static IContainer WithoutSingletonsAndCache(this IContainer container) =>
             container.With(container.Rules, container.ScopeContext,
-                RegistrySharing.CloneWithoutCache, singletonScope: null);
+                RegistrySharing.CloneAndDropCache, singletonScope: null);
 
         /// <summary>Shares all parts with original container But copies registrations, so the new registrations
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
             container.With(container.Rules, container.ScopeContext,
-                preserveCache ? RegistrySharing.CloneWithCache : RegistrySharing.CloneWithoutCache,
+                preserveCache ? RegistrySharing.CloneButKeepCache : RegistrySharing.CloneAndDropCache,
                 container.SingletonScope);
 
         /// <summary>For given instance resolves and sets properties and fields.
@@ -2199,17 +2199,18 @@ namespace DryIoc
             return instance;
         }
 
-        // todo: Opt-in for not creating the container copy for performance reasons. 
-        //
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
         /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
-        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, 
+        /// properties and fields.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static object New(this IContainer container, Type concreteType, Made made = null)
+        public static object New(this IContainer container, Type concreteType, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
         {
             var containerClone = container.With(container.Rules, container.ScopeContext,
-                RegistrySharing.CloneWithCache, container.SingletonScope);
+                registrySharing, container.SingletonScope);
 
             var implType = containerClone.GetWrappedType(concreteType, null);
 
@@ -2223,18 +2224,22 @@ namespace DryIoc
         /// <typeparam name="T">Type to instantiate.</typeparam>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
         /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
-        public static T New<T>(this IContainer container, Made made = null) =>
-            (T)container.New(typeof(T), made);
+        public static T New<T>(this IContainer container, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            (T)container.New(typeof(T), made, registrySharing);
 
         /// <summary>Creates service given strongly-typed creation expression.
         /// Can be used to invoke arbitrary method returning some value with injecting its parameters from container.</summary>
         /// <typeparam name="T">Method or constructor result type.</typeparam>
         /// <param name="container">Container to use for injecting dependencies.</param>
         /// <param name="made">Creation expression.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
         /// <returns>Created result.</returns>
-        public static T New<T>(this IContainer container, Made.TypedMade<T> made) =>
-            (T)container.New(typeof(T), made);
+        public static T New<T>(this IContainer container, Made.TypedMade<T> made,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            (T)container.New(typeof(T), made, registrySharing);
 
         /// <summary>Registers new service type with factory for registered service type.
         /// Throw if no such registered service type in container.</summary>
@@ -5302,7 +5307,6 @@ namespace DryIoc
         /// <summary>Empty service info for convenience.</summary>
         public static readonly IServiceInfo Empty = new ServiceInfo(null);
 
-        // todo: Should we change IfUnresolved to IfUnresolved?
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
@@ -5665,7 +5669,6 @@ namespace DryIoc
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
         private IServiceInfo _serviceInfo;
 
-        // todo: May be moved to ServiceInfo
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal readonly Expr[] InputArgs;
 
@@ -6391,7 +6394,7 @@ namespace DryIoc
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
 
-        // todo: Make decorateeResue a default?
+        // todo: Make decorateeReuse a default?
         /// <summary>Creates setup with optional condition.
         /// The <paramref name="order" /> specifies relative decorator position in decorators chain.
         /// Greater number means further from decoratee - specify negative number to stay closer.
@@ -8166,6 +8169,7 @@ namespace DryIoc
                 foreach (var disposable in disposables.Enumerate())
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal
+                    // todo: May be it is better to aggregate?
                     try
                     {
                         disposable.Value.Dispose();
@@ -8175,7 +8179,6 @@ namespace DryIoc
                 }
 
             _disposables = ImMap<IDisposable>.Empty;
-
             _items = ImMap<object>.Empty;
         }
 
@@ -8770,12 +8773,12 @@ namespace DryIoc
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
     public enum RegistrySharing
     {
-        /// <summary>Both containers share the resgitrations, changed in one, will change in another.</summary>
+        /// <summary>Shares both registrations and resolution cache if any</summary>
         Share = 0,
-        /// <summary>Both registrations and cache</summary>
-        CloneWithCache,
-        /// <summary>Clones registrations but drops the cache</summary>
-        CloneWithoutCache
+        /// <summary>Clones the registrations but preserves the resolution cache</summary>
+        CloneButKeepCache,
+        /// <summary>Clones the registrations and drops the cache -- full reset!</summary>
+        CloneAndDropCache
     }
 
     /// <summary>Combines registrator and resolver roles, plus rules and scope management.</summary>
