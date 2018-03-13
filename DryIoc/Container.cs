@@ -1734,21 +1734,25 @@ namespace DryIoc
                             case IfAlreadyRegistered.Replace:
                                 if (oldFactoriesEntry != null)
                                 {
-                                    var newFactories = oldFactoriesEntry.Factories;
+                                    // remove defaults but keep keyed (issue #569)
+                                    var oldFactories = oldFactoriesEntry.Factories;
+                                    var keyedFactories = ImHashMap<object, Factory>.Empty;
                                     if (oldFactoriesEntry.LastDefaultKey != null)
                                     {
-                                        newFactories = ImHashMap<object, Factory>.Empty;
                                         var removedFactories = ImHashMap<object, Factory>.Empty;
-                                        foreach (var f in newFactories.Enumerate())
+                                        foreach (var f in oldFactories.Enumerate())
                                             if (f.Key is DefaultKey)
                                                 removedFactories = removedFactories.AddOrUpdate(f.Key, f.Value);
-                                            else
-                                                newFactories = newFactories.AddOrUpdate(f.Key, f.Value);
+                                            else // copy keyed to new
+                                                keyedFactories = keyedFactories.AddOrUpdate(f.Key, f.Value);
+
                                         replacedFactories = removedFactories;
+                                        if (keyedFactories.IsEmpty)
+                                            return newEntry; // the entry with all default was completely replace
                                     }
 
                                     return new FactoriesEntry(DefaultKey.Value,
-                                        newFactories.AddOrUpdate(DefaultKey.Value, newFactory));
+                                        keyedFactories.AddOrUpdate(DefaultKey.Value, newFactory));
                                 }
 
                                 replacedFactory = oldFactory;

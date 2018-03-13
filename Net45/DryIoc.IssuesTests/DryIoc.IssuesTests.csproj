@@ -189,6 +189,7 @@
     <Compile Include="Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func.cs" />
     <Compile Include="Issue554_Allow_Register_an_open_generic_service_type_with_closed implementation_to_enable_variance.cs" />
     <Compile Include="Issue566_Named_service_not_replaced.cs" />
+    <Compile Include="Issue569_Replacing_Registration_clears_all_existing_registrations.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />
@@ -251,7 +252,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
