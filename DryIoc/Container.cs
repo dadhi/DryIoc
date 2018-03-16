@@ -1748,7 +1748,7 @@ namespace DryIoc
 
                                         replacedFactories = removedFactories;
                                         if (keyedFactories.IsEmpty)
-                                            return newEntry; // the entry with all default was completely replace
+                                            return newEntry; // the entry with all defaults was completely replaced
                                     }
 
                                     return new FactoriesEntry(DefaultKey.Value,
@@ -1989,21 +1989,20 @@ namespace DryIoc
             int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null, IResolverContext root = null)
         {
-            _disposed = disposed;
-            _disposeStackTrace = disposeStackTrace;
-
-            _parent = parent;
-            _root = root;
-
             Rules = rules;
 
             _registry = registry;
             _defaultFactoryDelegateCache = registry.Value.DefaultFactoryDelegateCache;
 
             _singletonScope = singletonScope;
-
-            _ownCurrentScope = ownCurrentScope;
             _scopeContext = scopeContext;
+            _ownCurrentScope = ownCurrentScope;
+
+            _disposed = disposed;
+            _disposeStackTrace = disposeStackTrace;
+
+            _parent = parent;
+            _root = root;
         }
 
         #endregion
