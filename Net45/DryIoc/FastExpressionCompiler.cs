@@ -368,18 +368,14 @@ namespace FastExpressionCompiler
 
             public bool IsEmpty => Parent == null;
             public readonly BlockInfo Parent;
-            public readonly Expression ResultExpr;
-            public readonly IList<ParameterExpression> VarExprs;
+            public readonly object ResultExpr;
+            public readonly object[] VarExprs;
             public readonly LocalBuilder[] LocalVars;
-
-            public BlockInfo Push(Expression blockResult,
-                IList<ParameterExpression> blockVars, LocalBuilder[] localVars) =>
-                new BlockInfo(this, blockResult, blockVars, localVars);
 
             private BlockInfo() { }
 
-            private BlockInfo(BlockInfo parent, Expression resultExpr,
-                IList<ParameterExpression> varExprs, LocalBuilder[] localVars)
+            internal BlockInfo(BlockInfo parent,
+                object resultExpr, object[] varExprs, LocalBuilder[] localVars)
             {
                 Parent = parent;
                 ResultExpr = resultExpr;
@@ -391,9 +387,8 @@ namespace FastExpressionCompiler
         [DebuggerDisplay("Expression={ConstantExpr}")]
         private struct ConstantInfo
         {
-            public object ConstantExpr;
+            public object ConstantExpr, Value;
             public Type Type;
-            public object Value;
             public ConstantInfo(object constantExpr, object value, Type type)
             {
                 ConstantExpr = constantExpr;
@@ -402,6 +397,7 @@ namespace FastExpressionCompiler
             }
         }
 
+        // todo: Rename to Context in next major version, cause it is not only about closure anymore
         // Track the info required to build a closure object + some context information not directly related to closure.
         private sealed class ClosureInfo
         {
@@ -430,7 +426,7 @@ namespace FastExpressionCompiler
 
             // Tells that we should construct a bounded closure object for the compiled delegate,
             // also indicates that we have to shift when we are operating on arguments 
-            // because the first will be the closure
+            // because the first argument should be the closure
             public bool HasBoundClosure { get; private set; }
 
             public void AddConstant(object expr, object value, Type type)
@@ -561,21 +557,20 @@ namespace FastExpressionCompiler
             public void FinishAnalysis() =>
                 HasBoundClosure = Constants.Length != 0 || NestedLambdas.Length != 0 || NonPassedParameters.Length != 0;
 
-            public void PushBlock(Expression blockResult, IList<ParameterExpression> blockVars, LocalBuilder[] localVars) =>
-                CurrentBlock = CurrentBlock.Push(blockResult, blockVars, localVars);
+            public void PushBlock(object blockResultExpr, object[] blockVarExprs, LocalBuilder[] localVars) =>
+                CurrentBlock = new BlockInfo(CurrentBlock, blockResultExpr, blockVarExprs, localVars);
 
-            public void PushBlockAndConstructLocalVars(BlockExpression block, ILGenerator il)
+            public void PushBlockAndConstructLocalVars(object blockResultExpr, object[] blockVarExprs, ILGenerator il)
             {
                 var localVars = Tools.Empty<LocalBuilder>();
-                var blockVars = block.Variables;
-                if (blockVars.Count != 0)
+                if (blockVarExprs.Length != 0)
                 {
-                    localVars = new LocalBuilder[blockVars.Count];
+                    localVars = new LocalBuilder[blockVarExprs.Length];
                     for (var i = 0; i < localVars.Length; i++)
-                        localVars[i] = il.DeclareLocal(blockVars[i].Type);
+                        localVars[i] = il.DeclareLocal(blockVarExprs[i].GetResultType());
                 }
 
-                CurrentBlock = CurrentBlock.Push(block.Result, blockVars, localVars);
+                CurrentBlock = new BlockInfo(CurrentBlock, blockResultExpr, blockVarExprs, localVars);
             }
 
             public void PopBlock() =>
@@ -583,13 +578,10 @@ namespace FastExpressionCompiler
 
             public bool IsLocalVar(object varParamExpr)
             {
-                for (var block = CurrentBlock; !block.IsEmpty; block = block.Parent)
-                {
-                    var varIndex = block.VarExprs.GetFirstIndex(varParamExpr);
-                    if (varIndex != -1)
-                        return true;
-                }
-                return false;
+                var i = -1;
+                for (var block = CurrentBlock; i == -1 && !block.IsEmpty; block = block.Parent)
+                    i = block.VarExprs.GetFirstIndex(varParamExpr);
+                return i != -1;
             }
 
             public LocalBuilder GetDefinedLocalVarOrDefault(object varParamExpr)
@@ -616,61 +608,37 @@ namespace FastExpressionCompiler
             public static readonly MethodInfo[] CreateMethods =
                 _methods as MethodInfo[] ?? _methods.ToArray();
 
-            public static Closure<T1> CreateClosure<T1>(T1 v1)
-            {
-                return new Closure<T1>(v1);
-            }
+            public static Closure<T1> CreateClosure<T1>(T1 v1) => new Closure<T1>(v1);
 
-            public static Closure<T1, T2> CreateClosure<T1, T2>(T1 v1, T2 v2)
-            {
-                return new Closure<T1, T2>(v1, v2);
-            }
+            public static Closure<T1, T2> CreateClosure<T1, T2>(T1 v1, T2 v2) => new Closure<T1, T2>(v1, v2);
 
-            public static Closure<T1, T2, T3> CreateClosure<T1, T2, T3>(T1 v1, T2 v2, T3 v3)
-            {
-                return new Closure<T1, T2, T3>(v1, v2, v3);
-            }
+            public static Closure<T1, T2, T3> CreateClosure<T1, T2, T3>(T1 v1, T2 v2, T3 v3) =>
+                new Closure<T1, T2, T3>(v1, v2, v3);
 
-            public static Closure<T1, T2, T3, T4> CreateClosure<T1, T2, T3, T4>(T1 v1, T2 v2, T3 v3, T4 v4)
-            {
-                return new Closure<T1, T2, T3, T4>(v1, v2, v3, v4);
-            }
+            public static Closure<T1, T2, T3, T4> CreateClosure<T1, T2, T3, T4>(T1 v1, T2 v2, T3 v3, T4 v4) =>
+                new Closure<T1, T2, T3, T4>(v1, v2, v3, v4);
 
             public static Closure<T1, T2, T3, T4, T5> CreateClosure<T1, T2, T3, T4, T5>(T1 v1, T2 v2, T3 v3, T4 v4,
-                T5 v5)
-            {
-                return new Closure<T1, T2, T3, T4, T5>(v1, v2, v3, v4, v5);
-            }
+                T5 v5) => new Closure<T1, T2, T3, T4, T5>(v1, v2, v3, v4, v5);
 
             public static Closure<T1, T2, T3, T4, T5, T6> CreateClosure<T1, T2, T3, T4, T5, T6>(T1 v1, T2 v2, T3 v3,
-                T4 v4, T5 v5, T6 v6)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6>(v1, v2, v3, v4, v5, v6);
-            }
+                T4 v4, T5 v5, T6 v6) => new Closure<T1, T2, T3, T4, T5, T6>(v1, v2, v3, v4, v5, v6);
 
             public static Closure<T1, T2, T3, T4, T5, T6, T7> CreateClosure<T1, T2, T3, T4, T5, T6, T7>(T1 v1, T2 v2,
-                T3 v3, T4 v4, T5 v5, T6 v6, T7 v7)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7>(v1, v2, v3, v4, v5, v6, v7);
-            }
+                T3 v3, T4 v4, T5 v5, T6 v6, T7 v7) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7>(v1, v2, v3, v4, v5, v6, v7);
 
             public static Closure<T1, T2, T3, T4, T5, T6, T7, T8> CreateClosure<T1, T2, T3, T4, T5, T6, T7, T8>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7, T8>(v1, v2, v3, v4, v5, v6, v7, v8);
-            }
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7, T8>(v1, v2, v3, v4, v5, v6, v7, v8);
 
             public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9> CreateClosure<T1, T2, T3, T4, T5, T6, T7, T8, T9>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9>(v1, v2, v3, v4, v5, v6, v7, v8, v9);
-            }
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9>(v1, v2, v3, v4, v5, v6, v7, v8, v9);
 
             public static Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> CreateClosure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
-                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9, T10 v10)
-            {
-                return new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10);
-            }
+                T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9, T10 v10) =>
+                new Closure<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(v1, v2, v3, v4, v5, v6, v7, v8, v9, v10);
         }
 
         internal sealed class Closure<T1>
@@ -994,9 +962,9 @@ namespace FastExpressionCompiler
                 case ExpressionType.NewArrayBounds:
                 case ExpressionType.NewArrayInit:
                     var newArrayInitInfo = exprObj as NewArrayExpressionInfo;
-                    if (newArrayInitInfo != null)
-                        return TryCollectBoundConstants(ref closure, newArrayInitInfo.Arguments, paramExprs);
-                    return TryCollectBoundConstants(ref closure, ((NewArrayExpression)exprObj).Expressions, paramExprs);
+                    return newArrayInitInfo != null ?
+                        TryCollectBoundConstants(ref closure, newArrayInitInfo.Arguments, paramExprs) :
+                        TryCollectBoundConstants(ref closure, ((NewArrayExpression)exprObj).Expressions, paramExprs);
 
                 case ExpressionType.MemberInit:
                     return TryCollectMemberInitExprConstants(ref closure, exprObj, paramExprs);
@@ -1010,14 +978,14 @@ namespace FastExpressionCompiler
                     {
                         var lambda = invokeExpr.Expression;
                         return TryCollectBoundConstants(ref closure, lambda, lambda.NodeType, lambda.Type, paramExprs)
-                               && TryCollectBoundConstants(ref closure, invokeExpr.Arguments, paramExprs);
+                            && TryCollectBoundConstants(ref closure, invokeExpr.Arguments, paramExprs);
                     }
                     else
                     {
                         var invokeInfo = (InvocationExpressionInfo)exprObj;
                         var lambda = invokeInfo.ExprToInvoke;
                         return TryCollectBoundConstants(ref closure, lambda, lambda.NodeType, lambda.Type, paramExprs)
-                               && TryCollectBoundConstants(ref closure, invokeInfo.Arguments, paramExprs);
+                            && TryCollectBoundConstants(ref closure, invokeInfo.Arguments, paramExprs);
                     }
 
                 case ExpressionType.Conditional:
@@ -1027,12 +995,7 @@ namespace FastExpressionCompiler
                         && TryCollectBoundConstants(ref closure, condExpr.IfFalse, condExpr.IfFalse.NodeType, condExpr.IfFalse.Type, paramExprs);
 
                 case ExpressionType.Block:
-                    var blockExpr = (BlockExpression)exprObj;
-                    closure = closure ?? new ClosureInfo();
-                    closure.PushBlock(blockExpr.Result, blockExpr.Variables, Tools.Empty<LocalBuilder>());
-                    var result = TryCollectBoundConstants(ref closure, blockExpr.Expressions, paramExprs);
-                    closure.PopBlock();
-                    return result;
+                    return TryCollectBlockBoundConstants(ref closure, exprObj, paramExprs);
 
                 case ExpressionType.Index:
                     var indexExpr = (IndexExpression)exprObj;
@@ -1042,7 +1005,9 @@ namespace FastExpressionCompiler
                         && TryCollectBoundConstants(ref closure, indexExpr.Arguments, paramExprs);
 
                 case ExpressionType.Try:
-                    return TryCollectTryExprConstants(ref closure, exprObj, paramExprs);
+                    return exprObj is TryExpression
+                        ? TryCollectTryExprConstants(ref closure, (TryExpression)exprObj, paramExprs)
+                        : TryCollectTryExprInfoConstants(ref closure, (TryExpressionInfo)exprObj, paramExprs);
 
                 case ExpressionType.Default:
                     return true;
@@ -1050,6 +1015,28 @@ namespace FastExpressionCompiler
                 default:
                     return TryCollectUnaryOrBinaryExprConstants(ref closure, exprObj, paramExprs);
             }
+        }
+
+        private static bool TryCollectBlockBoundConstants(ref ClosureInfo closure, object exprObj, object[] paramExprs)
+        {
+            closure = closure ?? new ClosureInfo();
+            var blockExpr = exprObj as BlockExpression;
+            if (blockExpr != null)
+            {
+                closure.PushBlock(blockExpr.Result, blockExpr.Variables.ToArray(), Tools.Empty<LocalBuilder>());
+                if (!TryCollectBoundConstants(ref closure, blockExpr.Expressions, paramExprs))
+                    return false;
+            }
+            else
+            {
+                var blockExprInfo = (BlockExpressionInfo)exprObj;
+                closure.PushBlock(blockExprInfo.Result, blockExprInfo.Variables, Tools.Empty<LocalBuilder>());
+                if (!TryCollectBoundConstants(ref closure, blockExprInfo.Expressions, paramExprs))
+                    return false;
+            }
+
+            closure.PopBlock();
+            return true;
         }
 
         private static bool TryCollectBoundConstants(ref ClosureInfo closure,
@@ -1177,46 +1164,76 @@ namespace FastExpressionCompiler
 
         }
 
-        private static bool TryCollectTryExprConstants(ref ClosureInfo closure, object exprObj, object[] paramExprs)
+        private static bool TryCollectTryExprConstants(ref ClosureInfo closure, TryExpression tryExpr, object[] paramExprs)
         {
-            var tryExpr = (TryExpression)exprObj;
             if (!TryCollectBoundConstants(ref closure, tryExpr.Body, tryExpr.Body.NodeType, tryExpr.Type, paramExprs))
                 return false;
 
             var catchBlocks = tryExpr.Handlers;
             for (var i = 0; i < catchBlocks.Count; i++)
             {
-                var block = catchBlocks[i];
-                var blockBody = block.Body;
-
-                var blockExceptionVar = block.Variable;
-                if (blockExceptionVar != null)
+                var catchBlock = catchBlocks[i];
+                var catchBody = catchBlock.Body;
+                var catchExVar = catchBlock.Variable;
+                if (catchExVar != null)
                 {
                     closure = closure ?? new ClosureInfo();
-                    closure.PushBlock(blockBody, new[] { blockExceptionVar }, Tools.Empty<LocalBuilder>());
-
-                    if (!TryCollectBoundConstants(ref closure,
-                        blockExceptionVar, blockExceptionVar.NodeType, blockExceptionVar.Type, paramExprs))
+                    closure.PushBlock(catchBody, new[] { catchExVar }, Tools.Empty<LocalBuilder>());
+                    if (!TryCollectBoundConstants(ref closure, catchExVar, catchExVar.NodeType, catchBlock.Test, paramExprs))
                         return false;
                 }
 
-                if (block.Filter != null && !TryCollectBoundConstants(ref closure,
-                        block.Filter, block.Filter.NodeType, block.Filter.Type, paramExprs))
+                var filterExpr = catchBlock.Filter;
+                if (filterExpr != null &&
+                    !TryCollectBoundConstants(ref closure, filterExpr, filterExpr.NodeType, filterExpr.Type, paramExprs))
                     return false;
 
-                if (!TryCollectBoundConstants(ref closure,
-                    blockBody, blockBody.NodeType, block.Test, paramExprs))
+                if (!TryCollectBoundConstants(ref closure, catchBody, catchBody.NodeType, catchBody.Type, paramExprs))
                     return false;
 
-                if (blockExceptionVar != null)
+                if (catchExVar != null)
                     closure.PopBlock();
             }
 
-            if (tryExpr.Finally != null && !TryCollectBoundConstants(ref closure,
-                    tryExpr.Finally, tryExpr.Finally.NodeType, tryExpr.Finally.Type, paramExprs))
+            var finallyExpr = tryExpr.Finally;
+            return finallyExpr == null
+                || TryCollectBoundConstants(ref closure, finallyExpr, finallyExpr.NodeType, finallyExpr.Type, paramExprs);
+        }
+
+        private static bool TryCollectTryExprInfoConstants(ref ClosureInfo closure, TryExpressionInfo tryExpr, object[] paramExprs)
+        {
+            if (!TryCollectBoundConstants(ref closure, tryExpr.Body, tryExpr.Body.GetNodeType(), tryExpr.Type, paramExprs))
                 return false;
 
-            return true;
+            var catchBlocks = tryExpr.Handlers;
+            for (var i = 0; i < catchBlocks.Length; i++)
+            {
+                var catchBlock = catchBlocks[i];
+                var catchBody = catchBlock.Body;
+                var catchExVar = catchBlock.Variable;
+                if (catchExVar != null)
+                {
+                    closure = closure ?? new ClosureInfo();
+                    closure.PushBlock(catchBody, new[] { catchExVar }, Tools.Empty<LocalBuilder>());
+                    if (!TryCollectBoundConstants(ref closure, catchExVar, catchExVar.NodeType, catchBlock.Test, paramExprs))
+                        return false;
+                }
+
+                var filterExpr = catchBlock.Filter;
+                if (filterExpr != null &&
+                    !TryCollectBoundConstants(ref closure, filterExpr, filterExpr.NodeType, filterExpr.Type, paramExprs))
+                    return false;
+
+                if (!TryCollectBoundConstants(ref closure, catchBody, catchBody.NodeType, catchBody.Type, paramExprs))
+                    return false;
+
+                if (catchExVar != null)
+                    closure.PopBlock();
+            }
+
+            var finallyExpr = tryExpr.Finally;
+            return finallyExpr == null
+                   || TryCollectBoundConstants(ref closure, finallyExpr, finallyExpr.NodeType, finallyExpr.Type, paramExprs);
         }
 
         private static bool TryCollectUnaryOrBinaryExprConstants(ref ClosureInfo closure, object exprObj, object[] paramExprs)
@@ -1374,13 +1391,19 @@ namespace FastExpressionCompiler
                         return EmitAssign(exprObj, exprType, paramExprs, il, closure);
 
                     case ExpressionType.Block:
-                        return EmitBlock((BlockExpression)exprObj, paramExprs, il, closure);
+                        return exprObj is BlockExpression ?
+                            EmitBlock((BlockExpression)exprObj, paramExprs, il, closure) :
+                            EmitBlockInfo((BlockExpressionInfo)exprObj, paramExprs, il, closure);
 
                     case ExpressionType.Try:
-                        return EmitTryCatchFinallyBlock((TryExpression)exprObj, paramExprs, il, closure);
+                        return exprObj is TryExpression
+                            ? EmitTryCatchFinallyBlock((TryExpression)exprObj, exprType, paramExprs, il, closure)
+                            : EmitTryCatchFinallyBlockInfo((TryExpressionInfo)exprObj, exprType, paramExprs, il, closure);
 
                     case ExpressionType.Throw:
-                        return EmitThrow((UnaryExpression)exprObj, paramExprs, il, closure);
+                        return exprObj is UnaryExpression
+                            ? EmitThrow((UnaryExpression)exprObj, paramExprs, il, closure)
+                            : EmitThrowInfo((UnaryExpressionInfo)exprObj, paramExprs, il, closure);
 
                     case ExpressionType.Default:
                         return EmitDefault((DefaultExpression)exprObj, il);
@@ -1490,44 +1513,51 @@ namespace FastExpressionCompiler
             }
 
             private static bool EmitBlock(
-                BlockExpression exprObj, object[] paramExprs, ILGenerator il, ClosureInfo closure)
+                BlockExpression blockExpr, object[] paramExprs, ILGenerator il, ClosureInfo closure)
             {
                 closure = closure ?? new ClosureInfo();
-                closure.PushBlockAndConstructLocalVars(exprObj, il);
-                if (!EmitMany(exprObj.Expressions, paramExprs, il, closure))
-                    return false;
+                closure.PushBlockAndConstructLocalVars(blockExpr.Result, blockExpr.Variables.ToArray(), il);
+                var ok = EmitMany(blockExpr.Expressions, paramExprs, il, closure);
                 closure.PopBlock();
-                return true;
+                return ok;
+            }
+
+            private static bool EmitBlockInfo(
+                BlockExpressionInfo blockExpr, object[] paramExprs, ILGenerator il, ClosureInfo closure)
+            {
+                closure = closure ?? new ClosureInfo();
+                closure.PushBlockAndConstructLocalVars(blockExpr.Result, blockExpr.Variables, il);
+                var ok = EmitMany(blockExpr.Expressions, paramExprs, il, closure);
+                closure.PopBlock();
+                return ok;
             }
 
             private static bool EmitTryCatchFinallyBlock(
-                TryExpression exprObj, object[] paramExprs, ILGenerator il, ClosureInfo closure)
+                TryExpression tryExpr, Type exprType, object[] paramExprs, ILGenerator il, ClosureInfo closure)
             {
                 var returnLabel = default(Label);
                 var returnResult = default(LocalBuilder);
-                var hasResult = exprObj.Type != typeof(void);
-                if (hasResult)
+                var isNonVoid = exprType != typeof(void);
+                if (isNonVoid)
                 {
                     returnLabel = il.DefineLabel();
-                    returnResult = il.DeclareLocal(exprObj.Type);
+                    returnResult = il.DeclareLocal(exprType);
                 }
 
                 il.BeginExceptionBlock();
-
-                if (!TryEmit(exprObj.Body, exprObj.Body.NodeType, exprObj.Body.Type, paramExprs, il, closure))
+                if (!TryEmit(tryExpr.Body, tryExpr.Body.NodeType, tryExpr.Body.Type, paramExprs, il, closure))
                     return false;
 
-                if (hasResult)
+                if (isNonVoid)
                 {
                     il.Emit(OpCodes.Stloc_S, returnResult);
                     il.Emit(OpCodes.Leave_S, returnLabel);
                 }
 
-                var catchBlocks = exprObj.Handlers;
+                var catchBlocks = tryExpr.Handlers;
                 for (var i = 0; i < catchBlocks.Count; i++)
                 {
                     var catchBlock = catchBlocks[i];
-
                     if (catchBlock.Filter != null)
                         return false; // todo: Add support for filters on catch expression
 
@@ -1535,26 +1565,23 @@ namespace FastExpressionCompiler
 
                     // at the beginning of catch the Exception value is on the stack,
                     // we will store into local variable.
-                    var catchExpr = catchBlock.Body;
-                    var exceptionVarExpr = catchBlock.Variable;
-                    if (exceptionVarExpr != null)
+                    var catchBodyExpr = catchBlock.Body;
+                    var exVarExpr = catchBlock.Variable;
+                    if (exVarExpr != null)
                     {
-                        var exceptionVar = il.DeclareLocal(exceptionVarExpr.Type);
-
+                        var exVar = il.DeclareLocal(exVarExpr.Type);
                         closure = closure ?? new ClosureInfo();
-                        closure.PushBlock(catchBlock.Body, new[] { exceptionVarExpr }, new[] { exceptionVar });
-
-                        // store the values of exception on stack into the variable
-                        il.Emit(OpCodes.Stloc_S, exceptionVar);
+                        closure.PushBlock(catchBodyExpr, new[] { exVarExpr }, new[] { exVar });
+                        il.Emit(OpCodes.Stloc_S, exVar);
                     }
 
-                    if (!TryEmit(catchExpr, catchExpr.NodeType, catchExpr.Type, paramExprs, il, closure))
+                    if (!TryEmit(catchBodyExpr, catchBodyExpr.NodeType, catchBodyExpr.Type, paramExprs, il, closure))
                         return false;
 
-                    if (exceptionVarExpr != null)
+                    if (exVarExpr != null)
                         closure.PopBlock();
 
-                    if (hasResult)
+                    if (isNonVoid)
                     {
                         il.Emit(OpCodes.Stloc_S, returnResult);
                         il.Emit(OpCodes.Leave_S, returnLabel);
@@ -1563,17 +1590,93 @@ namespace FastExpressionCompiler
                         il.Emit(OpCodes.Pop);
                 }
 
-                if (exprObj.Finally != null)
+                var finallyExpr = tryExpr.Finally;
+                if (finallyExpr != null)
                 {
                     il.BeginFinallyBlock();
-
-                    if (!TryEmit(exprObj.Finally, exprObj.Finally.NodeType, exprObj.Finally.Type, paramExprs, il, closure))
+                    if (!TryEmit(finallyExpr, finallyExpr.NodeType, finallyExpr.Type, paramExprs, il, closure))
                         return false;
                 }
 
                 il.EndExceptionBlock();
+                if (isNonVoid)
+                {
+                    il.MarkLabel(returnLabel);
+                    il.Emit(OpCodes.Ldloc, returnResult);
+                }
 
-                if (hasResult)
+                return true;
+            }
+
+            private static bool EmitTryCatchFinallyBlockInfo(
+                TryExpressionInfo tryExpr, Type exprType, object[] paramExprs, ILGenerator il, ClosureInfo closure)
+            {
+                var returnLabel = default(Label);
+                var returnResult = default(LocalBuilder);
+                var isNonVoid = exprType != typeof(void);
+                if (isNonVoid)
+                {
+                    returnLabel = il.DefineLabel();
+                    returnResult = il.DeclareLocal(exprType);
+                }
+
+                il.BeginExceptionBlock();
+                var bodyExpr = tryExpr.Body;
+                if (!TryEmit(bodyExpr, bodyExpr.GetNodeType(), bodyExpr.GetResultType(), paramExprs, il, closure))
+                    return false;
+
+                if (isNonVoid)
+                {
+                    il.Emit(OpCodes.Stloc_S, returnResult);
+                    il.Emit(OpCodes.Leave_S, returnLabel);
+                }
+
+                var catchBlocks = tryExpr.Handlers;
+                for (var i = 0; i < catchBlocks.Length; i++)
+                {
+                    var catchBlock = catchBlocks[i];
+                    if (catchBlock.Filter != null)
+                        return false; // todo: Add support for filters on catch expression
+
+                    il.BeginCatchBlock(catchBlock.Test);
+
+                    // at the beginning of catch the Exception value is on the stack,
+                    // we will store into local variable.
+                    var catchBodyExpr = catchBlock.Body;
+                    var exVarExpr = catchBlock.Variable;
+                    if (exVarExpr != null)
+                    {
+                        var exVar = il.DeclareLocal(exVarExpr.Type);
+                        closure = closure ?? new ClosureInfo();
+                        closure.PushBlock(catchBodyExpr, new[] { exVarExpr }, new[] { exVar });
+                        il.Emit(OpCodes.Stloc_S, exVar);
+                    }
+
+                    if (!TryEmit(catchBodyExpr, catchBodyExpr.NodeType, catchBodyExpr.Type, paramExprs, il, closure))
+                        return false;
+
+                    if (exVarExpr != null)
+                        closure.PopBlock();
+
+                    if (isNonVoid)
+                    {
+                        il.Emit(OpCodes.Stloc_S, returnResult);
+                        il.Emit(OpCodes.Leave_S, returnLabel);
+                    }
+                    else
+                        il.Emit(OpCodes.Pop);
+                }
+
+                var finallyExpr = tryExpr.Finally;
+                if (finallyExpr != null)
+                {
+                    il.BeginFinallyBlock();
+                    if (!TryEmit(finallyExpr, finallyExpr.NodeType, finallyExpr.Type, paramExprs, il, closure))
+                        return false;
+                }
+
+                il.EndExceptionBlock();
+                if (isNonVoid)
                 {
                     il.MarkLabel(returnLabel);
                     il.Emit(OpCodes.Ldloc, returnResult);
@@ -1585,20 +1688,29 @@ namespace FastExpressionCompiler
             private static bool EmitThrow(
                 UnaryExpression exprObj, object[] paramExprs, ILGenerator il, ClosureInfo closure)
             {
-                var exceptionExpr = exprObj.Operand;
-                if (!TryEmit(exceptionExpr, exceptionExpr.NodeType, exceptionExpr.Type, paramExprs, il, closure))
-                    return false;
+                var exExpr = exprObj.Operand;
+                var ok = TryEmit(exExpr, exExpr.NodeType, exExpr.Type, paramExprs, il, closure);
+                il.ThrowException(exExpr.Type);
+                return ok;
+            }
 
-                il.ThrowException(exceptionExpr.Type);
-                return true;
+            private static bool EmitThrowInfo(
+                UnaryExpressionInfo exprObj, object[] paramExprs, ILGenerator il, ClosureInfo closure)
+            {
+                var exExpr = exprObj.Operand;
+                var ok = TryEmit(exExpr, exExpr.NodeType, exExpr.Type, paramExprs, il, closure);
+                il.ThrowException(exExpr.Type);
+                return ok;
             }
 
             private static bool EmitParameter(
                 object paramExprObj, Type paramType, object[] paramExprs, ILGenerator il, ClosureInfo closure)
             {
-                var paramIndex = paramExprs.GetFirstIndex(paramExprObj);
+                if ((paramExprObj as ParameterExpression)?.IsByRef == true) // ref, and out parameters are not supported yet
+                    return false;
 
                 // if parameter is passed, then just load it on stack
+                var paramIndex = paramExprs.GetFirstIndex(paramExprObj);
                 if (paramIndex != -1)
                 {
                     if (closure != null && closure.HasBoundClosure)
@@ -1729,27 +1841,14 @@ namespace FastExpressionCompiler
                 {
                     if (sourceType.GetTypeInfo().IsValueType)
                         il.Emit(OpCodes.Box, sourceType); // for value type to object, just box a value
-                    return true; // for reference type we don't need to convert
                 }
-
-                // Just un-box type object to the target value type
-                if (targetType.GetTypeInfo().IsValueType &&
-                    sourceType == typeof(object))
-                {
+                else if (sourceType == typeof(object) && targetType.GetTypeInfo().IsValueType)
                     il.Emit(OpCodes.Unbox_Any, targetType);
-                    return true;
-                }
 
-                // Conversion to nullable: new Nullable<T>(T val);
-                if (targetType.IsNullable())
-                {
-                    var wrappedType = targetType.GetWrappedTypeFromNullable();
-                    var ctor = targetType.GetConstructorByArgs(wrappedType);
-                    il.Emit(OpCodes.Newobj, ctor);
-                    return true;
-                }
+                else if (targetType.IsNullable()) // Conversion to Nullable: new Nullable<T>(T val);
+                    il.Emit(OpCodes.Newobj, targetType.GetConstructorByArgs(targetType.GetWrappedTypeFromNullable()));
 
-                if (targetType == typeof(int))
+                else if (targetType == typeof(int))
                     il.Emit(OpCodes.Conv_I4);
                 else if (targetType == typeof(float))
                     il.Emit(OpCodes.Conv_R4);
@@ -1834,7 +1933,7 @@ namespace FastExpressionCompiler
                 }
                 else if (constantActualType == typeof(float))
                 {
-                    il.Emit(OpCodes.Ldc_R8, (float)constantValue);
+                    il.Emit(OpCodes.Ldc_R4, (float)constantValue);
                 }
                 else if (constantActualType == typeof(double))
                 {
@@ -1858,9 +1957,7 @@ namespace FastExpressionCompiler
                     var constantIndex = closure.Constants.GetFirstIndex(it => it.ConstantExpr == exprObj);
                     if (constantIndex == -1)
                         return false;
-
                     LoadClosureFieldOrItem(closure, il, constantIndex, exprType);
-
                 }
                 else return false;
 
@@ -3027,11 +3124,12 @@ namespace FastExpressionCompiler
                 return Empty<Type>();
 
             if (paramExprs.Count == 1)
-                return new[] { paramExprs[0].GetResultType() };
+                return new[] { paramExprs[0].IsByRef ? paramExprs[0].GetResultType().MakeByRefType() : paramExprs[0].GetResultType() };
 
             var paramTypes = new Type[paramExprs.Count];
             for (var i = 0; i < paramTypes.Length; i++)
-                paramTypes[i] = paramExprs[i].GetResultType();
+                paramTypes[i] = paramExprs[i].IsByRef ? paramExprs[i].GetResultType().MakeByRefType() : paramExprs[i].GetResultType();
+
             return paramTypes;
         }
 
@@ -3144,6 +3242,7 @@ namespace FastExpressionCompiler
         }
     }
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
     /// <summary>Facade for constructing expression info.</summary>
     public abstract class ExpressionInfo
     {
@@ -3166,7 +3265,11 @@ namespace FastExpressionCompiler
 
         /// <summary>Analog of Expression.Constant</summary>
         public static ConstantExpressionInfo Constant(object value, Type type = null) =>
-            new ConstantExpressionInfo(value, type);
+            value == null && type == null ? _nullExprInfo
+                : new ConstantExpressionInfo(value, type ?? value.GetType());
+
+        private static readonly ConstantExpressionInfo
+            _nullExprInfo = new ConstantExpressionInfo(null, typeof(object));
 
         /// <summary>Analog of Expression.New</summary>
         public static NewExpressionInfo New(ConstructorInfo ctor) =>
@@ -3294,21 +3397,51 @@ namespace FastExpressionCompiler
         /// <summary>Invoke</summary>
         public static ExpressionInfo Invoke(ExpressionInfo lambda, params object[] args) =>
             new InvocationExpressionInfo(lambda, args, lambda.Type);
+
+        /// <summary>Binary add</summary>
+        public static ExpressionInfo Add(ExpressionInfo left, ExpressionInfo right) =>
+            new ArithmeticBinaryExpressionInfo(ExpressionType.Add, left, right, left.Type);
+
+        /// <summary>Binary substract</summary>
+        public static ExpressionInfo Substract(ExpressionInfo left, ExpressionInfo right) =>
+            new ArithmeticBinaryExpressionInfo(ExpressionType.Subtract, left, right, left.Type);
+
+        public static ExpressionInfo Multiply(ExpressionInfo left, ExpressionInfo right) =>
+            new ArithmeticBinaryExpressionInfo(ExpressionType.Multiply, left, right, left.Type);
+
+        public static ExpressionInfo Divide(ExpressionInfo left, ExpressionInfo right) =>
+            new ArithmeticBinaryExpressionInfo(ExpressionType.Divide, left, right, left.Type);
+
+        public static BlockExpressionInfo Block(params object[] expressions) =>
+            new BlockExpressionInfo(expressions[expressions.Length - 1].GetResultType(),
+                Tools.Empty<ParameterExpressionInfo>(), expressions);
+
+        public static TryExpressionInfo TryCatch(object body, params CatchBlockInfo[] handlers) =>
+            new TryExpressionInfo(body, null, handlers);
+
+        public static TryExpressionInfo TryCatchFinally(object body, ExpressionInfo @finally, params CatchBlockInfo[] handlers) =>
+            new TryExpressionInfo(body, @finally, handlers);
+
+        public static TryExpressionInfo TryFinally(object body, ExpressionInfo @finally) =>
+            new TryExpressionInfo(body, @finally, null);
+
+        public static CatchBlockInfo Catch(ParameterExpressionInfo variable, ExpressionInfo body) =>
+            new CatchBlockInfo(variable, body, null, variable.Type);
+
+        public static CatchBlockInfo Catch(Type test, ExpressionInfo body) =>
+            new CatchBlockInfo(null, body, null, test);
+
+        public static UnaryExpressionInfo Throw(ExpressionInfo value) =>
+            new UnaryExpressionInfo(ExpressionType.Throw, value, typeof(void));
     }
 
-    /// <summary>Analog of Convert expression.</summary>
     public class UnaryExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType { get; }
-
-        /// <summary>Target type.</summary>
         public override Type Type { get; }
 
-        /// <summary>Operand expression</summary>
         public readonly ExpressionInfo Operand;
 
-        /// <inheritdoc />
         public override Expression ToExpression()
         {
             if (NodeType == ExpressionType.Convert)
@@ -3316,7 +3449,6 @@ namespace FastExpressionCompiler
             throw new NotSupportedException("Cannot convert ExpressionInfo to Expression of type " + NodeType);
         }
 
-        /// <summary>Constructor</summary>
         public UnaryExpressionInfo(ExpressionType nodeType, ExpressionInfo operand, Type type)
         {
             NodeType = nodeType;
@@ -3325,22 +3457,13 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>BinaryExpression analog.</summary>
     public abstract class BinaryExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType { get; }
-
-        /// <inheritdoc />
         public override Type Type { get; }
 
-        /// <summary>Left expression</summary>
-        public readonly object Left;
+        public readonly object Left, Right;
 
-        /// <summary>Right expression</summary>
-        public readonly object Right;
-
-        /// <summary>Constructs from left and right expressions.</summary>
         protected BinaryExpressionInfo(ExpressionType nodeType, object left, object right, Type type)
         {
             NodeType = nodeType;
@@ -3350,58 +3473,60 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>Expression.ArrayIndex </summary>
+    public class ArithmeticBinaryExpressionInfo : BinaryExpressionInfo
+    {
+        public ArithmeticBinaryExpressionInfo(ExpressionType nodeType, object left, object right, Type type)
+            : base(nodeType, left, right, type) { }
+
+        public override Expression ToExpression()
+        {
+            if (NodeType == ExpressionType.Add)
+                return Expression.Add(Left.ToExpression(), Right.ToExpression());
+            if (NodeType == ExpressionType.Subtract)
+                return Expression.Subtract(Left.ToExpression(), Right.ToExpression());
+            if (NodeType == ExpressionType.Multiply)
+                return Expression.Multiply(Left.ToExpression(), Right.ToExpression());
+            if (NodeType == ExpressionType.Divide)
+                return Expression.Divide(Left.ToExpression(), Right.ToExpression());
+            throw new NotSupportedException($"Not valid {NodeType} for arithmetic binary expression.");
+        }
+    }
+
     public class ArrayIndexExpressionInfo : BinaryExpressionInfo
     {
-        /// <summary>Constructor</summary>
         public ArrayIndexExpressionInfo(object left, object right, Type type)
             : base(ExpressionType.ArrayIndex, left, right, type) { }
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             Expression.ArrayIndex(Left.ToExpression(), Right.ToExpression());
     }
 
-    /// <summary>Expression.Assign </summary>
     public class AssignBinaryExpressionInfo : BinaryExpressionInfo
     {
-        /// <summary>Constructor</summary>
         public AssignBinaryExpressionInfo(object left, object right, Type type)
             : base(ExpressionType.Assign, left, right, type) { }
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             Expression.Assign(Left.ToExpression(), Right.ToExpression());
     }
 
-    /// <summary>Analog of MemberInitExpression</summary>
     public class MemberInitExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.MemberInit;
-
-        /// <inheritdoc />
         public override Type Type => ExpressionInfo.Type;
 
-        /// <summary>New expression.</summary>
         public NewExpressionInfo NewExpressionInfo => ExpressionInfo as NewExpressionInfo;
 
-        /// <summary>New expression.</summary>
         public readonly ExpressionInfo ExpressionInfo;
-
-        /// <summary>Member assignments.</summary>
         public readonly MemberAssignmentInfo[] Bindings;
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
-            Expression.MemberInit(NewExpressionInfo.ToNewExpression(), 
+            Expression.MemberInit(NewExpressionInfo.ToNewExpression(),
                 Bindings.Project(b => b.ToMemberAssignment()));
 
-        /// <summary>Constructs from the new expression and member initialization list.</summary>
         public MemberInitExpressionInfo(NewExpressionInfo newExpressionInfo, MemberAssignmentInfo[] bindings)
             : this((ExpressionInfo)newExpressionInfo, bindings) { }
 
-        /// <summary>Constructs from existing expression and member assignment list.</summary>
         public MemberInitExpressionInfo(ExpressionInfo expressionInfo, MemberAssignmentInfo[] bindings)
         {
             ExpressionInfo = expressionInfo;
@@ -3409,36 +3534,26 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>Wraps ParameterExpression and just it.</summary>
     public class ParameterExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.Parameter;
-
-        /// <inheritdoc />
         public override Type Type { get; }
 
-        /// <inheritdoc />
+        public readonly string Name;
+
         public override Expression ToExpression() => ParamExpr;
 
-        /// <summary>Wrapped parameter expression.</summary>
         public ParameterExpression ParamExpr =>
             _parameter ?? (_parameter = Expression.Parameter(Type, Name));
 
-        /// <summary>Allow to change parameter expression as info interchangeable.</summary>
         public static implicit operator ParameterExpression(ParameterExpressionInfo info) => info.ParamExpr;
 
-        /// <summary>Optional name.</summary>
-        public readonly string Name;
-
-        /// <summary>Creates a thing.</summary>
         public ParameterExpressionInfo(Type type, string name)
         {
             Type = type;
             Name = name;
         }
 
-        /// <summary>Constructor</summary>
         public ParameterExpressionInfo(ParameterExpression paramExpr)
             : this(paramExpr.Type, paramExpr.Name)
         {
@@ -3448,84 +3563,59 @@ namespace FastExpressionCompiler
         private ParameterExpression _parameter;
     }
 
-    /// <summary>Analog of ConstantExpression.</summary>
     public class ConstantExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.Constant;
-
-        /// <inheritdoc />
         public override Type Type { get; }
 
-        /// <summary>Value of constant.</summary>
         public readonly object Value;
 
-        /// <inheritdoc />
         public override Expression ToExpression() => Expression.Constant(Value, Type);
 
-        /// <summary>Constructor</summary>
-        public ConstantExpressionInfo(object value, Type type = null)
+        public ConstantExpressionInfo(object value, Type type)
         {
             Value = value;
-            Type = type ?? Value?.GetType() ?? typeof(object);
+            Type = type;
         }
     }
 
-    /// <summary>Base class for expressions with arguments.</summary>
     public abstract class ArgumentsExpressionInfo : ExpressionInfo
     {
-        /// <summary>List of arguments</summary>
         public readonly object[] Arguments;
 
-        /// <summary>Converts arguments to expressions</summary>
         protected Expression[] ArgumentsToExpressions() => Arguments.Project(Tools.ToExpression);
 
-        /// <summary>Constructor</summary>
         protected ArgumentsExpressionInfo(object[] arguments)
         {
             Arguments = arguments ?? Tools.Empty<object>();
         }
     }
 
-    /// <summary>Analog of NewExpression</summary>
     public class NewExpressionInfo : ArgumentsExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.New;
-
-        /// <inheritdoc />
         public override Type Type => Constructor.DeclaringType;
 
-        /// <summary>The constructor info.</summary>
         public readonly ConstructorInfo Constructor;
 
-        /// <inheritdoc />
         public override Expression ToExpression() => ToNewExpression();
 
-        /// <summary>Converts to NewExpression</summary>
         public NewExpression ToNewExpression() => Expression.New(Constructor, ArgumentsToExpressions());
 
-        /// <summary>Construct from constructor info and argument expressions</summary>
         public NewExpressionInfo(ConstructorInfo constructor, params object[] arguments) : base(arguments)
         {
             Constructor = constructor;
         }
     }
 
-    /// <summary>NewArrayExpression</summary>
     public class NewArrayExpressionInfo : ArgumentsExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.NewArrayInit;
-
-        /// <inheritdoc />
         public override Type Type { get; }
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             Expression.NewArrayInit(_elementType, ArgumentsToExpressions());
 
-        /// <summary>Array type and initializer</summary>
         public NewArrayExpressionInfo(Type elementType, object[] elements) : base(elements)
         {
             Type = elementType.MakeArrayType();
@@ -3535,26 +3625,17 @@ namespace FastExpressionCompiler
         private readonly Type _elementType;
     }
 
-    /// <summary>Analog of MethodCallExpression</summary>
     public class MethodCallExpressionInfo : ArgumentsExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.Call;
-
-        /// <inheritdoc />
         public override Type Type => Method.ReturnType;
 
-        /// <summary>The method info.</summary>
         public readonly MethodInfo Method;
-
-        /// <summary>Instance expression, null if static.</summary>
         public readonly ExpressionInfo Object;
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             Expression.Call(Object?.ToExpression(), Method, ArgumentsToExpressions());
 
-        /// <summary>Construct from method info and argument expressions</summary>
         public MethodCallExpressionInfo(ExpressionInfo @object, MethodInfo method, params object[] arguments)
             : base(arguments)
         {
@@ -3563,19 +3644,13 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>Analog of MemberExpression</summary>
     public abstract class MemberExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.MemberAccess;
-
-        /// <summary>Member info.</summary>
         public readonly MemberInfo Member;
 
-        /// <summary>Instance expression, null if static.</summary>
         public readonly object Expression;
 
-        /// <summary>Constructs with</summary>
         protected MemberExpressionInfo(object expression, MemberInfo member)
         {
             Expression = expression;
@@ -3583,56 +3658,38 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>Analog of PropertyExpression</summary>
     public class PropertyExpressionInfo : MemberExpressionInfo
     {
-        /// <inheritdoc />
         public override Type Type => PropertyInfo.PropertyType;
-
-        /// <summary>Subject</summary>
         public PropertyInfo PropertyInfo => (PropertyInfo)Member;
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             System.Linq.Expressions.Expression.Property(Expression.ToExpression(), PropertyInfo);
 
-        /// <summary>Construct from property info</summary>
         public PropertyExpressionInfo(object instance, PropertyInfo property)
             : base(instance, property) { }
     }
 
-    /// <summary>Analog of PropertyExpression</summary>
     public class FieldExpressionInfo : MemberExpressionInfo
     {
-        /// <inheritdoc />
         public override Type Type => FieldInfo.FieldType;
-
-        /// <summary>Subject</summary>
         public FieldInfo FieldInfo => (FieldInfo)Member;
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             System.Linq.Expressions.Expression.Field(Expression.ToExpression(), FieldInfo);
 
-        /// <summary>Construct from field info</summary>
         public FieldExpressionInfo(ExpressionInfo instance, FieldInfo field)
             : base(instance, field) { }
     }
 
-    /// <summary>MemberAssignment analog.</summary>
     public struct MemberAssignmentInfo
     {
-        /// <summary>Member to assign to.</summary>
         public MemberInfo Member;
-
-        /// <summary>Expression to assign</summary>
         public ExpressionInfo Expression;
 
-        /// <summary>Converts back to MemberAssignment</summary>
         public MemberBinding ToMemberAssignment() =>
             System.Linq.Expressions.Expression.Bind(Member, Expression.ToExpression());
 
-        /// <summary>Constructs out of member and expression to assign.</summary>
         public MemberAssignmentInfo(MemberInfo member, ExpressionInfo expression)
         {
             Member = member;
@@ -3640,23 +3697,16 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>Analog of InvocationExpression.</summary>
-    public sealed class InvocationExpressionInfo : ArgumentsExpressionInfo
+    public class InvocationExpressionInfo : ArgumentsExpressionInfo
     {
-        /// <inheritdoc />
         public override ExpressionType NodeType => ExpressionType.Invoke;
-
-        /// <inheritdoc />
         public override Type Type { get; }
 
-        /// <summary>Delegate to invoke.</summary>
         public readonly ExpressionInfo ExprToInvoke;
 
-        /// <inheritdoc />
         public override Expression ToExpression() =>
             Expression.Invoke(ExprToInvoke.ToExpression(), ArgumentsToExpressions());
 
-        /// <summary>Constructs</summary>
         public InvocationExpressionInfo(ExpressionInfo exprToInvoke, object[] arguments, Type type) : base(arguments)
         {
             ExprToInvoke = exprToInvoke;
@@ -3664,30 +3714,93 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>LambdaExpression</summary>
-    public class LambdaExpressionInfo : ArgumentsExpressionInfo
+    public class BlockExpressionInfo : ExpressionInfo
     {
-        /// <inheritdoc />
-        public override ExpressionType NodeType => ExpressionType.Lambda;
+        public override ExpressionType NodeType => ExpressionType.Block;
 
-        /// <inheritdoc />
         public override Type Type { get; }
 
-        /// <summary>Lambda body.</summary>
-        public readonly object Body;
+        public readonly ParameterExpressionInfo[] Variables;
+        public readonly object[] Expressions;
+        public readonly object Result;
 
-        /// <summary>List of parameters.</summary>
+        public override Expression ToExpression() =>
+            Expression.Block(Expressions.Project(Tools.ToExpression));
+
+        public BlockExpressionInfo(Type type, ParameterExpressionInfo[] variables, object[] expressions)
+        {
+            Variables = variables;
+            Expressions = expressions;
+            Result = expressions[expressions.Length - 1];
+            Type = type;
+        }
+    }
+
+    public class TryExpressionInfo : ExpressionInfo
+    {
+        public override ExpressionType NodeType => ExpressionType.Try;
+        public override Type Type { get; }
+
+        public readonly object Body;
+        public readonly CatchBlockInfo[] Handlers;
+        public readonly ExpressionInfo Finally;
+
+        public override Expression ToExpression() =>
+            Finally == null ? Expression.TryCatch(Body.ToExpression(), ToCatchBlocks(Handlers)) :
+            Handlers == null ? Expression.TryFinally(Body.ToExpression(), Finally.ToExpression()) :
+            Expression.TryCatchFinally(Body.ToExpression(), Finally.ToExpression(), ToCatchBlocks(Handlers));
+
+        private static CatchBlock[] ToCatchBlocks(CatchBlockInfo[] hs)
+        {
+            if (hs == null)
+                return Tools.Empty<CatchBlock>();
+            var catchBlocks = new CatchBlock[hs.Length];
+            for (var i = 0; i < hs.Length; ++i)
+                catchBlocks[i] = hs[i].ToCatchBlock();
+            return catchBlocks;
+        }
+
+        public TryExpressionInfo(object body, ExpressionInfo @finally, CatchBlockInfo[] handlers)
+        {
+            Type = body.GetResultType();
+            Body = body;
+            Handlers = handlers;
+            Finally = @finally;
+        }
+    }
+
+    public sealed class CatchBlockInfo
+    {
+        public readonly ParameterExpressionInfo Variable;
+        public readonly ExpressionInfo Body;
+        public readonly ExpressionInfo Filter;
+        public readonly Type Test;
+
+        public CatchBlockInfo(ParameterExpressionInfo variable, ExpressionInfo body, ExpressionInfo filter, Type test)
+        {
+            Variable = variable;
+            Body = body;
+            Filter = filter;
+            Test = test;
+        }
+
+        public CatchBlock ToCatchBlock() => Expression.Catch(Variable.ParamExpr, Body.ToExpression());
+    }
+
+    public class LambdaExpressionInfo : ArgumentsExpressionInfo
+    {
+        public override ExpressionType NodeType => ExpressionType.Lambda;
+        public override Type Type { get; }
+
+        public readonly object Body;
         public object[] Parameters => Arguments;
 
-        /// <inheritdoc />
         public override Expression ToExpression() => ToLambdaExpression();
 
-        /// <summary>subject</summary>
         public LambdaExpression ToLambdaExpression() =>
             Expression.Lambda(Body.ToExpression(),
                 Parameters.Project(p => (ParameterExpression)p.ToExpression()));
 
-        /// <summary>Constructor</summary>
         public LambdaExpressionInfo(Type delegateType, object body, object[] parameters) : base(parameters)
         {
             Body = body;
@@ -3698,22 +3811,18 @@ namespace FastExpressionCompiler
         }
     }
 
-    /// <summary>Typed lambda expression.</summary>
     public sealed class ExpressionInfo<TDelegate> : LambdaExpressionInfo
     {
-        /// <summary>Type of lambda</summary>
         public Type DelegateType => Type;
 
-        /// <inheritdoc />
         public override Expression ToExpression() => ToLambdaExpression();
 
-        /// <summary>subject</summary>
         public new Expression<TDelegate> ToLambdaExpression() =>
             Expression.Lambda<TDelegate>(Body.ToExpression(),
                 Parameters.Project(p => (ParameterExpression)p.ToExpression()));
 
-        /// <summary>Constructor</summary>
         public ExpressionInfo(ExpressionInfo body, object[] parameters)
             : base(typeof(TDelegate), body, parameters) { }
     }
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }
