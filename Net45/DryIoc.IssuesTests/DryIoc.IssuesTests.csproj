@@ -188,6 +188,7 @@
     <Compile Include="Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs.cs" />
     <Compile Include="Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func.cs" />
     <Compile Include="Issue554_Allow_Register_an_open_generic_service_type_with_closed implementation_to_enable_variance.cs" />
+    <Compile Include="Issue561_Child_containers_and_singletons.cs" />
     <Compile Include="Issue566_Named_service_not_replaced.cs" />
     <Compile Include="Issue569_Replacing_Registration_clears_all_existing_registrations.cs" />
     <Compile Include="Issue570_ArgumentNullThrownWhenMultipleConstructorsAndArgsDepsProvided.cs" />
