@@ -1,9 +1,4 @@
 ﻿using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DryIoc.IssuesTests
 {
@@ -11,37 +6,42 @@ namespace DryIoc.IssuesTests
     public class Issue570_ArgumentNullThrownWhenMultipleConstructorsAndArgsDepsProvided
     {
         [Test]
-        public void ResolveSouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided()
+        public void ResolveShouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided()
         {
-            var container = new Container(rules => rules.With(made: FactoryMethod.ConstructorWithResolvableArguments));
-            var config = new ServiceConfig();
+            var container = new Container(rules => rules
+                .With(made: FactoryMethod.ConstructorWithResolvableArguments));
+
             container.Register<Service>();
 
-            Assert.DoesNotThrow(() => container.Resolve<Service>(args: new object[] { config }));
+            var config = new ServiceConfig();
+            var service = container.Resolve<Service>(new object[] {config});
+
+            Assert.AreSame(config, service.Config);
         }
 
         [Test]
-        public void ResolveSouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided_WithConcreteTypesResolution()
+        public void ResolveShouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided_WithConcreteTypesResolution()
         {
             var container = new Container(rules => rules
                 .WithAutoConcreteTypeResolution()
                 .With(made: FactoryMethod.ConstructorWithResolvableArguments));
+            
             var config = new ServiceConfig();
 
-            Assert.DoesNotThrow(() => container.Resolve<Service>(args: new object[] { config }));
+            var service = container.Resolve<Service>(new object[] { config });
+            Assert.AreSame(config, service.Config);
         }
 
         public class ServiceConfig
         {
-
         }
 
         public class Service
         {
             public Service()
             {
-
             }
+
             public Service(ServiceConfig config)
             {
                 Config = config;

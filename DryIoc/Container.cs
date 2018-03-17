@@ -3864,11 +3864,15 @@ namespace DryIoc
                             .FindFirst(p => !IsResolvableParameter(p, parameterSelector, request)) == null)
                         .ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request));
 
-                // For Func<a, b, c> the constructor should contain all input arguments and
+                // For Func<a, b, r> the constructor should contain all input arguments and
                 // the rest should be resolvable.
                 var funcType = request.DirectParent.ServiceType;
-                var inputArgTypes = funcType.GetGenericParamsAndArgs();
-                var inputArgCount = inputArgTypes.Length - 1;
+                var inputArgTypes = funcType != null // get from either Func or Input arguments
+                    ? funcType.GetGenericParamsAndArgs()
+                    : request.InputArgs.Map(a => a.Type);
+
+                // drop func last return argument type
+                var inputArgCount = funcType != null ? inputArgTypes.Length - 1 : inputArgTypes.Length;
 
                 // Will store already resolved parameters to not repeat work twice
                 List<ParameterInfo> resolvedParams = null;
@@ -6116,7 +6120,7 @@ namespace DryIoc
                 s.Append(" decorating #").Append(DecoratedFactoryID);
 
             if (!InputArgs.IsNullOrEmpty())
-                s.AppendFormat(" with [{0}] Func args", InputArgs);
+                s.AppendFormat(" with args [{0}]", InputArgs);
 
             if ((Flags & RequestFlags.OpensResolutionScope) != 0)
                 s.Append(" [Opens resolution scope]");
