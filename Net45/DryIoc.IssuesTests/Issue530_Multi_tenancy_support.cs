@@ -93,7 +93,7 @@ namespace DryIoc.IssuesTests
             c.Register<ITenant, BlueTenant>(serviceKey: TenantKey.Blue, setup: Setup.With(openResolutionScope: true));
 
             // green tenant services
-            var greenSetup = Setup.With(condition: req => IsTenant(req, TenantKey.Green));
+            var greenSetup = Setup.With(condition: req => IsTenant(req, TenantKey.Green), asResolutionCall: true);
 
             c.Register<ITransient, GreenTransient>(setup: greenSetup);
             c.Register<IScoped, GreenScoped>(Reuse.Scoped, setup: greenSetup);

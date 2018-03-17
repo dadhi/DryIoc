@@ -808,12 +808,7 @@ namespace DryIoc
                 {
                     if (request.IsResolutionCall)
                         request.ChangeServiceKey(factory.Key);
-                    else // for injected dependency
-                    {
-                        var setup = factory.Value.Setup;
-                        if (setup.Condition != null)
-                            factory.Value.Setup = setup.WithAsResolutionCall();
-                    }
+                    // note: No AsResolutionCall by default
                 }
 
                 return factory.Value;
@@ -6363,10 +6358,9 @@ namespace DryIoc
             bool useParentReuse = false, int disposalOrder = 0)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
-                openResolutionScope == false && asResolutionCall == false && asResolutionRoot == false &&
-                preventDisposal == false && weaklyReferenced == false &&
-                allowDisposableTransient == false && trackDisposableTransient == false &&
-                useParentReuse == false && disposalOrder == 0)
+                !openResolutionScope && !asResolutionCall && !asResolutionRoot &&
+                !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
+                !useParentReuse && disposalOrder == 0)
                 return Default;
 
             return new ServiceSetup(condition,
@@ -6378,25 +6372,23 @@ namespace DryIoc
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
         public static readonly Setup Wrapper = new WrapperSetup();
 
-        /// <summary>Returns generic wrapper setup.</summary>
-        /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
-        /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-        /// <param name="unwrap">(optional) Delegate returning wrapped type from wrapper type. <b>Overwrites other options.</b></param>
-        /// <param name="openResolutionScope">(optional) Opens the new scope.</param>
-        /// <param name="asResolutionCall">(optional) Injects decorator as resolution call.</param>
-        /// <param name="preventDisposal">(optional) Prevents disposal of reused instance if it is disposable.</param>
-        /// <param name="condition">(optional)</param>
-        /// <param name="disposalOrder">(optional)</param>
-        /// <returns>New setup or default <see cref="Setup.Wrapper"/>.</returns>
+        /// <summary>Returns generic wrapper setup.
+        /// Default for <paramref name="wrappedServiceTypeArgIndex" /> is -1 for generic wrapper with single type argument.
+        /// Index need to be set for multiple type arguments. <paramref name="alwaysWrapsRequiredServiceType" /> need to be set 
+        /// when generic wrapper type arguments should be ignored.</summary>
         public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
             bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
-            bool openResolutionScope = false, bool asResolutionCall = false, bool preventDisposal = false,
-            Func<Request, bool> condition = null, int disposalOrder = 0)
-            => wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null
-            && !openResolutionScope && !preventDisposal && condition == null && disposalOrder == 0
+            bool openResolutionScope = false, bool asResolutionCall = false,
+            bool preventDisposal = false, bool weaklyReferenced = false,
+            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0)
+            => wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
+               !openResolutionScope && !asResolutionCall && !preventDisposal && !weaklyReferenced && 
+               !allowDisposableTransient && !trackDisposableTransient && condition == null && disposalOrder == 0
                 ? Wrapper
                 : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
-                    condition, openResolutionScope, asResolutionCall, preventDisposal, disposalOrder);
+                    condition, openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced,
+                    allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder);
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
@@ -6407,16 +6399,25 @@ namespace DryIoc
         /// Greater number means further from decoratee - specify negative number to stay closer.
         /// Decorators without order (Order is 0) or with equal order are applied in registration order
         /// - first registered are closer decoratee.</summary>
-        public static Setup DecoratorWith(Func<Request, bool> condition = null, int order = 0,
-            bool useDecorateeReuse = false, bool openResolutionScope = false, int disposalOrder = 0) =>
-            condition == null && order == 0 && !useDecorateeReuse && !openResolutionScope && disposalOrder == 0
+        public static Setup DecoratorWith(
+            Func<Request, bool> condition = null, int order = 0, bool useDecorateeReuse = false,
+            bool openResolutionScope = false, bool asResolutionCall = false,
+            bool preventDisposal = false, bool weaklyReferenced = false,
+            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+            int disposalOrder = 0) =>
+            condition == null && order == 0 && !useDecorateeReuse && 
+            !openResolutionScope && !asResolutionCall && 
+            !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
+            disposalOrder == 0
                 ? Decorator
-                : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope, disposalOrder);
+                : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
+                    preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
 
         /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>
         public static Setup DecoratorOf(Type decorateeType = null,
-            int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, int disposalOrder = 0,
-            object decorateeServiceKey = null)
+            int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, bool asResolutionCall = false, 
+            bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false,
+            bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null)
         {
             Func<Request, bool> condition
                 = decorateeType == null
@@ -6427,14 +6428,18 @@ namespace DryIoc
                     decorateeServiceKey.Equals(r.ServiceKey) &&
                     r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType));
 
-            return DecoratorWith(condition, order, useDecorateeReuse, openResolutionScope, disposalOrder);
+            return DecoratorWith(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
+                preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
         }
 
         /// <summary>Setup for decorator of type <typeparamref name="TDecoratee"/>.</summary>
         public static Setup DecoratorOf<TDecoratee>(
-            int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, int disposalOrder = 0,
-            object decorateeServiceKey = null) =>
-            DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, openResolutionScope, disposalOrder, decorateeServiceKey);
+            int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, bool asResolutionCall = false,
+            bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false,
+            bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null) =>
+            DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, openResolutionScope, asResolutionCall,
+                preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
+                disposalOrder, decorateeServiceKey);
 
         /// <summary>Service setup.</summary>
         internal sealed class ServiceSetup : Setup
@@ -6493,19 +6498,17 @@ namespace DryIoc
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
             }
 
-            /// <summary>Constructs wrapper setup from optional wrapped type selector and reuse wrapper factory.</summary>
-            /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument. Need to be set for multiple type arguments.</param>
-            /// <param name="alwaysWrapsRequiredServiceType">Need to be set when generic wrapper type arguments should be ignored.</param>
-            /// <param name="unwrap">Delegate returning wrapped type from wrapper type.  Overwrites other options.</param>
-            /// <param name="openResolutionScope">Opens the new scope.</param><param name="asResolutionCall"></param>
-            /// <param name="preventDisposal">Prevents disposal of reused instance if it is disposable.</param>
-            /// <param name="condition">Predicate to check if factory could be used for resolved request.</param>
-            /// <param name="disposalOrder">Disposal order</param>
+            /// <summary>Returns generic wrapper setup.
+            /// Default for <paramref name="wrappedServiceTypeArgIndex" /> is -1 for generic wrapper with single type argument.
+            /// Index need to be set for multiple type arguments. <paramref name="alwaysWrapsRequiredServiceType" /> need to be set 
+            /// when generic wrapper type arguments should be ignored.</summary>
             public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
-                Func<Request, bool> condition, bool openResolutionScope, bool asResolutionCall, bool preventDisposal,
-                int disposalOrder)
-                : base(condition, openResolutionScope: openResolutionScope, asResolutionCall: asResolutionCall,
-                    preventDisposal: preventDisposal, disposalOrder: disposalOrder)
+                Func<Request, bool> condition,
+                bool openResolutionScope, bool asResolutionCall,
+                bool preventDisposal, bool weaklyReferenced, bool allowDisposableTransient, bool trackDisposableTransient,
+                bool useParentReuse, int disposalOrder)
+                : base(condition, openResolutionScope, asResolutionCall, false, preventDisposal, weaklyReferenced,
+                    allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
@@ -6573,19 +6576,18 @@ namespace DryIoc
             /// <summary>Default setup.</summary>
             public DecoratorSetup() { }
 
-            /// <summary>Creates decorator setup with optional condition.</summary>
-            /// <param name="condition">(optional) Applied to decorated service to find that service is the decorator target.</param>
-            /// <param name="order">(optional) If provided specifies relative decorator position in decorators chain.
-            /// Greater number means further from decoratee - specify negative number to stay closer.
-            /// Decorators without order (Order is 0) or with equal order are applied in registration order
-            /// - first registered are closer decoratee.</param>
-            /// <param name="useDecorateeReuse">(optional) Instructs to use decorated service reuse.
-            /// Decorated service may be decorator itself.</param>
-            /// <param name="openResolutionScope">Opens resolution scope</param>
-            /// <param name="disposalOrder">Disposal order</param>
+            /// <summary>Creates decorator setup with optional condition. <paramref name="condition" /> applied to 
+            /// decorated service to find that service is the decorator target. <paramref name="order" /> specifies 
+            /// relative decorator position in decorators chain. Greater number means further from decoratee -
+            /// specify negative number to stay closer. Decorators without order (Order is 0) or with equal order
+            /// are applied in registration order - first registered are closer decoratee.</summary>
             public DecoratorSetup(Func<Request, bool> condition, int order, bool useDecorateeReuse,
-                bool openResolutionScope, int disposalOrder)
-                : base(condition, openResolutionScope, disposalOrder: disposalOrder)
+                bool openResolutionScope = false, bool asResolutionCall = false,
+                bool preventDisposal = false, bool weaklyReferenced = false,
+                bool allowDisposableTransient = false, bool trackDisposableTransient = false,
+                int disposalOrder = 0)
+                : base(condition, openResolutionScope, asResolutionCall, false, preventDisposal, weaklyReferenced,
+                    allowDisposableTransient, trackDisposableTransient, false, disposalOrder)
             {
                 Order = order;
                 UseDecorateeReuse = useDecorateeReuse;
