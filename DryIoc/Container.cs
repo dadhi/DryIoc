@@ -2551,9 +2551,8 @@ namespace DryIoc
     /// <summary>Interface used to convert reuse instance to expression.</summary>
     public interface IConvertibleToExpression
     {
-        /// <summary>Returns expression representation without closure.</summary>
-        /// <param name="fallbackConverter">Delegate for converting the sub-items, constants to container.</param>
-        /// <returns>Expression representation.</returns>
+        /// <summary>Returns expression representation without closure.
+        /// Use <paramref name="fallbackConverter"/> to converting the sub-items, constants to container.</summary>
         Expr ToExpression(Func<object, Expr> fallbackConverter);
     }
 
@@ -8604,6 +8603,7 @@ namespace DryIoc
         /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
         public static readonly IReuse InThread = Scoped;
 
+        // todo: Minimize usage of name for scopes, it will be more performant. e.g. ASP.NET Core does not use one.
         /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
         public static readonly string WebRequestScopeName = "WebRequestScopeName";
 
@@ -9818,11 +9818,8 @@ namespace DryIoc
             t.FullName != null && t.Namespace != null && !t.Namespace.StartsWith("System") ? t.FullName : t.Name;
 #endif
 
-        /// <summary>Appends type details to string builder.</summary>
-        /// <param name="s">String builder to append output to.</param>
-        /// <param name="type">Input type to print.</param>
-        /// <param name="getTypeName">(optional) Can specify to use either Name or FullName</param>
-        /// <returns>String builder with appended output.</returns>
+        /// <summary>Pretty prints the <paramref name="type"/> in proper C# representation.
+        /// <paramref name="getTypeName"/> allows to specify if you want Name instead of FullName.</summary>
         public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
         {
             if (type == null) return s;

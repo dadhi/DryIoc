@@ -39,8 +39,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<ClientPropThrow>());
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
-            Assert.That(ex.Message, Is.StringContaining("IService as property \"Service\""));
+            StringAssert.Contains("Unable to resolve", ex.Message);
+            StringAssert.Contains("IService as property \"Service\"", ex.Message);
         }
 
         [Test]

@@ -27,7 +27,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AnotherClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Unable to resolve "));
+            StringAssert.StartsWith("Unable to resolve ", ex.Message);
         }
 
         [Test]
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<YetAnotherClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Unable to find constructor with all resolvable parameters"));
+            StringAssert.StartsWith("Unable to find constructor with all resolvable parameters", ex.Message);
         }
 
         [Test]
@@ -52,7 +52,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<InternalClient>());
 
-            Assert.That(ex.Message, Is.StringStarting("Unable to get constructor of "));
+            StringAssert.StartsWith("Unable to get constructor of ", ex.Message);
         }
 
         [Test]

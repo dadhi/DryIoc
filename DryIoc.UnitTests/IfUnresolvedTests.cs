@@ -37,8 +37,8 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Client>());
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
-            Assert.That(ex.Message, Is.StringContaining("parameter \"service\""));
+            StringAssert.Contains("Unable to resolve", ex.Message);
+            StringAssert.Contains("parameter \"service\"", ex.Message);
         }
 
         [Test]
