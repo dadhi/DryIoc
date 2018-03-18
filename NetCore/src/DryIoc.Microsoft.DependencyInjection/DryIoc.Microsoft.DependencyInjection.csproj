@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
-    <VersionPrefix>2.0.0-preview-02</VersionPrefix>
+    <VersionPrefix>2.0.0-preview-03</VersionPrefix>
     <Authors>Maksim Volkau</Authors>
     <Copyright>Copyright © 2016 Maksim Volkau</Copyright>
     <TargetFrameworks>netstandard1.0;netstandard2.0</TargetFrameworks>
@@ -15,6 +15,7 @@
       v2.0.0:
       - updated: to DryIoc v3
       - updated: Targets changed to match MS.Ext.DI (netstandard 1.0 for DI 1.1.1 and netstandard 2.0 for DI 2.0)
+      - breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
       v1.3.1:
       - fixed: DryIoc updated to 2.12.1 with fix for relevant issue #512
       v1.3.0:
@@ -25,8 +26,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
-    <!--<PackageReference Include="DryIoc.dll" Version="3.0.0-preview-03" />-->
+    <!--<ProjectReference Include="..\DryIoc\DryIoc.csproj" />-->
+    <PackageReference Include="DryIoc.dll" Version="3.0.0-preview-11" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.0'">
