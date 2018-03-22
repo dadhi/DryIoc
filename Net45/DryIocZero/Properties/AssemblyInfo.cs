@@ -7,6 +7,6 @@ using System.Runtime.CompilerServices;
 
 [assembly: AssemblyVersion(             "4.0.0")]
 [assembly: AssemblyFileVersion(         "4.0.0")]
-[assembly: AssemblyInformationalVersion("4.0.0-preview-14")]
+[assembly: AssemblyInformationalVersion("4.0.0-preview-15")]
 
 [assembly: InternalsVisibleTo("DryIocZero.UnitTests")]
