@@ -17,8 +17,8 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
