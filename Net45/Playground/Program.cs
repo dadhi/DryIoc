@@ -100,7 +100,7 @@ namespace Playground
             }
         }
 
-        public class IfVsNullСoalesOperator
+        public class IfVsNullСoalesceOperator
         {
             private object x = "a";
 
@@ -139,14 +139,8 @@ namespace Playground
 
         public class ExpressionCompileVsEmit
         {
-            private Expression<Func<object[], object>> _funcExpr;
-
-            [Setup]
-            public void SetupData()
-            {
-                _funcExpr = CreateComplexExpression();
-            }
-
+            private static Expression<Func<object[], object>> _funcExpr = CreateComplexExpression();
+            
             [Benchmark]
             public void Compile()
             {
@@ -169,7 +163,7 @@ namespace Playground
             private Func<object[], object> _funcEmitted;
             private object[] _state;
 
-            [Setup]
+            [GlobalSetup]
             public void SetupData()
             {
                 var expression = CreateComplexExpression();
@@ -239,7 +233,7 @@ namespace Playground
         private readonly object[] _state = new object[32];
         private object _result;
 
-        [Setup]
+        [GlobalSetup]
         public void Setup()
         {
             _state[15] = "a";
