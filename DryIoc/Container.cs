@@ -8587,8 +8587,7 @@ namespace DryIoc
         /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
         /// <param name="name">(optional) Name to match with scope.</param>
         /// <returns>Created current scope reuse.</returns>
-        public static IReuse InCurrentNamedScope(object name = null) =>
-            ScopedTo(name);
+        public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
         /// <summary>Creates reuse to search for <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/>
         /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="Scoped"/> will be returned.</summary>
@@ -8605,9 +8604,11 @@ namespace DryIoc
 
         // todo: Minimize usage of name for scopes, it will be more performant. e.g. ASP.NET Core does not use one.
         /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
-        public static readonly string WebRequestScopeName = "WebRequestScopeName";
+        public static string WebRequestScopeName = "~WRSN";
 
-        /// <summary>Web request is just convention for reuse in <see cref="InCurrentNamedScope"/> with special name <see cref="WebRequestScopeName"/>.</summary>
+        /// <summary>Obsolete: please prefer using <see cref="Reuse.Scoped"/> instead.
+        /// The named scope has performance drawback comparing to just a scope.
+        /// If you need to distinsguish nested scope, give names to them instead of naming the top web request scope.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
 
         #region Implementation

@@ -685,7 +685,7 @@
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithCurrentScopeReuse), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.CurrentScope },
+        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Scoped },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = false,
@@ -741,7 +741,7 @@
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WithNamedCurrentScope), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.CurrentScope, ScopeName = "ScopeA" },
+        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Scoped, ScopeName = "ScopeA" },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = false,
@@ -928,7 +928,7 @@
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts), "a", DryIoc.IfAlreadyRegistered.Keep),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.CurrentScope },
+        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Scoped },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = true,
@@ -947,7 +947,7 @@
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts), "a", DryIoc.IfAlreadyRegistered.Keep),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.CurrentScope },
+        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Scoped },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = true,
@@ -966,7 +966,7 @@
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedScopeService), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.CurrentScope, ScopeName = "a" },
+        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Scoped, ScopeName = "a" },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = true,

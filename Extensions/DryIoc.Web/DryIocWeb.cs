@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2014 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -39,11 +39,8 @@ namespace DryIoc.Web
         /// <param name="container">Original container with some rules and registrations.</param>
         /// <param name="getContextItems">(optional) Arbitrary or test context to use instead of <see cref="HttpContext.Current"/>.</param>
         /// <returns>New container with the same rules and registrations/cache but with new ambient context.</returns>
-        public static IContainer WithHttpContextScopeContext(this IContainer container, Func<IDictionary> getContextItems = null)
-        {
-            return container.ThrowIfNull()
-                .With(scopeContext: new HttpContextScopeContext(getContextItems));
-        }
+        public static IContainer WithHttpContextScopeContext(this IContainer container, Func<IDictionary> getContextItems = null) => 
+            container.ThrowIfNull().With(scopeContext: new HttpContextScopeContext(getContextItems));
     }
 
     /// <summary>Registers <see cref="DryIocHttpModule"/>.</summary>
@@ -105,11 +102,7 @@ namespace DryIoc.Web
     {
         /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>
-        public static Func<IDictionary> GetContextItems = () =>
-        {
-            var httpContext = HttpContext.Current;
-            return httpContext == null ? null : httpContext.Items;
-        };
+        public static Func<IDictionary> GetContextItems = () => HttpContext.Current?.Items;
 
         /// <summary>Creates the context optionally with arbitrary/test items storage.</summary>
         /// <param name="getContextItems">(optional) Context items to use.</param>
@@ -132,7 +125,7 @@ namespace DryIoc.Web
         public static readonly string ScopeContextName = typeof(HttpContextScopeContext).FullName;
 
         /// <summary>Returns fixed name.</summary>
-        public string RootScopeName { get { return ScopeContextName; } }
+        public string RootScopeName => ScopeContextName;
 
         /// <summary>Returns current ambient scope stored in item storage.</summary> <returns>Current scope or null if there is no.</returns>
         public IScope GetCurrentOrDefault()

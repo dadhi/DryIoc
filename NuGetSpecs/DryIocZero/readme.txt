@@ -1,5 +1,4 @@
-﻿
-Hello Sailor,
+﻿Hello Sailor,
 
 Check 1: If you don't see any new files in the project, please copy all files from
 

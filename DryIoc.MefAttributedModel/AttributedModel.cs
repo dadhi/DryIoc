@@ -42,7 +42,7 @@ namespace DryIoc.MefAttributedModel
             ImHashMap<ReuseType, Func<object, IReuse>>.Empty
             .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
             .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
-            .AddOrUpdate(ReuseType.CurrentScope, Reuse.ScopedTo)
+            .AddOrUpdate(ReuseType.Scoped, Reuse.ScopedTo)
             .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.Scoped)
             .AddOrUpdate(ReuseType.ScopedOrSingleton, _ => Reuse.ScopedOrSingleton);
 
@@ -281,7 +281,7 @@ namespace DryIoc.MefAttributedModel
                 ? source.Select(it => it.Value)
                 : source.Where(it =>
                 {
-                    if (it.Key is DefaultKey) // todo: consider the DynamicDefaultKey?
+                    if (it.Key is DefaultKey || it.Key is DefaultDynamicKey)
                         return false;
                     if (serviceKey.Equals(it.Key))
                         return true;
@@ -433,7 +433,7 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
-                        // todo: Review need for factory service key
+                        // todo: Review the need for factory service key
                         // - May be export factory AsWrapper to hide from collection resolution
                         // - Use an unique (GUID) service key
                         var factoryKey = Constants.InstanceFactory;

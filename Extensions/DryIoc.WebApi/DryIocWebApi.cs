@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2014-2016 Maksim Volkau
+Copyright (c) 2014 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -90,26 +90,20 @@ namespace DryIoc.WebApi
         /// <summary>Helps to find if type is controller type.</summary>
         /// <param name="type">Type to check.</param>
         /// <returns>True if controller type</returns>
-        public static bool IsController(this Type type)
-        {
-            return ControllerResolver.Default.IsController(type);
-        }
+        public static bool IsController(this Type type) => 
+            ControllerResolver.Default.IsController(type);
 
         private sealed class ControllerResolver : DefaultHttpControllerTypeResolver
         {
             public static readonly ControllerResolver Default = new ControllerResolver();
-
-            public bool IsController(Type type)
-            {
-                return IsControllerTypePredicate(type);
-            }
+            public bool IsController(Type type) => IsControllerTypePredicate(type);
         }
 
         private sealed class GivenAssembliesResolver : IAssembliesResolver
         {
             private readonly ICollection<Assembly> _assemblies;
+            public ICollection<Assembly> GetAssemblies() => _assemblies;
             public GivenAssembliesResolver(ICollection<Assembly> assemblies) { _assemblies = assemblies; }
-            public ICollection<Assembly> GetAssemblies() { return _assemblies; }
         }
 
         /// <summary>Replaces all filter providers in services with <see cref="DryIocFilterProvider"/>, and registers it in container.</summary>
@@ -149,11 +143,7 @@ namespace DryIoc.WebApi
         }
 
         /// <summary>Disposes container.</summary>
-        public void Dispose()
-        {
-            if (Container != null)
-                Container.Dispose();
-        }
+        public void Dispose() => Container?.Dispose();
 
         /// <summary>Retrieves a service from the scope or null if unable to resolve service.</summary>
         /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
@@ -167,18 +157,13 @@ namespace DryIoc.WebApi
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
         /// <returns>The retrieved collection of services.</returns>
         /// <param name="serviceType">The collection of services to be retrieved.</param>
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            return Container.ResolveMany<object>(serviceType);
-        }
+        public IEnumerable<object> GetServices(Type serviceType) => 
+            Container.ResolveMany<object>(serviceType);
 
         /// <summary>Opens scope from underlying container.</summary>
         /// <returns>Opened scope wrapped in dependency scope.</returns>
-        public IDependencyScope BeginScope()
-        {
-            var scope = Container.OpenScope(Reuse.WebRequestScopeName);
-            return new DryIocDependencyScope(scope, _throwIfUnresolved);
-        }
+        public IDependencyScope BeginScope() => 
+            new DryIocDependencyScope(Container.OpenScope(Reuse.WebRequestScopeName), _throwIfUnresolved);
 
         private readonly Func<Type, bool> _throwIfUnresolved;
     }
@@ -202,28 +187,19 @@ namespace DryIoc.WebApi
         }
 
         /// <summary>Disposed underlying scoped container.</summary>
-        public void Dispose()
-        {
-            if (ScopedContainer != null)
-                ScopedContainer.Dispose();
-        }
+        public void Dispose() => ScopedContainer?.Dispose();
 
         /// <summary>Retrieves a service from the scope or returns null if not resolved.</summary>
-        /// <returns>The retrieved service.</returns> <param name="serviceType">The service to be retrieved.</param>
-        public object GetService(Type serviceType)
-        {
-            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
-                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
-            return ScopedContainer.Resolve(serviceType, ifUnresolved);
-        }
+        public object GetService(Type serviceType) => 
+            ScopedContainer.Resolve(serviceType, 
+            _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault);
 
         /// <summary>Retrieves a collection of services from the scope or empty collection.</summary>
         /// <returns>The retrieved collection of services.</returns>
         /// <param name="serviceType">The collection of services to be retrieved.</param>
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            return ScopedContainer.ResolveMany<object>(serviceType);
-        }
+        public IEnumerable<object> GetServices(Type serviceType) => 
+            ScopedContainer.ResolveMany<object>(serviceType);
     }
 
     /// <summary>Aggregated filter provider.</summary>
@@ -270,7 +246,7 @@ namespace DryIoc.WebApi
         public void RegisterInDependencyScope(HttpRequestMessage request)
         {
             var dependencyScope = request.ThrowIfNull()
-                .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.RequestMessageDoesnotReferenceDryiocDependencyScope);
+                .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.RequestMessageDoesNotReferenceDryIocDependencyScope);
             
             var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
             container.UseInstance(request);
@@ -282,7 +258,7 @@ namespace DryIoc.WebApi
     {
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
-            RequestMessageDoesnotReferenceDryiocDependencyScope = DryIoc.Error.Of(
+            RequestMessageDoesNotReferenceDryIocDependencyScope = DryIoc.Error.Of(
                 "Expecting request message dependency scope to be of type {1} but found: {0}.");
 #pragma warning restore 1591
     }
