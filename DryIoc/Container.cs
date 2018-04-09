@@ -4628,7 +4628,7 @@ namespace DryIoc
         /// which prevents diagnostics, plus it is easy to get memory leaks (due variables captured in delegate closure),
         /// and impossible to use in compile-time scenarios.
         /// Consider using <see cref="Made"/> instead:
-        /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
+        /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>
         /// </remarks>
         public static void RegisterDelegate(this IRegistrator registrator,
             Type serviceType, Func<IResolverContext, object> factoryDelegate,
@@ -4666,11 +4666,7 @@ namespace DryIoc
         internal sealed class DecoratorDelegateFactory<TDecoratee>
         {
             private readonly Func<IResolverContext, Func<TDecoratee, TDecoratee>> _getDecorator;
-
-            public DecoratorDelegateFactory(Func<IResolverContext, Func<TDecoratee, TDecoratee>> getDecorator)
-            {
-                _getDecorator = getDecorator;
-            }
+            public DecoratorDelegateFactory(Func<IResolverContext, Func<TDecoratee, TDecoratee>> getDecorator) { _getDecorator = getDecorator; }
 
             public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r)(decoratee);
         }
@@ -4775,7 +4771,7 @@ namespace DryIoc
             public T TrackForDispose(T item)
             {
                 if (Interlocked.CompareExchange(ref _state, Tracked, 0) != 0)
-                    Throw.It(Error.Of("Something is {0} already."), _state == Tracked ? " tracked" : "disposed");
+                    Throw.It(Error.DisposerTrackForDisposeError, _state == Tracked ? " tracked" : "disposed");
                 _item = item;
                 return item;
             }
@@ -8921,13 +8917,10 @@ namespace DryIoc
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
         /// optionally with <paramref name="innerException"/> exception.</summary>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
-            object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
-            Exception innerException = null)
-        {
-            var messageFormat = GetMessage(errorCheck, errorCode);
-            var message = string.Format(messageFormat, Print(arg0), Print(arg1), Print(arg2), Print(arg3));
-            return new ContainerException(errorCode, message, innerException);
-        }
+            object arg0, object arg1 = null, object arg2 = null, object arg3 = null, Exception innerException = null) =>
+            new ContainerException(errorCode, 
+                string.Format(GetMessage(errorCheck, errorCode), Print(arg0), Print(arg1), Print(arg2), Print(arg3)),
+                innerException);
 
         /// <summary>Gets error message based on provided args.</summary> <param name="errorCheck"></param> <param name="errorCode"></param>
         protected static string GetMessage(ErrorCheck errorCheck, int errorCode) =>
@@ -8939,17 +8932,14 @@ namespace DryIoc
 
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
-        /// <param name="error">Error code.</param> <param name="message">Error message.</param>
-        /// <param name="innerException">Underlying system/leading exception.</param>
-        protected ContainerException(int error, string message, Exception innerException)
+        public ContainerException(int errorCode, string message, Exception innerException)
             : base(message, innerException)
         {
-            Error = error;
+            Error = errorCode;
         }
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
-        /// <param name="error">Error code.</param> <param name="message">Error message.</param>
-        protected ContainerException(int error, string message)
+        public ContainerException(int error, string message)
             : this(error, message, null) { }
     }
 
@@ -8975,8 +8965,7 @@ namespace DryIoc
                 "  with normal and dynamic registrations:" + Environment.NewLine + "{1}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration but found many:" + Environment.NewLine + "{0}" +
-                Environment.NewLine +
+                "Expecting single default registration but found many:" + Environment.NewLine + "{0}" + Environment.NewLine +
                 "when resolving {1}." + Environment.NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
@@ -9130,28 +9119,41 @@ namespace DryIoc
             PassedMemberIsNotStaticButInstanceFactoryIsNull = Of(
                 "The member info {0} passed to `Made.Of` or `FactoryMethod.Of` is NOT static, but instance factory is not provided or null"),
             PassedMemberIsStaticButInstanceFactoryIsNotNull = Of(
-                "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing an INSTANCE factory: {1}");
+                "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing an INSTANCE factory: {1}"),
+            UndefinedMethodWhenGettingTheSingleMethod = Of(
+                "Undefined Method '{0}' in Type {1} (including non-public={2})"),
+            UndefinedMethodWhenGettingMethodWithSpecifiedParameters = Of(
+                "Undefined Method '{0}' in Type {1} with parameters {2}."),
+            UndefinedPropertyWhenGettingProperty = Of("Undefined property {0} in type {1}"),
+            UndefinedFieldWhenGettingField = Of("Undefined field {0} in type {1}"),
+            UnableToFindConstructorWithArgs = Of("Unable to find a constructor in Type {0} with args: {1}"),
+            UnableToFindSingleConstructor = Of("Unable to find a single constructor in Type {0} (including non-public={1})"),
+            DisposerTrackForDisposeError = Of("Something is {0} already.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
+        private static int _errorIndex = 0;
+
         /// <summary>Stores new error message and returns error code for it.</summary>
-        /// <param name="message">Error message to store.</param> <returns>Error code for message.</returns>
         public static int Of(string message)
         {
             Messages.Add(message);
             return FirstErrorCode + Messages.Count - 1;
+
+            //var errorIndex = Interlocked.Increment(ref _errorIndex) - 1;
+            //while (errorIndex >= Messages.Count)
+            //    Messages.Add("!_!");
+            //Messages[errorIndex] = message;
+            //return FirstErrorCode + errorIndex;
         }
 
         /// <summary>Returns the name for the provided error code.</summary>
-        /// <param name="error">error code.</param> <returns>name of error, unique in scope of this <see cref="Error"/> class.</returns>
         public static string NameOf(int error)
         {
             var index = error - FirstErrorCode + 1;
-            var field = typeof(Error).GetTypeInfo().DeclaredFields
-                .Where(f => f.FieldType == typeof(int))
-                .Where((_, i) => i == index)
-                .FirstOrDefault();
-            return field != null ? field.Name : null;
+            var field = typeof(Error).GetTypeInfo().DeclaredFields.Where(f => f.FieldType == typeof(int))
+                .Where((_, i) => i == index).FirstOrDefault();
+            return field?.Name;
         }
 
         static Error()
@@ -9195,14 +9197,10 @@ namespace DryIoc
         private static readonly string[] _defaultMessages = CreateDefaultMessages();
 
         /// <summary>Returns the default message specified for <see cref="ErrorCheck"/> code.</summary>
-        /// <param name="error">Error code to get message for.</param> <returns>String format message.</returns>
-        public static string GetDefaultMessage(ErrorCheck error)
-        {
-            return _defaultMessages[(int)error];
-        }
+        public static string GetDefaultMessage(ErrorCheck error) =>
+            _defaultMessages[(int)error];
 
         /// <summary>Declares mapping between <see cref="ErrorCheck"/> type and <paramref name="error"/> code to specific <see cref="Exception"/>.</summary>
-        /// <returns>Returns mapped exception.</returns>
         public delegate Exception GetMatchedExceptionHandler(ErrorCheck errorCheck, int error, object arg0, object arg1, object arg2, object arg3, Exception inner);
 
         /// <summary>Returns matched exception for error check and error code.</summary>
@@ -9280,8 +9278,6 @@ namespace DryIoc
     public static class ThrowInGeneratedCode
     {
         /// <summary>Throws if object is null.</summary>
-        /// <param name="obj">object to check.</param><param name="message">Error message.</param>
-        /// <returns>object if not null.</returns>
         public static object ThrowNewErrorIfNull(this object obj, string message)
         {
             if (obj == null) Throw.It(Error.Of(message));
@@ -9361,7 +9357,7 @@ namespace DryIoc
                 t.DeclaredFields.Cast<MemberInfo>())),
                 includeBase);
 
-        /// <summary>Returns true if <paramref name="openGenericType"/> contains all generic parameters
+        /// <summary>Returns true if the <paramref name="openGenericType"/> contains all generic parameters
         /// from <paramref name="genericParameters"/>.</summary>
         public static bool ContainsAllGenericTypeParameters(this Type openGenericType, Type[] genericParameters)
         {
@@ -9542,7 +9538,7 @@ namespace DryIoc
         /// <summary>Searches and returns constructor by its signature, or throws if not found</summary>
         public static ConstructorInfo Constructor(this Type type, params Type[] args) =>
             type.GetConstructorOrNull(includeNonPublic: true, args: args).ThrowIfNull(
-                Error.Of("Unable to find a constructor in Type {0} with args: {1}"), type, args);
+                Error.UnableToFindConstructorWithArgs, type, args);
 
         /// <summary>Returns single constructor otherwise (if no constructor or more than one) returns null.</summary>
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
@@ -9554,7 +9550,7 @@ namespace DryIoc
         /// <summary>Returns single constructor otherwise (if no or more than one) throws an exception</summary>
         public static ConstructorInfo SingleConstructor(this Type type, bool includeNonPublic = false) =>
             type.GetSingleConstructorOrNull(includeNonPublic).ThrowIfNull(
-                Error.Of("Unable to find a single constructor in Type {0} (including non-public={1})"), type, includeNonPublic);
+                Error.UnableToFindSingleConstructor, type, includeNonPublic);
 
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
@@ -9568,12 +9564,12 @@ namespace DryIoc
         /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
         public static MethodInfo SingleMethod(this Type type, string name, bool includeNonPublic = false) =>
             type.GetSingleMethodOrNull(name, includeNonPublic).ThrowIfNull(
-                Error.Of("Undefined Method '{0}' in Type {1} (including non-public={2})"), name, type, includeNonPublic);
+                Error.UndefinedMethodWhenGettingTheSingleMethod, name, type, includeNonPublic);
 
         /// <summary>Looks up for method with and specified parameter types.</summary>
         public static MethodInfo Method(this Type type, string name, params Type[] args) =>
             type.GetMethodOrNull(name, args).ThrowIfNull(
-                Error.Of("Undefined Method '{0}' in Type {1} with parameters {2}."), name, type, args);
+                Error.UndefinedMethodWhenGettingMethodWithSpecifiedParameters, name, type, args);
 
         /// <summary>Looks up for method with and specified parameter types.</summary>
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
@@ -9614,7 +9610,8 @@ namespace DryIoc
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         public static PropertyInfo Property(this Type type, string name, bool includeBase = false) =>
-            type.GetPropertyOrNull(name, includeBase).ThrowIfNull(Error.Of("Undefined property {0} in type {1}"), name, type);
+            type.GetPropertyOrNull(name, includeBase).ThrowIfNull(
+                Error.UndefinedPropertyWhenGettingProperty, name, type);
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false) =>
@@ -9622,7 +9619,8 @@ namespace DryIoc
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo Field(this Type type, string name, bool includeBase = false) =>
-            type.GetFieldOrNull(name, includeBase).ThrowIfNull(Error.Of("Undefined field {0} in type {1}"), name, type);
+            type.GetFieldOrNull(name, includeBase).ThrowIfNull(
+                Error.UndefinedFieldWhenGettingField, name, type);
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false) =>
