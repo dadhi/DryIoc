@@ -6784,7 +6784,7 @@ namespace DryIoc
                     typeof(ThrowInGeneratedCode).SingleMethod(nameof(ThrowInGeneratedCode.ThrowNewErrorIfNull)),
                     Property(Convert(serviceExpr, typeof(WeakReference)),
                         typeof(WeakReference).Property(nameof(WeakReference.Target))),
-                    Constant(Error.Messages[Error.WeakRefReuseWrapperGCed]));
+                    Constant(Error.WeakRefReuseWrapperGCed));
             else if (Setup.PreventDisposal)
                 serviceExpr = Field(
                     Convert(serviceExpr, typeof(HiddenDisposable)),
@@ -8946,11 +8946,10 @@ namespace DryIoc
     /// <summary>Defines error codes and error messages for all DryIoc exceptions (DryIoc extensions may define their own.)</summary>
     public static class Error
     {
-        /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public static readonly int FirstErrorCode = 0;
+        private static int _errorIndex = -1;
 
         /// <summary>List of error messages indexed with code.</summary>
-        public static readonly List<string> Messages = new List<string>(100);
+        public static readonly string[] Messages = new string[100];
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
@@ -8981,12 +8980,10 @@ namespace DryIoc
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all type arguments, but specifies only {2}."),
             RegisteringNotAGenericTypedefImplType = Of(
-                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." +
-                Environment.NewLine +
+                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNotAGenericTypedefServiceType = Of(
-                "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." +
-                Environment.NewLine +
+                "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNullImplementationTypeAndNoFactoryMethod = Of(
                 "Registering without implementation type and without FactoryMethod to use instead."),
@@ -9066,8 +9063,7 @@ namespace DryIoc
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
                 "Runtime state is required to inject (or use) the: {0}. " + Environment.NewLine +
-                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." +
-                Environment.NewLine +
+                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + Environment.NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgValueIndexIsProvidedButNoArgValues = Of(
                 "Arg.Index of value is used but no values are passed"),
@@ -9132,29 +9128,17 @@ namespace DryIoc
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
-        private static int _errorIndex = 0;
-
-        /// <summary>Stores new error message and returns error code for it.</summary>
-        public static int Of(string message)
+        private static int Of(string message)
         {
-            Messages.Add(message);
-            return FirstErrorCode + Messages.Count - 1;
-
-            //var errorIndex = Interlocked.Increment(ref _errorIndex) - 1;
-            //while (errorIndex >= Messages.Count)
-            //    Messages.Add("!_!");
-            //Messages[errorIndex] = message;
-            //return FirstErrorCode + errorIndex;
+            var errorIndex = Interlocked.Increment(ref _errorIndex);
+            Messages[errorIndex] = message;
+            return errorIndex;
         }
 
         /// <summary>Returns the name for the provided error code.</summary>
-        public static string NameOf(int error)
-        {
-            var index = error - FirstErrorCode + 1;
-            var field = typeof(Error).GetTypeInfo().DeclaredFields.Where(f => f.FieldType == typeof(int))
-                .Where((_, i) => i == index).FirstOrDefault();
-            return field?.Name;
-        }
+        public static string NameOf(int error) => 
+            typeof(Error).GetTypeInfo().DeclaredFields.Where(f => f.FieldType == typeof(int))
+                .Where((_, i) => i == error + 1).FirstOrDefault()?.Name;
 
         static Error()
         {
@@ -9278,9 +9262,9 @@ namespace DryIoc
     public static class ThrowInGeneratedCode
     {
         /// <summary>Throws if object is null.</summary>
-        public static object ThrowNewErrorIfNull(this object obj, string message)
+        public static object ThrowNewErrorIfNull(this object obj, int error)
         {
-            if (obj == null) Throw.It(Error.Of(message));
+            if (obj == null) Throw.It(error);
             return obj;
         }
     }

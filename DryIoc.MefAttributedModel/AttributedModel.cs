@@ -30,6 +30,7 @@ namespace DryIoc.MefAttributedModel
     using System.Linq;
     using System.Reflection;
     using System.Text;
+    using System.Threading;
     using DryIocAttributes;
     using ImTools;
 
@@ -55,7 +56,6 @@ namespace DryIoc.MefAttributedModel
             _getImportedPropertiesAndFields);
 
         /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
-        /// <param name="rules">Source rules.</param> <returns>New rules.</returns>
         public static Rules WithMefRules(this Rules rules)
         {
             var importMadeOf = rules.FactoryMethod == null ? _defaultImportMadeOf :
@@ -188,9 +188,7 @@ namespace DryIoc.MefAttributedModel
             // check if the service is resolvable
             var func = container.Resolve<Func<T>>(ifUnresolved: ifUnresolved);
             if (func == null)
-            {
                 return null;
-            }
 
             return new ExportFactory<T>(() =>
             {
@@ -698,8 +696,7 @@ namespace DryIoc.MefAttributedModel
             }
             else if (serviceTypes.Length > 1)
             {
-                // todo: multiple required types are not supported at the moment
-                Throw.It(DryIoc.Error.Of("Multiple required types are not supported at the moment: {0}"), serviceTypes);
+                Throw.It(Error.MultipleRequiredTypesAreNotSupported, serviceTypes);
             }
 
             return null;
@@ -1070,10 +1067,11 @@ namespace DryIoc.MefAttributedModel
     public static class Error
     {
         /// <summary>Error messages for corresponding codes.</summary>
-        public static readonly IList<string> Messages = new List<string>(20);
+        public static readonly string[] Messages = new string[20];
 
-        /// <summary>Codes are starting from this value.</summary>
-        public static readonly int FirstErrorCode = DryIoc.Error.FirstErrorCode + DryIoc.Error.Messages.Count;
+        // note: the order of static initialization is important, that's why those are initialized before messages
+        private static int _errorIndex = -1;
+        private static readonly int _containerErrorCount = DryIoc.Error.Messages.Length;
 
 #pragma warning disable 1591 // Missing XML-comment
         public static readonly int
@@ -1093,49 +1091,38 @@ namespace DryIoc.MefAttributedModel
             UnsupportedReuseWrapperType = Of(
                 "Attributed model does not support reuse wrapper type {0}."),
             UnableToSelectFromMultipleTypes = Of(
-                "Unable to select from multiple exported types {0} for the import {1}");
+                "Unable to select from multiple exported types {0} for the import {1}"),
+            MultipleRequiredTypesAreNotSupported = Of(
+                "Multiple required types are not supported at the moment: {0}");
 
 #pragma warning restore 1591
 
-        /// <summary>Returns message by provided error code.</summary>
-        /// <param name="error">Code starting from <see cref="FirstErrorCode"/></param> <returns>String message.</returns>
-        public static string GetMessage(int error)
+        private static int Of(string message)
         {
-            return Messages[error - FirstErrorCode];
+            var errorIndex = Interlocked.Increment(ref _errorIndex);
+            Messages[errorIndex] = message;
+            return errorIndex + _containerErrorCount;
         }
 
-        /// <summary>Returns the ID of error message.</summary> <param name="message"></param> <returns></returns>
-        public static int Of(string message)
-        {
-            Messages.Add(message);
-            return FirstErrorCode + Messages.Count - 1;
-        }
-
-        #region Implementation
+        internal static string GetMessage(int errorIndex) =>
+            Messages[errorIndex - _containerErrorCount];
 
         static Error()
         {
             Throw.GetMatchedException = GetAttributedModelOrContainerException;
         }
 
-        private static Exception GetAttributedModelOrContainerException(ErrorCheck check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner)
-        {
-            return FirstErrorCode <= error && error < FirstErrorCode + Messages.Count
+        private static Exception GetAttributedModelOrContainerException(
+            ErrorCheck check, int error, object arg0, object arg1, object arg2, object arg3, Exception inner) =>
+            error >= _containerErrorCount
                 ? AttributedModelException.Of(check, error, arg0, arg1, arg2, arg3, inner)
                 : ContainerException.Of(check, error, arg0, arg1, arg2, arg3, inner);
-        }
-
-        #endregion
     }
 
     /// <summary>Specific exception type to be thrown by MefAttributedModel extension. Check <see cref="Error"/> for possible error cases.</summary>
     public class AttributedModelException : ContainerException
     {
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and with message corresponding to code.</summary>
-        /// <param name="errorCheck">Type of check.</param> <param name="errorCode">Error code to wrap, <see cref="Error"/> for codes defined.</param>
-        /// <param name="arg0">(optional) Arguments for formatted message.</param> <param name="arg1"></param> <param name="arg2"></param> <param name="arg3"></param>
-        /// <param name="inner">(optional) Inner exception to wrap.</param>
-        /// <returns>Create exception object.</returns>
         public new static AttributedModelException Of(ErrorCheck errorCheck, int errorCode,
             object arg0, object arg1 = null, object arg2 = null, object arg3 = null,
             Exception inner = null)

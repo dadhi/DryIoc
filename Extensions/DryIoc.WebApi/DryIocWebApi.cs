@@ -242,24 +242,7 @@ namespace DryIoc.WebApi
         }
 
         /// <summary>Registers request into current dependency scope.</summary>
-        /// <param name="request">Request to register.</param>
-        public void RegisterInDependencyScope(HttpRequestMessage request)
-        {
-            var dependencyScope = request.ThrowIfNull()
-                .GetDependencyScope().ThrowIfNotOf(typeof(DryIocDependencyScope), Error.RequestMessageDoesNotReferenceDryIocDependencyScope);
-            
-            var container = ((DryIocDependencyScope)dependencyScope).ScopedContainer;
-            container.UseInstance(request);
-        }
-    }
-
-    /// <summary>Possible web exceptions.</summary>
-    public static class Error
-    {
-#pragma warning disable 1591 // "Missing XML-comment"
-        public static readonly int
-            RequestMessageDoesNotReferenceDryIocDependencyScope = DryIoc.Error.Of(
-                "Expecting request message dependency scope to be of type {1} but found: {0}.");
-#pragma warning restore 1591
+        public void RegisterInDependencyScope(HttpRequestMessage request) =>
+            ((DryIocDependencyScope)request.ThrowIfNull().GetDependencyScope()).ScopedContainer.UseInstance(request);
     }
 }
