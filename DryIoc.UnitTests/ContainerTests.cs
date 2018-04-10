@@ -666,11 +666,14 @@ namespace DryIoc.UnitTests
 
         class RequiredDependency { }
 
-        [Test, Ignore("#505: Failed to register object with ArgumentNullException")]
+        [Test]
         public void Can_register_an_object_by_type()
         {
             var c = new Container();
-            c.Register<object>();
+
+            var ex = Assert.Throws<ContainerException>(() => c.Register<object>());
+
+            Assert.AreEqual(Error.RegisteringObjectTypeAsImplementationIsNotSupported, ex.Error);
         }
     }
 }

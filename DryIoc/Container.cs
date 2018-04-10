@@ -7504,6 +7504,8 @@ namespace DryIoc
                 {
                     if (implType == null)
                         Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
+                    if (implType == typeof(object))
+                        Throw.It(Error.RegisteringObjectTypeAsImplementationIsNotSupported);
                     if (implType.IsAbstract())
                         Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implType);
                 }
@@ -8994,6 +8996,8 @@ namespace DryIoc
                 "Consider to register generic type definition {1} instead."),
             RegisteringNullImplementationTypeAndNoFactoryMethod = Of(
                 "Registering without implementation type and without FactoryMethod to use instead."),
+            RegisteringObjectTypeAsImplementationIsNotSupported = Of(
+                "Registering `System.Object` type as implementation without a factory method is not supported."),
             RegisteringAbstractImplementationTypeAndNoFactoryMethod = Of(
                 "Registering abstract implementation type {0} when it is should be concrete. Also there is not FactoryMethod to use instead."),
             UnableToSelectSinglePublicConstructorFromMultiple = Of(
