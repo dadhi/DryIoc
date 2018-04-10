@@ -47,6 +47,9 @@ using System.Threading;
 using ImTools;
 using static DryIocZero.ResolveManyResult;
 
+// Specified `NamespaceUsings` if any:
+using DryIoc.MefAttributedModel.UnitTests.CUT;
+
 namespace DryIocZero
 {
     partial class Container
@@ -60,166 +63,160 @@ namespace DryIocZero
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType)
         {
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting))
-                service = Get6_ServiceWithMultipleCostructorsAndOneImporting(this);
+            if (serviceType == typeof(IOpGen<Aa>))
+                service = Get0_IOpGen(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGenB))
-                service = Get7_ClGenB(this);
+            if (serviceType == typeof(IOpGen<Bb>))
+                service = Get1_IOpGen(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGen))
-                service = Get8_ClGen(this);
+            if (serviceType == typeof(ServiceWithMultipleCostructorsAndOneImporting))
+                service = Get2_ServiceWithMultipleCostructorsAndOneImporting(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedScopeService))
-                service = Get9_NamedScopeService(this);
+            if (serviceType == typeof(DbMan))
+                service = Get3_DbMan(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<DryIoc.MefAttributedModel.UnitTests.CUT.Aa>))
-                service = Get10_IOpGen(this);
+            if (serviceType == typeof(ClGenA))
+                service = Get4_ClGenA(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService))
-                service = Get11_PreventDisposalService(this);
+            if (serviceType == typeof(ClGenB))
+                service = Get5_ClGenB(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb))
-                service = Get12_IAnotherDb(this);
+            if (serviceType == typeof(ClGen))
+                service = Get9_ClGen(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService))
-                service = Get13_WeaklyReferencedService(this);
+            if (serviceType == typeof(DependentService))
+                service = Get15_DependentService(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ITransientService))
-                service = Get14_ITransientService(this);
+            if (serviceType == typeof(B))
+                service = Get16_B(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata))
-                service = Get15_SingleServiceWithMetadata(this);
+            if (serviceType == typeof(IAnotherDb))
+                service = Get17_IAnotherDb(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISingletonService))
-                service = Get16_ISingletonService(this);
+            if (serviceType == typeof(SingleServiceWithMetadata))
+                service = Get18_SingleServiceWithMetadata(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<string>))
-                service = Get17_IOpGen(this);
+            if (serviceType == typeof(IOpGen<string>))
+                service = Get19_IOpGen(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<DryIoc.MefAttributedModel.UnitTests.CUT.Bb>))
-                service = Get18_IOpGen(this);
+            if (serviceType == typeof(IOpGen<string>))
+                service = Get20_IOpGen(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1))
-                service = Get19_ImportConditionObject1(this);
+            if (serviceType == typeof(WeaklyReferencedService))
+                service = Get21_WeaklyReferencedService(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DependentService))
-                service = Get20_DependentService(this);
+            if (serviceType == typeof(ITransientService))
+                service = Get22_ITransientService(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan))
-                service = Get21_DbMan(this);
+            if (serviceType == typeof(NamedScopeService))
+                service = Get23_NamedScopeService(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb))
-                service = Get22_ISomeDb(this);
+            if (serviceType == typeof(PreventDisposalService))
+                service = Get24_PreventDisposalService(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3))
-                service = Get23_ImportConditionObject3(this);
+            if (serviceType == typeof(ImportConditionObject3))
+                service = Get25_ImportConditionObject3(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<string>))
-                service = Get24_IOpGen(this);
+            if (serviceType == typeof(ISingletonService))
+                service = Get26_ISingletonService(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B))
-                service = Get27_B(this);
+            if (serviceType == typeof(ISomeDb))
+                service = Get27_ISomeDb(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2))
+            if (serviceType == typeof(ImportConditionObject2))
                 service = Get28_ImportConditionObject2(this);
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGenA))
-                service = Get29_ClGenA(this);
+            if (serviceType == typeof(ImportConditionObject1))
+                service = Get29_ImportConditionObject1(this);
         }
 
         [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
             Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)) 
+            if (serviceType == typeof(MultiExported)) 
             {
                 if ("c".Equals(serviceKey))
-                    service = Get0_MultiExported(this);
+                    service = Get6_MultiExported(this);
 
                 else
                 if ("b".Equals(serviceKey))
-                    service = Get1_MultiExported(this);
+                    service = Get7_MultiExported(this);
 
                 else
                 if ("a".Equals(serviceKey))
-                    service = Get2_MultiExported(this);
+                    service = Get8_MultiExported(this);
             }
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)) 
+            if (serviceType == typeof(IMultiExported)) 
             {
                 if ("c".Equals(serviceKey))
-                    service = Get3_IMultiExported(this);
+                    service = Get10_IMultiExported(this);
 
                 else
                 if ("j".Equals(serviceKey))
-                    service = Get4_IMultiExported(this);
+                    service = Get11_IMultiExported(this);
 
                 else
                 if ("i".Equals(serviceKey))
-                    service = Get5_IMultiExported(this);
+                    service = Get12_IMultiExported(this);
             }
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts)) 
+            if (serviceType == typeof(IAllOpts)) 
             {
                 if ("a".Equals(serviceKey))
-                    service = Get25_IAllOpts(this);
+                    service = Get13_IAllOpts(this);
 
                 else
                 if (ImTools.KV.Of("a", 1).Equals(serviceKey))
-                    service = Get26_IAllOpts(this);
+                    service = Get14_IAllOpts(this);
             }
 
             else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)) 
-            {
-                if ((serviceKey == null || DefaultKey.Of(0).Equals(serviceKey)) &&
-                    requiredServiceType == null &&
-                    Equals(preRequestParent, Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), default(System.Type), (object)null, 62, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)))) 
-                    service = GetDep0_IExportConditionInterface(this);
-
-                else
-                if ((serviceKey == null || DefaultKey.Of(2).Equals(serviceKey)) &&
-                    requiredServiceType == null &&
-                    Equals(preRequestParent, Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), default(System.Type), (object)null, 64, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)))) 
-                    service = GetDep1_IExportConditionInterface(this);
-
-                else
-                if ((serviceKey == null || DefaultKey.Of(1).Equals(serviceKey)) &&
-                    requiredServiceType == null &&
-                    Equals(preRequestParent, Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2), default(System.Type), (object)null, 63, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)))) 
-                    service = GetDep3_IExportConditionInterface(this);
-            }
-
-            else
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A)) 
+            if (serviceType == typeof(A)) 
             {
                 if (serviceKey == null &&
                     requiredServiceType == null &&
-                    Equals(preRequestParent, Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), default(System.Type), (object)null, 66, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), Reuse.Transient, RequestFlags.IsResolutionCall))) 
-                    service = GetDep2_A(this);
+                    Equals(preRequestParent, Request.Empty.Push(typeof(B), default(System.Type), (object)null, 66, FactoryType.Service, typeof(B), Reuse.Transient, RequestFlags.IsResolutionCall))) 
+                    service = GetDep0_A(this);
+            }
+
+            else
+            if (serviceType == typeof(IExportConditionInterface)) 
+            {
+                if ((serviceKey == null || DefaultKey.Of(2).Equals(serviceKey)) &&
+                    requiredServiceType == null &&
+                    Equals(preRequestParent, Request.Empty.Push(typeof(ImportConditionObject3), default(System.Type), (object)null, 64, FactoryType.Service, typeof(ImportConditionObject3), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)))) 
+                    service = GetDep1_IExportConditionInterface(this);
+
+                else
+                if ((serviceKey == null || DefaultKey.Of(0).Equals(serviceKey)) &&
+                    requiredServiceType == null &&
+                    Equals(preRequestParent, Request.Empty.Push(typeof(ImportConditionObject1), default(System.Type), (object)null, 62, FactoryType.Service, typeof(ImportConditionObject1), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)))) 
+                    service = GetDep2_IExportConditionInterface(this);
             }
         }
 
@@ -232,337 +229,331 @@ namespace DryIocZero
         [ExcludeFromCodeCoverage]
         private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
         {
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported))
+            if (serviceType == typeof(IOpGen<Aa>))
             {
-                yield return Of(Get0_MultiExported, "c");
-                yield return Of(Get1_MultiExported, "b");
-                yield return Of(Get2_MultiExported, "a");
+                yield return Of(Get0_IOpGen);
+                yield return Of(Get1_IOpGen); // co-variant
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported))
+            if (serviceType == typeof(IOpGen<Bb>))
             {
-                yield return Of(Get3_IMultiExported, "c");
-                yield return Of(Get4_IMultiExported, "j");
-                yield return Of(Get5_IMultiExported, "i");
+                yield return Of(Get1_IOpGen);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting))
+            if (serviceType == typeof(ServiceWithMultipleCostructorsAndOneImporting))
             {
-                yield return Of(Get6_ServiceWithMultipleCostructorsAndOneImporting);
+                yield return Of(Get2_ServiceWithMultipleCostructorsAndOneImporting);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGenB))
+            if (serviceType == typeof(DbMan))
             {
-                yield return Of(Get7_ClGenB);
+                yield return Of(Get3_DbMan);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGen))
+            if (serviceType == typeof(ClGenA))
             {
-                yield return Of(Get8_ClGen);
+                yield return Of(Get4_ClGenA);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedScopeService))
+            if (serviceType == typeof(ClGenB))
             {
-                yield return Of(Get9_NamedScopeService);
+                yield return Of(Get5_ClGenB);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<DryIoc.MefAttributedModel.UnitTests.CUT.Aa>))
+            if (serviceType == typeof(MultiExported))
             {
-                yield return Of(Get10_IOpGen);
-                yield return Of(Get18_IOpGen); // co-variant
+                yield return Of(Get6_MultiExported, "c");
+                yield return Of(Get7_MultiExported, "b");
+                yield return Of(Get8_MultiExported, "a");
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService))
+            if (serviceType == typeof(ClGen))
             {
-                yield return Of(Get11_PreventDisposalService);
+                yield return Of(Get9_ClGen);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb))
+            if (serviceType == typeof(IMultiExported))
             {
-                yield return Of(Get12_IAnotherDb);
+                yield return Of(Get10_IMultiExported, "c");
+                yield return Of(Get11_IMultiExported, "j");
+                yield return Of(Get12_IMultiExported, "i");
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService))
+            if (serviceType == typeof(IAllOpts))
             {
-                yield return Of(Get13_WeaklyReferencedService);
+                yield return Of(Get13_IAllOpts, "a");
+                yield return Of(Get14_IAllOpts, ImTools.KV.Of("a", 1));
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ITransientService))
+            if (serviceType == typeof(DependentService))
             {
-                yield return Of(Get14_ITransientService);
+                yield return Of(Get15_DependentService);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata))
+            if (serviceType == typeof(B))
             {
-                yield return Of(Get15_SingleServiceWithMetadata);
+                yield return Of(Get16_B);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISingletonService))
+            if (serviceType == typeof(IAnotherDb))
             {
-                yield return Of(Get16_ISingletonService);
+                yield return Of(Get17_IAnotherDb);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<string>))
+            if (serviceType == typeof(SingleServiceWithMetadata))
             {
-                yield return Of(Get17_IOpGen, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<>));
-                yield return Of(Get24_IOpGen);
+                yield return Of(Get18_SingleServiceWithMetadata);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<DryIoc.MefAttributedModel.UnitTests.CUT.Bb>))
+            if (serviceType == typeof(IOpGen<string>))
             {
-                yield return Of(Get18_IOpGen);
+                yield return Of(Get19_IOpGen, typeof(IOpGen<>));
+                yield return Of(Get20_IOpGen);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1))
+            if (serviceType == typeof(WeaklyReferencedService))
             {
-                yield return Of(Get19_ImportConditionObject1);
+                yield return Of(Get21_WeaklyReferencedService);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DependentService))
+            if (serviceType == typeof(ITransientService))
             {
-                yield return Of(Get20_DependentService);
+                yield return Of(Get22_ITransientService);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan))
+            if (serviceType == typeof(NamedScopeService))
             {
-                yield return Of(Get21_DbMan);
+                yield return Of(Get23_NamedScopeService);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb))
+            if (serviceType == typeof(PreventDisposalService))
             {
-                yield return Of(Get22_ISomeDb);
+                yield return Of(Get24_PreventDisposalService);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3))
+            if (serviceType == typeof(ImportConditionObject3))
             {
-                yield return Of(Get23_ImportConditionObject3);
+                yield return Of(Get25_ImportConditionObject3);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts))
+            if (serviceType == typeof(ISingletonService))
             {
-                yield return Of(Get25_IAllOpts, "a");
-                yield return Of(Get26_IAllOpts, ImTools.KV.Of("a", 1));
+                yield return Of(Get26_ISingletonService);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B))
+            if (serviceType == typeof(ISomeDb))
             {
-                yield return Of(Get27_B);
+                yield return Of(Get27_ISomeDb);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2))
+            if (serviceType == typeof(ImportConditionObject2))
             {
                 yield return Of(Get28_ImportConditionObject2);
             }
 
-            if (serviceType == typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGenA))
+            if (serviceType == typeof(ImportConditionObject1))
             {
-                yield return Of(Get29_ClGenA);
+                yield return Of(Get29_ImportConditionObject1);
             }
 
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
-        internal static object Get0_MultiExported(IResolverContext r)
+        // typeof(IOpGen<Aa>)
+        internal static object Get0_IOpGen(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(170, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported(), 0);
+            return r.SingletonScope.GetOrAdd(92, () => new ClGenA(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
-        internal static object Get1_MultiExported(IResolverContext r)
+        // typeof(IOpGen<Bb>)
+        internal static object Get1_IOpGen(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(170, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported(), 0);
+            return r.SingletonScope.GetOrAdd(93, () => new ClGenB(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported)
-        internal static object Get2_MultiExported(IResolverContext r)
+        // typeof(ServiceWithMultipleCostructorsAndOneImporting)
+        internal static object Get2_ServiceWithMultipleCostructorsAndOneImporting(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(170, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported(), 0);
+            return r.SingletonScope.GetOrAdd(48, () => new ServiceWithMultipleCostructorsAndOneImporting(new TransientService()), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
-        internal static object Get3_IMultiExported(IResolverContext r)
+        // typeof(DbMan)
+        internal static object Get3_DbMan(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(170, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported(), 0);
+            return r.SingletonScope.GetOrAdd(53, () => new DbMan(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
-        internal static object Get4_IMultiExported(IResolverContext r)
+        // typeof(ClGenA)
+        internal static object Get4_ClGenA(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(170, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported(), 0);
+            return r.SingletonScope.GetOrAdd(92, () => new ClGenA(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IMultiExported)
-        internal static object Get5_IMultiExported(IResolverContext r)
+        // typeof(ClGenB)
+        internal static object Get5_ClGenB(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(170, () => new DryIoc.MefAttributedModel.UnitTests.CUT.MultiExported(), 0);
+            return r.SingletonScope.GetOrAdd(93, () => new ClGenB(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting)
-        internal static object Get6_ServiceWithMultipleCostructorsAndOneImporting(IResolverContext r)
+        // typeof(MultiExported)
+        internal static object Get6_MultiExported(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(48, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting(new DryIoc.MefAttributedModel.UnitTests.CUT.TransientService()), 0);
+            return r.SingletonScope.GetOrAdd(170, () => new MultiExported(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGenB)
-        internal static object Get7_ClGenB(IResolverContext r)
+        // typeof(MultiExported)
+        internal static object Get7_MultiExported(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(93, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ClGenB(), 0);
+            return r.SingletonScope.GetOrAdd(170, () => new MultiExported(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGen)
-        internal static object Get8_ClGen(IResolverContext r)
+        // typeof(MultiExported)
+        internal static object Get8_MultiExported(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(90, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ClGen(), 0);
+            return r.SingletonScope.GetOrAdd(170, () => new MultiExported(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.NamedScopeService)
-        internal static object Get9_NamedScopeService(IResolverContext r)
+        // typeof(ClGen)
+        internal static object Get9_ClGen(IResolverContext r)
         {
-            return CurrentScopeReuse.GetNameScoped(r, "a", true, 84, () => new DryIoc.MefAttributedModel.UnitTests.CUT.NamedScopeService(), 0);
+            return r.SingletonScope.GetOrAdd(90, () => new ClGen(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<DryIoc.MefAttributedModel.UnitTests.CUT.Aa>)
-        internal static object Get10_IOpGen(IResolverContext r)
+        // typeof(IMultiExported)
+        internal static object Get10_IMultiExported(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(92, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ClGenA(), 0);
+            return r.SingletonScope.GetOrAdd(170, () => new MultiExported(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService)
-        internal static object Get11_PreventDisposalService(IResolverContext r)
+        // typeof(IMultiExported)
+        internal static object Get11_IMultiExported(IResolverContext r)
         {
-            return ((HiddenDisposable)r.SingletonScope.GetOrAdd(74, () => new HiddenDisposable(new DryIoc.MefAttributedModel.UnitTests.CUT.PreventDisposalService()), 0)).Value;
+            return r.SingletonScope.GetOrAdd(170, () => new MultiExported(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAnotherDb)
-        internal static object Get12_IAnotherDb(IResolverContext r)
+        // typeof(IMultiExported)
+        internal static object Get12_IMultiExported(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(53, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan(), 0);
+            return r.SingletonScope.GetOrAdd(170, () => new MultiExported(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService)
-        internal static object Get13_WeaklyReferencedService(IResolverContext r)
+        // typeof(IAllOpts)
+        internal static object Get13_IAllOpts(IResolverContext r)
         {
-            return ((System.WeakReference)r.SingletonScope.GetOrAdd(73, () => new System.WeakReference(new DryIoc.MefAttributedModel.UnitTests.CUT.WeaklyReferencedService()), 0)).Target.ThrowNewErrorIfNull("Reused service wrapped in WeakReference is Garbage Collected and no longer available.");
+            return CurrentScopeReuse.GetScoped(r, true, 82, () => new AllOpts(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ITransientService)
-        internal static object Get14_ITransientService(IResolverContext r)
+        // typeof(IAllOpts)
+        internal static object Get14_IAllOpts(IResolverContext r)
         {
-            return new DryIoc.MefAttributedModel.UnitTests.CUT.TransientService();
+            return CurrentScopeReuse.GetScoped(r, true, 83, () => new AllOpts2(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata)
-        internal static object Get15_SingleServiceWithMetadata(IResolverContext r)
+        // typeof(DependentService)
+        internal static object Get15_DependentService(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(49, () => new DryIoc.MefAttributedModel.UnitTests.CUT.SingleServiceWithMetadata(), 0);
+            return r.SingletonScope.GetOrAdd(41, () => new DependentService(new TransientService(), (SingletonService)r.SingletonScope.GetOrAdd(37, () => new SingletonService(), 0), new TransientOpenGenericService<string>(), (OpenGenericServiceWithTwoParameters<bool, bool>)r.SingletonScope.GetOrAdd(228, () => new OpenGenericServiceWithTwoParameters<bool, bool>(), 0)), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISingletonService)
-        internal static object Get16_ISingletonService(IResolverContext r)
+        // typeof(B)
+        internal static object Get16_B(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(37, () => new DryIoc.MefAttributedModel.UnitTests.CUT.SingletonService(), 0);
+            return new B((A)r.Resolve(typeof(A), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(B), default(System.Type), (object)null, 66, FactoryType.Service, typeof(B), Reuse.Transient, RequestFlags.IsResolutionCall), default(object[])));
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<string>)
-        internal static object Get17_IOpGen(IResolverContext r)
+        // typeof(IAnotherDb)
+        internal static object Get17_IAnotherDb(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(227, () => new DryIoc.MefAttributedModel.UnitTests.CUT.OpGen<string>(), 0);
+            return r.SingletonScope.GetOrAdd(53, () => new DbMan(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<DryIoc.MefAttributedModel.UnitTests.CUT.Bb>)
-        internal static object Get18_IOpGen(IResolverContext r)
+        // typeof(SingleServiceWithMetadata)
+        internal static object Get18_SingleServiceWithMetadata(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(93, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ClGenB(), 0);
+            return r.SingletonScope.GetOrAdd(49, () => new SingleServiceWithMetadata(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1)
-        internal static object Get19_ImportConditionObject1(IResolverContext r)
+        // typeof(IOpGen<string>)
+        internal static object Get19_IOpGen(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(62, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.RootOrSelf().Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), default(System.Type), (object)null, 62, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject1), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)), default(object[]))), 0);
+            return r.SingletonScope.GetOrAdd(229, () => new OpGen<string>(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DependentService)
-        internal static object Get20_DependentService(IResolverContext r)
+        // typeof(IOpGen<string>)
+        internal static object Get20_IOpGen(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(41, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DependentService(new DryIoc.MefAttributedModel.UnitTests.CUT.TransientService(), (DryIoc.MefAttributedModel.UnitTests.CUT.SingletonService)r.SingletonScope.GetOrAdd(37, () => new DryIoc.MefAttributedModel.UnitTests.CUT.SingletonService(), 0), new DryIoc.MefAttributedModel.UnitTests.CUT.TransientOpenGenericService<string>(), (DryIoc.MefAttributedModel.UnitTests.CUT.OpenGenericServiceWithTwoParameters<bool, bool>)r.SingletonScope.GetOrAdd(229, () => new DryIoc.MefAttributedModel.UnitTests.CUT.OpenGenericServiceWithTwoParameters<bool, bool>(), 0)), 0);
+            return r.SingletonScope.GetOrAdd(90, () => new ClGen(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.DbMan)
-        internal static object Get21_DbMan(IResolverContext r)
+        // typeof(WeaklyReferencedService)
+        internal static object Get21_WeaklyReferencedService(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(53, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan(), 0);
+            return ((System.WeakReference)r.SingletonScope.GetOrAdd(73, () => new System.WeakReference(new WeaklyReferencedService()), 0)).Target.WeakRefReuseWrapperGCed();
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ISomeDb)
-        internal static object Get22_ISomeDb(IResolverContext r)
+        // typeof(ITransientService)
+        internal static object Get22_ITransientService(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(53, () => new DryIoc.MefAttributedModel.UnitTests.CUT.DbMan(), 0);
+            return new TransientService();
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3)
-        internal static object Get23_ImportConditionObject3(IResolverContext r)
+        // typeof(NamedScopeService)
+        internal static object Get23_NamedScopeService(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(64, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.RootOrSelf().Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), default(System.Type), (object)null, 64, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject3), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)), default(object[]))), 0);
+            return CurrentScopeReuse.GetNameScoped(r, "a", true, 84, () => new NamedScopeService(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IOpGen<string>)
-        internal static object Get24_IOpGen(IResolverContext r)
+        // typeof(PreventDisposalService)
+        internal static object Get24_PreventDisposalService(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(90, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ClGen(), 0);
+            return ((HiddenDisposable)r.SingletonScope.GetOrAdd(74, () => new HiddenDisposable(new PreventDisposalService()), 0)).Value;
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts)
-        internal static object Get25_IAllOpts(IResolverContext r)
+        // typeof(ImportConditionObject3)
+        internal static object Get25_ImportConditionObject3(IResolverContext r)
         {
-            return CurrentScopeReuse.GetScoped(r, true, 82, () => new DryIoc.MefAttributedModel.UnitTests.CUT.AllOpts(), 0);
+            return r.SingletonScope.GetOrAdd(64, () => new ImportConditionObject3((IExportConditionInterface)r.RootOrSelf().Resolve(typeof(IExportConditionInterface), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(ImportConditionObject3), default(System.Type), (object)null, 64, FactoryType.Service, typeof(ImportConditionObject3), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)), default(object[]))), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts)
-        internal static object Get26_IAllOpts(IResolverContext r)
+        // typeof(ISingletonService)
+        internal static object Get26_ISingletonService(IResolverContext r)
         {
-            return CurrentScopeReuse.GetScoped(r, true, 83, () => new DryIoc.MefAttributedModel.UnitTests.CUT.AllOpts2(), 0);
+            return r.SingletonScope.GetOrAdd(37, () => new SingletonService(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B)
-        internal static object Get27_B(IResolverContext r)
+        // typeof(ISomeDb)
+        internal static object Get27_ISomeDb(IResolverContext r)
         {
-            return new DryIoc.MefAttributedModel.UnitTests.CUT.B((DryIoc.MefAttributedModel.UnitTests.CUT.A)r.Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), default(System.Type), (object)null, 66, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.B), Reuse.Transient, RequestFlags.IsResolutionCall), default(object[])));
+            return r.SingletonScope.GetOrAdd(53, () => new DbMan(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2)
+        // typeof(ImportConditionObject2)
         internal static object Get28_ImportConditionObject2(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(63, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2((DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)r.RootOrSelf().Resolve(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2), default(System.Type), (object)null, 63, FactoryType.Service, typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ImportConditionObject2), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)), default(object[]))), 0);
+            return r.SingletonScope.GetOrAdd(63, () => new ImportConditionObject2((ExportConditionalObject2)r.SingletonScope.GetOrAdd(60, () => new ExportConditionalObject2(), 0)), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ClGenA)
-        internal static object Get29_ClGenA(IResolverContext r)
+        // typeof(ImportConditionObject1)
+        internal static object Get29_ImportConditionObject1(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(92, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ClGenA(), 0);
+            return r.SingletonScope.GetOrAdd(62, () => new ImportConditionObject1((IExportConditionInterface)r.RootOrSelf().Resolve(typeof(IExportConditionInterface), null, IfUnresolved.Throw, default(System.Type), Request.Empty.Push(typeof(ImportConditionObject1), default(System.Type), (object)null, 62, FactoryType.Service, typeof(ImportConditionObject1), Reuse.Singleton, (RequestFlags.IsSingletonOrDependencyOfSingleton | RequestFlags.IsResolutionCall)), default(object[]))), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)
-        internal static object GetDep0_IExportConditionInterface(IResolverContext r)
+        // typeof(A)
+        internal static object GetDep0_A(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(59, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject1(), 0);
+            return new A();
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)
+        // typeof(IExportConditionInterface)
         internal static object GetDep1_IExportConditionInterface(IResolverContext r)
         {
-            return r.SingletonScope.GetOrAdd(61, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject3(), 0);
+            return r.SingletonScope.GetOrAdd(61, () => new ExportConditionalObject3(), 0);
         }
 
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.A)
-        internal static object GetDep2_A(IResolverContext r)
+        // typeof(IExportConditionInterface)
+        internal static object GetDep2_IExportConditionInterface(IResolverContext r)
         {
-            return new DryIoc.MefAttributedModel.UnitTests.CUT.A();
-        }
-
-        // typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IExportConditionInterface)
-        internal static object GetDep3_IExportConditionInterface(IResolverContext r)
-        {
-            return r.SingletonScope.GetOrAdd(60, () => new DryIoc.MefAttributedModel.UnitTests.CUT.ExportConditionalObject2(), 0);
+            return r.SingletonScope.GetOrAdd(59, () => new ExportConditionalObject1(), 0);
         }
 
     }

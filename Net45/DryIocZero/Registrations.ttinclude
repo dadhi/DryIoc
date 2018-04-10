@@ -39,4 +39,11 @@ ServiceInfo[] SpecifyResolutionRoots(ServiceRegistrationInfo reg)
 
 // TODO: Additional roots to generate ...
 ServiceInfo[] CustomResolutionRoots = {};
+
+// TODO: Specify the namespace to go into using instead of qualify the type all the times, 
+// You may generate the Container.Generated.cs first, then look what you want to move to using
+string[] NamespaceUsings =
+{
+    //"Foo.Bar.Buzz",
+};
 #>

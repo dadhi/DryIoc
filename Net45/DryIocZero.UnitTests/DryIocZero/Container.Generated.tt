@@ -46,24 +46,36 @@ var result = container.GenerateResolutionExpressions(regs => regs.SelectMany(r =
 var exprToCode = ExpressionToCodeConfiguration.DefaultCodeGenConfiguration
     .WithObjectStringifier(ObjectStringify.WithFullTypeNames);
 
+string[] dryIocTypeToReplace =
+{
+    nameof(IfUnresolved),
+    nameof(IReuse), nameof(Reuse), nameof(SingletonReuse), nameof(CurrentScopeReuse), 
+    nameof(ResolutionScopeName), nameof(CompositeScopeName),
+    nameof(FactoryType),
+    nameof(DefaultKey), nameof(DefaultDynamicKey), 
+    nameof(Request), nameof(RequestFlags),
+    nameof(HiddenDisposable)
+};
+
+string ReplaceDryIocTypes(string source) 
+{
+    foreach (var x in  dryIocTypeToReplace)
+        source = source.Replace("DryIoc." + x, x);
+    return source;
+}
+
+string RemoveUsings(string source)
+{
+    foreach (var x in NamespaceUsings)
+        source = source.Replace(x + ".", "");
+    return source;
+}
+
 string Code(object x) =>
     x == null ? "null" :
-    x is Expression ? exprToCode.ToCode((Expression)x)
-        .Replace("DryIoc." + nameof(IfUnresolved), nameof(IfUnresolved))
-        .Replace("DryIoc." + nameof(IReuse), nameof(IReuse))
-        .Replace("DryIoc." + nameof(Reuse), nameof(Reuse))
-        .Replace("DryIoc." + nameof(SingletonReuse), nameof(SingletonReuse))
-        .Replace("DryIoc." + nameof(CurrentScopeReuse), nameof(CurrentScopeReuse))
-        .Replace("DryIoc." + nameof(FactoryType), nameof(FactoryType))
-        .Replace("DryIoc." + nameof(DefaultKey), nameof(DefaultKey))
-        .Replace("DryIoc." + nameof(DefaultDynamicKey), nameof(DefaultDynamicKey))
-        .Replace("DryIoc." + nameof(Request), nameof(Request))
-        .Replace("DryIoc." + nameof(RequestFlags), nameof(RequestFlags))
-        .Replace("DryIoc." + nameof(HiddenDisposable), nameof(HiddenDisposable))
-        .Replace("DryIoc." + nameof(ResolutionScopeName), nameof(ResolutionScopeName))
-        .Replace("DryIoc." + nameof(CompositeScopeName), nameof(CompositeScopeName))
-    : x is Request ? Code(container.GetRequestExpression((Request)x).ToExpression())
-    : Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
+    x is Expression ? RemoveUsings(ReplaceDryIocTypes(exprToCode.ToCode((Expression)x))) : 
+    x is Request ? Code(container.GetRequestExpression((Request)x).ToExpression()) : 
+    Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
 
 string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
@@ -114,6 +126,11 @@ using System.Collections.Generic;
 using System.Threading;
 using ImTools;
 using static DryIocZero.ResolveManyResult;
+
+// Specified `NamespaceUsings` if any:
+<# foreach (var ns in NamespaceUsings) {#>
+using <#=ns#>;
+<#}#>
 
 namespace DryIocZero
 {

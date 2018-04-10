@@ -2137,6 +2137,14 @@ namespace DryIoc
             return lambdaExpr.Compile();
 #endif
         }
+
+        /// <summary>Restores the expression from ExpressionInfo, or returns itself if already an Expression.</summary>
+        public static Expression ToExpression(this Expr expr) =>
+#if FEC_EXPRESSION_INFO
+            expr.ToExpression();
+#else
+            expr;
+#endif
     }
 
     /// <summary>Container extended features.</summary>
@@ -4556,7 +4564,7 @@ namespace DryIoc
                 var serviceTypes = getServiceTypes(implType);
                 if (!serviceTypes.IsNullOrEmpty())
                 {
-                    var factory = (getImplFactory ?? Registrator.ToFactory).Invoke(implType);
+                    var factory = (getImplFactory ?? ToFactory).Invoke(implType);
                     for (var i = 0; i < serviceTypes.Length; i++)
                         registrator.Register(serviceTypes[i], factory, ifAlreadyRegistered,
                             getServiceKey?.Invoke(implType, serviceTypes[i]));
@@ -6781,10 +6789,9 @@ namespace DryIoc
             // Unwrap WeakReference and/or array preventing disposal
             if (Setup.WeaklyReferenced)
                 serviceExpr = Call(
-                    typeof(ThrowInGeneratedCode).SingleMethod(nameof(ThrowInGeneratedCode.ThrowNewErrorIfNull)),
+                    typeof(ThrowInGeneratedCode).SingleMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
                     Property(Convert(serviceExpr, typeof(WeakReference)),
-                        typeof(WeakReference).Property(nameof(WeakReference.Target))),
-                    Constant(Error.WeakRefReuseWrapperGCed));
+                        typeof(WeakReference).Property(nameof(WeakReference.Target))));
             else if (Setup.PreventDisposal)
                 serviceExpr = Field(
                     Convert(serviceExpr, typeof(HiddenDisposable)),
@@ -9262,9 +9269,9 @@ namespace DryIoc
     public static class ThrowInGeneratedCode
     {
         /// <summary>Throws if object is null.</summary>
-        public static object ThrowNewErrorIfNull(this object obj, int error)
+        public static object WeakRefReuseWrapperGCed(this object obj)
         {
-            if (obj == null) Throw.It(error);
+            if (obj == null) Throw.It(Error.WeakRefReuseWrapperGCed);
             return obj;
         }
     }
@@ -9351,8 +9358,8 @@ namespace DryIoc
             var matchedParams = new Type[genericParameters.Length];
             Array.Copy(genericParameters, matchedParams, genericParameters.Length);
 
-            SetToNullGenericParametersReferencedInConstraints(matchedParams);
-            SetToNullMatchesFoundInGenericParameters(matchedParams, openGenericType.GetGenericParamsAndArgs());
+            ClearGenericParametersReferencedInConstraints(matchedParams);
+            ClearMatchesFoundInGenericParameters(matchedParams, openGenericType.GetGenericParamsAndArgs());
 
             for (var i = 0; i < matchedParams.Length; i++)
                 if (matchedParams[i] != null)
@@ -9690,7 +9697,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private static void SetToNullGenericParametersReferencedInConstraints(Type[] genericParams)
+        private static void ClearGenericParametersReferencedInConstraints(Type[] genericParams)
         {
             for (int i = 0; i < genericParams.Length; i++)
             {
@@ -9720,7 +9727,7 @@ namespace DryIoc
             }
         }
 
-        private static void SetToNullMatchesFoundInGenericParameters(Type[] matchedParams, Type[] genericParams)
+        private static void ClearMatchesFoundInGenericParameters(Type[] matchedParams, Type[] genericParams)
         {
             for (var i = 0; i < genericParams.Length; i++)
             {
@@ -9732,7 +9739,7 @@ namespace DryIoc
                         matchedParams[matchedIndex] = null;
                 }
                 else if (genericParam.IsOpenGeneric())
-                    SetToNullMatchesFoundInGenericParameters(matchedParams, genericParam.GetGenericParamsAndArgs());
+                    ClearMatchesFoundInGenericParameters(matchedParams, genericParam.GetGenericParamsAndArgs());
             }
         }
 

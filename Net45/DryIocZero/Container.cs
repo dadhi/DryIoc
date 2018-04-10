@@ -840,11 +840,10 @@ namespace DryIocZero
     /// <summary>List of error codes and messages.</summary>
     public static class Error
     {
-        /// <summary>First error code to identify error range for other possible error code definitions.</summary>
-        public static readonly int FirstErrorCode = 0;
+        private static int _errorIndex = -1;
 
         /// <summary>List of error messages indexed with code.</summary>
-        public static readonly List<string> Messages = new List<string>(100);
+        public static readonly string[] Messages = new string[20];
 
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
@@ -861,15 +860,17 @@ namespace DryIocZero
             ScopeIsDisposed = Of(
                 "Scope is disposed and scoped instances are no longer available."),
             ProducedServiceIsNotAssignableToRequiredServiceType = Of(
-                "Service {0} produced by registered delegate or instance is not assignable to required service type {1}.");
+                "Service {0} produced by registered delegate or instance is not assignable to required service type {1}."),
+            WeakRefReuseWrapperGCed = Of(
+                "Reused service wrapped in WeakReference is Garbage Collected and no longer available.");
+
 #pragma warning restore 1591 // "Missing XML-comment"
 
-        /// <summary>Generates new code for message.</summary>
-        /// <param name="message">Message.</param> <returns>Code.</returns>
-        public static int Of(string message)
+        private static int Of(string message)
         {
-            Messages.Add(message);
-            return FirstErrorCode + Messages.Count - 1;
+            var errorIndex = Interlocked.Increment(ref _errorIndex);
+            Messages[errorIndex] = message;
+            return errorIndex;
         }
     }
 
@@ -915,10 +916,9 @@ namespace DryIocZero
     public static class ThrowInGeneratedCode
     {
         /// <summary>Throws if object is null.</summary>
-        public static object ThrowNewErrorIfNull(this object obj, string message)
+        public static object WeakRefReuseWrapperGCed(this object obj)
         {
-            if (obj == null)
-                Throw.It(Error.Of(message));
+            if (obj == null) Throw.It(Error.WeakRefReuseWrapperGCed);
             return obj;
         }
     }
