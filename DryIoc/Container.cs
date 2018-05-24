@@ -126,7 +126,6 @@ namespace DryIoc
             }
             else // whole Container with singletons.
             {
-                _defaultFactoryDelegateCache = Ref.Of(FactoryDelegateCache.Empty());
                 _registry.Swap(Registry.Empty);
                 Rules = Rules.Default;
 
@@ -166,8 +165,6 @@ namespace DryIoc
             if (!_registry.TrySwapIfStillCurrent(registry,
                 registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
-
-            _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache;
         }
 
         /// <inheritdoc />
@@ -183,19 +180,15 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
-            _defaultFactoryDelegateCache = _registry.Value.DefaultFactoryDelegateCache;
         }
 
         #endregion
 
         #region IResolver
 
-        object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
-        {
-            var cachedDelegate = _defaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType);
-            return cachedDelegate != null ? cachedDelegate(this) 
-                : ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
-        }
+        object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved) =>
+            _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType)?.Invoke(this) ??
+            ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
 
         private object ResolveAndCacheDefaultFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -206,14 +199,15 @@ namespace DryIoc
 
             // The situation is possible for multiple default services registered.
             var serviceKey = request.ServiceKey;
-            if (serviceKey != null)
+            if (serviceKey != null || CurrentScope?.Name != null)
                 return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
 
             var factoryDelegate = factory?.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
 
-            var service = factoryDelegate(this);
+            // Create the service at least.. and if succeed, cache the producing factory
+            //var service = factoryDelegate(this);
 
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             var registry = _registry.Value;
@@ -225,12 +219,20 @@ namespace DryIoc
                     cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
             }
 
-            return service;
+            return factoryDelegate(this);
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
+            if (serviceKey == null && requiredServiceType == null &&
+                (preResolveParent == null || preResolveParent.IsEmpty) &&
+                args.IsNullOrEmpty() &&
+                CurrentScope?.Name == null)
+            {
+                return ((IResolver)this).Resolve(serviceType, ifUnresolved);
+            }
+
             var cacheEntryKey = serviceKey == null ? serviceType
                 : (object)new KV<object, object>(serviceType, serviceKey);
 
@@ -461,6 +463,7 @@ namespace DryIoc
             _registry.Swap(r =>
             {
                 var entry = r.Services.GetValueOrDefault(serviceType);
+                var oldEntry = entry;
 
                 // no entries, first registration, usual/hot path
                 if (entry == null)
@@ -479,7 +482,7 @@ namespace DryIoc
                     {
                         if (serviceKey != null)
                         {
-                            // @ifAlreadyRegistered doe no make sense for keyed, because there are no other keyed
+                            // @ifAlreadyRegistered does not make sense for keyed, because there are no other keyed
                             entry = FactoriesEntry.Empty.With(singleDefaultFactory)
                                 .With(InstanceFactory.Of(instance, instanceType, scope, reuse), serviceKey);
                         }
@@ -487,26 +490,24 @@ namespace DryIoc
                         {
                             switch (ifAlreadyRegistered)
                             {
-                                case IfAlreadyRegistered.Replace:
                                 case IfAlreadyRegistered.AppendNotKeyed:
-                                    if (ifAlreadyRegistered == IfAlreadyRegistered.Replace)
-                                    {
-                                        var reusedFactory = singleDefaultFactory as InstanceFactory;
-                                        if (reusedFactory != null)
-                                        {
-                                            scope.SetOrAdd(reusedFactory.FactoryID, instance);
-                                            break;
-                                        }
-
-                                        // for non-instance single registration we may replace with non-scoped instance only
-                                        if (reuse != Reuse.Scoped)
-                                            entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
-                                    }
                                     entry = FactoriesEntry.Empty.With(singleDefaultFactory)
                                         .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                     break;
                                 case IfAlreadyRegistered.Throw:
                                     Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, singleDefaultFactory);
+                                    break;
+                                case IfAlreadyRegistered.Keep:
+                                    break;
+                                case IfAlreadyRegistered.Replace:
+                                    var reusedFactory = singleDefaultFactory as InstanceFactory;
+                                    if (reusedFactory != null)
+                                        scope.SetOrAdd(reusedFactory.FactoryID, instance);
+                                    else if (reuse != Reuse.Scoped) // for non-instance single registration, just replace with non-scoped instance only
+                                        entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
+                                    else
+                                        entry = FactoriesEntry.Empty.With(singleDefaultFactory)
+                                            .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
                                     break;
                                 case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
                                     if (singleDefaultFactory.CanAccessImplementationType &&
@@ -577,29 +578,26 @@ namespace DryIoc
                                         {
                                             // scoped instance may be appended only, and not replacing anything
                                             if (reuse == Reuse.Scoped)
-                                            {
-                                                entry = singleKeyedOrManyDefaultFactories.With(
-                                                    InstanceFactory.Of(instance, instanceType, scope, reuse));
-                                                break;
-                                            }
-
-                                            // here is the replacement goes on
-                                            var keyedFactories = singleKeyedOrManyDefaultFactories.Factories.Enumerate()
-                                                .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
-
-                                            if (keyedFactories.Length == 0) // replaces all default factories?
-                                                entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
-                                            else
-                                            {
-                                                var factoriesEntry = FactoriesEntry.Empty;
-                                                for (int i = 0; i < keyedFactories.Length; i++)
-                                                    factoriesEntry = factoriesEntry
-                                                        .With(keyedFactories[i].Value, keyedFactories[i].Key);
-                                                entry = factoriesEntry
+                                                entry = singleKeyedOrManyDefaultFactories
                                                     .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
+                                            else // here is the replacement goes on
+                                            {
+                                                var keyedFactories = singleKeyedOrManyDefaultFactories.Factories.Enumerate()
+                                                    .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
+
+                                                if (keyedFactories.Length == 0) // replaces all default factories?
+                                                    entry = InstanceFactory.Of(instance, instanceType, scope, reuse);
+                                                else
+                                                {
+                                                    var factoriesEntry = FactoriesEntry.Empty;
+                                                    for (int i = 0; i < keyedFactories.Length; i++)
+                                                        factoriesEntry = factoriesEntry
+                                                            .With(keyedFactories[i].Value, keyedFactories[i].Key);
+                                                    entry = factoriesEntry
+                                                        .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
+                                                }
                                             }
                                         }
-
                                         break;
                                     case IfAlreadyRegistered.AppendNotKeyed:
                                         entry = singleKeyedOrManyDefaultFactories
@@ -626,7 +624,27 @@ namespace DryIoc
                 }
 
                 // add instance entry to service registrations
-                return r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
+                var registry = r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
+
+                if (!registry.DefaultFactoryDelegateCache.Value.IsEmpty ||
+                    !registry.KeyedFactoryDelegateCache.Value.IsEmpty)
+                {
+                    var oldFactory = oldEntry as Factory;
+                    if (oldFactory != null)
+                        registry = registry.WithoutFactoryCache(oldFactory, serviceType, serviceKey);
+                    else if (oldEntry is FactoriesEntry)
+                    {
+                        var defaultFactories = ((FactoriesEntry)oldEntry).Factories
+                            .Enumerate().Where(x => x.Key is DefaultKey);
+                        foreach (var f in defaultFactories)
+                            registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
+                    }
+                    //else if (!oldDefaultFactories.IsEmpty)
+                    //    foreach (var f in oldDefaultFactories.Enumerate())
+                    //        registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
+                }
+
+                return registry;
             });
         }
 
@@ -780,7 +798,7 @@ namespace DryIoc
                 return GetRuleSelectedServiceFactoryOrDefault(Rules.FactorySelector, request, serviceType);
 
             var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType);
-            var factories = GetCombinedRegisteredAndDynamicFactories(
+            var factories = CombineRegisteredWithDynamicFactories(
                 registeredFactories, true, FactoryType.Service, serviceType);
             if (factories.IsNullOrEmpty())
                 return null;
@@ -882,7 +900,7 @@ namespace DryIoc
                 }
             }
 
-            return GetCombinedRegisteredAndDynamicFactories(factories,
+            return CombineRegisteredWithDynamicFactories(factories,
                 bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
         }
 
@@ -1034,7 +1052,7 @@ namespace DryIoc
             if (!allDecorators.IsEmpty)
                 decorators = allDecorators.GetValueOrDefault(serviceType) ?? ArrayTools.Empty<Factory>();
 
-            decorators = GetCombinedRegisteredAndDynamicFactories(
+            decorators = CombineRegisteredWithDynamicFactories(
                     decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)),
                     true, FactoryType.Decorator, serviceType)
                 .Map(it => it.Value);
@@ -1207,7 +1225,7 @@ namespace DryIoc
             return ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
         }
 
-        private KV<object, Factory>[] GetCombinedRegisteredAndDynamicFactories(
+        private KV<object, Factory>[] CombineRegisteredWithDynamicFactories(
             KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics,
             FactoryType factoryType, Type serviceType, object serviceKey = null)
         {
@@ -1313,7 +1331,7 @@ namespace DryIoc
         private Factory GetKeyedServiceFactoryOrDefault(Request request, Type serviceType, object serviceKey)
         {
             var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
-            var registeredAndDynamicFactories = GetCombinedRegisteredAndDynamicFactories(
+            var registeredAndDynamicFactories = CombineRegisteredWithDynamicFactories(
                 registeredFactories, true,
                 FactoryType.Service, serviceType, serviceKey);
 
@@ -1446,7 +1464,6 @@ namespace DryIoc
         private StackTrace _disposeStackTrace;
 
         private readonly Ref<Registry> _registry;
-        private Ref<ImHashMap<Type, FactoryDelegate>[]> _defaultFactoryDelegateCache;
 
         private readonly IScope _singletonScope;
         private readonly IScope _ownCurrentScope;
@@ -1538,7 +1555,7 @@ namespace DryIoc
             public readonly ImHashMap<Type, Factory> Wrappers;
 
             // Resolved Delegate Cache:
-            public readonly Ref<ImHashMap<Type, FactoryDelegate>[]> DefaultFactoryDelegateCache;
+            public readonly Ref<ImHashMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and IntTreeMap<{requiredServicType+preResolvedParent}, FactoryDelegate>
@@ -1551,7 +1568,7 @@ namespace DryIoc
                 : this(ImHashMap<Type, object>.Empty,
                     ImHashMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
-                    Ref.Of(FactoryDelegateCache.Empty()),
+                    Ref.Of(ImHashMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
                     IsChangePermitted.Permitted)
             { }
@@ -1560,7 +1577,7 @@ namespace DryIoc
                 ImHashMap<Type, object> services,
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
-                Ref<ImHashMap<Type, FactoryDelegate>[]> defaultFactoryDelegateCache,
+                Ref<ImHashMap<Type, FactoryDelegate>> defaultFactoryDelegateCache,
                 Ref<ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
                 IsChangePermitted isChangePermitted)
             {
@@ -1574,7 +1591,7 @@ namespace DryIoc
 
             public Registry WithoutCache() =>
                 new Registry(Services, Decorators, Wrappers,
-                    Ref.Of(FactoryDelegateCache.Empty()),
+                    Ref.Of(ImHashMap<Type, FactoryDelegate>.Empty),
                     Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
                     _isChangePermitted);
 
@@ -1700,8 +1717,8 @@ namespace DryIoc
 
             private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered)
             {
-                Factory replacedFactory = null;
-                ImHashMap<object, Factory> replacedFactories = null;
+                var oldFactory = default(Factory);
+                var oldDefaultFactories = ImHashMap<object, Factory>.Empty;
                 ImHashMap<Type, object> services;
                 if (serviceKey == null)
                 {
@@ -1716,9 +1733,18 @@ namespace DryIoc
                         if (oldFactoriesEntry != null && oldFactoriesEntry.LastDefaultKey == null) // no default registered yet
                             return oldFactoriesEntry.With(newFactory);
 
-                        var oldFactory = oldFactoriesEntry == null ? (Factory)oldEntry : null;
+                        oldFactory = oldFactoriesEntry == null ? (Factory)oldEntry : null;
                         switch (ifAlreadyRegistered)
                         {
+                            case IfAlreadyRegistered.AppendNotKeyed:
+                                // collecting the default factories.
+                                if (oldFactoriesEntry?.LastDefaultKey != null)
+                                    foreach (var f in oldFactoriesEntry.Factories.Enumerate())
+                                        if (f.Key is DefaultKey)
+                                            oldDefaultFactories = oldDefaultFactories.AddOrUpdate(f.Key, f.Value);
+
+                                return (oldFactoriesEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(newFactory);
+
                             case IfAlreadyRegistered.Throw:
                                 oldFactory = oldFactory ?? oldFactoriesEntry.Factories.GetValueOrDefault(oldFactoriesEntry.LastDefaultKey);
                                 return Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, oldFactory);
@@ -1730,18 +1756,15 @@ namespace DryIoc
                                 if (oldFactoriesEntry != null)
                                 {
                                     // remove defaults but keep keyed (issue #569)
-                                    var oldFactories = oldFactoriesEntry.Factories;
                                     var keyedFactories = ImHashMap<object, Factory>.Empty;
                                     if (oldFactoriesEntry.LastDefaultKey != null)
                                     {
-                                        var removedFactories = ImHashMap<object, Factory>.Empty;
-                                        foreach (var f in oldFactories.Enumerate())
+                                        foreach (var f in oldFactoriesEntry.Factories.Enumerate())
                                             if (f.Key is DefaultKey)
-                                                removedFactories = removedFactories.AddOrUpdate(f.Key, f.Value);
-                                            else // copy keyed to new
+                                                oldDefaultFactories = oldDefaultFactories.AddOrUpdate(f.Key, f.Value);
+                                            else // copy keyed to new collection
                                                 keyedFactories = keyedFactories.AddOrUpdate(f.Key, f.Value);
 
-                                        replacedFactories = removedFactories;
                                         if (keyedFactories.IsEmpty)
                                             return newEntry; // the entry with all defaults was completely replaced
                                     }
@@ -1750,7 +1773,6 @@ namespace DryIoc
                                         keyedFactories.AddOrUpdate(DefaultKey.Value, newFactory));
                                 }
 
-                                replacedFactory = oldFactory;
                                 return newEntry;
 
                             case IfAlreadyRegistered.AppendNewImplementation:
@@ -1766,7 +1788,7 @@ namespace DryIoc
                                 return oldEntry;
 
                             default:
-                                return (oldFactoriesEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(newFactory);
+                                return oldEntry;
                         }
                     });
                 }
@@ -1783,22 +1805,20 @@ namespace DryIoc
 
                         var oldFactories = (FactoriesEntry)oldEntry;
                         return new FactoriesEntry(oldFactories.LastDefaultKey,
-                            oldFactories.Factories.AddOrUpdate(serviceKey, factory, (oldFactory, newFactory) =>
+                            oldFactories.Factories.AddOrUpdate(serviceKey, factory, (a, b) =>
                             {
-                                if (oldFactory == null)
-                                    return factory;
+                                if (a == null)
+                                    return b;
 
                                 switch (ifAlreadyRegistered)
                                 {
                                     case IfAlreadyRegistered.Keep:
-                                        return oldFactory;
-
+                                        return a;
                                     case IfAlreadyRegistered.Replace:
-                                        replacedFactory = oldFactory;
-                                        return newFactory;
-
+                                        oldFactory = a;
+                                        return b;
                                     default:
-                                        return Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, oldFactory);
+                                        return Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, a);
                                 }
                             }));
                     });
@@ -1811,11 +1831,15 @@ namespace DryIoc
                         DefaultFactoryDelegateCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
                         _isChangePermitted);
 
-                    if (replacedFactory != null)
-                        registry = registry.WithoutFactoryCache(replacedFactory, serviceType, serviceKey);
-                    else if (replacedFactories != null)
-                        foreach (var f in replacedFactories.Enumerate())
-                            registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
+                    if (!registry.DefaultFactoryDelegateCache.Value.IsEmpty ||
+                        !registry.KeyedFactoryDelegateCache.Value.IsEmpty)
+                    {
+                        if (oldFactory != null)
+                            registry = registry.WithoutFactoryCache(oldFactory, serviceType, serviceKey);
+                        else if (!oldDefaultFactories.IsEmpty)
+                            foreach (var f in oldDefaultFactories.Enumerate())
+                                registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
+                    }
                 }
 
                 return registry;
@@ -1918,11 +1942,7 @@ namespace DryIoc
                             return null;
                         }
 
-                        removed =
-                            oldFactories.Enumerate()
-                                .Except(remainingFactories.Enumerate())
-                                .Select(f => f.Value)
-                                .ToArray();
+                        removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
 
                         if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
                             return remainingFactories.Value; // replace entry with single remaining default factory
@@ -1952,8 +1972,7 @@ namespace DryIoc
                 return registry;
             }
 
-            // Does not change registry, returns Registry just for convenience of method chaining
-            private Registry WithoutFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
+            internal Registry WithoutFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
             {
                 if (factory.FactoryGenerator != null)
                 {
@@ -1963,11 +1982,15 @@ namespace DryIoc
                 else
                 {
                     // clean default factory cache
-                    DefaultFactoryDelegateCache.Swap(_ => _.Update(serviceType, null));
+                    if (!DefaultFactoryDelegateCache.Value.IsEmpty)
+                        DefaultFactoryDelegateCache.Swap(x => x.Update(serviceType, null));
 
                     // clean keyed/context cache from keyed and context based resolutions
-                    var keyedCacheKey = serviceKey == null ? (object)serviceType : new KV<object, object>(serviceType, serviceKey);
-                    KeyedFactoryDelegateCache.Swap(_ => _.Update(keyedCacheKey, null));
+                    if (!KeyedFactoryDelegateCache.Value.IsEmpty)
+                    {
+                        var keyedCacheKey = serviceKey == null ? (object)serviceType : new KV<object, object>(serviceType, serviceKey);
+                        KeyedFactoryDelegateCache.Swap(x => x.Update(keyedCacheKey, null));
+                    }
                 }
 
                 return this;
@@ -1987,7 +2010,6 @@ namespace DryIoc
             Rules = rules;
 
             _registry = registry;
-            _defaultFactoryDelegateCache = registry.Value.DefaultFactoryDelegateCache;
 
             _singletonScope = singletonScope;
             _scopeContext = scopeContext;
@@ -2014,79 +2036,6 @@ namespace DryIoc
 
         /// <summary>Wraps the value</summary>
         public HiddenDisposable(object value) { Value = value; }
-    }
-
-    internal static class FactoryDelegateCache
-    {
-        private const int NumberOfMapBuckets = 16;
-        private const int NumberOfMapMask = NumberOfMapBuckets - 1;  // get last 4 bits, fast (hash % NumberOfTrees)
-
-        public static ImHashMap<Type, FactoryDelegate>[] Empty()
-        {
-            return new ImHashMap<Type, FactoryDelegate>[NumberOfMapBuckets];
-        }
-
-        [MethodImpl((MethodImplOptions)256)]
-        public static FactoryDelegate GetValueOrDefault(this ImHashMap<Type, FactoryDelegate>[] maps, Type key)
-        {
-            var hash = key.GetHashCode();
-
-            var map = maps[hash & NumberOfMapMask];
-            if (map == null)
-                return null;
-
-            for (; map.Height != 0; map = hash < map.Hash ? map.Left : map.Right)
-            {
-                if (map.Key == key)
-                    return map.Value;
-                if (map.Hash == hash)
-                    return map.GetConflictedValueOrDefault(key, null);
-            }
-
-            return null;
-        }
-
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<Type, FactoryDelegate>[] AddOrUpdate(this ImHashMap<Type, FactoryDelegate>[] maps,
-            Type key, FactoryDelegate value)
-        {
-            var hash = key.GetHashCode();
-
-            var mapIndex = hash & NumberOfMapMask;
-            var map = maps[mapIndex];
-            if (map == null)
-                map = ImHashMap<Type, FactoryDelegate>.Empty;
-
-            map = map.AddOrUpdate(hash, key, value);
-
-            var newMaps = new ImHashMap<Type, FactoryDelegate>[NumberOfMapBuckets];
-            Array.Copy(maps, 0, newMaps, 0, NumberOfMapBuckets);
-            newMaps[mapIndex] = map;
-
-            return newMaps;
-        }
-
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<Type, FactoryDelegate>[] Update(this ImHashMap<Type, FactoryDelegate>[] maps,
-            Type key, FactoryDelegate value)
-        {
-            var hash = key.GetHashCode();
-
-            var mapIndex = hash & NumberOfMapMask;
-            var map = maps[mapIndex];
-            if (map == null)
-                return maps;
-
-            var newMap = map.Update(hash, key, value, null);
-            if (newMap == map)
-                return maps;
-
-            var newMaps = new ImHashMap<Type, FactoryDelegate>[NumberOfMapBuckets];
-            Array.Copy(maps, 0, newMaps, 0, NumberOfMapBuckets);
-            newMaps[mapIndex] = newMap;
-
-            return newMaps;
-        }
     }
 
     /// <summary>Compiles expression to factory delegate.</summary>
@@ -3505,6 +3454,9 @@ namespace DryIoc
 
             return (serviceType, serviceKey) =>
             {
+                if (serviceType.IsExcludedGeneralPurposeServiceType())
+                    return Enumerable.Empty<DynamicRegistration>();
+
                 var implementationTypes = getImplementationTypes(serviceType, serviceKey);
 
                 return implementationTypes.Match(
@@ -4471,6 +4423,7 @@ namespace DryIoc
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
         {
+            "System.Object",
             "System.IDisposable",
             "System.ValueType",
             "System.ICloneable",

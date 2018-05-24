@@ -47,14 +47,14 @@ namespace ImTools
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
     public static class ArrayTools
     {
-        /// <summary>Returns singleton empty array of provided type.</summary> 
-        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
-        public static T[] Empty<T>() => EmptyArray<T>.Value;
-
         private static class EmptyArray<T>
         {
             public static readonly T[] Value = new T[0];
         }
+
+        /// <summary>Returns singleton empty array of provided type.</summary> 
+        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
+        public static T[] Empty<T>() => EmptyArray<T>.Value;
 
         /// <summary>Wraps item in array.</summary>
         public static T[] One<T>(this T one) => new[] { one };
@@ -99,12 +99,8 @@ namespace ImTools
         /// <param name="source">goes first.</param>
         /// <param name="other">appended to source.</param>
         /// <returns>empty array or concat of source and other.</returns>
-        public static T[] Append<T>(this IEnumerable<T> source, IEnumerable<T> other)
-        {
-            var sourceArr = source.ToArrayOrSelf();
-            var otherArr = other.ToArrayOrSelf();
-            return sourceArr.Append(otherArr);
-        }
+        public static T[] Append<T>(this IEnumerable<T> source, IEnumerable<T> other) =>
+            source.ToArrayOrSelf().Append(other.ToArrayOrSelf());
 
         /// <summary>Returns new array with <paramref name="value"/> appended, 
         /// or <paramref name="value"/> at <paramref name="index"/>, if specified.
@@ -181,10 +177,8 @@ namespace ImTools
         /// <typeparam name="T">Type of array item.</typeparam>
         /// <param name="source">Input array.</param> <param name="value">Value to find and remove.</param>
         /// <returns>New array with value removed or original array if value is not found.</returns>
-        public static T[] Remove<T>(this T[] source, T value)
-        {
-            return source.RemoveAt(source.IndexOf(value));
-        }
+        public static T[] Remove<T>(this T[] source, T value) =>
+            source.RemoveAt(source.IndexOf(value));
 
         /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
         /// <typeparam name="T">item type</typeparam>
@@ -203,7 +197,7 @@ namespace ImTools
             return default(T);
         }
 
-        /// <summary>Returns first item matching the <paramref name="predicate"/>, or `default(T)` value.</summary>
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
         /// <typeparam name="T">item type</typeparam>
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>
@@ -252,10 +246,8 @@ namespace ImTools
                 if (count == 1)
                     newResults[0] = map(source[sourcePos]);
                 else
-                {
                     for (int i = 0, j = sourcePos; i < count; ++i, ++j)
                         newResults[i] = map(source[j]);
-                }
                 return newResults;
             }
 
@@ -272,7 +264,7 @@ namespace ImTools
             {
                 for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
                     appendedResults[i] = map(source[j]);
-             }
+            }
 
             return appendedResults;
         }
@@ -473,7 +465,7 @@ namespace ImTools
     public sealed class Ref<T> where T : class
     {
         /// <summary>Gets the wrapped value.</summary>
-        public T Value { get { return _value; } }
+        public T Value => _value;
 
         /// <summary>Creates ref to object, optionally with initial value provided.</summary>
         /// <param name="initialValue">(optional) Initial value.</param>
@@ -486,17 +478,13 @@ namespace ImTools
         /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
         /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
         /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public T Swap(Func<T, T> getNewValue)
-        {
-            return Ref.Swap(ref _value, getNewValue);
-        }
+        public T Swap(Func<T, T> getNewValue) =>
+            Ref.Swap(ref _value, getNewValue);
 
         /// <summary>Just sets new value ignoring any intermingled changes.</summary>
         /// <param name="newValue"></param> <returns>old value</returns>
-        public T Swap(T newValue)
-        {
-            return Interlocked.Exchange(ref _value, newValue);
-        }
+        public T Swap(T newValue) =>
+            Interlocked.Exchange(ref _value, newValue);
 
         /// <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
         /// <param name="currentValue"></param> <param name="newValue"></param>
@@ -506,10 +494,8 @@ namespace ImTools
         /// if (!SomeRef.TrySwapIfStillCurrent(value, Update(value))
         ///     SomeRef.Swap(v => Update(v)); // fallback to normal Swap with delegate allocation
         /// ]]</c></example>
-        public bool TrySwapIfStillCurrent(T currentValue, T newValue)
-        {
-            return Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
-        }
+        public bool TrySwapIfStillCurrent(T currentValue, T newValue) =>
+            Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
 
         private T _value;
     }
@@ -521,17 +507,11 @@ namespace ImTools
         /// <typeparam name="T">Type of value to wrap.</typeparam>
         /// <param name="value">Initial value to wrap.</param>
         /// <returns>New ref.</returns>
-        public static Ref<T> Of<T>(T value) where T : class
-        {
-            return new Ref<T>(value);
-        }
+        public static Ref<T> Of<T>(T value) where T : class => new Ref<T>(value);
 
         /// <summary>Creates new ref to the value of original ref.</summary> <typeparam name="T">Ref value type.</typeparam>
         /// <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
-        public static Ref<T> NewRef<T>(this Ref<T> original) where T : class
-        {
-            return Of(original.Value);
-        }
+        public static Ref<T> NewRef<T>(this Ref<T> original) where T : class => Of(original.Value);
 
         /// <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
         /// Second, it checks that original value is not changed. 
@@ -610,7 +590,7 @@ namespace ImTools
             unchecked
             {
                 return ((object)Key == null ? 0 : Key.GetHashCode() * 397)
-                       ^ ((object)Value == null ? 0 : Value.GetHashCode());
+                     ^ ((object)Value == null ? 0 : Value.GetHashCode());
             }
         }
     }
@@ -621,26 +601,17 @@ namespace ImTools
         /// <summary>Creates the key value pair.</summary>
         /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
         /// <param name="key">Key</param> <param name="value">Value</param> <returns>New pair.</returns>
-        public static KV<K, V> Of<K, V>(K key, V value)
-        {
-            return new KV<K, V>(key, value);
-        }
+        public static KV<K, V> Of<K, V>(K key, V value) => new KV<K, V>(key, value);
 
         /// <summary>Creates the new pair with new key and old value.</summary>
         /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
         /// <param name="source">Source value</param> <param name="key">New key</param> <returns>New pair</returns>
-        public static KV<K, V> WithKey<K, V>(this KV<K, V> source, K key)
-        {
-            return new KV<K, V>(key, source.Value);
-        }
+        public static KV<K, V> WithKey<K, V>(this KV<K, V> source, K key) => new KV<K, V>(key, source.Value);
 
         /// <summary>Creates the new pair with old key and new value.</summary>
         /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
         /// <param name="source">Source value</param> <param name="value">New value.</param> <returns>New pair</returns>
-        public static KV<K, V> WithValue<K, V>(this KV<K, V> source, V value)
-        {
-            return new KV<K, V>(source.Key, value);
-        }
+        public static KV<K, V> WithValue<K, V>(this KV<K, V> source, V value) => new KV<K, V>(source.Key, value);
     }
 
     /// <summary>Simple helper for creation of the pair of two parts.</summary>
@@ -658,10 +629,10 @@ namespace ImTools
         public static implicit operator Opt<T>(T value) => new Opt<T>(value);
 
         /// <summary>Argument value.</summary>
-        public T Value;
+        public readonly T Value;
 
         /// <summary>Indicates that value is provided.</summary>
-        public bool HasValue;
+        public readonly bool HasValue;
 
         /// <summary>Wraps passed value in structure. Sets the flag that value is present.</summary>
         public Opt(T value)
@@ -682,10 +653,7 @@ namespace ImTools
         public static readonly ImList<T> Empty = new ImList<T>();
 
         /// <summary>True for empty list.</summary>
-        public bool IsEmpty
-        {
-            get { return Tail == null; }
-        }
+        public bool IsEmpty => Tail == null;
 
         /// <summary>First value in a list.</summary>
         public readonly T Head;
@@ -696,10 +664,7 @@ namespace ImTools
         /// <summary>Prepends new value and returns new list.</summary>
         /// <param name="head">New first value.</param>
         /// <returns>List with the new head.</returns>
-        public ImList<T> Prep(T head)
-        {
-            return new ImList<T>(head, this);
-        }
+        public ImList<T> Prep(T head) => new ImList<T>(head, this);
 
         /// <summary>Enumerates the list.</summary>
         /// <returns>Each item in turn.</returns>
@@ -829,35 +794,26 @@ namespace ImTools
         public readonly int Height;
 
         /// <summary>Returns true is tree is empty.</summary>
-        public bool IsEmpty
-        {
-            get { return Height == 0; }
-        }
+        public bool IsEmpty => Height == 0;
 
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <returns>New tree.</returns>
-        public ImMap<V> AddOrUpdate(int key, V value)
-        {
-            return AddOrUpdateImpl(key, value);
-        }
+        public ImMap<V> AddOrUpdate(int key, V value) =>
+            AddOrUpdateImpl(key, value);
 
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key">Key</param> <param name="value">Value</param>
         /// <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
         /// <returns>New tree.</returns>
-        public ImMap<V> AddOrUpdate(int key, V value, Update<V> updateValue)
-        {
-            return AddOrUpdateImpl(key, value, false, updateValue);
-        }
+        public ImMap<V> AddOrUpdate(int key, V value, Update<V> updateValue) =>
+            AddOrUpdateImpl(key, value, false, updateValue);
 
         /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <returns>New tree if key is found, or the same tree otherwise.</returns>
-        public ImMap<V> Update(int key, V value)
-        {
-            return AddOrUpdateImpl(key, value, true, null);
-        }
+        public ImMap<V> Update(int key, V value) =>
+            AddOrUpdateImpl(key, value, true, null);
 
         /// <summary>Get value for found key or null otherwise.</summary>
         /// <param name="key"></param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
@@ -922,16 +878,11 @@ namespace ImTools
         /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
         /// <param name="key">Key to look for.</param> 
         /// <returns>New tree with removed or updated value.</returns>
-        public ImMap<V> Remove(int key)
-        {
-            return RemoveImpl(key);
-        }
+        public ImMap<V> Remove(int key) =>
+            RemoveImpl(key);
 
         /// <summary>Outputs key value pair</summary>
-        public override string ToString()
-        {
-            return Key + " : " + Value;
-        }
+        public override string ToString() => IsEmpty ? "empty" : (Key + ":" + Value);
 
         #region Implementation
 
@@ -1086,28 +1037,16 @@ namespace ImTools
         public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
 
         /// <summary>Calculated key hash.</summary>
-        public int Hash
-        {
-            get { return _data.Hash; }
-        }
+        public int Hash => _data.Hash;
 
         /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
-        public K Key
-        {
-            get { return _data.Key; }
-        }
+        public K Key => _data.Key;
 
         /// <summary>Value of any type V.</summary>
-        public V Value
-        {
-            get { return _data.Value; }
-        }
+        public V Value => _data.Value;
 
         /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
-        public KV<K, V>[] Conflicts
-        {
-            get { return _data.Conflicts; }
-        }
+        public KV<K, V>[] Conflicts => _data.Conflicts;
 
         /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImHashMap<K, V> Left;
@@ -1119,19 +1058,14 @@ namespace ImTools
         public readonly int Height;
 
         /// <summary>Returns true if tree is empty.</summary>
-        public bool IsEmpty
-        {
-            get { return Height == 0; }
-        }
+        public bool IsEmpty => Height == 0;
 
         /// <summary>Returns new tree with added key-value. 
         /// If value with the same key is exist then the value is replaced.</summary>
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <returns>New tree with added or updated key-value.</returns>
-        public ImHashMap<K, V> AddOrUpdate(K key, V value)
-        {
-            return AddOrUpdate(key.GetHashCode(), key, value);
-        }
+        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
+            AddOrUpdate(key.GetHashCode(), key, value);
 
         /// <summary>Returns new tree with added key-value. If value with the same key is exist, then
         /// if <paramref name="update"/> is not specified: then existing value will be replaced by <paramref name="value"/>;
@@ -1139,10 +1073,8 @@ namespace ImTools
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <param name="update">Update handler.</param>
         /// <returns>New tree with added or updated key-value.</returns>
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update)
-        {
-            return AddOrUpdate(key.GetHashCode(), key, value, update);
-        }
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
+            AddOrUpdate(key.GetHashCode(), key, value, update);
 
         /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
         /// runs custom update handler (<paramref name="update"/>) with old and new value to get the updated result.</summary>
@@ -1151,10 +1083,8 @@ namespace ImTools
         /// <param name="update">(optional) Delegate for custom update logic, it gets old and new <paramref name="value"/>
         /// as inputs and should return updated value as output.</param>
         /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
-        public ImHashMap<K, V> Update(K key, V value, Update<V> update = null)
-        {
-            return Update(key.GetHashCode(), key, value, update);
-        }
+        public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
+            Update(key.GetHashCode(), key, value, update);
 
         /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
         /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
@@ -1228,16 +1158,11 @@ namespace ImTools
         /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
         /// <param name="key">Key to look for.</param> 
         /// <returns>New tree with removed or updated value.</returns>
-        public ImHashMap<K, V> Remove(K key)
-        {
-            return Remove(key.GetHashCode(), key);
-        }
+        public ImHashMap<K, V> Remove(K key) =>
+            Remove(key.GetHashCode(), key);
 
         /// <summary>Outputs key value pair</summary>
-        public override string ToString()
-        {
-            return Key + " : " + Value;
-        }
+        public override string ToString() => IsEmpty ? "empty" : (Key + ":" + Value);
 
         #region Implementation
 
@@ -1288,7 +1213,9 @@ namespace ImTools
             Height = height;
         }
 
-        internal ImHashMap<K, V> AddOrUpdate(int hash, K key, V value)
+        // todo: made public for benchmarking
+        /// <summary>It is fine</summary>
+        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value)
         {
             return Height == 0  // add new node
                 ? new ImHashMap<K, V>(new Data(hash, key, value))
@@ -1323,7 +1250,9 @@ namespace ImTools
                     .KeepBalance());
         }
 
-        internal ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update)
+        // todo: made public for benchmarking
+        /// <summary>It is fine</summary>
+        public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update)
         {
             return Height == 0 ? this
                 : (hash == Hash
@@ -1359,7 +1288,9 @@ namespace ImTools
             return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
         }
 
-        internal V GetConflictedValueOrDefault(K key, V defaultValue)
+        // todo: temporary made public for benchmarking
+        /// <summary>It is fine</summary>
+        public V GetConflictedValueOrDefault(K key, V defaultValue)
         {
             if (Conflicts != null)
                 for (var i = Conflicts.Length - 1; i >= 0; --i)
@@ -1493,20 +1424,20 @@ namespace ImTools
 
             if (Conflicts.Length == 1)
                 return new ImHashMap<K, V>(new Data(Hash, Key, Value), Left, Right);
-            var shrinkConflicts = new KV<K, V>[Conflicts.Length - 1];
+            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
             var newIndex = 0;
             for (var i = 0; i < Conflicts.Length; ++i)
-                if (i != index) shrinkConflicts[newIndex++] = Conflicts[i];
-            return new ImHashMap<K, V>(new Data(Hash, Key, Value, shrinkConflicts), Left, Right);
+                if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
+            return new ImHashMap<K, V>(new Data(Hash, Key, Value, shrinkedConflicts), Left, Right);
         }
 
         private ImHashMap<K, V> ReplaceRemovedWithConflicted()
         {
             if (Conflicts.Length == 1)
                 return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value), Left, Right);
-            var shrinkConflicts = new KV<K, V>[Conflicts.Length - 1];
-            Array.Copy(Conflicts, 1, shrinkConflicts, 0, shrinkConflicts.Length);
-            return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkConflicts), Left, Right);
+            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
+            Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
+            return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts), Left, Right);
         }
 
         #endregion

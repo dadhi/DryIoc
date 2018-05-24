@@ -364,7 +364,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void ReRegister_transient_with_key()
+        public void Re_Register_transient_with_key()
         {
             var c = new Container();
             c.Register<ILogger, Logger1>(serviceKey: "a");
