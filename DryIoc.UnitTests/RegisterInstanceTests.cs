@@ -118,17 +118,15 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Throws_on_attempt_to_replace_keyed_instance_registration_of_non_instance_factory()
+        public void Can_replace_keyed_delegate_with_used_instance()
         {
             var container = new Container();
 
             container.RegisterDelegate(_ => "a", serviceKey: "x");
             Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
 
-            var ex = Assert.Throws<ContainerException>(() => 
-                container.UseInstance("b", serviceKey: "x"));
-
-            Assert.AreEqual(Error.NameOf(Error.UnableToUseInstanceForExistingNonInstanceFactory), Error.NameOf(ex.Error));
+            container.UseInstance("b", serviceKey: "x");
+            Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
         }
 
         [Test]

@@ -6,6 +6,37 @@ namespace DryIoc.IssuesTests
     public class Issue574_IResolverContext_UseInstance_ShouldNotHaveSideEffectsOnOtherScopes
     {
         [Test]
+        public void Can_add_to_single_keyed_singleton_the_instance()
+        {
+            var container = new Container();
+
+            container.Register<A, AA>(Reuse.Singleton, serviceKey: "42");
+            var aa = container.Resolve<A>(serviceKey: "42");
+            Assert.IsInstanceOf<AA>(aa);
+
+            container.UseInstance<A>(new AB(), serviceKey: "42");
+            var ab = container.Resolve<A>(serviceKey: "42");
+            Assert.IsInstanceOf<AB>(ab);
+        }
+
+        [Test]
+        public void Can_add_to_multiple_keyed_singletons_the_instance()
+        {
+            var container = new Container();
+
+            container.Register<A>(Reuse.Singleton);
+
+            container.Register<A, AA>(Reuse.Singleton, serviceKey: "42");
+
+            var aa = container.Resolve<A>(serviceKey: "42");
+            Assert.IsInstanceOf<AA>(aa);
+
+            container.UseInstance<A>(new AB(), serviceKey: "42");
+            var ab = container.Resolve<A>(serviceKey: "42");
+            Assert.IsInstanceOf<AB>(ab);
+        }
+
+        [Test]
         public void No_cache_issues_between_normal_registration_and_UseInstance()
         {
             var container = new Container();
@@ -59,7 +90,7 @@ namespace DryIoc.IssuesTests
         public class AA : A { }
         public class AB : A { }
 
-        [Test, Ignore]
+        [Test]
         public void ScopedFactory_ShouldResolveItselfWithinSelfScope_EvenIfThereAreParallelScopes()
         {
             var container = new Container();
@@ -83,7 +114,7 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(scopedFactory3, scopedFactory4);
         }
 
-        [Test, Ignore]
+        [Test]
         public void ScopedFactory_ShouldResolveItselfWithinSelfScope_EvenIfThereAreParallelScopesAndNullArgsProvided()
         {
             var container = new Container();

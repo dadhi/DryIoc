@@ -206,9 +206,6 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            // Create the service at least.. and if succeed, cache the producing factory
-            //var service = factoryDelegate(this);
-
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             var registry = _registry.Value;
             if (!registry.Services.IsEmpty)
@@ -525,8 +522,8 @@ namespace DryIoc
                         var singleKeyedOrManyDefaultFactories = (FactoriesEntry)entry;
                         if (serviceKey != null)
                         {
-                            var keyedFactory = singleKeyedOrManyDefaultFactories.Factories.GetValueOrDefault(serviceKey);
-                            if (keyedFactory == null)
+                            var singleKeyedFactory = singleKeyedOrManyDefaultFactories.Factories.GetValueOrDefault(serviceKey);
+                            if (singleKeyedFactory == null)
                             {
                                 entry = singleKeyedOrManyDefaultFactories
                                     .With(InstanceFactory.Of(instance, instanceType, scope, reuse), serviceKey);
@@ -536,17 +533,17 @@ namespace DryIoc
                                 switch (ifAlreadyRegistered)
                                 {
                                     case IfAlreadyRegistered.Replace:
-                                        var reusedFactory = keyedFactory as InstanceFactory;
+                                        var reusedFactory = singleKeyedFactory as InstanceFactory;
                                         if (reusedFactory != null)
                                             scope.SetOrAdd(reusedFactory.FactoryID, instance);
                                         else
-                                            Throw.It(Error.UnableToUseInstanceForExistingNonInstanceFactory,
-                                                KV.Of(serviceKey, instance), keyedFactory);
+                                            entry = singleKeyedOrManyDefaultFactories
+                                                .With(InstanceFactory.Of(instance, instanceType, scope, reuse), serviceKey);
                                         break;
                                     case IfAlreadyRegistered.Keep:
                                         break;
                                     default:
-                                        Throw.It(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, keyedFactory);
+                                        Throw.It(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, singleKeyedFactory);
                                         break;
                                 }
                             }
@@ -569,17 +566,19 @@ namespace DryIoc
                                 switch (ifAlreadyRegistered)
                                 {
                                     case IfAlreadyRegistered.Replace:
-                                        // replace single 
-                                        if (defaultFactories.Length == 1 && defaultFactories[0] is InstanceFactory)
+                                        var istanceFactories = defaultFactories.Match(f => f is InstanceFactory);
+                                        if (istanceFactories.Length == 1)
                                         {
-                                            scope.SetOrAdd(defaultFactories[0].FactoryID, instance);
+                                            scope.SetOrAdd(istanceFactories[0].FactoryID, instance);
                                         }
                                         else // multiple default or a keyed factory
                                         {
                                             // scoped instance may be appended only, and not replacing anything
                                             if (reuse == Reuse.Scoped)
+                                            {
                                                 entry = singleKeyedOrManyDefaultFactories
                                                     .With(InstanceFactory.Of(instance, instanceType, scope, reuse));
+                                            }
                                             else // here is the replacement goes on
                                             {
                                                 var keyedFactories = singleKeyedOrManyDefaultFactories.Factories.Enumerate()
@@ -626,22 +625,17 @@ namespace DryIoc
                 // add instance entry to service registrations
                 var registry = r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
 
-                if (!registry.DefaultFactoryDelegateCache.Value.IsEmpty ||
-                    !registry.KeyedFactoryDelegateCache.Value.IsEmpty)
+                // clearing the cache of old default factories, if the entry was updated
+                if (entry != oldEntry && (
+                    !registry.DefaultFactoryDelegateCache.Value.IsEmpty ||
+                    !registry.KeyedFactoryDelegateCache.Value.IsEmpty))
                 {
                     var oldFactory = oldEntry as Factory;
                     if (oldFactory != null)
-                        registry = registry.WithoutFactoryCache(oldFactory, serviceType, serviceKey);
+                        registry = registry.WithoutFactoryCache(oldFactory, serviceType);
                     else if (oldEntry is FactoriesEntry)
-                    {
-                        var defaultFactories = ((FactoriesEntry)oldEntry).Factories
-                            .Enumerate().Where(x => x.Key is DefaultKey);
-                        foreach (var f in defaultFactories)
+                        foreach (var f in ((FactoriesEntry)oldEntry).Factories.Enumerate())
                             registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
-                    }
-                    //else if (!oldDefaultFactories.IsEmpty)
-                    //    foreach (var f in oldDefaultFactories.Enumerate())
-                    //        registry = registry.WithoutFactoryCache(f.Value, serviceType, serviceKey);
                 }
 
                 return registry;
@@ -1150,15 +1144,11 @@ namespace DryIoc
 
             public FactoriesEntry With(Factory factory, object serviceKey = null)
             {
-                var lastDefaultKey = serviceKey != null
-                    ? LastDefaultKey // if service key is specified, the default one remains the same
-                    : LastDefaultKey == null
-                        ? DefaultKey.Value
-                        : LastDefaultKey.Next();
+                var lastDefaultKey = serviceKey == null
+                    ? LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next()
+                    : LastDefaultKey;
 
-                var factories = Factories.AddOrUpdate(serviceKey ?? lastDefaultKey, factory);
-
-                return new FactoriesEntry(lastDefaultKey, factories);
+                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(serviceKey ?? lastDefaultKey, factory));
             }
         }
 
@@ -8547,13 +8537,11 @@ namespace DryIoc
         /// <returns>Created current scope reuse.</returns>
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
-        /// <summary>Creates reuse to search for <paramref name="assignableFromServiceType"/> and <paramref name="serviceKey"/>
-        /// in existing resolution scope hierarchy. If parameters are not specified or null, then <see cref="Scoped"/> will be returned.</summary>
+        /// <summary>Obsolete: please use ScopedTo instead.</summary>
         public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
             ScopedTo(assignableFromServiceType, serviceKey);
 
-        /// <summary>Creates reuse to search for <typeparamref name="TAssignableFromServiceType"/> and <paramref name="serviceKey"/>
-        /// in existing resolution scope hierarchy.</summary>
+        /// <summary>Obsolete: please use ScopedTo instead.</summary>
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
             ScopedTo<TAssignableFromServiceType>(serviceKey);
 
@@ -9054,8 +9042,6 @@ namespace DryIoc
                 " or set the rule Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient())." +
                 " To enable tracking use Register<YourService>(setup: Setup.With(trackDisposableTransient: true)) " +
                 " or set the rule Container(rules => rules.WithTrackingDisposableTransients())"),
-            UnableToUseInstanceForExistingNonInstanceFactory = Of(
-                "Unable to use the keyed instance {0} because of existing non-instance keyed registration: {1}"),
             NotFoundMetaCtorWithTwoArgs = Of(
                 "Expecting Meta wrapper public constructor with two arguments {0} but not found when resolving: {1}"),
             UnableToSelectFromManyRegistrationsWithMatchingMetadata = Of(
