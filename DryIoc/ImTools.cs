@@ -37,11 +37,11 @@ namespace ImTools
         /// <summary>Always a true condition.</summary>
         public static bool Always<T>(T _) => true;
 
-        /// <summary>Always a false condition.</summary>
-        public static bool Never<T>(T _) => false;
-
         /// <summary>Identity function returning passed argument as result.</summary>
-        public static T Itself<T>(T x) => x;
+        public static T Id<T>(T x) => x;
+
+        /// <summary>Piping</summary>
+        public static R Do<T, R>(this T x, Func<T, R> next) => next(x);
     }
 
     /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
@@ -540,11 +540,36 @@ namespace ImTools
             "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
     }
 
+    /// <summary>Printable thingy via provided printer </summary>
+    public interface IPrintable
+    {
+        /// <summary>Print to the provided string builder via the provided printer.</summary>
+        StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer);
+    }
+
+    /// <summary>Produces good enough hash codes for the fields</summary>
+    public static class HashCode
+    {
+        /// <summary>Combines hashes of two fields</summary>
+        public static int Combine<T1, T2>(T1 a, T2 b) =>
+            Combine(a?.GetHashCode() ?? 0, b?.GetHashCode() ?? 0);
+
+        /// <summary>Inspired by System.Tuple.CombineHashCodes</summary>
+        public static int Combine(int h1, int h2)
+        {
+            if (h1 == 0) return h2;
+            unchecked
+            {
+                return (h1 << 5) + h1 ^ h2;
+            }
+        }
+    }
+
     /// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
     /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
     /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
     /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
-    public class KV<K, V>
+    public class KV<K, V> : IPrintable
     {
         /// <summary>Key.</summary>
         public readonly K Key;
@@ -560,21 +585,17 @@ namespace ImTools
             Value = value;
         }
 
+        /// <inheritdoc />
+        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
+             s.Append("KV(").Do(k => Key == null ? k : printer(k, Key))
+              .Append(", ").Do(r => Value == null ? r : printer(r, Value))
+              .Append(')');
+
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
-        public override string ToString()
-        {
-            var s = new StringBuilder('{');
-            if (Key != null)
-                s.Append(Key);
-            s.Append(',');
-            if (Value != null)
-                s.Append(Value);
-            s.Append('}');
-            return s.ToString();
-        }
+        public override string ToString() => 
+            Print(new StringBuilder(), (s, x) => s.Append(x)).ToString();
 
         /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
-        /// <param name="obj">Object to check equality with.</param> <returns>True if equal.</returns>
         public override bool Equals(object obj)
         {
             var other = obj as KV<K, V>;
@@ -583,16 +604,8 @@ namespace ImTools
                    && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
         }
 
-        /// <summary>Combines key and value hash code. R# generated default implementation.</summary>
-        /// <returns>Combined hash code for key-value.</returns>
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return ((object)Key == null ? 0 : Key.GetHashCode() * 397)
-                     ^ ((object)Value == null ? 0 : Value.GetHashCode());
-            }
-        }
+        /// <summary>Combines key and value hash code</summary>
+        public override int GetHashCode() => HashCode.Combine(Key, Value);
     }
 
     /// <summary>Helpers for <see cref="KV{K,V}"/>.</summary>
