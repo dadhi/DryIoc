@@ -442,7 +442,7 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             if (instance != null)
-                instance.ThrowIfNotOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
+                instance.ThrowIfNotInstanceOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
 
             if (weaklyReferenced)
                 instance = new WeakReference(instance);
@@ -3819,7 +3819,7 @@ namespace DryIoc
                 var funcType = request.DirectParent.ServiceType;
                 var inputArgTypes = funcType != null // get from either Func or Input arguments
                     ? funcType.GetGenericParamsAndArgs()
-                    : request.InputArgs.Map(a => a.Type);
+                    : request.InputArgExprs.Map(a => a.Type);
 
                 // drop func last return argument type
                 var inputArgCount = funcType != null ? inputArgTypes.Length - 1 : inputArgTypes.Length;
@@ -4099,10 +4099,10 @@ namespace DryIoc
             {
                 var member = ((MemberExpression)callExpr).Member;
                 Throw.If(!(member is PropertyInfo) && !(member is FieldInfo),
-                    Error.UnexpectedFactoryMemberExpression, member, serviceReturningExpr);
+                    Error.UnexpectedFactoryMemberExpressionInMadeOf, member, serviceReturningExpr);
                 ctorOrMethodOrMember = member;
             }
-            else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeExpression, callExpr);
+            else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeOfExpression, callExpr);
 
             FactoryMethodSelector factoryMethod = request =>
                 DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo?.Invoke(request));
@@ -4159,7 +4159,7 @@ namespace DryIoc
                 if (methodCallExpr != null)
                 {
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
-                        Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr, wholeServiceExpr);
+                        Error.UnexpectedExpressionInsteadOfArgMethodInMadeOf, methodCallExpr, wholeServiceExpr);
 
                     if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName)
                     {
@@ -4206,7 +4206,7 @@ namespace DryIoc
                 else
                 {
                     Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
-                        Error.UnexpectedExpressionInsteadOfArgMethod, methodCallExpr, wholeServiceExpr);
+                        Error.UnexpectedExpressionInsteadOfArgMethodInMadeOf, methodCallExpr, wholeServiceExpr);
 
                     if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) // handle custom value
                     {
@@ -4308,15 +4308,11 @@ namespace DryIoc
             if (member != null)
             {
                 var memberOwner = member.Expression as ConstantExpression;
-                if (memberOwner != null && memberOwner.Type.IsClosureType())
-                {
-                    var memberField = member.Member as FieldInfo;
-                    if (memberField != null)
-                        return memberField.GetValue(memberOwner.Value);
-                }
+                if (memberOwner != null && memberOwner.Type.IsClosureType() && member.Member is FieldInfo)
+                    return ((FieldInfo)member.Member).GetValue(memberOwner.Value);
             }
 
-            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstant, argExpr, wholeServiceExpr);
+            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf, argExpr, wholeServiceExpr);
         }
 
         #endregion
@@ -4611,7 +4607,7 @@ namespace DryIoc
             if (serviceType.IsOpenGeneric())
                 Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
             FactoryDelegate checkedDelegate = r => factoryDelegate(r)
-                .ThrowIfNotOf(serviceType, Error.RegedFactoryDlgResultNotOfServiceType, r);
+                .ThrowIfNotInstanceOf(serviceType, Error.RegedFactoryDlgResultNotOfServiceType, r);
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
         }
@@ -4983,7 +4979,7 @@ namespace DryIoc
             // recreates the request to emulate the Resolve call
             request = Request.Create(container, request.ServiceType, request.ServiceKey,
                 request.IfUnresolved, request.RequiredServiceType, request.DirectParent,
-                request.Flags, request.InputArgs);
+                request.Flags, request.InputArgExprs);
 
             var factory = container.ResolveFactory(request);
             if (factory == null || factory is FactoryPlaceholder)
@@ -5608,7 +5604,7 @@ namespace DryIoc
         private IServiceInfo _serviceInfo;
 
         /// <summary>Input arguments provided with `Resolve`</summary>
-        internal readonly Expr[] InputArgs;
+        internal readonly Expr[] InputArgExprs;
 
         /// <summary>Runtime known resolve factory, otherwise is <c>null</c></summary>
         internal readonly Factory Factory;
@@ -5657,12 +5653,12 @@ namespace DryIoc
         public bool IsWrappedInFunc() => (Flags & RequestFlags.IsWrappedInFunc) != 0;
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
-        public bool IsWrappedInFuncWithArgs() => InputArgs != null;
+        public bool IsWrappedInFuncWithArgs() => InputArgExprs != null;
 
         /// <summary>Returns expression for func arguments.</summary>
         public Expr GetInputArgsExpr() =>
-            InputArgs == null ? Constant(null, typeof(object[]))
-            : (Expr)NewArrayInit(typeof(object), InputArgs.Map(x => x.Type.IsValueType() ? Convert(x, typeof(object)) : x));
+            InputArgExprs == null ? Constant(null, typeof(object[]))
+            : (Expr)NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType() ? Convert(x, typeof(object)) : x));
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable => (Flags & RequestFlags.TracksTransientDisposable) != 0;
@@ -5738,7 +5734,7 @@ namespace DryIoc
             var flags = Flags & InheritedFlags | additionalFlags;
             var serviceInfo = info.ThrowIfNull().InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
 
-            return new Request(Container, this, flags, serviceInfo, InputArgs);
+            return new Request(Container, this, flags, serviceInfo, InputArgExprs);
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and Pushes the new request.</summary>
@@ -5752,7 +5748,7 @@ namespace DryIoc
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
             new Request(Container, this, DefaultFlags, ServiceInfo.Of(serviceType),
-                InputArgs, /*factory:*/null, factoryID, FactoryType.Service, implementationType, reuse, 0);
+                InputArgExprs, /*factory:*/null, factoryID, FactoryType.Service, implementationType, reuse, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith4Args = new Lazy<MethodInfo>(() =>
             typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
@@ -5762,7 +5758,7 @@ namespace DryIoc
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
             new Request(Container, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, IfUnresolved.Throw, serviceKey),
-                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, 0);
+                InputArgExprs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith8Args = new Lazy<MethodInfo>(() =>
             typeof(Request).Method(nameof(Push), typeof(Type), typeof(Type), typeof(object),
@@ -5774,7 +5770,7 @@ namespace DryIoc
             int decoratedFactoryID) =>
             new Request(Container, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
-                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, decoratedFactoryID);
+                InputArgExprs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith10Args = new Lazy<MethodInfo>(() =>
             typeof(Request).Method(nameof(Push),
@@ -5787,7 +5783,7 @@ namespace DryIoc
             int decoratedFactoryID) =>
             new Request(Container, this, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
-                InputArgs, /*factory:*/null, factoryID, factoryType, implementationType, reuse,
+                InputArgExprs, /*factory:*/null, factoryID, factoryType, implementationType, reuse,
                 decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = new Lazy<MethodInfo>(() =>
@@ -5804,7 +5800,7 @@ namespace DryIoc
         {
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
-                : new Request(Container, DirectParent, Flags, newServiceInfo, InputArgs,
+                : new Request(Container, DirectParent, Flags, newServiceInfo, InputArgExprs,
                     Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
         }
 
@@ -5823,7 +5819,7 @@ namespace DryIoc
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expr[] inputArgs) =>
-            new Request(Container, DirectParent, Flags, _serviceInfo, inputArgs.Append(InputArgs),
+            new Request(Container, DirectParent, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
                 Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -5883,7 +5879,7 @@ namespace DryIoc
                     flags |= RequestFlags.TracksTransientDisposable;
             }
 
-            return new Request(Container, DirectParent, flags, _serviceInfo, InputArgs,
+            return new Request(Container, DirectParent, flags, _serviceInfo, InputArgExprs,
                 factory, factory.FactoryID, factory.FactoryType,
                 null, // factoryImplType: null, so that implementation type can be lazily retrieved from `factory`
                 reuse, decoratedFactoryID);
@@ -6036,8 +6032,8 @@ namespace DryIoc
             if (DecoratedFactoryID != 0)
                 s.Append(" decorating #").Append(DecoratedFactoryID);
 
-            if (!InputArgs.IsNullOrEmpty())
-                s.AppendFormat(" with args [{0}]", InputArgs);
+            if (!InputArgExprs.IsNullOrEmpty())
+                s.AppendFormat(" with args [{0}]", InputArgExprs);
 
             if ((Flags & RequestFlags.OpensResolutionScope) != 0)
                 s.Append(" [Opens resolution scope]");
@@ -6107,22 +6103,22 @@ namespace DryIoc
         public override int GetHashCode() => _hashCode;
 
         private Request(IContainer container, Request parent, RequestFlags flags,
-            IServiceInfo serviceInfo, Expr[] inputArgs)
+            IServiceInfo serviceInfo, Expr[] inputArgExprs)
         {
             Container = container;
             DirectParent = parent;
             Flags = flags;
             _serviceInfo = serviceInfo;
-            InputArgs = inputArgs; // runtime state
+            InputArgExprs = inputArgExprs; // runtime state
             if (parent != null)
                 DependencyDepth = parent.DependencyDepth + 1;
         }
 
         // Request with resolved factory
-        private Request(IContainer container, Request parent, RequestFlags flags, IServiceInfo serviceInfo, Expr[] inputArgs,
+        private Request(IContainer container, Request parent, RequestFlags flags, IServiceInfo serviceInfo, Expr[] inputArgExprs,
             Factory factory, int factoryID, FactoryType factoryType, Type factoryImplType, IReuse reuse,
             int decoratedFactoryID)
-            : this(container, parent, flags, serviceInfo, inputArgs)
+            : this(container, parent, flags, serviceInfo, inputArgExprs)
         {
             Factory = factory; // runtime state
             FactoryID = factoryID;
@@ -6586,7 +6582,7 @@ namespace DryIoc
         }
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
-        /// If <paramref name="request"/> has <see cref="Request.InputArgs"/> specified, they could be used in expression.</summary>
+        /// If <paramref name="request"/> has <see cref="Request.InputArgExprs"/> specified, they could be used in expression.</summary>
         /// <param name="request">Service request.</param>
         /// <returns>Created expression.</returns>
         public abstract Expr CreateExpressionOrDefault(Request request);
@@ -7120,7 +7116,7 @@ namespace DryIoc
         }
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
-        /// <param name="implementationTypeProvider">Provider of non-abstract close or open generic type.</param>
+        /// <param name="implementationTypeProvider">Provider of non-abstract closed or open-generic type.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
         public ReflectionFactory(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null)
             : base(reuse, setup)
@@ -7132,24 +7128,23 @@ namespace DryIoc
         /// <summary>Creates service expression.</summary>
         public override Expr CreateExpressionOrDefault(Request request)
         {
-            var factoryMethod = GetFactoryMethod(request);
-
             var container = request.Container;
+            var rules = container.Rules;
 
-            // If factory method is instance method, then resolve factory instance first.
+            var factoryMethod = (Made.FactoryMethod ?? rules.FactoryMethod)
+                ?.Invoke(request).ThrowIfNull(Error.UnableToSelectCtor, request.ImplementationType, request)
+                ?? FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+
+            // If factory method is the method of some registered service, then resolve factory service first.
             Expr factoryExpr = null;
             if (factoryMethod.FactoryServiceInfo != null)
             {
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                 var factoryFactory = container.ResolveFactory(factoryRequest);
-                if (factoryFactory == null)
-                    return null;
-                factoryExpr = factoryFactory.GetExpressionOrDefault(factoryRequest);
+                factoryExpr = factoryFactory?.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
                     return null;
             }
-
-            var containerRules = container.Rules;
 
             var paramExprs = ArrayTools.Empty<Expr>();
             var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
@@ -7161,68 +7156,56 @@ namespace DryIoc
                 {
                     paramExprs = new Expr[parameters.Length];
 
-                    var selectorSelector =
-                        containerRules.OverrideRegistrationMade
-                        ? Made.Parameters.OverrideWith(containerRules.Parameters)
-                        : containerRules.Parameters.OverrideWith(Made.Parameters);
+                    var paramSelector = rules.OverrideRegistrationMade
+                        ? Made.Parameters.OverrideWith(rules.Parameters)
+                        : rules.Parameters.OverrideWith(Made.Parameters);
 
-                    var parameterSelector = selectorSelector(request);
+                    var getParamInfo = paramSelector(request);
 
-                    var funcArgs = request.InputArgs;
-                    var funcArgsUsedMask = 0;
-
+                    var argExprs = request.InputArgExprs;
+                    var argsUsedMask = 0;
                     for (var i = 0; i < parameters.Length; i++)
                     {
                         var param = parameters[i];
-                        Expr paramExpr = null;
 
-                        if (funcArgs != null)
-                        {
-                            for (var fa = 0; fa < funcArgs.Length && paramExpr == null; ++fa)
-                            {
-                                var funcArgExpr = funcArgs[fa];
-                                if ((funcArgsUsedMask & 1 << fa) == 0 &&                  // not yet used func argument
-                                    funcArgExpr.Type.IsAssignableTo(param.ParameterType)) // and it assignable to parameter
+                        // check not yet used func arguments
+                        if (argExprs != null)
+                            for (var a = 0; a < argExprs.Length; ++a)
+                                if ((argsUsedMask & 1 << a) == 0 && argExprs[a].Type.IsAssignableTo(param.ParameterType))
                                 {
-                                    paramExpr = funcArgExpr;
-                                    funcArgsUsedMask |= 1 << fa;  // mark that argument was used
+                                    argsUsedMask |= 1 << a; // mark that argument was used
+                                    paramExprs[i] = argExprs[a];
+                                    break;
                                 }
-                            }
+
+                        if (paramExprs[i] != null)
+                            continue; // done, parameter is by provided via input argument
+
+                        var paramInfo = getParamInfo(param) ?? ParameterServiceInfo.Of(param);
+                        var paramRequest = request.Push(paramInfo);
+                        var paramServiceType = paramRequest.ServiceType;
+
+                        if (paramInfo.Details.HasCustomValue)
+                        {
+                            var customValue = paramInfo.Details.CustomValue;
+                            customValue?.ThrowIfNotInstanceOf(paramServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+                            paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
+                            continue; // done, parameter is by provided via custom value specified in registration
                         }
 
-                        // If parameter expression still null (no Func argument to substitute), try to resolve it
+                        var paramFactory = container.ResolveFactory(paramRequest);
+                        var paramExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
                         if (paramExpr == null)
                         {
-                            var paramInfo = parameterSelector(param) ?? ParameterServiceInfo.Of(param);
-                            var paramRequest = request.Push(paramInfo);
+                            // Check if parameter dependency itself (without propagated parent details)
+                            // does not allow default, then stop checking the rest of parameters.
+                            if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
+                                return null;
 
-                            if (paramInfo.Details.HasCustomValue)
-                            {
-                                var customValue = paramInfo.Details.CustomValue;
-                                if (customValue != null)
-                                    customValue.ThrowIfNotOf(paramRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
-                                paramExpr = container.GetConstantExpression(customValue, paramRequest.ServiceType);
-                            }
-                            else
-                            {
-                                var paramFactory = container.ResolveFactory(paramRequest);
-                                paramExpr = paramFactory == null ? null : paramFactory.GetExpressionOrDefault(paramRequest);
-
-                                // Meant that parent Or parameter itself allows default value,
-                                // otherwise we did not get null but exception
-                                if (paramExpr == null)
-                                {
-                                    // Check if parameter dependency itself (without propagated parent details)
-                                    // does not allow default, then stop checking the rest of parameters.
-                                    if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
-                                        return null;
-
-                                    var defaultValue = paramInfo.Details.DefaultValue;
-                                    paramExpr = defaultValue != null
-                                        ? container.GetConstantExpression(defaultValue)
-                                        : paramRequest.ServiceType.GetDefaultValueExpression();
-                                }
-                            }
+                            var defaultValue = paramInfo.Details.DefaultValue;
+                            paramExpr = defaultValue != null
+                                ? container.GetConstantExpression(defaultValue)
+                                : paramServiceType.GetDefaultValueExpression();
                         }
 
                         paramExprs[i] = paramExpr;
@@ -7341,9 +7324,7 @@ namespace DryIoc
                 }
 
                 var openFactory = _openGenericFactory;
-                request = request.WithResolvedFactory(openFactory,
-                    skipRecursiveDependencyCheck: ifErrorReturnDefault,
-                    skipCaptiveDependencyCheck: ifErrorReturnDefault);
+                request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault);
 
                 var implType = openFactory._implementationType;
 
@@ -7360,12 +7341,10 @@ namespace DryIoc
                 {
                     var factoryMethod = made.FactoryMethod(request);
                     if (factoryMethod == null)
-                        return ifErrorReturnDefault ? null
-                            : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
+                        return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
 
                     var checkMatchingType = implType != null && implType.IsGenericParameter;
-                    var closedFactoryMethod = GetClosedFactoryMethodOrDefault(
-                        factoryMethod, closedTypeArgs, request, checkMatchingType);
+                    var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
 
                     // may be null only for IfUnresolved.ReturnDefault or check for matching type is failed
                     if (closedFactoryMethod == null)
@@ -7374,25 +7353,19 @@ namespace DryIoc
                     made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
                 }
 
-                Type closedImplType = null;
                 if (implType != null)
                 {
-                    if (implType.IsGenericParameter)
-                        closedImplType = closedTypeArgs[0];
-                    else
-                        closedImplType = Throw.IfThrows<ArgumentException, Type>(
-                            () => implType.MakeGenericType(closedTypeArgs),
+                    implType = implType.IsGenericParameter 
+                        ? closedTypeArgs[0]
+                        : Throw.IfThrows<ArgumentException, Type>(
+                            () => implType.MakeGenericType(closedTypeArgs), 
                             !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                             Error.NoMatchedGenericParamConstraints, implType, request);
-
-                    if (closedImplType == null)
+                    if (implType == null)
                         return null;
                 }
 
-                var closedGenericFactory = new ReflectionFactory(closedImplType, openFactory.Reuse, made, openFactory.Setup);
-
-                // Storing generated factory ID to service type/key mapping
-                // to find/remove generated factories when needed
+                var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup);
                 _generatedFactories.Swap(_ => _.AddOrUpdate(generatedFactoryKey, closedGenericFactory));
                 return closedGenericFactory;
             }
@@ -7458,17 +7431,13 @@ namespace DryIoc
                     : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
                     : (Expr)Field(factoryExpr, (FieldInfo)ctorOrMember);
 
-                var returnType = serviceExpr.Type;
-                var serviceType = request.GetActualServiceType();
+                var requestedServiceType = request.GetActualServiceType();
+                if (serviceExpr.Type == typeof(object))
+                    return Convert(serviceExpr, requestedServiceType);
 
-                if (returnType == typeof(object))
-                    return Convert(serviceExpr, serviceType);
-
-                if (!returnType.IsAssignableTo(serviceType))
-                    return request.IfUnresolved != IfUnresolved.Throw ? null :
-                        Throw.For<Expr>(Error.ServiceIsNotAssignableFromFactoryMethod, serviceType, ctorOrMember, request);
-
-                return serviceExpr;
+                return serviceExpr.Type.IsAssignableTo(requestedServiceType) ? serviceExpr
+                    : request.IfUnresolved != IfUnresolved.Throw ? null
+                    : Throw.For<Expr>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
             }
 
             // Optimize singleton creation by bypassing Expression.New and using Activator.CreateInstance.
@@ -7522,8 +7491,7 @@ namespace DryIoc
                 if (member.Details.HasCustomValue)
                 {
                     var customValue = member.Details.CustomValue;
-                    if (customValue != null)
-                        customValue.ThrowIfNotOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                    customValue?.ThrowIfNotInstanceOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
                     memberExpr = container.GetConstantExpression(customValue, memberRequest.ServiceType);
                 }
                 else
@@ -7574,15 +7542,6 @@ namespace DryIoc
             return () => Activator.CreateInstance(type, args);
         }
 
-        private FactoryMethod GetFactoryMethod(Request request)
-        {
-            var implType = request.ImplementationType;
-            var factoryMethodSelector = Made.FactoryMethod ?? request.Rules.FactoryMethod;
-            return factoryMethodSelector != null
-                ? factoryMethodSelector(request).ThrowIfNull(Error.UnableToSelectCtor, implType, request)
-                : FactoryMethod.Of(_knownSingleCtor ?? implType.SingleConstructor());
-        }
-
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
             Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
         {
@@ -7598,12 +7557,9 @@ namespace DryIoc
             for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
             {
                 var implementedType = implementedTypes[i];
-                if (implementedType.IsOpenGeneric() &&
-                    implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
-                {
+                if (implementedType.IsOpenGeneric() && implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
                     matchFound = MatchServiceWithImplementedTypeParams(
                         implTypeArgs, implTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs);
-                }
             }
 
             if (!matchFound)
@@ -7627,25 +7583,23 @@ namespace DryIoc
             for (var i = 0; i < implTypeParams.Length; i++)
             {
                 var implTypeArg = implTypeArgs[i];
-                if (implTypeArg == null) continue; // skip yet unknown type arg
+                if (implTypeArg == null)
+                    continue; // skip yet unknown type arg
 
-                var implTypeParam = implTypeParams[i];
-                var implTypeParamConstraints = implTypeParam.GetGenericParamConstraints();
-                if (implTypeParamConstraints.IsNullOrEmpty()) continue; // skip case with no constraints
+                var implTypeParamConstraints = implTypeParams[i].GetGenericParamConstraints();
+                if (implTypeParamConstraints.IsNullOrEmpty()) 
+                    continue; // skip case with no constraints
 
+                // match type parameters inside constraint
                 var constraintMatchFound = false;
                 for (var j = 0; !constraintMatchFound && j < implTypeParamConstraints.Length; ++j)
                 {
                     var implTypeParamConstraint = implTypeParamConstraints[j];
-                    if (implTypeParamConstraint != implTypeArg &&
-                        implTypeParamConstraint.IsOpenGeneric())
+                    if (implTypeParamConstraint != implTypeArg && implTypeParamConstraint.IsOpenGeneric())
                     {
-                        // match type parameters inside constraint
-                        var implTypeArgArgs = implTypeArg.IsGeneric()
-                            ? implTypeArg.GetGenericParamsAndArgs()
-                            : new[] { implTypeArg };
-
+                        var implTypeArgArgs = implTypeArg.IsGeneric() ? implTypeArg.GetGenericParamsAndArgs() : implTypeArg.One();
                         var implTypeParamConstraintParams = implTypeParamConstraint.GetGenericParamsAndArgs();
+
                         constraintMatchFound = MatchServiceWithImplementedTypeParams(
                             implTypeArgs, implTypeParams, implTypeParamConstraintParams, implTypeArgArgs);
                     }
@@ -7687,7 +7641,7 @@ namespace DryIoc
 
                     if (!MatchServiceWithImplementedTypeParams(resultImplArgs, implParams,
                         implementedParam.GetGenericParamsAndArgs(), serviceArg.GetGenericParamsAndArgs()))
-                        return false; // nested match failed due either one of above reasons.
+                        return false; // nested match failed due one of above reasons.
                 }
             }
 
@@ -7695,16 +7649,13 @@ namespace DryIoc
         }
 
         private static FactoryMethod GetClosedFactoryMethodOrDefault(
-            FactoryMethod factoryMethod, Type[] serviceTypeArgs, Request request,
-            bool shouldReturnOnError = false)
+            FactoryMethod factoryMethod, Type[] serviceTypeArgs, Request request, bool ifErrorReturnDefault = false)
         {
             var factoryMember = factoryMethod.ConstructorOrMethodOrMember;
             var factoryInfo = factoryMethod.FactoryServiceInfo;
 
-            var factoryResultType = factoryMember.GetReturnTypeOrDefault();
-            var implTypeParams = factoryResultType.IsGenericParameter
-                ? new[] { factoryResultType }
-                : factoryResultType.GetGenericParamsAndArgs();
+            var resultType = factoryMember.GetReturnTypeOrDefault();
+            var implTypeParams = resultType.IsGenericParameter ? resultType.One() : resultType.GetGenericParamsAndArgs();
 
             // Get method declaring type, and if its open-generic,
             // then close it first. It is required to get actual method.
@@ -7715,22 +7666,19 @@ namespace DryIoc
                 var resultFactoryImplTypeArgs = new Type[factoryImplTypeParams.Length];
 
                 var isFactoryImplTypeClosed = MatchServiceWithImplementedTypeParams(
-                    resultFactoryImplTypeArgs, factoryImplTypeParams,
-                    implTypeParams, serviceTypeArgs);
+                    resultFactoryImplTypeArgs, factoryImplTypeParams, implTypeParams, serviceTypeArgs);
 
                 if (!isFactoryImplTypeClosed)
-                    return shouldReturnOnError || request.IfUnresolved != IfUnresolved.Throw ? null
+                    return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
                         : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs,
                             factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
 
                 // For instance factory match its service type from the implementation factory type.
                 if (factoryInfo != null)
                 {
-                    // Open-generic service type is always normalized as generic type definition
-                    var factoryServiceType = factoryInfo.ServiceType;
-
                     // Look for service type equivalent within factory implementation type base classes and interfaces,
                     // because we need identical type arguments to match.
+                    var factoryServiceType = factoryInfo.ServiceType;
                     if (factoryServiceType != factoryImplType)
                         factoryServiceType = factoryImplType.GetImplementedTypes()
                             .FindFirst(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType)
@@ -7740,18 +7688,15 @@ namespace DryIoc
                     var resultFactoryServiceTypeArgs = new Type[factoryServiceTypeParams.Length];
 
                     var isFactoryServiceTypeClosed = MatchServiceWithImplementedTypeParams(
-                        resultFactoryServiceTypeArgs, factoryServiceTypeParams,
-                        factoryImplTypeParams, resultFactoryImplTypeArgs);
+                        resultFactoryServiceTypeArgs, factoryServiceTypeParams, factoryImplTypeParams, resultFactoryImplTypeArgs);
 
                     // Replace factory info with close factory service type
                     if (isFactoryServiceTypeClosed)
                     {
-                        MatchOpenGenericConstraints(factoryImplTypeParams, resultFactoryImplTypeArgs);
-
                         factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
                         var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
                             () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
-                            !shouldReturnOnError && request.IfUnresolved == IfUnresolved.Throw,
+                            !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                             Error.NoMatchedGenericParamConstraints, factoryServiceType, request);
 
                         if (closedFactoryServiceType == null)
@@ -7768,7 +7713,7 @@ namespace DryIoc
                 // and get factory member to use from it.
                 var closedFactoryImplType = Throw.IfThrows<ArgumentException, Type>(
                     () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
-                    !shouldReturnOnError && request.IfUnresolved == IfUnresolved.Throw,
+                    !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                     Error.NoMatchedGenericParamConstraints, factoryImplType, request);
 
                 if (closedFactoryImplType == null)
@@ -7821,7 +7766,7 @@ namespace DryIoc
                     resultMethodTypeArgs, methodTypeParams, implTypeParams, serviceTypeArgs);
 
                 if (!isMethodClosed)
-                    return shouldReturnOnError || request.IfUnresolved != IfUnresolved.Throw ? null
+                    return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
                         : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodWithServiceTypeArgs,
                             openFactoryMethod, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "),
                             request);
@@ -7830,7 +7775,7 @@ namespace DryIoc
 
                 factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
                     () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
-                    !shouldReturnOnError && request.IfUnresolved == IfUnresolved.Throw,
+                    !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                     Error.NoMatchedGenericParamConstraints, factoryImplType, request);
 
                 if (factoryMember == null)
@@ -8962,17 +8907,17 @@ namespace DryIoc
                 "Container is disposed and should not be used: {0}"),
             NoMatchedScopeFound = Of(
                 "Unable to find matching scope with name {0} starting from the current scope {1}."),
-            NotSupportedMadeExpression = Of(
+            NotSupportedMadeOfExpression = Of(
                 "Expected expression of method call, property getter, or new statement (with optional property initializer), " +
                 "but found this Made.Of expression: {0}"),
-            UnexpectedFactoryMemberExpression = Of(
+            UnexpectedFactoryMemberExpressionInMadeOf = Of(
                 "Expected property getter, but found not supported `{0}` " + Environment.NewLine +
                 "in Made.Of expression: `{1}`"),
-            UnexpectedExpressionInsteadOfArgMethod = Of(
-                "Expected `Arg.Of` method call to specify parameter, property or field, but found not supported `{0}` " + Environment.NewLine +
+            UnexpectedExpressionInsteadOfArgMethodInMadeOf = Of(
+                "Expected `Arg.Of` method call to specify parameter, property or field, but found `{0}` " + Environment.NewLine +
                 "in Made.Of expression: `{1}`"),
-            UnexpectedExpressionInsteadOfConstant = Of(
-                "Expected constant expression to specify parameter, property or field, but found not supported `{0}` " + Environment.NewLine +
+            UnexpectedExpressionInsteadOfConstantInMadeOf = Of(
+                "Expected `ConstantExpression` for value of parameter, property, or field, but found `{0}` " + Environment.NewLine +
                 "in Made.Of expression: `{1}`"),
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
@@ -9130,7 +9075,7 @@ namespace DryIoc
 
         /// <summary>Throws exception if <paramref name="arg0"/> is not assignable to type specified by <paramref name="arg1"/>,
         /// otherwise just returns <paramref name="arg0"/>.</summary>
-        public static T ThrowIfNotOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
+        public static T ThrowIfNotInstanceOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
             if (arg1.IsTypeOf(arg0)) return arg0;
@@ -9713,16 +9658,17 @@ namespace DryIoc
 #endif
 
         /// <summary>Pretty prints the <paramref name="type"/> in proper C# representation.
-        /// <paramref name="getTypeName"/> allows to specify if you want Name instead of FullName.</summary>
+        /// <paramref name="getTypeName"/>Allows to specify if you want Name instead of FullName.</summary>
         public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
         {
-            if (type == null) return s;
-
-            var typeName = (getTypeName ?? GetTypeNameDefault).Invoke(type);
+            if (type == null) 
+                return s;
 
             var isArray = type.IsArray;
             if (isArray)
                 type = type.GetElementType();
+
+            var typeName = (getTypeName ?? GetTypeNameDefault).Invoke(type);
 
             if (!type.IsGeneric())
                 return s.Append(typeName.Replace('+', '.'));

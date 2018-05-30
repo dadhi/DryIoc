@@ -361,6 +361,18 @@ namespace DryIoc.UnitTests
             container.Resolve<UseMyWrapper>();
         }
 
+        [Test]
+        public void Should_throw_with_enough_info_to_find_culprit_MadeOf()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Register(Made.Of(() => new UseMyWrapper(new MyWrapper(new object())))));
+
+            Assert.AreEqual(
+                Error.NameOf(Error.UnexpectedExpressionInsteadOfConstantInMadeOf),
+                Error.NameOf(ex.Error));
+        }
 
         public class MyWrapper {
             public readonly object Service;
