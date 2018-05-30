@@ -44,7 +44,7 @@ namespace ImTools
         public static R Do<T, R>(this T x, Func<T, R> next) => next(x);
     }
 
-    /// <summary>Methods to work with immutable arrays, and general array sugar.</summary>
+    /// <summary>Methods to work with immutable arrays and some sugar.</summary>
     public static class ArrayTools
     {
         private static class EmptyArray<T>
