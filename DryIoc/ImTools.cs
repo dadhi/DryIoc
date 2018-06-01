@@ -44,6 +44,13 @@ namespace ImTools
         public static R Do<T, R>(this T x, Func<T, R> next) => next(x);
     }
 
+    /// <summary>Helpers for lazy instantiations</summary>
+    public static class Lazy
+    {
+        /// <summary>Provides result type inference for creation of lazy.</summary>
+        public static Lazy<T> Of<T>(Func<T> valueFactory) => new Lazy<T>(valueFactory);
+    }
+
     /// <summary>Methods to work with immutable arrays and some sugar.</summary>
     public static class ArrayTools
     {
@@ -208,6 +215,28 @@ namespace ImTools
             if (sourceArr != null)
                 return sourceArr.FindFirst(predicate);
             return source.FirstOrDefault(predicate);
+        }
+
+        /// <summary>Returns element if collection consist on single element, otherwise returns default value.
+        /// It does not throw for collection with many elements</summary>
+        public static T SingleOrDefaultIfMany<T>(this IEnumerable<T> source)
+        {
+            if (source == null)
+                return default(T);
+
+            var list = source as IList<T>;
+            if (list != null)
+                return list.Count == 1 ? list[0] : default(T);
+
+            using (var e = source.GetEnumerator())
+            {
+                if (!e.MoveNext())
+                    return default(T);
+                var it = e.Current;
+                if (!e.MoveNext())
+                    return it;
+                return default(T);
+            }
         }
 
         private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)

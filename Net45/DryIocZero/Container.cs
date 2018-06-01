@@ -939,7 +939,7 @@ namespace DryIocZero
         /// <summary>Matches all the name in a loop until first match is found, otherwise returns false.</summary>
         public bool Match(object scopeName)
         {
-            for (int i = 0; i < _names.Length; i++)
+            for (var i = 0; i < _names.Length; i++)
             {
                 var name = _names[i];
                 if (name == scopeName)
