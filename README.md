@@ -1,2 +1,2 @@
 # DryIoc
-Simple, fast and powerful Dependency Injection Container for .NET
+Simple, fast and powerful DI IoC Container for .NET
