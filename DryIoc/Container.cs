@@ -6381,10 +6381,7 @@ namespace DryIoc
 
             internal void ThrowIfInvalidRegistration(Type serviceType)
             {
-                if (AlwaysWrapsRequiredServiceType || Unwrap != null)
-                    return;
-
-                if (!serviceType.IsGeneric())
+                if (AlwaysWrapsRequiredServiceType || Unwrap != null || !serviceType.IsGeneric())
                     return;
 
                 var typeArgCount = serviceType.GetGenericParamsAndArgs().Length;
@@ -6397,8 +6394,7 @@ namespace DryIoc
                     Error.GenericWrapperTypeArgIndexOutOfBounds, serviceType, index);
             }
 
-            /// <summary>Unwraps service type or returns its.</summary>
-            /// <param name="serviceType"></param> <returns>Wrapped type or self.</returns>
+            /// <summary>Unwraps service type or returns the <paramref name="serviceType"/> as-is.</summary>
             public Type GetWrappedTypeOrNullIfWrapsRequired(Type serviceType)
             {
                 if (Unwrap != null)
@@ -6693,7 +6689,6 @@ namespace DryIoc
         }
 
         /// <summary>Returns nice string representation of factory.</summary>
-        /// <returns>String representation.</returns>
         public override string ToString()
         {
             var s = new StringBuilder().Append("{ID=").Append(FactoryID);
@@ -6748,31 +6743,15 @@ namespace DryIoc
         public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other) =>
             source == null || source == Of ? other ?? Of
             : other == null || other == Of ? source
-            : request => parameterInfo =>
-            {
-                // try other selector first
-                var otherSelector = other(request);
-                if (otherSelector != null)
-                {
-                    var parameterServiceInfo = otherSelector(parameterInfo);
-                    if (parameterServiceInfo != null)
-                        return parameterServiceInfo;
-                }
-
-                // fallback to source selector if other is failed
-                var sourceSelector = source(request);
-                if (sourceSelector != null)
-                    return sourceSelector(parameterInfo);
-
-                return null;
-            };
+            : req => paramInfo => other(req)?.Invoke(paramInfo) ?? source(req)?.Invoke(paramInfo);
 
         /// <summary>Obsolete: please use <see cref="OverrideWith"/></summary>
         [Obsolete("Replaced with OverrideWith", false)]
         public static ParameterSelector And(this ParameterSelector source, ParameterSelector other) =>
             source.OverrideWith(other);
 
-        /// <summary>Overrides source parameter rules with specific parameter details. If it is not your parameter just return null.</summary>
+        /// <summary>Overrides source parameter rules with specific parameter details. 
+        /// If it is not your parameter just return null.</summary>
         /// <param name="source">Original parameters rules</param>
         /// <param name="getDetailsOrNull">Should return specific details or null.</param>
         /// <returns>New parameters rules.</returns>
@@ -6787,10 +6766,7 @@ namespace DryIoc
 
                 // for default source selector, return null to enable fallback to any non-default selector
                 // defined outside, usually by OverrideWith
-                if (source == Of)
-                    return null;
-
-                return source(request)(parameter);
+                return source == Of ? null : source?.Invoke(request)?.Invoke(parameter);
             };
         }
 
@@ -6947,32 +6923,24 @@ namespace DryIoc
         {
             name.ThrowIfNull();
             getDetails.ThrowIfNull();
-            return source.OverrideWith(request =>
+            return source.OverrideWith(req =>
             {
-                var implType = request.GetKnownImplementationOrServiceType();
+                var implType = req.GetKnownImplementationOrServiceType();
 
                 var property = implType
-                    .GetMembers(it => it.DeclaredProperties, includeBase: true)
-                    .FindFirst(it => it.Name == name);
+                    .GetMembers(x => x.DeclaredProperties, includeBase: true)
+                    .FindFirst(x => x.Name == name);
                 if (property != null && property.IsInjectable(true, true))
-                {
-                    var details = getDetails(request);
-                    return details == null ? null
-                        : new[] { PropertyOrFieldServiceInfo.Of(property).WithDetails(details) };
-                }
+                    return getDetails(req)?.Do(d => PropertyOrFieldServiceInfo.Of(property).WithDetails(d).One());
 
                 var field = implType
-                    .GetMembers(it => it.DeclaredFields, includeBase: true)
-                    .FindFirst(it => it.Name == name);
+                    .GetMembers(x => x.DeclaredFields, includeBase: true)
+                    .FindFirst(x => x.Name == name);
                 if (field != null && field.IsInjectable(true, true))
-                {
-                    var details = getDetails(request);
-                    return details == null ? null
-                        : new[] { PropertyOrFieldServiceInfo.Of(field).WithDetails(details) };
-                }
+                    return getDetails(req)?.Do(d => PropertyOrFieldServiceInfo.Of(field).WithDetails(d).One());
 
                 return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(
-                    Error.NotFoundSpecifiedWritablePropertyOrField, name, request);
+                    Error.NotFoundSpecifiedWritablePropertyOrField, name, req);
             });
         }
 
@@ -7087,71 +7055,69 @@ namespace DryIoc
                     return null;
             }
 
-            var paramExprs = Empty<Expr>();
             var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
             var ctorOrMethod = ctorOrMember as MethodBase;
-            if (ctorOrMethod != null)
+            if (ctorOrMethod == null) // return early when factory is Property or Field
+                return CreateServiceExpression(ctorOrMember, factoryExpr, Empty<Expr>(), request);
+
+            var parameters = ctorOrMethod.GetParameters();
+            if (parameters.Length == 0) // the same when no parameters to inject
+                return CreateServiceExpression(ctorOrMember, factoryExpr, Empty<Expr>(), request);
+
+            var paramExprs = new Expr[parameters.Length];
+
+            var paramSelector = rules.OverrideRegistrationMade
+                ? Made.Parameters.OverrideWith(rules.Parameters)
+                : rules.Parameters.OverrideWith(Made.Parameters);
+            var getParamInfo = paramSelector(request);
+
+            var argExprs = request.InputArgExprs;
+            var argsUsedMask = 0;
+            for (var i = 0; i < parameters.Length; i++)
             {
-                var parameters = ctorOrMethod.GetParameters();
-                if (parameters.Length != 0)
+                var param = parameters[i];
+
+                // check not yet used func arguments
+                if (argExprs != null)
+                    for (var a = 0; a < argExprs.Length; ++a)
+                        if ((argsUsedMask & 1 << a) == 0 && argExprs[a].Type.IsAssignableTo(param.ParameterType))
+                        {
+                            argsUsedMask |= 1 << a; // mark that argument was used
+                            paramExprs[i] = argExprs[a];
+                            break;
+                        }
+
+                if (paramExprs[i] != null)
+                    continue; // done, parameter is by provided via input argument
+
+                var paramInfo = getParamInfo(param) ?? ParameterServiceInfo.Of(param);
+                var paramRequest = request.Push(paramInfo);
+                var paramServiceType = paramRequest.ServiceType;
+
+                if (paramInfo.Details.HasCustomValue)
                 {
-                    paramExprs = new Expr[parameters.Length];
-
-                    var paramSelector = rules.OverrideRegistrationMade
-                        ? Made.Parameters.OverrideWith(rules.Parameters)
-                        : rules.Parameters.OverrideWith(Made.Parameters);
-
-                    var getParamInfo = paramSelector(request);
-
-                    var argExprs = request.InputArgExprs;
-                    var argsUsedMask = 0;
-                    for (var i = 0; i < parameters.Length; i++)
-                    {
-                        var param = parameters[i];
-
-                        // check not yet used func arguments
-                        if (argExprs != null)
-                            for (var a = 0; a < argExprs.Length; ++a)
-                                if ((argsUsedMask & 1 << a) == 0 && argExprs[a].Type.IsAssignableTo(param.ParameterType))
-                                {
-                                    argsUsedMask |= 1 << a; // mark that argument was used
-                                    paramExprs[i] = argExprs[a];
-                                    break;
-                                }
-
-                        if (paramExprs[i] != null)
-                            continue; // done, parameter is by provided via input argument
-
-                        var paramInfo = getParamInfo(param) ?? ParameterServiceInfo.Of(param);
-                        var paramRequest = request.Push(paramInfo);
-                        var paramServiceType = paramRequest.ServiceType;
-
-                        if (paramInfo.Details.HasCustomValue)
-                        {
-                            var customValue = paramInfo.Details.CustomValue;
-                            customValue?.ThrowIfNotInstanceOf(paramServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
-                            paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
-                            continue; // done, parameter is by provided via custom value specified in registration
-                        }
-
-                        var paramFactory = container.ResolveFactory(paramRequest);
-                        var paramExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
-                        if (paramExpr == null)
-                        {
-                            // Check if parameter dependency itself (without propagated parent details)
-                            // does not allow default, then stop checking the rest of parameters.
-                            if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
-                                return null;
-
-                            var defaultValue = paramInfo.Details.DefaultValue;
-                            paramExpr = defaultValue != null
-                                ? container.GetConstantExpression(defaultValue)
-                                : paramServiceType.GetDefaultValueExpression();
-                        }
-
-                        paramExprs[i] = paramExpr;
-                    }
+                    var customValue = paramInfo.Details.CustomValue;
+                    customValue?.ThrowIfNotInstanceOf(paramServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+                    paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
+                    continue; // done, parameter is by provided via custom value specified in registration
                 }
+
+                var paramFactory = container.ResolveFactory(paramRequest);
+                var paramExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
+                if (paramExpr == null)
+                {
+                    // Check if parameter dependency itself (without propagated parent details)
+                    // does not allow default, then stop checking the rest of parameters.
+                    if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
+                        return null;
+
+                    var defaultValue = paramInfo.Details.DefaultValue;
+                    paramExpr = defaultValue != null
+                        ? container.GetConstantExpression(defaultValue)
+                        : paramServiceType.GetDefaultValueExpression();
+                }
+
+                paramExprs[i] = paramExpr;
             }
 
             return CreateServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
