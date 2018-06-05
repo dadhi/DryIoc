@@ -785,8 +785,6 @@ namespace DryIoc
                         {
                             serviceType = openGenericType;
                             serviceKey = openGenericTypeKey.ServiceKey;
-                            // todo: remove when fixed #580
-                            //request.ChangeServiceKey(openGenericTypeKey.ServiceKey); // note: Mutates the request
                         }
                     }
                 }
@@ -2655,7 +2653,7 @@ namespace DryIoc
                         return s;
             }
 
-            return throwIfNotFound ? Throw.For<IScope>(Error.NoMatchedScopeFound, name, currentScope) : null;
+            return !throwIfNotFound ? null : Throw.For<IScope>(Error.NoMatchedScopeFound, name, currentScope);
         }
 
         /// <summary>Opens scope with optional name and optional tracking of new scope in a parent scope.</summary>
