@@ -378,10 +378,9 @@ namespace DryIoc
                 items = items.Where(x => x.Factory.FactoryID != parent.FactoryID);
 
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems
-                        .Where(it => !it.Factory.FactoryGenerator?.GeneratedFactories.Enumerate()
-                            .Any(f => f.Value.FactoryID == parent.FactoryID
-                                && f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey) ?? false);
+                    openGenericItems = openGenericItems.Where(x => x
+                        .Factory.FactoryGenerator?.GeneratedFactories.Enumerate()
+                        .FindFirst(f => f.Value.FactoryID == parent.FactoryID) == null);
 
                 if (variantGenericItems != null)
                     variantGenericItems = variantGenericItems
@@ -2846,12 +2845,15 @@ namespace DryIoc
             if (parent.FactoryType != FactoryType.Service)
                 parent = parent.FirstOrDefault(p => p.FactoryType == FactoryType.Service) ?? Request.Empty;
 
-            if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType) // check fast for the parent of the same type
-                items = items.Match(x => x.Factory.FactoryID != parent.FactoryID &&
-                    (x.Factory.FactoryGenerator == null ||
-                    !x.Factory.FactoryGenerator.GeneratedFactories.Enumerate()
-                        .Any(f => f.Value.FactoryID == parent.FactoryID
-                          && f.Key.Key == parent.ServiceType && f.Key.Value == parent.ServiceKey)));
+            // check fast for the parent of the same type
+            if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
+            {
+                items = items.Match(x => x.Factory.FactoryID != parent.FactoryID);
+                if (requiredItemType.IsGeneric())
+                    items = items.Match(x => x
+                        .Factory.FactoryGenerator?.GeneratedFactories.Enumerate()
+                        .FindFirst(f => f.Value.FactoryID == parent.FactoryID) == null);
+            }
 
             // Return collection of single matched item if key is specified.
             var serviceKey = request.ServiceKey;
