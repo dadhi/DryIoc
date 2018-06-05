@@ -92,7 +92,7 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<C>(ies.OfType<M<int>>().Single().Ies.Single());
         }
 
-        [Test]
+        [Test, Ignore]
         public void Resolving_open_generic_composite_should_work_with_ResolveMany()
         {
             var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
@@ -106,7 +106,7 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<C>(ies.OfType<M<int>>().Single().Ies.Single());
         }
 
-        [Test]
+        [Test, Ignore]
         public void Resolving_open_generic_composite_as_ResolveMany_should_work()
         {
             var container = new Container();

@@ -41,7 +41,10 @@ namespace ImTools
         public static T Id<T>(T x) => x;
 
         /// <summary>Piping</summary>
-        public static R Do<T, R>(this T x, Func<T, R> next) => next(x);
+        public static R Do<T, R>(this T x, Func<T, R> @do) => @do(x);
+
+        /// <summary>Piping</summary>
+        public static void Do<T>(this T x, Action<T> @do) =>  @do(x);
     }
 
     /// <summary>Helpers for lazy instantiations</summary>
@@ -237,6 +240,14 @@ namespace ImTools
                     return it;
                 return default(T);
             }
+        }
+
+        /// <summary>Does <paramref name="action"/> for each item</summary>
+        public static void DoPer<T>(this T[] source, Action<T> action)
+        {
+            if (!source.IsNullOrEmpty())
+                for (var i = 0; i < source.Length; i++)
+                    action(source[i]);
         }
 
         private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
@@ -1407,10 +1418,8 @@ namespace ImTools
             return this;
         }
 
-        private ImHashMap<K, V> With(ImHashMap<K, V> left, ImHashMap<K, V> right)
-        {
-            return left == Left && right == Right ? this : new ImHashMap<K, V>(_data, left, right);
-        }
+        private ImHashMap<K, V> With(ImHashMap<K, V> left, ImHashMap<K, V> right) => 
+            left == Left && right == Right ? this : new ImHashMap<K, V>(_data, left, right);
 
         internal ImHashMap<K, V> Remove(int hash, K key, bool ignoreKey = false)
         {
