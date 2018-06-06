@@ -1,4 +1,4 @@
-![](./logo.svg)
+<img src="./logo.svg" alt="logo" style="width: 100px;"/>
 
 # DryIoc
 Simple, fast and powerful DI IoC Container for .NET
