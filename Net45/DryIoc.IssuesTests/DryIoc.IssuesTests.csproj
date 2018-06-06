@@ -197,6 +197,7 @@
     <Compile Include="Issue574_IResolverContext_UseInstance_ShouldNotHaveSideEffectsOnOtherScopes.cs" />
     <Compile Include="Issue577_Resolve_many_keyed_factory_delegate_cache_anomaly.cs" />
     <Compile Include="Issue578_Specific_Service_Type_required_by_controller_not_resolving.cs" />
+    <Compile Include="Issue579_VerifyResolutions_strange_behaviour.cs" />
     <Compile Include="Issue580_Same_service_instance_resolved_twice_when_decorator_is_used.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
