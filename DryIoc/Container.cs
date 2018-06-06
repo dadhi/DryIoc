@@ -2363,7 +2363,7 @@ namespace DryIoc
                 }
             }
 
-            var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
+            var depExprs = generatingContainer.Rules.DependencyResolutionCallExprs.Value;
             result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
             return result;
         }
@@ -3162,7 +3162,7 @@ namespace DryIoc
         public Rules WithDependencyDepthToSplitObjectGraph(int depth) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Disables the <see cref="DependencyDepthToSplitObjectGraph"/> limitation.</summary>
@@ -3204,7 +3204,7 @@ namespace DryIoc
                         made.Parameters ?? _made.Parameters,
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
                 DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Defines single factory selector delegate.</summary>
@@ -3222,7 +3222,7 @@ namespace DryIoc
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
             new Rules(_settings, rule, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Select last registered factory from multiple default.</summary>
@@ -3264,7 +3264,7 @@ namespace DryIoc
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
 
         /// <summary>Appends dynamic registration rules 
@@ -3273,7 +3273,7 @@ namespace DryIoc
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallback, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
 
         /// <summary>Specifies to use dynamic registrations only when no normal registrations found</summary>
@@ -3291,7 +3291,7 @@ namespace DryIoc
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules));
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
@@ -3300,7 +3300,7 @@ namespace DryIoc
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule));
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
@@ -3463,7 +3463,7 @@ namespace DryIoc
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
@@ -3485,7 +3485,7 @@ namespace DryIoc
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, itemToExpressionOrDefault,
+                DependencyResolutionCallExprs, itemToExpressionOrDefault,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
@@ -3536,7 +3536,7 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.EagerCachingSingletonForFasterAccess);
 
         /// <summary><see cref="WithDependencyResolutionCallExpressions"/>.</summary>
-        public Ref<ImHashMap<Request, Expression>> DependencyResolutionCallExpressions { get; private set; }
+        public Ref<ImHashMap<Request, Expression>> DependencyResolutionCallExprs { get; private set; }
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
@@ -3579,7 +3579,7 @@ namespace DryIoc
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, rule, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
@@ -3636,7 +3636,7 @@ namespace DryIoc
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
             DependencyDepthToSplitObjectGraph = dependencyDepthToSplitObjectGraph;
-            DependencyResolutionCallExpressions = dependencyResolutionCallExpressions;
+            DependencyResolutionCallExprs = dependencyResolutionCallExpressions;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
             UnknownServiceResolvers = unknownServiceResolvers;
@@ -3645,7 +3645,7 @@ namespace DryIoc
         private Rules WithSettings(Settings newSettings) =>
             new Rules(newSettings,
                 FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExpressions, ItemToExpressionConverter,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers);
 
         private readonly Made _made;
@@ -4843,7 +4843,7 @@ namespace DryIoc
             var container = request.Container;
 
             if (!request.Factory.HasRuntimeState &&
-                container.Rules.DependencyResolutionCallExpressions != null)
+                container.Rules.DependencyResolutionCallExprs != null)
                 PopulateDependencyResolutionCallExpressions(request);
 
             var serviceTypeExpr = Constant(request.ServiceType, typeof(Type));
@@ -4855,7 +4855,7 @@ namespace DryIoc
 
             if (opensResolutionScope)
             {
-                // Generates code below. That's mean the service opening the scope is scoped to this scope.
+                // Generates the code below. That means the service opening the scope is scoped to this scope.
                 //
                 // r => r.OpenScope(new ResolutionScopeName(serviceType, serviceKey), trackInParent: true)
                 //       .Resolve(serviceType, serviceKey)
@@ -4906,12 +4906,24 @@ namespace DryIoc
             if (factory == null || factory is FactoryPlaceholder)
                 return;
 
+            // prevents recursion by checking
+            var resolutionCallExpressions = container.Rules.DependencyResolutionCallExprs;
+            var containsRequest = false;
+            resolutionCallExpressions.Swap(x => x.AddOrUpdate(request, null,
+                (old, _) =>
+                {
+                    containsRequest = true;
+                    return old;
+                }));
+            if (containsRequest)
+                return;
+
             var factoryExpr = factory.GetExpressionOrDefault(request);
             if (factoryExpr == null)
                 return;
 
-            container.Rules.DependencyResolutionCallExpressions
-                .Swap(it => it.AddOrUpdate(request, factoryExpr.NormalizeExpression()
+            factoryExpr = factoryExpr.NormalizeExpression();
+            resolutionCallExpressions.Swap(x => x.Update(request, factoryExpr
 #if FEC_EXPRESSION_INFO
                         .ToExpression()
 #endif
@@ -5041,8 +5053,6 @@ namespace DryIoc
     public static class ServiceInfoTools
     {
         /// <summary>Creates service info with new type but keeping the details.</summary>
-        /// <param name="source">Source info.</param> <param name="serviceType">New service type.</param>
-        /// <returns>New info.</returns>
         public static IServiceInfo With(this IServiceInfo source, Type serviceType) =>
             source.Create(serviceType, source.Details);
 
@@ -5163,7 +5173,6 @@ namespace DryIoc
 
         /// <summary>Returns required service type if it is specified and assignable to service type,
         /// otherwise returns service type.</summary>
-        /// <returns>The type to be used for lookup in registry.</returns>
         public static Type GetActualServiceType(this IServiceInfo info)
         {
             var requiredServiceType = info.Details.RequiredServiceType;
@@ -5172,8 +5181,6 @@ namespace DryIoc
         }
 
         /// <summary>Appends info string representation into provided builder.</summary>
-        /// <param name="s">String builder to print to.</param> <param name="info">Info to print.</param>
-        /// <returns>String builder with appended info.</returns>
         public static StringBuilder Print(this StringBuilder s, IServiceInfo info)
         {
             s.Print(info.ServiceType);
@@ -5246,10 +5253,7 @@ namespace DryIoc
 
         #region Implementation
 
-        private ServiceInfo(Type serviceType)
-        {
-            ServiceType = serviceType;
-        }
+        private ServiceInfo(Type serviceType) { ServiceType = serviceType; }
 
         private class WithDetails : ServiceInfo
         {
@@ -7886,8 +7890,8 @@ namespace DryIoc
                 if (disposalOrder == 0)
                     disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
 
-                var it = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, it.AddOrUpdate(disposalOrder, disposable), it) != it)
+                var dsp = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, dsp.AddOrUpdate(disposalOrder, disposable), dsp) != dsp)
                     Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalOrder, disposable));
             }
             return item;
@@ -8018,13 +8022,9 @@ namespace DryIoc
         object Name { get; }
 
         /// <summary>Returns true if reuse can be applied: may check if scope or other reused item storage is present.</summary>
-        /// <param name="request">Service request.</param> <returns>Check result.</returns>
         bool CanApply(Request request);
 
         /// <summary>Returns composed expression.</summary>
-        /// <param name="request">info</param>
-        /// <param name="serviceFactoryExpr">Service creation expression</param>
-        /// <returns>Subject</returns>
         Expr Apply(Request request, Expr serviceFactoryExpr);
     }
 
@@ -9389,7 +9389,7 @@ namespace DryIoc
             parameter.GetCustomAttributes(attributeType ?? typeof(Attribute), inherit).Cast<Attribute>();
 
         /// <summary>Get types from assembly that are loaded successfully.
-        /// Hacks to <see cref="ReflectionTypeLoadException"/> for loaded types.</summary>
+        /// Hacks the <see cref="ReflectionTypeLoadException"/>to get failing to load types metadata.</summary>
         public static Type[] GetLoadedTypes(this Assembly assembly)
         {
             try
@@ -9596,8 +9596,7 @@ namespace DryIoc
             if (method == null)
                 return null;
 
-            var lambdaExpr = Lambda<Func<int>>(Call(method, Empty<Expr>()), Empty<ParamExpr>());
-            return lambdaExpr
+            return Lambda<Func<int>>(Call(method, Empty<Expr>()), Empty<ParamExpr>())
 #if FEC_EXPRESSION_INFO
                 .ToLambdaExpression()
 #endif
