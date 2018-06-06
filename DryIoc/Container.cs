@@ -1953,22 +1953,28 @@ namespace DryIoc
     }
 
     /// Special service key with info about open-generic service type
-    internal sealed class OpenGenericTypeKey : IConvertibleToExpression
+    public sealed class OpenGenericTypeKey : IConvertibleToExpression
     {
+        /// <summary>Open-generic required service-type</summary>
         public readonly Type RequiredServiceType;
+
+        /// <summary>Optional key</summary>
         public readonly object ServiceKey;
 
+        /// <summary>Constructs the thingy</summary>
         public OpenGenericTypeKey(Type requiredServiceType, object serviceKey)
         {
             RequiredServiceType = requiredServiceType.ThrowIfNull();
             ServiceKey = serviceKey;
         }
 
+        /// <inheritdoc />
         public override string ToString() =>
             new StringBuilder(nameof(OpenGenericTypeKey)).Append('(')
                 .Print(RequiredServiceType).Append(", ").Print(ServiceKey)
                 .Append(')').ToString();
 
+        /// <inheritdoc />
         public override bool Equals(object obj)
         {
             var other = obj as OpenGenericTypeKey;
@@ -1977,10 +1983,14 @@ namespace DryIoc
                    Equals(other.ServiceKey, ServiceKey);
         }
 
+        /// <inheritdoc />
         public override int GetHashCode() => HashCode.Combine(RequiredServiceType, ServiceKey);
 
+        /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) => 
-            New(typeof(OpenGenericTypeKey).SingleConstructor(), Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
+            New(_ctor, Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
+
+        private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey).SingleConstructor();
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 

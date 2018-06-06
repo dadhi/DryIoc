@@ -54,7 +54,8 @@ string[] dryIocTypeToReplace =
     nameof(FactoryType),
     nameof(DefaultKey), nameof(DefaultDynamicKey), 
     nameof(Request), nameof(RequestFlags),
-    nameof(HiddenDisposable)
+    nameof(HiddenDisposable),
+    nameof(OpenGenericTypeKey)
 };
 
 string ReplaceDryIocTypes(string source) 
