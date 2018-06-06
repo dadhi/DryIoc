@@ -1,3 +1,5 @@
+<img src="./logo.svg" alt="logo" width="200px"/>
+
 DryIoc is fast, small, full-featured IoC Container for .NET
 ===========================================================
 

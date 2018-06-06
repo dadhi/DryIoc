@@ -2360,7 +2360,6 @@ namespace DryIoc
 
             var depExprs = generatingContainer.Rules.DependencyResolutionCallExpressions.Value;
             result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
-
             return result;
         }
 
@@ -2407,6 +2406,10 @@ namespace DryIoc
             var ifUnresolved = request.IfUnresolved;
             var requiredServiceType = request.RequiredServiceType;
             var serviceKey = request.ServiceKey;
+            if (serviceKey is OpenGenericTypeKey)
+            {
+                ; // todo: handle
+            }
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
 
