@@ -1471,10 +1471,35 @@ namespace DryIocZero
     internal sealed class HiddenDisposable
     {
         public readonly object Value;
-        public HiddenDisposable(object value)
+        public HiddenDisposable(object value) { Value = value; }
+    }
+
+    /// Special service key with info about open-generic service type
+    internal sealed class OpenGenericTypeKey
+    {
+        public readonly Type RequiredServiceType;
+        public readonly object ServiceKey;
+
+        public OpenGenericTypeKey(Type requiredServiceType, object serviceKey)
         {
-            Value = value;
+            RequiredServiceType = requiredServiceType;
+            ServiceKey = serviceKey;
         }
+
+        public override string ToString() =>
+            new StringBuilder(nameof(OpenGenericTypeKey)).Append('(')
+                .Append(RequiredServiceType).Append(", ").Append(ServiceKey)
+                .Append(')').ToString();
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as OpenGenericTypeKey;
+            return other != null &&
+                   other.RequiredServiceType == RequiredServiceType &&
+                   Equals(other.ServiceKey, ServiceKey);
+        }
+
+        public override int GetHashCode() => HashCode.Combine(RequiredServiceType, ServiceKey);
     }
 
     /// <summary>Custom exclude from test code coverage attribute for portability.</summary>

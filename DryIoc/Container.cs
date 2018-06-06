@@ -1087,18 +1087,15 @@ namespace DryIoc
 
             var convertible = item as IConvertibleToExpression;
             if (convertible != null)
-                return convertible.ToExpression(it => GetConstantExpression(it));
+                return convertible.ToExpression(it => GetConstantExpression(it, null, throwIfStateRequired));
 
             var actualItemType = item.GetType();
             if (actualItemType.GetGenericDefinitionOrNull() == typeof(KV<,>))
             {
                 var kvArgTypes = actualItemType.GetGenericParamsAndArgs();
-                var kvOfMethod = _kvOfMethod.MakeGenericMethod(kvArgTypes);
-                return Call(kvOfMethod,
-                    GetConstantExpression(actualItemType.Field("Key").GetValue(item),
-                        kvArgTypes[0], throwIfStateRequired),
-                    GetConstantExpression(actualItemType.Field("Value").GetValue(item),
-                        kvArgTypes[1], throwIfStateRequired));
+                return Call(_kvOfMethod.MakeGenericMethod(kvArgTypes),
+                    GetConstantExpression(actualItemType.Field("Key").GetValue(item), kvArgTypes[0], throwIfStateRequired),
+                    GetConstantExpression(actualItemType.Field("Value").GetValue(item), kvArgTypes[1], throwIfStateRequired));
             }
 
             if (actualItemType.IsPrimitive() ||
@@ -1106,11 +1103,8 @@ namespace DryIoc
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (actualItemType.IsArray)
-            {
-                var elems = ((object[])item)
-                    .Map(it => GetConstantExpression(it, null, throwIfStateRequired));
-                return NewArrayInit(actualItemType.GetElementType().ThrowIfNull(), elems);
-            }
+                return NewArrayInit(actualItemType.GetElementType().ThrowIfNull(),
+                    ((object[])item).Map(it => GetConstantExpression(it, null, throwIfStateRequired)));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
@@ -1178,10 +1172,9 @@ namespace DryIoc
                 return null;
 
             var factory = entry as Factory;
-            if (factory != null)
-                return new[] { new KV<object, Factory>(DefaultKey.Value, factory) };
-
-            return ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
+            return factory != null 
+                ? new KV<object, Factory>(DefaultKey.Value, factory).One()
+                : ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
         }
 
         private KV<object, Factory>[] CombineRegisteredWithDynamicFactories(
@@ -1291,8 +1284,7 @@ namespace DryIoc
         {
             var registeredFactories = GetRegisteredServiceFactoriesOrNull(serviceType, serviceKey);
             var registeredAndDynamicFactories = CombineRegisteredWithDynamicFactories(
-                registeredFactories, true,
-                FactoryType.Service, serviceType, serviceKey);
+                registeredFactories, true, FactoryType.Service, serviceType, serviceKey);
 
             var factory = registeredAndDynamicFactories.FindFirst(
                 f => serviceKey.Equals(f.Key) && f.Value.CheckCondition(request));
@@ -1960,8 +1952,8 @@ namespace DryIoc
         #endregion
     }
 
-    // Special service key with info about open-generic service type
-    internal sealed class OpenGenericTypeKey
+    /// Special service key with info about open-generic service type
+    internal sealed class OpenGenericTypeKey : IConvertibleToExpression
     {
         public readonly Type RequiredServiceType;
         public readonly object ServiceKey;
@@ -1986,6 +1978,9 @@ namespace DryIoc
         }
 
         public override int GetHashCode() => HashCode.Combine(RequiredServiceType, ServiceKey);
+
+        public Expr ToExpression(Func<object, Expr> fallbackConverter) => 
+            New(typeof(OpenGenericTypeKey).SingleConstructor(), Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 
@@ -2406,10 +2401,7 @@ namespace DryIoc
             var ifUnresolved = request.IfUnresolved;
             var requiredServiceType = request.RequiredServiceType;
             var serviceKey = request.ServiceKey;
-            if (serviceKey is OpenGenericTypeKey)
-            {
-                ; // todo: handle
-            }
+
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
 
