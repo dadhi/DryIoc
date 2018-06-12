@@ -18,11 +18,11 @@ namespace Playground
         static void Main()
         {
             //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
@@ -38,7 +38,6 @@ namespace Playground
             //new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
-            Console.ReadKey();
         }
 
         public class M { }

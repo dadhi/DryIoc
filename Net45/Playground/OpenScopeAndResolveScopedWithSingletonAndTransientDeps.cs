@@ -98,7 +98,7 @@ namespace PerformanceTests
                 return Measure(_autofac);
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(_dryioc);

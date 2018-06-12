@@ -4540,7 +4540,7 @@ namespace DryIoc
         {
             getDecorator.ThrowIfNull();
 
-            // unique key to binds decorator factory and decorator registrations
+            // unique key to bind decorator factory and decorator registrations
             var factoryKey = new object();
 
             registrator.RegisterDelegate(_ =>
@@ -4557,8 +4557,7 @@ namespace DryIoc
         {
             private readonly Func<IResolverContext, Func<TDecoratee, TDecoratee>> _getDecorator;
             public DecoratorDelegateFactory(Func<IResolverContext, Func<TDecoratee, TDecoratee>> getDecorator) { _getDecorator = getDecorator; }
-
-            public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r)(decoratee);
+            public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r).Invoke(decoratee);
         }
 
         /// <summary>Obsolete: replaced with UseInstance</summary>
@@ -4655,7 +4654,7 @@ namespace DryIoc
 
             public Disposer(Action<T> dispose)
             {
-                _dispose = dispose.ThrowIfNull();
+                _dispose = dispose;
             }
 
             public T TrackForDispose(T item)
@@ -4840,12 +4839,10 @@ namespace DryIoc
 
         internal static Expr CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
-            var container = request.Container;
-
-            if (!request.Factory.HasRuntimeState &&
-                container.Rules.DependencyResolutionCallExprs != null)
+            if (request.Rules.DependencyResolutionCallExprs != null && !request.Factory.HasRuntimeState)
                 PopulateDependencyResolutionCallExpressions(request);
 
+            var container = request.Container;
             var serviceTypeExpr = Constant(request.ServiceType, typeof(Type));
             var ifUnresolvedExpr = Constant(request.IfUnresolved, typeof(IfUnresolved));
             var requiredServiceTypeExpr = Constant(request.RequiredServiceType, typeof(Type));
@@ -5451,7 +5448,7 @@ namespace DryIoc
         /// <summary>Inherited</summary>
         IsWrappedInFunc = 1 << 4,
 
-        /// <summary>Indicates that the request the one from Resolve call.</summary>
+        /// <summary>Indicates that the request is the one from Resolve call.</summary>
         IsResolutionCall = 1 << 5,
 
         /// <summary>Non inherited</summary>
@@ -7821,11 +7818,11 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             object value;
-            return _items.TryFind(id, out value)
-                ? value : TryGetOrAdd(id, createValue, disposalOrder);
+            var items = _items;
+            return items.TryFind(id, out value) ? value : TryGetOrAdd(items, id, createValue, disposalOrder);
         }
 
-        private object TryGetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = 0)
+        private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
@@ -7833,18 +7830,23 @@ namespace DryIoc
             object item;
             lock (_locker)
             {
-                if (_items.TryFind(id, out item)) // double check locking
+                // re-check if items where changed in between (double check locking)
+                if (_items != items && _items.TryFind(id, out item)) 
                     return item;
 
                 item = createValue();
 
                 // Swap is required because if _items changed inside createValue, then we need to retry
-                var items = _items;
+                items = _items;
                 if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                    Ref.Swap(ref _items, it => it.AddOrUpdate(id, item));
+                    Ref.Swap(ref _items, x => x.AddOrUpdate(id, item));
             }
 
-            return TrackDisposable(item, disposalIndex);
+            var dispItem = item as IDisposable;
+            if (dispItem != null && dispItem != this)
+                TrackDisposable(dispItem, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
+
+            return item;
         }
 
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
@@ -7860,7 +7862,9 @@ namespace DryIoc
                 lock (_locker)
                     _items = _items.AddOrUpdate(id, item);
 
-            TrackDisposable(item);
+            var dispItem = item as IDisposable;
+            if (dispItem != null && dispItem != this)
+                TrackDisposable(dispItem, NextDisposalIndex());
         }
 
         /// <inheritdoc />
@@ -7881,20 +7885,19 @@ namespace DryIoc
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
-            if (item == this)
-                return item;
-
-            var disposable = item as IDisposable;
-            if (disposable != null)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
-
-                var dsp = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, dsp.AddOrUpdate(disposalOrder, disposable), dsp) != dsp)
-                    Ref.Swap(ref _disposables, _ => _.AddOrUpdate(disposalOrder, disposable));
-            }
+            var dispItem = item as IDisposable;
+            if (dispItem != null && dispItem != this)
+                TrackDisposable(dispItem, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
             return item;
+        }
+
+        private int NextDisposalIndex() => Interlocked.Decrement(ref _nextDisposalIndex);
+
+        private void TrackDisposable(IDisposable dispItem, int disposalOrder)
+        {
+            var ds = _disposables;
+            if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, dispItem), ds) != ds)
+                Ref.Swap(ref _disposables, x => x.AddOrUpdate(disposalOrder, dispItem));
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
@@ -7920,7 +7923,7 @@ namespace DryIoc
             if (!disposables.IsEmpty)
                 foreach (var disposable in disposables.Enumerate())
                 {
-                    // Ignoring disposing exception, as it is not important to proceed the disposal
+                    // Ignoring disposing exception, as it is not important to proceed the disposal of other items
                     // todo: May be it is better to aggregate?
                     try
                     {
@@ -8085,7 +8088,6 @@ namespace DryIoc
         public Expr Apply(Request request, Expr serviceFactoryExpr)
         {
             var resolverExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
-
             if (request.TracksTransientDisposable)
             {
                 if (_scopedOrSingleton)
