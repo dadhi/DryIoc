@@ -1083,7 +1083,7 @@ namespace DryIoc
         public Expr GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
             if (item == null)
-                return itemType == null ? Constant(null) : Constant(null, itemType);
+                return itemType == null || itemType == typeof(object) ? Constant(null) : Constant(null, itemType);
 
             var convertible = item as IConvertibleToExpression;
             if (convertible != null)
@@ -2434,7 +2434,7 @@ namespace DryIoc
                     serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
 
             var requiredServiceTypeExpr = Constant(requiredServiceType, typeof(Type));
-            var servicekeyExpr = Convert(container.GetConstantExpression(serviceKey), typeof(object));
+            var servicekeyExpr = container.GetConstantExpression(serviceKey, typeof(object));
             var factoryTypeExpr = Constant(factoryType, typeof(FactoryType));
             var flagsExpr = Constant(flags, typeof(RequestFlags));
 
@@ -2453,7 +2453,7 @@ namespace DryIoc
                     factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr, decoratedFactoryIDExpr);
 
             var metadataKeyExpr = Constant(metadataKey, typeof(string));
-            var metadataExpr = Convert(container.GetConstantExpression(metadata), typeof(object));
+            var metadataExpr = container.GetConstantExpression(metadata, typeof(object));
 
             return Call(parentExpr, Request.PushMethodWith12Args.Value,
                 serviceTypeExpr, requiredServiceTypeExpr, servicekeyExpr, metadataKeyExpr, metadataExpr, ifUnresolvedExpr,
@@ -4892,35 +4892,21 @@ namespace DryIoc
                 if (p.FactoryID == request.FactoryID)
                     return;
 
-            var container = request.Container;
-
-            // recreates the request to emulate the Resolve call
-            request = Request.Create(container, request.ServiceType, request.ServiceKey,
-                request.IfUnresolved, request.RequiredServiceType, request.DirectParent,
-                request.Flags, request.InputArgExprs);
-
-            var factory = container.ResolveFactory(request);
+            var factory = request.Container.ResolveFactory(request);
             if (factory == null || factory is FactoryPlaceholder)
                 return;
 
-            // prevents recursion by checking
-            var resolutionCallExpressions = container.Rules.DependencyResolutionCallExprs;
-            var containsRequest = false;
-            resolutionCallExpressions.Swap(x => x.AddOrUpdate(request, null,
-                (old, _) =>
-                {
-                    containsRequest = true;
-                    return old;
-                }));
-            if (containsRequest)
+            // Prevents infiinte recursion when genererating the resolution depenedency #579
+            if ((request.Flags & RequestFlags.AddedToResolutionExpressions) != 0)
                 return;
+            request.Flags |= RequestFlags.AddedToResolutionExpressions;
 
-            var factoryExpr = factory.GetExpressionOrDefault(request);
+            var factoryExpr = factory.GetExpressionOrDefault(request)?.NormalizeExpression();
             if (factoryExpr == null)
                 return;
 
-            factoryExpr = factoryExpr.NormalizeExpression();
-            resolutionCallExpressions.Swap(x => x.Update(request, factoryExpr
+            request.Container.Rules.DependencyResolutionCallExprs.Swap(x => 
+                x.AddOrUpdate(request, factoryExpr
 #if FEC_EXPRESSION_INFO
                         .ToExpression()
 #endif
@@ -5455,7 +5441,10 @@ namespace DryIoc
         OpensResolutionScope = 1 << 6,
 
         /// <summary>Non inherited</summary>
-        StopRecursiveDependencyCheck = 1 << 7
+        StopRecursiveDependencyCheck = 1 << 7,
+
+        /// <summary>Non inherited. Marks the expression to be added to generated resolutions to prevent infinite recursion</summary>
+        AddedToResolutionExpressions = 1 << 8
     }
 
     /// <summary>Tracks the requested service and resolved factory details in a chain of nested dependencies.</summary>
@@ -5519,8 +5508,9 @@ namespace DryIoc
         /// <summary>Request immediate parent.</summary>
         public readonly Request DirectParent;
 
+        // mutable because of RequestFlags.AddedToResolutionExpressions
         /// <summary>Some memoized request conditions</summary>
-        public readonly RequestFlags Flags;
+        public RequestFlags Flags;
 
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
         private IServiceInfo _serviceInfo;
@@ -5609,11 +5599,10 @@ namespace DryIoc
         {
             get
             {
-                if (IsEmpty)
-                    return Empty;
                 var p = DirectParent;
-                while (!p.IsEmpty && p.FactoryType == FactoryType.Wrapper)
-                    p = p.DirectParent;
+                if (p != null)
+                    while (p.DirectParent != null && p.FactoryType == FactoryType.Wrapper)
+                        p = p.DirectParent;
                 return p;
             }
         }
@@ -5621,8 +5610,11 @@ namespace DryIoc
         /// <summary>Requested service type.</summary>
         public Type ServiceType => _serviceInfo.ServiceType;
 
-        /// <summary>Required or service type.</summary>
-        public Type GetActualServiceType() => _serviceInfo.GetActualServiceType();
+        /// <summary>Compatible required or service type.</summary>
+        public Type GetActualServiceType() => 
+            _actualServiceType ?? (_actualServiceType = _serviceInfo.GetActualServiceType());
+
+        private Type _actualServiceType; // memoizing result once
 
         /// <summary>Optional service key to identify service of the same type.</summary>
         public object ServiceKey => _serviceInfo.Details.ServiceKey;
@@ -6071,10 +6063,10 @@ namespace DryIoc
         public abstract FactoryType FactoryType { get; }
 
         /// <summary>Predicate to check if factory could be used for resolved request.</summary>
-        public Func<Request, bool> Condition { get; private set; }
+        public Func<Request, bool> Condition { get; }
 
         /// <summary>Relative disposal order when defined. Greater number, later dispose.</summary>
-        public int DisposalOrder { get; private set; }
+        public int DisposalOrder { get; }
 
         /// <summary>Arbitrary metadata object associated with Factory/Implementation, may be a dictionary of key-values.</summary>
         public virtual object Metadata => null;
@@ -8343,7 +8335,6 @@ namespace DryIoc
 
         #region Implementation
 
-        /// <summary>No-reuse</summary>
         private sealed class TransientReuse : IReuse
         {
             public int Lifespan => 0;

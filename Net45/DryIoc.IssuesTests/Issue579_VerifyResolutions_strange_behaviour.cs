@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -21,26 +20,26 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<fiosEntities>(Reuse.InWebRequest, setup: Setup.With(openResolutionScope: true));
-            //container.Register(typeof(IGenericExecutor<>), typeof(GenericExecutor<>), Reuse.Singleton);
+            container.Register<fiosEntities>(setup: Setup.With(openResolutionScope: true));
+            container.Register(typeof(IGenericExecutor<>), typeof(GenericExecutor<>), Reuse.Singleton);
             container.Register<IBaseParams, BaseParams>(Reuse.Singleton);
-            //container.Register<IDataCheck, DataCheck>(Reuse.Singleton);
-            //container.Register<IReportUtilities, ReportUtilities>(Reuse.Singleton);
-            //container.Register<IResponseProvider, JsonResponseProvider>(Reuse.Singleton);
-            //container.Register<IRelationshipsService, RelationshipsService>(Reuse.Singleton);
-            //container.Register<IBusinessService, BusinessService>(Reuse.Singleton);
-            //container.Register<ISurveysService, SurveysService>(Reuse.Singleton);
-            //container.Register<IGenericService, GenericService>(Reuse.Singleton);
-            //container.Register<IGenericDataService, GenericDataService>(Reuse.Singleton);
-            //container.Register<IAccountsService, AccountsService>(Reuse.Singleton);
-            //container.Register<IApplicationsService, ApplicationsService>(Reuse.Singleton);
-            //container.Register<IInformationService, InformationService>(Reuse.Singleton);
-            //container.Register<IReferenceDataService, ReferenceDataService>(Reuse.Singleton);
-            //container.Register<IReportsService, ReportsService>(Reuse.Singleton);
-            //container.Register<ITechnologiesService, TechnologiesService>(Reuse.Singleton);
-            //container.Register<IUiService, UiService>(Reuse.Singleton);
+            container.Register<IDataCheck, DataCheck>(Reuse.Singleton);
+            container.Register<IReportUtilities, ReportUtilities>(Reuse.Singleton);
+            container.Register<IResponseProvider, JsonResponseProvider>(Reuse.Singleton);
+            container.Register<IRelationshipsService, RelationshipsService>(Reuse.Singleton);
+            container.Register<IBusinessService, BusinessService>(Reuse.Singleton);
+            container.Register<ISurveysService, SurveysService>(Reuse.Singleton);
+            container.Register<IGenericService, GenericService>(Reuse.Singleton);
+            container.Register<IGenericDataService, GenericDataService>(Reuse.Singleton);
+            container.Register<IAccountsService, AccountsService>(Reuse.Singleton);
+            container.Register<IApplicationsService, ApplicationsService>(Reuse.Singleton);
+            container.Register<IInformationService, InformationService>(Reuse.Singleton);
+            container.Register<IReferenceDataService, ReferenceDataService>(Reuse.Singleton);
+            container.Register<IReportsService, ReportsService>(Reuse.Singleton);
+            container.Register<ITechnologiesService, TechnologiesService>(Reuse.Singleton);
+            container.Register<IUiService, UiService>(Reuse.Singleton);
 
-            var errors = container.Validate();
+            var errors = container.Validate(ServiceInfo.Of<IBaseParams>());
             Assert.IsEmpty(errors);
         }
     }
@@ -106,11 +105,11 @@ namespace DryIoc.IssuesTests
 
     public class DataCheck : IDataCheck
     {
-        private readonly Func<fiosEntities> _getDb;
+        public readonly Func<fiosEntities> GetDb;
 
         public DataCheck(Func<fiosEntities> getDb)
         {
-            _getDb = getDb;
+            GetDb = getDb;
         }
     }
 
@@ -128,8 +127,8 @@ namespace DryIoc.IssuesTests
 
     public class RelationshipsService : BaseService, IRelationshipsService
     {
-        private readonly IGenericDataService _genericDataService;
-        private readonly IGenericExecutor<RelationshipsService> _genericExecutor;
+        public readonly IGenericDataService GenericDataService;
+        public readonly IGenericExecutor<RelationshipsService> GenericExecutor;
 
         public RelationshipsService(
             Func<fiosEntities> getDb,
@@ -138,8 +137,8 @@ namespace DryIoc.IssuesTests
             : base(getDb)
         {
 
-            _genericDataService = genericDataService;
-            _genericExecutor = genericExecutor;
+            GenericDataService = genericDataService;
+            GenericExecutor = genericExecutor;
         }
     }
 
@@ -169,15 +168,15 @@ namespace DryIoc.IssuesTests
 
     public class ReportUtilities : IReportUtilities
     {
-        private readonly Func<fiosEntities> _getDb;
-        private readonly ITechnologiesService _technologiesService;
-        private readonly IRelationshipsService _relationshipsService;
+        public readonly Func<fiosEntities> GetDb;
+        public readonly ITechnologiesService TechnologiesService;
+        public readonly IRelationshipsService RelationshipsService;
 
         public ReportUtilities(Func<fiosEntities> getDb, ITechnologiesService technologiesService, IRelationshipsService relationshipsService)
         {
-            _getDb = getDb;
-            _technologiesService = technologiesService;
-            _relationshipsService = relationshipsService;
+            GetDb = getDb;
+            TechnologiesService = technologiesService;
+            RelationshipsService = relationshipsService;
         }
     }
 
@@ -195,11 +194,11 @@ namespace DryIoc.IssuesTests
 
     public class BusinessService : BaseService, IBusinessService
     {
-        private readonly IRelationshipsService _relationshipService;
+        public readonly IRelationshipsService RelationshipService;
 
         public BusinessService(Func<fiosEntities> db, IRelationshipsService relationshipService) : base(db)
         {
-            _relationshipService = relationshipService;
+            RelationshipService = relationshipService;
         }
     }
 
@@ -209,14 +208,12 @@ namespace DryIoc.IssuesTests
 
     public class SurveysService : BaseService, ISurveysService
     {
-        private static readonly List<string> HierarchicalTables;
-
-        private readonly IRelationshipsService _relationshipService;
+        public readonly IRelationshipsService RelationshipService;
 
         public SurveysService(Func<fiosEntities> db, IRelationshipsService relationshipsService)
             : base(db)
         {
-            _relationshipService = relationshipsService;
+            RelationshipService = relationshipsService;
         }
     }
 
@@ -225,13 +222,12 @@ namespace DryIoc.IssuesTests
     /// </summary>
     public class GenericService : BaseService, IGenericService
     {
-        private const string IsDeletedPropertyName = "IsDeleted";
-        private readonly IRelationshipsService _relationshipService;
+        public readonly IRelationshipsService RelationshipService;
 
         public GenericService(Func<fiosEntities> getDb, IRelationshipsService relationshipService)
             : base(getDb)
         {
-            _relationshipService = relationshipService;
+            RelationshipService = relationshipService;
         }
     }
 
@@ -260,11 +256,11 @@ namespace DryIoc.IssuesTests
 
     public class ApplicationsService : BaseService, IApplicationsService
     {
-        private readonly IRelationshipsService _relationshipService;
+        public readonly IRelationshipsService RelationshipService;
 
         public ApplicationsService(Func<fiosEntities> db, IRelationshipsService relationshipService) : base(db)
         {
-            _relationshipService = relationshipService;
+            RelationshipService = relationshipService;
         }
     }
 
@@ -274,11 +270,11 @@ namespace DryIoc.IssuesTests
 
     public class InformationService : BaseService, IInformationService
     {
-        private readonly IRelationshipsService _relationshipService;
+        public readonly IRelationshipsService RelationshipService;
 
         public InformationService(Func<fiosEntities> db, IRelationshipsService relationshipService) : base(db)
         {
-            _relationshipService = relationshipService;
+            RelationshipService = relationshipService;
         }
     }
 
@@ -306,26 +302,26 @@ namespace DryIoc.IssuesTests
 
     public class TechnologiesService : BaseService, ITechnologiesService
     {
-        private readonly IRelationshipsService _relationshipsService;
+        public readonly IRelationshipsService RelationshipsService;
 
         public TechnologiesService(Func<fiosEntities> db, IRelationshipsService relationshipsService)
             : base(db)
         {
-            _relationshipsService = relationshipsService;
+            RelationshipsService = relationshipsService;
         }
     }
 
     public class UiService : BaseService, IUiService
     {
-        private readonly IRelationshipsService _relationshipsService;
-        private readonly ITechnologiesService _technologiesService;
+        public readonly IRelationshipsService RelationshipsService;
+        public readonly ITechnologiesService TechnologiesService;
 
         public UiService(Func<fiosEntities> getDb, IRelationshipsService relationshipsService, ITechnologiesService technologiesService)
             : base(getDb)
         {
 
-            _relationshipsService = relationshipsService;
-            _technologiesService = technologiesService;
+            RelationshipsService = relationshipsService;
+            TechnologiesService = technologiesService;
         }
     }
 }
