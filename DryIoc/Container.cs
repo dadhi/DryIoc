@@ -2381,14 +2381,20 @@ namespace DryIoc
 
         /// <summary>Helps to find potential problems in service registration setup.
         /// Method tries to resolve the specified registrations, collects exceptions, and
-        /// returns them to user. Does not create any actual service objects.</summary>
+        /// returns them to user. Does not create any actual service objects.
+        /// You must specify <paramref name="condition"/> to define your resolution roots,
+        /// otherwise container will try to resolve all registrations, 
+        /// which usually is not realistic case to validate. </summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> condition = null) =>
             container.GenerateResolutionExpressions(condition ?? Fun.Always).Errors.ToArray();
 
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
         /// Method will collect the exceptions when resolving or injecting the specific root.
-        /// Does not create any actual service objects.</summary>
+        /// Does not create any actual service objects.
+        /// You must specify <paramref name="roots"/> to define your resolution roots,
+        /// otherwise container will try to resolve all registrations, 
+        /// which usually is not realistic case to validate. </summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(
             this IContainer container, params ServiceInfo[] roots) =>
             container.GenerateResolutionExpressions(roots).Errors.ToArray();
