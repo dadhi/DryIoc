@@ -3637,6 +3637,10 @@ namespace FastExpressionCompiler
         public override ExpressionType NodeType => ExpressionType.NewArrayInit;
         public override Type Type { get; }
 
+        // todo: That it is a ReadOnlyCollection<Expression> in original NewArrayExpression. 
+        // I made it a ICollection for now to use Arguments as input, without changing Arguments type
+        public ICollection<object> Expressions => Arguments; 
+
         public override Expression ToExpression() =>
             Expression.NewArrayInit(_elementType, ArgumentsToExpressions());
 

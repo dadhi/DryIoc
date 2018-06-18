@@ -199,6 +199,7 @@
     <Compile Include="Issue578_Specific_Service_Type_required_by_controller_not_resolving.cs" />
     <Compile Include="Issue579_VerifyResolutions_strange_behaviour.cs" />
     <Compile Include="Issue580_Same_service_instance_resolved_twice_when_decorator_is_used.cs" />
+    <Compile Include="Issue581_Constructor_injection_with_array_parameter.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

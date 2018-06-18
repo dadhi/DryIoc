@@ -48,6 +48,7 @@ namespace DryIoc
     using ParamExpr = FastExpressionCompiler.ParameterExpressionInfo;
     using NewExpr = FastExpressionCompiler.NewExpressionInfo;
     using UnaryExpr = FastExpressionCompiler.UnaryExpressionInfo;
+    using NewArrayExpr = FastExpressionCompiler.NewArrayExpressionInfo;
     using MemberAssignmentExpr = FastExpressionCompiler.MemberAssignmentInfo;
     using FactoryDelegateExpr = FastExpressionCompiler.ExpressionInfo<FactoryDelegate>;
 
@@ -59,6 +60,7 @@ namespace DryIoc
     using ParamExpr = System.Linq.Expressions.ParameterExpression;
     using NewExpr = System.Linq.Expressions.NewExpression;
     using UnaryExpr = System.Linq.Expressions.UnaryExpression;
+    using NewArrayExpr = System.Linq.Expressions.NewArrayExpression;
     using MemberAssignmentExpr = System.Linq.Expressions.MemberAssignment;
     using FactoryDelegateExpr = System.Linq.Expressions.Expression<FactoryDelegate>;
 
@@ -315,7 +317,7 @@ namespace DryIoc
             if (preResolveParent == null || preResolveParent.IsEmpty)
                 preResolveParent = Request.Empty.Push(
                     typeof(IEnumerable<object>), requiredItemType, serviceKey, IfUnresolved.Throw,
-                    Factory.GetNextID(), FactoryType.Wrapper, null, null, RequestFlags.IsServiceCollection, 0);
+                    Factory.GetNextID(), FactoryType.Wrapper, null, null, 0, 0);
 
             var container = (IContainer)this;
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
@@ -2722,10 +2724,9 @@ namespace DryIoc
             typeof(Action<,,,,>), typeof(Action<,,,,,>), typeof(Action<,,,,,,>)
         };
 
-        /// <summary>Supported open-generic collection types.</summary>
-        public static readonly Type[] ArrayInterfaces =
-            typeof(object[]).GetImplementedInterfaces()
-                .Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
+        /// <summary>Supported open-generic collection types - all the interfaces implemented by array.</summary>
+        public static readonly Type[] SupportedCollectionTypes =
+            typeof(object[]).GetImplementedInterfaces().Match(t => t.IsGeneric(), t => t.GetGenericTypeDefinition());
 
         /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
         public static bool IsFunc(this Type type)
@@ -2743,7 +2744,7 @@ namespace DryIoc
 
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
 
-            var arrayInterfaces = ArrayInterfaces;
+            var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
                 wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
 
@@ -2912,7 +2913,7 @@ namespace DryIoc
                 preResolveParentExpr,
                 request.GetInputArgsExpr());
 
-            // cast to object is not required cause Resolve already return IEnumerable<object>
+            // cast to object is not required cause Resolve already returns IEnumerable<object>
             if (itemType != typeof(object))
                 resolveManyExpr = Call(_enumerableCastMethod.Value.MakeGenericMethod(itemType), resolveManyExpr);
 
@@ -4389,7 +4390,7 @@ namespace DryIoc
         /// generic definition.</summary>
         public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false) =>
             GetImplementedServiceTypes(type, nonPublicServiceTypes)
-                .Match(t => !t.IsGenericDefinition() || WrappersSupport.ArrayInterfaces.IndexOf(t) == -1);
+                .Match(t => !t.IsGenericDefinition() || WrappersSupport.SupportedCollectionTypes.IndexOf(t) == -1);
 
         /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
         /// actually a non abstract and not compiler generated classes.</summary>
@@ -5012,14 +5013,16 @@ namespace DryIoc
                 return s.Append("{CustomValue=").Print(CustomValue ?? "null", "\"").Append("}").ToString();
 
             if (RequiredServiceType != null)
-                s.Append("{RequiredServiceType=").Print(RequiredServiceType);
+                s.Append("RequiredServiceType=").Print(RequiredServiceType);
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
             if (MetadataKey != null || Metadata != null)
-                (s.Length == 0 ? s.Append('{') : s.Append(", "))
-                    .Append("Metadata=").Append(MetadataKey.Pair(Metadata));
+                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("Metadata=").Append(MetadataKey.Pair(Metadata));
             if (IfUnresolved != IfUnresolved.Throw)
-                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
+            {
+                s = (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
+                s = _value == null ? s : s.Append(", DefaultValue=").Print(_value);
+            }
 
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
@@ -5430,9 +5433,6 @@ namespace DryIoc
     {
         /// <summary>Not inherited</summary>
         TracksTransientDisposable = 1 << 1,
-
-        /// <summary>Not inherited</summary>
-        IsServiceCollection = 1 << 2,
 
         /// <summary>Inherited</summary>
         IsSingletonOrDependencyOfSingleton = 1 << 3,
@@ -6724,16 +6724,7 @@ namespace DryIoc
         public static ParameterSelector Details(this ParameterSelector source, Func<Request, ParameterInfo, ServiceDetails> getDetailsOrNull)
         {
             getDetailsOrNull.ThrowIfNull();
-            return request => parameter =>
-            {
-                var details = getDetailsOrNull(request, parameter);
-                if (details != null)
-                    return ParameterServiceInfo.Of(parameter).WithDetails(details);
-
-                // for default source selector, return null to enable fallback to any non-default selector
-                // defined outside, usually by OverrideWith
-                return source == Of ? null : source?.Invoke(request)?.Invoke(parameter);
-            };
+            return source.OverrideWith(request => p => getDetailsOrNull(request, p)?.Do(ParameterServiceInfo.Of(p).WithDetails));
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
@@ -6897,13 +6888,13 @@ namespace DryIoc
                     .GetMembers(x => x.DeclaredProperties, includeBase: true)
                     .FindFirst(x => x.Name == name);
                 if (property != null && property.IsInjectable(true, true))
-                    return getDetails(req)?.Do(d => PropertyOrFieldServiceInfo.Of(property).WithDetails(d).One());
+                    return getDetails(req)?.Do(PropertyOrFieldServiceInfo.Of(property).WithDetails).One();
 
                 var field = implType
                     .GetMembers(x => x.DeclaredFields, includeBase: true)
                     .FindFirst(x => x.Name == name);
                 if (field != null && field.IsInjectable(true, true))
-                    return getDetails(req)?.Do(d => PropertyOrFieldServiceInfo.Of(field).WithDetails(d).One());
+                    return getDetails(req)?.Do(PropertyOrFieldServiceInfo.Of(field).WithDetails).One();
 
                 return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(
                     Error.NotFoundSpecifiedWritablePropertyOrField, name, req);
@@ -7070,13 +7061,16 @@ namespace DryIoc
 
                 var paramFactory = container.ResolveFactory(paramRequest);
                 var paramExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
-                if (paramExpr == null)
+                if (paramExpr == null ||
+                    // When param is an empty array / collection, then we may use a default value instead (#581)
+                    paramInfo.Details.DefaultValue != null && 
+                    paramExpr.NodeType == ExpressionType.NewArrayInit && ((NewArrayExpr)paramExpr).Expressions.Count == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
                     if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
                         return null;
-
+                        
                     var defaultValue = paramInfo.Details.DefaultValue;
                     paramExpr = defaultValue != null
                         ? container.GetConstantExpression(defaultValue)
