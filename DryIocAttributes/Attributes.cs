@@ -37,8 +37,8 @@ namespace DryIocAttributes
         Transient,
         /// <summary>subj.</summary>
         Singleton,
-        /// <summary>subj.</summary>
-        CurrentScope, // todo: Make obsolete, replace with Scoped
+        /// <summary>Replaced the `CurrentScope`</summary>
+        Scoped,
         /// <summary>subj.</summary>
         ResolutionScope,
         /// <summary>subj.</summary>
@@ -155,7 +155,7 @@ namespace DryIocAttributes
     public class CurrentScopeReuseAttribute : ReuseAttribute
     {
         /// <summary>Creates attribute.</summary> <param name="scopeName">(optional)</param>
-        public CurrentScopeReuseAttribute(string scopeName = null) : base(ReuseType.CurrentScope, scopeName) { }
+        public CurrentScopeReuseAttribute(string scopeName = null) : base(ReuseType.Scoped, scopeName) { }
     }
 
     /// <summary>Marks exported type with Reuse.InWebRequest.

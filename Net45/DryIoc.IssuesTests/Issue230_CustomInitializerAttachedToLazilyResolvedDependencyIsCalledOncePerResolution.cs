@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests
             ctr.Register<B>(Reuse.Singleton);
 
             var initializedTimes = 0;
-            ctr.RegisterInitializer((A a, IResolver r) => ++initializedTimes);
+            ctr.RegisterInitializer<A>((a, r) => ++initializedTimes);
 
             var b = ctr.Resolve<B>();
             b.A();

@@ -215,7 +215,8 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Meta<IService<object>, int>>("no-no-name"));
-            Assert.That(ex.Message, Is.StringContaining("Unable to resolve"));
+
+            StringAssert.Contains("Unable to resolve", ex.Message);
         }
 
         [Test]

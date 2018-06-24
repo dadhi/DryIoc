@@ -31,7 +31,7 @@ namespace PerformanceTests
 
             container.Register<Parameter1>(Reuse.Transient);
             container.Register<Parameter2>(Reuse.Singleton);
-            container.Register<ScopedBlah>(Reuse.InCurrentScope);
+            container.Register<ScopedBlah>(Reuse.Scoped);
 
             return container;
         }
@@ -98,7 +98,7 @@ namespace PerformanceTests
                 return Measure(_autofac);
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(_dryioc);

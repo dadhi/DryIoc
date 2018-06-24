@@ -136,11 +136,11 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<ClientWithPropsAndFields>());
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to find writable property or field \"FReadonly\" when resolving"));
+            StringAssert.Contains("Unable to find writable property or field \"FReadonly\" when resolving", ex.Message);
         }
 
         [Test]
-        public void Only_non_primitive_properies_and_fields_should_be_resolved()
+        public void Only_non_primitive_properties_and_fields_should_be_resolved()
         {
             var container = new Container();
 

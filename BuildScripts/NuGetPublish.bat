@@ -6,15 +6,15 @@ set PACKAGEDIR="bin\NuGetPackages"
 set /p APIKEY=<ApiKey.txt
 
 rem DryIoc
-%NUGET% push "%PACKAGEDIR%\DryIoc.dll.3.0.0-preview-10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.3.0.0-preview-10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
-%NUGET% push "%PACKAGEDIR%\DryIoc.Internal.3.0.0-preview-10.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.dll.3.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.3.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+%NUGET% push "%PACKAGEDIR%\DryIoc.Internal.3.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIoc.Microsoft.DependencyInjection
 rem %NUGET% push "%PACKAGEDIR%\DryIoc.Microsoft.DependencyInjection.1.0.2.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocZero
-rem %NUGET% push "%PACKAGEDIR%\DryIocZero.4.0.0-preview-14.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
+rem %NUGET% push "%PACKAGEDIR%\DryIocZero.4.0.0-preview-15.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
 rem DryIocAttributes
 rem %NUGET% push "%PACKAGEDIR%\DryIocAttributes.4.0.0-preview-01.nupkg" -Source https://nuget.org -ApiKey %APIKEY%

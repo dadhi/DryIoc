@@ -73,8 +73,8 @@ namespace DryIoc.UnitTests
 
             var client = container.Resolve<ClientOfInitializableService>();
 
-            Assert.That(client.Service.Data, Is.StringContaining("yeah"));
-            Assert.That(client.Service.Data, Is.StringContaining("blah"));
+            StringAssert.Contains("yeah", client.Service.Data);
+            StringAssert.Contains("blah", client.Service.Data);
         }
 
         [Test]

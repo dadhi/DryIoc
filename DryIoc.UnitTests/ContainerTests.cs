@@ -364,7 +364,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void ReRegister_transient_with_key()
+        public void Re_Register_transient_with_key()
         {
             var c = new Container();
             c.Register<ILogger, Logger1>(serviceKey: "a");
@@ -666,11 +666,14 @@ namespace DryIoc.UnitTests
 
         class RequiredDependency { }
 
-        [Test, Ignore("#505: Failed to register object with ArgumentNullException")]
+        [Test]
         public void Can_register_an_object_by_type()
         {
             var c = new Container();
-            c.Register<object>();
+
+            var ex = Assert.Throws<ContainerException>(() => c.Register<object>());
+
+            Assert.AreEqual(Error.RegisteringObjectTypeAsImplementationIsNotSupported, ex.Error);
         }
     }
 }

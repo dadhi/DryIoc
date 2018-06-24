@@ -139,7 +139,7 @@ namespace DryIoc.UnitTests
 
             var fooExpr = container.Resolve<LambdaExpression>(typeof(Foo));
 
-            Assert.That(fooExpr.ToString(), Is.StringContaining(".Resolve"));
+            StringAssert.Contains(".Resolve", fooExpr.ToString());
         }
 
         internal class BarDependency : IDependency { }

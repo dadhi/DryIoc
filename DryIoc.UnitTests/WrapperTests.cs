@@ -81,18 +81,19 @@ namespace DryIoc.UnitTests
             container.Register<Service>();
 
             var serviceWeakRef = container.Resolve<WeakReference>(typeof(Service));
-            Assert.That(serviceWeakRef.Target, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(serviceWeakRef.Target);
 
             var servicesWeakRef = container.Resolve<Func<WeakReference>[]>(typeof(Service));
-            Assert.That(servicesWeakRef[0]().Target, Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(servicesWeakRef[0]().Target);
 
             var factoryWeakRef = container.Resolve<WeakReference>(typeof(Func<Service>));
-            Assert.That(factoryWeakRef.Target, Is.InstanceOf<Func<Service>>());
+            Assert.IsInstanceOf<Func<Service>>(factoryWeakRef.Target);
+
             var func = factoryWeakRef.Target as Func<Service>;
-            Assert.That(func.ThrowIfNull()(), Is.InstanceOf<Service>());
+            Assert.IsInstanceOf<Service>(func.ThrowIfNull().Invoke());
 
             var factoryWeakRefs = container.Resolve<WeakReference[]>(typeof(Func<Service>));
-            Assert.That(factoryWeakRefs.Length, Is.EqualTo(1));
+            Assert.AreEqual(1, factoryWeakRefs.Length);
         }
         public class WrapperWithTwoArgs<T0, T1>
         {

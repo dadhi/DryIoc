@@ -67,19 +67,13 @@ namespace DryIoc.Microsoft.DependencyInjection
             var adapter = container.With(rules => rules
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithTrackingDisposableTransients()
-
-#if NETSTANDARD2_0
-                , new AsyncExecutionFlowScopeContext()
-#endif
-                );
+                .WithTrackingDisposableTransients());
 
             adapter.RegisterMany<DryIocServiceProvider>(
                 setup: Setup.With(useParentReuse: true),
                 made: Parameters.Of.Type(_ => throwIfUnresolved));
 
-            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(
-                Reuse.ScopedOrSingleton);
+            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.ScopedOrSingleton);
 
             // Registers service collection
             if (descriptors != null)
@@ -94,11 +88,10 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="container">Adapted container</param> <returns>Service provider</returns>
         /// <example>
         /// <code><![CDATA[
-        /// // Example of CompositionRoot: 
-        /// public class CompositionRoot
+        /// public class ExampleCompositionRoot
         /// {
         ///    // if you need the whole container then change parameter type from IRegistrator to IContainer
-        ///    public CompositionRoot(IRegistrator r)
+        ///    public ExampleCompositionRoot(IRegistrator r)
         ///    {
         ///        r.Register<ISingletonService, SingletonService>(Reuse.Singleton);
         ///        r.Register<ITransientService, TransientService>(Reuse.Transient);
@@ -134,10 +127,8 @@ namespace DryIoc.Microsoft.DependencyInjection
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             foreach (var descriptor in descriptors)
-            {
                 if (registerDescriptor == null || !registerDescriptor(container, descriptor))
                     container.RegisterDescriptor(descriptor);
-            }
         }
 
         /// <summary>Uses passed descriptor to register service in container: 
@@ -185,20 +176,20 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// <summary>Wraps DryIoc scoped container.</summary>
     public sealed class DryIocServiceProvider : IServiceProvider, ISupportRequiredService, IServiceScope
     {
-        private readonly IContainer _scopedContainer;
+        private readonly IResolverContext _scopedResolver;
         private readonly Func<Type, bool> _throwIfUnresolved;
 
         /// <summary>Uses passed container for scoped resolutions.</summary> 
-        /// <param name="scopedContainer">Scoped container to wrap</param>
+        /// <param name="scopedResolver">A scoped resolver context to wrap</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
-        public DryIocServiceProvider(IContainer scopedContainer, Func<Type, bool> throwIfUnresolved)
+        public DryIocServiceProvider(IResolverContext scopedResolver, Func<Type, bool> throwIfUnresolved)
         {
-            _scopedContainer = scopedContainer;
+            _scopedResolver = scopedResolver;
             _throwIfUnresolved = throwIfUnresolved;
         }
 
-        /// <summary>This!</summary>
+        /// <summary>Just for convenience and access from tests</summary>
         public IServiceProvider ServiceProvider => this;
 
         /// <summary>Delegates resolution to scoped container. In case the service is unresolved
@@ -207,19 +198,17 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="serviceType">Service type to resolve.</param>
         /// <returns>Resolved service object.</returns>
         public object GetService(Type serviceType) => 
-            _scopedContainer.Resolve(serviceType, _throwIfUnresolved == null || !_throwIfUnresolved(serviceType));
+            _scopedResolver.Resolve(serviceType, _throwIfUnresolved == null || !_throwIfUnresolved(serviceType));
 
         /// <summary> Gets service of type <paramref name="serviceType" /> from the <see cref="T:System.IServiceProvider" /> implementing
         /// this interface. </summary>
         /// <param name="serviceType">An object that specifies the type of service object to get.</param>
         /// <returns>A service object of type <paramref name="serviceType" />.
         /// Throws an exception if the <see cref="T:System.IServiceProvider" /> cannot create the object.</returns>
-        public object GetRequiredService(Type serviceType) => 
-            _scopedContainer.Resolve(serviceType);
+        public object GetRequiredService(Type serviceType) => _scopedResolver.Resolve(serviceType);
 
         /// <summary>Disposes underlying container.</summary>
-        public void Dispose() => 
-            _scopedContainer.Dispose();
+        public void Dispose() => _scopedResolver.Dispose();
     }
 
     /// <summary>Creates/opens new scope in passed scoped container.</summary>
@@ -234,33 +223,8 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
-        /// <remarks>The scope name is defaulted to <see cref="Reuse.WebRequestScopeName"/>.</remarks>
-        public IServiceScope CreateScope() => 
-            _scopedResolver.OpenScope(Reuse.WebRequestScopeName).Resolve<IServiceScope>();
+        public IServiceScope CreateScope() => _scopedResolver.OpenScope().Resolve<IServiceScope>();
 
         private readonly IResolverContext _scopedResolver;
     }
-
-#if NETSTANDARD2_0
-
-    /// <summary>Stores scopes propagating through async-await boundaries.</summary>
-    sealed class AsyncExecutionFlowScopeContext : IScopeContext
-    {
-        /// <summary>Statically known name of root scope in this context.</summary>
-        public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
-
-        private static readonly System.Threading.AsyncLocal<IScope>
-            _ambientScope = new System.Threading.AsyncLocal<IScope>();
-
-        /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
-        public IScope GetCurrentOrDefault() => _ambientScope.Value;
-
-        /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
-        public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) =>
-            _ambientScope.Value = changeCurrentScope(GetCurrentOrDefault());
-
-        /// <summary>Nothing to dispose. Each scope should be disposed individually</summary>
-        public void Dispose() { }
-    }
-#endif
 }

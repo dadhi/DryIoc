@@ -22,6 +22,7 @@ namespace DryIoc.IssuesTests
             Assert.AreNotSame(foos[1], foos[2]);
 
             var lastFoo = c.Resolve<IFoo<int>>();
+
             Assert.AreSame(lastFoo, foos[2]);
         }
 

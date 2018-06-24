@@ -88,6 +88,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FEC\Issue67_Equality_comparison_with_nullables_throws_at_delegate_invoke.cs" />
     <Compile Include="Issue287_Add_IfUnresolved_ReturnDefaultIfNotRegistered_policy.cs" />
     <Compile Include="Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended.cs" />
     <Compile Include="DotnetWeekBlogExample.cs" />
@@ -188,9 +189,17 @@
     <Compile Include="Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs.cs" />
     <Compile Include="Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func.cs" />
     <Compile Include="Issue554_Allow_Register_an_open_generic_service_type_with_closed implementation_to_enable_variance.cs" />
+    <Compile Include="Issue561_Child_containers_and_singletons.cs" />
     <Compile Include="Issue566_Named_service_not_replaced.cs" />
     <Compile Include="Issue569_Replacing_Registration_clears_all_existing_registrations.cs" />
     <Compile Include="Issue570_ArgumentNullThrownWhenMultipleConstructorsAndArgsDepsProvided.cs" />
+    <Compile Include="Issue572_Dynamic_Service_Keys.cs" />
+    <Compile Include="Issue574_IResolverContext_UseInstance_ShouldNotHaveSideEffectsOnOtherScopes.cs" />
+    <Compile Include="Issue577_Resolve_many_keyed_factory_delegate_cache_anomaly.cs" />
+    <Compile Include="Issue578_Specific_Service_Type_required_by_controller_not_resolving.cs" />
+    <Compile Include="Issue579_VerifyResolutions_strange_behaviour.cs" />
+    <Compile Include="Issue580_Same_service_instance_resolved_twice_when_decorator_is_used.cs" />
+    <Compile Include="Issue581_Constructor_injection_with_array_parameter.cs" />
     <Compile Include="Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.cs" />
     <Compile Include="DryIOCSingletonFailureTest.cs" />
     <Compile Include="Issue80_SupportWrappersForAllInterfacesImplementedByArray.cs" />

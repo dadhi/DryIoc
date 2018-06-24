@@ -151,7 +151,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         {
             var b = _container.Resolve<LambdaExpression>(typeof(B));
 
-            Assert.That(b.ToString(), Is.StringContaining("Resolve(DryIoc.MefAttributedModel.UnitTests.CUT.A"));
+            StringAssert.Contains("Resolve(DryIoc.MefAttributedModel.UnitTests.CUT.A", b.ToString());
         }
 
         [Test]

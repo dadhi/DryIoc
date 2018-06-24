@@ -37,6 +37,8 @@ using System.Threading;
 using ImTools;
 using static DryIocZero.ResolveManyResult;
 
+// Specified `NamespaceUsings` if any:
+
 namespace DryIocZero
 {
     partial class Container

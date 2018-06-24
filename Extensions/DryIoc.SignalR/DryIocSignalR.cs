@@ -106,12 +106,10 @@ namespace DryIoc.SignalR
         /// <summary>Helper method to found if the passed type is hub type:
         /// concrete type which implements <see cref="Hub"/> or <see cref="IHub"/>.</summary>
         /// <param name="type">Type to check.</param> <returns><c>True if hub type.</c></returns>
-        public static bool IsHubType(Type type)
-        {
-            return !type.IsAbstract() && (
+        public static bool IsHubType(Type type) => 
+            !type.IsAbstract() && (
                 type.BaseType == typeof(Hub) ||
                 type.IsAssignableTo(typeof(IHub)));
-        }
     }
 
     /// <summary>DryIoc implementation of <see cref="IDependencyResolver"/>.
@@ -129,11 +127,8 @@ namespace DryIoc.SignalR
 
         /// <summary>Try to resolve service suing DryIoc container, 
         /// and if not resolved fallbacks to base <see cref="DefaultDependencyResolver"/>.</summary>
-        public override object GetService(Type serviceType)
-        {
-            return _resolver.Resolve(serviceType, IfUnresolved.ReturnDefault)
-                ?? base.GetService(serviceType);
-        }
+        public override object GetService(Type serviceType) => 
+            _resolver.Resolve(serviceType, IfUnresolved.ReturnDefault) ?? base.GetService(serviceType);
 
         /// <summary>Combines services from DryIoc container and base <see cref="DependencyResolverExtensions"/>
         /// and returns in a single collection.</summary>
@@ -175,11 +170,8 @@ namespace DryIoc.SignalR
         }
 
         /// <summary>Creates hub by using <paramref name="descriptor"/> info.</summary>
-        /// <returns>Created hub.</returns>
-        public IHub Create(HubDescriptor descriptor)
-        {
-            return _resolver.Resolve<IHub>(descriptor.HubType);
-        }
+        public IHub Create(HubDescriptor descriptor) => 
+            _resolver.Resolve<IHub>(descriptor.HubType);
 
         private readonly IResolver _resolver;
     }

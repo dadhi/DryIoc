@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright © 2014-2016 Maksim Volkau and Contributors
+Copyright © 2014 Maksim Volkau and Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -73,7 +73,7 @@ namespace DryIoc.Mvc
         /// for unresolved type instead of fallback to default Resolver.</param>
         /// <returns>New container with applied Web context.</returns>
         public static IContainer WithMvc(this IContainer container,
-            IEnumerable<Assembly> controllerAssemblies = null, 
+            IEnumerable<Assembly> controllerAssemblies = null,
             IScopeContext scopeContext = null,
             Func<Type, bool> throwIfUnresolved = null)
         {
@@ -94,18 +94,13 @@ namespace DryIoc.Mvc
         /// <summary>Helps to find if type is controller type.</summary>
         /// <param name="type">Type to check.</param>
         /// <returns>True if controller type</returns>
-        public static bool IsController(this Type type)
-        {
-            return type.IsAssignableTo(typeof(IController));
-        }
+        public static bool IsController(this Type type) => type.IsAssignableTo(typeof(IController));
 
         /// <summary>Returns all application specific referenced assemblies (except from GAC and Dynamic).</summary>
         /// <returns>The assemblies.</returns>
-        public static IEnumerable<Assembly> GetReferencedAssemblies()
-        {
-            return BuildManager.GetReferencedAssemblies().OfType<Assembly>()
-                .Where(a => !a.IsDynamic && !a.GlobalAssemblyCache); // filter out non-app specific assemblies
-        }
+        public static IEnumerable<Assembly> GetReferencedAssemblies() =>
+            BuildManager.GetReferencedAssemblies().OfType<Assembly>()
+                .Where(a => !a.IsDynamic && !a.GlobalAssemblyCache);
 
         /// <summary>Registers controllers types in container with InWebRequest reuse.</summary>
         /// <param name="container">Container to register controllers to.</param>
@@ -137,7 +132,7 @@ namespace DryIoc.Mvc
         /// <summary>Registers both <see cref="DryIocDataAnnotationsModelValidator"/> and
         /// <see cref="DryIocValidatableObjectAdapter"/> and provides the <paramref name="container"/> to use
         /// as <see cref="IServiceProvider"/> for resolving dependencies.</summary>
-        /// <param name="container"><see cref="IServiceProvider"/> implementaion.</param>
+        /// <param name="container"><see cref="IServiceProvider"/> implementation.</param>
         /// <returns>Returns source container for fluent access.</returns>
         public static IContainer WithDataAnnotationsValidator(this IContainer container)
         {
@@ -169,20 +164,16 @@ namespace DryIoc.Mvc
         /// <summary> Resolves single registered services that support arbitrary object creation. </summary>
         /// <returns> The requested service or object. </returns>
         /// <param name="serviceType">The type of the requested service or object.</param>
-        public object GetService(Type serviceType)
-        {
-            var ifUnresolved = _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
-                ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
-            return _resolver.Resolve(serviceType, ifUnresolved);
-        }
+        public object GetService(Type serviceType) => 
+            _resolver.Resolve(serviceType,
+                _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
+                    ? IfUnresolved.Throw : IfUnresolved.ReturnDefault);
 
         /// <summary> Resolves multiply registered services. </summary>
         /// <returns> The requested services. </returns>
         /// <param name="serviceType">The type of the requested services.</param>
-        public IEnumerable<object> GetServices(Type serviceType)
-        {
-            return _resolver.ResolveMany<object>(serviceType);
-        }
+        public IEnumerable<object> GetServices(Type serviceType) => 
+            _resolver.ResolveMany<object>(serviceType);
 
         private readonly IResolver _resolver;
         private readonly Func<Type, bool> _throwIfUnresolved;
@@ -223,10 +214,8 @@ namespace DryIoc.Mvc
 
         /// <summary>Resolves the service for requested <paramref name="serviceType"/>.</summary>
         /// <param name="serviceType">Requested service type.</param> <returns>Resolved service object</returns>
-        public object GetService(Type serviceType)
-        {
-            return _resolver.Resolve(serviceType);
-        }
+        public object GetService(Type serviceType) => 
+            _resolver.Resolve(serviceType);
 
         private readonly IResolver _resolver;
     }

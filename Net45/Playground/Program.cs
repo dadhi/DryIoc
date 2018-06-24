@@ -17,12 +17,12 @@ namespace Playground
     {
         static void Main()
         {
-            BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
+            //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
@@ -38,7 +38,6 @@ namespace Playground
             //new BenchmarkRunner().RunCompetition(new RunResultOfCompileVsEmit());
             //var result = ExpressionVsEmit();
             //Console.WriteLine("Ignored result: " + result);
-            Console.ReadKey();
         }
 
         public class M { }
@@ -100,7 +99,7 @@ namespace Playground
             }
         }
 
-        public class IfVsNullСoalesOperator
+        public class IfVsNullСoalesceOperator
         {
             private object x = "a";
 
@@ -139,14 +138,8 @@ namespace Playground
 
         public class ExpressionCompileVsEmit
         {
-            private Expression<Func<object[], object>> _funcExpr;
-
-            [Setup]
-            public void SetupData()
-            {
-                _funcExpr = CreateComplexExpression();
-            }
-
+            private static Expression<Func<object[], object>> _funcExpr = CreateComplexExpression();
+            
             [Benchmark]
             public void Compile()
             {
@@ -169,7 +162,7 @@ namespace Playground
             private Func<object[], object> _funcEmitted;
             private object[] _state;
 
-            [Setup]
+            [GlobalSetup]
             public void SetupData()
             {
                 var expression = CreateComplexExpression();
@@ -239,7 +232,7 @@ namespace Playground
         private readonly object[] _state = new object[32];
         private object _result;
 
-        [Setup]
+        [GlobalSetup]
         public void Setup()
         {
             _state[15] = "a";

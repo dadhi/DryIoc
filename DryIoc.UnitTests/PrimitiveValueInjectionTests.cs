@@ -38,7 +38,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<InjectionRulesTests.ClientWithStringParam>());
 
-            Assert.That(ex.Message, Is.StringContaining("Injected value 500 is not assignable to String"));
+            StringAssert.Contains("Injected value 500 is not assignable to String", ex.Message);
         }
 
         [Test]
@@ -135,7 +135,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<InjectionRulesTests.ClientWithServiceAndStringProperty>());
 
-            Assert.That(ex.Message, Is.StringContaining("Unable to find writable property or field \"WrongName\" when resolving"));
+            StringAssert.Contains("Unable to find writable property or field \"WrongName\" when resolving", ex.Message);
         }
     }
 }

@@ -846,7 +846,7 @@ namespace DryIoc.UnitTests
             public T TrackForDispose(T item)
             {
                 if (Interlocked.CompareExchange(ref _state, Tracked, 0) != 0)
-                    Throw.It(Error.Of("Something is {0} already."), _state == Tracked ? " tracked" : "disposed");
+                    Throw.It(Error.DisposerTrackForDisposeError, _state == Tracked ? " tracked" : "disposed");
                 _item = item;
                 return item;
             }
