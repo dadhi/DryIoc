@@ -8,15 +8,16 @@
 // Note: 
 // - When specifying assembly path, you may use $(SolutionDir), $(ProjectDir), $(Configuration) parameters.
 //
+// Should be regenerated in RELEASE mode - to match the DryIoc.dll in NuGet/tools/DryIoc/net45/DryIoc.dll
 #>
 <#@ assembly Name="System.Core" #>
 <#@ assembly Name="$(DryIocAssembly)" #>
 <#@ import Namespace="DryIoc" #>
 <#// TODO: Insert assemblies and namespaces with your services to register in container #>
-<#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIocAttributes.dll" #>
-<#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.dll" #>
+<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIocAttributes.dll" #>
+<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel" #>
-<#@ assembly Name="$(ProjectDir)\..\bin\$(Configuration)\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
+<#@ assembly Name="$(ProjectDir)\..\bin\Release\DryIoc.MefAttributedModel.UnitTests.CUT.dll" #>
 <#@ import Namespace="DryIoc.MefAttributedModel.UnitTests.CUT" #>
 <#@ import namespace="ImTools" #>
 <#+

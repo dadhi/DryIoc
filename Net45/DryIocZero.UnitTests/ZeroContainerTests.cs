@@ -192,6 +192,7 @@ namespace DryIocZero.UnitTests
         public void Can_resolve_generated_only_service()
         {
             var container = new Container();
+
             var b = container.ResolveGeneratedOrGetDefault(typeof(B));
             Assert.IsNotNull(b);
 

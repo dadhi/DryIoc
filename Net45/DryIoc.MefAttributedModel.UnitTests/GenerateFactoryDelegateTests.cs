@@ -18,6 +18,32 @@ namespace DryIoc.MefAttributedModel.UnitTests
     public class GenerateFactoryDelegateTests
     {
         [Test]
+        public void Generate_asResolutionCall_dependency_should_not_contain_Resolve_call()
+        {
+            var container = new Container();
+
+            container.Register<R>();
+            container.Register<Dep>(setup: Setup.With(asResolutionCall: true));
+
+            var exprs = container.GenerateResolutionExpressions(ServiceInfo.Of<R>());
+
+            Assert.IsEmpty(exprs.Errors);
+            Assert.AreEqual(1, exprs.Roots.Count);
+            Assert.AreEqual(1, exprs.ResolveDependencies.Count);
+
+            var depExpr = exprs.ResolveDependencies[0];
+            Assert.IsFalse(depExpr.ToString().Contains(".Resolve"));
+        }
+
+        public class R
+        {
+            public readonly Dep Dep;
+            public R(Dep d) { Dep = d; } 
+        }
+
+        public class Dep { }
+
+        [Test]
         public void Can_load_types_from_assembly_and_generate_some_resolutions()
         {
             var container = new Container().WithMef().With(rules => rules

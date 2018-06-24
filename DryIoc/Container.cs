@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-using static ImTools.ArrayTools;
-
 namespace DryIoc
 {
     using System;
@@ -38,6 +36,8 @@ namespace DryIoc
     using System.Diagnostics;               // for StackTrace
 
     using ImTools;
+    using static ImTools.ArrayTools;
+
     using FastExpressionCompiler;
 
 #if FEC_EXPRESSION_INFO

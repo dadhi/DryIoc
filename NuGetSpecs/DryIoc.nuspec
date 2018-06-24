@@ -12,11 +12,7 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v3.0.0-preview-12:
-      - fixed: #579
-      v3.0.0-preview-11:
-      - fixed: #570: ArgumentNullException thrown when multiple constructors and args dependencies provided
-      - fixes: from v2.12.8
+      v3.0.0
       - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
     </releaseNotes>
     <contentFiles>
