@@ -4904,9 +4904,9 @@ namespace DryIoc
                 return;
 
             // Prevents infiinte recursion when genererating the resolution depenedency #579
-            if ((request.Flags & RequestFlags.AddedToResolutionExpressions) != 0)
+            if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
                 return;
-            request.Flags |= RequestFlags.AddedToResolutionExpressions;
+            request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
 
             var factoryExpr = factory.GetExpressionOrDefault(request)?.NormalizeExpression();
             if (factoryExpr == null)
@@ -5450,7 +5450,7 @@ namespace DryIoc
         StopRecursiveDependencyCheck = 1 << 7,
 
         /// <summary>Non inherited. Marks the expression to be added to generated resolutions to prevent infinite recursion</summary>
-        AddedToResolutionExpressions = 1 << 8
+        IsGeneratedResolutionDependencyExpression = 1 << 8
     }
 
     /// <summary>Tracks the requested service and resolved factory details in a chain of nested dependencies.</summary>
@@ -5956,10 +5956,14 @@ namespace DryIoc
                 s.AppendFormat(" with args [{0}]", InputArgExprs);
 
             if ((Flags & RequestFlags.OpensResolutionScope) != 0)
-                s.Append(" [Opens resolution scope]");
+                s.Append(" (Opens resolution scope)");
 
             if ((Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
-                s.Append(" [Stops recursion check]");
+                s.Append(" (Stops recursion check)");
+
+            if ((Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
+                s.Append(" (Generated resolution dependency)");
+
 
             return s;
         }
@@ -6499,21 +6503,19 @@ namespace DryIoc
         /// <returns>Created expression.</returns>
         public abstract Expr CreateExpressionOrDefault(Request request);
 
-        private bool ShouldBeInjectedAsResolutionCall(Request request) =>
-            !request.IsResolutionCall // is not already a resolution call
-            && (Setup.AsResolutionCall || request.ShouldSplitObjectGraph() || Setup.UseParentReuse)
-            && request.GetActualServiceType() != typeof(void); // exclude action
-
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
         public virtual Expr GetExpressionOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
 
-            // preventing recursion
-            if (!request.OpensResolutionScope &&
-                (Setup.OpenResolutionScope || ShouldBeInjectedAsResolutionCall(request)))
-                return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
+            if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
+                !request.OpensResolutionScope && // preventing recursion
+               (Setup.OpenResolutionScope ||
+               !request.IsResolutionCall && // preventing recursion
+               (Setup.AsResolutionCall || Setup.UseParentReuse || request.ShouldSplitObjectGraph()) && 
+               request.GetActualServiceType() != typeof(void)))
+               return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator
             if (FactoryType != FactoryType.Decorator)

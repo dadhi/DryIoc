@@ -31,8 +31,9 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreEqual(1, exprs.Roots.Count);
             Assert.AreEqual(1, exprs.ResolveDependencies.Count);
 
-            var depExpr = exprs.ResolveDependencies[0];
-            Assert.IsFalse(depExpr.ToString().Contains(".Resolve"));
+            var depExpr = exprs.ResolveDependencies[0].ToString();
+            Assert.IsFalse(depExpr.Contains(".Resolve "));
+            Assert.IsTrue( depExpr.Contains("new "));
         }
 
         public class R
