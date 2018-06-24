@@ -30,10 +30,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- Version 3 Preview 11 is out, check it out and read the [Release Notes](https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes)
-
-- Latest stable DryIoc version is __2.12.8__
-    - [Release notes](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version)
+- Latest stable DryIoc version is __3.0.0__ / 24.06.2018
+    - [Release Notes](https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes)
     - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
 - [Documentation][WikiHome]
