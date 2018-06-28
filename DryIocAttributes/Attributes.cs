@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013-2017 Maksim Volkau
+Copyright (c) 2013 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -433,11 +433,6 @@ namespace DryIocAttributes
         public readonly int ReuseLifespan;
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
-        /// <param name="serviceType"></param> <param name="requiredServiceType"></param>
-        /// <param name="serviceKey"></param> <param name="metadataKey"></param><param name="metadata"></param>  <param name="ifUnresolved"></param>
-        ///  <param name="factoryID"></param><param name="factoryType"></param>
-        /// <param name="implementationType"></param> <param name="reuseLifespan"></param>
-        /// <returns>Created info chain to current (parent) info.</returns>
         public Request Push(
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan) => 

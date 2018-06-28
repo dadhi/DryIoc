@@ -5,28 +5,15 @@
     <version>0.0.0</version>
     <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2017 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013 Maksim Volkau</copyright>
     <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
     <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Super-set of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
     <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v4.0.0-preview-01:
-      - Compatible with DryIoc v3-preview-05
-      v3.1.0
-      - added: ScopedOrSingletonReuseAttribute
-      v3.0.0:
-      - added: #292: Add ImportManyAttribute support for full MEF compatibility
-      - added: #294: Support for MEF IPartImportSatisfiedNotification interface in DI.Mef
-      - added: #323: Support multiple WithMetadataAttribute(key, value)
-      - added: #353: MEF support for ExportFactory&lt;T&gt; imports
-      - added: #360: MEF: Lazy&lt;T, TMetadata&gt; support
-      - added: Support for ExportMetadataAttribute
-      - added: Xamarin MacOS support
-      - added: ImportEx as replacement for ImportWithKey
-      - removed: ImportWithKeyAttribute
-      - changed: Obsoleting AsFactoryAttribute as not required anymore
+      v4.0.0
+      - Support for DryIoc v3
     </releaseNotes>
     <frameworkAssemblies>
       <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />

@@ -5,46 +5,46 @@
     <!-- just a placeholder for "nuget pack -Version" flag -->
     <version>0.0.0</version>
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2017 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013 Maksim Volkau</copyright>
     <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
     <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
     <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
-      v4.0.0-preview-03:
-      - Based on DryIoc v3-preview-05
-      - Based on DryIocAttributes v4-preview-01
+      v4.0.0:
+      - Support for DryIoc v3
+      - Support for DryIocAttributes v4
     </releaseNotes>
     <dependencies>
       <!--Explicitly specify no dependencies for full .NET -->
       <group targetFramework="net35">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
       </group>
       <group targetFramework="net40">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
       </group>
       <group targetFramework="net45">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
       </group>
       <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
       </group>
       <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
       </group>
       <group targetFramework="xamarinmac20">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
       </group>
       <group targetFramework="netstandard1.0">
-        <dependency id="DryIoc.dll" version="3.0.0-preview-05" />
-        <dependency id="DryIocAttributes.dll" version="4.0.0-preview-01" />
+        <dependency id="DryIoc.dll" version="3.0.0" />
+        <dependency id="DryIocAttributes.dll" version="4.0.0" />
 
         <dependency id="System.Runtime" version="4.3.0" />
         <dependency id="System.Runtime.Extensions" version="4.3.0" />
