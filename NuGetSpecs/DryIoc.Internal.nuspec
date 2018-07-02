@@ -66,5 +66,11 @@
     <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\any" />
     <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\any" />
     <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\any" />
+
+    <!-- .netstandard 1.3 -->
+    <file src="..\DryIoc.Internal\Container.cs.pp" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
   </files>
 </package>
