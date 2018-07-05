@@ -23,17 +23,15 @@
       <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL328--></group>
       <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL259--></group>
       <group targetFramework="xamarinmac20"></group>
-      
+      <group targetFramework="netstandard2.0"></group>
+
       <group targetFramework="netstandard1.0">
         <dependency id="NETStandard.Library" version="1.6.1" />
       </group>
       <group targetFramework="netstandard1.3">
         <dependency id="NETStandard.Library" version="1.6.1" />
       </group>
-      <!-- TODO: Not sure yet about netstandard 2.0, do we need it if we have 1.3? -->
-      <!--group targetFramework="netstandard2.0">
-        <dependency id="NETStandard.Library" version="2.0.1" />
-      </group-->
+
     </dependencies>
   </metadata>
   <files>
@@ -50,6 +48,11 @@
     <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.3" />
     <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.3" />
     <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.3" />
+
+    <!-- netstandard2.0 (based on .NET 4.5) -->
+    <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\netstandard2.0" />
+    <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\netstandard2.0" />
+    <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\netstandard2.0" />
 
     <!-- net35 -->
     <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />

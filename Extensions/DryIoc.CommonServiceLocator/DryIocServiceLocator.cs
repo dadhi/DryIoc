@@ -24,7 +24,7 @@ THE SOFTWARE.
 
 using System;
 using System.Collections.Generic;
-using Microsoft.Practices.ServiceLocation;
+using CommonServiceLocator;
 
 namespace DryIoc.CommonServiceLocator
 {
@@ -38,32 +38,28 @@ namespace DryIoc.CommonServiceLocator
         public readonly IContainer Container;
 
         /// <summary>Creates new locator as adapter for provided container.</summary>
-        /// <param name="container">Container to use/adapt.</param>
+        /// <param name="container">DryIoc container to be used.</param>
         public DryIocServiceLocator(IContainer container)
         {
-            if (container == null) throw new ArgumentNullException("container");
+            if (container == null) throw new ArgumentNullException(nameof(container));
             Container = container;
         }
 
-        /// <summary>Resolves service from container. Throws if unable to resolve.</summary>
+        /// <summary>Resolves service from container. In case of exception won't return null!
+        /// The exception <see cref="ContainerException"/> is wrapped in <see cref="ActivationException"/>.</summary>
         /// <param name="serviceType">Service type to resolve.</param>
         /// <param name="key">(optional) Service key to resolve.</param>
         /// <returns>Resolved service object.</returns>
-        protected override object DoGetInstance(Type serviceType, string key)
-        {
-            if (serviceType == null) throw new ArgumentNullException("serviceType");
-            return Container.Resolve(serviceType, key);
-        }
+        protected override object DoGetInstance(Type serviceType, string key) => 
+            Container.Resolve(serviceType, key);
 
-        /// <summary>Returns enumerable which when enumerated! resolves all default and named 
+        /// <summary>Returns enumerable collection of all default and named 
         /// implementations/registrations of requested service type. 
-        /// If no services resolved when enumerable accessed, no exception is thrown - enumerable is empty.</summary>
+        /// If there are no resolved services then an empty enumerable is returned.
+        /// In case of exception, <see cref="ContainerException"/> is wrapped in <see cref="ActivationException"/>.</summary>
         /// <param name="serviceType">Service type to resolve.</param>
         /// <returns>Returns enumerable which will return resolved service objects.</returns>
-        protected override IEnumerable<object> DoGetAllInstances(Type serviceType)
-        {
-            if (serviceType == null) throw new ArgumentNullException("serviceType");
-            return Container.ResolveMany<object>(serviceType);
-        }
+        protected override IEnumerable<object> DoGetAllInstances(Type serviceType) => 
+            Container.ResolveMany<object>(serviceType);
     }
 }

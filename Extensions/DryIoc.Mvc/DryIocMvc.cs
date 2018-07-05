@@ -246,10 +246,7 @@ namespace DryIoc.Mvc
 
             var result = Attribute.GetValidationResult(Metadata.Model, context);
             if (result != ValidationResult.Success)
-                yield return new ModelValidationResult
-                {
-                    Message = result == null ? null : result.ErrorMessage
-                };
+                yield return new ModelValidationResult { Message = result?.ErrorMessage };
         }
 
         private readonly IServiceProvider _serviceProvider;

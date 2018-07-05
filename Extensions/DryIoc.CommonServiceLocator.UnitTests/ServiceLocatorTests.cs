@@ -1,5 +1,5 @@
 ﻿using System.Linq;
-using Microsoft.Practices.ServiceLocation;
+using CommonServiceLocator;
 using NUnit.Framework;
 
 namespace DryIoc.CommonServiceLocator.UnitTests
