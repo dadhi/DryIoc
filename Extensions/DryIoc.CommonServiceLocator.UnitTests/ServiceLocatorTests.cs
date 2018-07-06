@@ -19,7 +19,7 @@ namespace DryIoc.CommonServiceLocator.UnitTests
         }
 
         [Test]
-        public void Can_get_keyyed_instance_with_locator()
+        public void Can_get_keyed_instance_with_locator()
         {
             var locator = new DryIocServiceLocator(new Container());
             locator.Container.Register<IService, Service>(serviceKey: "1");

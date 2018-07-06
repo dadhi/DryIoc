@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v3.0.1
+      - added: NetStandard 1.3 as source package target
       v3.0.0
       - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
     </releaseNotes>
@@ -39,7 +41,7 @@
     <!--net45-->
     <file src="..\DryIoc\Container.cs" target="content\net45\DryIoc" />
     <file src="..\DryIoc\ImTools.cs" target="content\net45\DryIoc" />
-    <file src="..\NET45\DryIoc\FastExpressionCompiler.cs" target="content\net45\DryIoc" />
+    <file src="..\Net45\DryIoc\FastExpressionCompiler.cs" target="content\net45\DryIoc" />
     <file src="..\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIoc" />
 
     <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
@@ -67,10 +69,10 @@
     <file src="..\PCL\DryIoc\Ported-net.cs" target="contentFiles\cs\any" />
     <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\any" />
 
-    <!-- .netstandard 1.3 -->
-    <file src="..\DryIoc.Internal\Container.cs.pp" target="contentFiles\cs\netstandard1.3\DryIoc" />
-    <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-    <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-    <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <!-- .netstandard 1.3 (based on Net45) -->
+    <file src="..\DryIoc\Container.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\DryIoc\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\Net45\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
   </files>
 </package>

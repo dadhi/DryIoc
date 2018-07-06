@@ -65,7 +65,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Assert.AreSame(user.One, user.Another);
         }
 
-        [Test]
+        [Test, Explicit("Deals with WeakReference and may fail on CI")]
         public void Can_specify_to_store_reused_instance_as_weak_reference()
         {
             var container = new Container().WithMefAttributedModel();
