@@ -1,5 +1,5 @@
 ﻿using System;
-//using DryIoc.MefAttributedModel;
+using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -25,9 +25,9 @@ namespace DryIoc.AspNetCore.Sample
                 propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
                     ? PropertiesAndFields.Properties()(request) 
                     : null))
-                // optional: support for MEF service discovery
-                //.WithMef()
-                // setup DI adapter
+
+                .WithMef() // optional: support for MEF service discovery
+
                 .WithDependencyInjectionAdapter(services,
                     // optional: get original DryIoc.ContainerException if specified type is not resolved, 
                     // and prevent fallback to default resolution by infrastructure

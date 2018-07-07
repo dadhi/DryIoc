@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v3.0.1
+      - added: NetStandard 2.0 package target with no dependencies
       v3.0.0
       - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
     </releaseNotes>
@@ -23,7 +25,6 @@
       <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL328--></group>
       <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL259--></group>
       <group targetFramework="xamarinmac20"></group>
-      <group targetFramework="netstandard2.0"></group>
 
       <group targetFramework="netstandard1.0">
         <dependency id="NETStandard.Library" version="1.6.1" />
@@ -31,7 +32,8 @@
       <group targetFramework="netstandard1.3">
         <dependency id="NETStandard.Library" version="1.6.1" />
       </group>
-
+      <group targetFramework="netstandard2.0"></group>
+      
     </dependencies>
   </metadata>
   <files>
@@ -80,7 +82,7 @@
     <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
     <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
-    <!-- TODO: May be an obsolete with NetStandard 1.4 -->
+    <!-- TODO: May be an obsolete with NetStandard 2.0 -->
     <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\xamarinmac20" />
     <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\xamarinmac20" />
     <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\xamarinmac20" />

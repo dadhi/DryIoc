@@ -12,6 +12,8 @@
     <description>Super-set of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
     <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v4.0.1
+      - added: NetStandard 1.0, 1.3 and 2.0 package targets
       v4.0.0
       - Support for DryIoc v3
     </releaseNotes>
@@ -19,11 +21,12 @@
       <frameworkAssembly assemblyName="System.ComponentModel.Composition" targetFramework="net40" />
     </frameworkAssemblies>
     <contentFiles>
-      <files include="cs/any/*.*" buildAction="Compile" />
+      <files include="cs/**/*.*" buildAction="Compile" />
     </contentFiles>
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
+    <file src="..\NuGetSpecs\DryIoc.snk" />
 
     <!-- net35 -->
     <file src="..\DryIocAttributes\Attributes.cs" target="content\net35\DryIocAttributes" />
@@ -58,5 +61,19 @@
     <file src="..\DryIocAttributes\Attributes.cs" target="contentFiles\cs\any" />
     <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\any" />
     <file src="..\DryIocAttributes\Ported-net45.cs" target="contentFiles\cs\any" />
+
+    <!-- NetStandard1.0 (based on PCL Profile259) -->
+    <file src="..\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
+    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
+    <file src="..\DryIocAttributes\Ported-net45.cs" target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
+
+    <!-- NetStandard1.3 (based on Net45) -->
+    <file src="..\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard1.3\DryIocAttributes" />
+    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\netstandard1.3\DryIocAttributes" />
+
+    <!-- NetStandard2.0 (based on Net45) -->
+    <file src="..\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard2.0\DryIocAttributes" />
+    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\netstandard2.0\DryIocAttributes" />
+
   </files>
 </package>
