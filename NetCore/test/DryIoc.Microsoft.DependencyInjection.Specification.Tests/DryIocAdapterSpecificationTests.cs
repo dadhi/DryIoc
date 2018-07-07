@@ -14,7 +14,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             return new Container().WithDependencyInjectionAdapter(serviceCollection).Resolve<IServiceProvider>();
         }
 
-        internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection, IList<ServiceDescriptor>, ICollection<ServiceDescriptor>, IEnumerable<ServiceDescriptor>
+        internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {
         }
     }

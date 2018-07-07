@@ -23,7 +23,7 @@ namespace DryIoc.AspNetCore.Sample
             return new Container(rules => rules.With(
                 // optional: Enables property injection for Controllers
                 propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
-                    ? PropertiesAndFields.Auto(request) 
+                    ? PropertiesAndFields.Properties()(request) 
                     : null))
                 // optional: support for MEF service discovery
                 //.WithMef()
