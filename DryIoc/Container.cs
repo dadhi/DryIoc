@@ -1595,9 +1595,7 @@ namespace DryIoc
                             serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
 
                         var wrapper = Wrappers.GetValueOrDefault(serviceType.GetGenericDefinitionOrNull() ?? serviceType);
-                        return wrapper != null && (condition == null || condition(wrapper))
-                            ? new[] { wrapper }
-                            : null;
+                        return wrapper != null && (condition == null || condition(wrapper)) ? wrapper.One() : null;
 
                     case FactoryType.Decorator:
                         var decorators = Decorators.GetValueOrDefault(serviceType);
@@ -1607,9 +1605,7 @@ namespace DryIoc
                             decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType));
 
                         if (decorators != null && decorators.Length != 0)
-                            return condition == null
-                                ? decorators
-                                : decorators.Match(condition);
+                            return condition == null ? decorators : decorators.Match(condition);
                         return null;
 
                     default:
@@ -1621,9 +1617,7 @@ namespace DryIoc
                         if (factory != null)
                         {
                             if (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                                return condition == null || condition(factory)
-                                    ? new[] { factory }
-                                    : null;
+                                return condition == null || condition(factory) ? factory.One() : null;
                             return null;
                         }
 
@@ -1634,9 +1628,7 @@ namespace DryIoc
                                 : factories.Enumerate().Match(f => condition(f.Value), f => f.Value).ToArrayOrSelf();
 
                         factory = factories.GetValueOrDefault(serviceKey);
-                        return factory != null && (condition == null || condition(factory))
-                            ? new[] { factory }
-                            : null;
+                        return factory != null && (condition == null || condition(factory)) ? factory.One() : null;
                 }
             }
 
