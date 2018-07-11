@@ -21,7 +21,9 @@ namespace DryIoc.AspNetCore.Sample
                 .AddControllersAsServices();
 
             return new Container(rules => rules.With(
+
                 // optional: Enables property injection for Controllers
+                // NOTE: it will be overriden by MEF convention (ImportAttribute) with the `WithMef()` line below .
                 propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
                     ? PropertiesAndFields.Properties()(request) 
                     : null))

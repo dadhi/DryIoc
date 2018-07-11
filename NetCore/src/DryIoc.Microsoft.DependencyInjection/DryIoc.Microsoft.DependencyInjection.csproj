@@ -4,7 +4,7 @@
     <Title>DryIoc.Microsoft.DependencyInjection</Title>
     <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
     <Summary>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Summary>
-    <VersionPrefix>2.0.0</VersionPrefix>
+    <VersionPrefix>2.0.1</VersionPrefix>
     <Authors>Maksim Volkau</Authors>
     <Copyright>Copyright © 2016 Maksim Volkau</Copyright>
     <TargetFrameworks>netstandard1.0;netstandard2.0</TargetFrameworks>
@@ -16,10 +16,12 @@
     <PackageId>DryIoc.Microsoft.DependencyInjection</PackageId>
     <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
     <PackageReleaseNotes>
+      v2.0.1:
+      - updated: to DryIoc v3.0.2
       v2.0.0:
       - updated: to DryIoc v3
       - updated: Targets changed to match MS.Ext.DI (netstandard 1.0 for DI 1.1.1 and netstandard 2.0 for DI 2.0)
-      - updated: To Microsoft.Extensions.DependencyInjection.Abstractions 2.1.1 
+      - updated: To Microsoft.Extensions.DependencyInjection.Abstractions 2.1.1
       - breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
@@ -29,7 +31,7 @@
 
   <ItemGroup>
     <!--<ProjectReference Include="..\DryIoc\DryIoc.csproj" />-->
-    <PackageReference Include="DryIoc.dll" Version="3.0.0" />
+    <PackageReference Include="DryIoc.dll" Version="3.0.2" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.0'">
