@@ -76,17 +76,17 @@
     <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
     <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
 
-    <!-- .netstandard 1.3 (based on Net45) -->
+    <!-- .netstandard 1.3 (based on PCL Profile259) -->
     <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
     <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-    <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-    <file src="..\DryIoc.Internal\AsyncExecutionFlowScopeContext.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
 
-    <!-- .netstandard 2.0 (based on Net45) -->
+    <!-- .netstandard 2.0 (based on PCL Profile259) -->
     <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
     <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
-    <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
-    <file src="..\DryIoc.Internal\AsyncExecutionFlowScopeContext.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+    <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+    <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
 
   </files>
 </package>

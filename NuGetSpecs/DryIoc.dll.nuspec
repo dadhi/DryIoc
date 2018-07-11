@@ -12,6 +12,8 @@
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
+      v3.0.2
+      - fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
       v3.0.1
       - added: NetStandard 2.0 package target with no dependencies
       v3.0.0
@@ -46,15 +48,15 @@
     <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.0" />
     <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.0" />
 
-    <!-- netstandard1.3 (based on .NET 4.5) -->
-    <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.3" />
-    <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.3" />
-    <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.3" />
+    <!-- netstandard1.3 (based on PCL 259) -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.3" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.3" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.3" />
 
-    <!-- netstandard2.0 (based on .NET 4.5) -->
-    <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\netstandard2.0" />
-    <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\netstandard2.0" />
-    <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\netstandard2.0" />
+    <!-- netstandard2.0 (based on PCL 259) -->
+    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard2.0" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard2.0" />
+    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard2.0" />
 
     <!-- net35 -->
     <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />

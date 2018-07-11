@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DryIoc.MefAttributedModel.dll" Version="4.0.2" />
+    <PackageReference Include="DryIoc.MefAttributedModel.dll" Version="4.0.3" />
     <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="2.0.0" />
     <PackageReference Include="DryIocAttributes.dll" Version="4.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.1.1" />
