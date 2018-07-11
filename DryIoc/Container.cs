@@ -2961,31 +2961,26 @@ namespace DryIoc
             var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
             var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
-            var flags = RequestFlags.IsWrappedInFunc;
-
             var argExprs = new ParamExpr[argCount]; // may be empty, that's OK
             if (argCount != 0)
             {
+                // assign valid unique argument names for code generation
                 for (var i = 0; i < argCount; ++i)
-                {
-                    var argType = argTypes[i];
-                    var argName = "_" + argType.Name + i; // valid unique argument names for code generation
-                    argExprs[i] = Parameter(argType, argName);
-                }
+                    argExprs[i] = Parameter(argTypes[i], "_" + argTypes[i].Name + i);
 
                 request = request.WithInputArgs(argExprs);
             }
 
-            var serviceRequest = request.Push(serviceType, flags: flags);
+            var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc);
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            if (serviceFactory == null)
-                return null;
-
-            var serviceExpr = serviceFactory.GetExpressionOrDefault(serviceRequest);
+            // todo: new feature
+            //if (request.Container.Rules.FuncAsResolutionCall)
+            //    serviceFactory.Setup = serviceFactory.Setup.WithAsResolutionCall();
+            var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
-            // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
             if (!isAction && serviceExpr.Type != serviceType)
                 serviceExpr = Convert(serviceExpr, serviceType);
@@ -6087,6 +6082,7 @@ namespace DryIoc
                 && Equals(metadata, metaValue);
         }
 
+        // todo: move to the level of factory
         /// <summary>Indicates that injected expression should be:
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>

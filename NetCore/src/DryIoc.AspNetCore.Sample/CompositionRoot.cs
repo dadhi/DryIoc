@@ -1,5 +1,5 @@
 ﻿using DryIoc.AspNetCore.Sample.Services;
-//using DryIoc.MefAttributedModel;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.AspNetCore.Sample
 {
@@ -13,8 +13,8 @@ namespace DryIoc.AspNetCore.Sample
             r.Register<IScopedService, ScopedService>(Reuse.InCurrentScope);
 
             // optional: MEF based auto-wiring
-            //var assemblies = new[] { typeof(ExportedService).GetAssembly() };
-            //r.RegisterExports(assemblies);
+            var assemblies = new[] { typeof(ExportedService).GetAssembly() };
+            r.RegisterExports(assemblies);
         }
     }
 }

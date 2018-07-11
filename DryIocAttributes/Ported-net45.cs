@@ -1,7 +1,7 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2013-2016 Maksim Volkau
+Copyright (c) 2013 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@ namespace System.ComponentModel.Composition
         public ExportFactory(Func<Collections.Generic.KeyValuePair<T, Action>> exportCreator)
         {
             if (exportCreator == null)
-                throw new ArgumentNullException("exportCreator");
+                throw new ArgumentNullException(nameof(exportCreator));
             _exportLifetimeContextCreator = exportCreator;
         }
 
@@ -82,14 +82,10 @@ namespace System.ComponentModel.Composition
         }
 
         /// <summary>The exported value.</summary>
-        public T Value { get; private set; }
+        public T Value { get; }
 
         /// <summary>Release the parts associated with the exported value.</summary>
-        public void Dispose()
-        {
-            if (_disposeAction != null)
-                _disposeAction.Invoke();
-        }
+        public void Dispose() => _disposeAction?.Invoke();
 
         private readonly Action _disposeAction;
     }
