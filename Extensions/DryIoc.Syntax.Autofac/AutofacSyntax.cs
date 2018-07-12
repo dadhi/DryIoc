@@ -32,14 +32,11 @@ namespace Autofac
 {
     public class ContainerBuilder
     {
-        public static Rules WithDefaultAutofacRules(Rules rules)
-        {
-            return rules
-                .With(FactoryMethod.ConstructorWithResolvableArguments)
-                .WithTrackingDisposableTransients()
-                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithUnknownServiceResolvers(ThrowDependencyResolutionException);
-        }
+        public static Rules WithDefaultAutofacRules(Rules rules) => rules
+            .With(FactoryMethod.ConstructorWithResolvableArguments)
+            .WithTrackingDisposableTransients()
+            .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+            .WithUnknownServiceResolvers(ThrowDependencyResolutionException);
 
         public static Factory ThrowDependencyResolutionException(Request request)
         {
@@ -215,12 +212,12 @@ namespace Autofac
 
         public static RegistrationInfo InstancePerOwned<TService>(this RegistrationInfo info)
         {
-            return info.WithReuse(Reuse.InResolutionScopeOf<Owned<TService>>());
+            return info.WithReuse(Reuse.ScopedTo<Owned<TService>>());
         }
 
         public static RegistrationInfo InstancePerMatchingLifetimeScope(this RegistrationInfo info, object scopeName)
         {
-            return info.WithReuse(Reuse.InCurrentNamedScope(scopeName));
+            return info.WithReuse(Reuse.ScopedTo(scopeName));
         }
 
         public static RegistrationInfo As<TService>(this RegistrationInfo info)
@@ -267,7 +264,7 @@ namespace Autofac.Features.OwnedInstances
 {
     public class Owned<T> : IDisposable
     {
-        public T Value { get; private set; }
+        public T Value { get; }
         private readonly IDisposable _lifetime;
 
         public Owned(T value, IResolverContext lifetime)
@@ -278,11 +275,8 @@ namespace Autofac.Features.OwnedInstances
 
         public void Dispose()
         {
-            if (_lifetime != null)
-                _lifetime.Dispose();
-            var disposable = Value as IDisposable;
-            if (disposable != null)
-                disposable.Dispose();
+            _lifetime?.Dispose();
+            (Value as IDisposable)?.Dispose();
         }
     }
 }

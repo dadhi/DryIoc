@@ -11,8 +11,10 @@
         <description>DryIoc extension for ASP.NET MVC</description>
         <tags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v3.0.0:
+          - Support for DryIoc v3
           v2.2.2:
-          - added: Ability to handle HttpContextScopeContext errors via User handler to find reason for #433
+          - added: Ablity to handle HttpContextScopeContext errors via User handler to find reason for #433
           v2.2.1:
           - More robust HttpContextScopeContext to prevent possible concurrency errors
           v2.2.0:
@@ -22,20 +24,18 @@
           - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
           - added: WithDataAnnotationsValidator extension method
           - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
-          v2.0.2
-          - fixed: #273: NuGet - DryIoc.Mvc.dll has non-dll dependencies
           v2.0.1
           - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
         </releaseNotes>
         <dependencies>
           <group>
-              <dependency id="DryIoc.dll" version="[2.8.3,3.0.0)" />
-              <dependency id="DryIoc.Web.dll" version="[2.2.0,3.0.0)" />
+              <dependency id="DryIoc.dll" version="3.0.2" />
+              <dependency id="DryIoc.Web.dll" version="3.0.0" />
             
               <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />
           </group>
           <group targetFramework="net45">
-              <dependency id="Microsoft.AspNet.Mvc" version="5.2.3" />
+              <dependency id="Microsoft.AspNet.Mvc" version="5.2.6" />
           </group>
           <group targetFramework="net40">
               <dependency id="Microsoft.AspNet.Mvc" version="[4.0.40804,5.0)" />

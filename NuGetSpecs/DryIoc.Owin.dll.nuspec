@@ -4,13 +4,15 @@
         <id>DryIoc.Owin.dll</id>
         <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014-2017 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for OWIN</description>
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
+          v3.0.0:
+          - Support for DryIoc v3
           v2.2.0
           - changed: (for #460) `UseDryIocOwinMiddleware` to simply call `InsertOpenScope` then `UseRegisteredMiddlewares`
           - changed: Methods return `IAppBuilder` to enable fluent method chaining
@@ -26,8 +28,8 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="[2.10,3.0.0)" />
-            <dependency id="Microsoft.Owin" version="[3.0.0,4.0.0)" />
+            <dependency id="DryIoc.dll" version="3.0.2" />
+            <dependency id="Microsoft.Owin" version="3.0.1" />
           </group>
         </dependencies>
     </metadata>

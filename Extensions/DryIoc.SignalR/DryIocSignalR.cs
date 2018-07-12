@@ -147,11 +147,7 @@ namespace DryIoc.SignalR
         protected override void Dispose(bool disposing)
         {
             if (disposing)
-            {
-                var disposable = _resolver as IDisposable;
-                if (disposable != null)
-                    disposable.Dispose();
-            }
+                (_resolver as IDisposable)?.Dispose();
             base.Dispose(disposing);
         }
 

@@ -11,23 +11,17 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Lightweight IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
-    <releaseNotes>
-      v4.0.0-preview-15:
-      - updated: DryIoc to v3-preview-11
+    <releaseNotes><![CDATA[
+      v4.0.0:
+      - updated: DryIoc to 3.0.2
       - updated: ExpressionToCodeLib to v2.6.0
       - fixed: #559: Add covariant collection support for generated collection
       - fixed: references to compile-time dependencies in NuGet package
       - fixed: runtime registrations fallback
       - added: More compact and clean generation output, including type names in resolve methods
-        changed: Open-generics in generation now is a error
-      v3.0.0:
-      - fixed: Nuget package, so that DryIocZero compiles successfully right after install
-      - changed: Fixed versions of DryIoc and ExpressionToCodeLib dependencies located in package/tools folder
-      - changed: Updated to DryIoc v2.12.0, including `RegisterPlaceholder` support
-      - renamed: Registrations.tt to Registrations.ttinclude
-      - changed: Simplified IRegistrator interface
-      - changed: Optimized generated code
-      - added: Support for run-time reuse
+      - added: User-defined namespace usings to cleanup output even further
+      - changed: Open-generics in generation now is a error
+      ]]>
     </releaseNotes>
     <dependencies>
       <!--no run-time dependencies-->

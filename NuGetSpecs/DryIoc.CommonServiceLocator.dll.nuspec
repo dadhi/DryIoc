@@ -17,19 +17,31 @@
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc.dll" version="3.0.0" />
+            <dependency id="DryIoc.dll" version="3.0.2" />
             <dependency id="CommonServiceLocator" version="2.0.3" />
           </group>
         </dependencies>
     </metadata>
     <files>
       <file src="..\LICENSE.txt" />
+      <file src="..\NuGetSpecs\README.md" />
       <file src="..\NuGetSpecs\DryIoc.snk" />
 
       <!-- .NET 40 -->
       <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.dll" target="lib\net40-Client" />
       <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.pdb" target="lib\net40-Client" />
       <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.xml" target="lib\net40-Client" />
+
+      <!-- .NET Standard 1.0 -->
+      <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.dll" target="lib\netstandard1.0" />
+      <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.pdb" target="lib\netstandard1.0" />
+      <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.xml" target="lib\netstandard1.0" />
+
+      <!-- .NET Standard 2.0 -->
+      <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.dll" target="lib\netstandard2.0" />
+      <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.pdb" target="lib\netstandard2.0" />
+      <file src="..\Extensions\bin\Release\DryIoc.CommonServiceLocator.xml" target="lib\netstandard2.0" />
+
 
     </files>
 </package>

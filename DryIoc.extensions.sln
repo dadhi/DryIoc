@@ -34,9 +34,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{5454D365-E93C-42B8-8314-E304DB5765B3}"
-	ProjectSection(SolutionItems) = preProject
-		Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj = Extensions\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj
-	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Mvc", "Extensions\DryIoc.Mvc\DryIoc.Mvc.csproj", "{6936BFF7-6EE1-4A17-BBB7-4941D5F687DB}"
 EndProject
@@ -75,6 +72,44 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CommonServiceLocator", "Extensions\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj", "{CCBEDDC4-2415-4424-B810-544AA752004B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CommonServiceLocator.UnitTests", "Extensions\DryIoc.CommonServiceLocator.UnitTests\DryIoc.CommonServiceLocator.UnitTests.csproj", "{03A6D34D-3062-42F0-ACED-095C3A2657CB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", "{09DF12F2-2667-4506-B1F0-EAA052189E54}"
+	ProjectSection(SolutionItems) = preProject
+		NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.dll.nuspec
+		NuGetSpecs\DryIoc.CommonServiceLocator.nuspec = NuGetSpecs\DryIoc.CommonServiceLocator.nuspec
+		NuGetSpecs\DryIoc.dll.nuspec = NuGetSpecs\DryIoc.dll.nuspec
+		NuGetSpecs\DryIoc.Internal.nuspec = NuGetSpecs\DryIoc.Internal.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.dll.nuspec
+		NuGetSpecs\DryIoc.MefAttributedModel.nuspec = NuGetSpecs\DryIoc.MefAttributedModel.nuspec
+		NuGetSpecs\DryIoc.Mvc.dll.nuspec = NuGetSpecs\DryIoc.Mvc.dll.nuspec
+		NuGetSpecs\DryIoc.Mvc.nuspec = NuGetSpecs\DryIoc.Mvc.nuspec
+		NuGetSpecs\DryIoc.nuspec = NuGetSpecs\DryIoc.nuspec
+		NuGetSpecs\DryIoc.Owin.dll.nuspec = NuGetSpecs\DryIoc.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.Owin.nuspec = NuGetSpecs\DryIoc.Owin.nuspec
+		NuGetSpecs\DryIoc.SignalR.dll.nuspec = NuGetSpecs\DryIoc.SignalR.dll.nuspec
+		NuGetSpecs\DryIoc.SignalR.nuspec = NuGetSpecs\DryIoc.SignalR.nuspec
+		NuGetSpecs\DryIoc.Web.dll.nuspec = NuGetSpecs\DryIoc.Web.dll.nuspec
+		NuGetSpecs\DryIoc.Web.nuspec = NuGetSpecs\DryIoc.Web.nuspec
+		NuGetSpecs\DryIoc.WebApi.dll.nuspec = NuGetSpecs\DryIoc.WebApi.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.nuspec = NuGetSpecs\DryIoc.WebApi.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.dll.nuspec
+		NuGetSpecs\DryIoc.WebApi.Owin.nuspec = NuGetSpecs\DryIoc.WebApi.Owin.nuspec
+		NuGetSpecs\DryIocAttributes.dll.nuspec = NuGetSpecs\DryIocAttributes.dll.nuspec
+		NuGetSpecs\DryIocAttributes.nuspec = NuGetSpecs\DryIocAttributes.nuspec
+		NuGetSpecs\DryIocZero.nuspec = NuGetSpecs\DryIocZero.nuspec
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScripts", "{72DDC0B8-A426-4745-AE5B-CDCA8AF0A3BB}"
+	ProjectSection(SolutionItems) = preProject
+		BuildScripts\_main.bat = BuildScripts\_main.bat
+		BuildScripts\Build.bat = BuildScripts\Build.bat
+		BuildScripts\Build15.bat = BuildScripts\Build15.bat
+		BuildScripts\Clean.bat = BuildScripts\Clean.bat
+		BuildScripts\MakeInternal.ps1 = BuildScripts\MakeInternal.ps1
+		BuildScripts\NuGetPack.bat = BuildScripts\NuGetPack.bat
+		BuildScripts\NuGetPublish.bat = BuildScripts\NuGetPublish.bat
+		BuildScripts\RunTestsWithCoverage.bat = BuildScripts\RunTestsWithCoverage.bat
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

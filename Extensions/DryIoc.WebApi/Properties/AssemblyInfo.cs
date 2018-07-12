@@ -6,8 +6,8 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyCopyright("Copyright © 2014-2016 Maksim Volkau")]
 
 
-[assembly: AssemblyVersion(             "2.2")]
-[assembly: AssemblyFileVersion(         "2.2")]
-[assembly: AssemblyInformationalVersion("2.2")]
+[assembly: AssemblyVersion(             "3.0.0")]
+[assembly: AssemblyFileVersion(         "3.0.0")]
+[assembly: AssemblyInformationalVersion("3.0.0")]
 
 [assembly: InternalsVisibleTo("DryIoc.WebApi.UnitTests")]
