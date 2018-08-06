@@ -199,3 +199,7 @@ $RECYCLE.BIN/
 
 ## Generated build files
 DryIoc.Internal/
+
+## git
+.git/
+.gitignore
