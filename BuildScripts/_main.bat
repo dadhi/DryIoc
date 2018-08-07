@@ -3,9 +3,9 @@ setlocal
 
 rem Parse arguments:
 for %%A in (%*) do (
-	if /i "%%A"=="-NOPAUSE" (set NOPAUSE=1) else (
-	if /i "%%A"=="-PUBLISH" (set PUBLISH=1) else (
-	if /i "%%A"=="-MSB15"   (set MSB15=1)   else (
+	if /i "%%A"=="-NOPAUSE" (set NOPAUSE=1 && echo:"NOPAUSE is on") else (
+	if /i "%%A"=="-PUBLISH" (set PUBLISH=1 && echo:"PUBLISH is on") else (
+	if /i "%%A"=="-MSB15"   (set MSB15=1 && echo:"MSB is on")       else (
 	set UNKNOWNARG=1 & echo:Unknown script argument: "%%A"
 	)))
 )
@@ -27,8 +27,11 @@ cd /d %SCRIPTDIR%
 call Clean -nopause
 call :Check
 
-if defined MSB15 (call Build15 -nopause) else (call Build -nopause)
-rem call :Check
+
+if defined MSB15 (
+	call Build15.bat -nopause) else (
+	call Build.bat   -nopause)
+call :Check
 
 call RunTestsWithCoverage -nopause
 call :Check

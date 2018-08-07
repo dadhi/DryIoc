@@ -29,6 +29,7 @@ if exist %MSBUILD15% (
 		/p:RestorePackages=false 
 
 	find /C "Build succeeded." MSBuild.log
+	echo:Found "Build succeeded" in MSBuild.log
 	goto :eoscript
 ) 
 
@@ -47,9 +48,10 @@ for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuil
    			/p:RestorePackages=false 
 
 		find /C "Build succeeded." MSBuild.log
+		echo:Found "Build succeeded" in MSBuild.log
     )
 )
 
-endlocal
 :eoscript
 if not "%NOPAUSE%"=="-nopause" pause
+endlocal
