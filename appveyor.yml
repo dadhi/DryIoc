@@ -3,7 +3,7 @@ os: Visual Studio 2017
 test: off
 
 build_script:
-  - .\BuildScripts\_main.bat -nopause
+  - .\BuildScripts\_main.bat -MSB15 -nopause
 
 skip_commits:
   message: /skip .*/
