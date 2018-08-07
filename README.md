@@ -22,23 +22,18 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 
 - Designed for low-ceremony use, performance, and extensibility.
-- [MIT License](LICENSE.txt)
-- Supported platforms: 
-    - .NET 3.5+, PCL Profiles 259, 328
-    - .Net Core via [Net Standard 1.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
+- Supports: .NET 3.5+, [.NET Standard 1.0, 1.3, 2.0](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md), PCL Profiles 259, 328
 - NuGet packages:
  
     - __DryIoc.dll__ [![NuGet Badge](https://buildstats.info/nuget/DryIoc.dll)](https://www.nuget.org/packages/DryIoc.dll)
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- Latest stable DryIoc version is __3.0.0__ / 24.06.2018
-    - [Release Notes](https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes)
-    - [Previous versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
+- [Release Notes](https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes) :: [Previous Versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
 
 - [Documentation][WikiHome]
 - [How to contribute](CONTRIBUTING.md)
-- You may also check two original parts of DryIoc and now a standalone projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools).
+- Check two original parts of DryIoc and now a standalone projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
 
 ## Benchmarks
 
@@ -52,7 +47,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Memory footprint preserved as small as possible.
 
 
-## Code/Library
+## Code
 
 * No dependencies on the other libraries.
 * Public API is fully documented.
@@ -60,7 +55,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ## Reliability
 
-* More than 1000 of acceptance tests.
+* 1000+ of acceptance tests.
 * Thread-safe and lock-free registrations and resolutions. 
 * Detects recursive dependencies aka cycles in object graph.
 * Throws exceptions as early as possible with a lot of details.
@@ -76,16 +71,17 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * Register with resolution condition.
 * Register with associated metadata object of arbitrary type.
 * Resolve and ResolveMany. 
-* Unknown service resolution via `Rules.WithUnknownServiceResolvers()`:
+* Unknown service resolution:
     * Optional automatic concrete types resolution
 * Instance lifetime control or *Reuse* in DryIoc terms:
-    * Nested disposable scopes, ambient scope context.
-    * Supported out-of-the-box: `Singleton`, `InResolutionScope`, `InCurrentScope`, `InCurrentNamedScope`. Plus you can define your own.
-    * `useParentReuse` option for injected dependencies
+    * Nested disposable scopes with optional names 
+    * Ambient scope context
+    * Supported out-of-the-box: `Transient`, `Singleton`, `Scoped` in multiple flavors, including scoped to specific service in object graph
+    * `useParentReuse` and use `useDecorateeReuse` option for injected dependencies
     * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
-* Extensive Open-generics support without special syntax: supported constraints, variance, complex nested generic definitions
-* Constructor, property and field injection.
-* Static or instance factory methods in addition to constructor. Factory methods support parameter injection the same way as constructors.
+* Extensive Open-generics support: constraints, variance, complex nested, recurring generic definitions
+* Constructor, and optional property and field injection.
+* Static and Instance factory methods in addition to constructor. Factory method supports parameter injection the same way as constructor!
 * Injecting properties and fields into existing object.
 * Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
 * Generic wrappers:
