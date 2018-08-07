@@ -6,9 +6,6 @@ set OUTDIR="..\bin\Release"
 set NUGET="..\.nuget\NuGet.exe"
 
 set NOPAUSE=%1
-set MSBUILDVER=%2
-if "%MSBUILDVER%"=="" set MSBUILDVER=14
-echo:Default MSBuild version is 15, fallback version is: %MSBUILDVER%
 
 echo:
 echo:Restoring packages for solution %SLN% . . .
@@ -17,41 +14,42 @@ echo:Restoring packages for solution %SLN% . . .
 echo:
 echo:Building %SLN% into %OUTDIR% . . .
 
-set MSBUILD15="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe" 
-echo:First try to find MSBuild 15: %MSBUILD15%
-if exist %MSBUILD15% (
-	echo:OK, MsBuild15 is present. Start building . . .
+set MSBUILD15PRO="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe" 
+set MSBUILD15COMMUNITY="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\15.0\bin\MSBuild.exe" 
 
-	%MSBUILD15% %SLN% /t:Rebuild /v:minimal /m /fl /flp:LogFile=MSBuild.log ^
-		/p:OutDir=%OUTDIR% ^
-		/p:GenerateProjectSpecificOutputFolder=false ^
-		/p:Configuration=Release ^
-		/p:RestorePackages=false 
+echo:
+echo:... Looking for MSBuild in %MSBUILD15COMMUNITY%
+if exist %MSBUILD15COMMUNITY% (set MSBUILDPATH=%MSBUILD15COMMUNITY%) else (
 
-	find /C "Build succeeded." MSBuild.log
-	echo:Found "Build succeeded" in MSBuild.log
-	goto :eoscript
-) 
+echo:not found!
+echo:... Looking for MSBuild in %MSBUILD15PRO%
+if exist %MSBUILD15PRO%       (set MSBUILDPATH=%MSBUILD15PRO%) else (
 
-echo:MsBuild15 is not found. Try other versions found in Win Registry.
-for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\%MSBUILDVER%.0 /v MSBuildToolsPath') do (
+echo:not found!
+echo:... Looking for MSBuild path in "HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\15.0 /v MSBuildToolsPath"
+for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\15.0 /v MSBuildToolsPath') do (
+if exist "%%T"                (set MSBUILDPATH="%%T\MSBuild.exe") else (
 
-	if exist "%%T" (
+echo:not found!
+echo:... Looking for MSBuild path in "HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\14.0 /v MSBuildToolsPath"
+for /f "tokens=2*" %%S in ('reg query HKLM\SOFTWARE\Wow6432Node\Microsoft\MSBuild\ToolsVersions\14.0 /v MSBuildToolsPath') do (
+if exist "%%T"                (set MSBUILDPATH="%%T\MSBuild.exe") else (
+echo:Huh, MSBuild path is not found, exiting...
+if not "%NOPAUSE%"=="-nopause" pause
+exit 1
+))))))
 
-		echo:
-		echo:Using MSBuild from path "%%T\MSBuild.exe"
+echo:MSBuild is found in %MSBUILDPATH%
 
-		"%%T\MSBuild.exe" %SLN% /t:Rebuild /v:minimal /m /fl /flp:LogFile=MSBuild.log ^
-   			/p:OutDir=%OUTDIR% ^
-   			/p:GenerateProjectSpecificOutputFolder=false ^
-   			/p:Configuration=Release ^
-   			/p:RestorePackages=false 
+%MSBUILDPATH% %SLN% /t:Rebuild /v:minimal /m /fl /flp:LogFile=MSBuild.log ^
+    /p:OutDir=%OUTDIR% ^
+    /p:GenerateProjectSpecificOutputFolder=false ^
+    /p:Configuration=Release ^
+    /p:RestorePackages=false 
 
-		find /C "Build succeeded." MSBuild.log
-		echo:Found "Build succeeded" in MSBuild.log
-    )
-)
-
-:eoscript
+find /C "Build succeeded." MSBuild.log
+echo:
+echo:Hurrah, found words "Build succeeded" in MSBuild.log
+echo:
 if not "%NOPAUSE%"=="-nopause" pause
 endlocal

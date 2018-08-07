@@ -1,1 +1,1 @@
-.\BuildScripts\_main.bat -MSB15
+.\BuildScripts\_main.bat

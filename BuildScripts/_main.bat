@@ -3,11 +3,10 @@ setlocal
 
 rem Parse arguments:
 for %%A in (%*) do (
-	if /i "%%A"=="-NOPAUSE" (set NOPAUSE=1 && echo:"NOPAUSE is on") else (
-	if /i "%%A"=="-PUBLISH" (set PUBLISH=1 && echo:"PUBLISH is on") else (
-	if /i "%%A"=="-MSB15"   (set MSB15=1 && echo:"MSB is on")       else (
-	set UNKNOWNARG=1 & echo:Unknown script argument: "%%A"
-	)))
+    if /i "%%A"=="-NOPAUSE" (set NOPAUSE=1 && echo:"NOPAUSE is on") else (
+    if /i "%%A"=="-PUBLISH" (set PUBLISH=1 && echo:"PUBLISH is on") else (
+    set UNKNOWNARG=1 & echo:Unknown script argument: "%%A"
+    ))
 )
 if defined UNKNOWNARG (
 	echo:ERROR: Unknown script arguments, allowed arguments: "-nopause", "-publish" 
@@ -27,10 +26,7 @@ cd /d %SCRIPTDIR%
 call Clean -nopause
 call :Check
 
-
-if defined MSB15 (
-	call Build15.bat -nopause) else (
-	call Build.bat   -nopause)
+call Build15.bat -nopause
 call :Check
 
 call RunTestsWithCoverage -nopause
@@ -53,7 +49,7 @@ goto:eof
 :Check
 
 if %ERRORLEVEL% EQU 123 (
-	echo:"* Strange MSBuild error 123 that could be ignored."
+	echo:* Strange MSBuild error 123 that could be ignored.
 	exit /b
 )
 
