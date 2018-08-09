@@ -589,7 +589,7 @@ namespace ImTools
     }
 
     /// <summary>Produces good enough hash codes for the fields</summary>
-    public static class HashCode
+    public static class Hasher
     {
         /// <summary>Combines hashes of two fields</summary>
         public static int Combine<T1, T2>(T1 a, T2 b) =>
@@ -646,7 +646,7 @@ namespace ImTools
         }
 
         /// <summary>Combines key and value hash code</summary>
-        public override int GetHashCode() => HashCode.Combine(Key, Value);
+        public override int GetHashCode() => Hasher.Combine(Key, Value);
     }
 
     /// <summary>Helpers for <see cref="KV{K,V}"/>.</summary>

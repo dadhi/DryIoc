@@ -1979,7 +1979,7 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public override int GetHashCode() => HashCode.Combine(RequiredServiceType, ServiceKey);
+        public override int GetHashCode() => Hasher.Combine(RequiredServiceType, ServiceKey);
 
         /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) => 
@@ -6039,7 +6039,7 @@ namespace DryIoc
         {
             Factory = factory; // runtime state
             FactoryID = factoryID;
-            _hashCode = HashCode.Combine(parent?._hashCode ?? 0, FactoryID);
+            _hashCode = Hasher.Combine(parent?._hashCode ?? 0, FactoryID);
             FactoryType = factoryType;
             _factoryImplType = factoryImplType;
             Reuse = reuse;

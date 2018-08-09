@@ -1499,7 +1499,7 @@ namespace DryIocZero
                    Equals(other.ServiceKey, ServiceKey);
         }
 
-        public override int GetHashCode() => HashCode.Combine(RequiredServiceType, ServiceKey);
+        public override int GetHashCode() => Hasher.Combine(RequiredServiceType, ServiceKey);
     }
 
     /// <summary>Custom exclude from test code coverage attribute for portability.</summary>
