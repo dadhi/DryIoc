@@ -6,8 +6,9 @@
     <!-- overridden by "NuGet pack -Version" flag -->
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013 Maksim Volkau</copyright>
-    <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+    <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+    <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</iconUrl>
+    <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>

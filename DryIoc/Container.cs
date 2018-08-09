@@ -2167,7 +2167,10 @@ namespace DryIoc
         public static void RegisterMapping(this IContainer container, Type serviceType, Type registeredServiceType,
             object serviceKey = null, object registeredServiceKey = null)
         {
-            var request = Request.Create(container, registeredServiceType, registeredServiceKey);
+            var request = registeredServiceType.ThrowIfNull().IsOpenGeneric()
+                ? Request.Create(container, null, registeredServiceKey, requiredServiceType: registeredServiceType)
+                : Request.Create(container, registeredServiceType, registeredServiceKey);
+
             var factory = container.GetServiceFactoryOrDefault(request);
             factory.ThrowIfNull(Error.RegisterMappingNotFoundRegisteredService,
                 registeredServiceType, registeredServiceKey);
@@ -4834,7 +4837,8 @@ namespace DryIoc
 
         internal static Expr CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
-            if (request.Rules.DependencyResolutionCallExprs != null && !request.Factory.HasRuntimeState)
+            if (request.Rules.DependencyResolutionCallExprs != null && 
+                request.Factory != null && !request.Factory.HasRuntimeState)
                 PopulateDependencyResolutionCallExpressions(request);
 
             var container = request.Container;
@@ -5186,7 +5190,7 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null,
             string metadataKey = null, object metadata = null)
         {
-            serviceType.ThrowIfNull();
+            (serviceType ?? requiredServiceType).ThrowIfNull();
 
             // remove unnecessary details if service and required type are the same
             if (serviceType == requiredServiceType)
@@ -5468,8 +5472,9 @@ namespace DryIoc
         public static Request Create(IContainer container, IServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null)
         {
-            serviceInfo.ThrowIfNull().ServiceType.ThrowIfNull()
-                .ThrowIf(serviceInfo.ServiceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible);
+            var serviceType = serviceInfo.ThrowIfNull().ServiceType;
+            if (serviceType != null && serviceType.IsOpenGeneric())
+                Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
 
             flags |= RequestFlags.IsResolutionCall;
 
@@ -6468,7 +6473,7 @@ namespace DryIoc
         public virtual bool CanAccessImplementationType => true;
 
         /// <summary>Indicates that Factory is factory provider and
-        /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/>  to get concrete factory.</summary>
+        /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/> to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator => null;
 
         /// <summary>Settings <b>(if any)</b> to select Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
@@ -7167,17 +7172,14 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
+            // todo: GH#6 - does not work with single factory - multiple services (interrfaces) registered.
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
                 var serviceType = request.GetActualServiceType();
                 var serviceKey = request.ServiceKey;
+                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey;
 
-                var openGenericTypeKey = serviceKey as OpenGenericTypeKey;
-                if (openGenericTypeKey != null)
-                    serviceKey = openGenericTypeKey.ServiceKey;
-
-                var generatedFactoryKey = new KV<Type, object>(serviceType, serviceKey);
-
+                var generatedFactoryKey = KV.Of(serviceType, serviceKey);
                 var generatedFactories = _generatedFactories.Value;
                 if (!generatedFactories.IsEmpty)
                 {
@@ -7193,7 +7195,7 @@ namespace DryIoc
 
                 var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
                   ? serviceType.GetGenericParamsAndArgs()
-                  : implType.IsGenericParameter ? new[] { serviceType }
+                  : implType.IsGenericParameter ? serviceType.One()
                   : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
 
                 if (closedTypeArgs == null)
