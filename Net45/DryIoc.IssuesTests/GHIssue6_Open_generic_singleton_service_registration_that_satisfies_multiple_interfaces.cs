@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GH_Issue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces
+    public class GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces
     {
         [Test, Ignore("to fix")]
         public void Register_mapping_should_work()

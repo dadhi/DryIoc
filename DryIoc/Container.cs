@@ -3686,10 +3686,8 @@ namespace DryIoc
         /// <summary>Identifies factory service if factory method is instance member.</summary>
         public readonly ServiceInfo FactoryServiceInfo;
 
-        /// <summary>Wraps method and factory instance.</summary>
-        /// <param name="ctorOrMethodOrMember">Constructor, static or instance method, property or field.</param>
-        /// <param name="factoryInfo">Factory info to resolve in case of instance <paramref name="ctorOrMethodOrMember"/>.</param>
-        /// <returns>New factory method wrapper.</returns>
+        /// <summary>Wraps method and factory instance.
+        /// Where <paramref name="ctorOrMethodOrMember"/> is constructor, static or instance method, property or field.</summary>
         public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
         {
             ctorOrMethodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
@@ -3927,10 +3925,15 @@ namespace DryIoc
             Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
 
         /// <summary>Creates factory specification with method or member selector based on request.
-        /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
+        /// Where <paramref name="getMethodOrMember"/> is method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields);
+
+        /// <summary>Creates factory specification with implementation type, conditionally depending on request.</summary>
+        public static Made Of(Func<Request, Type> getImplType,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()), parameters, propertiesAndFields);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
