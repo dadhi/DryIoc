@@ -3869,7 +3869,10 @@ namespace DryIoc
 
         /// <summary>True is made has properties or parameters with custom value.
         /// That's mean the whole made become context based which affects caching</summary>
-        public bool HasCustomDependencyValue { get; private set; }
+        public bool HasCustomDependencyValue { get; private set; } // todo: unused, review what was the need for it
+
+        /// <summary>Indicates that the implementation type depends on request.</summary>
+        public readonly bool IsConditionalImplementation;
 
         /// <summary>Specifies how constructor parameters should be resolved:
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
@@ -3894,12 +3897,11 @@ namespace DryIoc
             Of(propertiesAndFields: propertiesAndFields);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
-        /// <param name="factoryMethod">(optional)</param> <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New injection rules or <see cref="Default"/>.</returns>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            factoryMethod == null && parameters == null && propertiesAndFields == null
-                ? Default : new Made(factoryMethod, parameters, propertiesAndFields);
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
+            bool isConditionalImlementation = false) =>
+            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation
+                ? Default : new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
@@ -3933,7 +3935,8 @@ namespace DryIoc
         /// <summary>Creates factory specification with implementation type, conditionally depending on request.</summary>
         public static Made Of(Func<Request, Type> getImplType,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()), parameters, propertiesAndFields);
+            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()), parameters, propertiesAndFields,
+            isConditionalImlementation: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
@@ -4060,13 +4063,14 @@ namespace DryIoc
         #region Implementation
 
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null, bool hasCustomValue = false)
+            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false)
         {
             FactoryMethod = factoryMethod;
             Parameters = parameters;
             PropertiesAndFields = propertiesAndFields;
             FactoryMethodKnownResultType = factoryMethodKnownResultType;
             HasCustomDependencyValue = hasCustomValue;
+            IsConditionalImplementation = isConditionalImlementation;
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
@@ -6996,8 +7000,8 @@ namespace DryIoc
             var container = request.Container;
             var rules = container.Rules;
 
-            var factoryMethod = (Made.FactoryMethod ?? rules.FactoryMethod)
-                ?.Invoke(request).ThrowIfNull(Error.UnableToSelectCtor, request.ImplementationType, request)
+            var factoryMethod = (Made.FactoryMethod ?? rules.FactoryMethod)?.Invoke(request)
+                 .ThrowIfNull(Error.UnableToSelectCtor, request.ImplementationType, request)
                 ?? FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
 
             // If factory method is the method of some registered service, then resolve factory service first.
@@ -7278,11 +7282,14 @@ namespace DryIoc
             }
 
             var openGenericImplType = knownImplType ?? implType;
+
             if (openGenericImplType == typeof(object) || // for open-generic T implementation
-                openGenericImplType != null && (         // for open-generic X<T> implementation
-                openGenericImplType.IsGenericDefinition() ||
-                openGenericImplType.IsGenericParameter))
+                openGenericImplType != null &&           // for open-generic X<T> implementation
+                (openGenericImplType.IsGenericDefinition() || openGenericImplType.IsGenericParameter) ||
+                made.IsConditionalImplementation)
+            {
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
+            }
 
             _implementationType = knownImplType;
         }
