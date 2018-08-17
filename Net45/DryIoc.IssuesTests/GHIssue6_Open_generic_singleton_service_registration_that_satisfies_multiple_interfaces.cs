@@ -7,14 +7,29 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces
     {
-        [Test, Ignore("to fix")]
-        public void Register_mapping_should_work()
+        [Test]
+        public void RegisterMapping_should_work()
         {
             var container = new Container();
 
             container.Register(typeof(EventHub<>), Reuse.Singleton);
             container.RegisterMapping(typeof(IPublisher<>), typeof(EventHub<>));
             container.RegisterMapping(typeof(ISubscriber<>), typeof(EventHub<>));
+
+            var pub = container.Resolve<IPublisher<string>>();
+            var sub = container.Resolve<ISubscriber<string>>();
+            var hub = container.Resolve<EventHub<string>>();
+
+            Assert.AreSame(pub, sub);
+            Assert.AreSame(pub, hub);
+        }
+
+        [Test]
+        public void RegisterMany_should_work()
+        {
+            var container = new Container();
+
+            container.RegisterMany(new[] { typeof(IPublisher<>), typeof(ISubscriber<>), typeof(EventHub<>) }, typeof(EventHub<>), Reuse.Singleton);
 
             var pub = container.Resolve<IPublisher<string>>();
             var sub = container.Resolve<ISubscriber<string>>();

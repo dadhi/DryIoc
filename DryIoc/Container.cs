@@ -2200,6 +2200,7 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
 
+        // todo: Move to Registrator and make it ext method on IRegistrator
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
         /// When the implementation is still not provided when the placeholder service is accessed,
@@ -7179,38 +7180,25 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
-            // todo: GH#6 - does not work with single factory - multiple services (interrfaces) registered.
+            // todo: GH#6 - does not work with single factory - multiple services (interfaces) registered.
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
-                var serviceType = request.GetActualServiceType();
-                var serviceKey = request.ServiceKey;
-                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey;
-
-                var generatedFactoryKey = KV.Of(serviceType, serviceKey);
-                var generatedFactories = _generatedFactories.Value;
-                if (!generatedFactories.IsEmpty)
-                {
-                    var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
-                    if (generatedFactory != null)
-                        return generatedFactory;
-                }
-
                 var openFactory = _openGenericFactory;
-                request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault);
-
                 var implType = openFactory._implementationType;
+                var serviceType = request.GetActualServiceType();
 
                 var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
                   ? serviceType.GetGenericParamsAndArgs()
                   : implType.IsGenericParameter ? serviceType.One()
                   : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
-
                 if (closedTypeArgs == null)
                     return null;
 
                 var made = openFactory.Made;
                 if (made.FactoryMethod != null)
                 {
+                    // resolve request with factory to specify the implementation tyoe may be required by FactoryMethod or GetClosed...
+                    request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault);
                     var factoryMethod = made.FactoryMethod(request);
                     if (factoryMethod == null)
                         return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
@@ -7227,14 +7215,27 @@ namespace DryIoc
 
                 if (implType != null)
                 {
-                    implType = implType.IsGenericParameter 
+                    implType = implType.IsGenericParameter
                         ? closedTypeArgs[0]
                         : Throw.IfThrows<ArgumentException, Type>(
-                            () => implType.MakeGenericType(closedTypeArgs), 
+                            () => implType.MakeGenericType(closedTypeArgs),
                             !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                             Error.NoMatchedGenericParamConstraints, implType, request);
                     if (implType == null)
                         return null;
+                }
+
+                var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
+                var serviceKey = request.ServiceKey;
+                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey;
+                var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
+
+                var generatedFactories = _generatedFactories.Value;
+                if (!generatedFactories.IsEmpty)
+                {
+                    var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
+                    if (generatedFactory != null)
+                        return generatedFactory;
                 }
 
                 var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup);
