@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+
+    <Title>DryIoc.Microsoft.Hosting</Title>
+    <Description>DryIoc as DI for generic IHost via extension methods on IHostBuilder</Description>
+    <Summary>
+      DryIoc as DI for generic IHost via extension methods on IHostBuilder.
+      See this SO answer: https://stackoverflow.com/questions/51872490/use-hostbuilder-configureservices-with-dryioc-container/51877235#51877235
+    </Summary>
+    <VersionPrefix>1.0.0-preview-01</VersionPrefix>
+    <Authors>Maksim Volkau</Authors>
+    <Copyright>Copyright © 2018 Maksim Volkau</Copyright>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>DryIoc.Microsoft.Hosting</AssemblyName>
+    <Product>DryIoc.Microsoft.Hosting</Product>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <PackageId>DryIoc.Microsoft.Hosting</PackageId>
+    <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;AspNetCore;NetCore;WebHost;GenericHost;WebHostBuilder;HostBuilder</PackageTags>
+
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="2.1.1" />
+    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="2.0.1" />
+  </ItemGroup>
+
+</Project>

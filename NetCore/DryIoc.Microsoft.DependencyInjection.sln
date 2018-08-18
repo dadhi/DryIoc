@@ -6,7 +6,6 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AC570BFB-20F4-4395-A7B8-D33A151A2FE1}"
 	ProjectSection(SolutionItems) = preProject
 		build.bat = build.bat
-		NuGet.Config = NuGet.Config
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{51CD64D5-4E22-4FCA-8110-2EEED5C79C4B}"
@@ -30,6 +29,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel.UnitTests", "test\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj", "{54AA91D5-B97C-4348-B945-DFFF2B241F4A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel.UnitTests.CUT", "test\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj", "{84F78FBB-5393-47C7-B7A2-7164E04EC80B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Microsoft.Hosting", "src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj", "{FE42F9DE-7D66-4F64-B3C3-C18BB0F54D71}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -73,6 +74,10 @@ Global
 		{84F78FBB-5393-47C7-B7A2-7164E04EC80B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{84F78FBB-5393-47C7-B7A2-7164E04EC80B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{84F78FBB-5393-47C7-B7A2-7164E04EC80B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE42F9DE-7D66-4F64-B3C3-C18BB0F54D71}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE42F9DE-7D66-4F64-B3C3-C18BB0F54D71}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE42F9DE-7D66-4F64-B3C3-C18BB0F54D71}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE42F9DE-7D66-4F64-B3C3-C18BB0F54D71}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -87,6 +92,7 @@ Global
 		{CA9AF1CA-DC01-4448-AC9C-B6FC312946E8} = {51CD64D5-4E22-4FCA-8110-2EEED5C79C4B}
 		{54AA91D5-B97C-4348-B945-DFFF2B241F4A} = {3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}
 		{84F78FBB-5393-47C7-B7A2-7164E04EC80B} = {3AF91A89-9BDC-4A8B-AD0F-5C68BDC046A9}
+		{FE42F9DE-7D66-4F64-B3C3-C18BB0F54D71} = {51CD64D5-4E22-4FCA-8110-2EEED5C79C4B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9C5A5DCE-C56C-4FC1-86BC-3388EC713B12}

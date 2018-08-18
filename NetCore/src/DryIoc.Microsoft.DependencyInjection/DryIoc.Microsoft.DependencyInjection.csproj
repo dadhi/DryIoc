@@ -1,13 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFrameworks>netstandard1.0;netstandard2.0</TargetFrameworks>
+
     <Title>DryIoc.Microsoft.DependencyInjection</Title>
     <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
     <Summary>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Summary>
-    <VersionPrefix>2.0.1</VersionPrefix>
+    <VersionPrefix>2.1.0</VersionPrefix>
     <Authors>Maksim Volkau</Authors>
     <Copyright>Copyright © 2016 Maksim Volkau</Copyright>
-    <TargetFrameworks>netstandard1.0;netstandard2.0</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>DryIoc.Microsoft.DependencyInjection</AssemblyName>
@@ -16,6 +17,9 @@
     <PackageId>DryIoc.Microsoft.DependencyInjection</PackageId>
     <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
     <PackageReleaseNotes>
+        v2.1.0:
+      - added: Split WithCompositionRoot and BuildServiceProvider extension methods
+      - removed: Preventing to use Container with ambient ScopeContext
       v2.0.1:
       - updated: to DryIoc v3.0.2
       v2.0.0:
@@ -26,7 +30,7 @@
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
     <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
-    <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo.png</PackageIconUrl>
+    <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</PackageIconUrl>
   </PropertyGroup>
 
   <ItemGroup>

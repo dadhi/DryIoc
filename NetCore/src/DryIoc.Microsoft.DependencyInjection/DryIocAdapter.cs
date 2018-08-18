@@ -60,10 +60,6 @@ namespace DryIoc.Microsoft.DependencyInjection
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             Func<Type, bool> throwIfUnresolved = null)
         {
-            if (container.ScopeContext != null)
-                throw new ArgumentException(
-                    $"Container with ambient scope context is not supported by MS.DI: ${container}");
-
             var adapter = container.With(rules => rules
                 .With(FactoryMethod.ConstructorWithResolvableArguments)
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
@@ -81,6 +77,23 @@ namespace DryIoc.Microsoft.DependencyInjection
 
             return adapter;
         }
+
+        /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
+        public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
+        {
+            container.Register(compositionRootType);
+            container.Resolve(compositionRootType);
+            return container;
+        }
+
+        /// <summary>Adds services registered in <typeparamref name="TCompositionRoot"/> to container</summary>
+        public static IContainer WithCompositionRoot<TCompositionRoot>(this IContainer container) =>
+            container.WithCompositionRoot(typeof(TCompositionRoot));
+
+        /// <summary>Resolves the <see cref="IServiceProvider"/> from the container.
+        /// It is usually the last method in fluent DI setup.</summary>
+        public static IServiceProvider BuildServiceProvider(this IContainer container) => 
+            container.Resolve<IServiceProvider>();
 
         /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
         /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
@@ -100,12 +113,8 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// }
         /// ]]></code>
         /// </example>
-        public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container)
-        {
-            container.Register<TCompositionRoot>();
-            container.Resolve<TCompositionRoot>();
-            return container.Resolve<IServiceProvider>();
-        }
+        public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
+            container.WithCompositionRoot<TCompositionRoot>().BuildServiceProvider();
 
         /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
         /// <param name="container">The container.</param>
