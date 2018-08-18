@@ -138,7 +138,7 @@ namespace DryIoc.UnitTests
                 .Where(t => t.Name.Contains("_DisplayClass"))));
 
             Assert.AreEqual(
-                Error.NameOf(Error.NoServiceWasRegisteredByRegisterMany),
+                Error.NameOf(Error.NoServicesWereRegisteredByRegisterMany),
                 Error.NameOf(ex.Error));
         }
 
