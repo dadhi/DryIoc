@@ -4429,7 +4429,7 @@ namespace DryIoc
         public static Factory ToFactory(this Type implType, IReuse reuse, Made made = null, Setup setup = null) =>
             new ReflectionFactory(implType, reuse, made, setup);
 
-        /// <summary>Batch registers implementations with possibly many service types.
+        /// <summary>A primary (basic) method for batch registering of implementations with possibly many service types.
         /// The default factory is the <see cref="ReflectionFactory"/> with default reuse.</summary>
         public static void RegisterMany(this IRegistrator registrator,
             IEnumerable<Type> implTypes, Func<Type, Type[]> getServiceTypes,
@@ -4437,6 +4437,8 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null)
         {
             getImplFactory = getImplFactory ?? ToFactory;
+
+            bool isSomeoneRegistered = false;
             foreach (var implType in implTypes)
             {
                 var serviceTypes = getServiceTypes(implType);
@@ -4447,9 +4449,13 @@ namespace DryIoc
                     {
                         var t = serviceTypes[i];
                         registrator.Register(t, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, t));
+                        isSomeoneRegistered = true;
                     }
                 }
             }
+
+            if (!isSomeoneRegistered)
+                Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implTypes);
         }
 
         /// <summary>Batch registers implementation with possibly many service types.</summary>
@@ -8748,7 +8754,7 @@ namespace DryIoc
                 "Unable to find constructor with all resolvable parameters when resolving {0}."),
             UnableToFindMatchingCtorForFuncWithArgs = Of(
                 "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine
-                + "and the rest of parameters resolvable from Container when resolving: {1}."),
+                                                                                              + "and the rest of parameters resolvable from Container when resolving: {1}."),
             RegedFactoryDlgResultNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
             NotFoundSpecifiedWritablePropertyOrField = Of(
@@ -8857,8 +8863,16 @@ namespace DryIoc
             UndefinedPropertyWhenGettingProperty = Of("Undefined property {0} in type {1}"),
             UndefinedFieldWhenGettingField = Of("Undefined field {0} in type {1}"),
             UnableToFindConstructorWithArgs = Of("Unable to find a constructor in Type {0} with args: {1}"),
-            UnableToFindSingleConstructor = Of("Unable to find a single constructor in Type {0} (including non-public={1})"),
-            DisposerTrackForDisposeError = Of("Something is {0} already.");
+            UnableToFindSingleConstructor = Of(
+                "Unable to find a single constructor in Type {0} (including non-public={1})"),
+            DisposerTrackForDisposeError = Of("Something is {0} already."),
+            NoServicesWereRegisteredByRegisterMany = Of(
+                "No services were registered by RegisterMany, please check the input arguments." + Environment.NewLine +
+                "RegisterMany considered the following @implementationTypes: [{0}]" + Environment.NewLine +
+                "May be you missed the implementation or service types, " +
+                "e.g. provided only abstract or compiler-generated implementation types, " +
+                "or specified a wrong @serviceTypeCondition," +
+                "or did not specify to use non-public service types, etc.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

@@ -129,12 +129,17 @@ namespace DryIoc.UnitTests
         internal class A { }
 
         [Test]
-        public void Register_many_should_skip_Compiler_generated_classes()
+        public void Register_many_should_skip_Compiler_generated_classes_and_throw_an_exception()
         {
             var container = new Container();
 
+            var ex = Assert.Throws<ContainerException>(() => 
             container.RegisterMany(GetType().GetAssembly().GetImplementationTypes()
-                .Where(t => t.Name.Contains("_DisplayClass")));
+                .Where(t => t.Name.Contains("_DisplayClass"))));
+
+            Assert.AreEqual(
+                Error.NameOf(Error.NoServiceWasRegisteredByRegisterMany),
+                Error.NameOf(ex.Error));
         }
 
         internal class MyClass
