@@ -52,8 +52,8 @@ rem DryIoc.CommonServiceLocator
 %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.3.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 %NUGET% push "%PACKAGEDIR%\DryIoc.CommonServiceLocator.dll.3.0.0.nupkg" -Source https://nuget.org -ApiKey %APIKEY%
 
+echo: 
+echo:Publishing completed.
+
 popd
 pause
-
-echo: 
-echo:Packaging succeeded.
