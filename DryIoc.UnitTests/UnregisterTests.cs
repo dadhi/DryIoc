@@ -47,7 +47,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Unregister_default_with_default_key_shoud_work()
+        public void Unregister_default_with_default_key_should_work()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Unregister_unregistered_default_with_default_key_shoud_work()
+        public void Unregister_unregistered_default_with_default_key_should_work()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -205,7 +205,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Unregister_unregistred_specific_default_from_multiple_defaults_and_named_should_not_throw()
+        public void Unregister_unregistered_specific_default_from_multiple_defaults_and_named_should_not_throw()
         {
             var container = new Container();
             container.Register<IService, Service>();
@@ -283,7 +283,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Unregister_unregistred_decorator_should_not_throw()
+        public void Unregister_of_unregistered_decorator_should_not_throw()
         {
             var container = new Container();
             container.Register<IHandler, LoggingHandlerDecorator>(setup: Setup.Decorator);
@@ -377,7 +377,25 @@ namespace DryIoc.UnitTests
                 IsDisposed = true;
             }
         }
-        
+
+        [Test]
+        public void Unregister_already_resolved_open_generic_service()
+        {
+            var container = new Container();
+            container.Register(typeof(IA<>), typeof(A<>));
+            container.Resolve<IA<int>>();
+
+            container.Unregister(typeof(IA<>));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<IA<int>>());
+
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), ex.ErrorName);
+        }
+
+        public interface IA<T> { }
+        public class A<T> : IA<T> { }
+
         [Test]
         public void Unregister_singleton_resolution_root()
         {

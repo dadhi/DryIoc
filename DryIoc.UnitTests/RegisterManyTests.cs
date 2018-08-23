@@ -129,18 +129,38 @@ namespace DryIoc.UnitTests
         internal class A { }
 
         [Test]
-        public void Register_many_should_skip_Compiler_generated_classes_and_throw_an_exception()
+        public void RegisterMany_should_skip_Compiler_generated_classes_and_throw_an_exception()
         {
             var container = new Container();
 
-            var ex = Assert.Throws<ContainerException>(() => 
             container.RegisterMany(GetType().GetAssembly().GetImplementationTypes()
-                .Where(t => t.Name.Contains("_DisplayClass"))));
-
-            Assert.AreEqual(
-                Error.NameOf(Error.NoServicesWereRegisteredByRegisterMany),
-                Error.NameOf(ex.Error));
+                .Where(t => t.Name.Contains("_DisplayClass")));
         }
+
+        [Test]
+        public void RegisterMany_should_inform_if_impl_type_is_abstract()
+        {
+            var container = new Container();
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.RegisterMany(typeof(INotAnImplementation).One()));
+
+            Assert.AreEqual(Error.NameOf(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod), ex.ErrorName);
+        }
+
+        [Test]
+        public void RegisterMany_should_inform_if_no_services_where_registered_for_impl_type()
+        {
+            var container = new Container();
+
+            container.RegisterMany(new [] { typeof(INotAnImplementation) }, made: Made.Of(() => new Yes()));
+
+            var i = container.Resolve<INotAnImplementation>();
+            Assert.IsNotNull(i);
+        }
+
+        public interface INotAnImplementation {}
+        public class Yes : INotAnImplementation { }
 
         internal class MyClass
         {

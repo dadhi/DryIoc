@@ -92,8 +92,6 @@ namespace DryIoc.Mvc
         }
 
         /// <summary>Helps to find if type is controller type.</summary>
-        /// <param name="type">Type to check.</param>
-        /// <returns>True if controller type</returns>
         public static bool IsController(this Type type) => type.IsAssignableTo(typeof(IController));
 
         /// <summary>Returns all application specific referenced assemblies (except from GAC and Dynamic).</summary>
@@ -108,8 +106,7 @@ namespace DryIoc.Mvc
         public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, type => type.IsAssignableTo(typeof(IController)),
-                Reuse.InWebRequest, FactoryMethod.ConstructorWithResolvableArguments);
+            container.RegisterMany(controllerAssemblies, IsController, Reuse.InWebRequest, FactoryMethod.ConstructorWithResolvableArguments);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,

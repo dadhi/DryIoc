@@ -6,6 +6,7 @@ using Microsoft.Owin.Testing;
 using NUnit.Framework;
 using DryIoc.Owin;
 using DryIoc.Web;
+using ImTools;
 
 namespace DryIoc.Mvc.Owin.UnitTests
 {
@@ -17,14 +18,14 @@ namespace DryIoc.Mvc.Owin.UnitTests
         {
             IContainer container = new Container();
             container.Register<TestGreetingMiddleware>();
-            container.Register(Made.Of(() => new Greeting { Message = Arg.Index<string>(0) }, _ => "Hey, DryIoc!"), Reuse.InWebRequest);
+            container.Register(Made.Of(() => new Greeting { Message = "Hey, DryIoc!" }), Reuse.InWebRequest);
 
             var contextItems = new Dictionary<object, object>();
             HttpContextScopeContext.GetContextItems = () => contextItems;
 
             using (var server = TestServer.Create(app =>
             {
-                container = container.WithMvc(new[] { Assembly.GetExecutingAssembly()} );
+                container = container.WithMvc(ArrayTools.Empty<Assembly>());
                 app.UseDryIocOwinMiddleware(container);
             }))
             {
@@ -45,7 +46,7 @@ namespace DryIoc.Mvc.Owin.UnitTests
             using (var server = TestServer.Create(app =>
             {
                 app.UseDryIocOwinMiddleware(
-                    container.WithMvc(new[] { Assembly.GetExecutingAssembly() }),
+                    container.WithMvc(ArrayTools.Empty<Assembly>()),
                     scope => scope.UseInstance(new Greeting { Message = "Hey, DryIoc!" }));
             }))
             {

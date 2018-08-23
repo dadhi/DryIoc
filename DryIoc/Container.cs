@@ -1905,9 +1905,13 @@ namespace DryIoc
                 {
                     if (factory.FactoryGenerator == null)
                         SetCachedFactoryValueToNull(serviceType, serviceKey);
-                    else
-                        foreach (var f in factory.FactoryGenerator.GeneratedFactories.Enumerate())
-                            SetCachedFactoryValueToNull(f.Key.Key, f.Key.Value);
+                    else 
+                    {
+                        // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
+                        // a safe alternative is dropping the whole cache
+                        DefaultFactoryDelegateCache.Swap(x => ImHashMap<Type, FactoryDelegate>.Empty);
+                        KeyedFactoryDelegateCache.Swap(x => ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty);
+                    }
                 }
             }
 
@@ -4452,8 +4456,10 @@ namespace DryIoc
             getImplFactory = getImplFactory ?? ToFactory;
 
             bool isSomeoneRegistered = false;
+            bool anyImplTypes = false;
             foreach (var implType in implTypes)
             {
+                anyImplTypes = true;
                 var serviceTypes = getServiceTypes(implType);
                 if (!serviceTypes.IsNullOrEmpty())
                 {
@@ -4467,7 +4473,7 @@ namespace DryIoc
                 }
             }
 
-            if (!isSomeoneRegistered)
+            if (anyImplTypes && !isSomeoneRegistered)
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implTypes);
         }
 
@@ -7199,7 +7205,6 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
-            // todo: GH#6 - does not work with single factory - multiple services (interfaces) registered.
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
                 var openFactory = _openGenericFactory;
@@ -8349,7 +8354,7 @@ namespace DryIoc
 
         // todo: Minimize usage of name for scopes, it will be more performant. e.g. ASP.NET Core does not use one.
         /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
-        public static string WebRequestScopeName = "~WRSN";
+        public static string WebRequestScopeName = "~WebRequestScopeName";
 
         /// <summary>Obsolete: please prefer using <see cref="Reuse.Scoped"/> instead.
         /// The named scope has performance drawback comparing to just a scope.
@@ -8661,6 +8666,9 @@ namespace DryIoc
         /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>
         public readonly int Error;
 
+        /// <summary>Simplifies the access to erro name.</summary>
+        public string ErrorName => DryIoc.Error.NameOf(Error);
+
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
         /// optionally with <paramref name="innerException"/> exception.</summary>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
@@ -8880,8 +8888,8 @@ namespace DryIoc
                 "Unable to find a single constructor in Type {0} (including non-public={1})"),
             DisposerTrackForDisposeError = Of("Something is {0} already."),
             NoServicesWereRegisteredByRegisterMany = Of(
-                "No services were registered by RegisterMany, please check the input arguments." + Environment.NewLine +
-                "RegisterMany considered the following @implementationTypes: [{0}]" + Environment.NewLine +
+                "No services were registered by RegisterMany for specified implementation types: " + Environment.NewLine +
+                "[{0}]" + Environment.NewLine +
                 "May be you missed the implementation or service types, " +
                 "e.g. provided only abstract or compiler-generated implementation types, " +
                 "or specified a wrong @serviceTypeCondition," +
@@ -8896,10 +8904,11 @@ namespace DryIoc
             return errorIndex;
         }
 
-        /// <summary>Returns the name for the provided error code.</summary>
+        /// <summary>Returns the name of error with the provided error code.</summary>
         public static string NameOf(int error) =>
-            typeof(Error).GetTypeInfo().DeclaredFields.Where(f => f.FieldType == typeof(int))
-                .Where((_, i) => i == error + 1).FirstOrDefault()?.Name;
+            typeof(Error).GetTypeInfo().DeclaredFields
+                .Where(f => f.FieldType == typeof(int)).Where((_, i) => i == error + 1)
+                .FirstOrDefault()?.Name;
 
         static Error()
         {
