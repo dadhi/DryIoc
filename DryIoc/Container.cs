@@ -2930,11 +2930,14 @@ namespace DryIoc
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
 
-            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            if (serviceFactory == null)
-                return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
-
-            serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+            var container = request.Container;
+            if (!container.Rules.FuncDoesNotNeedRegistration)
+            {
+                var serviceFactory = container.ResolveFactory(serviceRequest);
+                if (serviceFactory == null)
+                    return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
+                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+            }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
@@ -2976,11 +2979,12 @@ namespace DryIoc
             }
 
             var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc);
-            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            // todo: new feature
-            //if (request.Container.Rules.FuncAsResolutionCall)
-            //    serviceFactory.Setup = serviceFactory.Setup.WithAsResolutionCall();
-            var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
+
+            var container = request.Container;
+
+            var serviceExpr = container.Rules.FuncDoesNotNeedRegistration 
+                ? Resolver.CreateResolutionExpression(serviceRequest) 
+                : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
@@ -3607,6 +3611,14 @@ namespace DryIoc
         public Rules WithIgnoringReuseForFuncWithArgs() =>
             WithSettings(_settings | Settings.IgnoringReuseForFuncWithArgs);
 
+        /// <summary>Allows Func of service to be resolved even without registered service.</summary>
+        public bool FuncDoesNotNeedRegistration =>
+            (_settings & Settings.FuncDoesNotNeedRegistration) != 0;
+
+        /// <summary>Allows Func of service to be resolved even without registered service.</summary>
+        public Rules WithFuncDoesNotNeedRegistration() =>
+            WithSettings(_settings | Settings.FuncDoesNotNeedRegistration);
+
         #region Implementation
 
         private Rules()
@@ -3663,7 +3675,8 @@ namespace DryIoc
             CaptureContainerDisposeStackTrace = 1 << 9,
             UseDynamicRegistrationsAsFallback = 1 << 10,
             IgnoringReuseForFuncWithArgs = 1 << 11,
-            OverrideRegistrationMade = 1 << 12
+            OverrideRegistrationMade = 1 << 12,
+            FuncDoesNotNeedRegistration = 1 << 13
         }
 
         private const Settings DEFAULT_SETTINGS
