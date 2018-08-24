@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue596_RegisterMany_with_Factory
     {
-        [Test, Ignore("todo: fix")]
+        [Test]
         public void Test()
         {
             var container = new Container();
@@ -28,7 +28,9 @@ namespace DryIoc.IssuesTests
                 },
                 made: Made.Of(
                     r => ServiceInfo.Of<INeedDependencyFactory>(),
-                    f => f.Create(Arg.Of<IDependency>())));
+                    f => f.Create(Arg.Of<IDependency>())
+                ),
+                nonPublicServiceTypes: true);
 
             // works
             //container.RegisterMany(
