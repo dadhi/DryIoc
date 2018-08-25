@@ -146,6 +146,12 @@ namespace DryIoc
         public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations() =>
             _registry.Value.GetServiceRegistrations();
 
+        /// <summary>Searches for registered service factory and returns it, or null if not found.
+        /// Will use <see cref="DryIoc.Rules.FactorySelector"/> if specified.</summary>
+        /// <param name="request">Factory request.</param> <returns>Found factory or null.</returns>
+        public Factory GetRegisteredServiceFactoryOrDefault(Request request) =>
+            ((IContainer)this).GetServiceFactoryOrDefault(request);
+
         /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
         /// for later lookup.</summary>
         /// <param name="factory">Any subtypes of <see cref="Factory"/>.</param>
@@ -2192,17 +2198,11 @@ namespace DryIoc
             object serviceKey = null, object registeredServiceKey = null) =>
             container.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
 
-        /// <summary>Register a service without implementation which can be provided later in terms
-        /// of normal registration with IfAlreadyRegistered.Replace parameter.
-        /// When the implementation is still not provided when the placeholder service is accessed,
-        /// then the exception will be thrown.
-        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
-        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
-        /// That means, instead of placing service instance into graph expression we put here redirecting call to
-        /// container Resolve.</remarks>
+        // todo: Remove in VNext?
+        /// <summary>Forwards to <see cref="Registrator.RegisterPlaceholder"/>.</summary>
         public static void RegisterPlaceholder(this IContainer container, Type serviceType,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            container.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
+            Registrator.RegisterPlaceholder(container, serviceType, ifAlreadyRegistered, serviceKey);
 
         // todo: Move to Registrator and make it ext method on IRegistrator
         /// <summary>Register a service without implementation which can be provided later in terms
@@ -2935,7 +2935,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType);
 
             var container = request.Container;
-            if (!container.Rules.FuncDoesNotNeedRegistration)
+            if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
                 var serviceFactory = container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null)
@@ -2986,7 +2986,7 @@ namespace DryIoc
 
             var container = request.Container;
 
-            var serviceExpr = container.Rules.FuncDoesNotNeedRegistration 
+            var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration 
                 ? Resolver.CreateResolutionExpression(serviceRequest) 
                 : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
@@ -3616,12 +3616,12 @@ namespace DryIoc
             WithSettings(_settings | Settings.IgnoringReuseForFuncWithArgs);
 
         /// <summary>Allows Func of service to be resolved even without registered service.</summary>
-        public bool FuncDoesNotNeedRegistration =>
-            (_settings & Settings.FuncDoesNotNeedRegistration) != 0;
+        public bool FuncAndLazyWithoutRegistration =>
+            (_settings & Settings.FuncAndLazyWithoutRegistration) != 0;
 
         /// <summary>Allows Func of service to be resolved even without registered service.</summary>
-        public Rules WithFuncDoesNotNeedRegistration() =>
-            WithSettings(_settings | Settings.FuncDoesNotNeedRegistration);
+        public Rules WithFuncAndLazyWithoutRegistration() =>
+            WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
 
         #region Implementation
 
@@ -3680,7 +3680,7 @@ namespace DryIoc
             UseDynamicRegistrationsAsFallback = 1 << 10,
             IgnoringReuseForFuncWithArgs = 1 << 11,
             OverrideRegistrationMade = 1 << 12,
-            FuncDoesNotNeedRegistration = 1 << 13
+            FuncAndLazyWithoutRegistration = 1 << 13
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -4736,6 +4736,18 @@ namespace DryIoc
         public static void Unregister<TService>(this IRegistrator registrator,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(typeof(TService), serviceKey, factoryType, condition);
+
+        /// <summary>Register a service without implementation which can be provided later in terms
+        /// of normal registration with IfAlreadyRegistered.Replace parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed,
+        /// then the exception will be thrown.
+        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
+        /// That means, instead of placing service instance into graph expression we put here redirecting call to
+        /// container Resolve.</remarks>
+        public static void RegisterPlaceholder(this IRegistrator registrator, Type serviceType,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            registrator.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
     }
 
     /// <summary>Extension methods for <see cref="IResolver"/>.</summary>
@@ -8502,10 +8514,6 @@ namespace DryIoc
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
     public interface IRegistrator
     {
-        /// <summary>Returns all registered service factories with their Type and optional Key.
-        /// Decorator and Wrapper types are not included.</summary>
-        IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
-
         /// <summary>Registers factory in registry with specified service type and key for lookup.
         /// Returns true if factory was added to registry, false otherwise. False may be in case of <see cref="IfAlreadyRegistered.Keep"/>
         /// setting and already existing factory</summary>
@@ -8527,6 +8535,15 @@ namespace DryIoc
         /// BUT consuming services may still hold on the resolved service instance.
         /// The cache of consuming services may also hold on the unregistered service. Use `IContainer.ClearCache` to clear all cache.</summary>
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
+
+        /// <summary>Returns all registered service factories with their Type and optional Key.
+        /// Decorator and Wrapper types are not included.</summary>
+        IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
+
+        /// <summary>Searches for registered service factory and returns it, or null if not found.
+        /// Will use <see cref="DryIoc.Rules.FactorySelector"/> if specified.</summary>
+        /// <param name="request">Factory request.</param> <returns>Found factory or null.</returns>
+        Factory GetRegisteredServiceFactoryOrDefault(Request request);
     }
 
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>

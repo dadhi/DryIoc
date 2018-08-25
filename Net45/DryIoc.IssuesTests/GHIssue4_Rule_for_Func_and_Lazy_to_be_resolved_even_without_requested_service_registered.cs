@@ -9,7 +9,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Func_dependency_of_not_registered_service_should_work()
         {
-            var c = new Container(rules => rules.WithFuncDoesNotNeedRegistration());
+            var c = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
 
             c.Register<A>();
             var a = c.Resolve<A>();
@@ -23,7 +23,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Lazy_resolve_of_not_registered_service_should_work()
         {
-            var c = new Container(rules => rules.WithFuncDoesNotNeedRegistration());
+            var c = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
 
             var b = c.Resolve<Lazy<B>>();
             Assert.IsNotNull(b);

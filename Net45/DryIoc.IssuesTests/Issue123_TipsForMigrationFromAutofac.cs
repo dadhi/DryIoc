@@ -554,27 +554,39 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Autofac_Lazy_of_non_registered_dependency_should_throw()
+        public void Autofac_Func_of_non_registered_dependency_should_throw()
         {
             var builder = new ContainerBuilder();
 
-            builder.RegisterType<BLazy>();
+            builder.RegisterType<HasFuncDep>();
 
             var container = builder.Build();
 
             Assert.Throws<DependencyResolutionException>(() => 
-            container.Resolve<BLazy>());
+                container.Resolve<HasFuncDep>());
+        }
+
+        [Test]
+        public void Autofac_Lazy_of_non_registered_dependency_should_throw()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterType<HasLazyDep>();
+
+            var container = builder.Build();
+
+            Assert.Throws<DependencyResolutionException>(() =>
+            container.Resolve<HasLazyDep>());
         }
 
         [Test]
         public void DryIoc_Lazy_of_non_registered_dependency_should_throw()
         {
-            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments).WithFuncAndLazyWithoutRegistration());
 
-            container.Register<BLazy>();
+            container.Register<HasLazyDep>();
 
-            Assert.Throws<ContainerException>(() =>
-            container.Resolve<BLazy>());
+            container.Resolve<HasLazyDep>();
         }
 
         public class AutofacModule : Module
@@ -610,15 +622,26 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public class BLazy
+        public class HasLazyDep
         {
-            public Lazy<B> LazyB { get; }
+            public Lazy<B> B { get; }
 
-            public BLazy(Lazy<B> lazyB)
+            public HasLazyDep(Lazy<B> b)
             {
-                LazyB = lazyB;
+                B = b;
             }
         }
+
+        public class HasFuncDep
+        {
+            public Func<B> B { get; }
+
+            public HasFuncDep(Func<B> b)
+            {
+                B = b;
+            }
+        }
+
 
         public class C {}
 

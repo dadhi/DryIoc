@@ -34,8 +34,8 @@ namespace Autofac
     {
         public static Rules WithDefaultAutofacRules(Rules rules) => rules
             .With(FactoryMethod.ConstructorWithResolvableArguments)
-            .WithTrackingDisposableTransients()
             .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+            .WithTrackingDisposableTransients()
             .WithUnknownServiceResolvers(ThrowDependencyResolutionException);
 
         public static Factory ThrowDependencyResolutionException(Request request)
@@ -102,38 +102,24 @@ namespace Autofac
 
     public static class RegistrationExtensions
     {
-        public static RegistrationInfo RegisterType<TImplementation>(this ContainerBuilder builder)
-        {
-            return builder.Add(typeof(TImplementation), typeof(TImplementation));
-        }
+        public static RegistrationInfo RegisterType<TImplementation>(this ContainerBuilder builder) => 
+            builder.Add(typeof(TImplementation), typeof(TImplementation));
 
-        public static RegistrationInfo RegisterGeneric(this ContainerBuilder builder, Type genericTypeDefinition)
-        {
-            return builder.Add(genericTypeDefinition, genericTypeDefinition);
-        }
+        public static RegistrationInfo RegisterGeneric(this ContainerBuilder builder, Type genericTypeDefinition) => 
+            builder.Add(genericTypeDefinition, genericTypeDefinition);
 
         public static RegistrationInfo Register<TService>(
-            this ContainerBuilder builder, Func<IResolver, TService> factory)
-        {
-            return builder.Add(typeof(TService), factory: resolver => factory(resolver));
-        }
+            this ContainerBuilder builder, Func<IResolver, TService> factory) => 
+            builder.Add(typeof(TService), factory: resolver => factory(resolver));
 
-        public static RegistrationInfo RegisterInstance<T>(this ContainerBuilder builder, T instance)
-            where T : class
-        {
-            return builder.Add(typeof(T), instance: instance);
-        }
+        public static RegistrationInfo RegisterInstance<T>(this ContainerBuilder builder, T instance) where T : class => 
+            builder.Add(typeof(T), instance: instance);
 
-
-        public static void RegisterModule<TModule>(this ContainerBuilder builder) where TModule : IModule
-        {
+        public static void RegisterModule<TModule>(this ContainerBuilder builder) where TModule : IModule => 
             builder.RegisterType<TModule>().As<IModule>().SingleInstance();
-        }
 
-        public static void RegisterModule(this ContainerBuilder builder, IModule module)
-        {
+        public static void RegisterModule(this ContainerBuilder builder, IModule module) => 
             builder.RegisterInstance(module);
-        }
 
         private static RegistrationInfo Add(this ContainerBuilder builder,
             Type serviceType,
@@ -167,23 +153,16 @@ namespace Autofac
             Container = container;
         }
 
-        public void Dispose()
-        {
-            Container.Dispose();
-        }
+        public void Dispose() => Container?.Dispose();
     }
 
     public static class ContainerExtensions
     {
-        public static T Resolve<T>(this IComponentContext context)
-        {
-            return context.Container.Resolve<T>();
-        }
+        public static T Resolve<T>(this IComponentContext context) => 
+            context.Container.Resolve<T>();
 
-        public static ContainerAdapter BeginLifetimeScope(this ILifetimeScope scope)
-        {
-            return new ContainerAdapter(scope.Container.OpenScope());
-        }
+        public static ContainerAdapter BeginLifetimeScope(this ILifetimeScope scope) => 
+            new ContainerAdapter(scope.Container.OpenScope());
     }
 
     public class RegistrationInfo

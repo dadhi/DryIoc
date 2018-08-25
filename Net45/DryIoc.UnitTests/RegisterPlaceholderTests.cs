@@ -33,7 +33,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_throw_when_resolving_placholder_service()
+        public void Should_throw_when_resolving_placeholder_service()
         {
             var c = new Container();
 
