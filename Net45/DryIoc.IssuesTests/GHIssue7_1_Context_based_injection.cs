@@ -3,7 +3,7 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue7_Context_based_injection
+    public class GHIssue7_1_Context_based_injection
     {
         [Test]
         public void Request_based_impl_type()
