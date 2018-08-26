@@ -1,4 +1,5 @@
 ﻿using System;
+using ImTools;
 using NUnit.Framework;
 using Validators;
 
@@ -8,7 +9,7 @@ namespace DryIoc.IssuesTests
     public class GHIssue7_2_Context_based_injection
     {
         [Test]
-        public void Test()
+        public void Option_1_multiple_registrations_with_condition()
         {
             var container = new Container();
 
@@ -25,6 +26,43 @@ namespace DryIoc.IssuesTests
                 req => ServiceInfo.Of<SignUpViewModelValidationBuilder>(),
                 builder => builder.Build(Arg.Of<SignUpViewModel>())),
                 setup: Setup.With(condition: req => req.Parent.ImplementationType.IsAssignableTo<SignUpViewModel>()));
+
+            var sin = container.Resolve<SignInViewModel>();
+            Assert.NotNull(sin);
+
+            var sup = container.Resolve<SignUpViewModel>();
+            Assert.NotNull(sup);
+        }
+
+        [Test]
+        public void Option_2_single_generic_registration()
+        {
+            var container = new Container();
+
+            container.Register<SignInViewModel>();
+            container.RegisterMany<SignInViewModelValidationBuilder>();
+
+            container.Register<SignUpViewModel>();
+            container.RegisterMany<SignUpViewModelValidationBuilder>();
+
+            // Way 1: Works. Internally just calls the FactoryMethod.Of as in case below.
+            //container.Register<IObjectValidator>(made: Made.Of(
+            //    req => typeof(IObjectValidatorBuilder<>).MakeGenericType(req.Parent.ImplementationType)
+            //        .SingleMethod("Build"),
+            //    req => ServiceInfo.Of(
+            //        typeof(IObjectValidatorBuilder<>).MakeGenericType(req.Parent.ImplementationType))));
+
+            // Way 2: Works. 
+            //container.Register<IObjectValidator>(made: Made.Of(req =>
+            //{
+            //    var builderType = typeof(IObjectValidatorBuilder<>).MakeGenericType(req.Parent.ImplementationType);
+            //    return FactoryMethod.Of(builderType.SingleMethod("Build"), ServiceInfo.Of(builderType));
+            //}));
+
+            // Works 3: Same as above but with a bit of sugar with `Do` - most succinct variant
+            container.Register<IObjectValidator>(made: Made.Of(req =>
+                typeof(IObjectValidatorBuilder<>).MakeGenericType(req.Parent.ImplementationType)
+                    .Do(t => FactoryMethod.Of(t.SingleMethod("Build"), ServiceInfo.Of(t)))));
 
             var sin = container.Resolve<SignInViewModel>();
             Assert.NotNull(sin);
