@@ -146,11 +146,11 @@ namespace DryIoc
         public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations() =>
             _registry.Value.GetServiceRegistrations();
 
-        /// <summary>Searches for registered service factory and returns it, or null if not found.
-        /// Will use <see cref="DryIoc.Rules.FactorySelector"/> if specified.</summary>
-        /// <param name="request">Factory request.</param> <returns>Found factory or null.</returns>
-        public Factory GetRegisteredServiceFactoryOrDefault(Request request) =>
-            ((IContainer)this).GetServiceFactoryOrDefault(request);
+        /// <summary>Searches for registered factories by type, and key (if specified),
+        /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
+        /// May return empty, 1 or multiple factories.</summary>
+        public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType) => 
+            _registry.Value.GetRegisteredFactories(serviceType, serviceKey, factoryType, Fun.Always);
 
         /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
         /// for later lookup.</summary>
@@ -1621,11 +1621,9 @@ namespace DryIoc
 
                         var factory = entry as Factory;
                         if (factory != null)
-                        {
-                            if (serviceKey == null || DefaultKey.Value.Equals(serviceKey))
-                                return condition == null || condition(factory) ? factory.One() : null;
-                            return null;
-                        }
+                            return serviceKey == null || DefaultKey.Value.Equals(serviceKey)
+                                ? (condition == null || condition(factory) ? factory.One() : null)
+                                : null;
 
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null)
@@ -2168,6 +2166,7 @@ namespace DryIoc
             RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
             (T)container.New(typeof(T), made, registrySharing);
 
+        // todo: vNext: remove, replaced by Registrator.RegisterMapping
         /// <summary>Registers new service type with factory for registered service type.
         /// Throw if no such registered service type in container.</summary>
         /// <param name="container">Container</param> <param name="serviceType">New service type.</param>
@@ -2175,18 +2174,11 @@ namespace DryIoc
         /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
         /// <remarks>Does nothing if registration is already exists.</remarks>
         public static void RegisterMapping(this IContainer container, Type serviceType, Type registeredServiceType,
-            object serviceKey = null, object registeredServiceKey = null)
-        {
-            var request = registeredServiceType.ThrowIfNull().IsOpenGeneric()
-                ? Request.Create(container, null, registeredServiceKey, requiredServiceType: registeredServiceType)
-                : Request.Create(container, registeredServiceType, registeredServiceKey);
+            object serviceKey = null, object registeredServiceKey = null) =>
+            Registrator.RegisterMapping(container,
+                serviceType, registeredServiceType, serviceKey, registeredServiceKey);
 
-            var factory = container.GetServiceFactoryOrDefault(request);
-            factory.ThrowIfNull(Error.RegisterMappingNotFoundRegisteredService,
-                registeredServiceType, registeredServiceKey);
-            container.Register(factory, serviceType, serviceKey, IfAlreadyRegistered.Keep, false);
-        }
-
+        // todo: vNext: remove, replaced by Registrator.RegisterMapping
         /// <summary>Registers new service type with factory for registered service type.
         /// Throw if no such registered service type in container.</summary>
         /// <param name="container">Container</param>
@@ -2196,7 +2188,8 @@ namespace DryIoc
         /// <remarks>Does nothing if registration is already exists.</remarks>
         public static void RegisterMapping<TService, TRegisteredService>(this IContainer container,
             object serviceKey = null, object registeredServiceKey = null) =>
-            container.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
+            Registrator.RegisterMapping(container, 
+                typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
 
         // todo: Remove in VNext?
         /// <summary>Forwards to <see cref="Registrator.RegisterPlaceholder"/>.</summary>
@@ -2204,7 +2197,7 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             Registrator.RegisterPlaceholder(container, serviceType, ifAlreadyRegistered, serviceKey);
 
-        // todo: Move to Registrator and make it ext method on IRegistrator
+        // todo: vNext: Remove, replaced by Registrator.RegisterPlaceholder
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
         /// When the implementation is still not provided when the placeholder service is accessed,
@@ -4736,6 +4729,39 @@ namespace DryIoc
         public static void Unregister<TService>(this IRegistrator registrator,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(typeof(TService), serviceKey, factoryType, condition);
+
+        /// <summary>Registers new service type with factory for registered service type.
+        /// Throw if no such registered service type in container.</summary>
+        /// <param name="registrator">Registrator</param> <param name="serviceType">New service type.</param>
+        /// <param name="registeredServiceType">Existing registered service type.</param>
+        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+        /// <param name="factoryType">(optional) By default is <see cref="FactoryType.Service"/></param>
+        /// <remarks>Does nothing if registration is already exists.</remarks>
+        public static void RegisterMapping(this IRegistrator registrator, Type serviceType, Type registeredServiceType,
+            object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service)
+        {
+            var factories = registrator.GetRegisteredFactories(registeredServiceType, registeredServiceKey, factoryType);
+
+            if (factories.IsNullOrEmpty())
+                Throw.It(Error.RegisterMappingNotFoundRegisteredService, registeredServiceType, registeredServiceKey);
+
+            if (factories.Length > 1)
+                Throw.It(Error.RegisterMappingUnableToSelectFromMultipleFactories, serviceType, serviceKey, factories);
+
+            registrator.Register(factories[0], serviceType, serviceKey, IfAlreadyRegistered.Keep, false);
+        }
+
+        /// <summary>Registers new service type with factory for registered service type.
+        /// Throw if no such registered service type in container.</summary>
+        /// <param name="registrator">Registrator</param>
+        /// <typeparam name="TService">New service type.</typeparam>
+        /// <typeparam name="TRegisteredService">Existing registered service type.</typeparam>
+        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+        /// <param name="factoryType">(optional) By default is <see cref="FactoryType.Service"/></param>
+        /// <remarks>Does nothing if registration is already exists.</remarks>
+        public static void RegisterMapping<TService, TRegisteredService>(this IRegistrator registrator,
+            object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service) =>
+            registrator.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
@@ -8540,10 +8566,10 @@ namespace DryIoc
         /// Decorator and Wrapper types are not included.</summary>
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
 
-        /// <summary>Searches for registered service factory and returns it, or null if not found.
-        /// Will use <see cref="DryIoc.Rules.FactorySelector"/> if specified.</summary>
-        /// <param name="request">Factory request.</param> <returns>Found factory or null.</returns>
-        Factory GetRegisteredServiceFactoryOrDefault(Request request);
+        /// <summary>Searches for registered factories by type, and key (if specified),
+        /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
+        /// May return empty, 1 or multiple factories.</summary>
+        Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
     }
 
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
@@ -8853,6 +8879,8 @@ namespace DryIoc
                 "Expecting required service type but it is not specified when resolving: {0}"),
             RegisterMappingNotFoundRegisteredService = Of(
                 "When registering mapping, Container is unable to find factory of registered service type {0} and key {1}."),
+            RegisterMappingUnableToSelectFromMultipleFactories = Of(
+                "RegisterMapping selected more than 1 factory with provided type {0} and key {1}: {2}"),
             RegisteringInstanceNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
             NoMoreRegistrationsAllowed = Of(
