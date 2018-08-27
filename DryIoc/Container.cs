@@ -445,7 +445,8 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this, root: _root ?? this);
         }
 
-        void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+        /// <summary>Puts and instance into the current scope or singletons.</summary>
+        public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
             ThrowIfContainerDisposed();
@@ -632,7 +633,7 @@ namespace DryIoc
                     var oldFactory = oldEntry as Factory;
                     if (oldFactory != null)
                         registry.DropFactoryCache(oldFactory, serviceType);
-                    else 
+                    else
                         ((FactoriesEntry)oldEntry).Factories.Enumerate().ToArray()
                             .DoPer(x => registry.DropFactoryCache(x.Value, serviceType, serviceKey));
                 }
@@ -640,6 +641,14 @@ namespace DryIoc
                 return registry;
             });
         }
+
+        void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey) =>
+            UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+
+        void IRegistrator.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey) =>
+            UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         void IResolverContext.InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames)
         {
@@ -2585,7 +2594,7 @@ namespace DryIoc
         /// <summary>Creates resolver context with specified current scope (or container which implements the context).</summary>
         IResolverContext WithCurrentScope(IScope scope);
 
-        /// <summary>Allows to put instance into the scope.</summary>
+        /// <summary>Put instance into the current scope or singletons.</summary>
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
 
@@ -4598,17 +4607,44 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
+        // todo: why is this even in `Registrator`?
+        /// <summary>Stores an externally created instance in the current scope or singletons,
         /// replacing the existing registration and instance if any.</summary>
         public static void UseInstance<TService>(this IResolverContext r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
+        /// <summary>Stores an externally created instance in the current scope or singletons,
+        /// replacing the existing registration and instance if any.</summary>
+        public static void UseInstance<TService>(this IRegistrator r, TService instance,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+
+        // todo: do something aboutmultiplicity of methods on (IContainer, IRegistrator, IResolver) 
+        /// <summary>Stores an externally created instance in the current scope or singletons,
+        /// replacing the existing registration and instance if any.</summary>
+        public static void UseInstance<TService>(this IContainer c, TService instance,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            c.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+
+        // todo: why is this even in `Registrator`?
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+
+        /// <summary>Stores the externally created instance into open scope or singleton,
+        /// replacing the existing registration and instance if any.</summary>
+        public static void UseInstance(this IRegistrator r, Type serviceType, object instance,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
+
+        /// <summary>Stores the externally created instance into open scope or singleton,
+        /// replacing the existing registration and instance if any.</summary>
+        public static void UseInstance(this IContainer c, Type serviceType, object instance,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            c.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Stores the externally created instance into open scope or singleton,
         /// replacing the existing registration and instance if any.</summary>
@@ -4621,6 +4657,18 @@ namespace DryIoc
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+
+        /// <summary>Stores the externally created instance into open scope or singleton,
+        /// replacing the existing registration and instance if any.</summary>
+        public static void UseInstance(this IRegistrator r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+
+        /// <summary>Stores the externally created instance into open scope or singleton,
+        /// replacing the existing registration and instance if any.</summary>
+        public static void UseInstance(this IContainer c, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
+            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
@@ -8570,6 +8618,10 @@ namespace DryIoc
         /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
         /// May return empty, 1 or multiple factories.</summary>
         Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
+
+        /// <summary>Put instance into the current scope or singletons.</summary>
+        void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey);
     }
 
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
@@ -8659,6 +8711,10 @@ namespace DryIoc
         /// <param name="serviceKey">(optional) If omitted, the cache will be cleared for all registrations of <paramref name="serviceType"/>.</param>
         /// <returns>True if target service was found, false - otherwise.</returns>
         bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey);
+
+        /// <summary>Puts and instance into the current scope or singletons.</summary>
+        new void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
