@@ -1,4 +1,4 @@
-version: 3.0.0.{build}
+version: 3.0.0-preview-{build}
 os: Visual Studio 2017
 test: off
 
