@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -48,7 +47,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
 
-            var func = container.Resolve<Func<IService>>();
+            var func = container.Resolve<Func<IService>>(); 
 
             var one = func();
             var another = func();
@@ -83,7 +82,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_implementation_with_one_constuctor_primitive_parameter_Possible_to_resolve_service_as_Func_of_one_parameter()
+        public void Given_implementation_with_one_constructor_primitive_parameter_Possible_to_resolve_service_as_Func_of_one_parameter()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithOnePrimitiveParameter));
@@ -95,7 +94,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_implementation_with_many_constuctor_primitive_parameters_Possible_to_resolve_service_as_Func_of_many_parameters()
+        public void Given_implementation_with_many_constructor_primitive_parameters_Possible_to_resolve_service_as_Func_of_many_parameters()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithTwoPrimitiveParameters));
@@ -150,7 +149,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_implementation_with_two_constuctor_parameters_Possible_to_resolve_service_as_Func_of_one_parameter_with_another_provided_by_Conrainer()
+        public void Given_implementation_with_two_constructor_parameters_Possible_to_resolve_service_as_Func_of_one_parameter_with_another_provided_by_Conrainer()
         {
             var container = new Container();
             container.Register(typeof(IServiceWithParameterAndDependency), typeof(ServiceWithParameterAndDependency));
@@ -250,7 +249,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_service_with_resursive_dependency_with_Func_on_road_should_throw()
+        public void Resolving_service_with_recursive_dependency_with_Func_on_road_should_throw()
         {
             var container = new Container();
 
@@ -322,7 +321,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_subdependency_with_func_argument()
+        public void Can_resolve_sub_dependency_with_func_argument()
         {
             var container = new Container();
             container.Register<ClassWithDepAndSubDep>();
@@ -335,7 +334,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_reuse_func_argument_for_dependency_and_subdependency()
+        public void Can_reuse_func_argument_for_dependency_and_sub_dependency()
         {
             var container = new Container();
             container.Register<X>();

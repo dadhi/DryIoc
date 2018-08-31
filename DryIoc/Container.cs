@@ -2984,7 +2984,7 @@ namespace DryIoc
                 request = request.WithInputArgs(argExprs);
             }
 
-            var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc);
+            var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
 
             var container = request.Container;
 
@@ -5561,7 +5561,10 @@ namespace DryIoc
         StopRecursiveDependencyCheck = 1 << 7,
 
         /// <summary>Non inherited. Marks the expression to be added to generated resolutions to prevent infinite recursion</summary>
-        IsGeneratedResolutionDependencyExpression = 1 << 8
+        IsGeneratedResolutionDependencyExpression = 1 << 8,
+
+        /// <summary>Non inherited. Indicates the root service inside the function.</summary>
+        IsDirectlyWrappedInFunc = 1 << 9
     }
 
     /// <summary>Tracks the requested service and resolved factory details in a chain of nested dependencies.</summary>
@@ -5570,7 +5573,7 @@ namespace DryIoc
         internal static readonly RequestFlags InheritedFlags
             = RequestFlags.IsSingletonOrDependencyOfSingleton
             | RequestFlags.IsWrappedInFunc;
-
+ 
         private const RequestFlags DefaultFlags = default(RequestFlags);
 
         /// <summary>Empty terminal request.</summary>
@@ -5660,6 +5663,9 @@ namespace DryIoc
 
         /// <summary>Number of nested dependencies. Set with each new request Push.</summary>
         public readonly int DependencyDepth;
+
+        // holds the resolved expressions in root request only
+        private readonly Ref<ImMap<Expr>> _builtExpressions;
 
         #endregion
 
@@ -6102,6 +6108,15 @@ namespace DryIoc
             return s;
         }
 
+        /// <summary>Built expressions stored in resolution root (call).</summary>
+        public Ref<ImMap<Expr>> GetBuiltExpressions()
+        {
+            var req = this;
+            while (!req.IsEmpty && req._builtExpressions == null)
+                req = req.DirectParent;
+            return req._builtExpressions;
+        }
+
         /// <summary>Prints whole request chain.</summary>
         public override string ToString() => Print().ToString();
 
@@ -6138,6 +6153,7 @@ namespace DryIoc
         /// <summary>Calculates the combined hash code based on factory IDs.</summary>
         public override int GetHashCode() => _hashCode;
 
+        // Initial request without factory info yet
         private Request(IContainer container, Request parent, RequestFlags flags,
             IServiceInfo serviceInfo, Expr[] inputArgExprs)
         {
@@ -6146,6 +6162,7 @@ namespace DryIoc
             Flags = flags;
             _serviceInfo = serviceInfo;
             InputArgExprs = inputArgExprs; // runtime state
+
             if (parent != null)
                 DependencyDepth = parent.DependencyDepth + 1;
         }
@@ -6163,6 +6180,10 @@ namespace DryIoc
             _factoryImplType = factoryImplType;
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
+
+            if (factoryType == FactoryType.Service && 
+                (Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
+                _builtExpressions = Ref.Of(ImMap<Expr>.Empty);
         }
     }
 
@@ -6649,11 +6670,18 @@ namespace DryIoc
                     return Constant(singleton, request.ServiceType);
             }
 
+            Ref<ImMap<Expr>> builtExprs = null;
+            if (FactoryType == FactoryType.Service)
+            {
+                builtExprs = request.GetBuiltExpressions();
+                var builtExpr = builtExprs?.Value.GetValueOrDefault(FactoryID);
+                if (builtExpr != null)
+                    return builtExpr;
+            }
+
             // Then create new expression
             var serviceExpr = CreateExpressionOrDefault(request);
-            if (serviceExpr == null)
-                Container.TryThrowUnableToResolve(request);
-            else
+            if (serviceExpr != null)
             {
                 if (request.Reuse != DryIoc.Reuse.Transient &&
                     request.GetActualServiceType() != typeof(void))
@@ -6665,8 +6693,10 @@ namespace DryIoc
                     if (serviceExpr.Type != originalServiceExprType) // todo: do I need to convert?
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
-            }
 
+                builtExprs?.Swap(x => x.AddOrUpdate(FactoryID, serviceExpr));
+            }
+            else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
         }
 

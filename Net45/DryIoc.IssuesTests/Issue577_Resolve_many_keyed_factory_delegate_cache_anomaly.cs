@@ -41,7 +41,7 @@ namespace DryIoc.IssuesTests
                 ExpectedStrategiesWithSmallerDependencyTree);
         }
 
-        [Test] //RED
+        [Test]
         public void ResolvingEagerYieldsInstancesOfTheExpectedTypes()
         {
             DoResolutionTest(CreateContainerWithoutLazy, ExpectedStrategies);
