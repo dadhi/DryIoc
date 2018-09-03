@@ -104,6 +104,19 @@ namespace DryIoc.UnitTests
             Assert.AreSame(testconcreate1.Singleton, testconcreate2.Singleton);
         }
 
+        [Test]
+        public void Should_be_able_to_call_new_on_opened_scope()
+        {
+            var container = new Container();
+            container.Register<Wheels>();
+            using (var scope = container.OpenScope())
+            {
+                var car = scope.New<Car>();
+                Assert.That(car.Wheels, Is.Not.Null);
+                Assert.That(container.IsRegistered<Car>(), Is.False);
+            }
+        }
+
         public interface ISingleton
         {
             void Foo();

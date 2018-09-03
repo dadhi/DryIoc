@@ -417,6 +417,21 @@ namespace DryIoc
                 Throw.It(Error.ContainerIsDisposed, ToString());
         }
 
+        /// <inheritdoc />
+        public object New(Type concreteType, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
+        {
+            var containerClone = With(Rules, ScopeContext,
+                registrySharing, SingletonScope);
+
+            var implType = containerClone.GetWrappedType(concreteType, null);
+
+            containerClone.Register(implType, made: made);
+
+            // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
+            return containerClone.Resolve(concreteType, IfUnresolved.Throw);
+        }
+
         #endregion
 
         #region IResolverContext
@@ -2080,6 +2095,31 @@ namespace DryIoc
 #endif
     }
 
+    /// <summary>Resolver extended features.</summary>
+    public static class ResolverTools
+    {
+        /// <summary>Creates service using container for injecting parameters without registering anything in container.</summary>
+        /// <typeparam name="T">Type to instantiate.</typeparam>
+        /// <param name="resolver">Resolver to use for type creation and injecting its dependencies.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, properties and fields.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        public static T New<T>(this IResolver resolver, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            (T)resolver.New(typeof(T), made, registrySharing);
+
+        /// <summary>Creates service given strongly-typed creation expression.
+        /// Can be used to invoke arbitrary method returning some value with injecting its parameters from container.</summary>
+        /// <typeparam name="T">Method or constructor result type.</typeparam>
+        /// <param name="resolver">Resolver to use for injecting dependencies.</param>
+        /// <param name="made">Creation expression.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
+        /// <returns>Created result.</returns>
+        public static T New<T>(this IResolver resolver, Made.TypedMade<T> made,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            (T)resolver.New(typeof(T), made, registrySharing);
+    }
+
     /// <summary>Container extended features.</summary>
     public static class ContainerTools
     {
@@ -2148,15 +2188,7 @@ namespace DryIoc
         public static object New(this IContainer container, Type concreteType, Made made = null,
             RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
         {
-            var containerClone = container.With(container.Rules, container.ScopeContext,
-                registrySharing, container.SingletonScope);
-
-            var implType = containerClone.GetWrappedType(concreteType, null);
-
-            containerClone.Register(implType, made: made);
-
-            // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
-            return containerClone.Resolve(concreteType, IfUnresolved.Throw);
+            return container.New(concreteType, made, registrySharing);
         }
 
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
@@ -8552,6 +8584,15 @@ namespace DryIoc
         /// <returns>Enumerable of found services or empty. Does Not throw if no service found.</returns>
         IEnumerable<object> ResolveMany(Type serviceType, object serviceKey,
             Type requiredServiceType, Request preResolveParent, object[] args);
+
+        /// <summary>Creates service using container for injecting parameters without registering anything in container.</summary>
+        /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters,
+        /// properties and fields.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        object New(Type concreteType, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache);
     }
 
     /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
