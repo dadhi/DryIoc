@@ -2028,10 +2028,9 @@ namespace DryIoc
         private static readonly ParamExpr[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
 
         /// <summary>Strips the unnecessary or adds the necessary cast to expression return result.</summary>
-        public static Expr NormalizeExpression(this Expr expr) =>
+        public static Expr NormalizeExpression(this Expr expr) => 
             expr.NodeType == ExpressionType.Convert ? ((UnaryExpr)expr).Operand :
-            expr.Type.IsValueType() ? Convert(expr, typeof(object)) :
-            expr;
+            expr.Type != typeof(void) && expr.Type.IsValueType() ? Convert(expr, typeof(object)) : expr;
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static FactoryDelegateExpr WrapInFactoryExpression(this Expr expression) =>
@@ -2050,8 +2049,14 @@ namespace DryIoc
                 return _ => value;
             }
 
+            if (expression.Type == typeof(void))
+            {
+                ;
+            }
+
             var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
                 expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+
             if (factoryDelegate != null)
                 return factoryDelegate;
 
@@ -2987,10 +2992,10 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
 
             var container = request.Container;
-
-            var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration 
-                ? Resolver.CreateResolutionExpression(serviceRequest) 
+            var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration && !isAction
+                ? Resolver.CreateResolutionExpression(serviceRequest)
                 : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
+
             if (serviceExpr == null)
                 return null;
 
@@ -4997,6 +5002,9 @@ namespace DryIoc
 
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
+
+            if (request.ServiceType == typeof(void))
+                return resolveCallExpr;
 
             return Convert(resolveCallExpr, request.ServiceType);
         }

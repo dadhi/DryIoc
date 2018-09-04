@@ -307,7 +307,7 @@ namespace FastExpressionCompiler
         public static TDelegate TryCompile<TDelegate>(this LambdaExpressionInfo lambdaExpr)
             where TDelegate : class =>
             TryCompile<TDelegate>(lambdaExpr.Body, lambdaExpr.Parameters,
-                Tools.GetParamExprTypes(lambdaExpr.Parameters), lambdaExpr.Body.GetResultType());
+                Tools.GetParamExprTypes(lambdaExpr.Parameters), lambdaExpr.ReturnType);
 
         /// <summary>Tries to compile lambda expression info.</summary>
         public static Delegate TryCompile(this LambdaExpressionInfo lambdaExpr) =>
@@ -1034,7 +1034,7 @@ namespace FastExpressionCompiler
                 var bodyExpr = lambdaExprInfo.Body;
                 bodyType = bodyExpr.GetResultType();
                 compiledLambda = TryCompile(ref nestedClosure,
-                    lambdaExprInfo.Type, Tools.GetParamExprTypes(lambdaParamExprs), bodyType,
+                    lambdaExprInfo.Type, Tools.GetParamExprTypes(lambdaParamExprs), lambdaExprInfo.ReturnType,
                     bodyExpr, bodyExpr.GetNodeType(), bodyType,
                     lambdaParamExprs, isNestedLambda: true);
             }
@@ -1045,7 +1045,7 @@ namespace FastExpressionCompiler
                 var bodyExpr = lambdaExpr.Body;
                 bodyType = bodyExpr.Type;
                 compiledLambda = TryCompile(ref nestedClosure,
-                    lambdaExpr.Type, Tools.GetParamExprTypes(lambdaParamExprs), bodyType,
+                    lambdaExpr.Type, Tools.GetParamExprTypes(lambdaParamExprs), lambdaExpr.ReturnType,
                     bodyExpr, bodyExpr.NodeType, bodyExpr.Type,
                     lambdaParamExprs, isNestedLambda: true);
             }
@@ -3755,6 +3755,7 @@ namespace FastExpressionCompiler
         public override ExpressionType NodeType => ExpressionType.Lambda;
         public override Type Type { get; }
 
+        public readonly Type ReturnType;
         public readonly object Body;
         public object[] Parameters => Arguments;
 
@@ -3767,10 +3768,16 @@ namespace FastExpressionCompiler
         public LambdaExpressionInfo(Type delegateType, object body, object[] parameters) : base(parameters)
         {
             Body = body;
-            var bodyType = body.GetResultType();
-            Type = delegateType != null && delegateType != typeof(Delegate)
-                ? delegateType
-                : Tools.GetFuncOrActionType(Tools.GetParamExprTypes(parameters), bodyType);
+            if (delegateType == null || delegateType == typeof(Delegate))
+            {
+                ReturnType = body.GetResultType();
+                Type = Tools.GetFuncOrActionType(Tools.GetParamExprTypes(parameters), ReturnType);
+            }
+            else
+            {
+                ReturnType = delegateType.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
+                Type = delegateType;
+            }
         }
     }
 
