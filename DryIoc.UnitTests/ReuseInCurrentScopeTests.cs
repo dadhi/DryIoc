@@ -331,9 +331,10 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_resolve_service_as_scoped_or_singleton_depending_on_scope_availibility()
+        public void Can_resolve_service_as_scoped_or_singleton_depending_on_scope_availability()
         {
             var container = new Container();
+
             container.Register<Blah>(Reuse.ScopedOrSingleton);
 
             var singleton = container.Resolve<Blah>();
@@ -356,11 +357,52 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(singleton.IsDisposed);
         }
 
-        public class BlahConsumer
+        [Test]
+        public void Can_inject_service_as_scoped_or_singleton_depending_on_scope_availability()
+        {
+            var container = new Container();
+
+            container.Register<Blah>(Reuse.ScopedOrSingleton);
+
+            container.Register<SingletonBlahUser>(Reuse.Singleton);
+            container.Register<ScopedBlahUser>(Reuse.Scoped);
+
+            var singleton = container.Resolve<SingletonBlahUser>();
+
+            using (var scope = container.OpenScope())
+            {
+                var scoped = scope.Resolve<ScopedBlahUser>();
+
+                Assert.AreNotSame(singleton.Blah, scoped.Blah);
+                Assert.AreSame(scoped.Blah, scope.Resolve<ScopedBlahUser>().Blah);
+
+                using (var nestedScope = scope.OpenScope())
+                    Assert.AreNotSame(scoped.Blah, nestedScope.Resolve<ScopedBlahUser>().Blah);
+
+                Assert.AreSame(scoped.Blah, scope.Resolve<ScopedBlahUser>().Blah);
+            }
+
+            Assert.AreSame(singleton.Blah, container.Resolve<SingletonBlahUser>().Blah);
+
+            container.Dispose();
+            Assert.IsTrue(singleton.Blah.IsDisposed);
+        }
+
+        public class SingletonBlahUser
         {
             public Blah Blah { get; }
 
-            public BlahConsumer(Blah blah)
+            public SingletonBlahUser(Blah blah)
+            {
+                Blah = blah;
+            }
+        }
+
+        public class ScopedBlahUser
+        {
+            public Blah Blah { get; }
+
+            public ScopedBlahUser(Blah blah)
             {
                 Blah = blah;
             }

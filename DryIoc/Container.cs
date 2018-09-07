@@ -2397,7 +2397,10 @@ namespace DryIoc
         /// which usually is not realistic case to validate. </summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> condition = null) =>
-            container.GenerateResolutionExpressions(condition ?? Fun.Always).Errors.ToArray();
+            container.GenerateResolutionExpressions(condition ?? DefaultValidateCondition).Errors.ToArray();
+
+        /// <summary>Excluding open-generic resgitrations, cause you need to provide type arguments to actually create these types.</summary>
+        public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
         /// Method will collect the exceptions when resolving or injecting the specific root.
@@ -8450,10 +8453,10 @@ namespace DryIoc
 
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Singleton"/></summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
-        public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
+        public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(lifespan: SingletonReuse.DefaultLifespan, scopedOrSingleton: true);
 
         /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
-        [Obsolete("Now it is the same as Reuse.Scoped, please prefer it or use Reuse.ScopedTo to specify bound service")]
+        [Obsolete("The same as Reuse.Scoped, please prefer to use Reuse.Scoped or the Reuse.ScopedTo to specify a bound service.")]
         public static readonly IReuse InResolutionScope = Scoped;
 
         /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
