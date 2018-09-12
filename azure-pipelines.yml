@@ -10,8 +10,5 @@ variables:
   srcroot: $(Build.SourceDirectory)
 
 steps:
-- script: echo %srcroot% 
-
-- task: BatchScript@1
-  inputs:
-    filename: $(srcroot)\build.bat
+- script: $(Build.SourceDirectory)\build.bat
+  displayName: Start built.bat from $(Build.SourceDirectory)
