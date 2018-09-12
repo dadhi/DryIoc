@@ -628,8 +628,8 @@ namespace ImTools
 
         /// <inheritdoc />
         public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-             s.Append("KV(").Do(k => Key == null ? k : printer(k, Key))
-              .Append(", ").Do(r => Value == null ? r : printer(r, Value))
+             s.Append("(").Do(b => Key == null ? b : printer(b, Key))
+              .Append(", ").Do(b => Value == null ? b : printer(b, Value))
               .Append(')');
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>

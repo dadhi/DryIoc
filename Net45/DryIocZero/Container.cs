@@ -325,15 +325,13 @@ namespace DryIocZero
         public override string ToString()
         {
             var scope = CurrentScope;
-            var scopeStr = scope == null ? "container"
-                    : ScopeContext != null
-                        ? "ambient scoped container with scope " + scope
-                        : "scoped container with scope " + scope;
+            var scopeStr = scope == null 
+                ? "container without open scope"
+                : ScopeContext != null
+                ? "ambient scoped container with scope " + scope
+                : "container with scope " + scope;
 
-            if (IsDisposed)
-                scopeStr = "disposed " + scopeStr;
-
-            return scopeStr;
+            return IsDisposed ? "disposed " + scopeStr : scopeStr;
         }
     }
 

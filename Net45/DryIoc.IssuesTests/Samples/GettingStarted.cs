@@ -85,7 +85,7 @@ Where no service registrations found
             var ex = Assert.Throws<ContainerException>(() => 
                 container.Resolve<X>());
 
-            Assert.AreEqual(Error.UnableToResolveFromRegisteredServices, ex.Error);
+            Assert.AreEqual(ex.Error, Error.UnableToResolveFromRegisteredServices);
         }
 
         [Test]
@@ -93,17 +93,11 @@ Where no service registrations found
         {
             var container = new Container();
             container.Register<X>();
-            container.Register<Y>(Reuse.InCurrentNamedScope("specialScope"));
+            container.Register<Y>(Reuse.Scoped);
 
-            using (var scope = container.OpenScope("luckyScope"))
-            {
-                var ex = Assert.Throws<ContainerException>(() =>
-                    scope.Resolve<X>());
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<X>());
 
-                Assert.AreEqual(
-                    Error.NameOf(Error.NoMatchedScopeFound), 
-                    Error.NameOf(ex.Error));
-            }
+            Assert.AreEqual(Error.NameOf(Error.NoCurrentScope), ex.ErrorName);
         }
 
         class X

@@ -107,7 +107,7 @@ namespace DryIoc
             }
 
             var scope = CurrentScope;
-            var scopeStr = scope == null ? "container"
+            var scopeStr = scope == null ? "container without scope"
                 : (_scopeContext != null ? "ambiently " : string.Empty) + "scoped container with " + scope;
 
             return scopeStr;
@@ -768,8 +768,7 @@ namespace DryIoc
                 .Aggregate(new StringBuilder(), (s, f) =>
                     (f.Value.Reuse?.CanApply(request) ?? true
                         ? s.Append("  ")
-                        : s.Append("  without matching scope "))
-                        .AppendLine(f.ToString()));
+                        : s.Append("  without matching scope ")).Print(f, quote: "\""));
 
             if (registrations.Length != 0)
                 Throw.It(Error.UnableToResolveFromRegisteredServices,
@@ -2651,14 +2650,14 @@ namespace DryIoc
 
         /// <summary>Provides access to the current scope.</summary>
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
-            r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null);
+            r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null);
 
         /// <summary>Gets current scope matching the <paramref name="name"/></summary>
         public static IScope GetNamedScope(this IResolverContext r, object name, bool throwIfNotFound)
         {
             var currentScope = r.CurrentScope;
             if (currentScope == null)
-                return throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope) : null;
+                return throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
             if (name == null)
                 return currentScope;
@@ -8851,8 +8850,8 @@ namespace DryIoc
             UnableToResolveUnknownService = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
                 "Where no service registrations found" + Environment.NewLine +
-                "  and no dynamic registrations found in {1} Rules.DynamicServiceProviders" + Environment.NewLine +
-                "  and nothing in {2} Rules.UnknownServiceResolvers"),
+                "  and no dynamic registrations found in {1} of Rules.DynamicServiceProviders" + Environment.NewLine +
+                "  and nothing found in {2} of Rules.UnknownServiceResolvers"),
 
             UnableToResolveFromRegisteredServices = Of(
                 "Unable to resolve {0}" + Environment.NewLine +
@@ -8943,7 +8942,8 @@ namespace DryIoc
                 "Unable to register service {0} with duplicate key '{1}'" + Environment.NewLine +
                 " There is already registered service with the same key: {2}."),
             NoCurrentScope = Of(
-                "No current scope available: probably you are registering to, or resolving from outside of scope."),
+                "No current scope available. Probably you are registering to, or resolving from outside of scope. " + Environment.NewLine +
+                "Current resolver context is: {0}"),
             ContainerIsDisposed = Of(
                 "Container is disposed and should not be used: {0}"),
             NoMatchedScopeFound = Of(
@@ -9654,7 +9654,7 @@ namespace DryIoc
             x == null ? s.Append("null")
             : x is string ? s.Print((string)x, quote)
             : x is Type ? s.Print((Type)x, getTypeName)
-            : x is IPrintable ? ((IPrintable)x).Print(s, (_, i) => _.Print(i, quote, itemSeparator, getTypeName))
+            : x is IPrintable ? ((IPrintable)x).Print(s, (b, p) => b.Print(p, quote, itemSeparator, getTypeName))
             : x is IScope || x is Request ? s.Append(x) // prevent recursion for IEnumerable
             : x.GetType().IsEnum() ? s.Print(x.GetType()).Append('.').Append(Enum.GetName(x.GetType(), x))
             : (x is IEnumerable<Type> || x is IEnumerable) &&
