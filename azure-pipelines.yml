@@ -14,5 +14,5 @@ variables:
 steps:
 - task: BatchScript@1
   inputs:
-    path: build.bat
+    filename: build.bat
      
