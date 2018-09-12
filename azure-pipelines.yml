@@ -6,9 +6,6 @@
 pool:
   vmImage: 'VS2017-Win2016'
 
-variables:
-  srcroot: $(Build.SourceDirectory)
-
 steps:
-- script: $(Build.SourceDirectory)\build.bat
+- script: %Build_SourceDirectory%\build.bat
   displayName: Start built.bat from $(Build.SourceDirectory)
