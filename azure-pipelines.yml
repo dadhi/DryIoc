@@ -12,4 +12,7 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-- task: build.bat@1
+- task: BatchScript@1
+  inputs:
+    path: build.bat
+     
