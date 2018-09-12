@@ -7,5 +7,5 @@ pool:
   vmImage: 'VS2017-Win2016'
 
 steps:
-- script: %Build_SourceDirectory%\build.bat
+- script: .\BuildScripts\_main.bat
   displayName: Start built.bat from $(Build.SourceDirectory)
