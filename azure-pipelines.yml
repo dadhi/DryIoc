@@ -7,12 +7,11 @@ pool:
   vmImage: 'VS2017-Win2016'
 
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
-  buildConfiguration: 'Release'
+  srcroot: $(Build.SourceDirectory)
 
 steps:
+- script: echo %srcroot% 
+
 - task: BatchScript@1
   inputs:
-    filename: build.bat
-     
+    filename: $(srcroot)\build.bat

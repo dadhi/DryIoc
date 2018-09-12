@@ -34,10 +34,7 @@ namespace DryIoc.Interception
                 setup: decoratorSetup);
         }
 
-        private static DefaultProxyBuilder ProxyBuilder
-        {
-            get { return _proxyBuilder ?? (_proxyBuilder = new DefaultProxyBuilder()); }
-        }
+        private static DefaultProxyBuilder ProxyBuilder => _proxyBuilder ?? (_proxyBuilder = new DefaultProxyBuilder());
 
         private static DefaultProxyBuilder _proxyBuilder;
     }
