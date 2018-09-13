@@ -26,7 +26,7 @@ cd /d %SCRIPTDIR%
 call Clean -nopause
 call :Check
 
-call Build15.bat -nopause
+call Build.bat -nopause
 call :Check
 
 call RunTestsWithCoverage -nopause

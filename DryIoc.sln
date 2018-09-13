@@ -180,6 +180,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGetSpecs", "NuGetSpecs", 
 		NuGetSpecs\README.md = NuGetSpecs\README.md
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Docs", "Net45\DryIoc.Docs\DryIoc.Docs.csproj", "{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -414,6 +416,10 @@ Global
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -468,6 +474,7 @@ Global
 		{E5D3A0BD-21E8-4C2B-A37D-4B8082C1C3F8} = {75F9EC5A-506E-42F1-9C11-6513BEB47F4C}
 		{3B9FA7C3-844E-41B4-8B57-ADA9F3431469} = {C8C71EEF-0C64-4A33-96F8-D22C6E429741}
 		{DB409B03-9B4A-4AF5-9941-46CF76BC9CCA} = {CE5E598E-5A34-40EA-9110-AD2663BAD177}
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C} = {73380ECB-31FC-460B-8563-CA0FC10C54D9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0E2EF000-D09D-43EA-B611-369630A795B9}

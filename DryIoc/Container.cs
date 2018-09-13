@@ -1591,10 +1591,8 @@ namespace DryIoc
                 return factory.FactoryType == FactoryType.Service
                         ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(
-                            Decorators.AddOrUpdate(serviceType, new[] { factory }, ArrayTools.Append))
-                        : WithWrappers(
-                            Wrappers.AddOrUpdate(serviceType, factory));
+                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, factory.One(), ArrayTools.Append))
+                        : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
             }
 
             public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType,

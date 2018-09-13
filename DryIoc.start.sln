@@ -83,6 +83,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{70B242BC
 		NuGetSpecs\DryIocZero\build\DryIocZero.props = NuGetSpecs\DryIocZero\build\DryIocZero.props
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Docs", "Net45\DryIoc.Docs\DryIoc.Docs.csproj", "{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -137,6 +139,10 @@ Global
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D2656A9-81D3-4CCD-94E5-9CB8FC7E5E70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1EEE4073-54CA-4E49-B67B-4AF9D5B41A3C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
