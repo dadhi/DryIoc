@@ -768,7 +768,7 @@ namespace DryIoc
                 .Aggregate(new StringBuilder(), (s, f) =>
                     (f.Value.Reuse?.CanApply(request) ?? true
                         ? s.Append("  ")
-                        : s.Append("  without matching scope ")).Print(f, quote: "\""));
+                        : s.Append("  without matching scope ")).Print(f));
 
             if (registrations.Length != 0)
                 Throw.It(Error.UnableToResolveFromRegisteredServices,
@@ -5131,12 +5131,12 @@ namespace DryIoc
             var s = new StringBuilder();
 
             if (HasCustomValue)
-                return s.Append("{CustomValue=").Print(CustomValue ?? "null", "\"").Append("}").ToString();
+                return s.Append("{CustomValue=").Print(CustomValue ?? "null").Append("}").ToString();
 
             if (RequiredServiceType != null)
                 s.Append("RequiredServiceType=").Print(RequiredServiceType);
             if (ServiceKey != null)
-                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey, "\"");
+                (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey);
             if (MetadataKey != null || Metadata != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("Metadata=").Append(MetadataKey.Pair(Metadata));
             if (IfUnresolved != IfUnresolved.Throw)
@@ -5424,7 +5424,7 @@ namespace DryIoc
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
         public override string ToString() =>
-            new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name, "\"").ToString();
+            new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
         #region Implementation
 
@@ -5492,7 +5492,7 @@ namespace DryIoc
             public override void SetValue(object holder, object value) => _property.SetValue(holder, value, null);
 
             public override string ToString() => 
-                new StringBuilder().Print(this).Append(" as property ").Print(_property.Name, "\"").ToString();
+                new StringBuilder().Print(this).Append(" as property ").Print(_property.Name).ToString();
 
             private readonly PropertyInfo _property;
             public Property(PropertyInfo property) { _property = property; }
@@ -5524,7 +5524,8 @@ namespace DryIoc
 
             public override void SetValue(object holder, object value) => _field.SetValue(holder, value);
 
-            public override string ToString() => new StringBuilder().Print(this).Append(" as field ").Print(_field.Name, "\"").ToString();
+            public override string ToString() => 
+                new StringBuilder().Print(this).Append(" as field ").Print(_field.Name).ToString();
 
             private readonly FieldInfo _field;
             public Field(FieldInfo field) { _field = field; }
@@ -6820,7 +6821,7 @@ namespace DryIoc
             if (Setup.FactoryType != Setup.Default.FactoryType)
                 s.Append(", FactoryType=").Append(Setup.FactoryType);
             if (Setup.Metadata != null)
-                s.Append(", Metadata=").Print(Setup.Metadata, quote: "\"");
+                s.Append(", Metadata=").Print(Setup.Metadata);
             if (Setup.Condition != null)
                 s.Append(", HasCondition");
 
@@ -8274,7 +8275,7 @@ namespace DryIoc
         {
             var s = new StringBuilder(GetType().Name + " {");
             if (Name != null)
-                s.Append("Name=").Print(Name, "\"").Append(", ");
+                s.Append("Name=").Print(Name).Append(", ");
             return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
         }
 
@@ -8620,7 +8621,7 @@ namespace DryIoc
         {
             var s = new StringBuilder().Print(ServiceType);
             if (OptionalServiceKey != null)
-                s.Append(" with ServiceKey=").Print(OptionalServiceKey, "\"");
+                s.Append(" with ServiceKey=").Print(OptionalServiceKey);
             return s.Append(" with factory ").Append(Factory).ToString();
         }
     }
@@ -8918,7 +8919,7 @@ namespace DryIoc
             RegedFactoryDlgResultNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
             NotFoundSpecifiedWritablePropertyOrField = Of(
-                "Unable to find writable property or field \"{0}\" when resolving: {1}."),
+                "Unable to find writable property or field {0} when resolving: {1}."),
             PushingToRequestWithoutFactory = Of(
                 "Pushing the next request {0} into parent request not yet resolved to factory: {1}"),
             NoMatchedGenericParamConstraints = Of(
@@ -9650,7 +9651,7 @@ namespace DryIoc
         /// <param name="getTypeName">(optional) Custom type printing policy.</param>
         /// <returns>String builder with appended output.</returns>
         public static StringBuilder Print(this StringBuilder s, object x,
-            string quote = null, string itemSeparator = null, Func<Type, string> getTypeName = null) =>
+            string quote = "\"", string itemSeparator = null, Func<Type, string> getTypeName = null) =>
             x == null ? s.Append("null")
             : x is string ? s.Print((string)x, quote)
             : x is Type ? s.Print((Type)x, getTypeName)
@@ -9666,7 +9667,7 @@ namespace DryIoc
         /// <param name="s">String builder to append string to.</param> <param name="str">String to print.</param>
         /// <param name="quote">(optional) Quote to add before and after string.</param>
         /// <returns>String builder with appended string.</returns>
-        public static StringBuilder Print(this StringBuilder s, string str, string quote = null) =>
+        public static StringBuilder Print(this StringBuilder s, string str, string quote = "\"") =>
             quote == null ? s.Append(str) : s.Append(quote).Append(str).Append(quote);
 
         /// <summary>Prints enumerable by using corresponding Print method for known item type.</summary>
