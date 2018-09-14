@@ -166,6 +166,10 @@ namespace DryIoc
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked)
         {
             ThrowIfContainerDisposed();
+
+            if (serviceKey == null)
+                serviceKey = Rules.DefaultRegistrationServiceKey;
+
             factory.ThrowIfNull().ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, Rules);
 
             if (!ifAlreadyRegistered.HasValue)
@@ -2081,12 +2085,14 @@ namespace DryIoc
     public static class ContainerTools
     {
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
-        public const string FacadeKey = "<facade-key>"; // todo: use invisible keys #555
+        public const string FacadeKey = "@facade"; // todo: use invisible keys #555
 
         /// <summary>Allows to register new specially keyed services which will facade the same default service,
         /// registered earlier. May be used to "override" registrations when testing the container</summary>
         public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
-            container.With(rules => rules.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(FacadeKey)));
+            container.With(rules => rules
+                .WithDefaultRegistrationServiceKey(facadeKey)
+                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container,
@@ -3177,7 +3183,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Disables the <see cref="DependencyDepthToSplitObjectGraph"/> limitation.</summary>
         public Rules WithoutDependencyDepthToSplitObjectGraph() => WithDependencyDepthToSplitObjectGraph(int.MaxValue);
@@ -3219,7 +3225,18 @@ namespace DryIoc
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
                 DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+
+        /// <summary>Service key to be used instead on `null` in registration.</summary>
+        public object DefaultRegistrationServiceKey { get; }
+
+        /// <summary>Sets the <see cref="DefaultRegistrationServiceKey"/></summary>
+        public Rules WithDefaultRegistrationServiceKey(object serviceKey) =>
+            serviceKey == null ? this : 
+                new Rules(_settings, FactorySelector, DefaultReuse,
+                    _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                    DependencyResolutionCallExprs, ItemToExpressionConverter,
+                    DynamicRegistrationProviders, UnknownServiceResolvers, serviceKey);
 
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="request">Provides service request leading to factory selection.</param>
@@ -3237,7 +3254,7 @@ namespace DryIoc
             new Rules(_settings, rule, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Select last registered factory from multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => GetLastFactoryByKey;
@@ -3279,7 +3296,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
+                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Appends dynamic registration rules 
         /// And additionally specifies to use dynamic registrations only when no normal registrations found!</summary>
@@ -3288,7 +3305,7 @@ namespace DryIoc
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallback, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers);
+                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Specifies to use dynamic registrations only when no normal registrations found</summary>
         public bool UseDynamicRegistrationsAsFallback =>
@@ -3306,7 +3323,8 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules));
+                DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules),
+                DefaultRegistrationServiceKey);
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
         /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance,
@@ -3315,7 +3333,8 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule));
+                DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule),
+                DefaultRegistrationServiceKey);
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
         /// Does not guard you from action throwing an exception. Actually can be used to throw your custom exception
@@ -3478,7 +3497,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
         [Obsolete("Replaced by WithDefaultReuse because for some cases ..InsteadOfTransient does not make sense.", error: false)]
@@ -3500,7 +3519,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, itemToExpressionOrDefault,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
         public bool ThrowIfDependencyHasShorterReuseLifespan =>
@@ -3558,7 +3577,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 Ref.Of(ImHashMap<Request, Expression>.Empty), ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         public bool ImplicitCheckForReuseMatchingScope =>
@@ -3592,9 +3611,8 @@ namespace DryIoc
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, rule, DefaultDependencyDepthToSplitObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                _made, rule, DefaultDependencyDepthToSplitObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
@@ -3650,7 +3668,8 @@ namespace DryIoc
             Ref<ImHashMap<Request, Expression>> dependencyResolutionCallExpressions,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders,
-            UnknownServiceResolver[] unknownServiceResolvers)
+            UnknownServiceResolver[] unknownServiceResolvers,
+            object defaultRegistrationServiceKey)
         {
             _settings = settings;
             _made = made;
@@ -3662,13 +3681,14 @@ namespace DryIoc
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
             UnknownServiceResolvers = unknownServiceResolvers;
+            DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
 
         private Rules WithSettings(Settings newSettings) =>
             new Rules(newSettings,
                 FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers);
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         private readonly Made _made;
 

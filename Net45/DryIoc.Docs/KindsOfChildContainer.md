@@ -1,4 +1,3 @@
-﻿/*md
 # Kinds of Child Container
 
 [TOC]
@@ -40,7 +39,6 @@ class FacadeExample
         client.Service.Is<TestService>();
     }
 }
-/*md
 ```
 
 __Note:__ Because facade is just a normal standalone container it has its own singletons, not shared with parent even if resolved from parent.When you resolve singleton directly from parent and then ask for it from child, it will return another object.
@@ -117,4 +115,3 @@ Cache is not copied by default, that is why it safe to replace registrations.But
 
 [Here is explained in detail](FaqAutofacMigration#markdown-header-separate-build-stage)
 
-md*/

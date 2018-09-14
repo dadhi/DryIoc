@@ -47,10 +47,18 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ExampleServices.cs" />
-    <Compile Include="Is.cs" />
-    <Compile Include="KindsOfChildContainer.cs" />
+    <Compile Include="Asserts.cs" />
+    <Compile Include="KindsOfChildContainer.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="KindsOfChildContainer.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>KindsOfChildContainer.cs</DependentUpon>
+    </None>
     <None Include="packages.config" />
     <None Include="ReuseAndScopes.md" />
   </ItemGroup>
