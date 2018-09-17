@@ -74,6 +74,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="CreatingAndDisposingContainer.cs" />
     <None Include="KindsOfChildContainer.md">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

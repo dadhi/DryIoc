@@ -64,7 +64,7 @@ namespace DryIoc.IssuesTests.Interception
             registrator.Register(interfaceType, proxyType,
                 Reuse.Transient,
                 setup: decoratorSetup,
-                made: Made.Of(type => type.PublicConstructors().SingleOrDefault(constr => constr.GetParameters().Length != 0),
+                made: Made.Of(type => type.PublicConstructors().SingleOrDefault(ctor => ctor.GetParameters().Length != 0),
                     Parameters.Of
                         .Type(typeof(IInterceptor[]), lazyInterceptorArrayType)
                         .Type(interfaceType, r => null)));
@@ -119,9 +119,12 @@ namespace DryIoc.IssuesTests.Interception
                 if (target == null)
                 {
                     // create the lazy value on the first invocation
+                    // ReSharper disable once SuspiciousTypeConversion.Global
                     var changeProxyTarget = (IChangeProxyTarget)invocation;
                     changeProxyTarget.ChangeInvocationTarget(LazyTarget.Value);
+#pragma warning disable 618
                     changeProxyTarget.ChangeProxyTarget(LazyTarget.Value);
+#pragma warning restore 618
                 }
 
                 invocation.Proceed();
