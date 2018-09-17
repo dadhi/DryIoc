@@ -9,4 +9,5 @@ public class ExampleAttribute : TestAttribute { }
 public static class Asserts
 {
     public static void Is<TExpected>(this object actual) => Assert.IsInstanceOf<TExpected>(actual);
+    public static void IsSameAs<T>(this T actual, T expected) => Assert.AreSame(expected, actual);
 }

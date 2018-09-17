@@ -748,9 +748,10 @@ namespace DryIoc
                 if (factory != null)
                     return factory;
 
-                if (!Rules.UnknownServiceResolvers.IsNullOrEmpty())
-                    for (var i = 0; factory == null && i < Rules.UnknownServiceResolvers.Length; i++)
-                        factory = Rules.UnknownServiceResolvers[i](request);
+                var unknownServiceResolvers = Rules.UnknownServiceResolvers;
+                if (!unknownServiceResolvers.IsNullOrEmpty())
+                    for (var i = 0; factory == null && i < unknownServiceResolvers.Length; i++)
+                        factory = unknownServiceResolvers[i](request);
             }
 
             if (factory?.FactoryGenerator != null)
@@ -3346,7 +3347,7 @@ namespace DryIoc
                 return null;
             });
 
-        /// <summary>Obsolete: Replaced by ConcreteTypeDynamicRegistrations</summary>
+        /// <summary>The alternative is ConcreteTypeDynamicRegistrations</summary>
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null) =>
             request =>
             {
@@ -3433,7 +3434,7 @@ namespace DryIoc
 
             return (serviceType, serviceKey) =>
             {
-                if (serviceType.IsExcludedGeneralPurposeServiceType())
+                if (!serviceType.IsServiceType())
                     return Enumerable.Empty<DynamicRegistration>();
 
                 var implementationTypes = getImplementationTypes(serviceType, serviceKey);
@@ -4283,7 +4284,21 @@ namespace DryIoc
                     return ((FieldInfo)member.Member).GetValue(memberOwner.Value);
             }
 
-            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf, argExpr, wholeServiceExpr);
+            var newArrExpr = argExpr as NewArrayExpression;
+            if (newArrExpr != null)
+            {
+                var itemExprs = newArrExpr.Expressions;
+                var items = new object[itemExprs.Count];
+                for (var i = 0; i < itemExprs.Count; i++)
+                {
+                    items[i] = GetArgExpressionValueOrThrow(wholeServiceExpr, itemExprs[i]);
+                }
+
+                return items;
+            }
+
+            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf, 
+                argExpr, wholeServiceExpr);
         }
 
         #endregion
@@ -4409,16 +4424,18 @@ namespace DryIoc
         public static bool IsExcludedGeneralPurposeServiceType(this Type type) =>
             ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
 
+        /// <summary>Checks that type is not in the list of <see cref="ExcludedGeneralPurposeServiceTypes"/>.</summary>
+        public static bool IsServiceType(this Type type) => 
+            !type.IsPrimitive() && !type.IsExcludedGeneralPurposeServiceType();
+
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>.
         /// It means that for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
         public static Type[] GetImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false)
         {
             var implementedTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
 
-            var serviceTypes = implementedTypes.Match(t =>
-                (nonPublicServiceTypes || t.IsPublicOrNestedPublic()) &&
-                !t.IsPrimitive() &&
-                !t.IsExcludedGeneralPurposeServiceType());
+            var serviceTypes = implementedTypes
+                .Match(t => (nonPublicServiceTypes || t.IsPublicOrNestedPublic()) && t.IsServiceType());
 
             if (type.IsGenericDefinition())
                 serviceTypes = serviceTypes.Match(
@@ -7228,7 +7245,11 @@ namespace DryIoc
                 if (paramInfo.Details.HasCustomValue)
                 {
                     var customValue = paramInfo.Details.CustomValue;
-                    customValue?.ThrowIfNotInstanceOf(paramServiceType, Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+
+                    if (customValue != null && !customValue.GetType().IsArray)
+                        customValue.ThrowIfNotInstanceOf(paramServiceType, 
+                            Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+
                     paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
                     continue; // done, parameter is by provided via custom value specified in registration
                 }
