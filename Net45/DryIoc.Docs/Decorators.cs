@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Decorators
@@ -33,7 +34,7 @@ Interception and AOP support.
 
 We start with defining the `IHandler` which we will decorate adding the logging capabilities:
 
-```cs 
+```cs md*/
 using DryIoc;
 using NUnit.Framework;
 using System.Collections.Generic;
@@ -103,6 +104,7 @@ class Decorator_with_logger
             ((InMemoryLogger)((LoggingHandlerDecorator)handler).Logger).Lines);
     }
 }
+/*md
 ```
 
 In most cases you only need to add `setup: Setup.Decorator` parameter. 
@@ -490,3 +492,4 @@ The example illustrates use of instance factory method for registering decorator
 ## Decorator as Interceptor with Castle DynamicProxy
 
 [Explained here](Interception#markdown-header-decorator-with-castle-dynamicproxy)
+md*/
