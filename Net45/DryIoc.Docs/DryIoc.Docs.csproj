@@ -74,7 +74,15 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="CreatingAndDisposingContainer.cs" />
+    <Compile Include="CreatingAndDisposingContainer.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>CreatingAndDisposingContainer.md</LastGenOutput>
+    </Compile>
+    <None Include="CreatingAndDisposingContainer.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>CreatingAndDisposingContainer.cs</DependentUpon>
+    </None>
     <None Include="KindsOfChildContainer.md">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
