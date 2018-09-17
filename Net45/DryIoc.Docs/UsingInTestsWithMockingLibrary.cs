@@ -5,9 +5,8 @@
 
 For examples below we need to add:
 ```cs md*/
-
-using System;
 using NUnit.Framework;
+
 using DryIoc;
 using NSubstitute;
 using Moq;
@@ -48,7 +47,7 @@ class NSubstitute_example
             return new ReflectionFactory(made: Made.Of(() => Substitute.For(new[] { serviceType }, null)));
         }));
 
-    [Test] public void Mock_via_unknown_service_resolvers()
+    [Test] public void Test()
     {
         var container = WithAutoMocking(new Container());
 
@@ -90,7 +89,7 @@ class NSubstitute_example_with_singleton_mocks
         }));
 
 
-    [Test] public void Mock_via_unknown_service_resolvers()
+    [Test] public void Test()
     {
         var container = WithAutoMocking(new Container(), Reuse.Singleton);
 
@@ -132,7 +131,7 @@ class Moq_example_with_singleton_mocks
         }));
 
 
-    [Test] public void Mock_via_unknown_service_resolvers()
+    [Test] public void Test()
     {
         var container = WithAutoMocking(new Container(), Reuse.Singleton);
 
