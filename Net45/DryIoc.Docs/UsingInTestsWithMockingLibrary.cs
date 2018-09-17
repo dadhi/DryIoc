@@ -1,5 +1,5 @@
 /*md
-<!--Auto-generate from .cs file, the edits here will be lost! -->
+<!--Auto-generated from .cs file, the edits here will be lost! -->
 
 ## Auto-mocking with a mocking library
 
