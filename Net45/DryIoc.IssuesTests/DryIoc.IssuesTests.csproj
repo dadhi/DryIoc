@@ -96,8 +96,6 @@
     <Compile Include="GHIssue7_2_Context_based_injection.cs" />
     <Compile Include="GHIssue7_1_Context_based_injection.cs" />
     <Compile Include="GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces.cs" />
-    <Compile Include="Interception\DryIocInterceptionLinFu.cs" />
-    <Compile Include="Interception\InterceptionTestsLinFu.cs" />
     <Compile Include="Issue287_Add_IfUnresolved_ReturnDefaultIfNotRegistered_policy.cs" />
     <Compile Include="Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended.cs" />
     <Compile Include="DotnetWeekBlogExample.cs" />

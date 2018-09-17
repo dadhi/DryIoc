@@ -5,9 +5,12 @@
 
 For examples below we need to add:
 ```cs md*/
+
+using System;
 using NUnit.Framework;
 using DryIoc;
 using NSubstitute;
+using Moq;
 
 using System.Collections.Concurrent;
 /*md
@@ -33,7 +36,7 @@ public class SomeConsumer
 
 Let's test a `SomeConsumer` by mocking its `Service` dependency:
 ```md*/
-class NSubstituteExample
+class NSubstitute_example
 {
     // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes
     private IContainer WithAutoMocking(IContainer container) => 
@@ -62,14 +65,14 @@ class NSubstituteExample
 With above example there is still the problem though - the factory will be created each time when non-registered service is requested.
 It may be also problematic if we want the mock to be a _singleton_. Let's fix it by caching the factory in the dictionary:
 ```md*/
-class NSubstituteExample_with_singleton_mocks
+public class OtherConsumer
 {
-    public class OtherConsumer
-    {
-        public INotImplementedService Service { get; }
-        public OtherConsumer(INotImplementedService service) { Service = service; }
-    }
+    public INotImplementedService Service { get; }
+    public OtherConsumer(INotImplementedService service) { Service = service; }
+}
 
+class NSubstitute_example_with_singleton_mocks
+{
     readonly ConcurrentDictionary<System.Type, ReflectionFactory> _mockFactories = 
         new ConcurrentDictionary<System.Type, ReflectionFactory>();
 
@@ -81,9 +84,8 @@ class NSubstituteExample_with_singleton_mocks
             var serviceType = request.ServiceType;
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null;
-            return _mockFactories.GetOrAdd(serviceType, 
-                type => new ReflectionFactory(
-                    reuse: reuse,
+            return _mockFactories.GetOrAdd(serviceType,
+                type => new ReflectionFactory(reuse: reuse,
                     made: Made.Of(() => Substitute.For(new[] { type }, null))));
         }));
 
@@ -105,7 +107,45 @@ class NSubstituteExample_with_singleton_mocks
 /*md
 ```
 
-## Auto-mocking with 
+## Auto-mocking with Moq
+
+Let's implement auto-mocking with mock [Moq library](https://github.com/moq/moq).
+
+```cs md*/
+class Moq_example_with_singleton_mocks
+{
+    readonly ConcurrentDictionary<System.Type, ReflectionFactory> _mockFactories = 
+        new ConcurrentDictionary<System.Type, ReflectionFactory>();
+
+    // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes.
+    // Optional `reuse` parameter will allow to specify a mock reuse.
+    private IContainer WithAutoMocking(IContainer container, IReuse reuse = null) =>
+        container.With(rules => rules.WithUnknownServiceResolvers(request =>
+        {
+            var serviceType = request.ServiceType;
+            if (!serviceType.IsAbstract) // Mock interface or abstract class only.
+                return null;
+
+            return _mockFactories.GetOrAdd(serviceType, 
+                _ => new ReflectionFactory(reuse: reuse, 
+                    made: Made.Of(typeof(Mock).Method(nameof(Mock.Of)))));
+        }));
 
 
+    [Test] public void Mock_via_unknown_service_resolvers()
+    {
+        var container = WithAutoMocking(new Container(), Reuse.Singleton);
+
+        container.Register<SomeConsumer>();
+        container.Register<OtherConsumer>();
+
+        var consumer1 = container.Resolve<SomeConsumer>();
+        var consumer2 = container.Resolve<OtherConsumer>();
+
+        // Verify that `Service` dependency is indeed a singleton in a different consumers
+        Assert.AreSame(consumer1.Service, consumer2.Service);
+    }
+}
+/*md
+```
 md*/
