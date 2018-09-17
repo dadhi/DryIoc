@@ -103,7 +103,7 @@ class NSubstitute_example_with_singleton_mocks
 
 ## Auto-mocking with Moq
 
-Let's implement auto-mocking with mock [Moq library](https://github.com/moq/moq).
+Let's implement auto-mocking with popular [Moq library](https://github.com/moq/moq).
 
 ```cs 
 class Moq_example_with_singleton_mocks
