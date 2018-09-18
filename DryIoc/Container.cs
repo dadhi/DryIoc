@@ -997,8 +997,8 @@ namespace DryIoc
                 if (!genericDecorators.IsNullOrEmpty())
                 {
                     genericDecorators = genericDecorators
-                        .Map(d => d.FactoryGenerator == null ? d
-                            : d.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true))
+                        .Map(d => d.FactoryGenerator == null ? d :
+                            d.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true))
                         .Match(d => d != null);
                     decorators = decorators.Append(genericDecorators);
                 }
@@ -1026,6 +1026,7 @@ namespace DryIoc
                 // or if no Order for all decorators, then the last registered - with maximum FactoryID
                 decorator = decorators
                     .OrderByDescending(d => ((Setup.DecoratorSetup)d.Setup).Order)
+                    .ThenByDescending(d => d.GeneratorFactoryID != 0 ? d.GeneratorFactoryID : d.FactoryID)
                     .ThenByDescending(d => d.FactoryID)
                     .FirstOrDefault(d => d.CheckCondition(request));
             }
@@ -6629,8 +6630,7 @@ namespace DryIoc
     public abstract class Factory
     {
         /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
-        public static int GetNextID() =>
-            Interlocked.Increment(ref _lastFactoryID);
+        public static int GetNextID() => Interlocked.Increment(ref _lastFactoryID);
 
         /// <summary>Unique factory id generated from static seed.</summary>
         public int FactoryID { get; internal set; }
@@ -6646,8 +6646,7 @@ namespace DryIoc
         }
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
-        public bool CheckCondition(Request request) =>
-            (Setup.Condition == null || Setup.Condition(request));
+        public bool CheckCondition(Request request) => (Setup.Condition == null || Setup.Condition(request));
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
         public FactoryType FactoryType => Setup.FactoryType;
@@ -6661,6 +6660,9 @@ namespace DryIoc
         /// <summary>Indicates that Factory is factory provider and
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/> to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator => null;
+
+        /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
+        public virtual int GeneratorFactoryID => 0;
 
         /// <summary>Settings <b>(if any)</b> to select Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public virtual Made Made => Made.Default;
@@ -7162,6 +7164,9 @@ namespace DryIoc
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public override Made Made => _made;
 
+        /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
+        public override int GeneratorFactoryID => _generatorFactoryID;
+
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
         /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
@@ -7361,6 +7366,7 @@ namespace DryIoc
         private readonly Made _made;
         private ClosedGenericFactoryGenerator _factoryGenerator;
         private ConstructorInfo _knownSingleCtor;
+        internal int _generatorFactoryID;
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
@@ -7429,6 +7435,7 @@ namespace DryIoc
                 }
 
                 var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup);
+                closedGenericFactory._generatorFactoryID = openFactory.FactoryID;
                 _generatedFactories.Swap(_ => _.AddOrUpdate(generatedFactoryKey, closedGenericFactory));
                 return closedGenericFactory;
             }

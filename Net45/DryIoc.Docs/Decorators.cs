@@ -172,63 +172,84 @@ class Nested_decorators
 
         // ACTUALLY, you even can see how service is created yourself
         var expr = container.Resolve<LambdaExpression>(typeof(S));
-        var exprString = ExpressionToCode.ToCode(expr);
-        Assert.AreEqual("r => new D2(new D1(new S()))", exprString);
+        Assert.AreEqual("r => new D2(new D1(new S()))", ExpressionToCode.ToCode(expr));
     }
-}
-/*md
+} /*md
 ```
 
 ### Decorators Order
 
 The order of decorator nesting may be explicitly specified with `order` setup option:
-```csharp
-container.Register<A>();
-container.Register<A, D1>(setup: Setup.DecoratorWith(order: 2));
-container.Register<A, D2>(setup: Setup.DecoratorWith(order: 1));
+```cs md*/
+class Nested_decorators_order
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<S>();
+        container.Register<S, D1>(setup: Setup.DecoratorWith(order: 2));
+        container.Register<S, D2>(setup: Setup.DecoratorWith(order: 1));
 
-var a = container.Resolve<A>();
+        var s = container.Resolve<S>();
+        Assert.IsInstanceOf<D1>(s);
 
-// a is created as `new D1(new D2(new A()))`
-Assert.IsInstanceOf<D1>(a);
+        var expr = container.Resolve<LambdaExpression>(typeof(S));
+        Assert.AreEqual("r => new D1(new D2(new S()))", ExpressionToCode.ToCode(expr));
+    }
+} /*md
 ```
 
-The decorators without defined order have implicit `order` value of `0`. Decorators with identical `order` are ordered by registration.
+The decorators without defined `order` have an implicit `order` value of `0`. Decorators with identical `order` are ordered by registration.
 You can specify `-1`, `-2`, etc. order to insert decorator closer to decorated service.
 
-__Note:__ The order does not prefer specific decorator type, e.g. concrete, open-generic or decorators of any generic `T` type are ordered based on the same rules.
+__Note:__ The order does not prefer a specific decorator type, e.g. concrete, open-generic, or decorator of any generic `T` type. All decorators are ordered based on the same rules.
 
 
 ## Open-generic decorators
 
 Decorators may be open-generic and registered to wrap open-generic services. 
 
-```csharp
+```cs md*/
 // constructors are skipped for brevity, they just accept A parameter
-class A<T> {}
-class D1<T> : A<T> {}
-class D2<T> : A<T> {}
-class Ds : A<string> {} 
+class S<T> {}
+class D1<T> : S<T> {}
+class D2<T> : S<T> {}
+class DStr : S<string> {}
 
-container.Register(typeof(A<>));
+class Open_generic_decorators
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-container.Register(typeof(A<>), typeof(D1<>), setup: Setup.Decorator);
-container.Register<A<string>, Ds>(setup: Setup.Decorator);
-container.Register(typeof(A<>), typeof(D2<>), setup: Setup.Decorator);
+        container.Register(typeof(S<>));
 
-var aint = container.Resolve<A<int>>();
-// the aint will be created as: new D2<int>(new D1<int>(new A<int>()));
-// Ds decorator is not applied because it is defined only for A<string>
+        container.Register(typeof(S<>), typeof(D1<>), setup: Setup.Decorator);
+        container.Register(typeof(S<>), typeof(D2<>), setup: Setup.Decorator);
 
-var astr = container.Resolve<A<int>>();
-// the astr will be created as: new D2<string>(new Ds<string>(new D1<string>(new A<string>())));
-// Ds is applied as expected
+        // decorator specific to the `S<string>` type
+        container.Register<S<string>, DStr>(setup: Setup.Decorator);
+
+        var intS = container.Resolve<S<int>>();
+        Assert.IsInstanceOf<D2<int>>(intS); // won't use DStr decorator
+
+        var strS = container.Resolve<S<string>>();
+        Assert.IsInstanceOf<DStr>(strS);    // will use DStr decorator
+    }
+}/*md
 ```
 
 ## Decorator of generic T
 
 Decorator may be registered using a [FactoryMethod]. This brings an interesting question: what if the factory method is open-generic and returns a generic type `T`:
-```csharp
+```cs md*/
+public interface IStartable
+{
+    void Start();
+}
+
 public static class DecoratorFactory 
 {
     public static T Decorate<T>(T service) where T : IStartable
@@ -236,42 +257,70 @@ public static class DecoratorFactory
         service.Start();
         return service;
     }
-}
+}/*md
 ```
 
-Let's use method `Decorate` to register decorator applied to any `T` service. For this we need to register a decorator of type `object`, cause `T` does not make sense outside of its defined method.
-```csharp
+Now we will use method `Decorate` to register decorator applied to any `T` service. 
+For this we need to register a decorator of type `object`, cause `T` does not make sense outside of its defined method.
+```cs md*/
 public class X : IStartable
 {
     public bool IsStarted { get; private set; }
-    public void Start()
-    {
-        IsStarted = true;
-    }
+    public void Start() => IsStarted = true;
 }
 
-container.Register<X>();
+class Decorator_of_generic_T_type
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-container.Register<object>(
-    made: Made.Of(req => typeof(DecoratorFactory).SingleMethod("Decorate")      
-        .MakeGenericMethod(req.ServiceType)), 
-    setup: Setup.Decorator);
+        container.Register<X>();
 
-var x = container.Resolve<X>();
-Assert.IsTrue(x.IsStarted);
+        // register with a service type of `object`
+        container.Register<object>(
+            made: Made.Of(req => typeof(DecoratorFactory)
+                .SingleMethod(nameof(DecoratorFactory.Decorate))
+                .MakeGenericMethod(req.ServiceType)),
+            setup: Setup.Decorator);
+
+        var x = container.Resolve<X>();
+        Assert.IsTrue(x.IsStarted);
+    }
+}/*md
 ```
 
 The "problem" of `object` decorators that they will be applied to all services,
-__affecting the resolution performance__. To make decorator more targeted we can provide the setup condition.
+__affecting the resolution performance__. To make decorator more targeted, we can provide the setup condition.
 
 Adding condition to apply decorator only to `IStartable` services:
 
-```csharp
-container.Register<object>(
-    made: Made.Of(req => typeof(DecoratorFactory).SingleMethod("Decorate")
-        .MakeGenericMethod(req.ServiceType)), 
-    setup: Setup.DecoratorWith(
-        condition: req => req.ImplementationType.IsAssignableTo<IStartable>()));
+```cs md*/
+class Decorator_of_generic_T_type_with_condition
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<X>();
+
+        var decorateMethod = typeof(DecoratorFactory)
+            .SingleMethod(nameof(DecoratorFactory.Decorate));
+
+        container.Register<object>(
+            made: Made.Of(r => decorateMethod.MakeGenericMethod(r.ServiceType)),
+            setup: Setup.DecoratorWith(r => r.ImplementationType.IsAssignableTo<IStartable>()));
+
+        // or we may simplify the condition via `DecoratorOf` method:
+        container.Register<object>(
+            made: Made.Of(r => decorateMethod.MakeGenericMethod(r.ServiceType)),
+            setup: Setup.DecoratorOf<IStartable>());
+
+        var x = container.Resolve<X>();
+        Assert.IsTrue(x.IsStarted);
+    }
+}/*md
 ```
 
 ## Decorator Reuse
