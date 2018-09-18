@@ -34,9 +34,12 @@ We start with defining the `IHandler` which we will decorate adding the logging 
 
 ```cs 
 using DryIoc;
+
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using ExpressionToCodeLib;
+// ReSharper disable UnusedParameter.Local
 
 public interface IHandler
 {
@@ -161,12 +164,13 @@ class Nested_decorators
 
         var s = container.Resolve<S>();
 
-        // s is created as `new D2(new D1(new A()))`
+        // s is created as `new D2(new D1(new S()))`
         Assert.IsInstanceOf<D2>(s);
 
-        // ACTUALLY, you even can see how service is created
-        var expression = container.Resolve<LambdaExpression>(typeof(S));
-
+        // ACTUALLY, you even can see how service is created yourself
+        var expr = container.Resolve<LambdaExpression>(typeof(S));
+        var exprString = ExpressionToCode.ToCode(expr);
+        Assert.AreEqual("r => new D2(new D1(new S()))", exprString);
     }
 }
 ```
