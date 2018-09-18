@@ -36,9 +36,11 @@ We start with defining the `IHandler` which we will decorate adding the logging 
 using DryIoc;
 
 using NUnit.Framework;
+using ExpressionToCodeLib;
+
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using ExpressionToCodeLib;
 // ReSharper disable UnusedParameter.Local
 
 public interface IHandler
@@ -325,80 +327,118 @@ class Decorator_of_generic_T_type_with_condition
 Decorator may have its own reuse the same way as a normal service. 
 This way you may add a context-based reuse to already registered service just by applying the decorator.
 
-__Note__: If no reuse specified for decorator, it means the decorator is of default container reuse `container.Rules.DefaultReuse` (if not changed it is a `Reuse.Transient`).
+__Note__: If no reuse specified for decorator, it means the decorator is of default container reuse `container.Rules.DefaultReuse` 
+(which is `Reuse.Transient` by default).
 
-```csharp
-container.Register<A>();
+```cs 
+class Decorator_reuse
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-// singleton decorator effectively makes the decorated service a singleton too 
-container.Register<A, D>(Reuse.Singleton, setup: Setup.Decorator);
+        container.Register<S>();
 
-var a1 = container.Resolve<A>();
-var a2 = container.Resolve<A>();
-Assert.AreSame(a1, a2);
+        // singleton decorator effectively makes the decorated service a singleton too.
+        container.Register<S, D1>(Reuse.Singleton, setup: Setup.Decorator);
+
+        var s1 = container.Resolve<S>();
+        var s2 = container.Resolve<S>();
+        Assert.AreSame(s1, s2);
+    }
+}
 ```
-
 
 ### UseDecorateeReuse
 
 This setup option allows decorator to match the decorated service reuse whatever it might be. 
 It is a good "default" option when you don't want to adjust decorated service reuse, but just want it to follow along. 
-```csharp
+```cs 
+class Decoratee_reuse
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-container.Register<A>(Reuse.Singleton);
-container.Register<A, D>(setup: Setup.DecoratorWith(useDecorateeReuse: true));
+        container.Register<S>(Reuse.Singleton);
+        container.Register<S, D1>(setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
-var a1 = container.Resolve<A>();
-var a2 = container.Resolve<A>();
-Assert.AreSame(a1, a2); // because of decorated service reuse.
+        var s1 = container.Resolve<S>();
+        var s2 = container.Resolve<S>();
+        Assert.AreSame(s1, s2); // because of decoratee service reuse.
+    }
+}
 ```
 
 
 ## Decorator of Wrapped Service
 
 Decorator may be applied to [wrapped](Wrappers) service in order to provide laziness, create decorated service on demand, proxy-ing, etc.
-```csharp
-class A { virtual void Call() {} }
-class LazyADecorator : A
-{ 
-    public Lazy<A> _a;
-    public LazyADecorator(Lazy<A> a) { _a = a; }
-    
-    public override void Call() 
-    {
-        // gets A value lazily on demand:
-        _a.Value.Call();
-    }
+```cs 
+class ACall
+{
+    public virtual void Call() {}
 }
 
-container.Register<A>();
+class LazyCallDecorator : ACall
+{ 
+    public Lazy<ACall> A;
+    public LazyCallDecorator(Lazy<ACall> a) { A = a; }
+    
+    // Creates an object only when calling it.
+    public override void Call() => A.Value.Call();
+}
 
-// register as usual
-container.Register<A, LazyADecorator>(setup: Setup.Decorator);
+class Decorator_of_wrapped_service
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-var a = container.Resolve<A>(); // A is not created.
-a.Call(); // A is created and called.
+        container.Register<ACall>();
+        container.Register<ACall, LazyCallDecorator>(setup: Setup.Decorator);
+
+        var a = container.Resolve<ACall>(); // A is not created.
+        a.Call();                           // A is created and called.
+    }
+}
 ```
 
 Decorators of wrappers may be nested the same way as for normal services:
-```csharp
-public class AsLazy : A
+```cs 
+class DLazy : S
 {
-    public AsLazy(Lazy<A> a) { A = a; }
+    public Lazy<S> S { get; }
+    public DLazy(Lazy<S> s) { S = s; }
 }
 
-public class AsFunc : A
+class DFunc : S
 {
-    public AsLazy(Func<A> a) { A = a; }
+    public Func<S> S { get; }
+    public DFunc(Func<S> s) { S = s; }
 }
 
-container.Register<A>();
-container.Register<AsLazy, A>(setup: Setup.Decorator);
-container.Register<AsFunc, A>(setup: Setup.Decorator);
+class Nesting_decorators_of_wrapped_service
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-var a = container.Resolve<A>() // wrapped in AsFunc
-a = ((AsFunc)a).A();           // wrapped in AsLazy
-a = ((AsLazy)a).A.Value;       // actual decorated A
+        container.Register<S>();
+        container.Register<S, DLazy>(setup: Setup.Decorator);
+        container.Register<S, DFunc>(setup: Setup.Decorator);
+
+        var s = container.Resolve<S>(); // `s` is wrapped in Func with DFunc decorator
+
+        s = ((DFunc)s).S();             // then its wrapped in Lazy with DLazy decorator
+        s = ((DLazy)s).S.Value;         // an actual decorated `S` object
+        Assert.IsInstanceOf<S>(s);
+    }
+}
 ```
 
 
