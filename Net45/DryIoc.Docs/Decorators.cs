@@ -26,8 +26,7 @@ DryIoc Decorators support:
 aka __Initializer__.
 - Combining decorator reuse and factory method registration, decorator may provide additional action on service dispose, aka __Disposer__.
 - With Factory Method and decorator condition, it is possible to register decorator of generic `T` service type. This opens possibility for more generic use-cases, e.g. EventAggregator with attributed subscribe.
-- Combining Decorator with library like __Castle.DynamicProxy__ enables 
-Interception and AOP support.
+- Combining Decorator with library like _Castle.DynamicProxy_ enables Interception and AOP support.
 
 
 ## General use-case
@@ -38,6 +37,7 @@ We start with defining the `IHandler` which we will decorate adding the logging 
 using DryIoc;
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 
 public interface IHandler
 {
@@ -94,14 +94,15 @@ class Decorator_with_logger
         // decorator is the normal registration with `Decorator` setup 
         container.Register<IHandler, LoggingHandlerDecorator>(setup: Setup.Decorator);
 
-        // now resolving handler should wrap it in decorator
+        // resolved handler will be a decorator instance
         var handler = container.Resolve<IHandler>();
         Assert.IsInstanceOf<LoggingHandlerDecorator>(handler);
 
         handler.Handle();
+
         CollectionAssert.AreEqual(
             new[] { "About to handle", "Successfully handled" },
-            ((InMemoryLogger)((LoggingHandlerDecorator)handler).Logger).Lines);
+            ((handler as LoggingHandlerDecorator)?.Logger as InMemoryLogger)?.Lines);
     }
 }
 /*md
@@ -109,31 +110,69 @@ class Decorator_with_logger
 
 In most cases you only need to add `setup: Setup.Decorator` parameter. 
 The rest of registration options are available for decorators.
+Except for the `serviceKey` which is not supported. 
+To apply decorator for service registered with `serviceKey` you need to specify a setup condition or
+use a `Decorator.Of` method.
 
-__Note:__ Except for the `serviceKey` which is not supported. To apply decorator for service registered with `serviceKey` you need to specify a setup condition.
-```csharp
-container.Register<IHandler, FooHandler>(serviceKey: "Foo");
-container.Register<IHandler, LoggingHandlerDecorator>(
-    setup: Setup.DecoratorWith(condition: request => "Foo".Equals(request.ServiceKey)));
+```cs md*/
+class Decorator_of_keyed_service
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<ILogger, InMemoryLogger>();
+
+        container.Register<IHandler, FooHandler>(serviceKey: "foo");
+
+        container.Register<IHandler, LoggingHandlerDecorator>(
+            setup: Setup.DecoratorWith(condition: request => "foo".Equals(request.ServiceKey)));
+
+        container.Register<IHandler, LoggingHandlerDecorator>(
+            setup: Setup.DecoratorOf(decorateeServiceKey: "foo")); // a condition in disguise
+
+        Assert.IsInstanceOf<LoggingHandlerDecorator>(container.Resolve<IHandler>("foo"));
+    }
+} 
+/*md
 ```
+
+__Note:__ In the example above we are registering the decorator twice. 
+It is OK because DryIoc supports decorator nesting. Read on to the next section for details.
 
 ## Nested Decorators
 
-DryIoc supports decorator nesting. **The first registered** decorator will wrap the actual service and the subsequent decorators will wrap the already decorated objects.
+DryIoc supports decorator nesting. 
+**The first registered** decorator will wrap the actual service,
+ * and the subsequent decorators will wrap the already decorated objects.
 
-```csharp
-class A {}
-class D1 : A { public D1(A a) {} }
-class D2 : A { public D2(A a) {} }
+```cs md*/
+class S {}
+class D1 : S { public D1(S s) {} }
+class D2 : S { public D2(S s) {} }
 
-container.Register<A>();
-container.Register<A, D1>(setup: Setup.Decorator);
-container.Register<A, D2>(setup: Setup.Decorator);
+class Nested_decorators
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-var a = container.Resolve<A>();
+        container.Register<S>();
+        container.Register<S, D1>(setup: Setup.Decorator);
+        container.Register<S, D2>(setup: Setup.Decorator);
 
-// a is created as `new D2(new D1(new A()))`
-Assert.IsInstanceOf<D2>(a);
+        var s = container.Resolve<S>();
+
+        // s is created as `new D2(new D1(new A()))`
+        Assert.IsInstanceOf<D2>(s);
+
+        // ACTUALLY, you even can see how service is created
+        var expression = container.Resolve<LambdaExpression>(typeof(S));
+
+    }
+}
+/*md
 ```
 
 ### Decorators Order
