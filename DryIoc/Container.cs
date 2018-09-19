@@ -3733,6 +3733,9 @@ namespace DryIoc
         /// <summary>Identifies factory service if factory method is instance member.</summary>
         public readonly ServiceInfo FactoryServiceInfo;
 
+        /// <summary>Alternatively you may just provide an expression for factory</summary>
+        public readonly Expr FactoryExpression;
+
         /// <summary>Wraps method and factory instance.
         /// Where <paramref name="ctorOrMethodOrMember"/> is constructor, static or instance method, property or field.</summary>
         public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
@@ -3747,12 +3750,21 @@ namespace DryIoc
             return new FactoryMethod(ctorOrMethodOrMember, factoryInfo);
         }
 
+        /// <summary>Wraps method and factory instance.
+        /// Where <paramref name="methodOrMember"/> is constructor, static or instance method, property or field.</summary>
+        public static FactoryMethod Of(MemberInfo methodOrMember, object factoryInstance)
+        {
+            factoryInstance.ThrowIfNull();
+            methodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
+            if (methodOrMember.IsStatic())
+                Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, methodOrMember, factoryInstance);
+            return new FactoryMethod(methodOrMember, Constant(factoryInstance));
+        }
+
         /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
         /// Should play nice with C# <see langword="nameof"/> operator.</summary>
         public static FactoryMethod Of<TFactory>(string methodOrMemberName) =>
-            Of(typeof(TFactory).GetAllMembers()
-                .SingleOrDefault(m => m.Name == methodOrMemberName)
-                .ThrowIfNull());
+            Of(typeof(TFactory).GetAllMembers().FindFirst(m => m.Name == methodOrMemberName).ThrowIfNull());
 
         /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
         public override string ToString() =>
@@ -3899,6 +3911,12 @@ namespace DryIoc
             ConstructorOrMethodOrMember = constructorOrMethodOrMember;
             FactoryServiceInfo = factoryServiceInfo;
         }
+
+        private FactoryMethod(MemberInfo constructorOrMethodOrMember, Expr factoryExpression)
+        {
+            ConstructorOrMethodOrMember = constructorOrMethodOrMember;
+            FactoryExpression = factoryExpression;
+        }
     }
 
     /// <summary>Rules how to: <list type="bullet">
@@ -3968,7 +3986,7 @@ namespace DryIoc
             return new Made(_ => factoryMethod, parameters, propertiesAndFields, methodReturnType);
         }
 
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
+        /// <summary>Creates factory method specification</summary>
         public static Made Of(MemberInfo factoryMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
@@ -7199,8 +7217,8 @@ namespace DryIoc
                 ?? FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
 
             // If factory method is the method of some registered service, then resolve factory service first.
-            Expr factoryExpr = null;
-            if (factoryMethod.FactoryServiceInfo != null)
+            var factoryExpr = factoryMethod.FactoryExpression;
+            if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
             {
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                 var factoryFactory = container.ResolveFactory(factoryRequest);
@@ -9066,7 +9084,7 @@ namespace DryIoc
             PassedMemberIsNotStaticButInstanceFactoryIsNull = Of(
                 "The member info {0} passed to `Made.Of` or `FactoryMethod.Of` is NOT static, but instance factory is not provided or null"),
             PassedMemberIsStaticButInstanceFactoryIsNotNull = Of(
-                "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing an INSTANCE factory: {1}"),
+                "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing factory INSTANCE: {1}"),
             UndefinedMethodWhenGettingTheSingleMethod = Of(
                 "Undefined Method '{0}' in Type {1} (including non-public={2})"),
             UndefinedMethodWhenGettingMethodWithSpecifiedParameters = Of(

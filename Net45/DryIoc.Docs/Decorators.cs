@@ -37,7 +37,6 @@ We start by defining the `IHandler` which we will decorate adding the logging ca
 using DryIoc;
 
 using NUnit.Framework;
-using ExpressionToCodeLib;
 
 using System;
 using System.Collections.Generic;
@@ -175,7 +174,7 @@ class Nested_decorators
 
         // ACTUALLY, you even can see how service is created yourself
         var expr = container.Resolve<LambdaExpression>(typeof(S));
-        Assert.AreEqual("r => new D2(new D1(new S()))", ExpressionToCode.ToCode(expr));
+        Assert.AreEqual("r => new D2(new D1(new S()))", expr.ToString());
     }
 } /*md
 ```
@@ -198,7 +197,7 @@ class Nested_decorators_order
         Assert.IsInstanceOf<D1>(s);
 
         var expr = container.Resolve<LambdaExpression>(typeof(S));
-        Assert.AreEqual("r => new D1(new D2(new S()))", ExpressionToCode.ToCode(expr));
+        Assert.AreEqual("r => new D1(new D2(new S()))", expr.ToString());
     }
 } /*md
 ```

@@ -19,13 +19,14 @@ Let's define an extension method for intercepting interfaces and classes:
 using DryIoc;
 using ImTools;
 using Castle.DynamicProxy;
+using IInterceptor = Castle.DynamicProxy.IInterceptor;
+using LinFu.DynamicProxy;
 
 using NUnit.Framework;
 
 using System;
 using System.Collections.Generic;
-using LinFu.DynamicProxy;
-using IInterceptor = Castle.DynamicProxy.IInterceptor;
+using System.Reflection;
 
 public static class DryIocInterception
 {
@@ -110,31 +111,43 @@ Lately, there was a new release of [LinFu.DynamicProxy]() with .NET Standard 2.0
 It is interesting to at least have an alternative to Castle.DynamicProxy. Let's try it out :-)
 
 ```cs md*/
-public static class DryIocInterceptionWithLinFu
+public static class DryIocInterceptionLinFu
 {
     private static readonly ProxyFactory _proxyFactory = new ProxyFactory();
+
+    private static readonly MethodInfo _createProxyMethod = typeof(ProxyFactory)
+        .Method(nameof(ProxyFactory.CreateProxy), typeof(IInvokeWrapper), typeof(Type[]));
 
     public static void InterceptInvocation<TService, TInvokeWrapper>(this IRegistrator registrator, object serviceKey = null)
         where TInvokeWrapper : class, IInvokeWrapper
     {
         var serviceType = typeof(TService);
-        if (!serviceType.IsInterface() && !serviceType.IsClass())
-            throw new ArgumentException(
-                $"Intercepted service type {serviceType} is not a supported, because it is nor a class nor an interface");
+        if (!serviceType.IsAbstract())
+            throw new ArgumentException($"Non-abstract {serviceType} are not a supported.");
 
-        registrator.UseInstance(_proxyFactory);
-
-        var createProxyMethod = typeof(ProxyFactory)
-            .Method(nameof(ProxyFactory.CreateProxy), typeof(IInvokeWrapper), typeof(Type[]))
-            .MakeGenericMethod(serviceType);
+        var createProxyMethod = _createProxyMethod.MakeGenericMethod(serviceType);
 
         registrator.Register(serviceType, 
-            made: Made.Of(createProxyMethod,
-                ServiceInfo.Of<ProxyFactory>(),
+            made: Made.Of(FactoryMethod.Of(createProxyMethod, _proxyFactory),
                 Parameters.Of.Type<IInvokeWrapper>(typeof(TInvokeWrapper)).Type<Type[]>(_ => null)),
             setup: Setup.DecoratorOf(useDecorateeReuse: true, decorateeServiceKey: serviceKey));
     }
-}/*md
+}
+
+// Simplify implementation of wrapper
+public abstract class InvokeWrapperBase<TIntercepted> : IInvokeWrapper
+{
+    public readonly TIntercepted Target;
+    protected InvokeWrapperBase(TIntercepted target)
+    {
+        Target = target;
+    }
+    public virtual void BeforeInvoke(InvocationInfo info) { }
+    public virtual void AfterInvoke(InvocationInfo info, object returnValue) { }
+    public virtual object DoInvoke(InvocationInfo info) => info.TargetMethod.Invoke(Target, info.Arguments);
+}
+
+/*md
 ```
 Implement `IInvokeWrapper` to intercept the methods of `IBar` instances.
 Then register service, `BarInvokeWrapper`, and link them together via Intercept method:
@@ -157,32 +170,22 @@ public class Register_and_use_interceptor_with_LinFu
         public void Log(string line) => LogLines.Add(line);
     }
 
-    public class BarInvokeWrapper : IInvokeWrapper
+    public class BarInvokeWrapper : InvokeWrapperBase<IBar>
     {
-        private readonly IBar _bar;
         private readonly BarLogger _logger;
-
-        public BarInvokeWrapper(IBar bar, BarLogger logger)
+        public BarInvokeWrapper(IBar bar, BarLogger logger) : base(bar)
         {
-            _bar = bar;
             _logger = logger;
         }
 
-        public object DoInvoke(InvocationInfo info)
+        public override object DoInvoke(InvocationInfo info)
         {
             _logger.Log($"Invoking method: {info.TargetMethod.Name}");
-
-            info.TargetMethod.Invoke(_bar, info.Arguments);
-
-            // may be optimized, because we know the actual `_bar` object here.
+            // may be optimized, because we know the actual `Target` object here.
             //if (info.TargetMethod.Name == nameof(IBar.Greet))
-            //    _bar.Greet();
-
-            return _bar;
+            //    Target.Greet();
+            return base.DoInvoke(info);
         }
-
-        public void BeforeInvoke(InvocationInfo info) { }
-        public void AfterInvoke(InvocationInfo info, object returnValue) { }
     }
 
     [Test]
@@ -203,7 +206,5 @@ public class Register_and_use_interceptor_with_LinFu
         Assert.AreEqual("Invoking method: Greet", logger.LogLines[0]);
     }
 }/*md
-
-/*md
 ```
 md*/

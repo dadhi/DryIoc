@@ -26,7 +26,7 @@ echo:
  -register:path64^
  -target:%NUNIT%^
  -targetargs:"%TESTLIBS%"^
- -filter:"+[*]* -[*Test*]* -[Microsoft*]* -[xunit*]* -[NetCore*]*"^
+ -filter:"+[*]* -[*Test*]* -[*Docs*]* -[*Moq*]* -[Microsoft*]* -[xunit*]* -[NetCore*]*"^
  -excludebyattribute:*.ExcludeFromCodeCoverageAttribute^
  -hideskipped:all^
  -output:%COVERAGE%
