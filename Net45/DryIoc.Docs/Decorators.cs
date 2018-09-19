@@ -31,7 +31,7 @@ aka __Initializer__.
 
 ## General use-case
 
-We start with defining the `IHandler` which we will decorate adding the logging capabilities:
+We start by defining the `IHandler` which we will decorate adding the logging capabilities:
 
 ```cs md*/
 using DryIoc;
@@ -41,6 +41,7 @@ using ExpressionToCodeLib;
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 // ReSharper disable UnusedParameter.Local
 
@@ -148,8 +149,8 @@ It is OK because DryIoc supports decorator nesting. Read on to the next section 
 ## Nested Decorators
 
 DryIoc supports decorator nesting. 
-**The first registered** decorator will wrap the actual service,
- * and the subsequent decorators will wrap the already decorated objects.
+**The first registered** decorator will wrap the actual service, 
+ and the subsequent decorators will wrap the already decorated objects.
 
 ```cs md*/
 class S {}
@@ -294,9 +295,9 @@ class Decorator_of_generic_T_type
 ```
 
 The "problem" of `object` decorators that they will be applied to all services,
-__affecting the resolution performance__. To make decorator more targeted, we can provide the setup condition.
+__affecting the resolution performance__. 
 
-Adding condition to apply decorator only to `IStartable` services:
+To make decorator more targeted, we can provide the setup condition:
 
 ```cs md*/
 class Decorator_of_generic_T_type_with_condition
@@ -378,7 +379,7 @@ class Decoratee_reuse
 
 ## Decorator of Wrapped Service
 
-Decorator may be applied to [wrapped](Wrappers) service in order to provide laziness, create decorated service on demand, proxy-ing, etc.
+Decorator may be applied to the [wrapped](Wrappers) service in order to provide laziness, create decorated service on demand, proxy-ing, etc.
 ```cs md*/
 class ACall
 {
@@ -410,7 +411,7 @@ class Decorator_of_wrapped_service
 }/*md
 ```
 
-Decorators of wrappers may be nested the same way as for normal services:
+Decorators of wrappers may be nested the same way as decorators of normal services:
 ```cs md*/
 class DLazy : S
 {
@@ -452,173 +453,111 @@ DryIoc supports decorating of wrappers directly to adjust corresponding wrapper 
 Consider the decorating of [collection wrapper](Wrappers#markdown-header-ienumerable-or-array-of-a).
 Let`s say we want to change the default collection behavior and exclude keyed services from the result:
 
-```csharp
-container.Register<I, A>();
-container.Register<I, B>();
-container.Register<I, C>(serviceKey: "test");
+```cs md*/
+public interface I { }
+public class A : I { }
+public class B : I { }
+public class C : I { }
 
-// by default will return instances of A, B, C
-var iis = container.Resolve<IEnumerable<I>>();
-```
-
-To exclude keyed service `C` we may define the decorator for `IEnumerable<I>`, which accepts all instances and filter out the keyed things:
-
-```csharp
-public static class Decorators
+class Collection_wrapper_of_non_keyed_and_keyed_services
 {
-    public static IEnumerable<I> FilterOutKeyed(IEnumerable<KeyValuePair<object, I>> all) =>
-        all.Where(kv => kv.Key is DryIoc.DefaultKey).Select(kv => kv.Value);
-}
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-// a collection decorator
-container.Register<IEnumerable<I>>(
-    Made.Of(() => Decorators.FilterOutKeyed(Arg.Of<IEnumerable<KeyValuePair<object, I>>())), 
-    setup: Setup.Decorator);
+        container.Register<I, A>();
+        container.Register<I, B>();
+        container.Register<I, C>(serviceKey: "test");
+
+        // by default collection will contain instances of all registered types
+        var iis = container.Resolve<IEnumerable<I>>();
+        CollectionAssert.AreEqual(new[]{ typeof(A), typeof(B), typeof(C) },
+            iis.Select(i => i.GetType()));
+    }
+} /*md
 ```
 
-__Note:__ By decorating the `IEnumerable<T>` we automatically decorating the array of `T[]` as well.
+To exclude keyed service `C` we may define the decorator for `IEnumerable<I>`, 
+which accepts all instances and filters out the keyed things:
+
+```cs md*/
+class Decorator_of_wrapper
+{
+    public static IEnumerable<I> GetNoneKeyed(IEnumerable<KeyValuePair<object, I>> all) =>
+        all.Where(kv => kv.Key is DefaultKey).Select(kv => kv.Value);
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<I, A>();
+        container.Register<I, B>();
+        container.Register<I, C>(serviceKey: "test");
+
+        // a collection decorator to filter out keyed services, a `C` with `"test"` key
+        container.Register<IEnumerable<I>>(
+            Made.Of(() => GetNoneKeyed(Arg.Of<IEnumerable<KeyValuePair<object, I>>>())),
+            setup: Setup.Decorator);
+
+        var iis = container.Resolve<IEnumerable<I>>();
+        CollectionAssert.AreEqual(new[] { typeof(A), typeof(B) },
+            iis.Select(i => i.GetType()));
+    }
+}/*md
+```
+
+__Note:__ By decorating the `IEnumerable<T>` we are automatically decorating the array of `T[]` as well.
+
 
 ## Decorator as Initializer
 
-When registering decorator with [FactoryMethod], it is possible to __decorate the creation of a service__. 
+When registering decorator with [FactoryMethod], it is possible to __decorate an initialization pipeline of a service__. 
 
 It means that decorator factory method accepts injected decorated service, 
 invokes some initialization logic on the decorated instance, 
 and returns this (or another) instance.
 
-```csharp
-public class Foo : IFoo 
+```cs md*/
+
+public class Foo 
 {
     public string Message { get; set; }
 }
 
-public static class FooMiddleware 
+class Decorator_as_initializer
 {
-    public static IFoo Greet(IFoo foo) 
+    public static Foo DecorateFooWithGreet(Foo foo)
     {
         foo.Message = "Hello, " + (foo.Message ?? "");
         return foo;
     }
-}
 
-container.Register<IFoo, Foo>();
-container.Register<IFoo>(
-    Made.Of(() => FooMiddleware.Greet(Arg.Of<IFoo>())),
-    setup: Setup.Decorator)
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-var foo = container.Resolve<IFoo>();
-StringAssert.Contains("Hello", foo.Message);
+        container.Register<Foo>();
+        container.Register<Foo>(
+            Made.Of(() => DecorateFooWithGreet(Arg.Of<Foo>())),
+            setup: Setup.Decorator);
+
+        var foo = container.Resolve<Foo>();
+        StringAssert.Contains("Hello", foo.Message);
+    }
+} /*md
 ```
 
-Here `FooMiddleware.Greet` is a static method just for the demonstration. 
-It also may be a non-static and include additional dependencies to be injected by Container, check the [FactoryMethod] docs for more details.
+Here `DecorateFooWithGreet` is a static method just for the demonstration. 
+It also may be a non-static and include additional dependencies to be injected by Container, 
+check the [FactoryMethod] for more details.
 
-DryIoc has a dedicated `RegisterInitializer` [method](RegisterResolve#markdown-header-registerinitializer) which is a decorator in disguise. Here is the implementation of register initializer to illustrate the idea:
+DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve#markdown-header-registerinitializer) method,
+which is a decorator in disguise.
 
-```csharp
-// Step 1:
-// Define the decorator factory which accepts user initialize action.
-// The actual decorator method is Decorate which just invokes stored action and 
-// returns decorated service instance.
-internal sealed class InitializerFactory<TTarget>
-{
-    private readonly Action<TTarget, IResolver> _initialize;
-
-    public InitializerFactory(Action<TTarget, IResolver> initialize)
-    {
-        _initialize = initialize;
-    }
-
-    public TService Decorate<TService>(TService service, IResolver resolver)
-        where TService : TTarget
-    {
-        _initialize(service, resolver);
-        return service;
-    }
-}
-
-// Step 2: Register the decorator factory and decorator produced by Decorate method.
-// unique key to bind decorator factory and decorator registrations
-var decoratorFactoryKey = new object();
-
-// register decorator factory and identify it with the key
-registrator.RegisterDelegate(
-    _ => new InitializerFactory<TTarget>(initialize),
-    serviceKey: decoratorFactoryKey);
-
-// decorator condition to make decorator applied only to TTarget service type.
-Func<RequestInfo, bool> decoratorCondition = r => 
-    (r.ImplementationType ?? r.GetActualServiceType()).IsAssignableTo(typeof(TTarget));
-
-// register decorator with Decorate method of factory identified with the key
-registrator.Register<object>(
-    made: Made.Of(request => FactoryMethod.Of(
-        typeof(InitializerFactory<TTarget>).GetSingleMethodOrNull("Decorate").MakeGenericMethod(request.ServiceType),
-        ServiceInfo.Of<InitializerFactory<TTarget>>(serviceKey: decoratorFactoryKey))),
-    setup: Setup.DecoratorWith(decoratorCondition, useDecorateeReuse: true));
-```
-
-The example illustrations use of decorator of generic type `T`, and use of instance factory method, as well as `useDecorateeReuse`.
-
-
-## Decorator as Disposer
-
-DryIoc supports a [dispose action](RegisterResolve#markdown-header-registerdisposer) for the service that does not implement as `IDisposable` (or a custom action for `IDisposable`).
-
-As you may predict. a disposer is also implemented as decorator:
-
-```csharp
-// Step 1:
-// Define decorator factory to store dispose action 
-// and actual decorator method "TrackForDispose"
-internal sealed class Disposer<T> : IDisposable
-{
-    private readonly Action<T> _dispose;
-    private int _state;
-    private const int Tracked = 1, Disposed = 2;
-    private T _item;
-
-    public Disposer(Action<T> dispose)
-    {
-        _dispose = dispose.ThrowIfNull();
-    }
-
-    public T TrackForDispose(T item)
-    {
-        if (Interlocked.CompareExchange(ref _state, Tracked, 0) != 0)
-            Throw.It(Error.Of("Something is {0} already."), _state == Tracked ? " tracked" : "disposed");
-        _item = item;
-        return item;
-    }
-
-    public void Dispose()
-    {
-        if (Interlocked.CompareExchange(ref _state, Disposed, Tracked) != Tracked)
-            return;
-        var item = _item;
-        if (item != null)
-        {
-            _dispose(item);
-            _item = default(T);
-        }
-    }
-}
-
-// Step 2:
-// Register factory and decorator via factory method
-var disposerKey = new object();
-
-registrator.RegisterDelegate(_ => new Disposer<TService>(dispose), 
-    serviceKey: disposerKey,
-    setup: Setup.With(useParentReuse: true));
-
-registrator.Register(Made.Of(
-    r => ServiceInfo.Of<Disposer<TService>>(serviceKey: disposerKey),
-    f => f.TrackForDispose(Arg.Of<TService>())),
-    setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
-```
-
-The example illustrates use of instance factory method for registering decorator, `useDecorateeReuse`, and `useParentReuse` for the factory.
+Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve#markdown-header-registerdisposer).
 
 
 ## Decorator as Interceptor with Castle DynamicProxy

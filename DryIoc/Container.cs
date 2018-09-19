@@ -4725,7 +4725,8 @@ namespace DryIoc
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                     // specify ResolverContext as parameter to prevent applying initializer for injected resolver too
                     parameters: Parameters.Of
-                        .Type(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope ? r.Container.RootOrSelf() : r.Container)
+                        .Type(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope 
+                            ? r.Container.RootOrSelf() : r.Container)
                         .Type(_ => initialize)),
                 setup: Setup.DecoratorWith(
                     r => r.ServiceType.IsAssignableTo<TTarget>() && (condition == null || condition(r)),
