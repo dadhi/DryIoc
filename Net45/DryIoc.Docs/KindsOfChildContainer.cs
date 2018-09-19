@@ -1,4 +1,4 @@
-﻿/*md
+/*md
 # Kinds of Child Container
 
 [TOC]
@@ -22,7 +22,7 @@ Facade is a normal container that fall-backs resolution to another container(_pa
 Facade inherits from the parent the `Rules` and the `ScopeContext` and nothing more. Facade has its own Registrations, Cache and Singletons.
 
 Example:
-```csharp */
+```cs md*/
 using DryIoc;
 class FacadeExample
 {
@@ -39,8 +39,7 @@ class FacadeExample
         var client = testFacade.Resolve<Client>();
         client.Service.Is<TestService>();
     }
-}
-/*md
+} /*md
 ```
 
 __Note:__ Because facade is just a normal standalone container it has its own singletons, not shared with parent even if resolved from parent.When you resolve singleton directly from parent and then ask for it from child, it will return another object.

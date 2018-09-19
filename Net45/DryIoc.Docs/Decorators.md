@@ -518,13 +518,14 @@ and returns this (or another) instance.
 
 ```cs 
 
-public class Foo 
-{
-    public string Message { get; set; }
-}
 
 class Decorator_as_initializer
 {
+    public class Foo
+    {
+        public string Message { get; set; }
+    }
+
     public static Foo DecorateFooWithGreet(Foo foo)
     {
         foo.Message = "Hello, " + (foo.Message ?? "");

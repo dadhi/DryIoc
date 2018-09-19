@@ -89,6 +89,10 @@
     </Compile>
     <Compile Include="ExampleServices.cs" />
     <Compile Include="Asserts.cs" />
+    <Compile Include="Interception.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>Interception.md</LastGenOutput>
+    </Compile>
     <Compile Include="KindsOfChildContainer.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
@@ -113,6 +117,11 @@
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Decorators.cs</DependentUpon>
+    </None>
+    <None Include="Interception.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Interception.cs</DependentUpon>
     </None>
     <None Include="KindsOfChildContainer.md">
       <AutoGen>True</AutoGen>
