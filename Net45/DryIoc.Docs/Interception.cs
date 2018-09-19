@@ -19,10 +19,13 @@ Let's define an extension method for intercepting interfaces and classes:
 using DryIoc;
 using ImTools;
 using Castle.DynamicProxy;
+
 using NUnit.Framework;
 
 using System;
 using System.Collections.Generic;
+using LinFu.DynamicProxy;
+using IInterceptor = Castle.DynamicProxy.IInterceptor;
 
 public static class DryIocInterception
 {
@@ -44,14 +47,10 @@ public static class DryIocInterception
             throw new ArgumentException(
                 $"Intercepted service type {serviceType} is not a supported, cause it is nor a class nor an interface");
 
-        var decoratorSetup = serviceKey == null
-            ? Setup.DecoratorWith(useDecorateeReuse: true)
-            : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
-
         registrator.Register(serviceType, proxyType,
             made: Made.Of(pType => pType.PublicConstructors().FindFirst(ctor => ctor.GetParameters().Length != 0),
                 Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))),
-            setup: decoratorSetup);
+            setup: Setup.DecoratorOf(useDecorateeReuse: true, decorateeServiceKey: serviceKey));
     }
 } /*md
 ```
@@ -101,5 +100,110 @@ public class Register_and_use_interceptor
         Assert.AreEqual("Invoking method: Greet", logger.LogLines[0]);
     }
 }/*md
+```
+
+
+## Decorator with LinFu DynamicProxy
+
+Lately, there was a new release of [LinFu.DynamicProxy]() with .NET Standard 2.0 support.
+
+It is interesting to at least have an alternative to Castle.DynamicProxy. Let's try it out :-)
+
+```cs md*/
+public static class DryIocInterceptionWithLinFu
+{
+    private static readonly ProxyFactory _proxyFactory = new ProxyFactory();
+
+    public static void InterceptInvocation<TService, TInvokeWrapper>(this IRegistrator registrator, object serviceKey = null)
+        where TInvokeWrapper : class, IInvokeWrapper
+    {
+        var serviceType = typeof(TService);
+        if (!serviceType.IsInterface() && !serviceType.IsClass())
+            throw new ArgumentException(
+                $"Intercepted service type {serviceType} is not a supported, because it is nor a class nor an interface");
+
+        registrator.UseInstance(_proxyFactory);
+
+        var createProxyMethod = typeof(ProxyFactory)
+            .Method(nameof(ProxyFactory.CreateProxy), typeof(IInvokeWrapper), typeof(Type[]))
+            .MakeGenericMethod(serviceType);
+
+        registrator.Register(serviceType, 
+            made: Made.Of(createProxyMethod,
+                ServiceInfo.Of<ProxyFactory>(),
+                Parameters.Of.Type<IInvokeWrapper>(typeof(TInvokeWrapper)).Type<Type[]>(_ => null)),
+            setup: Setup.DecoratorOf(useDecorateeReuse: true, decorateeServiceKey: serviceKey));
+    }
+}/*md
+```
+Implement `IInvokeWrapper` to intercept the methods of `IBar` instances.
+Then register service, `BarInvokeWrapper`, and link them together via Intercept method:
+```cs md*/
+
+public class Register_and_use_interceptor_with_LinFu
+{
+    public interface IBar
+    {
+        void Greet();
+    }
+    public class Bar : IBar
+    {
+        public void Greet() { }
+    }
+
+    public class BarLogger
+    {
+        public List<string> LogLines = new List<string>();
+        public void Log(string line) => LogLines.Add(line);
+    }
+
+    public class BarInvokeWrapper : IInvokeWrapper
+    {
+        private readonly IBar _bar;
+        private readonly BarLogger _logger;
+
+        public BarInvokeWrapper(IBar bar, BarLogger logger)
+        {
+            _bar = bar;
+            _logger = logger;
+        }
+
+        public object DoInvoke(InvocationInfo info)
+        {
+            _logger.Log($"Invoking method: {info.TargetMethod.Name}");
+
+            info.TargetMethod.Invoke(_bar, info.Arguments);
+
+            // may be optimized, because we know the actual `_bar` object here.
+            //if (info.TargetMethod.Name == nameof(IBar.Greet))
+            //    _bar.Greet();
+
+            return _bar;
+        }
+
+        public void BeforeInvoke(InvocationInfo info) { }
+        public void AfterInvoke(InvocationInfo info, object returnValue) { }
+    }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IBar, Bar>();
+        container.Register<BarLogger>(Reuse.Singleton);
+        container.Register<BarInvokeWrapper>();
+        container.InterceptInvocation<IBar, BarInvokeWrapper>();
+
+        var foo = container.Resolve<IBar>();
+        foo.Greet();
+
+        // examine that logging indeed was hooked up
+        var logger = container.Resolve<BarLogger>();
+        Assert.AreEqual("Invoking method: Greet", logger.LogLines[0]);
+    }
+}/*md
+
+/*md
 ```
 md*/

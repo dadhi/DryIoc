@@ -9465,8 +9465,37 @@ namespace DryIoc
 
         /// <summary>Searches and returns constructor by its signature.</summary>
         public static ConstructorInfo GetConstructorOrNull(this Type type,
-            bool includeNonPublic = false, params Type[] args) =>
-            type.Constructors(includeNonPublic).FindFirst(c => c.GetParameters().Map(p => p.ParameterType).SequenceEqual(args));
+            bool includeNonPublic = false, params Type[] args)
+        {
+            var pTypesCount = args.Length;
+            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            if (!includeNonPublic)
+                ctors = ctors.Match(c => c.IsPublic);
+            
+            for (var i = 0; i < ctors.Length; i++)
+            {
+                var ctor = ctors[i];
+                var ps = ctor.GetParameters();
+                if (ps.Length != pTypesCount)
+                    continue;
+
+                if (pTypesCount == 0)
+                    return ctor;
+
+                var p = 0;
+                for (; p < pTypesCount; ++p)
+                {
+                    var paramType = ps[p].ParameterType;
+                    if (paramType != args[p] && paramType.GetGenericDefinitionOrNull() != args[p])
+                        break;
+                }
+
+                if (p == pTypesCount)
+                    return ctor;
+            }
+
+            return null;
+        }
 
         /// <summary>Searches and returns constructor by its signature.</summary>
         public static ConstructorInfo GetConstructorOrNull(this Type type, params Type[] args) =>
@@ -9505,32 +9534,31 @@ namespace DryIoc
         /// <summary>Looks up for method with and specified parameter types.</summary>
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
-            var paramCount = paramTypes.Length;
+            var pTypesCount = paramTypes.Length;
             var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
-            for (var m = 0; m < methods.Length; m++)
+            for (var i = 0; i < methods.Length; i++)
             {
-                var method = methods[m];
+                var method = methods[i];
                 if (method.Name != name)
                     continue;
 
-                var methodParams = method.GetParameters();
-                if (paramCount == methodParams.Length)
+                var ps = method.GetParameters();
+                if (ps.Length != pTypesCount)
+                    continue;
+
+                if (pTypesCount == 0)
+                    return method;
+
+                var p = 0;
+                for (; p < pTypesCount; ++p)
                 {
-                    if (paramCount == 0)
-                        return method;
-
-                    var paramIndex = 0;
-                    for (; paramIndex < paramCount; ++paramIndex)
-                    {
-                        var paramType = methodParams[paramIndex].ParameterType;
-                        if (paramType != paramTypes[paramIndex] &&
-                            (!paramType.IsOpenGeneric() || paramType.GetGenericTypeDefinition() != paramTypes[paramIndex]))
-                            break;
-                    }
-
-                    if (paramIndex == paramCount)
-                        return method;
+                    var paramType = ps[p].ParameterType;
+                    if (paramType != paramTypes[p] && paramType.GetGenericDefinitionOrNull() != paramTypes[p])
+                        break;
                 }
+
+                if (p == pTypesCount)
+                    return method;
             }
 
             return null;

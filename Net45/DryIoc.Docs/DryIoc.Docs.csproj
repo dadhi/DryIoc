@@ -43,6 +43,9 @@
     <Reference Include="FastExpressionCompiler, Version=1.8.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\FastExpressionCompiler.1.8.0\lib\net45\FastExpressionCompiler.dll</HintPath>
     </Reference>
+    <Reference Include="LinFu.DynamicProxy, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\LinFu.DynamicProxy.2.1.1\lib\netstandard2.0\LinFu.DynamicProxy.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.DotNet.PlatformAbstractions, Version=2.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.DotNet.PlatformAbstractions.2.1.0\lib\net45\Microsoft.DotNet.PlatformAbstractions.dll</HintPath>
     </Reference>
