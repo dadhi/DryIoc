@@ -8,31 +8,32 @@
 
 In most cases all you need is: 
 ```cs 
+using DryIoc;
+using NUnit.Framework;
 
 using System;
-using DryIoc;
 
 // ReSharper disable UnusedVariable
 class Creating_container
 {
-    [Example] public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         // start using the container..
     }
-}
+} 
 ``` 
 
 Actually, the above example is equivalent to:
 ```cs 
 class Creating_container_with_explicit_defaults
 {
-    [Example] public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules: Rules.Default, scopeContext: null);
         // start using the container..
     }
-}
+} 
 ```
 
 As you see, it is possible to additionally specify the `rules` and 
@@ -48,7 +49,7 @@ get the rules without some setting via the `Without..` methods.
 ```cs 
 class Adding_some_rules
 {
-    [Example] public void Example()
+    [Test] public void Example()
     {
         var container1 = new Container(
             Rules.Default.With(FactoryMethod.ConstructorWithResolvableArguments));
@@ -56,21 +57,21 @@ class Adding_some_rules
         var container2 = new Container(
             Rules.Default.WithoutThrowIfDependencyHasShorterReuseLifespan());
     }
-}
+} 
 ```
 
 There is an alternate way to specify the rules with existing container rules as a starting point (without explicit mention of `Rules.Default`):
 ```cs 
 class Adding_some_rules_with_action
 {
-    [Example]
+    [Test]
     public void Example()
     {
         var container1 = new Container(rules => rules.WithDefaultReuse(Reuse.Singleton));
 
         var container2 = new Container(rules => rules.WithAutoConcreteTypeResolution());
     }
-}
+} 
 ```
 
 ### ScopeContext
@@ -99,7 +100,7 @@ class Disposing_container
         public void Dispose() => IsDisposed = true;
     }
 
-    [Example]
+    [Test]
     public void Example()
     {
         MyService myService;
@@ -109,7 +110,7 @@ class Disposing_container
             myService = container.Resolve<MyService>();
         }
 
-        myService.IsDisposed.IsTrue();
+        Assert.IsTrue(myService.IsDisposed);
     }
 }
 ```

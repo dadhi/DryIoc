@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Wiki Home
@@ -7,7 +8,7 @@
 ## Getting Started
 
 Let's define a simple interface and implementation setup:
-```cs 
+```cs md*/
 // these usings are for later
 using DryIoc;
 using NUnit.Framework;
@@ -26,13 +27,13 @@ public class SomeClient : IClient
 {
     public IService Service { get; }
     public SomeClient(IService service) { Service = service; }
-} 
+} /*md
 ```
 
 To illustrate the idea of Dependency Injection container, we will start from the problem.
 Let's create `SomeClient` by hand, but with [DI principle](http://en.wikipedia.org/wiki/Dependency_inversion_principle) in mind:
 
-```cs 
+```cs md*/
 class Created_manually
 {
     [Test]
@@ -40,7 +41,7 @@ class Created_manually
     {
         IClient client = new SomeClient(new SomeService());
     }
-} 
+} /*md
 ```
 
 The manual implementation is a hard-wired - we are using implementation types `SomeClient` and `SomeService` in-place of
@@ -52,7 +53,7 @@ Here goes the DI / IoC container!
 
 Let's try DryIoc:
 
-```cs 
+```cs md*/
 class Created_by_DryIoc
 {
     private IContainer _container;
@@ -71,7 +72,7 @@ class Created_by_DryIoc
         var client = _container.Resolve<IClient>();
         Assert.IsInstanceOf<SomeClient>(client);
     }
-} 
+} /*md
 ```
 
 In the example with DryIoc, configuration of types is separate from the resolution, so that both can be changed independently.
@@ -173,3 +174,4 @@ Stay tuned!
 
 ### [Previous Versions](VersionHistory)
 
+md*/

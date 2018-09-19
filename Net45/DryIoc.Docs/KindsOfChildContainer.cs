@@ -1,4 +1,6 @@
 /*md
+<!--Auto-generated from .cs file, the edits here will be lost! -->
+
 # Kinds of Child Container
 
 [TOC]
@@ -24,20 +26,35 @@ Facade inherits from the parent the `Rules` and the `ScopeContext` and nothing m
 Example:
 ```cs md*/
 using DryIoc;
+using NUnit.Framework;
+
 class FacadeExample
 {
-    [Example] public void Facade_for_tests()
+    public interface IService {}
+    public class ProdService : IService { }
+    public class TestService : IService { }
+
+    public class Client
+    {
+        public IService Service { get; }
+        public Client(IService service)
+        {
+            Service = service;
+        }
+    }
+
+    [Test] public void Facade_for_tests()
     {
         var container = new Container();
 
-        container.Register<IService, Service>();
+        container.Register<IService, ProdService>();
         container.Register<Client>();
 
         var testFacade = container.CreateFacade();
         testFacade.Register<IService, TestService>();
 
         var client = testFacade.Resolve<Client>();
-        client.Service.Is<TestService>();
+        Assert.IsInstanceOf<TestService>(client.Service);
     }
 } /*md
 ```

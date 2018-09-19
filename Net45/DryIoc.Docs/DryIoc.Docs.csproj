@@ -84,8 +84,10 @@
       <Generator>CsToMd</Generator>
       <LastGenOutput>Decorators.md</LastGenOutput>
     </Compile>
-    <Compile Include="ExampleServices.cs" />
-    <Compile Include="Asserts.cs" />
+    <Compile Include="Home.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>Home.md</LastGenOutput>
+    </Compile>
     <Compile Include="Interception.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>Interception.md</LastGenOutput>
@@ -114,6 +116,11 @@
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Decorators.cs</DependentUpon>
+    </None>
+    <None Include="Home.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Home.cs</DependentUpon>
     </None>
     <None Include="Interception.md">
       <AutoGen>True</AutoGen>
