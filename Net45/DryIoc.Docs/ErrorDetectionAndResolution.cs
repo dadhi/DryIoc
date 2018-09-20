@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Error Detection and Resolution
@@ -33,7 +34,7 @@ A very common problem when you forgot to register required service or dependency
 ### UnableToResolveUnknownService
 
 For instance if no registration exist for the service type - nor keyed nor default, then the error will be:
-```cs 
+```cs md*/
 
 using System;
 using DryIoc;
@@ -67,7 +68,7 @@ class Unable_to_resolve_unknown_service
         // and no dynamic registrations found in 0 of Rules.DynamicServiceProviders
         //   and nothing found in 0 of Rules.UnknownServiceResolvers
     }
-}
+}/*md
 ```
 
 
@@ -75,7 +76,7 @@ class Unable_to_resolve_unknown_service
 
 If in previous example, `Y` class is registered with key, 
 then DryIoc will list available registrations and provide an additional information about container state:
-```cs 
+```cs md*/
 
 class Unable_to_resolve_from_registered_services
 {
@@ -102,12 +103,12 @@ class Unable_to_resolve_from_registered_services
         //   with normal and dynamic registrations:
         // ("special", { FactoryID = 28, ImplType = Y})
     }
-}
+}/*md
 ```
 
 Let's see a bit different situation when you have registered a scoped service, but there was no scope opened.
 
-```cs 
+```cs md*/
 class No_current_scope_available
 {
     public class Y { }
@@ -130,14 +131,14 @@ class No_current_scope_available
         // No current scope is available: probably you are registering to, or resolving from outside of the scope.
         // Current resolver context is: container without scope.
     }
-}
+}/*md
 ```
 
 ## RecursiveDependencyDetected
 
 The problem says that you dependencies form a (infinite) cycle in object graph. 
 Better illustrated with code:
-``` 
+``` md*/
 class Recursive_dependencies
 {
     class A
@@ -149,7 +150,7 @@ class Recursive_dependencies
     {
         public B(A a) { } // B requires A
     }
-}
+}/*md
 ```
 
 Straightforward approach of creating `A` with a `new` will fail:
@@ -161,7 +162,7 @@ The same will fail for container as well.
 __Note:__ Recursive dependency usually points to a design problem. That's why some languages prohibit it at compile-time, e.g. F#.
 
 DryIoc will throw `ContainerException` with `Error.RecursiveDependencyDetected` when resolving either `A` or `B`:
-```cs 
+```cs md*/
 
 class Recursive_dependency_detected
 {
@@ -187,7 +188,7 @@ class Recursive_dependency_detected
         //  in A #27 <--recursive
         //  from container without scope.
     }
-}
+}/*md
 ```
 
 `<--recursive` identify exact points in object graph when recursion is introduced.
@@ -196,7 +197,7 @@ class Recursive_dependency_detected
 ### How to allow recursive dependency
 
 In some case recursive dependency is what you wont, usually inside `Lazy` or `Func` wrapper:
-```cs 
+```cs md*/
 
 class Allow_a_recursive_dependencies
 {
@@ -216,11 +217,11 @@ class Allow_a_recursive_dependencies
         Parent parent = null;
         parent = new Parent(new Child(new Lazy<Parent>(() => parent)));
     }
-}
+}/*md
 ```
 
 By the way, DryIoc natively supports  `Lazy`  and `Func` [wrappers](Wrappers.md):
-```cs 
+```cs md*/
 class Allow_recursive_dependency_in_DryIoc
 {
     class Child
@@ -249,7 +250,7 @@ class Allow_recursive_dependency_in_DryIoc
         var parent = container.Resolve<Parent>(); // works just fine
         Assert.AreSame(parent, parent.Child.Parent);
     }
-}
+}/*md
 ```
 
 
@@ -260,7 +261,7 @@ The method finds all or selected registrations (except for the open-generics), t
 
 __Note:__ `Validate` does not actually create any service object, neither affects container state.
 
-```cs 
+```cs md*/
 class Registrations_diagnostics
 {
     public class RequiredDependency { }
@@ -280,7 +281,7 @@ class Registrations_diagnostics
        Assert.AreEqual(1, errors.Length);
        Assert.AreEqual(nameof(MyService), errors[0].Key.ServiceType.Name);
     }
-}
+}/*md
 ```
 
 `errors` is the collection of key-value pairs of `ServiceRegistrationInfo` and `ContainerException`. 
@@ -314,3 +315,4 @@ Generated resolution expressions are expression-trees `Expression<DryIoc.Factory
 or even compiled to actual delegates and used for __container-less service resolution__.
 
 __Note:__ [DryIocZero](Companions/DryIocZero) package uses the `GenerateResolutionExpressions` to generate factory delegates at compile-time.
+md*/

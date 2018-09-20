@@ -84,6 +84,10 @@
       <Generator>CsToMd</Generator>
       <LastGenOutput>Decorators.md</LastGenOutput>
     </Compile>
+    <Compile Include="ErrorDetectionAndResolution.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>ErrorDetectionAndResolution.md</LastGenOutput>
+    </Compile>
     <Compile Include="Home.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>Home.md</LastGenOutput>
@@ -116,6 +120,11 @@
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Decorators.cs</DependentUpon>
+    </None>
+    <None Include="ErrorDetectionAndResolution.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>ErrorDetectionAndResolution.cs</DependentUpon>
     </None>
     <None Include="Home.md">
       <AutoGen>True</AutoGen>

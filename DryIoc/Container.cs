@@ -6148,7 +6148,6 @@ namespace DryIoc
             if ((Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
                 s.Append(" (Generated resolution dependency)");
 
-
             return s;
         }
 
@@ -6869,7 +6868,7 @@ namespace DryIoc
         /// <summary>Returns nice string representation of factory.</summary>
         public override string ToString()
         {
-            var s = new StringBuilder().Append("{ID=").Append(FactoryID);
+            var s = new StringBuilder().Append("{FactoryID=").Append(FactoryID);
             if (ImplementationType != null)
                 s.Append(", ImplType=").Print(ImplementationType);
             if (Reuse != null)
@@ -9008,8 +9007,8 @@ namespace DryIoc
                 "Unable to register service {0} with duplicate key '{1}'" + Environment.NewLine +
                 " There is already registered service with the same key: {2}."),
             NoCurrentScope = Of(
-                "No current scope available. Probably you are registering to, or resolving from outside of scope. " + Environment.NewLine +
-                "Current resolver context is: {0}"),
+                "No current scope is available: probably you are registering to, or resolving from outside of the scope. " + Environment.NewLine +
+                "Current resolver context is: {0}."),
             ContainerIsDisposed = Of(
                 "Container is disposed and should not be used: {0}"),
             NoMatchedScopeFound = Of(
