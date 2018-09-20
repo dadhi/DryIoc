@@ -1022,12 +1022,11 @@ namespace DryIoc
             }
             else
             {
-                // Within remaining decorators find one with maximum Order
-                // or if no Order for all decorators, then the last registered - with maximum FactoryID
+                // Within the remaining decorators find one with the maximum Order
+                // or if no Order for all decorators, then find the last registered - with the biggest FactoryID
                 decorator = decorators
                     .OrderByDescending(d => ((Setup.DecoratorSetup)d.Setup).Order)
-                    .ThenByDescending(d => d.GeneratorFactoryID != 0 ? d.GeneratorFactoryID : d.FactoryID)
-                    .ThenByDescending(d => d.FactoryID)
+                    .ThenByDescending(d => d.RegistrationOrder)
                     .FirstOrDefault(d => d.CheckCondition(request));
             }
 
@@ -6679,8 +6678,8 @@ namespace DryIoc
         /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/> to get concrete factory.</summary>
         public virtual IConcreteFactoryGenerator FactoryGenerator => null;
 
-        /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
-        public virtual int GeneratorFactoryID => 0;
+        /// <summary>Registration order.</summary>
+        public virtual int RegistrationOrder => FactoryID;
 
         /// <summary>Settings <b>(if any)</b> to select Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public virtual Made Made => Made.Default;
@@ -7182,8 +7181,11 @@ namespace DryIoc
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public override Made Made => _made;
 
+        /// <summary>FactoryID of generator (open-generic) factory.</summary>
+        public int GeneratorFactoryID { get; private set; }
+
         /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
-        public override int GeneratorFactoryID => _generatorFactoryID;
+        public override int RegistrationOrder => GeneratorFactoryID != 0 ? GeneratorFactoryID : FactoryID;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
@@ -7384,7 +7386,6 @@ namespace DryIoc
         private readonly Made _made;
         private ClosedGenericFactoryGenerator _factoryGenerator;
         private ConstructorInfo _knownSingleCtor;
-        internal int _generatorFactoryID;
 
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
@@ -7453,7 +7454,7 @@ namespace DryIoc
                 }
 
                 var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup);
-                closedGenericFactory._generatorFactoryID = openFactory.FactoryID;
+                closedGenericFactory.GeneratorFactoryID = openFactory.FactoryID;
                 _generatedFactories.Swap(_ => _.AddOrUpdate(generatedFactoryKey, closedGenericFactory));
                 return closedGenericFactory;
             }
@@ -8650,8 +8651,9 @@ namespace DryIoc
         public object OptionalServiceKey;
 
         /// <summary>Provides registration order across all factory registrations in container.</summary>
-        /// <remarks>May be the same for factory registered with multiple services.</remarks>
-        public int FactoryRegistrationOrder => Factory.FactoryID;
+        /// <remarks>May be the same for factory registered with multiple services
+        /// OR for closed-generic factories produced from the single open-generic registration.</remarks>
+        public int FactoryRegistrationOrder => Factory.RegistrationOrder;
 
         /// <summary>Implementation type if available.</summary>
         public Type ImplementationType => Factory.CanAccessImplementationType ? Factory.ImplementationType : null;
