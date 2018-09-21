@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Examples of context based resolution
@@ -10,7 +11,7 @@ Here is [the discussion](https://github.com/autofac/Autofac/issues/644) and exam
 
 In DryIoc we may use [strongly-typed Factory Method](https://bitbucket.org/dadhi/dryioc/wiki/SelectConstructorOrFactoryMethod#markdown-header-factory-method-instead-of-constructor) specification to register log4net.ILog:
 
-```cs 
+```cs md*/
 using DryIoc;
 using NUnit.Framework;
 using System;
@@ -39,7 +40,7 @@ class Log4net_logger
         var a = container.Resolve<A>();
         Assert.IsNotNull(a.Log);
     }
-} 
+} /*md
 ```
 
 `Made.Of` `Arg.Index<Type>(0)` argument references to the value: `request => request.Parent.ImplementationType`, 
@@ -51,7 +52,7 @@ which evaluates to the `typeof(A)` in the example.
 The code is similar to the __log4net__ with using dependency parent type as context for instantiating of `ILogger`.
 In addition, the condition allows to use default logger where context is not available, e.g. at resolution root.
 
-```cs 
+```cs md*/
 
 class Serilog_logger
 {
@@ -86,5 +87,6 @@ class Serilog_logger
 
         Assert.AreSame(Serilog.Log.ForContext<LogSubject>(), s.Logger);
     }
-} 
+} /*md
 ```
+md*/

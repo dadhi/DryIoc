@@ -40,6 +40,9 @@
     <Reference Include="LinFu.DynamicProxy, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\LinFu.DynamicProxy.2.1.1\lib\netstandard2.0\LinFu.DynamicProxy.dll</HintPath>
     </Reference>
+    <Reference Include="log4net, Version=2.0.8.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.DotNet.PlatformAbstractions, Version=2.1.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
       <HintPath>..\..\packages\Microsoft.DotNet.PlatformAbstractions.2.1.0\lib\net45\Microsoft.DotNet.PlatformAbstractions.dll</HintPath>
     </Reference>
@@ -57,6 +60,9 @@
     </Reference>
     <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
       <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\Serilog.2.7.1\lib\net46\Serilog.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -87,6 +93,10 @@
     <Compile Include="ErrorDetectionAndResolution.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>ErrorDetectionAndResolution.md</LastGenOutput>
+    </Compile>
+    <Compile Include="ExamplesContextBasedResolution.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>ExamplesContextBasedResolution.md</LastGenOutput>
     </Compile>
     <Compile Include="Home.cs">
       <Generator>CsToMd</Generator>
@@ -125,6 +135,11 @@
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>ErrorDetectionAndResolution.cs</DependentUpon>
+    </None>
+    <None Include="ExamplesContextBasedResolution.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>ExamplesContextBasedResolution.cs</DependentUpon>
     </None>
     <None Include="Home.md">
       <AutoGen>True</AutoGen>
