@@ -8,21 +8,37 @@
 
 DryIoc has no "usual" notion of child and parent container.  
 
-Instead DryIoc has number of APIs to address specific related scenarios, 
-taking advantage of Container immutable state with very fast `O(1)` snapshots.
+Instead, DryIoc has a number of APIs to address specific related scenarios, 
+taking advantage of Container immutable state with very fast `O(1)` copy snapshots.
 
+To create a kind of child container from the existing one, 
+you may use one of the extension `With..` methods based on the `IContainer.With` method.
 
-## With Open Scope
+The signature of `IContainer.With` describes what can be changed:
+```cs
+IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
+```
 
-Method `OpenScope` produces a new container and [explained in more details here](ReuseAndScopes#markdown-header-incurrentscope).
+- `rules` are described in details [here](RulesAndDefaultConventions#markdown-header-Rules-per-Container)
+- `scopeContext` and `singletonScope` are described [here](ReuseAndScopes#markdown-header-scopecontext) 
+
+`RegistrySharing` is the `enum` to specify how to re-use the parent registry:
+```cs
+public enum RegistrySharing { Share, CloneButKeepCache, CloneAndDropCache }
+```
+
+The enum member names are self-explanatory.
+
+__Note__: `OpenScope` is another way to create a new container from existing one, but a bit different from `With`.
+It is explained in details [here](ReuseAndScopes#markdown-header-incurrentscope).
 
 
 ## Facade
 
-Facade is a normal container that fall-backs resolution to another container(_parent_) for unresolved services. 
-Facade inherits from the parent the `Rules` and the `ScopeContext` and nothing more. Facade has its own Registrations, Cache and Singletons.
+Facade is a new container which allows to have __a new separate registrations__ from the parent container,
+making them override the default resolutions of the parent. To make it more concrete, think of example where 
+you need to replace the `prod` service in tests with `test` service or mock. 
 
-Example:
 ```cs 
 using DryIoc;
 using NUnit.Framework;
@@ -58,49 +74,96 @@ class FacadeExample
 } 
 ```
 
-__Note:__ Because facade is just a normal standalone container it has its own singletons, not shared with parent even if resolved from parent.When you resolve singleton directly from parent and then ask for it from child, it will return another object.
+Actually, `CreateFacade` does not do anything magic. It uses a `With` method to create a new container with
+a new default `serviceKey` and set a rule to prefer this `serviceKey` over default:
 
-To achieve instance sharing between containers you may use `Reuse.InCurrentScope` instead of Singleton together with `container.OpenScope` ([more info here](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes)).
+```cs
+public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
+    container.With(rules => rules
+        .WithDefaultRegistrationServiceKey(facadeKey)
+        .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+```
+
+__Note:__ In case the `CreateFacade` does no meet your use-case, you may always go one level deeper in API and
+select your set of rules and arguments for the `With` method.
 
 
 ## With different Rules and ScopeContext
 
-There is no way to change the rules in-place for existing container.One reason of this design  is simplicity and safety in multi-threaded access, another reason s to prevent possible inconsistency of new rules with already resolved cache.
+As it said above, you may provide a new `rules` and `scopeContext` using the `With` method.
 
-But you may create new container from old one, by copying its registrations, and without its cache, and with the new Rules:
+Setting rules is a very common thing, so there is a dedicated `With` overload for this:
+```cs
+IContainer With(this IContainer container, 
+    Func<Rules, Rules> configure = null, 
+    IScopeContext scopeContext = null)
+```
 
-    var c = new Container();
-var newC = c.With(currentRules => ChangeRules(currentRules));
+The important and may be not clear point, what happens with a parent registry in a new container.
+The answer is the __registry is cloned__ and the __cache is dropped__. The cache is dropped, because
+the new rules may lead to resolving a new services in a child container, different from the already
+resolved services in the parent. Therefore, we need to drop (invalidate) the cache to stop serving the
+wrong results.
 
-Here first container stays untouched and operates as usual.
+The cloned registry means that new registration made into child container won't appear in the parent,
+and vice versa. The reason is not only an isolation of parent from the changes in child, but also there are
+rules that affect how registrations are done, e.g. `DefaultRegistrationServiceKey`. 
 
-New container contains all registrations of the first plus all resolved singletons or scoped services.Because of new rules it may operate differently and produce different services.
+## With expression generation
 
-__Note:__ Because registry is implemented as immutable structure, copying means just passing its reference without any cost added.Simply put, it is very fast.
+```cs
+public static IContainer WithExpressionGeneration(this IContainer container)
+```
 
-Beside the Rules With allows to specify new ScopeContext for the container.Rules and context may be specified together just for convenience of one operation instead of two:
+Will store the expressions built for service resolution. 
+This is used in `Validate` and `GenerateResolutionExpressions` methods described 
+[here](ErrorDetectionAndResolution-#markdown-header-Service-Registrations-Diagnostics).
 
 
-  var newC = c.With(scopeContext: new AsyncExecutionFlowScopeContext());
+## Without cache
 
+Cache in DryIoc usually means a some artifacts stored while resolving services.
 
-## Without Cache
+More precisely, the resolution cache contains a set of `FactoryDelegate` compiled from expression trees
+to create an actual services.
 
-Cache in DryIoc usually means Resolution cache consisting of:
+The reason for removing cache may be changing or removing a service registration after the fact, 
+when the resolutions were already made from Container and were cached internally. 
 
-- Compiled factory delegates which invoked when you call Resolve.__Factory delegates are static__, they could not reference any state except that provided by parameters.
-- Expression trees for creating services and their dependencies.These expressions may be reused when compiling delegates for different services.
-- State - items could not be re-created inside expression and therefore should be referenced from expression closure.It may be non primitive metadata objects, or registered custom delegates, or singletons copied to state for optimization.
+```cd 
+class Without_cache
+{
+    public interface I { }
+    public class Prod : I { }
+    public class Test : I { }
 
-The reason for removing cache may be changing service registrations.When some dependency was injected into resolved service, dependency expression was cached to save the work for next inject. When you replacing dependency registration, you expect new expression to be used for service.Ultimate tool to ensure fresh service creation is removing the cache.
+    public class B
+    {
+        public I I { get; }
+        public B(I i) { I = i; }
+    }
 
-As usual in DryIoc it is not possible to drop cache in container.You may create new container without cache, but otherwise the same as original:
+    [Test]
+    public void Example()
+    {
+        IContainer container = new Container();
+        container.Register<B>();
+        container.Register<I, Prod>();
+        var b = container.Resolve<B>();
+        Assert.IsInstanceOf<Prod>(b.I);
 
-    container.Resolve<A>();
-    container = container.WithoutCache();
-    container.Register<A, TestB>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-    container.Resolve<A>(); // now is TestB
+        // now lets replace the I with Test
+        container.Register<I, Test>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+        b = container.Resolve<B>();
+        // As you can see the dependency did no change, it is still `Prod` and not the `Test`
+        Assert.IsInstanceOf<Prod>(b.I); 
 
+        container = container.WithoutCache();
+        b = container.Resolve<B>();
+        // And now it is Test
+        Assert.IsInstanceOf<Test>(b.I);
+    }
+} 
 
 ## Without Singletons
 
