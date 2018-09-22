@@ -2114,13 +2114,12 @@ namespace DryIoc
             container.With(container.Rules, container.ScopeContext,
                 RegistrySharing.CloneAndDropCache, container.SingletonScope);
 
-        /// <summary>Creates new container with state shared with original except singletons and cache.
-        /// Dropping cache is required because singletons are cached in resolution state.</summary>
+        /// <summary>Creates new container with state shared with original, except for the singletons and cache.</summary>
         public static IContainer WithoutSingletonsAndCache(this IContainer container) =>
             container.With(container.Rules, container.ScopeContext,
                 RegistrySharing.CloneAndDropCache, singletonScope: null);
 
-        /// <summary>Shares all parts with original container But copies registrations, so the new registrations
+        /// <summary>Shares the setup with original container but copies the registrations, so the new registrations
         /// won't be visible in original. Registrations include decorators and wrappers as well.</summary>
         public static IContainer WithRegistrationsCopy(this IContainer container, bool preserveCache = false) =>
             container.With(container.Rules, container.ScopeContext,

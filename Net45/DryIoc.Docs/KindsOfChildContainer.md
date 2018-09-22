@@ -12,7 +12,7 @@ Instead, DryIoc has a number of APIs to address specific related scenarios,
 taking advantage of Container immutable state with very fast `O(1)` copy snapshots.
 
 To create a kind of child container from the existing one, 
-you may use one of the extension `With..` methods based on the `IContainer.With` method.
+you may use one of the extension `With(out)..` methods based on the `IContainer.With` method.
 
 The signature of `IContainer.With` describes what can be changed:
 ```cs
@@ -45,7 +45,7 @@ using NUnit.Framework;
 
 class FacadeExample
 {
-    public interface IService {}
+    public interface IService { }
     public class ProdService : IService { }
     public class TestService : IService { }
 
@@ -58,7 +58,8 @@ class FacadeExample
         }
     }
 
-    [Test] public void Facade_for_tests()
+    [Test]
+    public void Facade_for_tests()
     {
         var container = new Container();
 
@@ -120,7 +121,7 @@ This is used in `Validate` and `GenerateResolutionExpressions` methods described
 [here](ErrorDetectionAndResolution-#markdown-header-Service-Registrations-Diagnostics).
 
 
-## Without cache
+## Without Cache
 
 Cache in DryIoc usually means a some artifacts stored while resolving services.
 
@@ -156,7 +157,7 @@ class Without_cache
         container.Register<I, Test>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
         b = container.Resolve<B>();
         // As you can see the dependency did no change, it is still `Prod` and not the `Test`
-        Assert.IsInstanceOf<Prod>(b.I); 
+        Assert.IsInstanceOf<Prod>(b.I);
 
         container = container.WithoutCache();
         b = container.Resolve<B>();
@@ -164,34 +165,74 @@ class Without_cache
         Assert.IsInstanceOf<Test>(b.I);
     }
 } 
+```
+
 
 ## Without Singletons
 
 To remove resolved singleton instances from the container:
+```cd 
+class Without_singletons
+{
+    public class S { }
+    [Test]
+    public void Example()
+    {
+        IContainer container = new Container();
+        container.Register<S>(Reuse.Singleton);
+        var s = container.Resolve<S>();
 
-    container = container.WithoutSingletonsAndCache();
+        var container2 = container.WithoutSingletonsAndCache();
+        var s2 = container2.Resolve<S>();
 
-It will create copy of container registrations but without cache, because cache may refer to resolved singleton instances.
+        Assert.AreNotSame(s, s2);
+    }
+}
+```
+
+The method will clone the container registrations but will drop cache.
 
 
 ## With registrations copy
 
-WithRegistrationsCopy allows to register to some basic container and then produce from it more containers with ready-to-go registrations:
+`WithRegistrationsCopy` will create a container clone (child) where new registration will be isolated from the parent
+and vice versa.
 
-    var startingSet = new Container();
-startingSet.RegisterMany(new[] { MyAssembly });
-    var container = startingSet.WithRegistrationsCopy();
-container.Register<More>();
-    container.Register<A, NewA>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
-Again copy here is fast O(1) operation.
+class With_registrations_copy
+{
+    class A { }
+    class B { public B(A a) {} }
 
-You may resolve from `startingSet` too, all resolved singletons then will be shared with new container.
+    [Test]
+    public void Example()
+    {
+        var parent = new Container();
+        parent.Register<A>();
 
-Cache is not copied by default, that is why it safe to replace registrations.But if you want you may optionally preserve cache for performance reasons.
+        // by default cache will be dropped
+        var child = parent.WithRegistrationsCopy(preserveCache: false);
+        child.Register<B>();
+
+        // child know about dependency `A` copied from the parent
+        var b = child.Resolve<B>();
+        Assert.IsNotNull(b);
+
+        // parent does not know about `B`
+        var parentB = parent.Resolve<B>(IfUnresolved.ReturnDefaultIfNotRegistered);
+        Assert.IsNull(parentB);
+    }
+}
+```
+
+Again, a cloning here is the fast `O(1)` operation.
+
+By default, the cache is dropped, but you may pass optional argument `preserveCache: true` to keep the cache.
+For instance in the example above, we atr just adding a new registration without replacing anything, 
+so the cache from the parent will work just fine.
 
 
 ## With no more registration allowed
 
-[Here is explained in detail](FaqAutofacMigration#markdown-header-separate-build-stage)
+[Explained in detail here](FaqAutofacMigration#markdown-header-separate-build-stage)
 
