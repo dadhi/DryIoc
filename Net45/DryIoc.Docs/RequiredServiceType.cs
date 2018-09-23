@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Required Service Type
@@ -13,7 +14,7 @@ Better illustrated with examples.
 
 ### Required service type is implemented by resolved type 
 
-```cd 
+```cd md*/
 using DryIoc;
 using NUnit.Framework;
 using System.Collections.Generic;
@@ -32,7 +33,7 @@ class Required_service_type_is_implemented_by_resolution_type
         var f = container.Resolve<IFoo>(requiredServiceType: typeof(Foo));
         Assert.IsInstanceOf<Foo>(f);
     }
-} 
+} /*md
 ```
     
 Where `Foo` is required (registered) service type and `IFoo` is a resolved type.
@@ -43,7 +44,7 @@ __Note:__ Required service type always refers to __service type__ and not to __i
 
 ### Required service type identifies a wrapped service type when resolving a [Wrapper](Wrappers)
 
-```cd 
+```cd md*/
 class Service_type_for_a_wrapper
 {
     class Foo { }
@@ -58,7 +59,7 @@ class Service_type_for_a_wrapper
 
         Assert.IsInstanceOf<Foo>(fooObjects.Single());
     }
-}
+}/*md
 ```
 
 We are resolving collection of objects `IEnumerable<object>` where an object required to ba a `Foo`. 
@@ -67,7 +68,7 @@ Works with nested wrappers as well, e.g. `IEnumerable<Func<object>>`
 
 ### Specify to use open-generic type in case you have both closed and open-generic registrations
 
-```cs 
+```cs md*/
 class Select_to_use_and_open_generic_type 
 {
     interface IFoo<T> { }
@@ -94,7 +95,7 @@ class Select_to_use_and_open_generic_type
         var f3 = container.Resolve<IFoo<int>>(typeof(Foo<>), IfUnresolved.ReturnDefault);
         Assert.IsNull(f3);
     }
-} 
+} /*md
 ```
 
 To specify required service type for injected dependency you may use `Made.Of` expression:
@@ -213,3 +214,4 @@ Here DryIoc will look for `IFoo` instead of `object` inside `Lazy<>` wrapper.
 
 __Note:__ Examples with Lazy and IEnumerable give the same vibe as [Variance for open-generic types in .NET 4.0 and higher](http://msdn.microsoft.com/en-us/library/dd799517%28v=vs.110%29.aspx) and DryIoc is supporting this functionality starting from .NET 3.5.
 
+md*/

@@ -110,6 +110,7 @@
       <Generator>CsToMd</Generator>
       <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
     </Compile>
+    <Compile Include="RequiredServiceType.cs" />
     <Compile Include="UsingInTestsWithMockingLibrary.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
