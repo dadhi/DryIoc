@@ -3350,16 +3350,17 @@ namespace DryIoc
         public static UnknownServiceResolver AutoResolveConcreteTypeRule(Func<Request, bool> condition = null) =>
             request =>
             {
-                var concreteServiceType = request.GetActualServiceType();
-                if (concreteServiceType.IsAbstract() || condition != null && !condition(request))
+                var concreteType = request.GetActualServiceType();
+                if (!concreteType.IsImplementationType() || concreteType.IsPrimitive() || 
+                    condition != null && !condition(request))
                     return null;
 
-                var openGenericServiceType = concreteServiceType.GetGenericDefinitionOrNull();
+                var openGenericServiceType = concreteType.GetGenericDefinitionOrNull();
                 if (openGenericServiceType != null &&
                     WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
                     return null;
 
-                var factory = new ReflectionFactory(concreteServiceType,
+                var factory = new ReflectionFactory(concreteType,
                     made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 // to enable fallback to other rules if unresolved try to resolve expression first and return null
@@ -4441,9 +4442,14 @@ namespace DryIoc
         public static bool IsExcludedGeneralPurposeServiceType(this Type type) =>
             ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
 
-        /// <summary>Checks that type is not in the list of <see cref="ExcludedGeneralPurposeServiceTypes"/>.</summary>
+        /// <summary>Checks that type can be used a service type.</summary>
         public static bool IsServiceType(this Type type) => 
-            !type.IsPrimitive() && !type.IsExcludedGeneralPurposeServiceType();
+            !type.IsPrimitive() && !type.IsCompilerGenerated() && !type.IsExcludedGeneralPurposeServiceType();
+
+        /// <summary>Checks if type can be used as implementation type for reflection factory,
+        /// and therefore registered to container. Usually used to discover implementation types from assembly.</summary>
+        public static bool IsImplementationType(this Type type) =>
+            type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
 
         /// <summary>Returns only those types that could be used as service types of <paramref name="type"/>.
         /// It means that for open-generic <paramref name="type"/> its service type should supply all type arguments.</summary>
@@ -4478,11 +4484,6 @@ namespace DryIoc
         /// actually a non abstract and not compiler generated classes.</summary>
         public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly, Func<Type, bool> condition) =>
             Portable.GetAssemblyTypes(assembly).Where(t => condition(t) && t.IsImplementationType());
-
-        /// <summary>Checks if type can be used as implementation type for reflection factory,
-        /// and therefore registered to container. Usually used to discover implementation types from assembly.</summary>
-        public static bool IsImplementationType(this Type type) =>
-            type.IsClass() && !type.IsAbstract() && !type.IsCompilerGenerated();
 
         /// <summary>Sugar, so you can say <code lang="cs"><![CDATA[r.RegisterMany<X>(Registrator.Interfaces)]]></code></summary>
         public static Func<Type, bool> Interfaces = ReflectionTools.IsInterface;
@@ -5194,7 +5195,7 @@ namespace DryIoc
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("Metadata=").Append(MetadataKey.Pair(Metadata));
             if (IfUnresolved != IfUnresolved.Throw)
             {
-                s = (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append(IfUnresolved);
+                s = (s.Length == 0 ? s.Append('{') : s.Append(", ")).Print(IfUnresolved);
                 s = _value == null ? s : s.Append(", DefaultValue=").Print(_value);
             }
 

@@ -107,34 +107,50 @@ Where `Bar` expects `IDisposable` and we are injecting `IFoo` required service t
 
 ## Adapts external code
 
-Given the service: `container.Register<IFoo, Foo>()`
-and `GenericHandler` class in external library that expects `object` dependency:
-```
-#!c#
-    public class GenericHandler 
+Given the service registration: `container.Register<IFoo, Foo>()`
+and `GenericHandler` class in external library that expects an `object` dependency:
+```cs md*/
+class GenericHandler
+{
+    public readonly object Target;
+    public GenericHandler(object target)
     {
-        public readonly object Target,
-        public class GenericHandler(object target)
-        {
-            Target = target;
-        }
+        Target = target;
     }
+} /*md
 ```
 
-How to configure `GenericHandler` to use `IFoo`?
+How to configure `GenericHandler` to use `IFoo` for the `object` dependency?
 
-Let's try `RegisterDelegate` as generally available technique in may IoC Containers: 
+First, let's use a `RegisterDelegate` as a generally available technique in many IoC Containers: 
+```cs md*/
+class Using_register_delegate_to_adapt_service_type
+{
+    interface IFoo { }
+    class Foo : IFoo { }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo, Foo>();
+        container.RegisterDelegate(r => new GenericHandler(r.Resolve<IFoo>()));
+
+        var handler = container.Resolve<GenericHandler>();
+        Assert.IsInstanceOf<Foo>(handler.Target);
+    }
+} /*md
 ```
-#!c#
-    container.RegisterDelegate(r => new GenericHandler(r.Resolve<IFoo>()));
-```
 
-Seems fine, but what if `GenericHandler` has many more dependencies which are also available from container. Then we need to specify Resolve for all of them.
+Seems fine, but what if `GenericHandler` has many more dependencies which are also available from container. 
+Then we need to specify Resolve for all of them.
 
-But the main point is the delegate registration (though powerful) is the "black box" for container and may lead to problems when used wrong: 
+But the main point is the delegate registration (though powerful) is the "black box" for the container, 
+and may lead to problems when used wrong:
 
-- __Memory leaks by capturing variable into delegate closure and keeping them for container lifetime.__
-- __Container is unable to see what's inside delegate. Which makes it hard to find type mismatches or diagnose other potential problems.__
+- Memory leaks by capturing variable into delegate closure and keeping them for container lifetime.
+- Container is unable to see what's inside delegate, which makes it hard to find a lifestyle mismatch or diagnose other problems.
 
 Let's use required service type:
 ```

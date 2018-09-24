@@ -15,29 +15,29 @@ using DryIoc;
 using NUnit.Framework;
 using System;
 
-class Log4net_logger
+class NLog_logger
 {
     public class A
     {
-        public log4net.ILog Log { get; }
-        public A(log4net.ILog log)
+        public NLog.ILogger Logger { get; }
+        public A(NLog.ILogger logger)
         {
-            Log = log;
+            Logger = logger;
         }
     }
 
     [Test]
-    public void Can_register_ILog_with_factory_method()
+    public void Example()
     {
         var container = new Container();
         container.Register<A>();
 
-        container.Register(Made.Of(() => 
-                log4net.LogManager.GetLogger(Arg.Index<Type>(0)),
-                request => request.Parent.ImplementationType));
+        container.Register(Made.Of<NLog.ILogger>(() => 
+                NLog.LogManager.GetLogger(Arg.Index<string>(0)),
+                request => request.Parent.ImplementationType.Name.ToString()));
 
         var a = container.Resolve<A>();
-        Assert.IsNotNull(a.Log);
+        Assert.IsNotNull(a.Logger);
     }
 } 
 ```
