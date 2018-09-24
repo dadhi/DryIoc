@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 using DryIoc;
 
 namespace Playground
@@ -65,16 +65,10 @@ namespace Playground
             private readonly IContainer _containerWithDynamicRegistration = PrepareContainerWithDynamicRegistration();
 
             [Benchmark(Baseline = true)]
-            public object AutoConcreteTypeResolution()
-            {
-                return _containerWithAutoConcreteRule.Resolve<A>();
-            }
+            public object AutoConcreteTypeResolution() => _containerWithAutoConcreteRule.Resolve<A>();
 
             [Benchmark]
-            public object ConcreteTypeDynamicRegistration()
-            {
-                return _containerWithDynamicRegistration.Resolve<A>();
-            }
+            public object ConcreteTypeDynamicRegistration() => _containerWithDynamicRegistration.Resolve<A>();
         }
 
         public class A

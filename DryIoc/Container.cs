@@ -429,7 +429,18 @@ namespace DryIoc
         public IResolverContext Parent => _parent;
 
         /// <inheritdoc />
-        public IResolverContext Root => _root;
+        public IResolverContext Root
+        {
+            get
+            {
+                if (_parent == null)
+                    return null;
+                var p = _parent;
+                while (p.Parent != null)
+                    p = p.Parent;
+                return p;
+            }
+        }
 
         /// <inheritdoc />
         public IScope SingletonScope => _singletonScope;
@@ -446,7 +457,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
             return new Container(Rules, _registry, _singletonScope, _scopeContext,
-                scope, _disposed, _disposeStackTrace, parent: this, root: _root ?? this);
+                scope, _disposed, _disposeStackTrace, parent: this);
         }
 
         /// <summary>Puts and instance into the current scope or singletons.</summary>
@@ -698,21 +709,27 @@ namespace DryIoc
         public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed;
 
         /// <inheritdoc />
-        public IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope)
+        public IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope) =>
+            With(_parent, rules, scopeContext, registrySharing, singletonScope, _ownCurrentScope);
+
+        /// <inheritdoc />
+        public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext, 
+            RegistrySharing registrySharing, IScope singletonScope, IScope curentScope)
         {
             ThrowIfContainerDisposed();
-
-            // the checks to prevent invalid state of container
             rules = rules ?? Rules.Default;
-            singletonScope = singletonScope ?? NewSingletonScope();
 
             var registry =
                 registrySharing == RegistrySharing.Share ? _registry :
                 registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
+            singletonScope = singletonScope ?? NewSingletonScope();
+            curentScope = curentScope ?? _ownCurrentScope;
+            parent = parent ?? _parent;
+
             return new Container(rules, registry, singletonScope, scopeContext,
-                _ownCurrentScope, _disposed, _disposeStackTrace, _parent, _root);
+                _ownCurrentScope, _disposed, _disposeStackTrace, _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -722,7 +739,7 @@ namespace DryIoc
             new Container(Rules, 
                 Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow)),
                 _singletonScope, _scopeContext, _ownCurrentScope,
-                _disposed, _disposeStackTrace, _parent, _root);
+                _disposed, _disposeStackTrace, _parent);
 
         /// <inheritdoc />
         public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
@@ -1432,8 +1449,6 @@ namespace DryIoc
         private readonly IScope _singletonScope;
         private readonly IScope _ownCurrentScope;
         private readonly IScopeContext _scopeContext;
-
-        private readonly IResolverContext _root;
         private readonly IResolverContext _parent;
 
         internal sealed class InstanceFactory : Factory
@@ -1946,7 +1961,7 @@ namespace DryIoc
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
             IScopeContext scopeContext = null, IScope ownCurrentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
-            IResolverContext parent = null, IResolverContext root = null)
+            IResolverContext parent = null)
         {
             Rules = rules;
 
@@ -1960,7 +1975,6 @@ namespace DryIoc
             _disposeStackTrace = disposeStackTrace;
 
             _parent = parent;
-            _root = root;
         }
 
         #endregion
@@ -8751,11 +8765,19 @@ namespace DryIoc
         /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
         IScope OwnCurrentScope { get; }
 
+        // todo: replace with the below overload with more parameters
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
         /// Nothing will be inherited from the current container.
         /// If you want to inherit something you need to provide it as parameter.</summary>
         IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
+
+        /// <summary>Creates new container from the current one by specifying the listed parameters.
+        /// If the null or default values are provided then the default or new values will be applied.
+        /// Nothing will be inherited from the current container.
+        /// If you want to inherit something you need to provide it as parameter.</summary>
+        IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext, 
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
