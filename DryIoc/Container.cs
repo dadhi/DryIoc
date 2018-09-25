@@ -6465,14 +6465,16 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false,
             bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null)
         {
-            Func<Request, bool> condition
-                = decorateeType == null
-                    ? (r => r.ServiceKey == null || r.ServiceKey.Equals(null))
-                : decorateeServiceKey == null
-                    ? (r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType))
-                : (Func<Request, bool>)(r =>
-                    decorateeServiceKey.Equals(r.ServiceKey) &&
-                    r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType));
+            Func<Request, bool> condition;
+            if (decorateeType == null && decorateeServiceKey == null)
+                condition = null;
+            else if (decorateeServiceKey == null)
+                condition = r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
+            else if (decorateeType == null)
+                condition = r => decorateeServiceKey.Equals(r.ServiceKey);
+            else
+                condition = r => decorateeServiceKey.Equals(r.ServiceKey) &&
+                    r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
 
             return DecoratorWith(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
@@ -9099,9 +9101,9 @@ namespace DryIoc
                 "Expecting the instance to be stored in singleton scope, but unable to find anything here." + Environment.NewLine +
                 "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton."),
             DecoratorShouldNotBeRegisteredWithServiceKey = Of(
-                "Registering Decorator {0} with not-null service key {1} does not make sense," + Environment.NewLine +
-                "because decorator may be applied to multiple service of any key." + Environment.NewLine +
-                "If you wanted to apply decorator to services of specific key please use `setup: Setup.DecoratorOf(serviceKey: blah)`"),
+                "Registering Decorator {0} with service key {1} is not supported," + Environment.NewLine +
+                "because instead of decorator with the key you actually want a decorator for service registered with the key." + Environment.NewLine +
+                "To apply decorator for service with the key, please use `Setup.DecoratorOf(decorateeServiceKey: \"a service key\")`"),
             PassedCtorOrMemberIsNull = Of(
                 "The constructor of member info passed to `Made.Of` or `FactoryMethod.Of` is null"),
             PassedMemberIsNotStaticButInstanceFactoryIsNull = Of(

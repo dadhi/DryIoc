@@ -111,36 +111,100 @@ class Decorator_with_logger
 }
 ```
 
+## Decorator of service with serviceKey
+
 In most cases you only need to add `setup: Setup.Decorator` parameter. 
-The rest of registration options are available for decorators.
-Except for the `serviceKey` which is not supported. 
+The rest of registration options are available for decorators as for the normal services.
+Except for the `serviceKey`, which is not supported. The `serviceKey` is not available because 
+really you don't want to register decorator with the `serviceKey`, instead you want decorator
+to decorate service registered with specific `serviceKey`.
+
 To apply decorator for service registered with `serviceKey` you need to specify a setup condition or
 use a `Decorator.Of` method.
 
 ```cs 
 class Decorator_of_keyed_service
 {
-    [Test] public void Example()
+    [Test]
+    public void Example_with_condition()
     {
         var container = new Container();
 
         container.Register<ILogger, InMemoryLogger>();
-
         container.Register<IHandler, FooHandler>(serviceKey: "foo");
 
         container.Register<IHandler, LoggingHandlerDecorator>(
             setup: Setup.DecoratorWith(condition: request => "foo".Equals(request.ServiceKey)));
+
+        Assert.IsInstanceOf<LoggingHandlerDecorator>(container.Resolve<IHandler>("foo"));
+    }
+
+    [Test]
+    public void Example_with_DecoratorOf()
+    {
+        var container = new Container();
+
+        container.Register<ILogger, InMemoryLogger>();
+        container.Register<IHandler, FooHandler>(serviceKey: "foo");
 
         container.Register<IHandler, LoggingHandlerDecorator>(
             setup: Setup.DecoratorOf(decorateeServiceKey: "foo")); // a condition in disguise
 
         Assert.IsInstanceOf<LoggingHandlerDecorator>(container.Resolve<IHandler>("foo"));
     }
-} 
+}
 ```
 
-__Note:__ In the example above we are registering the decorator twice. 
-It is OK because DryIoc supports decorator nesting. Read on to the next section for details.
+### Using Setup.DecoratorOf
+
+`DecoratorOf` is just a `DecoratorWith(condition: ...)` wrapped in a 
+more simple API to specify a decorated service key or/and type. 
+
+```cd 
+class Decorator_of_keyed_service_and_specific_type
+{
+    class BooHandler : IHandler
+    {
+        public bool IsHandled { get; private set; }
+        public void Handle() => IsHandled = true;
+    }
+
+    [Test]
+    public void Example_with_DecoratorOf_type_and_key()
+    {
+        var container = new Container();
+
+        container.Register<ILogger, InMemoryLogger>();
+        container.Register<IHandler, FooHandler>(serviceKey: "foo");
+        container.Register<IHandler, BooHandler>(serviceKey: "boo");
+
+        // Decorating `Boo` with key "boo"
+        container.Register<IHandler, LoggingHandlerDecorator>(
+            setup: Setup.DecoratorOf<BooHandler>(decorateeServiceKey: "boo"));
+
+        var boo = container.Resolve<IHandler>("boo");
+        Assert.IsInstanceOf<LoggingHandlerDecorator>(boo);
+    }
+
+    [Test]
+    public void Example_with_DecoratorOf_type()
+    {
+        var container = new Container();
+
+        container.Register<ILogger, InMemoryLogger>();
+        container.Register<IHandler, FooHandler>();
+        container.Register<IHandler, BooHandler>(serviceKey: "boo");
+
+        // Decorating `Boo`
+        container.Register<IHandler, LoggingHandlerDecorator>(
+            setup: Setup.DecoratorOf<BooHandler>());
+
+        var boo = container.Resolve<IHandler>("boo");
+        Assert.IsInstanceOf<LoggingHandlerDecorator>(boo);
+    }
+}
+```
+
 
 ## Nested Decorators
 
