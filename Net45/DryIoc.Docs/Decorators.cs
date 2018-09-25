@@ -113,7 +113,7 @@ class Decorator_with_logger
 /*md
 ```
 
-### Decorator for the keyed service
+## Decorator of service registered with serviceKey
 
 In most cases you only need to add `setup: Setup.Decorator` parameter. 
 The rest of registration options are available for decorators as for the normal services.
@@ -125,7 +125,7 @@ To apply decorator for service registered with `serviceKey` you need to specify 
 use a `Decorator.Of` method.
 
 ```cs md*/
-class Decorator_of_keyed_service
+class Decorator_of_service_with_serviceKey
 {
     [Test]
     public void Example_with_condition()
@@ -138,7 +138,8 @@ class Decorator_of_keyed_service
         container.Register<IHandler, LoggingHandlerDecorator>(
             setup: Setup.DecoratorWith(condition: request => "foo".Equals(request.ServiceKey)));
 
-        Assert.IsInstanceOf<LoggingHandlerDecorator>(container.Resolve<IHandler>("foo"));
+        var foo = container.Resolve<IHandler>("foo");
+        Assert.IsInstanceOf<LoggingHandlerDecorator>(foo);
     }
 
     [Test]
@@ -152,7 +153,8 @@ class Decorator_of_keyed_service
         container.Register<IHandler, LoggingHandlerDecorator>(
             setup: Setup.DecoratorOf(decorateeServiceKey: "foo")); // a condition in disguise
 
-        Assert.IsInstanceOf<LoggingHandlerDecorator>(container.Resolve<IHandler>("foo"));
+        var foo = container.Resolve<IHandler>("foo");
+        Assert.IsInstanceOf<LoggingHandlerDecorator>(foo);
     }
 }/*md
 ```
@@ -163,7 +165,7 @@ class Decorator_of_keyed_service
 more simple API to specify a decorated service key or/and type. 
 
 ```cd md*/
-class Decorator_of_keyed_service_and_specific_type
+class Decorator_of_service_with_key_and_type
 {
     class BooHandler : IHandler
     {
