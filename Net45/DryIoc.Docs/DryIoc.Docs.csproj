@@ -114,6 +114,10 @@
       <Generator>CsToMd</Generator>
       <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
     </Compile>
+    <Compile Include="RegisterResolve.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>RegisterResolve.md</LastGenOutput>
+    </Compile>
     <Compile Include="RequiredServiceType.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>RequiredServiceType.md</LastGenOutput>
@@ -165,6 +169,11 @@
       <DependentUpon>KindsOfChildContainer.cs</DependentUpon>
     </None>
     <None Include="packages.config" />
+    <None Include="RegisterResolve.md">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>RegisterResolve.cs</DependentUpon>
+    </None>
     <None Include="RequiredServiceType.md">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

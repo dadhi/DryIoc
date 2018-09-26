@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Register and Resolve
@@ -39,7 +40,7 @@ e.g. in `var client = container.Resolve<IClient>();` `client` is a Resolution Ro
 ## Registration API
 
 DryIoc supports registration vid `Register..` methods with the provided mapping of service and implementation types:
-```cs 
+```cs md*/
 using DryIoc;
 using NUnit.Framework;
 
@@ -52,14 +53,14 @@ class Register_service_with_implementation_types
         container.Register<IClient, SomeClient>();
         container.Register<IService, SomeService>();
     }
-} 
+} /*md
 ```
 
 __Note:__ The order of registrations is not important __here__, 
 but may be important for other cases, like [Decorators](Decorators) or Collection [Wrappers](Wrappers).
 
 If you don't know the type in compile-time you can specify a run-time `Type` instead:
-```cs 
+```cs md*/
 class Register_service_with_implementation_runtime_types
 {
     [Test]
@@ -69,13 +70,13 @@ class Register_service_with_implementation_runtime_types
         container.Register(typeof(IClient), typeof(SomeClient));
         container.Register(typeof(IService), typeof(SomeService));
     }
-}
+}/*md
 ```
 
 Container will check if the service type is assignable to the implementation type and will throw exception otherwise.
 
 You can register open-generic as well:
-```cs 
+```cs md*/
 class Register_open_generic_service_with_implementation_runtime_types
 {
     interface IService<T> {}
@@ -90,11 +91,11 @@ class Register_open_generic_service_with_implementation_runtime_types
         var s = container.Resolve<IService<string>>();
         Assert.IsInstanceOf<SomeService<string>>(s);
     }
-}
+}/*md
 ```
 
 An implementation type may play the role of service type:
-```cs 
+```cs md*/
 class Register_implementation_as_service_type
 {
     [Test]
@@ -107,7 +108,7 @@ class Register_implementation_as_service_type
         // or via run-time type
         container.Register(typeof(SomeService));
     }
-}
+}/*md
 ```
 
 
@@ -612,3 +613,4 @@ For instance to filter out services already implementing `IDisposable`:
 
     container.RegisterDisposer<IClosable>((closable, resolver) => closable.Close(),
         condition: request => !typeof(IDisposable).IsAssignableFrom(request.ImplementationType ?? request.ServiceType));
+md*/
