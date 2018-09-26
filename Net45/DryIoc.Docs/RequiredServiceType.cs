@@ -17,6 +17,7 @@ Better illustrated with examples.
 ```cd md*/
 using DryIoc;
 using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -143,8 +144,8 @@ class Using_register_delegate_to_adapt_service_type
 } /*md
 ```
 
-Seems fine, but what if `GenericHandler` has many more dependencies which are also available from container. 
-Then we need to specify Resolve for all of them.
+Seems fine, but what if `GenericHandler` has many more dependencies which are also available from container, 
+then we need to specify Resolve for all of them.
 
 But the main point is the delegate registration (though powerful) is the "black box" for the container, 
 and may lead to problems when used wrong:
@@ -153,81 +154,102 @@ and may lead to problems when used wrong:
 - Container is unable to see what's inside delegate, which makes it hard to find a lifestyle mismatch or diagnose other problems.
 
 Let's use required service type:
+```cs md*/
+class Required_service_type_to_adapt_the_object_dependency
+{
+    interface IFoo { }
+    class Foo : IFoo { }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register(Made.Of(() => new GenericHandler(Arg.Of<IFoo>())));
+        container.Register<IFoo, Foo>();
+
+        var handler = container.Resolve<GenericHandler>();
+        Assert.IsInstanceOf<IFoo>(handler.Target);
+    }
+} /*md
 ```
-#!c#
-    contaner.Register(Made.Of(() => new GenericHandler(Arg.Of<IFoo>()));
-    contaner.Register<IFoo, Foo>();
 
-    // and resolution work fine
-    var service = c.Resolve<DynamicService>();
-    Assert.That(service.FooObject, Is.InstanceOf<IFoo>());
-```
+Here, we are using `Made.Of` specification expression saying to use required service type `IFoo` as argument.
 
-Here we are using `Made.Of` specification expression saying to use required service type `IFoo` as argument.
-
-__Made.Of looks similar to RegisterDelegate but actually not a delegate but [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) analyzed by Container to get registration information.__
-
-Another example is just resolving some service as base or interface type:
-```
-#!c#
-    public class A {}
-    public class B : Log4net_logger.A {}
-
-    // Given registered B:
-    container.Register<B>();
-
-    // Resolve B as A:
-    A a = container.Resolve<A>(requiredServiceType: typeof(B));
-    // or just
-    a = container.Resolve<A>(typeof(B));
-```
+`Made.Of` looks a very similar to RegisterDelegate but actually its argument is not a delegate, but an 
+[ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) parsed by Container to get a 
+registration information. The `Made.Of<T>(...)` is similar to `Register<T>(...)` where 
+DryIoc retrieves the information about `T` and do its "magic", but with the `Made.Of<T>` it is
+possible to provide statically checked expression, which won't compile if provided wrong.
 
 
 ## Works with Wrappers
 
-More interesting is using required service type together with [Wrappers](Wrappers).
+Another interesting case is using required service type with [Wrappers](Wrappers).
 
-Basically required service type will be propagated inside wrapper the same way as service key. That's allow us to specify __wrapped__ service type.
+Basically, required service type will be propagated inside wrapper the same way as service key. 
+That's allow us to specify a target service type inside a wrapper.
 
-Let's imaging that `GenericHandler` expects `Lazy<object>` in constructor:
-```
-#!c#
-    public class GenericHandler 
+Imaging, the `GenericHandler` expects a `Lazy<object>` instead of an `object` in its constructor:
+```cs nd*/
+class Required_service_type_with_wrapper
+{
+    public class GenericHandler
     {
-        public object Target { get { return _target.Value; }}
-    
-        public class DynamicService(Lazy<object> target)
+        public object Target => _target.Value;
+
+        public GenericHandler(Lazy<object> target)
         {
             _target = target;
         }
-    
+
         private readonly Lazy<object> _target;
     }
 
-    // Change registration as following:
-    contaner.Register(Made.Of(() => new GenericHandler(Arg.Of<Lazy<object>, IFoo>()));
-    contaner.Register<IFoo, Foo>();
+    interface IFoo { }
+    class Foo : IFoo { }
 
-    // Resolution remain the same
-    var handler = c.Resolve<GenericHandler>();
-    Assert.IsInstanceOf<IFoo>(handler.Target));
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<IFoo, Foo>();
+        container.Register(Made.Of(() => new GenericHandler(Arg.Of<Lazy<object>, IFoo>())));
+
+        // Resolution remain the same
+        var handler = container.Resolve<GenericHandler>();
+        Assert.IsInstanceOf<IFoo>(handler.Target);
+    }
+} /*md
 ```
 
-Here DryIoc will look for `IFoo` instead of `object` inside `Lazy<>` wrapper.
+Here in `Arg.Of<Lazy<object>, IFoo>()` DryIoc will look for required service type `IFoo` instead of `object` inside the `Lazy<>` wrapper.
 
 
 ## Works with IEnumerable and collection wrappers
 
-[IEnumerable and the rest of supported collection types]((Wrappers#markdown-header-ienumerable-or-array-of-a)) are also Wrappers, so you may expect required service type to work with them too:
-```
-#!c#
-    container.Register<IDigit, One>();
-    container.Register<IDigit, Two>();
-    
-    // Get all digits as objects:
-    container.Resolve<IEnumerable<object>>(typeof(IDigit));
+[IEnumerable and the rest of supported collection types]((Wrappers#markdown-header-ienumerable-or-array-of-a)) are also Wrappers, 
+so you may expect required service type to work with them too:
+```cs md*/
+class Required_service_type_in_collection
+{
+    interface IDigit { }
+    class One : IDigit { }
+    class Two : IDigit { }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<IDigit, One>();
+        container.Register<IDigit, Two>();
+
+        // Get all digits as objects:
+        container.Resolve<IEnumerable<object>>(requiredServiceType: typeof(IDigit));
+    }
+} /*md
 ```
 
-__Note:__ Examples with Lazy and IEnumerable give the same vibe as [Variance for open-generic types in .NET 4.0 and higher](http://msdn.microsoft.com/en-us/library/dd799517%28v=vs.110%29.aspx) and DryIoc is supporting this functionality starting from .NET 3.5.
-
+__Note:__ Examples with Lazy and IEnumerable give the same vibe as 
+[Variance for open-generic types in .NET 4.0 and higher](http://msdn.microsoft.com/en-us/library/dd799517%28v=vs.110%29.aspx) 
+and DryIoc is supporting this functionality starting from .NET 3.5.
 md*/
