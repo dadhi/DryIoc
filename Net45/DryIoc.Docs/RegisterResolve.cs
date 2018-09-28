@@ -41,6 +41,8 @@ e.g. in `var client = container.Resolve<IClient>();` `client` is a Resolution Ro
 
 DryIoc supports registration vid `Register..` methods with the provided mapping of service and implementation types:
 ```cs md*/
+using System.Collections.Generic;
+using System.Linq;
 using DryIoc;
 using NUnit.Framework;
 
@@ -114,74 +116,106 @@ class Register_implementation_as_service_type
 
 ## Registering as Singleton
 
-The setup above is simple. What if `IService` is Singleton? Singleton means
-that the same `IService` instance should be reused during container lifetime - usually it means the same an Application lifetime. 
+The registrations above are simple because they don't take into account a service lifetime, 
+that means they are Transient - the new service created each time it is resolved or injected. 
 
-DryIoc supports Singletons via concept of [Reuse and Scopes](ReuseAndScopes). 
+What if I want service to be a Singleton. Singleton means that the same service instance is used during container lifetime. 
+
+__Note:__ Usually, the container lifetime will match your application lifetime. 
+
+DryIoc supports Singleton with a concept of [Reuse and Scopes](ReuseAndScopes). 
 
 Example of singleton service registration:
 
-```
-#!c#
-    c.Register<IClient, SomeClient>();
-    c.Register<IService, SomeService>(Reuse.Singleton);
-    
-    // consuming part is still the same, win!
-    IClient client = c.Resolve<IClient>();
-    
-    var anotherClient = c.Resolve<IClient>();
-    Assert.AreSame(anotherClient.Service, client.Service);
+```cs md*/
+class Singleton_service_registration
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IClient, SomeClient>();
+
+        // making Service dependency a singleton
+        container.Register<IService, SomeService>(Reuse.Singleton);
+
+        // consuming part is still the same, win!
+        var one = container.Resolve<IClient>();
+        var two = container.Resolve<IClient>();
+
+        Assert.AreSame(two.Service, one.Service);
+    }
+} /*md
 ```
 
-It is a simple task to replace `IService` implementation with `FasterService` or `TestMockService` without changing the resolution code. 
+Static singletons are considered an anti-pattern, because they hard to replace, for instance in tests.
+Here, when using DI / IoC Container, we may change `IService` to `SomeTestService` on registration side, without need to change 
+anything on consuming side. 
 
 
 ## Registering multiple implementations
 
-DryIoc supports two kinds of multiple implementations of the same service: default and keyed registrations with Service Key. 
+DryIoc supports two kinds of multiple implementations of the same service: default and keyed registration with a `serviceKey`. 
 
 
 ### Default registrations
 
 For multiple default implementations write Register as usual:
 
+```cs md*/
+class Multiple_default_registrations
+{
+    internal interface ICommand { }
+    internal class GetCommand : ICommand { }
+    internal class SetCommand : ICommand { }
+    internal class DeleteCommand : ICommand { }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<ICommand, GetCommand>();
+        container.Register<ICommand, SetCommand>();
+        container.Register<ICommand, DeleteCommand>();
+
+        Assert.Throws<ContainerException>(() =>
+            container.Resolve<ICommand>()); // Huh, what command did you mean?
+
+        var commands = container.Resolve<IEnumerable<ICommand>>();
+        Assert.AreEqual(3, commands.Count());
+
+        // There is also a dedicated ResolveMany method:
+        var commands2 = container.ResolveMany<ICommand>();
+        Assert.AreEqual(3, commands2.Count());
+    }
+}/*md
 ```
-#!c#
-    container.Register<ICommand, GetCommand>();
-    container.Register<ICommand, SetCommand>();
-    container.Register<ICommand, DeleteCommand>();
-```
 
-Here three different `ICommand` implementations registered. By default there is no way to distinguish between them and resolving `ICommand` will lead to error: 
+There are three different `ICommand` implementations registered. 
+By default there is no way to distinguish between them, therefore just resolving an `ICommand` will lead to error.
+So you need to resolve a collection (`IEnumerable<ICommand>`) of commands.
 
-_"Expecting single default registration of ICommand but found many ..."_
+__Note:__ Additionally to `IEnumerable<T>`, DryIoc supports resolving an array `T[]` 
+or any interface implemented by array, e.g. `IList<T>`, `ICollection<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>`. 
+Check the documentation for collection [Wrappers](Wrappers). 
 
-But you may Resolve all three services as Collection:
+For convenience DryIoc has dedicated `ResolveMany` method with couple of optional settings. 
 
-```
-#!c#
-    var commands = container.Resolve<IEnumerable<ICommand>>();
-    Assert.AreEqual(3, commands.Count());
-```
+Internally to store multiple default registrations, DryIoc uses special key type `DefaultKey`. 
+It has an interesting property `DefaultKey.RegistrationOrder`. More on keyed registrations below.
 
-__Note:__ Additionally to `IEnumerable<T>` DryIoc supports resolution as array (`T[]`) and any interface implemented by array, e.g. `IList<T>`, `ICollection<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>`. 
+__Note:__ When resolving collection of multiple defaults, it always ordered in registration order.
 
-For convenience DryIoc has dedicated `ResolveMany` method with couple of optional settings: 
+There are also a couple of ways to select a specific registration and avoid an exception in `Resolve<ICommand>`:
 
-```
-#!c#
-    IEnumerable<ICommand> commands = container.ResolveMany<ICommand>();
-```
-
-Internally to store multiple default registrations DryIoc uses special key type `DefaultKey`. It has single `int` property `DefaultKey.RegistrationOrder`. More on keyed registrations below.
-
-__Note:__ When resolving collection of multiple defaults they always ordered in registration order.
-
-There are still couple of ways to select specific registration:
-
-- Using [condition](SpecifyDependencyAndPrimitiveValues#markdown-header-registering-with-condition): `container.Register<ICommand, GetCommand>(setup: Setup.With(condition: r => r.IsCompositionRoot))` and for the rest of registrations specify opposite, e.g. `condition: r => !r.IsCompositionRoot`.
-- Using specific metadata type and resolving as `Meta<,>` wrapper: `container.Register<ICommand, GetCommand>(setup: Setup.With(metadata: CommandId.Get));` and then resolving as `container.Resolve<IEnumerable<Meta<ICommand, CommandId>>>().Where(m => m.Metadata == CommandId.Get))`
-- Using [reuse bound to specific parent](ReuseAndScopes#markdown-header-reuseinresolutionscopeof) or to [named current scope](ReuseAndScopes#markdown-header-reuseincurrentnamedscope-and-reuseinthread).
+- Using [condition](SpecifyDependencyAndPrimitiveValues#markdown-header-registering-with-condition): 
+`container.Register<ICommand, GetCommand>(setup: Setup.With(condition: req => req.IsResolutionRoot))` 
+and for the rest of registrations to specify opposite condition, e.g. `condition: r => !r.IsResolutionRoot`.
+- Using specific metadata type (`CommandId` enum) and resolving as `Meta<,>` wrapper: 
+`container.Register<ICommand, GetCommand>(setup: Setup.With(metadata: CommandId.Get));` 
+and then resolving as `container.Resolve<IEnumerable<Meta<ICommand, CommandId>>>().Where(m => m.Metadata == CommandId.Get))`
+- Using [reuse bound to specific parent scope](ReuseAndScopes#markdown-header-reuseinresolutionscopeof) 
+or to [named scope](ReuseAndScopes#markdown-header-reuseincurrentnamedscope-and-reuseinthread).
 
 
 ### Keyed registrations

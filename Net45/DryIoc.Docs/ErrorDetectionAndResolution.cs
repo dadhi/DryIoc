@@ -63,7 +63,7 @@ class Unable_to_resolve_unknown_service
         // ex.Message:
         // Unable to resolve Y as parameter "y"
         //   in X #27
-        //   from container without scope
+        //   from Container without Scope
         //   Where no service registrations found
         // and no dynamic registrations found in 0 of Rules.DynamicServiceProviders
         //   and nothing found in 0 of Rules.UnknownServiceResolvers
@@ -99,7 +99,7 @@ class Unable_to_resolve_from_registered_services
         // ex.Message:
         // Unable to resolve Y as parameter "y"
         //   in X #27
-        //   from container without scope
+        //   from Container without Scope
         //   with normal and dynamic registrations:
         // ("special", { FactoryID = 28, ImplType = Y})
     }

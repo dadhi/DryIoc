@@ -3389,9 +3389,8 @@ namespace DryIoc
         /// <param name="reuse">(optional) Reuse for concrete types.</param>
         /// <returns>New rule.</returns>
         public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
-            Func<Type, object, bool> condition = null, IReuse reuse = null)
-        {
-            return AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
+            Func<Type, object, bool> condition = null, IReuse reuse = null) => 
+            AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
             {
                 if (serviceType.IsAbstract() ||
                     serviceType.IsOpenGeneric() || // service type in principle should be concrete, so should not be open-generic
@@ -3414,12 +3413,11 @@ namespace DryIoc
                 factory = new ReflectionFactory(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
                     Setup.With(condition: r1 => r1
-                        .WithChangedServiceInfo(x => x.WithIfUnresolved(IfUnresolved.ReturnDefault))
-                        .Do(r2 => factory?.GetExpressionOrDefault(r2)) != null));
+                                                    .WithChangedServiceInfo(x => x.WithIfUnresolved(IfUnresolved.ReturnDefault))
+                                                    .Do(r2 => factory?.GetExpressionOrDefault(r2)) != null));
 
                 return factory;
             });
-        }
 
         /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
         /// The resolution creates Transient services.</summary>
