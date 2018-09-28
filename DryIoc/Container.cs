@@ -4001,14 +4001,6 @@ namespace DryIoc
         /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
 
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            if (FactoryMethod != null)
-                return FactoryMethod.ToString();
-            return "non-default";
-        }
-
         /// <summary>Container will use some sensible defaults for service creation.</summary>
         public static readonly Made Default = new Made();
 
