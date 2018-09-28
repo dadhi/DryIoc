@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 using ImTools;
@@ -653,10 +653,26 @@ namespace DryIoc.UnitTests
         public void Container_ToString_should_output_scope_info_for_open_scope()
         {
             var container = new Container();
-            StringAssert.Contains("container", container.ToString());
+            StringAssert.Contains("Container", container.ToString());
 
             using (var scope = container.OpenScope("a-a-a"))
                 StringAssert.Contains("a-a-a", scope.ToString());
+        }
+
+        [Test]
+        public void Container_ToString_should_output_non_default_Rules_and_MadeOf_info()
+        {
+            var container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution()
+                .WithoutImplicitCheckForReuseMatchingScope()
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                .With(FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic)
+                .WithDefaultReuse(Reuse.ScopedOrSingleton));
+
+            var message = container.ToString();
+            StringAssert.Contains("AutoConcreteTypeResolution", message);
+            StringAssert.Contains("SelectLastRegisteredFactory", message);
+            StringAssert.Contains("ScopedOrSingleton", message);
         }
 
         class MyService

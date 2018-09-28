@@ -38,6 +38,7 @@ namespace DryIoc
 
     using ImTools;
     using static ImTools.ArrayTools;
+    using static System.Environment;
 
     using FastExpressionCompiler;
 
@@ -95,22 +96,25 @@ namespace DryIoc
         /// <summary>Outputs info about container disposal state and current scopes.</summary>
         public override string ToString()
         {
-            if (IsDisposed)
-            {
-                var s = "Container is disposed." + Environment.NewLine;
-                if (_disposeStackTrace != null)
-                    s += "Dispose stack-trace " + _disposeStackTrace;
-                else
-                    s += "You may include Dispose stack-trace into the message via:" + Environment.NewLine +
-                        "container.With(rules => rules.WithCaptureContainerDisposeStackTrace())";
-                return s;
-            }
+            var s = _scopeContext == null ? "Container" : "Container with ambient ScopeContext " + _scopeContext;
 
             var scope = CurrentScope;
-            var scopeStr = scope == null ? "container without scope"
-                : (_scopeContext != null ? "ambiently " : string.Empty) + "scoped container with " + scope;
+            s += scope == null ? " without Scope" : " with Scope " + scope;
 
-            return scopeStr;
+            if (Rules != Rules.Default)
+                s += NewLine + " with " + Rules;
+
+            if (IsDisposed)
+            {
+                s += " has been DISPOSED!" + NewLine;
+                if (_disposeStackTrace != null)
+                    s += " Dispose stack-trace " + _disposeStackTrace;
+                else
+                    s += " You may include Dispose stack-trace into the message via:" + NewLine +
+                        "container.With(rules => rules.WithCaptureContainerDisposeStackTrace())";
+            }
+
+            return s;
         }
 
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
@@ -1220,8 +1224,7 @@ namespace DryIoc
             KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics,
             FactoryType factoryType, Type serviceType, object serviceKey = null)
         {
-            if (!registeredFactories.IsNullOrEmpty() &&
-                Rules.UseDynamicRegistrationsAsFallback)
+            if (!registeredFactories.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallback)
                 return registeredFactories;
 
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
@@ -1233,7 +1236,6 @@ namespace DryIoc
             // assign unique continuous keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
             var dynamicKey = DefaultDynamicKey.Value;
-
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             {
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
@@ -3264,16 +3266,15 @@ namespace DryIoc
         public FactorySelectorRule FactorySelector { get; }
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
-        public Rules WithFactorySelector(FactorySelectorRule rule) =>
-            new Rules(_settings, rule, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+        public Rules WithFactorySelector(FactorySelectorRule rule) => 
+            new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)), 
+                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Select last registered factory from multiple default.</summary>
-        public static FactorySelectorRule SelectLastRegisteredFactory() => GetLastFactoryByKey;
-
-        private static Factory GetLastFactoryByKey(Request request, KeyValuePair<object, Factory>[] factories)
+        public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
+        private static Factory SelectLastRegisteredFactory(Request request, KeyValuePair<object, Factory>[] factories)
         {
             var serviceKey = request.ServiceKey;
             for (var i = factories.Length - 1; i >= 0; i--)
@@ -3290,9 +3291,8 @@ namespace DryIoc
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
-            (req, factories) =>
-                factories.FindFirst(f => f.Key.Equals(serviceKey)).Value ??
-                factories.FindFirst(f => f.Key.Equals(null)).Value;
+            (r, fs) => fs.FindFirst(f => f.Key.Equals(serviceKey)).Value ?? 
+                       fs.FindFirst(f => f.Key.Equals(null)).Value;
 
         /// <summary>Specify the method signature for returning multiple keyed factories.
         /// This is dynamic analog to the normal Container Registry.</summary>
@@ -3429,7 +3429,11 @@ namespace DryIoc
 
         /// <summary>Replaced with WithConcreteTypeDynamicRegistrations</summary>
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
-            WithUnknownServiceResolvers(AutoResolveConcreteTypeRule(condition));
+            new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)),
+                DefaultRegistrationServiceKey);
 
         /// <summary>Creates dynamic fallback registrations for the requested service type
         /// with provided <paramref name="getImplementationTypes"/>.
@@ -3663,6 +3667,35 @@ namespace DryIoc
         public Rules WithFuncAndLazyWithoutRegistration() =>
             WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
 
+        /// <summary>Outputs most notable non-default rules</summary>
+        public override string ToString()
+        {
+            if (this == Default)
+                return "Rules.Default";
+
+            string s = "";
+            if (_settings != DEFAULT_SETTINGS)
+            {
+                var addedSettings = _settings & ~DEFAULT_SETTINGS;
+                if (addedSettings != 0)
+                    s = "Rules with {" + addedSettings + "}";
+                var removedSettings = DEFAULT_SETTINGS & ~ _settings;
+                if (removedSettings != 0)
+                    s += (s != "" ? " and without {" : "Rules without {") + removedSettings + "}";
+            }
+
+            if (DefaultReuse != null && DefaultReuse != Reuse.Transient)
+                s += (s != "" ? NewLine : "Rules ") + " with DefaultReuse=" + DefaultReuse;
+
+            if (FactorySelector != null)
+                s += (s != "" ? NewLine : "Rules ") + " with FactorySelector=<non-default>";
+
+            if (_made != Made.Default)
+                s += (s != "" ? NewLine : "Rules ") + " with Made.Of=<non-default>";
+
+            return s;
+        }
+
         #region Implementation
 
         private Rules()
@@ -3722,7 +3755,9 @@ namespace DryIoc
             UseDynamicRegistrationsAsFallback = 1 << 10,
             IgnoringReuseForFuncWithArgs = 1 << 11,
             OverrideRegistrationMade = 1 << 12,
-            FuncAndLazyWithoutRegistration = 1 << 13
+            FuncAndLazyWithoutRegistration = 1 << 13,
+            AutoConcreteTypeResolution = 1 << 14, // informational flag
+            SelectLastRegisteredFactory = 1 << 15 // informational flag
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -3779,10 +3814,18 @@ namespace DryIoc
         public static FactoryMethod Of<TFactory>(string methodOrMemberName) =>
             Of(typeof(TFactory).GetAllMembers().FindFirst(m => m.Name == methodOrMemberName).ThrowIfNull());
 
-        /// <summary>Pretty prints wrapped method.</summary> <returns>Printed string.</returns>
-        public override string ToString() =>
-            new StringBuilder().Print(ConstructorOrMethodOrMember.DeclaringType)
-                .Append('.').Append(ConstructorOrMethodOrMember).ToString();
+        /// <summary>Pretty prints wrapped method.</summary>
+        public override string ToString()
+        {
+            var s = new StringBuilder("{")
+                .Print(ConstructorOrMethodOrMember.DeclaringType)
+                .Append('.').Append(ConstructorOrMethodOrMember);
+            if (FactoryServiceInfo != null)
+                s.Append(" of factory service ").Append(FactoryServiceInfo);
+            if (FactoryExpression != null)
+                s.Append(" of factory expression ").Append(FactoryExpression);
+            return s.Append('}').ToString();
+        }
 
         /// <summary>Easy way to specify non-public and most resolvable constructor.</summary>
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param>
@@ -3959,6 +4002,14 @@ namespace DryIoc
         /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
 
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            if (FactoryMethod != null)
+                return FactoryMethod.ToString();
+            return "non-default";
+        }
+
         /// <summary>Container will use some sensible defaults for service creation.</summary>
         public static readonly Made Default = new Made();
 
@@ -3978,8 +4029,8 @@ namespace DryIoc
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             bool isConditionalImlementation = false) =>
-            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation
-                ? Default : new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
+            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation ? Default : 
+            new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
@@ -7515,7 +7566,6 @@ namespace DryIoc
             }
 
             var openGenericImplType = knownImplType ?? implType;
-
             if (openGenericImplType == typeof(object) || // for open-generic T implementation
                 openGenericImplType != null &&           // for open-generic X<T> implementation
                 (openGenericImplType.IsGenericDefinition() || openGenericImplType.IsGenericParameter) ||
@@ -7529,24 +7579,9 @@ namespace DryIoc
 
         private Expr CreateServiceExpression(MemberInfo ctorOrMember, Expr factoryExpr, Expr[] paramExprs, Request request)
         {
-            var rules = request.Rules;
-
             var ctor = ctorOrMember as ConstructorInfo;
-            if (ctor == null) // generate a method call or property/field access
-            {
-                var serviceExpr
-                    = ctorOrMember is MethodInfo ? Call(factoryExpr, (MethodInfo)ctorOrMember, paramExprs)
-                    : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
-                    : (Expr)Field(factoryExpr, (FieldInfo)ctorOrMember);
-
-                var requestedServiceType = request.GetActualServiceType();
-                if (serviceExpr.Type == typeof(object))
-                    return Convert(serviceExpr, requestedServiceType);
-
-                return serviceExpr.Type.IsAssignableTo(requestedServiceType) ? serviceExpr
-                    : request.IfUnresolved != IfUnresolved.Throw ? null
-                    : Throw.For<Expr>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
-            }
+            if (ctor == null)
+                return CreateNonConstructorServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
 
             // Optimize singleton creation by bypassing Expression.New and using Activator.CreateInstance.
             // Why? Because singleton is created only once and it does not make sense
@@ -7554,6 +7589,7 @@ namespace DryIoc
             // to create the delegate itself.
             // Moreover, the singleton dependency may be a singleton or Transient,
             // so we may activate Transients on a spot as well.
+            var rules = request.Rules;
             if (request.Reuse is SingletonReuse &&
                 rules.EagerCachingSingletonForFasterAccess &&
 
@@ -7615,6 +7651,23 @@ namespace DryIoc
             }
 
             return assignments.Length == 0 ? (Expr)newServiceExpr : MemberInit(newServiceExpr, assignments);
+        }
+
+        private static Expr CreateNonConstructorServiceExpression(
+            MemberInfo ctorOrMember, Expr factoryExpr, Expr[] paramExprs, Request request)
+        {
+            var serviceExpr
+                = ctorOrMember is MethodInfo ? Call(factoryExpr, (MethodInfo)ctorOrMember, paramExprs)
+                : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
+                : (Expr)Field(factoryExpr, (FieldInfo)ctorOrMember);
+
+            var requestedServiceType = request.GetActualServiceType();
+            if (serviceExpr.Type == typeof(object))
+                return Convert(serviceExpr, requestedServiceType);
+
+            return serviceExpr.Type.IsAssignableTo(requestedServiceType) ? serviceExpr
+                : request.IfUnresolved != IfUnresolved.Throw ? null
+                : Throw.For<Expr>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
         }
 
         private static CreateScopedValue GetActivator(Type type, IList<object> argExprs)
@@ -8289,9 +8342,8 @@ namespace DryIoc
         /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) => _singletonReuseExpr.Value;
 
-        /// <summary>Pretty prints reuse name and lifespan</summary> <returns>Printed string.</returns>
-        public override string ToString() =>
-            GetType().Name + " {Lifespan=" + Lifespan + "}";
+        /// <summary>Pretty prints reuse name and lifespan</summary>
+        public override string ToString() => "Singleton {Lifespan=" + Lifespan + "}";
     }
 
     /// <summary>Specifies that instances are created, stored and disposed together with some scope.</summary>
@@ -8354,7 +8406,7 @@ namespace DryIoc
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
         {
-            var s = new StringBuilder(GetType().Name + " {");
+            var s = new StringBuilder(_scopedOrSingleton ? "ScopedOrSingleton {" : "Scoped {");
             if (Name != null)
                 s.Append("Name=").Print(Name).Append(", ");
             return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
@@ -8939,18 +8991,18 @@ namespace DryIoc
 #pragma warning disable 1591 // "Missing XML-comment"
         public static readonly int
             UnableToResolveUnknownService = Of(
-                "Unable to resolve {0}" + Environment.NewLine +
-                "Where no service registrations found" + Environment.NewLine +
-                "  and no dynamic registrations found in {1} of Rules.DynamicServiceProviders" + Environment.NewLine +
+                "Unable to resolve {0}" + NewLine +
+                "Where no service registrations found" + NewLine +
+                "  and no dynamic registrations found in {1} of Rules.DynamicServiceProviders" + NewLine +
                 "  and nothing found in {2} of Rules.UnknownServiceResolvers"),
 
             UnableToResolveFromRegisteredServices = Of(
-                "Unable to resolve {0}" + Environment.NewLine +
-                "  with normal and dynamic registrations:" + Environment.NewLine + "{1}"),
+                "Unable to resolve {0}" + NewLine +
+                "  with normal and dynamic registrations:" + NewLine + "{1}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration but found many:" + Environment.NewLine + "{0}" + Environment.NewLine +
-                "when resolving {1}." + Environment.NewLine +
+                "Expecting single default registration but found many:" + NewLine + "{0}" + NewLine +
+                "when resolving {1}." + NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 
             RegisteringImplementationNotAssignableToServiceType = Of(
@@ -8958,17 +9010,17 @@ namespace DryIoc
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(
-                "Unable to register delegate factory for open-generic service {0}." + Environment.NewLine +
+                "Unable to register delegate factory for open-generic service {0}." + NewLine +
                 "You need to specify concrete (closed) service type returned by delegate."),
             RegisteringOpenGenericImplWithNonGenericService = Of(
                 "Unable to register open-generic implementation {0} with non-generic service {1}."),
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all type arguments, but specifies only {2}."),
             RegisteringNotAGenericTypedefImplType = Of(
-                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
+                "Unsupported registration of implementation {0} which is not a generic type definition but contains generic parameters." + NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNotAGenericTypedefServiceType = Of(
-                "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + Environment.NewLine +
+                "Unsupported registration of service {0} which is not a generic type definition but contains generic parameters." + NewLine +
                 "Consider to register generic type definition {1} instead."),
             RegisteringNullImplementationTypeAndNoFactoryMethod = Of(
                 "Registering without implementation type and without FactoryMethod to use instead."),
@@ -8977,7 +9029,7 @@ namespace DryIoc
             RegisteringAbstractImplementationTypeAndNoFactoryMethod = Of(
                 "Registering abstract implementation type {0} when it is should be concrete. Also there is not FactoryMethod to use instead."),
             UnableToSelectSinglePublicConstructorFromMultiple = Of(
-                "Unable to select single public constructor from implementation type {0}:" + Environment.NewLine +
+                "Unable to select single public constructor from implementation type {0}:" + NewLine +
                 "{1}"),
             UnableToSelectSinglePublicConstructorFromNone = Of(
                 "Unable to select single public constructor from implementation type {0} because it does not have one."),
@@ -8989,12 +9041,12 @@ namespace DryIoc
                 "Unable to match open-generic factory method {0} with requested service type arguments <{1}> when resolving {2}."),
             OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform = Of(
                 "[Specific to this .NET version] Unable to match method or constructor {0} from open-generic declaring type {1} to closed-generic type {2}, " +
-                Environment.NewLine +
+                NewLine +
                 "Please give the method an unique name to distinguish it from other overloads."),
             ResolvingOpenGenericServiceTypeIsNotPossible = Of(
                 "Resolving open-generic service type is not possible for type: {0}."),
             RecursiveDependencyDetected = Of(
-                "Recursive dependency is detected when resolving" + Environment.NewLine + "{0}."),
+                "Recursive dependency is detected when resolving" + NewLine + "{0}."),
             ScopeIsDisposed = Of(
                 "Scope {0} is disposed and scoped instances are disposed and no longer available."),
             NotFoundOpenGenericImplTypeArgInService = Of(
@@ -9004,7 +9056,7 @@ namespace DryIoc
             UnableToFindCtorWithAllResolvableArgs = Of(
                 "Unable to find constructor with all resolvable parameters when resolving {0}."),
             UnableToFindMatchingCtorForFuncWithArgs = Of(
-                "Unable to find constructor with all parameters matching Func signature {0} " + Environment.NewLine
+                "Unable to find constructor with all parameters matching Func signature {0} " + NewLine
                                                                                               + "and the rest of parameters resolvable from Container when resolving: {1}."),
             RegedFactoryDlgResultNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
@@ -9019,7 +9071,7 @@ namespace DryIoc
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
             DependencyHasShorterReuseLifespan = Of(
-                "Dependency {0} reuse {1} lifespan shorter than its parent's: {2}" + Environment.NewLine +
+                "Dependency {0} reuse {1} lifespan shorter than its parent's: {2}" + NewLine +
                 "To turn Off this error, specify the rule with new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())."),
             WeakRefReuseWrapperGCed = Of(
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
@@ -9030,10 +9082,10 @@ namespace DryIoc
             UnableToRegisterDuplicateDefault = Of(
                 "Service {0} without key is already registered as {1}."),
             UnableToRegisterDuplicateKey = Of(
-                "Unable to register service {0} with duplicate key '{1}'" + Environment.NewLine +
+                "Unable to register service {0} with duplicate key '{1}'" + NewLine +
                 " There is already registered service with the same key: {2}."),
             NoCurrentScope = Of(
-                "No current scope is available: probably you are registering to, or resolving from outside of the scope. " + Environment.NewLine +
+                "No current scope is available: probably you are registering to, or resolving from outside of the scope. " + NewLine +
                 "Current resolver context is: {0}."),
             ContainerIsDisposed = Of(
                 "Container is disposed and should not be used: {0}"),
@@ -9043,25 +9095,25 @@ namespace DryIoc
                 "Expected expression of method call, property getter, or new statement (with optional property initializer), " +
                 "but found this Made.Of expression: {0}"),
             UnexpectedFactoryMemberExpressionInMadeOf = Of(
-                "Expected property getter, but found not supported `{0}` " + Environment.NewLine +
+                "Expected property getter, but found not supported `{0}` " + NewLine +
                 "in Made.Of expression: `{1}`"),
             UnexpectedExpressionInsteadOfArgMethodInMadeOf = Of(
-                "Expected `Arg.Of` method call to specify parameter, property or field, but found `{0}` " + Environment.NewLine +
+                "Expected `Arg.Of` method call to specify parameter, property or field, but found `{0}` " + NewLine +
                 "in Made.Of expression: `{1}`"),
             UnexpectedExpressionInsteadOfConstantInMadeOf = Of(
-                "Expected `ConstantExpression` for value of parameter, property, or field, but found `{0}` " + Environment.NewLine +
+                "Expected `ConstantExpression` for value of parameter, property, or field, but found `{0}` " + NewLine +
                 "in Made.Of expression: `{1}`"),
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {2}."),
             StateIsRequiredToUseItem = Of(
-                "Runtime state is required to inject (or use) the: {0}. " + Environment.NewLine +
-                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + Environment.NewLine +
+                "Runtime state is required to inject (or use) the: {0}. " + NewLine +
+                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgValueIndexIsProvidedButNoArgValues = Of(
-                "`Arg.Index` is provided but no values are passed in Made.Of expression: " + Environment.NewLine +
+                "`Arg.Index` is provided but no values are passed in Made.Of expression: " + NewLine +
                 "{0}"),
             ArgValueIndexIsOutOfProvidedArgValues = Of(
-                "`Arg.Index` {0} is outside of provided values [{1}] in Made.Of expression: " + Environment.NewLine +
+                "`Arg.Index` {0} is outside of provided values [{1}] in Made.Of expression: " + NewLine +
                 "{2}"),
             ResolutionNeedsRequiredServiceType = Of(
                 "Expecting required service type but it is not specified when resolving: {0}"),
@@ -9072,10 +9124,10 @@ namespace DryIoc
             RegisteringInstanceNotAssignableToServiceType = Of(
                 "Registered instance {0} is not assignable to serviceType {1}."),
             NoMoreRegistrationsAllowed = Of(
-                "Container does not allow further registrations." + Environment.NewLine +
+                "Container does not allow further registrations." + NewLine +
                 "Attempting to register {0}{1} with implementation factory {2}."),
             NoMoreUnregistrationsAllowed = Of(
-                "Container does not allow further registry modification." + Environment.NewLine +
+                "Container does not allow further registry modification." + NewLine +
                 "Attempting to Unregister {0}{1} with factory type {2}."),
             GotNullFactoryWhenResolvingService = Of(
                 "Got null factory method when resolving {0}"),
@@ -9089,20 +9141,20 @@ namespace DryIoc
             NotFoundMetaCtorWithTwoArgs = Of(
                 "Expecting Meta wrapper public constructor with two arguments {0} but not found when resolving: {1}"),
             UnableToSelectFromManyRegistrationsWithMatchingMetadata = Of(
-                "Unable to select from multiple registrations matching the Metadata type {0}:" + Environment.NewLine +
-                "{1}" + Environment.NewLine +
+                "Unable to select from multiple registrations matching the Metadata type {0}:" + NewLine +
+                "{1}" + NewLine +
                 "When resolving: {2}"),
             ImplTypeIsNotSpecifiedForAutoCtorSelection = Of(
                 "Implementation type is not specified when using automatic constructor selection: {0}"),
             NoImplementationForPlaceholder = Of(
-                "There is no real implementation, only a placeholder for the service {0}." + Environment.NewLine +
+                "There is no real implementation, only a placeholder for the service {0}." + NewLine +
                 "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder."),
             UnableToFindSingletonInstance = Of(
-                "Expecting the instance to be stored in singleton scope, but unable to find anything here." + Environment.NewLine +
+                "Expecting the instance to be stored in singleton scope, but unable to find anything here." + NewLine +
                 "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton."),
             DecoratorShouldNotBeRegisteredWithServiceKey = Of(
-                "Registering Decorator {0} with service key {1} is not supported," + Environment.NewLine +
-                "because instead of decorator with the key you actually want a decorator for service registered with the key." + Environment.NewLine +
+                "Registering Decorator {0} with service key {1} is not supported," + NewLine +
+                "because instead of decorator with the key you actually want a decorator for service registered with the key." + NewLine +
                 "To apply decorator for service with the key, please use `Setup.DecoratorOf(decorateeServiceKey: \"a service key\")`"),
             PassedCtorOrMemberIsNull = Of(
                 "The constructor of member info passed to `Made.Of` or `FactoryMethod.Of` is null"),
@@ -9121,8 +9173,8 @@ namespace DryIoc
                 "Unable to find a single constructor in Type {0} (including non-public={1})"),
             DisposerTrackForDisposeError = Of("Something is {0} already."),
             NoServicesWereRegisteredByRegisterMany = Of(
-                "No services were registered by RegisterMany for specified implementation types: " + Environment.NewLine +
-                "[{0}]" + Environment.NewLine +
+                "No services were registered by RegisterMany for specified implementation types: " + NewLine +
+                "[{0}]" + NewLine +
                 "May be you missed the implementation or service types, " +
                 "e.g. provided only abstract or compiler-generated implementation types, " +
                 "or specified a wrong @serviceTypeCondition," +
@@ -9760,7 +9812,7 @@ namespace DryIoc
     public static class PrintTools
     {
         /// <summary>Default separator used for printing enumerable.</summary>
-        public static string DefaultItemSeparator = ", " + Environment.NewLine;
+        public static string DefaultItemSeparator = ", " + NewLine;
 
         /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
         /// <param name="s">Builder to append output to.</param> <param name="x">Object to print.</param>
