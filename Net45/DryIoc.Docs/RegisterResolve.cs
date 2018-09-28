@@ -83,8 +83,8 @@ You can register open-generic as well:
 ```cs md*/
 class Register_open_generic_service_with_implementation_runtime_types
 {
-    interface IService<T> {}
-    class SomeService<T> : IService<T> {}
+    interface IService<T> { }
+    class SomeService<T> : IService<T> { }
 
     [Test]
     public void Example()
@@ -132,7 +132,8 @@ Example of singleton service registration:
 ```cs md*/
 class Singleton_service_registration
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -321,7 +322,7 @@ class Resolving_service_with_key_as_KeyValuePair
 
         // the keys of resolved items
         CollectionAssert.AreEqual(
-            new object[] { DefaultKey.Of(0), DefaultKey.Of(1), "z" }, 
+            new object[] { DefaultKey.Of(0), DefaultKey.Of(1), "z" },
             items.Select(x => x.Key));
 
         // you may get only services with default keys
@@ -347,132 +348,243 @@ In case of multiple string keys you will get expected exception: _"Unable to res
 
 ## IsRegistered
 
-Sometimes you need to find if service is already registered. IsRegistered allows to find that specified service, decorator, or wrapper was registered into Container.
+Sometimes you need to find, if a service is already registered. 
+`IsRegistered` method allows you to find, that specific service, decorator, or wrapper is registered into the Container.
 
-It also allows to provide condition to test registered implementation Factory for the service. For instance you may test for specific Reuse, or Metadata, or Setup.
+Additionally, `IsRegistered` allows you to provide a `condition` to test registered implementation `Factory` of the service. 
+For instance, you may test for specific `Reuse`, or `Metadata`, or `Setup`.
 
-To find if MyService is registered as Singleton:
+To find if `MyService` is registered as `Singleton`:
+```cs md*/
+class IsRegistered_examples
+{
+    class MyService { }
 
-    container.IsRegistered<MyService>(
-        condition: factory => factory.Reuse is SingletonReuse);
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
 
-In above case we are lookingfor any default or keyed registration. If you need to find service with specific key then specify the key:
+        // not registered yet
+        Assert.IsFalse(c.IsRegistered<MyService>(condition: factory => factory.Reuse is SingletonReuse));
 
-    container.IsRegistered<MyService>(serviceKey: "my string key");
+        c.Register<MyService>();
 
-    // to check for default registration
-    container.IsRegistered<MyService>(serviceKey: DefaultKey.Value);
+        // registered, but not a singleton
+        Assert.IsTrue(c.IsRegistered<MyService>());
+        Assert.IsFalse(c.IsRegistered<MyService>(condition: factory => factory.Reuse is SingletonReuse));
 
-By default IsRegistered will look only for registered services, not for decorators or wrappers. To look for them you need to specify corresponding FactoryType:
+        c.Register<MyService>(Reuse.Singleton);
 
-    container.IsRegistered(typeof(MyOwned<>), factoryType: FactoryType.Wrapper);
+        // found a singleton
+        Assert.IsTrue(c.IsRegistered<MyService>(condition: factory => factory.Reuse is SingletonReuse));
+    }
+}/*md
+```
 
-__Note:__ IsRegistered does not check if service is actually resolvable. For instance, if some of its dependencies are not registered. To check for resolvability use Resolve with IfUnresolved.ReturnDefault:
+In above case we are looking for any default or keyed registration. 
+If you need to find service with specific key then specify the key:
+```cs md*/
+class IsRegistered_with_key_examples
+{
+    class MyService { }
 
-    var isResolvable = container.Resolve<MyService>(ifUnresolved: IfUnresolved.ReturnDefault) != null;
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
 
-If you want just to check service resolvability without actually creating service then resolve it as Func wrapper.
+        c.Register<MyService>(serviceKey: "the key");
+        Assert.IsTrue(c.IsRegistered<MyService>(serviceKey: "the key"));
 
-    var isResolvable = container.Resolve<Func<MyService>>(ifUnresolved: IfUnresolved.ReturnDefault) != null;
+        // check that, there is no default registration
+        Assert.IsFalse(c.IsRegistered<MyService>(serviceKey: DefaultKey.Value));
+
+        // Note, when key is not provided it will find any registered service
+        Assert.IsTrue(c.IsRegistered<MyService>());
+
+        c.Register<MyService>();
+
+        // Now found registered default service
+        Assert.IsTrue(c.IsRegistered<MyService>(serviceKey: DefaultKey.Value));
+    }
+}/*md
+```
+
+By default `IsRegistered` will look only for __services__, not for [decorators](Decorators) or [wrappers](Wrappers). 
+To look for them you need to specify corresponding FactoryType:
+```cs md*/
+
+class IsRegistered_for_wrapper_or_decorators
+{
+    class Owned<T> { }
+
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        Assert.IsFalse(c.IsRegistered(typeof(Owned<>), factoryType: FactoryType.Wrapper));
+
+        c.Register(typeof(Owned<>), setup: Setup.Wrapper);
+        Assert.IsTrue(c.IsRegistered(typeof(Owned<>), factoryType: FactoryType.Wrapper));
+    }
+}/*md
+```
+
+__Important:__ `IsRegistered` does not check if service is actually resolvable. 
+For instance, if some of its dependencies are not registered. To check for resolvability use Resolve with `IfUnresolved.ReturnDefault`:
+
+```cs md*/
+class Check_if_resolvable
+{
+    class MyService { }
+
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        Assert.IsFalse(c.Resolve<MyService>(ifUnresolved: IfUnresolved.ReturnDefault) != null);
+
+        c.Register<MyService>();
+        Assert.IsTrue(c.Resolve<MyService>(ifUnresolved: IfUnresolved.ReturnDefault) != null);
+
+        // If you want just to check service resolvability without actually creating service then resolve it as Func wrapper.
+        Assert.IsTrue(c.Resolve<Func<MyService>>(ifUnresolved: IfUnresolved.ReturnDefault) != null);
+    }
+}/*md
+```
 
 ### Implicit ways to know that service is registered
 
-There are other ways to get existing registration that may fit to your needs:
+There are other ways to get existing registration, that may fit to your needs.
+The basic one is to get all Container registrations and find the one you need.
 
-- GetServiceRegistrations() will enumerate all service registrations in container. For instance to find all services registered with specific key and reuse:
+```cs md*/
+class Get_specific_registration
+{
+    class MyService { }
 
-        container.GetServiceRegistrations()
-            .Where(r => myKey.Equals(r.OptionalServiceKey) && r.Factory.Reuse is CurrentScopeReuse);
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
 
-- Register with ifAlreadyRegistered option:
+        c.Register<MyService>(Reuse.Scoped, serviceKey: "foo");
 
-        container.Register<MyService>(ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+        var serviceRegistration = c.GetServiceRegistrations()
+            .FirstOrDefault(r => Equals(r.OptionalServiceKey, "foo") && r.Factory.Reuse == Reuse.Scoped);
+
+        Assert.AreEqual(typeof(MyService), serviceRegistration.ImplementationType);
+    }
+}/*md
+```
+
+`GetServiceRegistrations()` method will enumerate all service registrations in container. 
 
 
 ## RegisterMany
 
-`RegisterMany` allows to register single or multiple implementations of multiple services. In addition it may automatically deduce service types from given implementation types (or assemblies of implementation types).
+`RegisterMany` method allows to register single or multiple implementations of multiple services. 
+In addition, it may automatically deduce service types from given implementation types (or assemblies of implementation types).
 
-`RegisterMany` may help you to automate batch registrations and registrations from assemblies.
+`RegisterMany` helps to automate batch registrations and registrations from assemblies.
 
-Examples:
+```cs md*/
+public class RegisterMany_examples
+{
+    public interface X { }
+    public interface Y { }
+
+    public class A : X, Y { }
+
+    public class B : X, IDisposable
+    {
+        public void Dispose() { }
+    }
+
+    public static A CreateA() => new A();
+
+    [Test]
+    public void Example()
+    {
+        // Allows to register B which implements IDisposable as Transient, which is default `RegisterMany` reuse.
+        var container = new Container(rules => rules
+            .WithTrackingDisposableTransients()); 
+
+        // Registers X, Y and A itself with A implementation 
+        container.RegisterMany<A>();
+
+        // Registers only X and Y, but not A itself
+        container.RegisterMany<A>(serviceTypeCondition: type => type.IsInterface);
+
+        // X, Y, A are sharing the same singleton
+        container.RegisterMany<A>(Reuse.Singleton);
+        Assert.AreSame(container.Resolve<X>(), container.Resolve<Y>());
+
+        // Registers X, Y with A and X with B
+        // IDisposable is too general to be considered as a service type, 
+        // see the full list of excluded types after example below.
+        container.RegisterMany(
+            new[] { typeof(A), typeof(B) },
+            serviceTypeCondition: type => type.IsInterface);
+
+        // Registers only X with A and X with B
+        container.RegisterMany(
+            new[] { typeof(A), typeof(B) },
+            serviceTypeCondition: type => type == typeof(X));
+
+        // The same as above if A and B in the same assembly.
+        // Plus registers the rest of the types from assembly of A.
+        container.RegisterMany(new[] { typeof(A).Assembly }, type => type == typeof(X));
+
+        // Everything in assembly of A including internal types
+        container.RegisterMany(new[] { typeof(A).Assembly }, type => true, nonPublicServiceTypes: true);
+
+        // Made.Of expression is supported too
+        container.RegisterMany(Made.Of(() => CreateA()));
+
+        // Explicit about what services to register
+        container.RegisterMany(new[] { typeof(X), typeof(Y) }, typeof(A));
+
+        // Provides full control to you
+        container.RegisterMany(new[] { typeof(A).Assembly },
+            getServiceTypes: implType => implType.GetImplementedServiceTypes(),
+            getImplFactory: implType => new ReflectionFactory(implType,
+                reuse: implType.IsAssignableTo<IDisposable>() ? Reuse.Scoped : Reuse.Transient));
+    }
+} /*md
 ```
-#!c#
-    public interface X {}
-    public interface Y {}
 
-    public class A : X, Y {}
-    public class B : X, IDisposable {}
-    
-    
-    // Registers X, Y and A itself with A implementation 
-    container.RegisterMany<A>();
-    
-    
-    // Registers only X and Y, but not A itself
-    container.RegisterMany<A>(serviceTypeCondition: type => type.IsInterface);
-    
-    
-    // X, Y, A are sharing the same singleton
-    container.RegisterMany<A>(Reuse.Singleton)
-    Assert.AreSame(container.Resolve<X>(), container.Resolve<Y>());
-    
-    
-    // Registers X, Y with A and X with B
-    // IDisposable is too general to be considered as a service type, 
-    // see the full list of excluded types after example below.
-    container.RegisterMany(new[] { typeof(NLog_logger.A), typeof(Without_cache.B) },
-        serviceTypeCondition: type => type.IsInterface);
-    
-    
-    // Registers only X with A and X with B
-    container.RegisterMany(new[] { typeof(NLog_logger.A), typeof(Without_cache.B) },
-        serviceTypeCondition: type => type == typeof(X));
-    
-    
-    // The same as above if A and B in the same assembly.
-    // Plus registers the rest of the types from assembly of A.
-    container.RegisterMany(new[] { typeof(NLog_logger.A).Assembly }, 
-        serviceTypeCondition: type => type == typeof(X));
-    
-    
-    // Everything in assembly of A including internal types
-    container.RegisterMany(new[] { typeof(NLog_logger.A).Assembly }, nonPublicServiceTypes: true);
-        
-    
-    // Made.Of expression is supported too
-    container.RegisterMany(Made.Of(() => MyMethodReturnsA()));
-    
-    
-    // Explicit about what services to register
-    container.RegisterMany(new[] { typeof(X), typeof(Y) }, typeof(A));
-    
-    
-    // Provides full control to you
-    container.RegisterMany(new[] { typeof(NLog_logger.A).Assembly },
-        action: (registrator, serviceTypes, implType) =>
-        {
-            var reuse = implType.IsAssignableTo(typeof(IDisposable)))
-                ? Reuse.InResolutionScope
-                : Reuse.Transient;
-            registrator.RegisterMany(serviceTypes, implType, reuse);
-        });
+DryIoc does not consider some types as a service type for `RegisterMany` method. 
+You may examine the excluded types by looking at `Registrator.ExcludedGeneralPurposeServiceTypes` property.
+The value may depend on your .NET framework.
+
+```cs md*/
+class RegisterMany_excludes_these_types
+{
+    [Test]
+    public void Example()
+    {
+        var excludedTypes = Registrator.ExcludedGeneralPurposeServiceTypes;
+        Assert.IsNotEmpty(excludedTypes);
+    }
+}/*md
 ```
 
-DryIoc does not consider some types as a service type (__for RegisterMany method__). Here is the full list of excluded types:
+On my platform it may be:
 
-  - System.IDisposable
-  - System.ValueType
-  - System.ICloneable
-  - System.IEquatable
-  - System.IComparable
-  - System.Runtime.Serialization.ISerializable
-  - System.Collections.IStructuralEquatable
-  - System.Collections.IEnumerable
-  - System.Collections.IList
-  - System.Collections.ICollection
+  - `System.IDisposable`
+  - `System.ValueType`
+  - `System.ICloneable`
+  - `System.IEquatable`
+  - `System.IComparable`
+  - `System.Runtime.Serialization.ISerializable`
+  - `System.Collections.IStructuralEquatable`
+  - `System.Collections.IEnumerable`
+  - `System.Collections.IList`
+  - `System.Collections.ICollection`
 
-__Note:__ But if you really need this, you may register the type with `Register` method.
+__Note:__ If you really need to register something from the list, you may register it `Register` method.
 
 
 ## RegisterMapping
@@ -579,7 +691,7 @@ container should just _use instance_ for injection.
 
 When you call the `UseInstance` the instance will be **directly put into Open scope or Singleton scope* 
 based on whether the container is scoped (returned from `OpenScope` call) or not.
-In addition, the scoped and sington instances may coexist with each other.
+In addition, the scoped and singleton instances may coexist with each other.
 
 Example of scoped and singleton instance:
 
