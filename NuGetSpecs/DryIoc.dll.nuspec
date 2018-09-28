@@ -1,94 +1,117 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-  <metadata>
-    <id>DryIoc.dll</id>
-    <version>0.0.0</version>
-    <!-- overridden by "NuGet pack -Version" flag -->
-    <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013 Maksim Volkau</copyright>
-    <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
-    <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</iconUrl>
-    <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
-    <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
-    <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
-    <releaseNotes>
-      v3.0.2
-      - fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
-      v3.0.1
-      - added: NetStandard 2.0 package target with no dependencies
-      v3.0.0
-      - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
-    </releaseNotes>
-    <dependencies>
-      <!--Explicitly specify that there are no dependencies in full .NET version -->
-      <group targetFramework="net35"></group>
-      <group targetFramework="net40"></group>
-      <group targetFramework="net45"></group>
-      <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL328--></group>
-      <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1"><!--PCL259--></group>
-      <group targetFramework="xamarinmac20"></group>
+    <metadata>
+        <id>DryIoc.dll</id>
+        <version>0.0.0</version>
+        <!-- overridden by "NuGet pack -Version" flag -->
+        <authors>Maksim Volkau</authors>
+        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</iconUrl>
+        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
+        <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <releaseNotes>
+            v3.1.0-preview-01
+            - fixed: BB-593 Add auto-generated tag to PCL FEC
+            - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
+            - fixed: BB-596 The problem was in non-public service type
+            - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
+            - fixed: #7 Context-based injection
+            - fixed: #16 AutoConcreteTypeResolution should not consider a primitive type
+            - fixed: #25 Decorator with serviceKey throws exception which gives invalid advice on how to fix the issue for the most common reason to use the servicekey
+            - fixed: RegisterMapping for open-generic service type
+            - fixed: Using facadeKey in CreateFacade
+            - added: #4 Rule for Func and Lazy to be resolved even without requested service registered
+            - added: #9 RegisterMany should indicate if no registration was made
+            - added: #17 Rules.DefaultRegistrationServiceKey enhancement
+            - added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
+            - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
+            - added: IRegistrator.GetRegisteredFactories
+            - added: FactoryType to Registrator.RegisterMapping
+            - changed: #11 Resolution root bound dependency expression de-duplication
+            - changed: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
+            v3.0.2
+            - fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
+            v3.0.1
+            - added: NetStandard 2.0 package target with no dependencies
+            v3.0.0
+            - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
+        </releaseNotes>
+        <dependencies>
+            <!--Explicitly specify that there are no dependencies in full .NET version -->
+            <group targetFramework="net35"></group>
+            <group targetFramework="net40"></group>
+            <group targetFramework="net45"></group>
+            <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1">
+                <!--PCL328-->
+            </group>
+            <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1">
+                <!--PCL259-->
+            </group>
+            <group targetFramework="xamarinmac20"></group>
 
-      <group targetFramework="netstandard1.0">
-        <dependency id="NETStandard.Library" version="1.6.1" />
-      </group>
-      <group targetFramework="netstandard1.3">
-        <dependency id="NETStandard.Library" version="1.6.1" />
-      </group>
-      <group targetFramework="netstandard2.0"></group>
-      
-    </dependencies>
-  </metadata>
-  <files>
-    <file src="..\LICENSE.txt" />
-    <file src="..\NuGetSpecs\README.md" />
-    <file src="..\NuGetSpecs\DryIoc.snk" />
+            <group targetFramework="netstandard1.0">
+                <dependency id="NETStandard.Library" version="1.6.1" />
+            </group>
+            <group targetFramework="netstandard1.3">
+                <dependency id="NETStandard.Library" version="1.6.1" />
+            </group>
+            <group targetFramework="netstandard2.0"></group>
 
-    <!-- netstandard1.0 (based on PCL 259) -->
-    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.0" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.0" />
+        </dependencies>
+    </metadata>
+    <files>
+        <file src="..\LICENSE.txt" />
+        <file src="..\NuGetSpecs\README.md" />
+        <file src="..\NuGetSpecs\DryIoc.snk" />
 
-    <!-- netstandard1.3 (based on PCL 259) -->
-    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.3" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.3" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.3" />
+        <!-- netstandard1.0 (based on PCL 259) -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.0" />
 
-    <!-- netstandard2.0 (based on PCL 259) -->
-    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard2.0" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard2.0" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard2.0" />
+        <!-- netstandard1.3 (based on PCL 259) -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard1.3" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard1.3" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard1.3" />
 
-    <!-- net35 -->
-    <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
-    <file src="..\bin\Release\DryIoc.pdb" target="lib\net35" />
-    <file src="..\bin\Release\DryIoc.xml" target="lib\net35" />
+        <!-- netstandard2.0 (based on PCL 259) -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\netstandard2.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\netstandard2.0" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\netstandard2.0" />
 
-    <!-- net40 -->
-    <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
-    <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
-    <file src="..\Net40\bin\Release\DryIoc.xml" target="lib\net40" />
+        <!-- net35 -->
+        <file src="..\bin\Release\DryIoc.dll" target="lib\net35" />
+        <file src="..\bin\Release\DryIoc.pdb" target="lib\net35" />
+        <file src="..\bin\Release\DryIoc.xml" target="lib\net35" />
 
-    <!-- net45 -->
-    <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\net45" />
-    <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\net45" />
-    <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\net45" />
+        <!-- net40 -->
+        <file src="..\Net40\bin\Release\DryIoc.dll" target="lib\net40" />
+        <file src="..\Net40\bin\Release\DryIoc.pdb" target="lib\net40" />
+        <file src="..\Net40\bin\Release\DryIoc.xml" target="lib\net40" />
 
-    <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-    <file src="..\PCL\bin\Release\DryIoc.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-    <file src="..\PCL\bin\Release\DryIoc.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-    <file src="..\PCL\bin\Release\DryIoc.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <!-- net45 -->
+        <file src="..\Net45\bin\Release\DryIoc.dll" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.pdb" target="lib\net45" />
+        <file src="..\Net45\bin\Release\DryIoc.xml" target="lib\net45" />
 
-    <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\PCL\bin\Release\DryIoc.dll" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL\bin\Release\DryIoc.pdb" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL\bin\Release\DryIoc.xml" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-    <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
-    <!-- TODO: May be an obsolete with NetStandard 2.0 -->
-    <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\xamarinmac20" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\xamarinmac20" />
-    <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\xamarinmac20" />
+        <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
 
-  </files>
+        <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
+        <!-- TODO: May be an obsolete with NetStandard 2.0 -->
+        <file src="..\PCL-Net45\bin\Release\DryIoc.dll" target="lib\xamarinmac20" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.pdb" target="lib\xamarinmac20" />
+        <file src="..\PCL-Net45\bin\Release\DryIoc.xml" target="lib\xamarinmac20" />
+
+    </files>
 </package>
