@@ -2716,15 +2716,16 @@ namespace DryIoc
         public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
             // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
-            var openedScope = r.ScopeContext == null
-                ? new Scope(r.CurrentScope, name)
-                : r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
+            var scope = r.ScopeContext != null ? SetCurrentContextScope(r, name) : new Scope(r.CurrentScope, name);
 
             if (trackInParent)
-                (openedScope.Parent ?? r.SingletonScope).TrackDisposable(openedScope);
+                (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
 
-            return r.WithCurrentScope(openedScope);
+            return r.WithCurrentScope(scope);
         }
+
+        private static IScope SetCurrentContextScope(IResolverContext r, object name) => 
+            r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
     }
 
     /// <summary>The result generated delegate used for service creation.</summary>

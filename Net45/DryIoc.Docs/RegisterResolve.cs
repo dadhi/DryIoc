@@ -41,6 +41,8 @@ e.g. in `var client = container.Resolve<IClient>();` `client` is a Resolution Ro
 
 DryIoc supports registration vid `Register..` methods with the provided mapping of service and implementation types:
 ```cs md*/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DryIoc;
@@ -216,79 +218,129 @@ and for the rest of registrations to specify opposite condition, e.g. `condition
 and then resolving as `container.Resolve<IEnumerable<Meta<ICommand, CommandId>>>().Where(m => m.Metadata == CommandId.Get))`
 - Using [reuse bound to specific parent scope](ReuseAndScopes#markdown-header-reuseinresolutionscopeof) 
 or to [named scope](ReuseAndScopes#markdown-header-reuseincurrentnamedscope-and-reuseinthread).
+- Registering with `serviceKey`.
 
 
 ### Keyed registrations
 
 To identify specific service implementation you may provide Service Key in registration. Service Key is value of arbitrary type which implements `Object.GetHashCode` and `Object.Equals`. Usual choice is enum type, string, or number.
-```
-#!c#
-    container.Register<ICommand, GetCommand>(serviceKey: CommandId.Get);
-    container.Register<ICommand, SetCommand>(serviceKey: CommandId.Set);
-    container.Register<ICommand, DeleteCommand>(serviceKey: CommandId.Del);
+```cs md*/
+class Multiple_keyed_registrations
+{
+    internal interface ICommand { }
+    internal class GetCommand : ICommand { }
+    internal class SetCommand : ICommand { }
+    internal class DeleteCommand : ICommand { }
+
+    enum CommandId { Get, Set, Delete }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<ICommand, GetCommand>(serviceKey: CommandId.Get);
+        container.Register<ICommand, SetCommand>(serviceKey: CommandId.Set);
+        container.Register<ICommand, DeleteCommand>(serviceKey: CommandId.Delete);
+
+        // then specify the required key on resolve
+        var setCommand = container.Resolve<ICommand>(serviceKey: CommandId.Set);
+        Assert.IsInstanceOf<SetCommand>(setCommand);
+
+        // get array of all commands, don't matter the key
+        var commands = container.Resolve<ICommand[]>();
+        Assert.AreEqual(3, commands.Length);
+
+        // you may select a specific behavior of ResolveMany:
+        var commands2 = (ICommand[])container.ResolveMany<ICommand>(behavior: ResolveManyBehavior.AsFixedArray);
+        Assert.AreEqual(3, commands2.Length);
+    }
+} /*md
 ```
 
-And then resolve using registration key:
+There is also a way to get the commands with their respective keys. 
+It may be especially useful in combination with `Lazy` or `Func` [wrappers](Wrappers), e.g. to built a menu or navigation in UI.
 
-```
-#!c#
-    var setCommand = container.Resolve<ICommand>(serviceKey: CommandId.Set);
-```
+```cs md*/
+class Resolve_commands_with_keys
+{
+    internal interface ICommand { }
+    internal class GetCommand : ICommand { }
+    internal class SetCommand : ICommand { }
+    internal class DeleteCommand : ICommand { }
 
-Or get all commands:
-```
-#!c#
-    var commands = container.Resolve<ICommand[]>();
-``` 
+    enum CommandId { Get, Set, Delete }
 
-Or get all commands with corresponding registration key:
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<ICommand, GetCommand>(serviceKey: CommandId.Get);
+        container.Register<ICommand, SetCommand>(serviceKey: CommandId.Set);
+        container.Register<ICommand, DeleteCommand>(serviceKey: CommandId.Delete);
 
-```
-#!c#
-    var commands = container.Resolve<KeyValuePair<ICommandId, ICommand>[]>();
-    
-    // or as Lazy 
-    var lazyCommands = container.Resolve<KeyValuePair<ICommandId, Lazy<ICommand>>[]>();
-    
-    // or as Func
-    var commandFactories = container.Resolve<KeyValuePair<ICommandId, Func<ICommand>>[]>();
+        var commands = container.Resolve<KeyValuePair<CommandId, ICommand>[]>();
+        Assert.AreEqual(CommandId.Get, commands[0].Key);
+
+        // or as Lazy 
+        var lazyCommands = container.Resolve<KeyValuePair<CommandId, Lazy<ICommand>>[]>();
+        Assert.AreEqual(CommandId.Set, lazyCommands[1].Key);
+
+        // or as Func
+        var commandFactories = container.Resolve<KeyValuePair<CommandId, Func<ICommand>>[]>();
+        Assert.AreEqual(CommandId.Delete, commandFactories[2].Key);
+    }
+}/*md
 ```
 
 ### Resolving as KeyValuePair wrapper
 
-DryIoc supports resolving service with corresponding service key as `KeyValuePair<KeyType, ServiceType>` wrapper.
+DryIoc supports resolving of services registered with corresponding service key via `KeyValuePair<KeyType, ServiceType>` wrapper.
+It works both for default and keyed registrations, because a default registration internally identified with the special `DefaultKey` type. 
 
-It works both for default and keyed registrations, because default registrations internally stored with `DefaultKey`. To get all registrations you need to specify `object` as `TKey`:
-```
-#!c#
-    container.Register<I, X>();
-    container.Register<I, Y>();
-    container.Register<I, Z>(serviceKey: "z");
-    
-    var items = container.Resolve<KeyValuePair<object, I>[]>();
-    
-    Assert.AreEqual(DefaultKey.Of(0), items[0].Key);
-    Assert.AreEqual(DefaultKey.Of(1), items[1].Key);
-    Assert.AreEqual("z", items[2].Key);
+__Note:__ When resolving a collection of services with service keys of different types, you need to specify `object` as `TKey` in a pair.
+
+```cs md*/
+class Resolving_service_with_key_as_KeyValuePair
+{
+    interface I { }
+    class X : I { }
+    class Y : I { }
+    class Z : I { }
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<I, X>();
+        container.Register<I, Y>();
+        container.Register<I, Z>(serviceKey: "z");
+
+        // use an `object` key to get all of registrations
+        var items = container.Resolve<KeyValuePair<object, I>[]>();
+
+        // the keys of resolved items
+        CollectionAssert.AreEqual(
+            new object[] { DefaultKey.Of(0), DefaultKey.Of(1), "z" }, 
+            items.Select(x => x.Key));
+
+        // you may get only services with default keys
+        var defaultItems = container.Resolve<KeyValuePair<DefaultKey, I>[]>();
+        Assert.AreEqual(2, defaultItems.Length);
+
+        // or the one with string key
+        // you may get only services with default keys
+        var z = container.Resolve<KeyValuePair<string, I>[]>().Single().Value;
+        Assert.IsInstanceOf<Z>(z);
+    }
+}/*md
 ```
 
-__Note:__ DryIoc does not guaranty return order for non-default keyed registrations. So in example above it is not guarantied that _"z"_ registration will be last because it was registered the last.
+You see, that you can filter registrations based on the `serviceKey` type.
 
-Resolving as `KeyValuePair` has ability to filter services based on provided `TKey` type. For instance the way default registrations only is:
+__Note:__ DryIoc does not guaranty return order for non-default keyed registrations. 
+So in example above it is not guarantied that `"z"` registration will be the last, because it was registered the last.
 
-```
-#!c#
-    // will resolve only X and Y but not Z
-    var items = container.Resolve<KeyValuePair<DefaultKey, I>[]>();
-```
-
-Using filtering ability you may resolve single keyed _"z"_:
-
-```
-#!c#
-    // check that array is not used here:
-    var z = container.Resolve<KeyValuePair<string, I>>();
-```
 
 In case of multiple string keys you will get expected exception: _"Unable to resolve multiple ..."_.
 
