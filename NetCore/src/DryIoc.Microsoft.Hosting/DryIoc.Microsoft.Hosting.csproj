@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -15,7 +15,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>DryIoc.Microsoft.Hosting</AssemblyName>
-    <Product>DryIoc.Microsoft.Hosting</Product>
     <NeutralLanguage>en-US</NeutralLanguage>
     <PackageId>DryIoc.Microsoft.Hosting</PackageId>
     <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;AspNetCore;NetCore;WebHost;GenericHost;WebHostBuilder;HostBuilder</PackageTags>
