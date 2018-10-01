@@ -1,10 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <VersionPrefix>3.1.0-preview-01</VersionPrefix>
         <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
+        <VersionPrefix>3.1.0-preview-01</VersionPrefix>
+        <AssemblyVersion>3.1.0.0</AssemblyVersion>
+        <FileVersion>3.1.0.0</FileVersion>
+
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
         <AssemblyName>DryIoc</AssemblyName>
         <AssemblyTitle>DryIoc $(TargetFramework)</AssemblyTitle>
@@ -57,9 +61,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" />
+        <None Include="..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
         <None Remove="**\*.orig" />
-        <None Remove="dist\*" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.3'">

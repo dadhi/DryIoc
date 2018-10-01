@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.28010.2036
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc", "DryIoc\DryIoc.csproj", "{8D54B007-C892-463E-9205-93E9CE04353E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.UnitTests", "DryIoc.UnitTests\DryIoc.UnitTests.csproj", "{DCEE9EF2-B12D-45D1-9A1E-7E9BFA63F18E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{8D54B007-C892-463E-9205-93E9CE04353E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8D54B007-C892-463E-9205-93E9CE04353E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8D54B007-C892-463E-9205-93E9CE04353E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCEE9EF2-B12D-45D1-9A1E-7E9BFA63F18E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCEE9EF2-B12D-45D1-9A1E-7E9BFA63F18E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCEE9EF2-B12D-45D1-9A1E-7E9BFA63F18E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCEE9EF2-B12D-45D1-9A1E-7E9BFA63F18E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
