@@ -9954,6 +9954,82 @@ namespace DryIoc
     }
 } // end of DryIoc namespace
 
+#if NETSTANDARD1_3 || NETSTANDARD2_0
+namespace DryIoc
+{
+    using System.Threading;
+
+    /// <summary>Stores scopes propagating through async-await boundaries.</summary>
+    public sealed class AsyncExecutionFlowScopeContext : IScopeContext
+    {
+        /// <summary>Statically known name of root scope in this context.</summary>
+        public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
+
+        private static readonly AsyncLocal<IScope> _ambientScope = new AsyncLocal<IScope>();
+
+        /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
+        /// <returns>Current scope or null.</returns>
+        public IScope GetCurrentOrDefault() => _ambientScope.Value;
+
+        /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
+        /// <param name="changeCurrentScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="changeCurrentScope"/> may be called multiple times in concurrent environment.
+        /// Make it predictable by removing any side effects.</remarks>
+        /// <returns>New current scope. It is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
+        public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) => 
+            _ambientScope.Value = changeCurrentScope(GetCurrentOrDefault());
+
+        /// <summary>Nothing to dispose.</summary>
+        public void Dispose() { }
+    }
+}
+#endif
+#if NET45
+namespace DryIoc
+{
+    using System;
+    using System.Threading;
+
+    /// <summary>Stores scopes propagating through async-await boundaries.</summary>
+    public sealed class AsyncExecutionFlowScopeContext : IScopeContext
+    {
+        /// <summary>Statically known name of root scope in this context.</summary>
+        public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
+
+        [Serializable]
+        internal sealed class ScopeEntry<T> : MarshalByRefObject
+        {
+            public readonly T Value;
+            public ScopeEntry(T value) { Value = value; }
+        }
+
+        private static int _seedKey;
+        private readonly string _scopeEntryKey = ScopeContextName + Interlocked.Increment(ref _seedKey);
+
+        /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
+        /// <returns>Current scope or null.</returns>
+        public IScope GetCurrentOrDefault() =>
+            ((ScopeEntry<IScope>)System.Runtime.Remoting.Messaging.CallContext.LogicalGetData(_scopeEntryKey))?.Value;
+
+        /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and  should return new current scope.</summary>
+        /// <param name="changeCurrentScope">Delegate to change the scope.</param>
+        /// <remarks>Important: <paramref name="changeCurrentScope"/> may be called multiple times in concurrent environment.
+        /// Make it predictable by removing any side effects.</remarks>
+        /// <returns>New current scope. It is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
+        public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope)
+        {
+            var newScope = changeCurrentScope(GetCurrentOrDefault());
+            var scopeEntry = newScope == null ? null : new ScopeEntry<IScope>(newScope);
+            System.Runtime.Remoting.Messaging.CallContext.LogicalSetData(_scopeEntryKey, scopeEntry);
+            return newScope;
+        }
+
+        /// <summary>Nothing to dispose.</summary>
+        public void Dispose() { }
+    }
+}
+#endif
+
 #if NETSTANDARD1_0 || NETSTANDARD1_3 || PCL  
 namespace DryIoc
 {
