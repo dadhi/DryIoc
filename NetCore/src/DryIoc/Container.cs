@@ -9954,7 +9954,7 @@ namespace DryIoc
     }
 } // end of DryIoc namespace
 
-#if NETSTANDARD1_0 || NETSTANDARD1_3 
+#if NETSTANDARD1_0 || NETSTANDARD1_3 || PCL  
 namespace DryIoc
 {
     internal class StackTrace
@@ -9963,7 +9963,7 @@ namespace DryIoc
     }
 }
 #endif
-#if NET35 || NET40
+#if NET35 || NET40 || PCL328
 namespace DryIoc
 {
     using System.Threading;
@@ -10219,7 +10219,7 @@ namespace System
         /// <exception cref="InvalidOperationException">Throws if value computation is recursive.</exception>
         public T Value => IsValueCreated ? _value : Create();
 
-        #region Implementation
+#region Implementation
 
         private Func<T> _valueFactory;
         private T _value;

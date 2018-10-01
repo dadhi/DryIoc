@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <VersionPrefix>3.1.0-preview-01</VersionPrefix>
-        <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
         <AssemblyName>DryIoc</AssemblyName>
         <PackageId>DryIoc</PackageId>
     </PropertyGroup>
@@ -25,5 +25,27 @@
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
     </ItemGroup>
+
+    <!--PCL Profile259-->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net45+win8+wpa81+wp8'">
+        <AssemblyTitle>DryIoc PCL259</AssemblyTitle>
+        <DefineConstants>PCL;PCL259</DefineConstants>
+        <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
+        <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+        <TargetFrameworkProfile>Profile259</TargetFrameworkProfile>
+        <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile259</NugetTargetMoniker>
+        <LanguageTargets>$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
+    </PropertyGroup>
+
+    <!--PCL Profile328-->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net40+win8+wpa81+wp8+sl5'">
+        <AssemblyTitle>DryIoc PCL328</AssemblyTitle>
+        <DefineConstants>PCL;PCL328</DefineConstants>
+        <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
+        <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+        <TargetFrameworkProfile>Profile328</TargetFrameworkProfile>
+        <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile328</NugetTargetMoniker>
+        <LanguageTargets>$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
+    </PropertyGroup>
 
 </Project>
