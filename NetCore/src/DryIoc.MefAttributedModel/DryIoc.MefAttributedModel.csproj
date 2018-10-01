@@ -1,0 +1,89 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
+
+        <Version>4.1.0</Version>
+        <VersionSuffix>preview-01</VersionSuffix>
+        <AssemblyVersion>$(Version)</AssemblyVersion>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+        <AssemblyName>DryIoc.MefAttributedModel</AssemblyName>
+        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <PackageId>$(AssemblyName).dll</PackageId>
+        <Authors>Maksim Volkau</Authors>
+        <Description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</Description>
+        <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
+        <NeutralLanguage>en</NeutralLanguage>
+        <PackageLicenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicenseUrl>
+        <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
+        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</PackageIconUrl>
+        <RepositoryType>git</RepositoryType>
+        <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
+        <PackageTags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
+        <PackageReleaseNotes><![CDATA[
+            v4.1.0:
+            - updated: to DryIoc v3.1 and DryIocAttributes v4.1
+            v4.0.4:
+            - fixed: Using new fixed DryIoc 3.0.2 for NetStandard 1.3 and 2.0 targets
+            v4.0.3:
+            - fixed: NetStandard 1.3 and 2.0 targets to use Pcl-259 profile rather than Net45
+            v4.0.2:
+            - fixed: Dependencies to fixed DryIocAttributes 4.0.2
+            v4.0.1:
+            - added: NetStandard 1.3 and 2.0 package targets
+            v4.0.0:
+            - Support for DryIoc v3
+            - Support for DryIocAttributes v4
+        ]]></PackageReleaseNotes>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DebugType>embedded</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
+        <None Remove="**\*.orig" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
+        <Reference Include="System.ComponentModel.Composition" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
+        <Reference Include="System.ComponentModel.Composition" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj" />
+      <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+    </ItemGroup>
+
+    <!--PCL Profile259-->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net45+win8+wpa81+wp8'">
+        <AssemblyTitle>$(AssemblyName) PCL259</AssemblyTitle>
+        <DefineConstants>PCL;PCL259</DefineConstants>
+        <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
+        <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+        <TargetFrameworkProfile>Profile259</TargetFrameworkProfile>
+        <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile259</NugetTargetMoniker>
+        <LanguageTargets>$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
+    </PropertyGroup>
+
+    <!--PCL Profile328-->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net40+win8+wpa81+wp8+sl5'">
+        <AssemblyTitle>$(AssemblyName) PCL328</AssemblyTitle>
+        <DefineConstants>PCL;PCL328</DefineConstants>
+        <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
+        <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+        <TargetFrameworkProfile>Profile328</TargetFrameworkProfile>
+        <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile328</NugetTargetMoniker>
+        <LanguageTargets>$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
+    </PropertyGroup>
+
+</Project>

@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
-        <Version>4.0.3</Version>
+        <Version>4.1.0</Version>
         <VersionSuffix>preview-01</VersionSuffix>
         <AssemblyVersion>$(Version)</AssemblyVersion>
         <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -12,8 +12,8 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
         <AssemblyName>DryIocAttributes</AssemblyName>
-        <AssemblyTitle>DryIocAttributes $(TargetFramework)</AssemblyTitle>
-        <PackageId>DryIocAttributes.dll</PackageId>
+        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <PackageId>$(AssemblyName).dll</PackageId>
         <Authors>Maksim Volkau</Authors>
         <Description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features</Description>
         <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
@@ -25,6 +25,8 @@
         <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes><![CDATA[
+            v4.1.0
+            - updated: to sdk based csproj
             v4.0.2
             - fixed: NetStandard 1.0, 1.3 and 2.0 package targets
             v4.0.1
@@ -54,7 +56,7 @@
 
     <!--PCL Profile259-->
     <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net45+win8+wpa81+wp8'">
-        <AssemblyTitle>DryIoc PCL259</AssemblyTitle>
+        <AssemblyTitle>$(AssemblyName) PCL259</AssemblyTitle>
         <DefineConstants>PCL;PCL259</DefineConstants>
         <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
         <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -65,7 +67,7 @@
 
     <!--PCL Profile328-->
     <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net40+win8+wpa81+wp8+sl5'">
-        <AssemblyTitle>DryIoc PCL328</AssemblyTitle>
+        <AssemblyTitle>$(AssemblyName) PCL328</AssemblyTitle>
         <DefineConstants>PCL;PCL328</DefineConstants>
         <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
         <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>

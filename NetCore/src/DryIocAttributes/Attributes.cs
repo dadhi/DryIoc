@@ -696,54 +696,60 @@ namespace DryIocAttributes
     public class AsResolutionRootAttribute : Attribute { }
 }
 
-#if NET35
+#if NET35 || PCL328
 namespace System
 {
-    /// <summary>Wrapper for value computation required on-demand. Since computed the same value will be returned over and over again.</summary>
-    /// <typeparam name="T">Type of value.</typeparam>
-    public sealed class Lazy<T>
+    /// <summary>Provides a lazy indirect reference to an object and its associated metadata for use by the Managed Extensibility Framework.</summary>
+    /// <typeparam name="T">The type of the service</typeparam>
+    /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
+    public class Lazy<T, TMetadata> // : Lazy<T> is defined in DryIoc
     {
-        /// <summary>Creates lazy object with passed value computation delegate.</summary>
-        /// <param name="valueFactory">Value computation. Will be stored until computation is done.</param>
-        /// <exception cref="ArgumentNullException">Throws for null computation.</exception>
-        public Lazy(Func<T> valueFactory)
+        /// <summary>Initializes a new instance of the <see cref="Lazy{T, TMetadata}"/> class.</summary>
+        /// <param name="valueFactory">The value factory.</param>
+        /// <param name="metadata">The metadata.</param>
+        /// <exception cref="ArgumentNullException">valueFactory</exception>
+        public Lazy(Func<T> valueFactory, TMetadata metadata)
         {
             if (valueFactory == null) throw new ArgumentNullException("valueFactory");
             _valueFactory = valueFactory;
+            Metadata = metadata;
         }
+
+        /// <summary>Gets the metadata associated with the referenced object.</summary>
+        public TMetadata Metadata { get; private set; }
 
         /// <summary>Indicates if value is computed already, or not.</summary>
         public bool IsValueCreated { get; private set; }
 
-        /// <summary>Computes value if it was not before, and returns it. 
+        /// <summary>Computes value if it was not before, and returns it.
         /// Value is guaranteed to be computed only once despite possible thread contention.</summary>
         /// <exception cref="InvalidOperationException">Throws if value computation is recursive.</exception>
-        public T Value => IsValueCreated ? _value : Create();
-
-#region Implementation
+        public T Value => IsValueCreated ? _createdValue : CreateValue();
 
         private Func<T> _valueFactory;
-        private T _value;
+
+        private T _createdValue;
+
         private readonly object _valueCreationLock = new object();
 
-        private T Create()
+        private T CreateValue()
         {
             lock (_valueCreationLock)
             {
                 if (!IsValueCreated)
                 {
-                    if (_valueFactory == null) throw new InvalidOperationException("The initialization function tries to access Value on this instance.");
+                    if (_valueFactory == null)
+                        throw new InvalidOperationException("The initialization function tries to access Value on this instance.");
+
                     var factory = _valueFactory;
                     _valueFactory = null;
-                    _value = factory();
+                    _createdValue = factory();
                     IsValueCreated = true;
                 }
             }
 
-            return _value;
+            return _createdValue;
         }
-
-#endregion
     }
 }
 #endif
@@ -981,7 +987,7 @@ namespace System.ComponentModel.Composition
     {
         /// <summary>Initializes a new instance of the <see cref="ExportFactory{T}"/> class.</summary>
         /// <param name="exportCreator">Action invoked upon calls to the Create() method.</param>
-        public ExportFactory(Func<Collections.Generic.KeyValuePair<T, Action>> exportCreator)
+        public ExportFactory(Func<KeyValuePair<T, Action>> exportCreator)
         {
             if (exportCreator == null)
                 throw new ArgumentNullException(nameof(exportCreator));
@@ -996,7 +1002,7 @@ namespace System.ComponentModel.Composition
             return new ExportLifetimeContext<T>(partAndDisposeAction.Key, partAndDisposeAction.Value);
         }
 
-        private readonly Func<Collections.Generic.KeyValuePair<T, Action>> _exportLifetimeContextCreator;
+        private readonly Func<KeyValuePair<T, Action>> _exportLifetimeContextCreator;
     }
 
     /// <summary>An ExportFactory that provides metadata describing the created exports.</summary>
@@ -1009,7 +1015,7 @@ namespace System.ComponentModel.Composition
         /// </summary>
         /// <param name="exportCreator">Action invoked upon calls to the Create() method.</param>
         /// <param name="metadata">The metadata associated with the export.</param>
-        public ExportFactory(Func<Collections.Generic.KeyValuePair<T, Action>> exportCreator, TMetadata metadata)
+        public ExportFactory(Func<KeyValuePair<T, Action>> exportCreator, TMetadata metadata)
             : base(exportCreator)
         {
             Metadata = metadata;

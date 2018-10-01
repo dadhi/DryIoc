@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
@@ -12,9 +12,9 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
         <AssemblyName>DryIoc</AssemblyName>
-        <AssemblyTitle>DryIoc $(TargetFramework)</AssemblyTitle>
+        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
         <NeutralLanguage>en</NeutralLanguage>
-        <PackageId>DryIoc.dll</PackageId>
+        <PackageId>$(AssemblyName).dll</PackageId>
         <Authors>Maksim Volkau</Authors>
         <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
         <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
@@ -25,7 +25,7 @@
         <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes><![CDATA[
-            v3.1.0-preview-01
+            v3.1.0
             - fixed: BB-593 Add auto-generated tag to PCL FEC
             - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
             - fixed: BB-596 The problem was in non-public service type
@@ -76,7 +76,7 @@
 
     <!--PCL Profile259-->
     <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net45+win8+wpa81+wp8'">
-        <AssemblyTitle>DryIoc PCL259</AssemblyTitle>
+        <AssemblyTitle>$(AssemblyName) PCL259</AssemblyTitle>
         <DefineConstants>PCL;PCL259</DefineConstants>
         <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
         <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -87,7 +87,7 @@
 
     <!--PCL Profile328-->
     <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net40+win8+wpa81+wp8+sl5'">
-        <AssemblyTitle>DryIoc PCL328</AssemblyTitle>
+        <AssemblyTitle>$(AssemblyName) PCL328</AssemblyTitle>
         <DefineConstants>PCL;PCL328</DefineConstants>
         <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
         <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>

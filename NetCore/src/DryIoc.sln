@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.UnitTests", "DryIoc.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIocAttributes", "DryIocAttributes\DryIocAttributes.csproj", "{78DD37F5-7B87-45FB-9850-88DD3E47DBA6}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel", "DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj", "{F984C7C9-DCCA-4F28-8B5B-03FAF179E103}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{78DD37F5-7B87-45FB-9850-88DD3E47DBA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78DD37F5-7B87-45FB-9850-88DD3E47DBA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{78DD37F5-7B87-45FB-9850-88DD3E47DBA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F984C7C9-DCCA-4F28-8B5B-03FAF179E103}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F984C7C9-DCCA-4F28-8B5B-03FAF179E103}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F984C7C9-DCCA-4F28-8B5B-03FAF179E103}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F984C7C9-DCCA-4F28-8B5B-03FAF179E103}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
