@@ -3,9 +3,10 @@
     <PropertyGroup>
         <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
-        <VersionPrefix>3.1.0-preview-01</VersionPrefix>
-        <AssemblyVersion>3.1.0.0</AssemblyVersion>
-        <FileVersion>3.1.0.0</FileVersion>
+        <Version>3.1.0</Version>
+        <VersionPrefix>preview-01</VersionPrefix>
+        <AssemblyVersion>$(Version)</AssemblyVersion>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
