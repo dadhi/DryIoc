@@ -26,10 +26,4 @@
         <Reference Include="System.ComponentModel.Composition" />
     </ItemGroup>
 
-    <ItemGroup>
-      <None Update="DryIoc.Samples.CUT.dll">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-    </ItemGroup>
-
 </Project>

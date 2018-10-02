@@ -1,20 +1,18 @@
 @echo off
-pushd ".."
 setlocal EnableDelayedExpansion
 
-set NUNIT="packages\NUnit.ConsoleRunner.3.5.0\tools\nunit3-console.exe"
+set NUNIT="packages\NUnit.ConsoleRunner.3.9.0\tools\nunit3-console.exe"
 set OPENCOVER="packages\OpenCover.4.6.519\tools\OpenCover.Console.exe"
-set REPORTGEN="packages\ReportGenerator.2.4.5.0\tools\ReportGenerator.exe"
-set REPORTS=bin\Reports
+set REPORTGEN="packages\ReportGenerator.3.1.2\tools\ReportGenerator.exe"
+set REPORTS=CoverageReport
 set COVERAGE="%REPORTS%\Coverage.xml"
 
 if not exist %REPORTS% md %REPORTS% 
 
-REM Excluded the "PCL-Net45" because .NETPortable test assemblies are not yet supported by the engine
-for %%P in ("."; "Net40"; "Net45"; "Extensions") do (
-    for %%T in ("%%P\bin\Release\*Tests.dll"; "%%P\bin\Release\*.Docs.dll") do (
-        set TESTLIBS=!TESTLIBS! %%T
-))
+set TESTS= ^
+.\test\DryIoc.UnitTests\Release\net45\DryIoc.UnitTests.dll ^
+.\test\DryIoc.IssuesTests\Release\net45\DryIoc.UnitIssues.dll ^
+.\test\DryIoc.MefAttributedModel.UnitTests\Release\net45\DryIoc.MefAttributedModel.UnitTests.dll
 
 echo:
 echo:Running tests with coverage. Results are collected in %COVERAGE% . . .
@@ -46,7 +44,5 @@ rem start %REPORTS%\index.htm
 
 echo:
 echo:Succeeded.
-endlocal
-popd
 
-if not "%1"=="-nopause" pause
+endlocal

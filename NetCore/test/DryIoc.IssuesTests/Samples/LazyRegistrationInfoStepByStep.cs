@@ -2,17 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
-using System.Reflection;
 using DryIoc.MefAttributedModel;
 using DryIocAttributes;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples
 {
-    public interface IAddin
-    {
-    }
-
     [TestFixture]
     public class LazyRegistrationInfoStepByStep
     {
@@ -27,27 +22,6 @@ namespace DryIoc.IssuesTests.Samples
             var asm = GetType().GetAssembly();
             var type = asm.GetType(registrationInfo.ImplementationTypeFullName);
             Assert.IsNotNull(type);
-        }
-
-        [Test]
-        public void Register_interface_with_implementation_as_unregistered_type_resolution_rule()
-        {
-            const string assemblyFile = "DryIoc.Samples.CUT.dll";
-
-            var assembly = Assembly.LoadFrom(assemblyFile);
-            var registrations = AttributedModel.Scan(new[] { assembly });
-
-            // create serializable registrations
-            var lazyRegistrations = registrations.MakeLazyAndEnsureUniqueServiceKeys();
-
-            // load the registrations and provide a way dynamically register them in container
-            var dynamicRegistrations = lazyRegistrations.GetLazyTypeRegistrationProvider(() => assembly);
-
-            var container = new Container().WithMef()
-                .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations));
-
-            var thing = container.Resolve<IThing>();
-            Assert.IsNotNull(thing);
         }
 
         [Test]

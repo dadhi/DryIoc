@@ -26,6 +26,7 @@ REM dotnet pack ".\src\DryIoc.Microsoft.Hosting"             -c Release -o "..\b
 REM if %ERRORLEVEL% neq 0 call :error "dotnet pack"
 
 echo:All is successful.
+pause
 exit 0
 
 :error
