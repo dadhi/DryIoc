@@ -4,22 +4,16 @@ set SLN=".\DryIoc.sln"
 set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe"
 
 call .nuget\nuget.exe restore %SLN%
-if %ERRORLEVEL% neq 0 (
-    call :error "RESTORE") 
-else (
-    echo:
-    echo:## RESTORE IS SUCCESSFUL ##
-    echo:
-)
+if %ERRORLEVEL% neq 0 call :error "RESTORE"
+echo:
+echo:## RESTORE IS SUCCESSFUL ##
+echo:
 
 call %MSB% %SLN% /t:Rebuild /p:Configuration=Release /p:RestorePackages=false /v:minimal /fl /flp:LogFile=MSBuild.log
-if %ERRORLEVEL% neq 0 (
-    call :error "BUILD") 
-else (
-    echo:
-    echo:## BUILD IS SUCCESSFUL ##
-    echo:
-)
+if %ERRORLEVEL% neq 0 call :error "BUILD"
+echo:
+echo:## BUILD IS SUCCESSFUL ##
+echo:
 
 REM dotnet test ".\test\DryIoc.UnitTests"
 REM dotnet test ".\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests"

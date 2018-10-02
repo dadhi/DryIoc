@@ -7,7 +7,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIocAttributes\DryIocAttributes.csproj" />
-        <ProjectReference Include="..\DryIoc.IssueTests\DryIoc.IssueTests.csproj" />
+        <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net45'">

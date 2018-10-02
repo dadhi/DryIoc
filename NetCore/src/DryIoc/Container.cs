@@ -1146,8 +1146,8 @@ namespace DryIoc
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (actualItemType.IsArray)
-                return NewArrayInit(actualItemType.GetElementType().ThrowIfNull(),
-                    ((object[])item).Map(it => GetConstantExpression(it, null, throwIfStateRequired)));
+                return GetArrayOfConstantsExpression(
+                    (object[])item, actualItemType.GetElementType().ThrowIfNull(), throwIfStateRequired);
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
@@ -1157,6 +1157,26 @@ namespace DryIoc
                 Error.StateIsRequiredToUseItem, item);
 
             return itemType == null ? Constant(item) : Constant(item, itemType);
+        }
+
+        private Expr GetArrayOfConstantsExpression(object[] elems, Type elemType, bool throwIfStateRequired)
+        {
+            if (elems.Length == 0)
+                return NewArrayInit(elemType, Enumerable.Empty<Expr>());
+
+            var finalElemType = elems[0]?.GetType() ?? elemType;
+            if (elems.Length == 1)
+                return NewArrayInit(finalElemType, GetConstantExpression(elems[0], finalElemType, throwIfStateRequired));
+
+            // select less specific base type of elements, or object type otherwise
+            for (var i = 1; i < elems.Length; ++i)
+            {
+                var t = elems[0]?.GetType() ?? elemType;
+                if (t != finalElemType && (finalElemType == typeof(object) || finalElemType.IsAssignableTo(t)))
+                    finalElemType = t;
+            }
+
+            return NewArrayInit(finalElemType, elems.Map(it => GetConstantExpression(it, finalElemType, throwIfStateRequired)));
         }
 
         private static readonly MethodInfo _kvOfMethod = typeof(KV).SingleMethod(nameof(KV.Of));
@@ -4364,9 +4384,7 @@ namespace DryIoc
                 var itemExprs = newArrExpr.Expressions;
                 var items = new object[itemExprs.Count];
                 for (var i = 0; i < itemExprs.Count; i++)
-                {
                     items[i] = GetArgExpressionValueOrThrow(wholeServiceExpr, itemExprs[i]);
-                }
 
                 return items;
             }
