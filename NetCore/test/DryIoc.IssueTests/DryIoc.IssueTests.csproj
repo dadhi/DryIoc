@@ -10,6 +10,11 @@
         <PackageReference Include="nunit" Version="3.10.1" />
         <PackageReference Include="NUnit3TestAdapter" Version="3.10.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.8.0" />
+
+        <PackageReference Include="Autofac" Version="4.8.1" />
+        <PackageReference Include="Castle.Core" Version="4.3.1" />
+        <PackageReference Include="MediatR" Version="5.1.0" />
+        <PackageReference Include="NSubstitute" Version="3.1.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -19,6 +24,12 @@
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
         <Reference Include="System.ComponentModel.Composition" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="DryIoc.Samples.CUT.dll">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

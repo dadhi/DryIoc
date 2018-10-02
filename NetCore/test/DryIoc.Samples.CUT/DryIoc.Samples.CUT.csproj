@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net45</TargetFramework>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIocAttributes\DryIocAttributes.csproj" />
+        <ProjectReference Include="..\DryIoc.IssueTests\DryIoc.IssueTests.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
+        <Reference Include="System.ComponentModel.Composition" />
+    </ItemGroup>
+
+</Project>
