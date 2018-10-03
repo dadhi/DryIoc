@@ -10048,7 +10048,7 @@ namespace DryIoc
 }
 #endif
 
-#if NETSTANDARD1_0 || NETSTANDARD1_3 || PCL  
+#if !NETSTANDARD2_0 && !NET35 && !NET40 && !NET45
 namespace DryIoc
 {
     internal class StackTrace

@@ -23,6 +23,7 @@ set COVERAGE=%TESTRESULTS%\Coverage.xml
 if not exist %TESTRESULTS% md %TESTRESULTS% 
 
 set TESTS=.\test\DryIoc.UnitTests\bin\Release\net45\DryIoc.UnitTests.dll^
+    .\docs\DryIoc.Docs\bin\Release\net471\DryIoc.Docs.dll^
     .\test\DryIoc.IssuesTests\bin\Release\net45\DryIoc.IssuesTests.dll^
     .\test\DryIoc.MefAttributedModel.UnitTests\bin\Release\net45\DryIoc.MefAttributedModel.UnitTests.dll
 

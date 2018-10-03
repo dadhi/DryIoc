@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFrameworks>netcoreapp2.1;net471</TargetFrameworks>
@@ -6,13 +6,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="LinFu.DynamicProxy" Version="2.1.1" />
-        <PackageReference Include="Moq" Version="4.10.0" />
-        <PackageReference Include="NLog" Version="4.5.10" />
         <PackageReference Include="nunit" Version="3.10.1" />
         <PackageReference Include="NUnit3TestAdapter" Version="3.10.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.8.0" />
 
+        <PackageReference Include="LinFu.DynamicProxy" Version="2.1.1" />
+        <PackageReference Include="Moq" Version="4.10.0" />
+        <PackageReference Include="NLog" Version="4.5.10" />
         <PackageReference Include="Autofac" Version="4.8.1" />
         <PackageReference Include="Castle.Core" Version="4.3.1" />
         <PackageReference Include="MediatR" Version="5.1.0" />
