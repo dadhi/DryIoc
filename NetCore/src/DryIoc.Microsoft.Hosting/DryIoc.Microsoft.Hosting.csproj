@@ -3,21 +3,34 @@
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
 
-        <Title>DryIoc.Microsoft.Hosting</Title>
+        <VersionPrefix>1.0.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
+        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
+
+        <AssemblyName>DryIoc.Microsoft.Hosting</AssemblyName>
+        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <PackageId>$(AssemblyName)</PackageId>
+
         <Description>DryIoc as DI for generic IHost via extension methods on IHostBuilder</Description>
-        <Summary><![CDATA[
-  DryIoc as DI for generic IHost via extension methods on IHostBuilder.
-  See this SO answer: https://stackoverflow.com/questions/51872490/use-hostbuilder-configureservices-with-dryioc-container/51877235#51877235
-        ]]></Summary>
-        <VersionPrefix>1.0.0-preview-01</VersionPrefix>
+        <Summary>
+            <![CDATA[
+DryIoc as DI for generic IHost via extension methods on IHostBuilder.
+See this SO answer: https://stackoverflow.com/questions/51872490/use-hostbuilder-configureservices-with-dryioc-container/51877235#51877235
+        ]]>
+        </Summary>
         <Authors>Maksim Volkau</Authors>
         <Copyright>Copyright © 2018 Maksim Volkau</Copyright>
+        <NeutralLanguage>en</NeutralLanguage>
+        <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;AspNetCore;NetCore;WebHost;GenericHost;WebHostBuilder;HostBuilder</PackageTags>
+        <PackageReleaseNotes>
+            <![CDATA[
+v1.0.0:
+- Initial version
+        ]]></PackageReleaseNotes>
+
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <AssemblyName>DryIoc.Microsoft.Hosting</AssemblyName>
-        <NeutralLanguage>en-US</NeutralLanguage>
-        <PackageId>DryIoc.Microsoft.Hosting</PackageId>
-        <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;AspNetCore;NetCore;WebHost;GenericHost;WebHostBuilder;HostBuilder</PackageTags>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
@@ -26,8 +39,16 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
+        <None Remove="**\*.orig" />
+        <None Remove="**\*.ncrunch*" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="2.1.1" />
-        <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="2.0.1" />
+
+        <ProjectReference Include="..\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
+        <!--<PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="2.0.1" />-->
     </ItemGroup>
 
 </Project>

@@ -1,19 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
-        <Version>4.1.0</Version>
+        <VersionPrefix>4.1.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
-        <AssemblyVersion>$(Version)</AssemblyVersion>
-        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
 
         <AssemblyName>DryIocAttributes</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
         <PackageId>$(AssemblyName).dll</PackageId>
+
         <Authors>Maksim Volkau</Authors>
         <Description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features</Description>
         <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
@@ -24,16 +21,21 @@
         <RepositoryType>git</RepositoryType>
         <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
-        <PackageReleaseNotes><![CDATA[
-            v4.1.0
-            - updated: to sdk based csproj
-            v4.0.2
-            - fixed: NetStandard 1.0, 1.3 and 2.0 package targets
-            v4.0.1
-            - added: NetStandard 1.3 and 2.0 package targets
-            v4.0.0
-            - Support for DryIoc v3
+        <PackageReleaseNotes>
+            <![CDATA[
+v4.1.0
+- updated: to sdk based csproj
+v4.0.2
+- fixed: NetStandard 1.0, 1.3 and 2.0 package targets
+v4.0.1
+- added: NetStandard 1.3 and 2.0 package targets
+v4.0.0
+- Support for DryIoc v3
         ]]></PackageReleaseNotes>
+
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
@@ -42,8 +44,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
         <None Remove="**\*.orig" />
+        <None Remove="**\*.ncrunch*" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net40'">

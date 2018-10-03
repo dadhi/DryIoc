@@ -3,33 +3,42 @@
     <PropertyGroup>
         <TargetFrameworks>netstandard1.0;netstandard2.0</TargetFrameworks>
 
-        <Title>DryIoc.Microsoft.DependencyInjection</Title>
+        <VersionPrefix>2.2.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
+        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
+
+        <AssemblyName>DryIoc.Microsoft.DependencyInjection</AssemblyName>
+        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <PackageId>$(AssemblyName)</PackageId>
         <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
         <Summary>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Summary>
-        <VersionPrefix>2.1.0</VersionPrefix>
         <Authors>Maksim Volkau</Authors>
         <Copyright>Copyright © 2016-2018 Maksim Volkau</Copyright>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <AssemblyName>DryIoc.Microsoft.DependencyInjection</AssemblyName>
         <NeutralLanguage>en</NeutralLanguage>
-        <PackageId>DryIoc.Microsoft.DependencyInjection</PackageId>
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
-        <PackageReleaseNotes><![CDATA[
-            v2.1.0:
-              - added: Split WithCompositionRoot and BuildServiceProvider extension methods
-              - removed: Preventing to use Container with ambient ScopeContext
-              v2.0.1:
-              - updated: to DryIoc v3.0.2
-              v2.0.0:
-              - updated: to DryIoc v3
-              - updated: Targets changed to match MS.Ext.DI (netstandard 1.0 for DI 1.1.1 and netstandard 2.0 for DI 2.0)
-              - updated: To Microsoft.Extensions.DependencyInjection.Abstractions 2.1.1
-              - breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
-        ]]></PackageReleaseNotes>
+        <PackageReleaseNotes>
+            <![CDATA[
+v2.2.0:
+- updated: To DryIoc v3.1
+v2.1.0:
+- added: Split WithCompositionRoot and BuildServiceProvider extension methods
+- removed: Preventing to use Container with ambient ScopeContext
+v2.0.1:
+- updated: to DryIoc v3.0.2
+v2.0.0:
+- updated: to DryIoc v3
+- updated: Targets changed to match MS.Ext.DI (netstandard 1.0 for DI 1.1.1 and netstandard 2.0 for DI 2.0)
+- updated: To Microsoft.Extensions.DependencyInjection.Abstractions 2.1.1
+- breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
+        ]]>
+        </PackageReleaseNotes>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
         <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</PackageIconUrl>
+
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
@@ -38,7 +47,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
+        <None Remove="**\*.orig" />
+        <None Remove="**\*.ncrunch*" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+        <!--TODO: Add Build.Directory.props with dev env-->
         <!--<PackageReference Include="DryIoc.dll" Version="3.0.2" />-->
     </ItemGroup>
 

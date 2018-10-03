@@ -9,30 +9,29 @@ echo:
 echo:## RESTORE IS SUCCESSFUL ##
 echo:
 
-call %MSB% %SLN% /t:Rebuild /p:Configuration=Release /p:RestorePackages=false /v:minimal /fl /flp:LogFile=MSBuild.log
+call %MSB% %SLN% /t:Rebuild /t:Pack /p:Configuration=Release /p:RestorePackages=false /v:minimal /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 call :error "BUILD"
 echo:
-echo:## BUILD IS SUCCESSFUL ##
+echo:## RESTORE, BUILD, PACK IS SUCCESSFUL ##
 echo:
 
 set NUNIT="packages\NUnit.ConsoleRunner.3.9.0\tools\nunit3-console.exe"
 set OPENCOVER="packages\OpenCover.4.6.519\tools\OpenCover.Console.exe"
 set REPORTGEN="packages\ReportGenerator.3.1.2\tools\ReportGenerator.exe"
-set REPORTS=.\CoverageReport
-set COVERAGE=%REPORTS%\Coverage.xml
-if not exist %REPORTS% md %REPORTS% 
+set TESTRESULTS=.\TestResults
+set COVERAGE=%TESTRESULTS%\Coverage.xml
+if not exist %TESTRESULTS% md %TESTRESULTS% 
 
 set TESTS=.\test\DryIoc.UnitTests\bin\Release\net45\DryIoc.UnitTests.dll^
     .\test\DryIoc.IssuesTests\bin\Release\net45\DryIoc.IssuesTests.dll^
     .\test\DryIoc.MefAttributedModel.UnitTests\bin\Release\net45\DryIoc.MefAttributedModel.UnitTests.dll
 
-echo:
 echo:## RUNNING TESTS: %TESTS%
 echo: 
 %OPENCOVER%^
  -register:path64^
  -target:%NUNIT%^
- -targetargs:"%TESTS%"^
+ -targetargs:"%TESTS% --out=%TESTRESULTS%\TestResult.xml"^
  -filter:"+[*]* -[*Test*]* -[*Docs*]* -[*Moq*]* -[Microsoft*]* -[xunit*]* -[NetCore*]*"^
  -excludebyattribute:*.ExcludeFromCodeCoverageAttribute^
  -hideskipped:all^
@@ -43,25 +42,18 @@ echo:## GENERATING "%COVERAGE%" . . .
 echo: 
 %REPORTGEN%^
  -reports:%COVERAGE%^
- -targetdir:%REPORTS%^
+ -targetdir:%TESTRESULTS%^
  -reporttypes:Html;HtmlSummary;Badges^
  -assemblyfilters:-*Test*^
  -classfilters:-DryIoc.Arg
 
-REM dotnet test ".\test\DryIoc.UnitTests"
-REM dotnet test ".\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests"
-REM dotnet test ".\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests.v1.1"
-REM if %ERRORLEVEL% neq 0 call :error "dotnet test"
-
-REM dotnet pack ".\src\DryIoc" -c Release -o ".\bin\NuGetPackages"
-REM dotnet pack ".\src\DryIoc.Microsoft.DependencyInjection" -c Release -o "..\bin\NuGetPackages"
-REM dotnet pack ".\src\DryIoc.Microsoft.Hosting"             -c Release -o "..\bin\NuGetPackages"
-REM if %ERRORLEVEL% neq 0 call :error "dotnet pack"
-
-echo:All is successful.
-pause
-exit 0
+echo:
+echo:## ALL IS SUCCESSFUL ##
+echo:
+exit /b 0
 
 :error
-echo:%1 failed with error: %ERRORLEVEL%
-exit %ERRORLEVEL%
+echo:
+echo:## %1 FAILED WITH ERROR: %ERRORLEVEL%
+echo:
+exit /b %ERRORLEVEL%
