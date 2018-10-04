@@ -5,11 +5,12 @@
 
         <VersionPrefix>2.2.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
-        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
 
         <AssemblyName>DryIoc.Microsoft.DependencyInjection</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <Title>$(AssemblyName)</Title>
         <PackageId>$(AssemblyName)</PackageId>
+
         <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
         <Summary>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Summary>
         <Authors>Maksim Volkau</Authors>
@@ -35,22 +36,7 @@ v2.0.0:
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
         <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</PackageIconUrl>
-
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
-
     </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)'=='Release'">
-        <DebugType>embedded</DebugType>
-        <DebugSymbols>true</DebugSymbols>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
-        <None Remove="**\*.orig" />
-        <None Remove="**\*.ncrunch*" />
-    </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
@@ -65,5 +51,4 @@ v2.0.0:
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="2.1.1" />
     </ItemGroup>
-
 </Project>

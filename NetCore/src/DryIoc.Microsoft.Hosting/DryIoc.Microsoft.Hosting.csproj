@@ -5,10 +5,10 @@
 
         <VersionPrefix>1.0.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
-        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
 
         <AssemblyName>DryIoc.Microsoft.Hosting</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <Title>$(AssemblyName).dll</Title>
         <PackageId>$(AssemblyName)</PackageId>
 
         <Description>DryIoc as DI for generic IHost via extension methods on IHostBuilder</Description>
@@ -27,22 +27,7 @@ See this SO answer: https://stackoverflow.com/questions/51872490/use-hostbuilder
 v1.0.0:
 - Initial version
         ]]></PackageReleaseNotes>
-
-        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)'=='Release'">
-        <DebugType>embedded</DebugType>
-        <DebugSymbols>true</DebugSymbols>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
-        <None Remove="**\*.orig" />
-        <None Remove="**\*.ncrunch*" />
-    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="2.1.1" />
@@ -50,5 +35,4 @@ v1.0.0:
         <ProjectReference Include="..\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
         <!--<PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="2.0.1" />-->
     </ItemGroup>
-
 </Project>

@@ -1,55 +1,40 @@
 @echo off
+setlocal EnableDelayedExpansion
 
 set SLN=".\DryIoc.sln"
-set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe"
 
+rem finding MSBuild.exe
+set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe"
+if not exist %MSB% set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\15.0\bin\MSBuild.exe"
+if not exist %MSB% for /f "tokens=4 delims='" %%p IN ('.nuget\nuget.exe restore ^| find "MSBuild auto-detection"') do set MSB="%%p\MSBuild.exe"
+echo:
+echo:## USING MSBUILD: %MSB%
+echo:
+
+rem The nuget.exe executable is used directly because of error with restoring in `dotnet build` and `dotnet test`
 call .nuget\nuget.exe restore %SLN%
 if %ERRORLEVEL% neq 0 call :error "RESTORE"
 echo:
 echo:## RESTORE IS SUCCESSFUL ##
 echo:
 
-call %MSB% %SLN% /t:Rebuild /t:Pack /p:Configuration=Release /p:RestorePackages=false /v:minimal /fl /flp:LogFile=MSBuild.log
-if %ERRORLEVEL% neq 0 call :error "BUILD"
+call %MSB% %SLN% /t:Rebuild;Pack /p:Configuration=Release /p:RestorePackages=false /v:minimal /fl /flp:LogFile=MSBuild.log
+if %ERRORLEVEL% neq 0 call :error "BUILD;PACK"
 echo:
-echo:## RESTORE, BUILD, PACK IS SUCCESSFUL ##
+echo:## BUILD, PACK IS SUCCESSFUL ##
 echo:
 
-set NUNIT="packages\NUnit.ConsoleRunner.3.9.0\tools\nunit3-console.exe"
-set OPENCOVER="packages\OpenCover.4.6.519\tools\OpenCover.Console.exe"
-set REPORTGEN="packages\ReportGenerator.3.1.2\tools\ReportGenerator.exe"
-set TESTRESULTS=.\TestResults
-set COVERAGE=%TESTRESULTS%\Coverage.xml
-if not exist %TESTRESULTS% md %TESTRESULTS% 
-
-set TESTS=.\test\DryIoc.UnitTests\bin\Release\net45\DryIoc.UnitTests.dll^
-    .\docs\DryIoc.Docs\bin\Release\net471\DryIoc.Docs.dll^
-    .\test\DryIoc.IssuesTests\bin\Release\net45\DryIoc.IssuesTests.dll^
-    .\test\DryIoc.MefAttributedModel.UnitTests\bin\Release\net45\DryIoc.MefAttributedModel.UnitTests.dll
-
-echo:## RUNNING TESTS: %TESTS%
-echo: 
-%OPENCOVER%^
- -register:path64^
- -target:%NUNIT%^
- -targetargs:"%TESTS% --out=%TESTRESULTS%\TestResult.xml"^
- -filter:"+[*]* -[*Test*]* -[*Docs*]* -[*Moq*]* -[Microsoft*]* -[xunit*]* -[NetCore*]*"^
- -excludebyattribute:*.ExcludeFromCodeCoverageAttribute^
- -hideskipped:all^
- -output:%COVERAGE%
-
+dotnet test /restore:false .\docs\DryIoc.Docs
+dotnet test /restore:false .\test\DryIoc.UnitTests
+dotnet test /restore:false .\test\DryIoc.IssuesTests
+dotnet test /restore:false .\test\DryIoc.MefAttributedModel.UnitTests
+dotnet test /restore:false .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
+if %ERRORLEVEL% neq 0 call :error "TESTS"
 echo:
-echo:## GENERATING "%COVERAGE%" . . .
-echo: 
-%REPORTGEN%^
- -reports:%COVERAGE%^
- -targetdir:%TESTRESULTS%^
- -reporttypes:Html;HtmlSummary;Badges^
- -assemblyfilters:-*Test*^
- -classfilters:-DryIoc.Arg
-
+echo:## TESTS ARE SUCCESSFUL ##
 echo:
-echo:## ALL IS SUCCESSFUL ##
+
+echo:## ALL DONE SUCCESSFULLY ##
 echo:
 exit /b 0
 

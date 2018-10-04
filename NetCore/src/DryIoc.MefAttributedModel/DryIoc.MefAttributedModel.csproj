@@ -4,7 +4,6 @@
 
         <VersionPrefix>4.1.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
-        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
 
         <AssemblyName>DryIoc.MefAttributedModel</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -37,21 +36,7 @@ v4.0.0:
 - Support for DryIoc v3
 - Support for DryIocAttributes v4
         ]]></PackageReleaseNotes>
-
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
-
-    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-        <DebugType>embedded</DebugType>
-        <DebugSymbols>true</DebugSymbols>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
-        <None Remove="**\*.orig" />
-        <None Remove="**\*.ncrunch*" />
-    </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
         <Reference Include="System.ComponentModel.Composition" />

@@ -3,6 +3,23 @@
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" 
         Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
 
+    <PropertyGroup>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DebugType>embedded</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
+        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
+        <None Remove="**\*.orig" />
+        <None Remove="**\*.ncrunch*" />
+    </ItemGroup>
+
     <!--Probing for portable targets, it could be either MS Visual Studio or 'dotnet\sdk' locations-->
     <PropertyGroup>
         <PortableTargetsDir>C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\Microsoft\Portable</PortableTargetsDir>

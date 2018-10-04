@@ -4,7 +4,6 @@
 
         <VersionPrefix>3.1.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
-        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
 
         <AssemblyName>DryIoc</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -24,24 +23,24 @@
         <PackageReleaseNotes>
             <![CDATA[
 v3.1.0
-- fixed: BB-593 Add auto-generated tag to PCL FEC
-- fixed: BB-594 Conflicting type is not working in .NET Core 2.1
-- fixed: BB-596 The problem was in non-public service type
 - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
 - fixed: #7 Context-based injection
 - fixed: #16 AutoConcreteTypeResolution should not consider a primitive type
 - fixed: #25 Decorator with serviceKey throws exception which gives invalid advice on how to fix the issue for the most common reason to use the servicekey
-- fixed: RegisterMapping for open-generic service type
+- fixed: #28 FastExpressionCompiler is not used in Net Standard 1.3, 2.0 packages and not used in .Net Core
+- fixed: BB-593 Add auto-generated tag to PCL FEC
+- fixed: BB-594 Conflicting type is not working in .NET Core 2.1
+- fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
 - fixed: Using facadeKey in CreateFacade
 - added: #4 Rule for Func and Lazy to be resolved even without requested service registered
+- added: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
 - added: #9 RegisterMany should indicate if no registration was made
+- added: #11 Resolution root bound dependency expression de-duplication
 - added: #17 Rules.DefaultRegistrationServiceKey enhancement
 - added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
 - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
 - added: IRegistrator.GetRegisteredFactories
 - added: FactoryType to Registrator.RegisterMapping
-- changed: #11 Resolution root bound dependency expression de-duplication
-- changed: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
 
 v3.0.2
 - fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
@@ -53,21 +52,7 @@ v3.0.0
 - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
 
         ]]></PackageReleaseNotes>
-
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
-
-    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-        <DebugType>embedded</DebugType>
-        <DebugSymbols>true</DebugSymbols>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
-        <None Remove="**\*.orig" />
-        <None Remove="**\*.ncrunch*" />
-    </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.3'">
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
