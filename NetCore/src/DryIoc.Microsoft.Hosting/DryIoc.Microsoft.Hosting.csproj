@@ -31,8 +31,6 @@ v1.0.0:
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="2.1.1" />
-
         <ProjectReference Include="..\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
-        <!--<PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="2.0.1" />-->
     </ItemGroup>
 </Project>
