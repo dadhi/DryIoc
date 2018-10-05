@@ -243,8 +243,7 @@ namespace DryIoc
         {
             if (serviceKey == null && requiredServiceType == null &&
                 (preResolveParent == null || preResolveParent.IsEmpty) &&
-                args.IsNullOrEmpty() &&
-                CurrentScope?.Name == null)
+                CurrentScope?.Name == null && args.IsNullOrEmpty())
             {
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
             }
@@ -256,17 +255,21 @@ namespace DryIoc
                 preResolveParent = Request.Empty;
 
             if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null ? preResolveParent
-                    : (object)new KV<object, Request>(cacheContextKey, preResolveParent);
+                cacheContextKey = cacheContextKey == null ? preResolveParent : (object)KV.Of(cacheContextKey, preResolveParent);
             else if (preResolveParent.OpensResolutionScope)
-                cacheContextKey = cacheContextKey == null ? true
-                    : (object)new KV<object, bool>(cacheContextKey, true);
+                cacheContextKey = cacheContextKey == null ? true : (object)KV.Of(cacheContextKey, true);
 
             var currentScopeName = CurrentScope?.Name;
             if (currentScopeName != null)
-                cacheContextKey = cacheContextKey == null 
-                    ? currentScopeName
-                    : KV.Of(cacheContextKey, currentScopeName);
+                cacheContextKey = cacheContextKey == null ? currentScopeName : KV.Of(cacheContextKey, currentScopeName);
+
+            if (!args.IsNullOrEmpty())
+            {
+                if (args.Length == 1)
+                    cacheContextKey = cacheContextKey == null ? args[0] : (object)KV.Of(cacheContextKey, args[0]);
+                else
+                    cacheContextKey = cacheContextKey == null ? args : (object)KV.Of(cacheContextKey, args);
+            }
 
             // Try get from cache first
             var keyedCache = _registry.Value.KeyedFactoryDelegateCache;
@@ -5800,7 +5803,7 @@ namespace DryIoc
         /// <summary>ID of decorated factory in case of decorator factory type</summary>
         public readonly int DecoratedFactoryID;
 
-        /// <summary>Number of nested dependencies. Set with each new request Push.</summary>
+        /// <summary>Number of nested dependencies. Set with each new Push.</summary>
         public readonly int DependencyDepth;
 
         // holds the resolved expressions in root request only
