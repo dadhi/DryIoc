@@ -1,14 +1,9 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using Me;
 using NUnit.Framework;
-
-#if FEC_EXPRESSION_INFO
 using static FastExpressionCompiler.ExpressionInfo;
-#else
-using static System.Linq.Expressions.Expression;
-#endif
 
 #pragma warning disable 0649 // Field '...' is never assigned to, and will always have its default value null
 

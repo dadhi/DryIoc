@@ -1,9 +1,5 @@
-﻿using NUnit.Framework;
-#if FEC_EXPRESSION_INFO
-    using static FastExpressionCompiler.ExpressionInfo;
-#else
-    using static System.Linq.Expressions.Expression;
-#endif
+using NUnit.Framework;
+using static FastExpressionCompiler.ExpressionInfo;
 
 namespace DryIoc.IssuesTests
 {

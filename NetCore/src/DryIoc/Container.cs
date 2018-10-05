@@ -42,7 +42,7 @@ namespace DryIoc
 
     using FastExpressionCompiler;
 
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
 
     using static FastExpressionCompiler.ExpressionInfo;
     using Expr = FastExpressionCompiler.ExpressionInfo;
@@ -2102,7 +2102,7 @@ namespace DryIoc
             // or just in case when some expression is not supported (did not found one yet)
             var lambdaExpr = Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs);
 
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
             return lambdaExpr.ToLambdaExpression().Compile();
 #else
             return lambdaExpr.Compile();
@@ -2111,7 +2111,7 @@ namespace DryIoc
 
         /// <summary>Restores the expression from ExpressionInfo, or returns itself if already an Expression.</summary>
         public static Expression ToExpression(this Expr expr) =>
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
             expr.ToExpression();
 #else
             expr;
@@ -2401,7 +2401,7 @@ namespace DryIoc
                         continue;
 
                     result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
                         .ToLambdaExpression()
 #endif
                     ));
@@ -3059,7 +3059,7 @@ namespace DryIoc
             if (expr == null)
                 return null;
             return Constant(expr.WrapInFactoryExpression()
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
                 .ToLambdaExpression()
 #endif
                 , typeof(LambdaExpression));
@@ -3715,7 +3715,7 @@ namespace DryIoc
             return s;
         }
 
-        #region Implementation
+#region Implementation
 
         private Rules()
         {
@@ -3788,7 +3788,7 @@ namespace DryIoc
 
         private Settings _settings;
 
-        #endregion
+#endregion
     }
 
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
@@ -4200,7 +4200,7 @@ namespace DryIoc
             { }
         }
 
-        #region Implementation
+#region Implementation
 
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false)
@@ -4393,7 +4393,7 @@ namespace DryIoc
                 argExpr, wholeServiceExpr);
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
@@ -5163,7 +5163,7 @@ namespace DryIoc
 
             request.Container.Rules.DependencyResolutionCallExprs.Swap(x => 
                 x.AddOrUpdate(request, factoryExpr
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
                         .ToExpression()
 #endif
                 ));
@@ -5492,7 +5492,7 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).ToString();
 
-        #region Implementation
+#region Implementation
 
         private ServiceInfo(Type serviceType) { ServiceType = serviceType; }
 
@@ -5510,7 +5510,7 @@ namespace DryIoc
             private readonly ServiceDetails _details;
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Provides <see cref="IServiceInfo"/> for parameter,
@@ -5554,7 +5554,7 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
-        #region Implementation
+#region Implementation
 
         private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
 
@@ -5576,7 +5576,7 @@ namespace DryIoc
             private readonly Type _serviceType;
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Base class for property and field dependency info.</summary>
@@ -5606,7 +5606,7 @@ namespace DryIoc
         /// <param name="holder">Holder of property or field.</param> <param name="value">Value to set.</param>
         public abstract void SetValue(object holder, object value);
 
-        #region Implementation
+#region Implementation
 
         private class Property : PropertyOrFieldServiceInfo
         {
@@ -5674,7 +5674,7 @@ namespace DryIoc
             }
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Stored check results of two kinds: inherited down dependency chain and not.</summary>
@@ -5760,7 +5760,7 @@ namespace DryIoc
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
 
-        #region State carried with each request
+#region State carried with each request
 
         /// <summary>Available in runtime only, provides access to container initiated request.</summary>
         public readonly IContainer Container;
@@ -5806,7 +5806,7 @@ namespace DryIoc
         // holds the resolved expressions in root request only
         private readonly Ref<ImMap<Expr>> _builtExpressions;
 
-        #endregion
+#endregion
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -5920,7 +5920,7 @@ namespace DryIoc
             Push(ServiceInfo.Of(serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible), 
                 requiredServiceType, ifUnresolved, serviceKey), flags);
 
-        #region Used in generated expression
+#region Used in generated expression
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
@@ -5968,7 +5968,7 @@ namespace DryIoc
             typeof(Type), typeof(Type), typeof(object), typeof(string), typeof(object), typeof(IfUnresolved),
             typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags), typeof(int)));
 
-        #endregion
+#endregion
 
         /// <summary>Allow to switch current service info to the new one, e.g. in decorators.
         /// If info did not change then return the same this request.</summary>
@@ -6963,13 +6963,13 @@ namespace DryIoc
             return s.Append("}").ToString();
         }
 
-        #region Implementation
+#region Implementation
 
         private static int _lastFactoryID;
         private IReuse _reuse;
         private Setup _setup;
 
-        #endregion
+#endregion
     }
 
     /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
@@ -7455,7 +7455,7 @@ namespace DryIoc
                     implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
         }
 
-        #region Implementation
+#region Implementation
 
         private Type _implementationType; // non-readonly to be set by lazy type provider
         private readonly Func<Type> _implementationTypeProvider;
@@ -7955,7 +7955,7 @@ namespace DryIoc
             return FactoryMethod.Of(factoryMember, factoryInfo);
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Creates service expression using client provided expression factory delegate.</summary>
@@ -8234,7 +8234,7 @@ namespace DryIoc
             + (Parent != null ? ", Parent=" + Parent : "")
             + "}";
 
-        #region Implementation
+#region Implementation
 
         private ImMap<object> _items;
         private ImMap<IDisposable> _disposables;
@@ -8245,7 +8245,7 @@ namespace DryIoc
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
 
-        #endregion
+#endregion
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -8630,7 +8630,7 @@ namespace DryIoc
         /// If you need to distinguish nested scope, give names to them instead of naming the top web request scope.</summary>
         public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
 
-        #region Implementation
+#region Implementation
 
         private sealed class TransientReuse : IReuse
         {
@@ -8651,7 +8651,7 @@ namespace DryIoc
             public override string ToString() => "TransientReuse";
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Policy to handle unresolved service.</summary>
@@ -9761,7 +9761,7 @@ namespace DryIoc
         public static Expr GetDefaultValueExpression(this Type type) =>
             Call(_getDefaultMethod.Value.MakeGenericMethod(type), Empty<Expr>());
 
-        #region Implementation
+#region Implementation
 
         private static void ClearGenericParametersReferencedInConstraints(Type[] genericParams)
         {
@@ -9814,7 +9814,7 @@ namespace DryIoc
         private static readonly Lazy<MethodInfo> _getDefaultMethod = Lazy.Of(() =>
             typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true));
 
-        #endregion
+#endregion
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>
@@ -9952,7 +9952,7 @@ namespace DryIoc
                 return null;
 
             return Lambda<Func<int>>(Call(method, Empty<Expr>()), Empty<ParamExpr>())
-#if FEC_EXPRESSION_INFO
+#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
                 .ToLambdaExpression()
 #endif
                 .Compile();

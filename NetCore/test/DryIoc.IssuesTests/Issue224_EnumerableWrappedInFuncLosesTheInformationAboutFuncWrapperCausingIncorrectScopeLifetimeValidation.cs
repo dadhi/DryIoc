@@ -1,13 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-
-#if FEC_EXPRESSION_INFO
 using Expr = FastExpressionCompiler.ExpressionInfo;
-#else
-using Expr = System.Linq.Expressions.Expression;
-#endif
+
 
 namespace DryIoc.IssuesTests
 {

@@ -1,16 +1,12 @@
-﻿using System;
+using System;
 using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using DryIocAttributes;
 
-#if FEC_EXPRESSION_INFO
 using static FastExpressionCompiler.ExpressionInfo;
 using Expr = FastExpressionCompiler.ExpressionInfo;
-#else
-using static System.Linq.Expressions.Expression;
-using Expr = System.Linq.Expressions.Expression;
-#endif
+
 
 namespace DryIoc.IssuesTests
 {

@@ -5,12 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
-
-#if FEC_EXPRESSION_INFO
 using static FastExpressionCompiler.ExpressionInfo;
-#else
-using static System.Linq.Expressions.Expression;
-#endif
 
 namespace DryIoc.UnitTests
 {
