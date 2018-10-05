@@ -92,6 +92,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="FEC\Issue67_Equality_comparison_with_nullables_throws_at_delegate_invoke.cs" />
+    <Compile Include="GHIssue29_Resolve_caches_args_values.cs" />
     <Compile Include="GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered.cs" />
     <Compile Include="GHIssue7_2_Context_based_injection.cs" />
     <Compile Include="GHIssue7_1_Context_based_injection.cs" />
