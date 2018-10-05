@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>netstandard1.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard1.0;netstandard2.0</TargetFrameworks>
 
         <VersionPrefix>2.2.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>

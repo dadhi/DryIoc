@@ -4,6 +4,11 @@
         Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
 
     <PropertyGroup>
+        <!--Set to true to minimize number of target frameworks, to fasten the build :-) -->
+        <DevMode>false</DevMode>
+    </PropertyGroup>
+
+    <PropertyGroup>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>

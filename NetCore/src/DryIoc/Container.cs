@@ -2467,7 +2467,6 @@ namespace DryIoc
             var parentExpr = container.GetRequestExpression(request.DirectParent);
 
             var flags = request.Flags | requestParentFlags;
-
             var serviceType = request.ServiceType;
             var ifUnresolved = request.IfUnresolved;
             var requiredServiceType = request.RequiredServiceType;
@@ -3612,11 +3611,14 @@ namespace DryIoc
         /// <summary><see cref="WithDependencyResolutionCallExpressions"/>.</summary>
         public Ref<ImHashMap<Request, Expression>> DependencyResolutionCallExprs { get; private set; }
 
+        /// Indicates that container is used for generation purposes, so it should use less runtime state
+        public bool UsedForExpressionGeneration => (_settings & Settings.UsedForExpressionGeneration) != 0;
+
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
         public Rules WithDependencyResolutionCallExpressions() =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+            new Rules(_settings | Settings.UsedForExpressionGeneration, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 Ref.Of(ImHashMap<Request, Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -3779,7 +3781,8 @@ namespace DryIoc
             OverrideRegistrationMade = 1 << 12,
             FuncAndLazyWithoutRegistration = 1 << 13,
             AutoConcreteTypeResolution = 1 << 14, // informational flag
-            SelectLastRegisteredFactory = 1 << 15 // informational flag
+            SelectLastRegisteredFactory = 1 << 15,// informational flag
+            UsedForExpressionGeneration = 1 << 16
         }
 
         private const Settings DEFAULT_SETTINGS

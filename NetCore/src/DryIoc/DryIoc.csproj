@@ -1,9 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-02</VersionSuffix>
+        <VersionSuffix>preview-03</VersionSuffix>
 
         <AssemblyName>DryIoc</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -28,6 +29,7 @@ v3.1.0
 - fixed: #16 AutoConcreteTypeResolution should not consider a primitive type
 - fixed: #25 Decorator with serviceKey throws exception which gives invalid advice on how to fix the issue for the most common reason to use the servicekey
 - fixed: #28 FastExpressionCompiler is not used in Net Standard 1.3, 2.0 packages and not used in .Net Core
+- fixed: #29 Resolve caches object[] args values
 - fixed: BB-593 Add auto-generated tag to PCL FEC
 - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
 - fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
