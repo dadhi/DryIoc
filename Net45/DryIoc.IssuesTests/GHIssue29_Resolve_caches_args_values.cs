@@ -18,7 +18,7 @@ namespace DryIoc.IssuesTests
             var id2 = Guid.NewGuid();
             var instance2 = (Implementation) c.Resolve(typeof(Interface), new object[] {id2});
 
-            Assert.AreEqual(id2, instance2.Id, "'Object[] args' provided to Resolve where not injected");
+            Assert.AreEqual(id2, instance2.Id, "'Object[] args' provided to Resolve were not injected");
         }
 
         private class Implementation : Interface
