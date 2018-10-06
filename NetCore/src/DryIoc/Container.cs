@@ -2463,29 +2463,35 @@ namespace DryIoc
                     ? Request.EmptyOpensResolutionScopeRequestExpr
                     : Request.EmptyRequestExpr;
 
+            var flags = request.Flags | requestParentFlags;
+            var r = requestParentFlags == default(RequestFlags) ? request : request.WithFlags(flags);
+
+            // note: When not for generation, using run-time request object to Minimize generated object graph.
+            if (!container.Rules.UsedForExpressionGeneration)
+                return Constant(r);
+
             // recursively ask for parent expression until it is empty
             var parentExpr = container.GetRequestExpression(request.DirectParent);
 
-            var flags = request.Flags | requestParentFlags;
-            var serviceType = request.ServiceType;
-            var ifUnresolved = request.IfUnresolved;
-            var requiredServiceType = request.RequiredServiceType;
-            var serviceKey = request.ServiceKey;
+            var serviceType = r.ServiceType;
+            var ifUnresolved = r.IfUnresolved;
+            var requiredServiceType = r.RequiredServiceType;
+            var serviceKey = r.ServiceKey;
 
-            var metadataKey = request.MetadataKey;
-            var metadata = request.Metadata;
+            var metadataKey = r.MetadataKey;
+            var metadata = r.Metadata;
 
-            var factoryID = request.FactoryID;
-            var factoryType = request.FactoryType;
-            var implementationType = request.ImplementationType;
-            var decoratedFactoryID = request.DecoratedFactoryID;
+            var factoryID = r.FactoryID;
+            var factoryType = r.FactoryType;
+            var implementationType = r.ImplementationType;
+            var decoratedFactoryID = r.DecoratedFactoryID;
 
             var serviceTypeExpr = Constant(serviceType, typeof(Type));
             var factoryIdExpr = Constant(factoryID, typeof(int));
             var implTypeExpr = Constant(implementationType, typeof(Type));
-            var reuseExpr = request.Reuse == null
+            var reuseExpr = r.Reuse == null
                 ? Constant(null, typeof(IReuse))
-                : request.Reuse.ToExpression(it => container.GetConstantExpression(it));
+                : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (ifUnresolved == IfUnresolved.Throw &&
                 requiredServiceType == null && serviceKey == null && metadataKey == null && metadata == null &&
@@ -5985,6 +5991,11 @@ namespace DryIoc
                 : new Request(Container, DirectParent, Flags, newServiceInfo, InputArgExprs,
                     Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
         }
+
+        /// <summary>Updates the flags</summary>
+        public Request WithFlags(RequestFlags newFlags) => 
+            new Request(Container, DirectParent, newFlags, _serviceInfo, InputArgExprs,
+                Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
