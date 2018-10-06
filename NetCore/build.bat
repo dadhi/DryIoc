@@ -11,6 +11,8 @@ echo:
 echo:## USING MSBUILD: %MSB%
 echo:
 
+rem dotnet clean --verbosity:minimal
+
 rem The nuget.exe executable is used directly because of error with restoring in `dotnet build` and `dotnet test`
 call .nuget\nuget.exe restore %SLN%
 if %ERRORLEVEL% neq 0 call :error "RESTORE"
@@ -18,7 +20,7 @@ echo:
 echo:## RESTORE IS SUCCESSFUL ##
 echo:
 
-call %MSB% %SLN% /t:Rebuild;Pack /p:Configuration=Release /p:RestorePackages=false /v:minimal /fl /flp:LogFile=MSBuild.log
+call %MSB% %SLN% /t:Rebuild;Pack /p:Configuration=Release /p:RestorePackages=false /verbosity:minimal /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 call :error "BUILD;PACK"
 echo:
 echo:## BUILD, PACK IS SUCCESSFUL ##

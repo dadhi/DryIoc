@@ -2466,7 +2466,7 @@ namespace DryIoc
             // recursively ask for parent expression until it is empty
             var parentExpr = container.GetRequestExpression(request.DirectParent);
 
-            var flags = request.Flags | requestParentFlags;
+            var flags = request.Flags |= requestParentFlags;
             var serviceType = request.ServiceType;
             var ifUnresolved = request.IfUnresolved;
             var requiredServiceType = request.RequiredServiceType;
@@ -6084,6 +6084,17 @@ namespace DryIoc
                 if (reuse != DryIoc.Reuse.Transient)
                     flags |= RequestFlags.TracksTransientDisposable;
             }
+            else if (reuse == DryIoc.Reuse.ScopedOrSingleton)
+            {
+                if ((flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0)
+                {
+                    ;
+                }
+                else
+                {
+                    ;
+                }
+            }
 
             return new Request(Container, DirectParent, flags, _serviceInfo, InputArgExprs,
                 factory, factory.FactoryID, factory.FactoryType,
@@ -8628,7 +8639,7 @@ namespace DryIoc
 
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Singleton"/></summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
-        public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(lifespan: SingletonReuse.DefaultLifespan, scopedOrSingleton: true);
+        public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
         /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
         [Obsolete("The same as Reuse.Scoped, please prefer to use Reuse.Scoped or the Reuse.ScopedTo to specify a bound service.")]

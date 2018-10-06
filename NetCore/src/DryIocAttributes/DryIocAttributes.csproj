@@ -1,6 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <VersionPrefix>4.1.0</VersionPrefix>
