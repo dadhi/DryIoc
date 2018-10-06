@@ -4760,7 +4760,7 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        // todo: do something aboutmultiplicity of methods on (IContainer, IRegistrator, IResolver) 
+        // todo: do something about multiplicity of methods on (IContainer, IRegistrator, IResolver) 
         /// <summary>Stores an externally created instance in the current scope or singletons,
         /// replacing the existing registration and instance if any.</summary>
         public static void UseInstance<TService>(this IContainer c, TService instance,
@@ -5927,33 +5927,6 @@ namespace DryIoc
                 requiredServiceType, ifUnresolved, serviceKey), flags);
 
         #region Used in generated expression
-
-        // todo: minimize Push methods noise via ServiceInfo and Factoryinfo parameter objects
-        // internal ServiceInfo Service(Type serviceType) => ServiceInfo.Of(serviceType);
-
-        // internal ServiceInfo Service(Type serviceType, IfUnresolved ifUnresolved) => ServiceInfo.Of(serviceType, ifUnresolved);
-
-        // internal ServiceInfo ServiceKeyed(Type serviceType, object serviceKey) => ServiceInfo.Of(serviceType, serviceKey: serviceKey);
-
-        // internal ServiceInfo Service(Type serviceType, Type requiredServiceType) =>
-        //     ServiceInfo.Of(serviceType, requiredServiceType);
-
-        // internal ServiceInfo Service(Type serviceType, Type requiredServiceType, IfUnresolved ifUnresolved) =>
-        //     ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved);
-
-        // internal ServiceInfo ServiceKeyed(Type serviceType, Type requiredServiceType, object serviceKey) =>
-        //     ServiceInfo.Of(serviceType, requiredServiceType, serviceKey: serviceKey);
-
-        // internal struct FactoryInfo
-        // {
-        //     public int FactoryId;
-        //     public FactoryType FactoryType;
-        //     public IReuse Reuse;
-        //     public Type ImplementationType;
-        // }
-
-        // internal FactoryInfo Fac(int factoryId, Type implementationType) =>
-        //     new FactoryInfo { FactoryId = factoryId, ImplementationType = implementationType };
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
