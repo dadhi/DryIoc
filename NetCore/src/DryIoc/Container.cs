@@ -2466,7 +2466,7 @@ namespace DryIoc
             // recursively ask for parent expression until it is empty
             var parentExpr = container.GetRequestExpression(request.DirectParent);
 
-            var flags = request.Flags |= requestParentFlags;
+            var flags = request.Flags | requestParentFlags;
             var serviceType = request.ServiceType;
             var ifUnresolved = request.IfUnresolved;
             var requiredServiceType = request.RequiredServiceType;
@@ -6084,17 +6084,6 @@ namespace DryIoc
                 if (reuse != DryIoc.Reuse.Transient)
                     flags |= RequestFlags.TracksTransientDisposable;
             }
-            else if (reuse == DryIoc.Reuse.ScopedOrSingleton)
-            {
-                if ((flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0)
-                {
-                    ;
-                }
-                else
-                {
-                    ;
-                }
-            }
 
             return new Request(Container, DirectParent, flags, _serviceInfo, InputArgExprs,
                 factory, factory.FactoryID, factory.FactoryType,
@@ -6152,13 +6141,17 @@ namespace DryIoc
 
         private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
         {
-            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+            for (var parent = DirectParent; !parent.IsEmpty; parent = parent.DirectParent)
             {
-                if (p.OpensResolutionScope ||
-                    p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                if (parent.OpensResolutionScope ||
+                    // ignores the ScopedOrSingleton inside Scoped or Singleton
+                    (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true && parent.Reuse is SingletonReuse ||
+                    parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
                     break;
-                if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuse.Lifespan)
-                    Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
+
+                if (parent.FactoryType == FactoryType.Service && 
+                    parent.ReuseLifespan > reuse.Lifespan)
+                    Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
             }
         }
 
@@ -8413,7 +8406,7 @@ namespace DryIoc
 
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
         public bool CanApply(Request request) =>
-            _scopedOrSingleton || Name == null
+            ScopedOrSingleton || Name == null
                 ? request.Container.CurrentScope != null
                 : request.Container.GetNamedScope(Name, false) != null;
 
@@ -8423,7 +8416,7 @@ namespace DryIoc
             var resolverExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
             if (request.TracksTransientDisposable)
             {
-                if (_scopedOrSingleton)
+                if (ScopedOrSingleton)
                     return Call(_trackScopedOrSingletonMethod, resolverExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
@@ -8438,7 +8431,7 @@ namespace DryIoc
                 var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
                 var idExpr = Constant(request.FactoryID);
                 var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
-                if (_scopedOrSingleton)
+                if (ScopedOrSingleton)
                     return Call(_getScopedOrSingletonMethod, resolverExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
@@ -8452,14 +8445,14 @@ namespace DryIoc
 
         /// <inheritdoc />
         public Expr ToExpression(Func<object, Expr> fallbackConverter) =>
-            Name == null && !_scopedOrSingleton ? _scopedExpr.Value
-                : _scopedOrSingleton ? _scopedOrSingletonExpr.Value
+            Name == null && !ScopedOrSingleton ? _scopedExpr.Value
+                : ScopedOrSingleton ? _scopedOrSingletonExpr.Value
                 : Call(_scopedToMethod.Value, fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
         {
-            var s = new StringBuilder(_scopedOrSingleton ? "ScopedOrSingleton {" : "Scoped {");
+            var s = new StringBuilder(ScopedOrSingleton ? "ScopedOrSingleton {" : "Scoped {");
             if (Name != null)
                 s.Append("Name=").Print(Name).Append(", ");
             return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
@@ -8471,10 +8464,11 @@ namespace DryIoc
         {
             Name = name;
             Lifespan = lifespan;
-            _scopedOrSingleton = scopedOrSingleton;
+            ScopedOrSingleton = scopedOrSingleton;
         }
 
-        private readonly bool _scopedOrSingleton;
+        /// <summary>Flag indicating that it is a scope or singleton.</summary>
+        public readonly bool ScopedOrSingleton;
 
         internal static object TrackScopedOrSingleton(IResolverContext r, object item) =>
             (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
