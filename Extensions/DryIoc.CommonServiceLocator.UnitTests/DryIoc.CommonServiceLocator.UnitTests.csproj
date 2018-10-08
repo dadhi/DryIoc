@@ -1,70 +1,21 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{03A6D34D-3062-42F0-ACED-095C3A2657CB}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.CommonServiceLocator.UnitTests</RootNamespace>
-    <AssemblyName>DryIoc.CommonServiceLocator.UnitTests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
+    <AssemblyTitle>DryIoc.CommonServiceLocator.UnitTests</AssemblyTitle>
+    <Product>DryIoc</Product>
+    <Copyright>Copyright © 2013 Maksim Volkau</Copyright>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="CommonServiceLocator, Version=2.0.3.0, Culture=neutral, PublicKeyToken=489b6accfaf20ef0, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\CommonServiceLocator.2.0.3\lib\net45\CommonServiceLocator.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ServiceLocatorTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
-      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
-      <Name>DryIoc</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj">
-      <Project>{ccbeddc4-2415-4424-b810-544aa752004b}</Project>
-      <Name>DryIoc.CommonServiceLocator</Name>
-      <Private>False</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -72,11 +23,15 @@
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <ItemGroup>
+    <PackageReference Include="CommonServiceLocator" Version="2.0.3" />
+    <PackageReference Include="NUnit" Version="2.6.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
 </Project>

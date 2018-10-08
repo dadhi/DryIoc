@@ -1,68 +1,32 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{BFB1206A-3545-4369-8F23-49FD1BFFC362}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.MefAttributedModel</RootNamespace>
-    <AssemblyName>DryIoc.MefAttributedModel</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
+    <AssemblyTitle>DryIoc.MefAttributedModel</AssemblyTitle>
+    <Description>DryIoc is small, fast, capable IoC container.</Description>
+    <Copyright>Copyright © 2013 Maksim Volkau</Copyright>
+    <Version>4.0.4</Version>
+    <AssemblyVersion>4.0.4</AssemblyVersion>
+    <FileVersion>4.0.4</FileVersion>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
     <RunCodeAnalysis>true</RunCodeAnalysis>
-    <DocumentationFile>..\bin\Release\DryIoc.MefAttributedModel.XML</DocumentationFile>
+    <DocumentationFile>..\bin\$(Configuration)\DryIoc.MefAttributedModel.XML</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
-    <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs">
-      <Link>AttributedModel.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
-    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel\AttributedModel.cs" Link="AttributedModel.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel\Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
-      <Project>{9fb3bbb2-30a6-4b67-9af7-ffc152920e49}</Project>
-      <Name>DryIocAttributes</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
-      <Name>DryIoc</Name>
-      <Private>False</Private>
-    </ProjectReference>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj" />
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

@@ -1,63 +1,28 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{B6C2FC35-7586-417B-AD35-32AED63ADFA9}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc</RootNamespace>
-    <AssemblyName>DryIoc</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
+    <AssemblyTitle>DryIoc</AssemblyTitle>
+    <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
+    <Copyright>Copyright © 2013 Maksim Volkau</Copyright>
+    <Version>3.1.0-preview-01</Version>
+    <AssemblyVersion>3.1.0</AssemblyVersion>
+    <FileVersion>3.1.0</FileVersion>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>TRACE;DEBUG;FEC_EXPRESSION_INFO</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE;FEC_EXPRESSION_INFO</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
     <RunCodeAnalysis>true</RunCodeAnalysis>
-    <DocumentationFile>..\bin\Release\DryIoc.XML</DocumentationFile>
+    <DocumentationFile>..\bin\$(Configuration)\DryIoc.XML</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
+    <Compile Include="..\..\DryIoc\Container.cs" Link="Container.cs" />
+    <Compile Include="..\..\DryIoc\ImTools.cs" Link="ImTools.cs" />
+    <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\DryIoc\Container.cs">
-      <Link>Container.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc\ImTools.cs">
-      <Link>ImTools.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc\Properties\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="AsyncExecutionFlowScopeContext.cs" />
-    <Compile Include="FastExpressionCompiler.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

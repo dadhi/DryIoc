@@ -1,110 +1,17 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{ADD26CAE-81BF-4C24-82AF-C9C9F1F95708}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.Mvc.UnitTests</RootNamespace>
-    <AssemblyName>DryIoc.Mvc.UnitTests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
+    <AssemblyTitle>DryIoc.Mvc.UnitTests</AssemblyTitle>
+    <Copyright>Copyright © 2014-2016 Maksim Volkau and Contributors</Copyright>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="Castle.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=407dd0808d44fbdc, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Castle.Core.4.3.1\lib\net45\Castle.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Web.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Web.Infrastructure.1.0.0.0\lib\net40\Microsoft.Web.Infrastructure.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="NSubstitute, Version=3.1.0.0, Culture=neutral, PublicKeyToken=92dd2e9066daa5ca, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NSubstitute.3.1.0\lib\net45\NSubstitute.dll</HintPath>
-    </Reference>
-    <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.ComponentModel.DataAnnotations" />
-    <Reference Include="System.Configuration" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\System.Runtime.CompilerServices.Unsafe.4.5.1\lib\netstandard1.0\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\System.Threading.Tasks.Extensions.4.5.1\lib\portable-net45+win8+wp8+wpa81\System.Threading.Tasks.Extensions.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.Helpers, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebPages.3.2.6\lib\net45\System.Web.Helpers.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.Mvc, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.Mvc.5.2.6\lib\net45\System.Web.Mvc.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.Razor.3.2.6\lib\net45\System.Web.Razor.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.WebPages, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebPages.3.2.6\lib\net45\System.Web.WebPages.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.WebPages.Deployment, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebPages.3.2.6\lib\net45\System.Web.WebPages.Deployment.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.WebPages.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebPages.3.2.6\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="DryIocDataAnnotationsValidatorTests.cs" />
-    <Compile Include="DryIocMvcTests.cs" />
-    <Compile Include="ReuseInRequestTests.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
-      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
-      <Name>DryIoc</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.Mvc\DryIoc.Mvc.csproj">
-      <Project>{6936bff7-6ee1-4a17-bbb7-4941d5f687db}</Project>
-      <Name>DryIoc.Mvc</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.Web\DryIoc.Web.csproj">
-      <Project>{3af3b3b0-a5da-45d0-91c7-7a9e96716fab}</Project>
-      <Name>DryIoc.Web</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -112,11 +19,28 @@
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <ItemGroup>
+    <PackageReference Include="Castle.Core" Version="4.3.1" />
+    <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.2.6" />
+    <PackageReference Include="Microsoft.AspNet.Razor" Version="3.2.6" />
+    <PackageReference Include="Microsoft.AspNet.WebPages" Version="3.2.6" />
+    <PackageReference Include="Microsoft.Web.Infrastructure" Version="1.0.0.0" />
+    <PackageReference Include="NSubstitute" Version="3.1.0" />
+    <PackageReference Include="NUnit" Version="2.6.4" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.5.1" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\DryIoc.Mvc\DryIoc.Mvc.csproj" />
+    <ProjectReference Include="..\DryIoc.Web\DryIoc.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
 </Project>

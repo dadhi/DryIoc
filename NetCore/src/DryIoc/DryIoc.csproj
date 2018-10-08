@@ -11,8 +11,8 @@
         <Title>$(AssemblyName).dll</Title>
         <PackageId>$(AssemblyName).dll</PackageId>
 
-        <Authors>Maksim Volkau</Authors>
         <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
+        <Authors>Maksim Volkau</Authors>
         <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
         <NeutralLanguage>en</NeutralLanguage>
         <PackageLicenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicenseUrl>

@@ -1,150 +1,20 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{BD3EFE68-767A-4F0D-BE4A-AB6334212248}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.MefAttributedModel.UnitTests</RootNamespace>
-    <AssemblyName>DryIoc.MefAttributedModel.UnitTests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
+    <AssemblyTitle>DryIoc.MefAttributedModel.UnitTests</AssemblyTitle>
+    <Product>DryIoc.MefAttributedModel.UnitTests</Product>
+    <Copyright>Copyright � 2016 Maksim Volkau</Copyright>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>TRACE;DEBUG;FEC_EXPRESSION_INFO</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE;FEC_EXPRESSION_INFO</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="ExpressionToCodeLib, Version=1.5.4.0, Culture=neutral, PublicKeyToken=b43a6eb33831e563, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\ExpressionToCodeLib.1.5.4.0\lib\net40-Client\ExpressionToCodeLib.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.ComponentModel.Composition" />
-    <Reference Include="System.Core" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AllowDefaultTests.cs">
-      <Link>AllowDefaultTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTests.cs">
-      <Link>AttributedModelTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTestsBase.cs">
-      <Link>AttributedModelTestsBase.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\CodeGenerationTests.cs">
-      <Link>CodeGenerationTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\DryIocMefCompatibilityTests.cs">
-      <Link>DryIocMefCompatibilityTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsDecoratorTests.cs">
-      <Link>ExportAsDecoratorTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsWrapperTests.cs">
-      <Link>ExportAsWrapperTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportFactoryTests.cs">
-      <Link>ExportFactoryTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportImportWithKeyTests.cs">
-      <Link>ExportImportWithKeyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportManyTests.cs">
-      <Link>ExportManyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportAttributeTests.cs">
-      <Link>ImportAttributeTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportExternalTests.cs">
-      <Link>ImportExternalTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportManyTests.cs">
-      <Link>ImportManyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportWithMetadataTests.cs">
-      <Link>ImportWithMetadataTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs">
-      <Link>InheritedExportTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefCompatibilityTests.cs">
-      <Link>MefCompatibilityTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefCustomCatalogTests.cs">
-      <Link>MefCustomCatalogTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefImportManyTests.cs">
-      <Link>MefImportManyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefMultiExportTests.cs">
-      <Link>MefMultiExportTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\MoreAttributedModelTests.cs">
-      <Link>MoreAttributedModelTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\Properties\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ReuseAttributeTests.cs">
-      <Link>ReuseAttributeTests.cs</Link>
-    </Compile>
-    <Compile Include="ContainerHierarchyTests.cs" />
-    <Compile Include="GenerateFactoryDelegateTests.cs" />
-    <Compile Include="ImportMetadataTests.cs" />
-    <Compile Include="MefExportFactoryTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj">
-      <Project>{e210b3d9-29c8-46f5-8968-09a0e5857158}</Project>
-      <Name>DryIoc.MefAttributedModel.UnitTests.CUT</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj">
-      <Project>{bfb1206a-3545-4369-8f23-49fd1bffc362}</Project>
-      <Name>DryIoc.MefAttributedModel</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
-      <Project>{9fb3bbb2-30a6-4b67-9af7-ffc152920e49}</Project>
-      <Name>DryIocAttributes</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
-      <Name>DryIoc</Name>
-      <Private>False</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -152,11 +22,44 @@
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <ItemGroup>
+    <PackageReference Include="ExpressionToCodeLib" Version="1.5.4.0" />
+    <PackageReference Include="NUnit" Version="2.6.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.ComponentModel.Composition" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AllowDefaultTests.cs" Link="AllowDefaultTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTests.cs" Link="AttributedModelTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\AttributedModelTestsBase.cs" Link="AttributedModelTestsBase.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\CodeGenerationTests.cs" Link="CodeGenerationTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\DryIocMefCompatibilityTests.cs" Link="DryIocMefCompatibilityTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsDecoratorTests.cs" Link="ExportAsDecoratorTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportAsWrapperTests.cs" Link="ExportAsWrapperTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportFactoryTests.cs" Link="ExportFactoryTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportImportWithKeyTests.cs" Link="ExportImportWithKeyTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ExportManyTests.cs" Link="ExportManyTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportAttributeTests.cs" Link="ImportAttributeTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportExternalTests.cs" Link="ImportExternalTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportManyTests.cs" Link="ImportManyTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ImportWithMetadataTests.cs" Link="ImportWithMetadataTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\InheritedExportTests.cs" Link="InheritedExportTests.cs" />
+    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefCompatibilityTests.cs" Link="MefCompatibilityTests.cs" />
+    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefCustomCatalogTests.cs" Link="MefCustomCatalogTests.cs" />
+    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefImportManyTests.cs" Link="MefImportManyTests.cs" />
+    <Compile Include="..\..\Net40\DryIoc.MefAttributedModel.UnitTests\MefMultiExportTests.cs" Link="MefMultiExportTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\MoreAttributedModelTests.cs" Link="MoreAttributedModelTests.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests\ReuseAttributeTests.cs" Link="ReuseAttributeTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj" />
+    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj" />
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
 </Project>

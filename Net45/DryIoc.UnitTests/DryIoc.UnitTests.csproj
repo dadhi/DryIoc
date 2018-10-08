@@ -1,205 +1,20 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{13085219-07C8-4907-BA4B-E215B3DBA588}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.UnitTests</RootNamespace>
-    <AssemblyName>DryIoc.UnitTests</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
+    <AssemblyTitle>DryIoc.UnitTests</AssemblyTitle>
+    <Product>DryIoc.UnitTests</Product>
+    <Copyright>Copyright © 2016 Maksim Volkau</Copyright>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>TRACE;DEBUG;FEC_EXPRESSION_INFO</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE;FEC_EXPRESSION_INFO</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\DryIoc.UnitTests\ActionTests.cs">
-      <Link>ActionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ChildContainerTests.cs">
-      <Link>ChildContainerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\CompositePatternTests.cs">
-      <Link>CompositePatternTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ConstructionTests.cs">
-      <Link>ConstructionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.cs">
-      <Link>ContainerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.CUT.cs">
-      <Link>ContainerTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ContextDependentResolutionTests.cs">
-      <Link>ContextDependentResolutionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\DecoratorConditionTests.cs">
-      <Link>DecoratorConditionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\DecoratorTests.cs">
-      <Link>DecoratorTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\DelegateFactoryTests.cs">
-      <Link>DelegateFactoryTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\DiagnosticsTests.cs">
-      <Link>DiagnosticsTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\DynamicFactoryTests.cs">
-      <Link>DynamicFactoryTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\EnumerableAndArrayTests.cs">
-      <Link>EnumerableAndArrayTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\FuncTests.cs">
-      <Link>FuncTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\IfAlreadyRegisteredTests.cs">
-      <Link>IfAlreadyRegisteredTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\IfUnresolvedTests.cs">
-      <Link>IfUnresolvedTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\InitializerTests.cs">
-      <Link>InitializerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\InjectionRulesTests.cs">
-      <Link>InjectionRulesTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\KeyValuePairResolutionTests.cs">
-      <Link>KeyValuePairResolutionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\LazyEnumerableTests.cs">
-      <Link>LazyEnumerableTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\LazyTests.cs">
-      <Link>LazyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\MetadataTests.cs">
-      <Link>MetadataTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\NewTests.cs">
-      <Link>NewTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\NoMemoryLeaksTests.cs">
-      <Link>NoMemoryLeaksTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\OpenGenericsTests.cs">
-      <Link>OpenGenericsTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\PrimitiveValueInjectionTests.cs">
-      <Link>PrimitiveValueInjectionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\PrintTests.cs">
-      <Link>PrintTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\Properties\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\PropertyResolutionTests.cs">
-      <Link>PropertyResolutionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\RefTests.cs">
-      <Link>RefTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\RegisterInstanceTests.cs">
-      <Link>RegisterInstanceTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\RegisterManyTests.cs">
-      <Link>RegisterManyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\RegisterWithNonStringServiceKeyTests.cs">
-      <Link>RegisterWithNonStringServiceKeyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\RequiredServiceTypeTests.cs">
-      <Link>RequiredServiceTypeTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ResolveManyTests.cs">
-      <Link>ResolveManyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ReuseInCurrentScopeTests.cs">
-      <Link>ReuseInCurrentScopeTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ReuseTests.cs">
-      <Link>ReuseTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ReuseWrapperTests.cs">
-      <Link>ReuseWrapperTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\RulesTests.cs">
-      <Link>RulesTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\SelectConstructorWithAllResolvableArguments.cs">
-      <Link>SelectConstructorWithAllResolvableArguments.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\StronglyTypeConstructorAndParametersSpecTests.cs">
-      <Link>StronglyTypeConstructorAndParametersSpecTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\ThrowTests.cs">
-      <Link>ThrowTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\TypeCSharpNameFormattingTests.cs">
-      <Link>TypeCSharpNameFormattingTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\TypeToolsTests.cs">
-      <Link>TypeToolsTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\UnregisterTests.cs">
-      <Link>UnregisterTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\WipeCacheTests.cs">
-      <Link>WipeCacheTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.UnitTests\WrapperTests.cs">
-      <Link>WrapperTests.cs</Link>
-    </Compile>
-    <Compile Include="ArrayToolsTest.cs" />
-    <Compile Include="AsyncExecutionFlowScopeContextTests.cs" />
-    <Compile Include="DynamicRegistrationsTests.cs" />
-    <Compile Include="RegisterPlaceholderTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj">
-      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
-      <Name>DryIoc</Name>
-      <Private>False</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -207,11 +22,72 @@
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="2.6.4" />
+    <PackageReference Include="NUnit.Console" Version="3.5.0" />
+    <PackageReference Include="NUnit.ConsoleRunner" Version="3.5.0" />
+    <PackageReference Include="NUnit.Extension.NUnitProjectLoader" Version="3.5.0" />
+    <PackageReference Include="NUnit.Extension.NUnitV2Driver" Version="3.5.0" />
+    <PackageReference Include="NUnit.Extension.NUnitV2ResultWriter" Version="3.5.0" />
+    <PackageReference Include="NUnit.Extension.TeamCityEventListener" Version="1.0.2" />
+    <PackageReference Include="NUnit.Extension.VSProjectLoader" Version="3.5.0" />
+    <PackageReference Include="NUnit.Runners" Version="3.4.1" />
+    <PackageReference Include="OpenCover" Version="4.6.519" />
+    <PackageReference Include="ReportGenerator" Version="2.4.5.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\DryIoc.UnitTests\ActionTests.cs" Link="ActionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ChildContainerTests.cs" Link="ChildContainerTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\CompositePatternTests.cs" Link="CompositePatternTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ConstructionTests.cs" Link="ConstructionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.cs" Link="ContainerTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ContainerTests.CUT.cs" Link="ContainerTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ContextDependentResolutionTests.cs" Link="ContextDependentResolutionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\DecoratorConditionTests.cs" Link="DecoratorConditionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\DecoratorTests.cs" Link="DecoratorTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\DelegateFactoryTests.cs" Link="DelegateFactoryTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\DiagnosticsTests.cs" Link="DiagnosticsTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\DynamicFactoryTests.cs" Link="DynamicFactoryTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\EnumerableAndArrayTests.cs" Link="EnumerableAndArrayTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\FuncTests.cs" Link="FuncTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\IfAlreadyRegisteredTests.cs" Link="IfAlreadyRegisteredTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\IfUnresolvedTests.cs" Link="IfUnresolvedTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\InitializerTests.cs" Link="InitializerTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\InjectionRulesTests.cs" Link="InjectionRulesTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\KeyValuePairResolutionTests.cs" Link="KeyValuePairResolutionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\LazyEnumerableTests.cs" Link="LazyEnumerableTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\LazyTests.cs" Link="LazyTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\MetadataTests.cs" Link="MetadataTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\NewTests.cs" Link="NewTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\NoMemoryLeaksTests.cs" Link="NoMemoryLeaksTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\OpenGenericsTests.cs" Link="OpenGenericsTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\PrimitiveValueInjectionTests.cs" Link="PrimitiveValueInjectionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\PrintTests.cs" Link="PrintTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\PropertyResolutionTests.cs" Link="PropertyResolutionTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\RefTests.cs" Link="RefTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterInstanceTests.cs" Link="RegisterInstanceTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterManyTests.cs" Link="RegisterManyTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\RegisterWithNonStringServiceKeyTests.cs" Link="RegisterWithNonStringServiceKeyTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\RequiredServiceTypeTests.cs" Link="RequiredServiceTypeTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ResolveManyTests.cs" Link="ResolveManyTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ReuseInCurrentScopeTests.cs" Link="ReuseInCurrentScopeTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ReuseTests.cs" Link="ReuseTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ReuseWrapperTests.cs" Link="ReuseWrapperTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\RulesTests.cs" Link="RulesTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\SelectConstructorWithAllResolvableArguments.cs" Link="SelectConstructorWithAllResolvableArguments.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\StronglyTypeConstructorAndParametersSpecTests.cs" Link="StronglyTypeConstructorAndParametersSpecTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\ThrowTests.cs" Link="ThrowTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\TypeCSharpNameFormattingTests.cs" Link="TypeCSharpNameFormattingTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\TypeToolsTests.cs" Link="TypeToolsTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\UnregisterTests.cs" Link="UnregisterTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\WipeCacheTests.cs" Link="WipeCacheTests.cs" />
+    <Compile Include="..\..\DryIoc.UnitTests\WrapperTests.cs" Link="WrapperTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
 </Project>

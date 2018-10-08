@@ -2441,7 +2441,7 @@ namespace DryIoc
             Func<ServiceRegistrationInfo, bool> condition = null) =>
             container.GenerateResolutionExpressions(condition ?? DefaultValidateCondition).Errors.ToArray();
 
-        /// <summary>Excluding open-generic resgitrations, cause you need to provide type arguments to actually create these types.</summary>
+        /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.

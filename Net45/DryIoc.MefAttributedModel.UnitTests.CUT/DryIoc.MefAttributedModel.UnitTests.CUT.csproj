@@ -1,99 +1,38 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{E210B3D9-29C8-46F5-8968-09A0E5857158}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.MefAttributedModel.UnitTests.CUT</RootNamespace>
-    <AssemblyName>DryIoc.MefAttributedModel.UnitTests.CUT</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
+    <AssemblyTitle>DryIoc.MefAttributedModel.UnitTests.CUT</AssemblyTitle>
+    <Product>DryIoc.MefAttributedModel.UnitTests.CUT</Product>
+    <Copyright>Copyright � 2016 Maksim Volkau</Copyright>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
-    <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\AttributedModelTests.CUT.cs">
-      <Link>AttributedModelTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\CodeGenerationTests.CUT.cs">
-      <Link>CodeGenerationTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\CustomInjectionRulesTests.CUT.cs">
-      <Link>CustomInjectionRulesTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs">
-      <Link>ExportAsDecoratorTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs">
-      <Link>ExportAsGenericWrapperTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportFactoryTests.CUT.cs">
-      <Link>ExportFactoryTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportImportWithKeyTests.CUT.cs">
-      <Link>ExportImportWithKeyTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportManyTests.CUT.cs">
-      <Link>ExportManyTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportExternalTests.CUT.cs">
-      <Link>ImportExternalTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportManyTests.CUT.cs">
-      <Link>ImportManyTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs">
-      <Link>ImportWithMetadataTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\InheritedExportTests.CUT.cs">
-      <Link>InheritedExportTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\MefCompatibilityTests.CUT.cs">
-      <Link>MefCompatibilityTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\MefCustomCatalogTests.CUT.cs">
-      <Link>MefCustomCatalogTests.CUT.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\Properties\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
-    </Compile>
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\AttributedModelTests.CUT.cs" Link="AttributedModelTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\CodeGenerationTests.CUT.cs" Link="CodeGenerationTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\CustomInjectionRulesTests.CUT.cs" Link="CustomInjectionRulesTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsDecoratorTests.CUT.cs" Link="ExportAsDecoratorTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportAsGenericWrapperTests.CUT.cs" Link="ExportAsGenericWrapperTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportFactoryTests.CUT.cs" Link="ExportFactoryTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportImportWithKeyTests.CUT.cs" Link="ExportImportWithKeyTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ExportManyTests.CUT.cs" Link="ExportManyTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportExternalTests.CUT.cs" Link="ImportExternalTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportManyTests.CUT.cs" Link="ImportManyTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\ImportWithMetadataTests.CUT.cs" Link="ImportWithMetadataTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\InheritedExportTests.CUT.cs" Link="InheritedExportTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\MefCompatibilityTests.CUT.cs" Link="MefCompatibilityTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\MefCustomCatalogTests.CUT.cs" Link="MefCustomCatalogTests.CUT.cs" />
+    <Compile Include="..\..\DryIoc.MefAttributedModel.UnitTests.CUT\Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj">
-      <Project>{9fb3bbb2-30a6-4b67-9af7-ffc152920e49}</Project>
-      <Name>DryIocAttributes</Name>
-      <Private>False</Private>
-    </ProjectReference>
+    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

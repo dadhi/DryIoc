@@ -1,57 +1,27 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{9FB3BBB2-30A6-4B67-9AF7-FFC152920E49}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIocAttributes</RootNamespace>
-    <AssemblyName>DryIocAttributes</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
+    <AssemblyTitle>DryIocAttributes</AssemblyTitle>
+    <Description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</Description>
+    <Copyright>Copyright � 2013 Maksim Volkau</Copyright>
+    <Version>4.0.2</Version>
+    <AssemblyVersion>4.0.2</AssemblyVersion>
+    <FileVersion>4.0.2</FileVersion>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
+    <DocumentationFile>..\bin\$(Configuration)\DryIocAttributes.XML</DocumentationFile>
+    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\bin\Debug\DryIocAttributes.XML</DocumentationFile>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\bin\Release\DryIocAttributes.XML</DocumentationFile>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
-    <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\DryIocAttributes\Attributes.cs">
-      <Link>Attributes.cs</Link>
-    </Compile>
-    <Compile Include="..\..\DryIocAttributes\Properties\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
-    </Compile>
+    <Compile Include="..\..\DryIocAttributes\Attributes.cs" Link="Attributes.cs" />
+    <Compile Include="..\..\DryIocAttributes\Properties\AssemblyInfo.cs" Link="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

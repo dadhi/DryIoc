@@ -42,6 +42,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Docs", "docs\DryIoc.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.IssuesTests", "test\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj", "{A55B918A-80B3-454D-A541-F0A62C34020F}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIocZero", "src\DryIocZero\DryIocZero.csproj", "{07C19E75-7B77-42EB-8B2E-E362F7DCF271}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -92,6 +94,10 @@ Global
 		{A55B918A-80B3-454D-A541-F0A62C34020F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A55B918A-80B3-454D-A541-F0A62C34020F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A55B918A-80B3-454D-A541-F0A62C34020F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07C19E75-7B77-42EB-8B2E-E362F7DCF271}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07C19E75-7B77-42EB-8B2E-E362F7DCF271}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07C19E75-7B77-42EB-8B2E-E362F7DCF271}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07C19E75-7B77-42EB-8B2E-E362F7DCF271}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -108,6 +114,7 @@ Global
 		{B68F244B-0751-44CA-8B79-5076115F16A6} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{F7DD1921-09C0-4F71-BF54-8CFB24575D6C} = {CFF511D2-B665-4C38-A58B-52D087BB929F}
 		{A55B918A-80B3-454D-A541-F0A62C34020F} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
+		{07C19E75-7B77-42EB-8B2E-E362F7DCF271} = {258FA031-1B82-403A-B235-9A25B17A024A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

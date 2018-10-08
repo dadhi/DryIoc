@@ -1,111 +1,26 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{FFBA94E2-8293-4F38-B687-72E4A64D64CD}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DryIoc.WebApi.Owin.Sample</RootNamespace>
-    <AssemblyName>DryIoc.WebApi.Owin.Sample</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
+    <AssemblyTitle>DryIoc.WebApi.Owin.Sample</AssemblyTitle>
+    <Product>DryIoc</Product>
+    <Description>Sample App using DryIoc extension for ASP.NET WebAPI with OWIN</Description>
+    <Copyright>Copyright © 2014-2017 Maksim Volkau</Copyright>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0</AssemblyVersion>
+    <FileVersion>2.0.0</FileVersion>
+    <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>DryIoc.WebApi.Owin.Sample.Program</StartupObject>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="Microsoft.Owin, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\Microsoft.Owin.3.0.1\lib\net45\Microsoft.Owin.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Owin.Diagnostics, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Owin.Diagnostics.3.0.1\lib\net45\Microsoft.Owin.Diagnostics.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Owin.Host.HttpListener, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Owin.Host.HttpListener.3.0.1\lib\net45\Microsoft.Owin.Host.HttpListener.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Owin.Hosting, Version=3.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.Owin.Hosting.3.0.1\lib\net45\Microsoft.Owin.Hosting.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.framework, Version=2.6.4.14350, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NUnit.2.6.4\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Owin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=f0ebd12fd5e55cc5, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Net.Http.Formatting, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebApi.Client.5.2.6\lib\net45\System.Net.Http.Formatting.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.Http, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebApi.Core.5.2.6\lib\net45\System.Web.Http.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Web.Http.Owin, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\Microsoft.AspNet.WebApi.Owin.5.2.6\lib\net45\System.Web.Http.Owin.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="NewsController.Tests.cs" />
-    <Compile Include="Services\NewsProvider.cs" />
-    <Compile Include="Services\ConsoleLogger.cs" />
-    <Compile Include="NewsController.cs" />
-    <Compile Include="Program.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Startup.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj">
-      <Project>{b6c2fc35-7586-417b-ad35-32aed63adfa9}</Project>
-      <Name>DryIoc</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.WebApi.Owin\DryIoc.WebApi.Owin.csproj">
-      <Project>{34553207-1be8-42d3-9fe5-b4419cbc7764}</Project>
-      <Name>DryIoc.WebApi.Owin</Name>
-      <Private>False</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\DryIoc.WebApi\DryIoc.WebApi.csproj">
-      <Project>{5c8368e1-143b-4d37-9f33-bce395d9c3a4}</Project>
-      <Name>DryIoc.WebApi</Name>
-      <Private>False</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -113,11 +28,29 @@
     </PropertyGroup>
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.6" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.2.6" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.OwinSelfHost" Version="5.2.6" />
+    <PackageReference Include="Microsoft.Owin" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Owin.Diagnostics" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Owin.Host.HttpListener" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Owin.Hosting" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Owin.SelfHost" Version="3.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="6.0.8" />
+    <PackageReference Include="NUnit" Version="2.6.4" />
+    <PackageReference Include="Owin" Version="1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\DryIoc.WebApi.Owin\DryIoc.WebApi.Owin.csproj" />
+    <ProjectReference Include="..\DryIoc.WebApi\DryIoc.WebApi.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
 </Project>
