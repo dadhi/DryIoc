@@ -571,7 +571,7 @@ class RegisterMany_excludes_these_types
 }/*md
 ```
 
-On my platform it may be:
+The excluded types are:
 
   - `System.IDisposable`
   - `System.ValueType`
@@ -584,7 +584,9 @@ On my platform it may be:
   - `System.Collections.IList`
   - `System.Collections.ICollection`
 
-__Note:__ If you really need to register something from the list, you may register it `Register` method.
+// todo: Consider other types
+
+__Note:__ If you really need to register something from the list, you may register it with standalone `Register` method.
 
 
 ## RegisterMapping
@@ -592,25 +594,54 @@ __Note:__ If you really need to register something from the list, you may regist
 `RegisterMapping` allows to map new service to already registered service and its implementation. 
 
 For example you have a singleton implementation which can be accessed via two different facades / services:
+```cs md*/
+class Register_mapping
+{
+    public interface I { }
+    public interface J { }
+    class S : I, J { } // implements both I and J
 
-    public interface I {}
-    public interface J {}
-    class S : Without_cache.I, J {} // implements both I and J
-    
-    // register singleton as I
-    container.Register<I, S>(Reuse.Singleton);
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-    // map J to I and therefore to the same S singleton
-    container.RegisterMapping<J, I>();
+        // Register I as a singleton S
+        container.Register<I, S>(Reuse.Singleton);
 
-    Assert.AreSame(container.Resolve<I>(), container.Resolve<J>());
+        // Map J to I, and therefore map J to the same singleton S
+        container.RegisterMapping<J, I>();
 
-This feature may be viewed as complementary to `RegisterMany`:
+        Assert.AreSame(container.Resolve<I>(), container.Resolve<J>());
+    }
+}/*md
+```
 
-    container.RegisterMany(new[] { typeof(Without_cache.I), typeof(J) }, typeof(S), Reuse.Singleton);
-    Assert.AreSame(container.Resolve<I>(), container.Resolve<J>());
+This same result maybe achieved via `RegisterMany`:
 
-The difference is that you just map to existing registration.
+```cs md*/
+class Register_mapping_with_RegisterMany
+{
+    public interface I { }
+    public interface J { }
+    class S : I, J { } // implements both I and J
+
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        // Multiple interfaces refer to a single implementation
+        container.RegisterMany(new[] { typeof(I), typeof(J) }, typeof(S), Reuse.Singleton);
+        Assert.AreSame(container.Resolve<I>(), container.Resolve<J>());
+
+        Assert.AreSame(container.Resolve<I>(), container.Resolve<J>());
+    }
+}/*md
+```
+
+The possible advantage of `RegisterMapping` would be that you can decide on mapping for already existing registration.
+
 Performance considered it should be the same.
 
 
