@@ -4,7 +4,7 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-03</VersionSuffix>
+        <VersionSuffix>preview-04</VersionSuffix>
 
         <AssemblyName>DryIoc</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -43,6 +43,7 @@ v3.1.0
 - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
 - added: IRegistrator.GetRegisteredFactories
 - added: FactoryType to Registrator.RegisterMapping
+- changed: [generation] Using run-time request object 
 
 v3.0.2
 - fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
