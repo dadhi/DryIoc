@@ -36,6 +36,12 @@ echo:
 echo:## TESTS ARE SUCCESSFUL ##
 echo:
 
+call BuildScripts\NugetPack.bat
+if %ERRORLEVEL% neq 0 call :error "PACK SOURCE PACKAGES"
+echo:
+echo:## PACK SOURCE PACKAGES IS SUCCESSFUL ##
+echo:
+
 echo:## ALL DONE SUCCESSFULLY ##
 echo:
 exit /b 0

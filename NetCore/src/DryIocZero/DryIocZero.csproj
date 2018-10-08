@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net452;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
+        <!-- net452 and not net45, because it is a minimal ExpressionToCodeLib target -->
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net452;netstandard1.0;netstandard2.0</TargetFrameworks>
         <AssemblyTitle>DryIocZero</AssemblyTitle>
         <Description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc</Description>
         <Copyright>Copyright © 2016-2018 Maksim Volkau</Copyright>

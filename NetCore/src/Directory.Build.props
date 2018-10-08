@@ -14,7 +14,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE" Visible="false" />
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" Visible="false" />
         <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
         <None Remove="**\*.orig" />
         <None Remove="**\*.ncrunch*" />
