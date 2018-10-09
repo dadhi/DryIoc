@@ -736,39 +736,55 @@ class Register_delegate_returning_object
 
 ### Will not detect recursive dependencies
 
-When using the normal typed registration DryIoc will detect [recursive dependencies](ErrorDetectionAndResolution#markdown-header-RecursiveDependencyDetected). 
+When using normal typed registration DryIoc will detect [recursive dependencies](ErrorDetectionAndResolution#markdown-header-RecursiveDependencyDetected). 
 
-But when using delegate registration DryIoc is unable to analyze what dependencies are used inside delegate. That is another reason to avoid `RegisterDelegate` whatsoever:
+But when using the delegate registration DryIoc is unable to analyze what dependencies are used inside delegate. 
+That is another reason to avoid `RegisterDelegate` whatsoever:
+```cs
+public class A { public A(B b) {} } // A requires B
+public class B { public B(A a) {} } // B requires A
 
-    public class A { public A(Without_cache.B b) {} } // A requires B
-    public class B { public B(NLog_logger.A a) {} } // B requires A
-    
-    container.Register<A>();
-    container.RegisterDelegate<B>(r => new B(r.Resolve<A>()));
+container.Register<A>();
+container.RegisterDelegate<B>(r => new B(r.Resolve<A>()));
 
-    container.Resolve<A>(); // Fails with StackOverflowException
+container.Resolve<A>(); // Fails with StackOverflowException
+```
 
-    // To catch the problem do container.Register<B>() instead
+To catch the problem with recursive dependency, replace `RegisterDelegate` with `container.Register<B>()`.
 
 
 ## UseInstance
 
-**Caution:** Please avoid using `UseInstance` if not absolutely necessary: 
-when it is impossible to utilize DryIoc container for creating the instance for you. 
-The only case I can imagine, when the value provided by some external context, e.g. `HttpContext` in ASP.NET.
+**Caution:** Please avoid using `UseInstance` if not absolutely necessary. 
+Instead, utilize DryIoc container to create an instance for you. 
+The only case I can imagine for `UseInstance`, when the value provided by some external context, e.g. `HttpContext` in ASP.NET.
 
-`UseInstance` method supplies the already created external instance to container to use for injection in resolved services.
+Basically, `UseInstance` method supplies an already created external instance to the container to use it for dependency injection.
 
-Example:
+```cs 
+class Use_instance
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-    var a = new A();
-    container.UseInstance(a);
+        var a = new A();
+        container.UseInstance(a);
+        container.Register<B>();
 
-    // has a constructor with A parameter
-    container.Register<B>();
+        var b = container.Resolve<B>();
+        Assert.AreSame(a, b.A);
+    }
 
-    // will inject used instance of `a` as a parameter when creating B
-    container.Resolve<B>(); 
+    class A { }
+    class B
+    {
+        public readonly A A;
+        public B(A a) { A = a; }
+    }
+} 
+```
 
 Why it is called `UseInstance` instead of `RegisterInstance`?
 
@@ -776,48 +792,70 @@ The main container goal is to _create_ the services using registered Type or Del
 In case of _pre-created_ external instance there is nothing to create - 
 container should just _use instance_ for injection.
 
-When you call the `UseInstance` the instance will be **directly put into Open scope or Singleton scope* 
+When you call `UseInstance` the instance will be **directly put into current open scope or singleton scope** 
 based on whether the container is scoped (returned from `OpenScope` call) or not.
+
 In addition, the scoped and singleton instances may coexist with each other.
+```cs 
 
-Example of scoped and singleton instance:
-
-    var container = new Container();
-    container.Register<B>();
-
-    using (var scope = container.OpenScope())
+class Example_of_scoped_and_singleton_instance
+{
+    [Test]
+    public void Example()
     {
-        var a = new NLog_logger.A();
-        scope.UseInstance(a); // Scoped
+        var container = new Container();
+        container.Register<B>();
 
-        scope.Resolve<Without_cache.B>(); // will inject `a`
+        using (var scope = container.OpenScope())
+        {
+            var a = new A();
+            scope.UseInstance(a); // injected into current open scope
+
+            var b = scope.Resolve<B>(); // will inject `a`
+            Assert.AreSame(a, b.A);
+        }
+
+        var anotherA = new A();
+        container.UseInstance(anotherA); // injected into singleton scope
+
+        var anotherB = container.Resolve<B>(); // will inject `anotherA`
+        Assert.AreSame(anotherA, anotherB.A);
     }
 
-    var anotherA = new A();
-    container.UseInstance(anotherA); // Singleton
-    container.Resolve<B>(); // will inject `anotherA`
+    class A { }
+    class B
+    {
+        public readonly A A;
+        public B(A a) { A = a; }
+    }
+}
+```
 
 In previous examples we did not specify the service type, but you can specify it for used instance 
 and moreover, you can provide run-time **service type** for the `object` instance:
 
-    // compile-time known type
-    container.UseInstance<ISomeService>(a);
+```cs
+// compile-time known type
+container.UseInstance<ISomeService>(a);
 
-    // run-time known type
-    object aa = a;
-    container.UseInstance(typeof(ISomeService), aa);
+// run-time known type
+object aa = a;
+container.UseInstance(typeof(ISomeService), aa);
+```
 
 You may also provide **service key** to distinguish used instances:
-
-    container.UseInstance(new A()); 
-    container.UseInstance(new A(special), serviceKey: "specialOne");
+```cs
+container.UseInstance(new A()); 
+container.UseInstance(new A(special), serviceKey: "specialOne");
+```
 
 `UseInstance` method will replace (override) the previous registrations done on the same level: container or scope.
+```cs
+container.UseInstance(new A(1)); 
+container.UseInstance(new A(2)); // will replace the A(1) instance.
+```
 
-    container.UseInstance(new A(1)); 
-    container.UseInstance(new A(2)); // will replace the A(1) instance.
-
-**Note:** The DryIoc version prior 3.0 also contains `RegisterInstance` method. 
+**Note:** The DryIoc version prior 3.0 contains `RegisterInstance` method. 
 The method is obsolete and its usages should be replaced with `UseInstance`.
 
 
