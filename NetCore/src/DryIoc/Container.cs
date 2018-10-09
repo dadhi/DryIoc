@@ -792,16 +792,15 @@ namespace DryIoc
             if (request.IfUnresolved != IfUnresolved.Throw)
                 return;
 
-            var registrations = request.Container
+            var str = new StringBuilder();
+            str = request.Container
                 .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
-                .Aggregate(new StringBuilder(), (s, f) =>
-                    (f.Value.Reuse?.CanApply(request) ?? true
-                        ? s.Append("  ")
-                        : s.Append("  without matching scope ")).Print(f));
+                .Aggregate(str, (s, x) => s
+                    .Append(x.Value.Reuse?.CanApply(request) ?? true ? "  " : "  without matching scope ")
+                    .Print(x));
 
-            if (registrations.Length != 0)
-                Throw.It(Error.UnableToResolveFromRegisteredServices,
-                    request, registrations);
+            if (str.Length != 0)
+                Throw.It(Error.UnableToResolveFromRegisteredServices, request, str);
             else
                 Throw.It(Error.UnableToResolveUnknownService, request,
                     request.Rules.DynamicRegistrationProviders.EmptyIfNull().Length,
