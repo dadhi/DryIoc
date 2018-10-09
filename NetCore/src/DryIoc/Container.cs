@@ -3718,10 +3718,16 @@ namespace DryIoc
                 s += (s != "" ? NewLine : "Rules ") + " with DefaultReuse=" + DefaultReuse;
 
             if (FactorySelector != null)
-                s += (s != "" ? NewLine : "Rules ") + " with FactorySelector=<non-default>";
+            {
+                s += (s != "" ? NewLine : "Rules ") + " with FactorySelector=";
+                if (FactorySelector == SelectLastRegisteredFactory)
+                    s += nameof(Rules.SelectLastRegisteredFactory);
+                else
+                    s += "<custom>";
+            }
 
             if (_made != Made.Default)
-                s += (s != "" ? NewLine : "Rules ") + " with Made.Of=<non-default>";
+                s += (s != "" ? NewLine : "Rules ") + " with Made=" + _made;
 
             return s;
         }
@@ -4033,6 +4039,35 @@ namespace DryIoc
         /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
         public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
 
+        /// <summary>Outputs whatever is possible (known) for Made</summary>
+        public override string ToString()
+        {
+            if (this == Default)
+                return "Made.Default";
+
+            var s = "{";
+            if (FactoryMethod != null)
+            {
+                s += (s == "{" ? "" : ", ") + "FactoryMethod=";
+                if (FactoryMethod == DryIoc.FactoryMethod.ConstructorWithResolvableArguments)
+                    s += nameof(DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
+                else if (FactoryMethod == DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic)
+                    s += nameof(DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+                else
+                    s += "<custom>";
+            }
+
+            if (FactoryMethodKnownResultType != null)
+                s += (s == "{" ? "" : ", ") + "FactoryMethodKnownResultType=" + FactoryMethodKnownResultType;
+            if (HasCustomDependencyValue)
+                s += (s == "{" ? "" : ", ") + "HasCustomDependencyValue=true";
+            if (PropertiesAndFields != null)
+                s += (s == "{" ? "" : ", ") + "PropertiesAndFields=<custom>";
+            if (Parameters != null)
+                s += (s == "{" ? "" : ", ") + "ParameterSelector=<custom>";
+            return s + "}";
+        }
+
         /// <summary>Container will use some sensible defaults for service creation.</summary>
         public static readonly Made Default = new Made();
 
@@ -4212,7 +4247,7 @@ namespace DryIoc
             { }
         }
 
-#region Implementation
+        #region Implementation
 
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false)
@@ -4405,7 +4440,7 @@ namespace DryIoc
                 argExpr, wholeServiceExpr);
         }
 
-#endregion
+    #endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
