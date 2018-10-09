@@ -583,8 +583,6 @@ The excluded types are:
   - `System.Collections.IList`
   - `System.Collections.ICollection`
 
-// todo: Consider other types
-
 __Note:__ If you really need to register something from the list, you may register it with standalone `Register` method.
 
 
@@ -646,36 +644,95 @@ Performance considered it should be the same.
 
 ## RegisterDelegate
 
-You can register any custom delegate as your service factory:
+You can register any custom delegate as your service factory via `RegisterDelegate`:
 
-```
-#!c#
-    container.RegisterDelegate<IService>(r => new CheerfulService() { Greetings = "Hey!" });
+```cs 
+class Register_delegate
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.RegisterDelegate<IService>(resolverContext => new CheerfulService { Greetings = "Hey!" });
+
+        var x = container.Resolve<IService>();
+        Assert.AreEqual("Hey!", ((CheerfulService)x).Greetings);
+    }
+
+    internal class CheerfulService : IService
+    {
+        public string Greetings { get; set; }
+    }
+}
 ```
 
-`r` parameter allows to access `IResolver` side of Container, it could be used to resolve any additional dependencies required for service creation and initialization:
+The `IResolverContext resolverContext` delegate parameter was not used in example above. 
+Actually, it could be used to resolve any additional dependencies required for service creation and initialization:
 
-```
-#!c#
-    container.RegisterDelegate<IService>(
-        r => new CheerfulService(r.Resolver.Resolve<IGreetingsProvider>());
+```cs 
+class Register_delegate_with_resolved_dependencies
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.RegisterDelegate(_ => new GreetingsProvider { Greetings = "Mya" });
+        container.RegisterDelegate<IService>(resolverContext =>
+            new CheerfulService(resolverContext.Resolve<GreetingsProvider>()));
+
+        var x = container.Resolve<IService>();
+        Assert.AreEqual("Mya", ((CheerfulService)x).Greetings);
+    }
+
+    class GreetingsProvider
+    {
+        public string Greetings { get; set; }
+    }
+
+    class CheerfulService : IService
+    {
+        public string Greetings => _greetingsProvider.Greetings;
+
+        public CheerfulService(GreetingsProvider greetingsProvider)
+        {
+            _greetingsProvider = greetingsProvider;
+        }
+
+        private readonly GreetingsProvider _greetingsProvider;
+    }
+}
 ```
 
 Though powerful, registering delegate may lead to the problems:
 
-- __Memory leaks by capturing variables into delegate closure and keeping them for a container lifetime.__
-- __Delegate is the black box for Container - which makes hard to find type mismatches or diagnose other potential problems.__
+1. Memory leaks by capturing variables into delegate closure and keeping them for a container lifetime.
+2. Delegate is the black box for Container - which makes hard to find type mismatches or diagnose other potential problems.
 
-Therefore, try to use it only as last resort. DryIoc has plenty of tools to cover for custom delegate in more effective way. The ultimate alternative would be [Factory Methods](ConstructorSelection).
+Therefore, try to use it only as a last resort. DryIoc has plenty of tools to cover for custom delegate in more effective way. 
+The ultimate alternative would be a [FactoryMethod](ConstructorSelection).
 
-Another thing that delegate usually is hard to use when types and not known in the compile time. Given `type = typeof(Foo)` it is impossible to write `new type();`.
+Another thing, that delegate is usually hard to use when types are not known in the compile time. 
+Given `type = typeof(Foo)` it is impossible to write `new type();`.
 To enable such use-case DryIoc allow to register delegate with runtime known type:
 
-```
-#!c#
-    container.RegisterDelegate(someTypeOrInterface, 
-        r => MyCustomReflectionMagicToCreate(someType));
-```
+```cs 
+class Register_delegate_returning_object
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.RegisterDelegate(typeof(IService), r => Activator.CreateInstance(typeof(Foo)));
+
+        var x = container.Resolve<IService>();
+        Assert.IsInstanceOf<Foo>(x);
+    }
+
+    class Foo : IService { }
+}
+ ```
+
 
 ### Will not detect recursive dependencies
 
