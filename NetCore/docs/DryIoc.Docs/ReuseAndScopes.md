@@ -9,19 +9,27 @@ Created service becomes shared between its consumers.
 
 One type of reuse is well known in software development as [Singleton](http://en.wikipedia.org/wiki/Singleton_pattern). IoC Containers implement Singleton in a way that make it easy to test and replace.
 
-DryIoc provides following types of reuse out-of-the-box:
+DryIoc provides following basic types of reuse:
 
 * `Transient`
 * `Singleton`
-* `InResolutionScope` 
-* `InResolutionScopeOf(...)`
-* `InCurrentScope`
-* `InCurrentNamedScope(...)`
+* `Scoped`
+* `ScopedOrSingleton`
+
+Variations of basic `Scoped` reuse:
+
+* `ScopedTo(scopeName(s))`
+* `ScopedTo<Service>()`
+* `ScopedTo<Service>(serviceKey)`
 * `InThread`
 * `InWebRequest`
-* `Setup.UseParentReuse` - not an actual reuse but the registration option
 
-If something is not in the list, you can create you own reuse by implementing `IReuse` interface.
+Service setup options:
+
+* `Setup.UseParentReuse`
+* `DecoratorSetup.UseDecorateeReuse`
+
+You can create you own reuse by implementing `IReuse` interface.
 
 Container uses Scopes ([see below](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes#markdown-header-what-scope-is)) to store resolved services of non-Transient reuse.
 Scope implements `IDisposable` and when disposed will dispose reused disposable services. You may prevent service disposal via [setup option](ReuseAndScopes#markdown-header-prevent-disposal-of-reused-service).
