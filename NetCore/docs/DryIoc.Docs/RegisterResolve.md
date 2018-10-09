@@ -861,44 +861,86 @@ The method is obsolete and its usages should be replaced with `UseInstance`.
 
 ## RegisterInitializer
 
-Initializer is the action to be invoked on created service before returning it from resolve method, 
+Initializer is an action to be invoked on created service before returning it from resolve method, 
 or before injecting it as dependency. 
 
 __Note:__ Underneath Initializer is registered as [Decorator](Decorators).
 
 Let's say we want to log the creation of our service:
+```cs 
+class Register_initializer
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<Logger>(Reuse.Singleton);
+        container.Register<IService, MyService>();
 
-    container.Register<ILogger, MyLogger>();
-    container.Register<IService, MyService>();
-    container.RegisterInitializer<IService>(
-        (service, resolver) => resolver.Resolve<ILogger>().LogInfo("resolved: " + service));
+        container.RegisterInitializer<IService>(
+            (service, resolver) => resolver.Resolve<Logger>().Log("created"));
+
+        container.Resolve<IService>();
+        Assert.AreEqual("created", container.Resolve<Logger>().LogData[0]);
+    }
+
+    class Logger
+    {
+        public readonly List<string> LogData = new List<string>();
+        public void Log(string s) => LogData.Add(s);
+    }
+
+    interface IService {}
+    class MyService: IService {}
+}
+```
 
 OK, this works for specific service `IService`. What if I want to log creation of _any_ resolved or injected service.
 
-Initializer may be registered for `object` target, which means _any_ service type.
+```cs 
+class Register_initializer_for_any_object
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        var loggerKey = "logger";
+        container.Register<Logger>(Reuse.Singleton, serviceKey: loggerKey);
+        container.Register<IService, MyService>();
 
-    container.RegisterInitializer<object>(
-        (serviceObj, resolver) => resolver.Resolve<ILogger>().LogInfo("resolved: " + serviceObj));
+        container.RegisterInitializer<object>(
+            (anyObj, resolver) => resolver.Resolve<Logger>(loggerKey).Log("created object"),
+            condition: request => !loggerKey.Equals(request.ServiceKey));
 
-__Note:__ Invoking intializer for any object will affect performance of each resolution and injection.
+        container.Resolve<IService>();
+        Assert.AreEqual("created object", container.Resolve<Logger>(loggerKey).LogData[0]);
+    }
 
-It would be helpful to limit initializer to specific cases. 
-It may be done via optional condition parameter passed to `RegisterInitializer`.
+    class Logger
+    {
+        public readonly List<string> LogData = new List<string>();
+        public void Log(string s) => LogData.Add(s);
+    }
 
-Let's change example to log only Controller dependencies creation:
+    interface IService { }
+    class MyService : IService { }
+}
+```
 
-    container.RegisterInitializer<object>(
-        (serviceObj, resolver) => resolver.Resolve<ILogger>().LogInfo("created: " + serviceObj),
-        condition: request => request.Parent.ServiceType.Name.EndsWith("Controller"));
+Initializer maybe registered for an `object` service, which means _any_ service type.
 
-Important thing that `TTarget` of Initializer may not correspond to actual registered _Service Type_.
-It may be any type implemented by registered _Service Type_ or _Implementation Type_.
+__Note:__ Invoking initializer for any object means, that it will be invoked for the `Logger` itself causing a `StackOverflowException`. 
+To avoid this, logger is registered with a `serviceKey` and excluded from initializer action via `condition` parameter.
 
-To register logger for disposable services:
 
-    container.RegisterInitializer<IDisposable>(
-        (disposable, resolver) => resolver.Resolve<ILogger>().LogInfo("resolved disposable: " + disposable));
+Important thing, that `TTarget` of `RegisterInitializer<TTarget>()` may not correspond to the registered _serviceType_ of the service.
+It maybe any type implemented by registered service (including implementation type itself).
 
+For instance, to register logger for disposable services:
+```cs
+container.RegisterInitializer<IDisposable>(
+    (disposable, resolver) => resolver.Resolve<Logger>().Log("resolved disposable " + disposable));
+```
 
 ## RegisterDisposer
 
