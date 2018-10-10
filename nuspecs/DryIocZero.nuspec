@@ -2,12 +2,13 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIocZero</id>
-    <version>0.0.0</version>
+    <version>4.1.0-preview-02</version>
     <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2016-2018 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+    <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Lightweight IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
@@ -38,8 +39,9 @@
     -->
   </metadata>
   <files>
-    <file src="..\LICENSE.txt" target="." />
-    <file src="..\nuspecs\DryIocZero\readme.txt" target="." />
+    <file src="..\LICENSE.txt" />
+    <file src="..\nuspecs\DryIoc.snk" />
+    <file src="..\nuspecs\DryIocZero\readme.txt" />
     
     <!--Compile-time dependencies-->
     <file src="..\nuspecs\DryIocZero\tools\DryIoc.dll.3.1.0\net45\DryIoc.dll" target="tools\DryIoc.dll.3.1.0\net45" />

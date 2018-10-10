@@ -16,9 +16,14 @@ if not exist %PACKAGEDIR% md %PACKAGEDIR%
 echo:
 echo:DryIoc source and internal packages
 echo:===================================
-REM REM %NUGET% pack %NUSPECS%\DryIoc.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 REM PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\BuildScripts\MakeInternal.ps1'";
 REM %NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+
+echo:
+echo:DryIocZero
+echo:============================
+%NUGET% pack %NUSPECS%\DryIocZero.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIocAttributes
@@ -65,10 +70,6 @@ echo:DryIoc.SignalR
 echo:============================
 REM %NUGET% pack %NUSPECS%\DryIoc.SignalR.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 
-echo:
-echo:DryIocZero
-echo:============================
-%NUGET% pack %NUSPECS%\DryIocZero.nuspec -Version 4.1.0-preview-01 -OutputDirectory %PACKAGEDIR% -NonInteractive
 echo: 
 echo:## PACKAGING SUCCEEDED ##
 
