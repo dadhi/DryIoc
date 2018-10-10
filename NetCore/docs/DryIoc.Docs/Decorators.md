@@ -162,7 +162,7 @@ class Decorator_of_service_with_serviceKey
 `DecoratorOf` is just a `DecoratorWith(condition: ...)` wrapped in a 
 more simple API to specify a decorated service key or/and type. 
 
-```cd 
+```cs 
 class Decorator_of_service_with_key_and_type
 {
     class BooHandler : IHandler
