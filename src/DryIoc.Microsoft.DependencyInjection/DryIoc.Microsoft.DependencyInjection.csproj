@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard1.0;netstandard2.0</TargetFrameworks>
+
+        <VersionPrefix>2.2.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
+
+        <AssemblyName>DryIoc.Microsoft.DependencyInjection</AssemblyName>
+        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+        <Title>$(AssemblyName)</Title>
+        <PackageId>$(AssemblyName)</PackageId>
+
+        <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
+        <Summary>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Summary>
+        <Authors>Maksim Volkau</Authors>
+        <Copyright>Copyright © 2016-2018 Maksim Volkau</Copyright>
+        <NeutralLanguage>en</NeutralLanguage>
+        <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
+        <PackageReleaseNotes>
+            <![CDATA[
+v2.2.0:
+- updated: To DryIoc v3.1
+v2.1.0:
+- added: Split WithCompositionRoot and BuildServiceProvider extension methods
+- removed: Preventing to use Container with ambient ScopeContext
+v2.0.1:
+- updated: to DryIoc v3.0.2
+v2.0.0:
+- updated: to DryIoc v3
+- updated: Targets changed to match MS.Ext.DI (netstandard 1.0 for DI 1.1.1 and netstandard 2.0 for DI 2.0)
+- updated: To Microsoft.Extensions.DependencyInjection.Abstractions 2.1.1
+- breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
+        ]]>
+        </PackageReleaseNotes>
+        <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
+        <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
+        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</PackageIconUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.0'">
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="1.1.1" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="2.1.1" />
+    </ItemGroup>
+</Project>

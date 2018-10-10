@@ -1,52 +1,55 @@
 # Contributing
 
-## Areas
+## In general
 
-Your contribution to the DryIoc project and extensions is highly appreciated.
+Your contribution to the DryIoc project and extensions is highly appreciated, and will help to evolve the project.
 
-It may come as
+You may help via:
 
-- Comments to existing issues
-- New issues: bugs, enhancements, and feature proposals
-- Pull Requests with improvements, failed tests for the found bugs, and bug fixes
-- Documentation error corrections and new documentation content
-- [StackOverflow](http://stackoverflow.com/questions/tagged/dryioc) questions and answers. Please tag questions with __dryioc__ tag for easy finding.
+- Commenting on existing issues
+- Opening new issues for bugs, enhancements, and feature proposals
+- Creating Pull Requests with improvements, failed tests for the found bugs, and bug fixes
+- Correcting documentation errors and submitting new documentation topics
+- Asking and answering questions on [StackOverflow](http://stackoverflow.com/questions/tagged/dryioc), tagging your questions with `dryioc` tag for easy finding
+- Discussing the problems and ideas in [Gitter](https://gitter.im/dadhi/DryIoc) or [Slack](https://dryioc.slack.com) rooms
+- Poking me on [Twitter](http://twitter.com/intent/user?screen_name=DryIoc)
 
 
-### How to report issue step-by-step
+## How to report an issue step-by-step
 
 If you found the problem with DryIoc:
 
  - Please check that you are using the [latest DryIoc version](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version).
- - [Create new issue](https://bitbucket.org/dadhi/dryioc/issues/new) with problem description.
- - To get faster feedback, faster fixes, and generally to make me happy :) 
-     - [Fork DryIoc](https://bitbucket.org/dadhi/dryioc/fork)
-     - Add failing tests reproducing your case into [Net45\DryIoc.IssuesTests](https://bitbucket.org/dadhi/dryioc/src/8510666893daaea1d07b49ba0dfcbf3f95dcccd4/Net45/DryIoc.IssuesTests/?at=dev) project. Check other files in project for general guidelines, but nothing is strict here
-     - Commit your tests and create Pull Request for me to merge
-     
-    Thank you!
+ - [Create new issue](https://github.com/dadhi/DryIoc/issues/new) with problem description.
+ - To get faster feedback, faster fixes, and generally to make me happy :-) 
+     - [Fork DryIoc](https://github.com/dadhi/DryIoc/fork)
+     - Add failing tests reproducing your case to `test\DryIoc.IssuesTests` project. Check other files in the project for general guideline, but nothing is strict here.
+     - **Ignore** the failing tests with `[Ignore("todo: fix me")]` attribute, so that CI build pass.
+     - Commit your tests and create a Pull Request for me to review.
+    
+Thank you!
 
 
-## How to build and verify your changes
+## How to build and develop the DryIoc
 
 ### Build from the command line 
 
-Before sending a Pull Request, please build solution with _build.bat_ located in the root folder.
+Before sending a Pull Request, please build solution with `build.bat` located in the root folder.
 
-It will build all projects, run unit tests with coverage, and create NuGet packages.
+It will build all projects, run unit tests, and create NuGet packages.
+Make sure that there are no project build errors or failing tests.
 
-Make sure that there are no project build errors or failing tests. Also, check package creation errors for obvious issues, e.g. missing files.
+### Develop in Visual Studio 2017
 
-__Note:__ For .NET Core DependencyInjection adapter please run _NetCore\build.bat_ to run tests and create package. 
+- Open `DryIoc.sln` solution and re-build it. If something is failing, you may try to close VS, open command line and run `dotnet clean /v:m && build.bat` in solution folder, open VS and try to build again.
+- Projects in solution multi-target multiple platforms, e.g. `DryIoc` targets 6+ platforms which makes it slower to build. To speedup development you may:
+    -  Set `<DevMode>true</DevMode>` to `true` in `Directory.Build.props` file in solution root folder. This setting will set projects to target a single platform: `.Net Standard` for libraries and `.Net Core` for tests. 
+    -  Re-build solution as described in step 1. 
+    -  **Don't forget** to set `<DevMode>false</DevMode>` back to `false` when publishing your changes.
 
 
-### Develop in Visual Studio
+__Productivity hint:__ Usually I am using [NCrunch](http://www.ncrunch.net/) to build and run tests continuously, to get an immediate feedback, quickly find regressions, and generally experiment with code.
 
-There are 3 solutions:
+### Develop in Visual Studio Code
 
-- _DryIoc.start.sln_ contains "starting" set of projects targeting .NET 4.5 only. __It is may be all you need.__
-- _DryIoc.extenstions.sln_ Adds to _DryIoc.start.sln_ all extentions targeting .NET 4.5.
-- _DryIoc.sln_ includes every project except for .Net Core for every target platform.
-- _NetCore/DryIoc.Microsoft.DependencyInjection.sln_ for [.NET Core and DryIoc.Microsoft.DependencyInjection](https://github.com/aspnet/dependencyinjection).
-
-__Hint:__ Usually I am enabling [NCrunch](http://www.ncrunch.net/) to build and run Unit Tests continuously, saves me a lot of time.
+It is possible to develop and even run tests (via plugin) in VS Code, but only with `<DevMode>true</DevMode>` set to `true` in `Directory.Build.props` file in solution root folder. 
