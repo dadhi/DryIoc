@@ -6,7 +6,7 @@ build_script:
   - .\build.bat
 
 skip_commits:
-  message: /skip .*/
+  message: /skipci .*/
 
 artifacts:
   - path: .\.dist\packages\*.nupkg

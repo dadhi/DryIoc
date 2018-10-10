@@ -41,7 +41,7 @@ Make sure that there are no project build errors or failing tests.
 
 ### Develop in Visual Studio 2017
 
-- Open `DryIoc.sln` solution and re-build it. If something is failing, you may try to close VS, open command line and run `dotnet clean /v:m && build.bat` in solution folder, open VS and try to build again.
+- Open `DryIoc.sln` solution and re-build it. If something is failing, you may try to close VS, open command line and run `dotnet clean`, then `build.bat` in solution folder, open VS and try to build again.
 - Projects in solution multi-target multiple platforms, e.g. `DryIoc` targets 6+ platforms which makes it slower to build. To speedup development you may:
     -  Set `<DevMode>true</DevMode>` to `true` in `Directory.Build.props` file in solution root folder. This setting will set projects to target a single platform: `.Net Standard` for libraries and `.Net Core` for tests. 
     -  Re-build solution as described in step 1. 
