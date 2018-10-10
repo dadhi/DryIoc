@@ -1,0 +1,124 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks Condition="'$(TargetFramework)' == 'true'">netcoreapp2.1</TargetFrameworks>
+        <TargetFrameworks Condition="'$(TargetFramework)' != 'true'">netcoreapp2.1;net471</TargetFrameworks>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="nunit" Version="3.10.1" />
+        <PackageReference Include="NUnit3TestAdapter" Version="3.10.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.8.0" />
+
+        <PackageReference Include="LinFu.DynamicProxy" Version="2.1.1" />
+        <PackageReference Include="Moq" Version="4.10.0" />
+        <PackageReference Include="NLog" Version="4.5.10" />
+        <PackageReference Include="Autofac" Version="4.8.1" />
+        <PackageReference Include="Castle.Core" Version="4.3.1" />
+        <PackageReference Include="MediatR" Version="5.1.0" />
+        <PackageReference Include="NSubstitute" Version="3.1.0" />
+        <PackageReference Include="Serilog" Version="2.7.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="CreatingAndDisposingContainer.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>CreatingAndDisposingContainer.md</LastGenOutput>
+      </Compile>
+      <Compile Update="Decorators.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>Decorators.md</LastGenOutput>
+      </Compile>
+      <Compile Update="ErrorDetectionAndResolution.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>ErrorDetectionAndResolution.md</LastGenOutput>
+      </Compile>
+      <Compile Update="ExamplesContextBasedResolution.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>ExamplesContextBasedResolution.md</LastGenOutput>
+      </Compile>
+      <Compile Update="Home.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>Home.md</LastGenOutput>
+      </Compile>
+      <Compile Update="Interception.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>Interception.md</LastGenOutput>
+      </Compile>
+      <Compile Update="KindsOfChildContainer.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
+      </Compile>
+      <Compile Update="RegisterResolve.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>RegisterResolve.md</LastGenOutput>
+      </Compile>
+      <Compile Update="RequiredServiceType.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>RequiredServiceType.md</LastGenOutput>
+      </Compile>
+      <Compile Update="UsingInTestsWithMockingLibrary.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="CreatingAndDisposingContainer.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>CreatingAndDisposingContainer.cs</DependentUpon>
+      </None>
+      <None Update="Decorators.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Decorators.cs</DependentUpon>
+      </None>
+      <None Update="ErrorDetectionAndResolution.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>ErrorDetectionAndResolution.cs</DependentUpon>
+      </None>
+      <None Update="ExamplesContextBasedResolution.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>ExamplesContextBasedResolution.cs</DependentUpon>
+      </None>
+      <None Update="Home.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Home.cs</DependentUpon>
+      </None>
+      <None Update="Interception.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Interception.cs</DependentUpon>
+      </None>
+      <None Update="KindsOfChildContainer.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>KindsOfChildContainer.cs</DependentUpon>
+      </None>
+      <None Update="RegisterResolve.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>RegisterResolve.cs</DependentUpon>
+      </None>
+      <None Update="RequiredServiceType.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>RequiredServiceType.cs</DependentUpon>
+      </None>
+      <None Update="UsingInTestsWithMockingLibrary.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>UsingInTestsWithMockingLibrary.cs</DependentUpon>
+      </None>
+    </ItemGroup>
+
+</Project>
