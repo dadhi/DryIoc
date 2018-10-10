@@ -10448,3 +10448,94 @@ namespace System
     }
 }
 #endif
+#if NETSTANDARD1_3 || NETSTANDARD2_0 || NET45
+namespace DryIoc.Messages
+{
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    /// Base type for messages
+    public interface IMessage<out TResponse> { }
+
+    /// Type for an empty response
+    public struct EmptyResponse
+    {
+        /// Single value
+        public static readonly EmptyResponse Value = new EmptyResponse();
+    }
+
+    /// Base message handler
+    public interface IMessageHandler<in M, R> where M : IMessage<R>
+    {
+        /// Generic handler
+        Task<R> Handle(M message, CancellationToken cancellationToken);
+    }
+
+    /// Message handler middleware to handle the message and pass the result to the next middleware
+    public interface IMessageMiddleware<in M, R>
+    {
+        /// Handles message and passes to the next middlewar
+        Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
+    }
+
+    /// Base class for implmenting async handlers
+    public abstract class AsyncMessageHandler<M, R> : IMessageHandler<M, R>
+        where M : IMessage<R>
+    {
+        /// Base method to implement in your inheritor
+        protected abstract Task<R> Handle(M message, CancellationToken cancellationToken);
+
+        async Task<R> IMessageHandler<M, R>.Handle(M message, CancellationToken cancellationToken) =>
+            await Handle(message, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// Message handler decorator which adds middleware handling
+    public class MessageHandlerMiddlewareDecorator<M, R> : IMessageHandler<M, R> where M : IMessage<R>
+    {
+        private readonly IMessageHandler<M, R> _handler;
+        private readonly IEnumerable<IMessageMiddleware<M, R>> _middlewares;
+
+        /// Decorates message handler with optional middlewares
+        public MessageHandlerMiddlewareDecorator(IMessageHandler<M, R> handler, IEnumerable<IMessageMiddleware<M, R>> middlewares)
+        {
+            _handler = handler;
+            _middlewares = middlewares;
+        }
+
+        /// Composes middlewares with handler
+        public Task<R> Handle(M message, CancellationToken cancellationToken) =>
+            _middlewares.Reverse().Aggregate(
+                new Func<Task<R>>(() => _handler.Handle(message, cancellationToken)),
+                (h, middleware) => () => middleware.Handle(message, cancellationToken, h))
+                .Invoke();
+    }
+
+    /// Composite handles multiple handlers :)
+    public class MessageHandlerComposite<M> : IMessageHandler<M, EmptyResponse> 
+        where M : IMessage<EmptyResponse>
+    {
+        private readonly IEnumerable<IMessageHandler<M, EmptyResponse>> _handlers;
+
+        /// Constructs the hub with the handler and optional middlewares
+        public MessageHandlerComposite(IEnumerable<IMessageHandler<M, EmptyResponse>> handlers)
+        {
+            _handlers = handlers;
+        }
+
+        /// Composes middlewares with handler
+        public Task<EmptyResponse> Handle(M message, CancellationToken cancellationToken) =>
+            HandlingStrategy(_handlers.Select(h => h.Handle(message, cancellationToken)));
+
+        // todo: simplify by removing EmptyResponse out to Handle method
+        /// Handling strategy - parallel by default
+        protected virtual async Task<EmptyResponse> HandlingStrategy(IEnumerable<Task<EmptyResponse>> handlers)
+        {
+            await Task.WhenAll(handlers).ConfigureAwait(false);
+            return EmptyResponse.Value;
+        }
+    }
+}
+#endif
