@@ -508,65 +508,6 @@ class Nesting_decorators_of_wrapped_service
 }
 ```
 
-### Composite Decorator
-
-Another example of decorating wrapper will be a [Composite pattern](https://en.wikipedia.org/wiki/Composite_pattern).
-Let's say we have many message handlers in out system, fro specific types of the messages. Now we want a single "composite" handler
-to invoke all handlers for a particular message type.
-
-```cs 
-class Composite_decorator
-{
-    [Test]
-    public void Not_working_example_without_decorator()
-    {
-        var container = new Container();
-
-        container.Register<IHandler<int>, FooHandler<int>>();
-        container.Register<IHandler<int>, BarHandler<int>>();
-        container.Register<IHandler<int>, CompositeHandler<int>>();
-
-        Assert.Throws<ContainerException>(() => 
-        container.Resolve<IHandler<int>>());
-    }
-
-    [Test]
-    public void Working_example_with_decorator()
-    {
-        var container = new Container();
-
-        container.Register<IHandler<int>, FooHandler<int>>();
-        container.Register<IHandler<int>, BarHandler<int>>();
-        container.Register<IHandler<int>, CompositeHandler<int>>(setup: Setup.Decorator);
-
-        container.Resolve<IHandler<int>>();
-    }
-
-    interface IHandler<T> { void Handle(T t); }
-    class FooHandler<T> : IHandler<T> { public void Handle(T t) { } }
-    class BarHandler<T> : IHandler<T> { public void Handle(T t) { } }
-
-    class CompositeHandler<T> : IHandler<T>
-    {
-        private readonly IHandler<T>[] _handlers;
-        public CompositeHandler(IHandler<T>[] handlers) { _handlers = handlers; }
-        
-        // Composite handler which delegates its work to all dependent handlers 
-        public void Handle(T t)
-        {
-            foreach (var handler in _handlers)
-                handler.Handle(t);
-        }
-    }
-} 
-```
-
-In the first example we are first trying without Decorator for composite and failing,
-because it is not clear what handler from 3 available should container peek from.
-
-The second example demonstrates how to resolve a composite handler for requested handler type 
-via registering composite as a decorator.
-
 
 ## Decorator of Wrapper
 
