@@ -48,13 +48,13 @@ public interface IHandler
     bool IsHandled { get; }
     void Handle();
 }
-public class FooHandler : IHandler 
+public class FooHandler : IHandler
 {
     public bool IsHandled { get; private set; }
     public void Handle() => IsHandled = true;
 }
 
-public interface  ILogger
+public interface ILogger
 {
     void Log(string line);
 }
@@ -65,7 +65,7 @@ class InMemoryLogger : ILogger
     public void Log(string line) => Lines.Add(line);
 }
 
-public class LoggingHandlerDecorator : IHandler 
+public class LoggingHandlerDecorator : IHandler
 {
     private readonly IHandler _handler;
     public readonly ILogger Logger;
@@ -88,7 +88,8 @@ public class LoggingHandlerDecorator : IHandler
 
 class Decorator_with_logger
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -215,9 +216,9 @@ DryIoc supports decorator nesting.
  and the subsequent decorators will wrap the already decorated objects.
 
 ```cs 
-class S {}
-class D1 : S { public D1(S s) {} }
-class D2 : S { public D2(S s) {} }
+class S { }
+class D1 : S { public D1(S s) { } }
+class D2 : S { public D2(S s) { } }
 
 class Nested_decorators
 {
@@ -277,10 +278,10 @@ Decorators may be open-generic and registered to wrap open-generic services.
 
 ```cs 
 // constructors are skipped for brevity, they just accept A parameter
-class S<T> {}
-class D1<T> : S<T> {}
-class D2<T> : S<T> {}
-class DStr : S<string> {}
+class S<T> { }
+class D1<T> : S<T> { }
+class D2<T> : S<T> { }
+class DStr : S<string> { }
 
 class Open_generic_decorators
 {
@@ -315,7 +316,7 @@ public interface IStartable
     void Start();
 }
 
-public static class DecoratorFactory 
+public static class DecoratorFactory
 {
     public static T Decorate<T>(T service) where T : IStartable
     {
@@ -445,14 +446,14 @@ Decorator may be applied to the [wrapped](Wrappers) service in order to provide 
 ```cs 
 class ACall
 {
-    public virtual void Call() {}
+    public virtual void Call() { }
 }
 
 class LazyCallDecorator : ACall
-{ 
+{
     public Lazy<ACall> A;
     public LazyCallDecorator(Lazy<ACall> a) { A = a; }
-    
+
     // Creates an object only when calling it.
     public override void Call() => A.Value.Call();
 }
@@ -507,6 +508,65 @@ class Nesting_decorators_of_wrapped_service
 }
 ```
 
+### Composite Decorator
+
+Another example of decorating wrapper will be a [Composite pattern](https://en.wikipedia.org/wiki/Composite_pattern).
+Let's say we have many message handlers in out system, fro specific types of the messages. Now we want a single "composite" handler
+to invoke all handlers for a particular message type.
+
+```cs 
+class Composite_decorator
+{
+    [Test]
+    public void Not_working_example_without_decorator()
+    {
+        var container = new Container();
+
+        container.Register<IHandler<int>, FooHandler<int>>();
+        container.Register<IHandler<int>, BarHandler<int>>();
+        container.Register<IHandler<int>, CompositeHandler<int>>();
+
+        Assert.Throws<ContainerException>(() => 
+        container.Resolve<IHandler<int>>());
+    }
+
+    [Test]
+    public void Working_example_with_decorator()
+    {
+        var container = new Container();
+
+        container.Register<IHandler<int>, FooHandler<int>>();
+        container.Register<IHandler<int>, BarHandler<int>>();
+        container.Register<IHandler<int>, CompositeHandler<int>>(setup: Setup.Decorator);
+
+        container.Resolve<IHandler<int>>();
+    }
+
+    interface IHandler<T> { void Handle(T t); }
+    class FooHandler<T> : IHandler<T> { public void Handle(T t) { } }
+    class BarHandler<T> : IHandler<T> { public void Handle(T t) { } }
+
+    class CompositeHandler<T> : IHandler<T>
+    {
+        private readonly IHandler<T>[] _handlers;
+        public CompositeHandler(IHandler<T>[] handlers) { _handlers = handlers; }
+        
+        // Composite handler which delegates its work to all dependent handlers 
+        public void Handle(T t)
+        {
+            foreach (var handler in _handlers)
+                handler.Handle(t);
+        }
+    }
+} 
+```
+
+In the first example we are first trying without Decorator for composite and failing,
+because it is not clear what handler from 3 available should container peek from.
+
+The second example demonstrates how to resolve a composite handler for requested handler type 
+via registering composite as a decorator.
+
 
 ## Decorator of Wrapper
 
@@ -534,7 +594,7 @@ class Collection_wrapper_of_non_keyed_and_keyed_services
 
         // by default collection will contain instances of all registered types
         var iis = container.Resolve<IEnumerable<I>>();
-        CollectionAssert.AreEqual(new[]{ typeof(A), typeof(B), typeof(C) },
+        CollectionAssert.AreEqual(new[] { typeof(A), typeof(B), typeof(C) },
             iis.Select(i => i.GetType()));
     }
 } 
