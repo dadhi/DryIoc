@@ -10493,13 +10493,13 @@ namespace DryIoc.Messages
     }
 
     /// Message handler decorator which adds middleware handling
-    public class MessageHandlerMiddlewareDecorator<M, R> : IMessageHandler<M, R> where M : IMessage<R>
+    public class MiddlewareMessageHandler<M, R> : IMessageHandler<M, R> where M : IMessage<R>
     {
         private readonly IMessageHandler<M, R> _handler;
         private readonly IEnumerable<IMessageMiddleware<M, R>> _middlewares;
 
         /// Decorates message handler with optional middlewares
-        public MessageHandlerMiddlewareDecorator(IMessageHandler<M, R> handler, IEnumerable<IMessageMiddleware<M, R>> middlewares)
+        public MiddlewareMessageHandler(IMessageHandler<M, R> handler, IEnumerable<IMessageMiddleware<M, R>> middlewares)
         {
             _handler = handler;
             _middlewares = middlewares;
@@ -10513,29 +10513,47 @@ namespace DryIoc.Messages
                 .Invoke();
     }
 
+    /// Message with empty response
+    public interface IMessage : IMessage<EmptyResponse> { }
+
     /// Composite handles multiple handlers :)
-    public class MessageHandlerComposite<M> : IMessageHandler<M, EmptyResponse> 
-        where M : IMessage<EmptyResponse>
+    public class BroadcastMessageHandler<M> : IMessageHandler<M, EmptyResponse> 
+        where M : IMessage
     {
         private readonly IEnumerable<IMessageHandler<M, EmptyResponse>> _handlers;
 
         /// Constructs the hub with the handler and optional middlewares
-        public MessageHandlerComposite(IEnumerable<IMessageHandler<M, EmptyResponse>> handlers)
+        public BroadcastMessageHandler(IEnumerable<IMessageHandler<M, EmptyResponse>> handlers)
         {
             _handlers = handlers;
         }
 
         /// Composes middlewares with handler
-        public Task<EmptyResponse> Handle(M message, CancellationToken cancellationToken) =>
-            HandlingStrategy(_handlers.Select(h => h.Handle(message, cancellationToken)));
-
-        // todo: simplify by removing EmptyResponse out to Handle method
-        /// Handling strategy - parallel by default
-        protected virtual async Task<EmptyResponse> HandlingStrategy(IEnumerable<Task<EmptyResponse>> handlers)
+        public async Task<EmptyResponse> Handle(M message, CancellationToken cancellationToken)
         {
-            await Task.WhenAll(handlers).ConfigureAwait(false);
+            await Task.WhenAll(_handlers.Select(h => h.Handle(message, cancellationToken)));
             return EmptyResponse.Value;
         }
     }
+
+    /// A subject
+    public class MessageMediator
+    {
+        private readonly IResolver _resolver;
+
+        /// Constructs with resolver
+        public MessageMediator(IResolver resolver)
+        {
+            _resolver = resolver;
+        }
+
+        /// Sends message with response to resolved handlers
+        public Task<R> Send<M, R>(M message, CancellationToken cancellationToken) where M : IMessage<R> =>
+            _resolver.Resolve<IMessageHandler<M, R>>().Handle(message, cancellationToken);
+
+        /// Sends message with empty response to resolved handlers
+        public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage =>
+            _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
+    } 
 }
 #endif
