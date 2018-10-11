@@ -10492,7 +10492,7 @@ namespace DryIoc.Messages
             await Handle(message, cancellationToken).ConfigureAwait(false);
     }
 
-    /// Message handler decorator which adds middleware handling
+    /// Sequencial middleware type of message handler decorator
     public class MiddlewareMessageHandler<M, R> : IMessageHandler<M, R> where M : IMessage<R>
     {
         private readonly IMessageHandler<M, R> _handler;
@@ -10516,7 +10516,7 @@ namespace DryIoc.Messages
     /// Message with empty response
     public interface IMessage : IMessage<EmptyResponse> { }
 
-    /// Composite handles multiple handlers :)
+    /// Broadcasting type of message handler decorator
     public class BroadcastMessageHandler<M> : IMessageHandler<M, EmptyResponse> 
         where M : IMessage
     {
