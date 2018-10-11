@@ -3215,7 +3215,7 @@ namespace DryIoc
         public static readonly Rules Default = new Rules();
 
         /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
-        public const int DefaultDependencyDepthToSplitObjectGraph = 8;
+        public const int DefaultDependencyDepthToSplitObjectGraph = 20;
 
         /// <summary>Nested dependency depth to split an object graph</summary>
         public int DependencyDepthToSplitObjectGraph { get; private set; }
