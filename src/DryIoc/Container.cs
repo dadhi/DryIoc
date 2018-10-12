@@ -863,6 +863,13 @@ namespace DryIoc
                     matchedFactories = conditionedFactories;
             }
 
+            if (matchedFactories.Length > 1)
+            {
+                var preferedFactories = matchedFactories.Match(f => f.Value.Setup.PreferOverMultipleDefaultResolved);
+                if (preferedFactories.Length == 1)
+                    matchedFactories = preferedFactories;
+            }
+
             // The result is a single matched factory
             if (matchedFactories.Length == 1)
             {
@@ -6457,9 +6464,6 @@ namespace DryIoc
         /// <summary>Opens scope, also implies <see cref="AsResolutionCall"/>.</summary>
         public bool OpenResolutionScope => (_settings & Settings.OpenResolutionScope) != 0;
 
-        /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
-        public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
-
         /// <summary>Stores reused instance as WeakReference.</summary>
         public bool WeaklyReferenced => (_settings & Settings.WeaklyReferenced) != 0;
 
@@ -6472,12 +6476,18 @@ namespace DryIoc
         /// <summary>Instructs to use parent reuse. Applied only if <see cref="Factory.Reuse"/> is not specified.</summary>
         public bool UseParentReuse => (_settings & Settings.UseParentReuse) != 0;
 
+        /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
+        public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
+        
+        /// <summary>When multiple default services are selуcted, this option will be used at the end to decide what to return.</summary>
+        public bool PreferOverMultipleDefaultResolved => (_settings & Settings.PreferOverMultipleDefaultResolved) != 0;
+
         /// <summary>Sets the base settings.</summary>
         private Setup(Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, int disposalOrder = 0)
+            bool useParentReuse = false, int disposalOrder = 0, bool preferOverMultipleResolved = false)
         {
             Condition = condition;
             DisposalOrder = disposalOrder;
@@ -6504,6 +6514,8 @@ namespace DryIoc
                 _settings |= Settings.AsResolutionRoot;
             if (useParentReuse)
                 _settings |= Settings.UseParentReuse;
+            if (preferOverMultipleResolved)
+                _settings |= Settings.PreferOverMultipleDefaultResolved;
         }
 
         [Flags]
@@ -6516,7 +6528,8 @@ namespace DryIoc
             AllowDisposableTransient = 1 << 5,
             TrackDisposableTransient = 1 << 6,
             AsResolutionRoot = 1 << 7,
-            UseParentReuse = 1 << 8
+            UseParentReuse = 1 << 8,
+            PreferOverMultipleDefaultResolved = 1 << 9
         }
 
         private Settings _settings; // note: mutable because of setting the AsResolutionCall
@@ -6532,18 +6545,18 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, int disposalOrder = 0)
+            bool useParentReuse = false, int disposalOrder = 0, bool preferOverMultipleResolved = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
                 !openResolutionScope && !asResolutionCall && !asResolutionRoot &&
                 !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
-                !useParentReuse && disposalOrder == 0)
+                !useParentReuse && disposalOrder == 0 && !preferOverMultipleResolved)
                 return Default;
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                useParentReuse, disposalOrder);
+                useParentReuse, disposalOrder, preferOverMultipleResolved);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -6647,10 +6660,10 @@ namespace DryIoc
                 bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
                 bool preventDisposal, bool weaklyReferenced,
                 bool allowDisposableTransient, bool trackDisposableTransient,
-                bool useParentReuse, int disposalOrder)
+                bool useParentReuse, int disposalOrder, bool preferOverMultipleResolved = false)
                 : base(condition, openResolutionScope, asResolutionCall, asResolutionRoot,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                    useParentReuse, disposalOrder)
+                    useParentReuse, disposalOrder, preferOverMultipleResolved)
             {
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
             }
