@@ -335,7 +335,7 @@ namespace DryIoc
             if (preResolveParent == null || preResolveParent.IsEmpty)
                 preResolveParent = Request.Empty.Push(
                     typeof(IEnumerable<object>), requiredItemType, serviceKey, IfUnresolved.Throw,
-                    Factory.GetNextID(), FactoryType.Wrapper, null, null, 0, 0);
+                    WrappersSupport.CollectionWrapperID, FactoryType.Wrapper, null, null, 0, 0);
 
             var container = (IContainer)this;
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
@@ -2800,6 +2800,8 @@ namespace DryIoc
             return genericDefinition != null && FuncTypes.IndexOf(genericDefinition) != -1;
         }
 
+        internal static int CollectionWrapperID { get; private set; }
+
         /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
         public static readonly ImHashMap<Type, Factory> Wrappers = BuildSupportedWrappers();
 
@@ -2808,6 +2810,7 @@ namespace DryIoc
             var wrappers = ImHashMap<Type, Factory>.Empty;
 
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
+            CollectionWrapperID = arrayExpr.FactoryID;
 
             var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
@@ -6065,7 +6068,7 @@ namespace DryIoc
                 ServiceDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue));
         }
 
-        /// <summary>Prepends input arguments ot existing arguments in request. The pre-pending is done because
+        /// <summary>Prepends input arguments to existing arguments in request. Prepending is done because
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expr[] inputArgs) =>
@@ -6282,22 +6285,16 @@ namespace DryIoc
             s.Append(_serviceInfo);
 
             if (FactoryID != 0)
-                s.Append(" #").Append(FactoryID);
+                s.Append(" FactoryId=").Append(FactoryID);
 
             if (DecoratedFactoryID != 0)
-                s.Append(" decorating #").Append(DecoratedFactoryID);
+                s.Append(" decorating FactoryId=").Append(DecoratedFactoryID);
 
             if (!InputArgExprs.IsNullOrEmpty())
-                s.AppendFormat(" with args [{0}]", InputArgExprs);
+                s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
 
-            if ((Flags & RequestFlags.OpensResolutionScope) != 0)
-                s.Append(" (Opens resolution scope)");
-
-            if ((Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
-                s.Append(" (Stops recursion check)");
-
-            if ((Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
-                s.Append(" (Generated resolution dependency)");
+            if (Flags != default(RequestFlags))
+                s.Append(" ").Append(Flags);
 
             return s;
         }
