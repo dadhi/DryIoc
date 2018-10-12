@@ -933,8 +933,7 @@ __Note:__ Invoking initializer for any object means, that it will be invoked for
 To avoid this, logger is registered with a `serviceKey` and excluded from initializer action via `condition` parameter.
 
 
-Important thing, that `TTarget` of `RegisterInitializer<TTarget>()` may not correspond to the registered _serviceType_ of the service.
-It maybe any type implemented by registered service (including implementation type itself).
+The `TTarget` of `RegisterInitializer<TTarget>()` maybe an any type implemented by registered service type, but not by implementation type.
 
 For instance, to register logger for disposable services:
 ```cs
@@ -946,35 +945,89 @@ container.RegisterInitializer<IDisposable>(
 
 The normal way to cleanup things is to implement `IDisposable` interface. 
 If disposable service was registered with `Reuse`, and reuse scope is disposed, then the service will be disposed as well.
-For instance, registered singleton will be disposed when container (and therefore singletons scope) is disposed.
+For instance, registered singleton will be disposed when container (and therefore singleton scope) is disposed.
 
 But what if service for some reason does not implement `IDisposable` 
-but still wants to invoke __release logic__ when goes out of scope.
+but still wants to invoke "release logic" when goes out of the scope.
 
 `RegisterDisposer` addresses such a need. 
 
-__Note:__ Internally it is just a [Decorator](Decorators) which creates companion disposable object
-with specified _release_ action. When scope is disposed the conpanion is disposed too and invokes the action.
+__Note:__ Internally it is just a [Decorator](Decorators) which creates "companion" disposable object
+with specified _release_ action. When scope is disposed then the companion is disposed too invoking the action.
+```cs 
+class Register_disposer
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-    container.Register<FileUser>(Reuse.Singleton);
-    container.RegisterDisposer<FileUser>((fileUser, resolver) => fileUser.CloseFile());
+        container.Register<FileAbstraction>(Reuse.Singleton);
+        container.RegisterDisposer<FileAbstraction>(f => f.CloseFile());
 
-    container.Resolve<FileUser>().DoUsefulStuff();
+        var file = container.Resolve<FileAbstraction>();
+        file.ReadWriteStuff();
 
-    container.Dispose() // will call disposer action for FileUser singleton
+        container.Dispose(); // will call disposer action for FileUser singleton
+        Assert.IsTrue(file.IsClosed);
+    }
 
-The same as for `RegisterInitializer` the disposer _target type_ is any type implemented by registered service or its implementation.
+    internal class FileAbstraction
+    {
+        public bool IsClosed { get; private set; }
+        public void CloseFile() => IsClosed = true;
 
-    class X : IClosable {}
-    class Y : IClosable {}
-    
-    container.Register<X>();
-    container.Register<Y>();
+        public void ReadWriteStuff() { }
+    }
+}
 
-    container.RegisterDisposer<IClosable>((closable, resolver) => closable.Close());
+```
+The same as for `RegisterInitializer`, the disposer _target type_ maybe any type implemented by registered service type 
+(but not the implementation type).
+```cs 
+class Register_disposer_for_many_services
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-Additionally you may provide condition parameter to select target service. 
+        container.Register<X>(Reuse.Singleton);
+        container.Register<Y>(Reuse.Singleton);
+        container.RegisterDisposer<IClosable>(closable => closable.Close());
+
+        var x = container.Resolve<X>();
+        var y = container.Resolve<Y>();
+        container.Dispose();
+
+        Assert.IsTrue(x.IsClosed);
+        Assert.IsTrue(y.IsClosed);
+    }
+
+    interface IClosable
+    {
+        bool IsClosed { get; } 
+        void Close();
+    }
+    class X : IClosable
+    {
+        public bool IsClosed { get; private set; }
+        public void Close() => IsClosed = true;
+    }
+    class Y : IClosable
+    {
+        public bool IsClosed { get; private set; }
+        public void Close() => IsClosed = true;
+    }
+} 
+```
+
+Additionally, you may provide condition parameter to select target service. 
 For instance to filter out services already implementing `IDisposable`:
+```cs
+container.RegisterDisposer<IClosable>(closable => closable.Close(),
+    condition: request => !request.GetKnownImplementationOrServiceType().IsAssignableTo<IDisposable>());
+```
 
-    container.RegisterDisposer<IClosable>((closable, resolver) => closable.Close(),
-        condition: request => !typeof(IDisposable).IsAssignableFrom(request.ImplementationType ?? request.ServiceType));
+__NOTE__: The `RegisterDisposer` is just for adapt / compensate absence of `IDisposable` interface in third-party code. 
+If you in control, please implement `IDisposable` interface instead - it will cleanly state the intent without any DI tool involved.

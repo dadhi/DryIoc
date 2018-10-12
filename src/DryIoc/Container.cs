@@ -4149,7 +4149,7 @@ namespace DryIoc
         public static TypedMade<TService> Of<TService>(
             Expression<Func<TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues) =>
-            FromExpression<TService>(null, serviceReturningExpr, argValues);
+            FromExpression<TService>(member => _ => DryIoc.FactoryMethod.Of(member), serviceReturningExpr, argValues);
 
         /// <summary>Defines creation info from factory method call Expression without using strings.
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
@@ -4165,17 +4165,30 @@ namespace DryIoc
             where TFactory : class
         {
             getFactoryInfo.ThrowIfNull();
-            // NOTE: cannot convert to method group because of lack of covariance support in .Net 3.5
-            return FromExpression<TService>(r => getFactoryInfo(r).ThrowIfNull(), serviceReturningExpr, argValues);
+            return FromExpression<TService>(member => request => DryIoc.FactoryMethod.Of(member, getFactoryInfo(request)),
+                serviceReturningExpr, argValues);
+        }
+
+        /// Composes Made.Of expression with known factory instance and expression to get a service
+        public static TypedMade<TService> Of<TFactory, TService>(
+            TFactory factoryInstance,
+            Expression<Func<TFactory, TService>> serviceReturningExpr,
+            params Func<Request, object>[] argValues)
+            where TFactory : class
+        {
+            factoryInstance.ThrowIfNull();
+            return FromExpression<TService>(
+                member => request => DryIoc.FactoryMethod.Of(member, factoryInstance),
+                serviceReturningExpr, argValues);
         }
 
         private static TypedMade<TService> FromExpression<TService>(
-            Func<Request, ServiceInfo> getFactoryInfo, LambdaExpression serviceReturningExpr,
-            params Func<Request, object>[] argValues)
+            Func<MemberInfo, FactoryMethodSelector> getFactoryMethodSelector,
+            LambdaExpression serviceReturningExpr, params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
             if (callExpr.NodeType == ExpressionType.Convert) // proceed without Cast expression.
-                return FromExpression<TService>(getFactoryInfo,
+                return FromExpression<TService>(getFactoryMethodSelector,
                     Expression.Lambda(((UnaryExpression)callExpr).Operand, Empty<ParameterExpression>()),
                     argValues);
 
@@ -4219,9 +4232,6 @@ namespace DryIoc
             }
             else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeOfExpression, callExpr);
 
-            FactoryMethodSelector factoryMethod = request =>
-                DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, getFactoryInfo?.Invoke(request));
-
             var hasCustomValue = false;
 
             var parameterSelector = parameters.IsNullOrEmpty() ? null
@@ -4233,7 +4243,8 @@ namespace DryIoc
                 : ComposePropertiesAndFieldsSelector(ref hasCustomValue, 
                     serviceReturningExpr, memberBindingExprs, argValues);
 
-            return new TypedMade<TService>(factoryMethod, parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
+            return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember), 
+                parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
 
         /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
@@ -4890,12 +4901,17 @@ namespace DryIoc
 
             registrator.RegisterDelegate(_ => new Disposer<TService>(dispose),
                 serviceKey: disposerKey,
-                setup: Setup.With(useParentReuse: true));
+                // tracking instead of parent reuse, so that I can use one disposer for multiple services
+                setup: Setup.With(trackDisposableTransient: true)); 
 
-            registrator.Register(Made.Of(
-                r => ServiceInfo.Of<Disposer<TService>>(serviceKey: disposerKey),
-                f => f.TrackForDispose(Arg.Of<TService>())),
-                setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
+            var disposerType = typeof(Disposer<>).MakeGenericType(typeof(TService));
+            registrator.Register<object>(
+                made: Made.Of(
+                    r => disposerType.SingleMethod("TrackForDispose").MakeGenericMethod(r.ServiceType),
+                    ServiceInfo.Of(disposerType, serviceKey: disposerKey)),
+                setup: Setup.DecoratorWith(
+                    r => r.ServiceType.IsAssignableTo<TService>() && (condition == null || condition(r)), 
+                    useDecorateeReuse: true));
         }
 
         internal sealed class Disposer<T> : IDisposable
@@ -4910,7 +4926,7 @@ namespace DryIoc
                 _dispose = dispose;
             }
 
-            public T TrackForDispose(T item)
+            public S TrackForDispose<S>(S item) where S : T
             {
                 if (Interlocked.CompareExchange(ref _state, TRACKED, 0) != 0)
                     Throw.It(Error.DisposerTrackForDisposeError, _state == TRACKED ? " tracked" : "disposed");
@@ -6574,26 +6590,31 @@ namespace DryIoc
                 : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
 
+        /// Creates a condition for both <paramref name="decorateeType"/>, <paramref name="decorateeServiceKey"/> and additional condition
+        public static Func<Request, bool> GetDecorateeCondition(Type decorateeType,
+            object decorateeServiceKey = null, Func<Request, bool> condition = null)
+        {
+            if (decorateeType == null && decorateeServiceKey == null)
+                return condition;
+
+            Func<Request, bool> decorateeCond;
+            if (decorateeServiceKey == null)
+                decorateeCond = r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
+            else if (decorateeType == null)
+                decorateeCond = r => decorateeServiceKey.Equals(r.ServiceKey);
+            else
+                decorateeCond = r => decorateeServiceKey.Equals(r.ServiceKey) &&
+                                     r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
+            return condition == null ? decorateeCond : r => decorateeCond(r) && condition(r);
+        }
+
         /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>
         public static Setup DecoratorOf(Type decorateeType = null,
             int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false,
-            bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null)
-        {
-            Func<Request, bool> condition;
-            if (decorateeType == null && decorateeServiceKey == null)
-                condition = null;
-            else if (decorateeServiceKey == null)
-                condition = r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
-            else if (decorateeType == null)
-                condition = r => decorateeServiceKey.Equals(r.ServiceKey);
-            else
-                condition = r => decorateeServiceKey.Equals(r.ServiceKey) &&
-                    r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
-
-            return DecoratorWith(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
+            bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null) =>
+            DecoratorWith(GetDecorateeCondition(decorateeType, decorateeServiceKey), order, useDecorateeReuse, openResolutionScope, asResolutionCall,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
-        }
 
         /// <summary>Setup for decorator of type <typeparamref name="TDecoratee"/>.</summary>
         public static Setup DecoratorOf<TDecoratee>(

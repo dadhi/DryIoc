@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using DryIoc.UnitTests.CUT;
@@ -684,11 +684,10 @@ namespace DryIoc.UnitTests
             {
                 var serviceKey = new IntKey(i);
                 container.Register<AD>(Reuse.Singleton, serviceKey: serviceKey);
-                container.RegisterDisposer<AD>(ad => ad.IsDisposed = true);
             }
 
             var services = container.Resolve<KeyValuePair<IntKey, AD>[]>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 var pair = services[i];
                 Assert.IsNotNull(pair.Value);
@@ -696,7 +695,7 @@ namespace DryIoc.UnitTests
             }
 
             container.Dispose();
-            for (int i = 0; i < count; ++i)
+            for (var i = 0; i < count; ++i)
                 Assert.IsTrue(services[i].Value.IsDisposed);
         }
 
@@ -721,7 +720,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        public class AD
+        public class AD : IDisposable
         {
             public bool IsDisposed { get; set; }
 
