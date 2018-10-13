@@ -1,3 +1,4 @@
+/*md
 # Reuse and Scopes
 
 [TOC]
@@ -711,3 +712,4 @@ __Note:__ `preventDisposal` should be used with weakly referenced service too in
     container.Register<Service>(Reuse.Singleton, 
         setup: Setup.With(preventDisposal: true, weaklyReferenced: true);
 ```
+md*/
