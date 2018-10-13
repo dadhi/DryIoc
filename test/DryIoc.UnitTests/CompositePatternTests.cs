@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ImTools;
@@ -119,6 +119,40 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<CompositeOperation>(service.Action);
         }
 
+        [Test]
+        public void Working_example_with_decorator()
+        {
+            var container = new Container();
+
+            container.Register<IHandler<int>, FooHandler<int>>();
+            container.Register<IHandler<int>, BarHandler<int>>();
+            container.Register<IHandler<int>, CompositeHandler<int>>(
+                setup: Setup.With(preferOverMultipleResolved: true));
+
+            var h = container.Resolve<IHandler<int>>();
+
+            Assert.IsInstanceOf<CompositeHandler<int>>(h);
+        }
+
+        #region Composite pattern CUT
+
+        interface IHandler<T> { void Handle(T t); }
+        class FooHandler<T> : IHandler<T> { public void Handle(T t) { } }
+        class BarHandler<T> : IHandler<T> { public void Handle(T t) { } }
+
+        class CompositeHandler<T> : IHandler<T>
+        {
+            private readonly IHandler<T>[] _handlers;
+            public CompositeHandler(IHandler<T>[] handlers) { _handlers = handlers; }
+
+            // Composite handler which delegates its work to all dependent handlers 
+            public void Handle(T t)
+            {
+                foreach (var handler in _handlers)
+                    handler.Handle(t);
+            }
+        }
+
         public interface IAction
         {
         }
@@ -154,8 +188,6 @@ namespace DryIoc.UnitTests
                 Action = action;
             }
         }
-
-        #region Composite pattern CUT
 
         public interface IShape
         {
