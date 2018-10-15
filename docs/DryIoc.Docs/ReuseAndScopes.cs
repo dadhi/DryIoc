@@ -68,6 +68,7 @@ an individual registration or `Rules.WithoutThrowOnRegisteringDisposableTransien
 using System;
 using DryIoc;
 using NUnit.Framework;
+// ReSharper disable UnusedVariable
 
 class Disposable_transient_as_resolved_service
 {
@@ -223,23 +224,33 @@ class Prevent_disposable_tracking_with_Func
 ### Different default Reuse instead of Transient
 
 Sometimes you may want to apply another default reuse instead of Transient. 
-Possible reasons may be: to minimize clutter in registrations, or to automatically provide reuse preferred in your application domain.
+Possible reasons maybe: to minimize clutter in registrations, 
+or to automatically provide reuse preferred to your use-case.
 
 You can achieve this by setting the Container Rules:
-```
-#!c#
-   var container = new Container(rules => 
-       rules.WithDefaultReuseInsteadOfTransient(Reuse.InCurrentScope));
+```cs md*/
+class Default_reuse_per_container
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.WithDefaultReuse(Reuse.Scoped));
 
-   container.Register<Abc>();
-// or container.Register<Abc>(Reuse.Transient);
+        container.Register<Abc>();
 
-   using (var scope = container.OpenScope())
-   {
-       var abc = scope.Resolve<Abc>();
-       Assert.AreSame(abc, scope.Resolve<Abc>());
-   }
+        using (var scope = container.OpenScope())
+        {
+            var abc = scope.Resolve<Abc>();
+            Assert.AreSame(abc, scope.Resolve<Abc>());
+        }
+    }
+
+    class Abc { }
+} /*md
 ```
+
+What if I want a Transient reuse when `DefaultReuse` is different from Transient. In this case you need to 
+specify `Reuse.Transient` explicitly: `container.Register<X>(Reuse.Transient)`.
 
 
 ## Reuse.Singleton
@@ -445,7 +456,7 @@ ScopeContext is the storage and tracking mechanism for current opened scope and 
 Result scopes `s1`, `s2`, `s3`and `t1` form a tree.
 
 Given example from previous section, when you call `carFactory()` from the first thread, the created car will be stored in `s3`,
-and when called ofrom the second thread, car will be stored in `t1`;
+and when called from the second thread, car will be stored in `t1`;
 
 Then if you dispose `s3`, context will start tracking `s2` as a current scope of first thread (there is no car in it yet.).
 When you dispose all `s3`, `s2`, `s1` then no current scope in ScopeContext for the first thread, and car factory will
