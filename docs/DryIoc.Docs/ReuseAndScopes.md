@@ -254,6 +254,23 @@ specify `Reuse.Transient` explicitly: `container.Register<X>(Reuse.Transient)`.
 The same single instance per Container. Service instance will be created on first resolve or injection and will live until
 container is disposed. If instance type is `IDisposable` then it will be disposed together with container.
 
+```cs 
+class Singleton_reuse
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<A>(Reuse.Singleton);
+
+        var a = container.Resolve<A>();
+        Assert.AreSame(a, container.Resolve<A>());
+    }
+
+    class A { }
+} 
+```
+
 
 ## Reuse.InResolutionScope
 
