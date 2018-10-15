@@ -62,6 +62,10 @@
         <Generator>CsToMd</Generator>
         <LastGenOutput>RequiredServiceType.md</LastGenOutput>
       </Compile>
+      <Compile Update="ReuseAndScopes.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>ReuseAndScopes.md</LastGenOutput>
+      </Compile>
       <Compile Update="UsingInTestsWithMockingLibrary.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
@@ -113,6 +117,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>RequiredServiceType.cs</DependentUpon>
+      </None>
+      <None Update="ReuseAndScopes.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>ReuseAndScopes.cs</DependentUpon>
       </None>
       <None Update="UsingInTestsWithMockingLibrary.md">
         <DesignTime>True</DesignTime>
