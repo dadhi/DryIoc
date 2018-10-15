@@ -70,9 +70,6 @@ echo:DryIoc.SignalR
 echo:============================
 REM %NUGET% pack %NUSPECS%\DryIoc.SignalR.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
 
-echo: 
-echo:## PACKAGING SUCCEEDED ##
-
 REM if not "%1"=="-nopause" pause 
 REM goto:eof
 

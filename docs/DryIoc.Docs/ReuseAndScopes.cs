@@ -1,4 +1,6 @@
 /*md
+<!--Auto-generated from .cs file, the edits here will be lost! -->
+
 # Reuse and Scopes
 
 [TOC]

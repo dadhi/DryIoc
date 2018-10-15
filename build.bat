@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 
 set SLN=".\DryIoc.sln"
 
-rem finding MSBuild.exe
+rem Looking for MSBuild.exe path
 set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe"
 if not exist %MSB% set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\15.0\bin\MSBuild.exe"
 if not exist %MSB% for /f "tokens=4 delims='" %%p IN ('.nuget\nuget.exe restore ^| find "MSBuild auto-detection"') do set MSB="%%p\MSBuild.exe"
@@ -13,36 +13,37 @@ echo:
 
 rem dotnet clean --verbosity:minimal
 
-rem The nuget.exe executable is used directly because of error with restoring in `dotnet build` and `dotnet test`
-call .nuget\nuget.exe restore %SLN%
-if %ERRORLEVEL% neq 0 call :error "RESTORE"
-echo:
-echo:## RESTORE IS SUCCESSFUL ##
-echo:
-
-call %MSB% %SLN% /t:Rebuild;Pack /p:Configuration=Release /p:RestorePackages=false /verbosity:minimal /fl /flp:LogFile=MSBuild.log
+rem: Turning Off the $(DevMode) from the Directory.Build.props to alway build an ALL TARGETS
+call %MSB% %SLN% /t:Restore;Rebuild /p:DevMode=false /p:Configuration=Release /verbosity:minimal /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 call :error "BUILD;PACK"
 echo:
-echo:## BUILD, PACK IS SUCCESSFUL ##
+echo:## RESTORE and BUILD is SUCCESSFUL ##
 echo:
 
-dotnet test /restore:false .\docs\DryIoc.Docs
-dotnet test /restore:false .\test\DryIoc.UnitTests
-dotnet test /restore:false .\test\DryIoc.IssuesTests
-dotnet test /restore:false .\test\DryIoc.MefAttributedModel.UnitTests
-dotnet test /restore:false .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
+dotnet test -c:Release --no-build .\docs\DryIoc.Docs
+dotnet test -c:Release --no-build .\test\DryIoc.UnitTests
+dotnet test -c:Release --no-build .\test\DryIoc.IssuesTests
+dotnet test -c:Release --no-build .\test\DryIoc.MefAttributedModel.UnitTests
+dotnet test -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
 if %ERRORLEVEL% neq 0 call :error "TESTS"
 echo:
-echo:## TESTS ARE SUCCESSFUL ##
+echo:## TESTS are SUCCESSFUL ##
 echo:
+
+dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc\DryIoc.csproj
+dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIocAttributes\DryIocAttributes.csproj
+dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj
+dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj
+dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj
+if %ERRORLEVEL% neq 0 call :error "PACKAGING"
 
 call BuildScripts\NugetPack.bat
-if %ERRORLEVEL% neq 0 call :error "PACK SOURCE PACKAGES"
+if %ERRORLEVEL% neq 0 call :error "PACKAGING SOURCE PACKAGES"
 echo:
-echo:## PACK SOURCE PACKAGES IS SUCCESSFUL ##
+echo:## PACKAGING is SUCCESSFUL ##
 echo:
 
-echo:## ALL DONE SUCCESSFULLY ##
+echo:## ALL done SUCCESSFULLY ##
 echo:
 exit /b 0
 
