@@ -543,61 +543,24 @@ class Named_open_scopes_and_scoped_to_name
 When resolving or injecting a service with `ScopeTo(name)` reuse DryIoc will look up starting from the current open scope, 
 through chain of its parents until the scope with the name is found or we reached the top scope.
 
-To define Name you may use object of any type with overridden method `Equals`: `Reuse.InCurrentNamedScope(42)` - `42` is valid Name.
+To define a name you may use object of any type with `Equals(object other)` and `GetHashCode()` available. 
+`Reuse.ScopedTo(42)` or `Reuse.ScopedTo(Flags.Red)` are the valid names.
 
-__Note:__ By default if no Name specified in first `c.OpenScope()` DryIoc will set Name to container's `ScopeContext.RootScopeName`.
+__Note:__ When the name is not specified it has a `null` value.
 
-To make previous example work without "top" name:
-```
-#!c#
-   container.Register<Car>(Reuse.InCurrentNamedScope(container.ScopeContext.RootScopeName));
-   using (var s1 = container.OpenScope()) // creates scope s1 with Name=container.ScopeContext.RootScopeName
-   // the rest ...
-```
-
-All supported scope contexts have different `IScopeContext.RootScopeName`.
-For convenience this name also available statically from ScopeContext type: `ThreadScopeContext.ROOT_SCOPE_NAME`;
-
-So we are close to understanding what is `Reuse.InThread` and `Reuse.InWebRequest`.
-Code is better than thousands words:
-```
-#!c#
-   Reuse.InThread = Reuse.InCurrentNamedScope(ThreadScopeContext.ROOT_SCOPE_NAME);
-```
-
-It is clear that `InThread` is just in reuse in current scope with special predefined name.
-
-__Note:__ Reuse itself is independent from specific scope context - you may change scope context to another, for instance `AsyncExecutionFlowScopeContext`, without changing reuse in registrations. As long as you `OpenScope` with predefined name everything will work as expected.
-
-## Reuse.InWebRequest
-
-Similar to `InThread` `InWebRequest` is just reuse in scope with special predefined name.
-That's it. It is defined as following:
-
-```
-#!c#
-   Reuse.InWebRequest = Reuse.InCurrentNamedScope(Reuse.WebRequestScopeName);
-```
-
-ASP.NET extensions are using `InWebRequest` paired with corresponding ScopeContext:
-
-- `HttpContextScopeContext` for Web Forms and MVC
-- `AsyncExecutionFlowScopeContext` for WebApi
-
-__Note:__ In tests you may change scope context without changing reuse, e.g. change `HttpContextScopeContext` to `ThreadScopeContext`:
-
-```
-#!c#
-   testContainer = webContainer.With(scopeContext: new ThreadScopeContext());
-```
-
-__Note:__ If you want to emulate Request Begin/End in test just `OpenScope` with corresponding name: `using (var scope = testContainer.OpenScope(Reuse.WebRequestScopeName)) { }`.
-
-No need to touch reuse in registrations, everything still works.
+Since v3.0 DryIoc supports specifying multiple names via `Reuse.ScopedTo(params object[] names)`. 
+DryIoc will stop when __any__ of the names are equal to the scope name.
 
 
+### Reuse.InWebRequest and Reuse.InThread
 
-## Reuse.InResolutionScope
+Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
+
+- `Reuse.InWebRequest == Reuse.ScopedTo(specificName)`.
+- `Reuse.InThread == Reuse.Scoped` just a scoped reuse in presence of `ThreadScopeContext`
+
+
+## Reuse.ScopeTo{TService}(serviceKey)
 
 The same instance per Resolution Root, which means the same instance inside `Resolve` method call. 
 It is similar to assigning resolved service to variable and then reusing this variable during service creation.
