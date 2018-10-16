@@ -691,7 +691,7 @@ __Note:__ There is a similar reuse (lifestyle) available in other IoC libraries,
 
 There is more to `Reuse.ScopeTo<T>(object serviceKey = null)`:
 
-- You may provide an optional `serviceKey` to match a service scope registered with this key
+- You may provide an optional `serviceKey` to match a service registered with this key.
 - You may register to match not only the exact `TService` but its base class or the implemented interface.
 
 

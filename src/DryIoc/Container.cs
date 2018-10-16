@@ -8715,7 +8715,7 @@ namespace DryIoc
         /// <summary>Obsolete: please prefer using <see cref="Reuse.Scoped"/> instead.
         /// The named scope has performance drawback comparing to just a scope.
         /// If you need to distinguish nested scope, give names to them instead of naming the top web request scope.</summary>
-        public static readonly IReuse InWebRequest = InCurrentNamedScope(WebRequestScopeName);
+        public static readonly IReuse InWebRequest = ScopedTo(WebRequestScopeName);
 
 #region Implementation
 
