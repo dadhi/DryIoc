@@ -85,7 +85,7 @@ class Disposable_transient_as_resolved_service
         x.Dispose();
     }
 
-    class X : IDisposable { public void Dispose() {} }
+    class X : IDisposable { public void Dispose() { } }
 }
 ```
 
@@ -572,12 +572,12 @@ class Example_of_reusing_dependency_as_variable
 
     class Foo
     {
-        public Foo(SubDependency sub, Dependency dep) {}
+        public Foo(SubDependency sub, Dependency dep) { }
     }
 
     class Dependency
     {
-        public Dependency(SubDependency sub) {}
+        public Dependency(SubDependency sub) { }
     }
 
     class SubDependency { }
@@ -693,33 +693,55 @@ There is more to `Reuse.ScopeTo<T>(object serviceKey = null)`:
 
 ## Setup.UseParentReuse
 
-This option allows dependency to use parent or ancestor reuse, if it has reused parents.
-In case if all parents are transient or dependency is wrapped in `Func` somewhere in parents chain,
-then the dependency itself will be transient.
+This option allows the dependency to use parent or ancestor service reuse (if it has parents defining a reuse).
+In case of all parents are transient or dependency is wrapped in `Func` somewhere in parents chain,
+the dependency will be transient at the end.
 
-```
-#!c#
-   class Mercedes
-   {
-       public Mercedes(Wheels wheels) {}
-   }
+```cs 
+class Use_parent_reuse
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-   class Car 
-   {
-       public Car(Wheels wheels) {}
-   }
+        container.Register<Mercedes>(Reuse.Singleton);
+        container.Register<Dodge>();
 
-   container.Register<Mercedes>(Reuse.Singleton);
-   container.Register<Car>();
-   container.Register<Wheels>(setup: Setup.With(useParentReuse: true));
+        container.Register<Wheels>(setup: Setup.With(useParentReuse: true));
 
-   // same Mercedes with the same Wheels
-   var m1 = container.Resolve<Mercedes>();
-   var m2 = container.Resolve<Mercedes>();
+        // same Mercedes with the same Wheels
+        var m1 = container.Resolve<Mercedes>();
+        var m2 = container.Resolve<Mercedes>();
+        Assert.AreSame(m1.Wheels, m2.Wheels);
 
-   // different Cars with different Wheels
-   var c1 = container.Resolve<Car>();
-   var c2 = container.Resolve<Car>();
+        // different Dodges with the different Wheels
+        var d1 = container.Resolve<Dodge>();
+        var d2 = container.Resolve<Dodge>();
+        Assert.AreNotSame(d1.Wheels, d2.Wheels);
+    }
+
+    class Mercedes
+    {
+        public Wheels Wheels { get; }
+        public Mercedes(Wheels wheels)
+        {
+            Wheels = wheels;
+        }
+    }
+
+    class Dodge
+    {
+        public Wheels Wheels { get; }
+        public Dodge(Wheels wheels)
+        {
+            Wheels = wheels;
+        }
+    }
+
+    private class Wheels { }
+
+}
 ```
 
 __Note:__ If both `reuse` and `useParentReuse` specified then `reuse` has an upper hand and setup option is ignored.
