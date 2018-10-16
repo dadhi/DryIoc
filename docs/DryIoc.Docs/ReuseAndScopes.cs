@@ -344,7 +344,7 @@ Interesting thing, if you resolve `Car` from container wrapped in `Func<Car>` or
 But when you try to use a lazy value in open scope it will throw.
 
 ```cs md*/
-class Scoped_reuse_resolve_wrapped_in_Func
+class Scoped_reuse_resolve_wrapped_in_Lazy_outside_of_scope
 {
     [Test]
     public void Example()
@@ -376,103 +376,130 @@ There is way to support such a lazy scenario, check the next section.
 
 ### ScopeContext
 
-ScopeContext is the storage and tracking mechanism for current opened scope and its nested scopes:
-```
-#!c#
-   var c = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+ScopeContext (`IScopeContext` interface) is the __shared__ storage and tracking mechanism for current opened scope and its nested scopes.
+By default, `Container` does not have any scope context, and stores a scope directly in itself. When providing with scope context,
+container may share the context with scoped containers, making possible lazy resolve outside of the scope and then getting value
+when scope is available __in shared scope context__.
 
-   // Three nested scopes in one branch
-   s1 = c.OpenScope(); s2 = s1.OpenScope(); s3 = s2.OpenScope();
-       
-   // One nested scope in another branch
-   t1 = c.OpenScope();
-```
+```cs md*/
+class Scoped_reuse_resolve_Lazy_with_scope_context
+{
+    [Test]
+    public void Example()
+    {
+        // The important bit is creating the scope context for container
+        var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
 
-Result scopes `s1`, `s2`, `s3`and `t1` form a tree.
+        container.Register<Car>(Reuse.Scoped);
 
-Given example from previous section, when you call `carFactory()` from the first thread, the created car will be stored in `s3`,
-and when called from the second thread, car will be stored in `t1`;
+        var carFactory = container.Resolve<Lazy<Car>>();
 
-Then if you dispose `s3`, context will start tracking `s2` as a current scope of first thread (there is no car in it yet.).
-When you dispose all `s3`, `s2`, `s1` then no current scope in ScopeContext for the first thread, and car factory will
-throw as we saw in first example.
+        using (var scopedContainer = container.OpenScope())
+        {
+            var car = carFactory.Value;
+            car.DriveToMexico();
+        }
+    }
 
-__By default container does no have associated scope context__ and opened scope will be bound to container itself.
-
-To specify scope context when creating container: 
-```
-#!c#
-   var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
-```
-
-To change context when you have an existing container:
-```
-#!c#
-   var containerForTest = c.With(scopeContext: new MyTestScopeContext());
+    class Car
+    {
+        public void DriveToMexico() { }
+    }
+} /*md
 ```
 
 Supported contexts:
 
-- `AsyncExecutionFlowScopeContext` - defined only for .NET 4.5 and higher. This context tracks opened scope across await/async boundaries using `System.Runtime.Remoting.Messaging.CallContext`. Check this [blog post](http://blog.stephencleary.com/2013/04/implicit-async-context-asynclocal.html) for details.
-- `ThreadScopeContext` - aka Thread Local, opened scope will be bound to current thread.
-- `HttpContextScopeContext` - is available with __DryIoc.Web__ extension. It binds opened scope to `HttpContext`.
+- `AsyncExecutionFlowScopeContext` is available in .NET 4.5+ and .NET Standard 1.3+. 
+This context tracks open scopes across `await / async` call boundaries. 
+Check this [blog post](http://blog.stephencleary.com/2013/04/implicit-async-context-asynclocal.html) for details.
+- `ThreadScopeContext` is a thread local context, shares the open scopes in the current thread.
+- `HttpContextScopeContext`is available with `DryIoc.Web` extension. It stores the open scopes in `HttpContext`.
 
 You may create your own context by implementing `IScopeContext` interface.
 
-
-### ScopeContext is important for ASP.NET Web applications
-
-Tracking or binding the scopes to some context, e.g. `HttpContext` or `CallContext`, allow to reuse services per Request. Check `Reuse.InWebRequest` section  below for more details.
-
-### OpenScope without ScopeContext
-
-`OpenScope` in container without context (__which is default__) creates new scope associated with the container. 
-You may call `OpenScope` multiple times producing new independent scopes existing in parallel.
-```
-#!c#
-   var container = new Container();
-   container.Register<Blah>(Reuse.InCurrentScope);
-   
-   var scope1 = container.OpenScope();
-   var scope2 = container.OpenScope();
-   
-   var blah1 = scope1.Resolve<Blah>();
-   var blah2 = scope2.Resolve<Blah>();
-   
-   Assert.AreSame(blah1, scope1.Resolve<Blah>());
-   Assert.AreNotSame(blah1, blah2);
-   
-   scope1.Dispose();
-   scope2.Dispose();
-```
-
-__Note:__ `OpenScope` creates scope tree bound to corresponding container tree. 
-Calling `OpenScope` with context produces chain of current scopes with latest (current) scope stored in the context.
+__Note:__ `AsyncExecutionFlowScopeContext` maybe considered a default option, when you don't know what to use.
 
 
-### Implicit Open Scope
+### Nested scopes
 
-DryIoc has an optional rule do automatically open scope when container is created. 
-The rule is only valid for non-ambient scopes - it means for container without ScopeContext.
+The scopes maybe nested either with or without scope context present.
 
-__Note:__ The important thing, that implicitly open scope will be disposed when the container is disposed, 
-so that both scoped and singleton services will be disposed.
+```cs md*/
+class Nested_scopes_without_scope_context
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-```
-#!c#
-   var container = new Container(rules => rules.WithImplicitRootOpenScope());
-   
-   container.Register<X>(Reuse.InCurrentScope);
-   container.Register<Y>(Reuse.Singleton);
+        container.Register<A>(Reuse.Scoped);
 
-   var x = container.Resolve<X>(); // works without OpenScope
-   var y = container.Resolve<Y>();
+        // Three nested scopes
+        var s1 = container.OpenScope();
+        var s2 = s1.OpenScope();
+        var s3 = s2.OpenScope();
 
-   container.Dispose(); // both x and y are disposed here.
+        Assert.AreSame(s1.Resolve<A>(), s1.Resolve<A>());
+        Assert.AreNotSame(s1.Resolve<A>(), s2.Resolve<A>());
+        Assert.AreNotSame(s2.Resolve<A>(), s3.Resolve<A>());
+    }
+
+    class A { }
+} /*md
 ```
 
-Given implicitly open scope calling `OpenScope` again will create second level nested scope. 
-This nested scope should be disposed normally via `scope.Dispose()`;
+Scopes `s1`, `s2`, `s3` form a nested chain where `s1` is parent of `s2` and `s2` is parent of `s3`.
+
+__Note:__ In absence of scope context, all the nested scopes are exist and available __independently__, so you may 
+resolve from any nested scoped container any time getting a different instances from the different scopes. 
+
+Now we add `ScopeContext` to the mix:
+
+```cs md*/
+class Nested_scopes_with_scope_context
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+
+        container.Register<A>(Reuse.Scoped);
+
+        // Three nested scopes
+        var s1 = container.OpenScope();
+        var s2 = s1.OpenScope();
+        var s3 = s2.OpenScope();
+
+        Assert.AreSame(s1.Resolve<A>(), s1.Resolve<A>());
+
+        // Here is the difference - all the instances of are the same and stored in the deepest scope `s3`
+        Assert.AreSame(s1.Resolve<A>(), s2.Resolve<A>());
+        Assert.AreSame(s2.Resolve<A>(), s3.Resolve<A>());
+
+        // An `a` will be actually resolved from the `s3` despite that we resolving from the `parent`
+        var a = s1.Resolve<A>();
+
+        // We disposed of the `s3` scope, making its parent `s2` a new current scope.
+        s3.Dispose();
+        Assert.IsTrue(a.IsDisposed);
+
+        // Now a new instances started to be resolved from `s2`
+        Assert.AreNotSame(a, s2.Resolve<A>());
+        Assert.AreSame(s2.Resolve<A>(), s1.Resolve<A>());
+    }
+
+    class A : IDisposable
+    {
+        public void Dispose() => IsDisposed = true;
+        public bool IsDisposed { get; private set; }
+    }
+} /*md
+```
+
+Scope context associated with `container` has a shared "current" scope property, which references the last / deepest open scope.
+The "current" scope is overridden with new scope open, making it an actual current scope to resolve from. 
+When current scope is disposed, its parent becomes a new current scope.
 
 
 ## Reuse.InCurrentNamedScope and Reuse.InThread
