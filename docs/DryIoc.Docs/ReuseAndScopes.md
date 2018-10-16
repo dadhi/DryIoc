@@ -749,35 +749,44 @@ __Note:__ If both `reuse` and `useParentReuse` specified then `reuse` has an upp
 
 ## Reuse lifespan diagnostics
 
-Lifetime diagnostics helps you to find [Captive Dependency](http://blog.ploeh.dk/2014/06/02/captive-dependency/) 
-of service which tends to outlive its parent, making the parent behavior undetermined afterwards.
+Lifespan diagnostics helps you to find a [Captive Dependencies](http://blog.ploeh.dk/2014/06/02/captive-dependency/) 
+of a service which tends to outlive its parent, making the parent behavior undetermined afterwards.
 
-`IReuse` implementations in DryIoc have associated `Lifespan` property. This is a relative number of how long the reused object lives, 
-which allows to detect lifespan mismatches by simply comparing the lifespan values:
+`IReuse` implementations in DryIoc have an associated `Lifespan` property. This is a relative `int` number of how long the reused object lives, 
+which allows to detect lifespan mismatches by simply comparing the lifespan values.
 
-Pre-defined DryIoc reuses have following lifespan:
+DryIoc reuses have the following lifespans:
 
 - `Singleton`: 1000. Object lives for lifetime of container.
-- `InCurrentScope` family: 100. Object lives until current scope is closed which is less the container lifetime.
-- `InResolutionScope` family: 0. Because resolution scope reuse is orthogonal to other reuses - the comparison does not make sense.
-- transient services: 0. Does not have the reuse and therefore lifetime.
+- `Scoped(To)`: 100. Object lives until current scope is closed which is less the container lifetime.
+- `Transient`: 0. Indicate an absence of reuse and therefore the absence of lifetime.
 
-Example: 
-Given the numbers above, when singleton `Car` depends on injected `Wheels` reused in current scope,
-the resolution of `Car` will throw exception - because `Wheels` lifespan 100 is less than parent's 1000.
-```
-#!c#
-   var c = new Container();
-   
-   c.Register<Car>(Reuse.Singleton);
-   c.Register<Wheels>(Reuse.InCurrentScope);
-   
-   using (var scope = c.OpenScope())
-       c.Resolve<Car>(); // will throw ContainerException with message:
-   
-   // Dependency Wheels as parameter "wheels" has shorter Reuse lifespan than its parent: Car.
-   // CurrentScopeReuse:100 lifetime is shorter than SingletonReuse:1000.
-   // You may turn Off this error with Rules.WithoutThrowIfDepenedencyHasShorterReuseLifespan().
+```cs 
+class Reuse_lifespan_mismatch_detection
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Mercedes>(Reuse.Singleton);
+        container.Register<Wheels>(Reuse.Scoped);
+
+        using (var scope = container.OpenScope())
+        {
+            // Throws an exception with captive dependency detected:
+            // dependency Scoped lifespan is less than parent Singleton lifespan 
+            Assert.Throws<ContainerException>(() => container.Resolve<Mercedes>());
+        }
+    }
+
+    class Mercedes
+    {
+        public Mercedes(Wheels wheels) { }
+    }
+
+    class Wheels { }
+}
 ```
 
 The error message is saying how to turn Off this error via rule:
