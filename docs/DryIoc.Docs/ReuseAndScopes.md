@@ -447,7 +447,9 @@ class Nested_scopes_without_scope_context
 
 Scopes `s1`, `s2`, `s3` form a nested chain where `s1` is parent of `s2` and `s2` is parent of `s3`.
 
-__Note:__ In absence of scope context, all the nested scopes are exist and available __independently__, so you may 
+__Note:__ In DryIoc a singleton scope is not a part of scope chain.
+
+In absence of scope context, all the nested scopes are exist and available __independently__, so you may 
 resolve from any nested scoped container any time getting a different instances from the different scopes. 
 
 Now we add `ScopeContext` to the mix:
@@ -498,57 +500,44 @@ The "current" scope is overridden with new scope open, making it an actual curre
 When current scope is disposed, its parent becomes a new current scope.
 
 
-## Reuse.InCurrentNamedScope and Reuse.InThread
+## Reuse.ScopedTo(name)
 
-Scopes may be nested. Let's review what happens when we open one scope from another:
-```
-#!c#
-   container.Register<Car>(Reuse.InCurrentScope);
-   
-   using (var s1 = container.OpenScope()) // creates scope s1, s1 becomes ScopeContext.CurrentScope
-   {
-       var car1 = s1.Resolve<Car>();      // creates new Car and stores it into CurrentScope (s1)
-   
-       using (var s2 = s1.OpenScope())    // creates scope s2, s1 becomes s2.Parent, s2 becomes ScopeContext.CurrentScope
-       {
-           var car2 = s2.Resolve<Car>();  // creates new Car and stores it into CurrentScope s2
-   
-           Assert.AreNotSame(car2, car1); // car2 and car1 are different because residing in different scopes: s2 and s1
-   
-       }                                  // disposes s2 together with car2, s2.Parent (s1) becomes ScopeContext.CurrentScope again
-   
-       var car3 = s1.Resolve<Car>();      // returns existing Car (car1) in CurrentScope (s1)
-   
-       Assert.AreSame(car3, car1);        // car3 and car1 are the same
-   
-   }                                      // disposes s1 together with car1, CurrentScope becomes null
-   
-   container.Resolve<Car>();              // throws ContainerException as there is no CurrentScope
+You may tag the scope with the distinct "name" to resolve from the specific scope in nested chain using the 
+`Reuse.ScopedTo(object name)` reuse.
+
+It also works both with or without the context scope.
+
+```cs 
+class Named_open_scopes_and_scoped_to_name
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Car>(Reuse.ScopedTo("top"));
+
+        using (var s1 = container.OpenScope("top"))
+        {
+            var car1 = s1.Resolve<Car>();
+
+            using (var s2 = s1.OpenScope())
+            {
+                var car2 = s2.Resolve<Car>();
+
+                // Cars are the same despite that `car2` is resolved from the nested `s2`,
+                // because it was specifically resolved from the matching name scope `s1`
+                Assert.AreSame(car2, car1);
+            }
+        }
+    }
+
+    class Car { }
+} 
 ```
 
-`IScope.Parent` is used to track scope nesting.
-
-__Note:__ If you want to get `car1` in any nested scope instead of creating the new Car, 
-use same name for `OpenScope(name)` and for `Reuse.InCurrentNamedScope(name)`.
-Name will identify required scope in nested scopes stack:
-```
-#!c#
-   container.Register<Car>(Reuse.InCurrentNamedScope("top"));
-   
-   using (var s1 = container.OpenScope("top")) // creates scope s1 with Name="top"
-   {
-       var car1 = s1.Resolve<Car>();           // looks up nested scope chain for Name=="top", found s1,
-                                               // creates new Car and stores it into s1
-   
-       using (var s2 = s1.OpenScope())         // creates scope s2 without Name
-       {
-           var car2 = s2.Resolve<Car>();       // looks up nested scope chain for Name=="top", found s1 again,       
-                                               // returns existing car1 from s1
-   
-           Assert.AreSame(car2, car1);         // car2 and car1 are the same
-       }
-   }
-```
+When resolving or injecting a service with `ScopeTo(name)` reuse DryIoc will look up starting from the current open scope, 
+through chain of its parents until the scope with the name is found or we reached the top scope.
 
 To define Name you may use object of any type with overridden method `Equals`: `Reuse.InCurrentNamedScope(42)` - `42` is valid Name.
 
