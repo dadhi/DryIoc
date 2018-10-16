@@ -27,7 +27,7 @@ namespace DryIoc.IssuesTests
             Assert.IsFalse(@ref.IsAlive);
         }
 
-        [Test]
+        [Test, Explicit("Relies on GC")]
         public void ExternallyOwnedInstanceShouldNotBeAliveAfterDisposalAndGc()
         {
             WeakReference @ref;

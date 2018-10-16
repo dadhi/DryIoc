@@ -271,186 +271,104 @@ class Singleton_reuse
 } 
 ```
 
+## Reuse.Scoped
 
-## Reuse.InResolutionScope
-
-The same instance per Resolution Root, which means the same instance inside `Resolve` method call. 
-It is similar to assigning resolved service to variable and then reusing this variable during service creation.
-
-So the manual code:
-```
-#!c#
-   Foo Create()
-   {
-       var log = new Log();
-       return new Foo(log, new Dependency(new SubDependency(log), log))
-   }
-```
-
-Translates to container setup:
-```
-#!c#
-   container.Register<Log>(Reuse.InResolutionScope);
-   container.Register<Foo>(); 
-   container.Register<Dependency>(); 
-   container.Register<SubDependency>();
-   
-   // create Foo
-   var foo = container.Resolve<Foo>();
-   Assert.AreTheSame(foo.Log, foo.Dependency.Log);
-```
-
-What if `Log` is `IDisposable`? How it could be disposed?
-
-Container does track current `ResolutionScope` but it may be injected as `IDisposable` as one of service dependencies.
-So the service can dispose the scope when the time comes.
-
-```
-#!c#
-   public class Foo : IDisposable
-   {
-       public Foo(Log log, Dependency dep, IDisposable scope) {}
-       
-       public void Dispose()
-       {
-           _scope.Dispose(); // Will dispose resolution scope together with Log instance
-       }
-}
-```
-
-__Note:__ When [disposable transients tracking](ReuseAndScopes#markdown-header-disposable-transient) is turned On then resolution scope
-`IDisposable` dependency will be disposed automatically, as a normal disposable transient.
-
-
-
-## Reuse.InResolutionScopeOf
-
-Works similar to [Castle Winsdor Bound LifeStyle](http://docs.castleproject.org/Default.aspx?Page=LifeStyles&NS=Windsor&AspxAutoDetectCookieSupport=1#Bound_8) or
-to [Autofac InstancePerOwned Lifestyle](http://docs.autofac.org/en/latest/lifetime/instance-scope.html#instance-per-owned).
-
-Service is reused in specified resolution sub-graph. For instance we want to share `Log` instance inside `XViewModel` object and its dependencies. 
-It means that in another `XViewModel` there will be another `Log` instance.
-```
-#!c#
-   public class Presentation 
-   {
-       public XViewModel Area1, Area2;
-       public Presentation(XViewModel area1, XViewModel area2) 
-       { 
-           Area1 = area1; 
-           Area2 = area2; 
-       }
-   }
-   
-   public class XViewModel 
-   {
-       public YViewModel SubArea; public Log Log;
-       public XViewModel(YViewModel subArea, Log log) { SubArea = subArea; Log = log; }
-   }
-   
-   public class YViewModel 
-   {
-       public Log Log;
-       public YViewModel(Log log) { Log = log; }
-   }
-   
-   // Container setup:
-   c.Register<Presentation>(); c.Register<YViewModel>();
-   
-   c.Register<XViewModel>(setup: Setup.With(openResolutionScope: true));
-   c.Register<Log>(Reuse.InResolutionScopeOf<XViewModel>());
-   
-   var p = c.Resolve<Presentation>();
-   Assert.AreSame(p.Area1.Log, p.Area1.SubArea.Log);
-   Assert.AreNotSame(p.Area1.Log, p.Area2.Log);
-```
-
-If no matching scope found, container will throw exception because __never fail silently until it explicitly said__.
-
-### How it works?
-
-- When you are calling `container.Resolve` the top-level resolution scope is created - actually it is created on first access for performance reasons.
-
-- If service creation expression contains nested Resolve call: 
-
-   `(state, r, scope) => new Client(r.Resolver.Resolve<Service>(..., scope)`
-
-   (_you can setup it with_ `c.Register<Service>(setup: Setup.With(openResolutionScope: true))`)
-
-   The new scope is created inside new `Resolve` with top-level scope set as `IScope.Parent`. 
-   And the same happens for further nested resolves.
-   The result is hierarchy of resolution scopes.
-
-- When nested scope is created, it also captures resolved service Type and service Key (_if specified_).
-   In example above: `Service` is service Type. This information is used to find matching scope in hierarchy if 
-   you register as following: 
-   `c.Register<ServiceDependency>(Reuse.InResolutionScopeOf<Service>(serviceKey: optionalKey));`
-
-   __Note:__ 
-
- - You may register to match not only with exact `Service` type but with it base class/interfaces: `c.Register<ServiceDependency>(Reuse.InResolutionScopeOf<ServiceBaseClass>())`.
-
- - If both Type and Key specified then they both should match the scope. But for Type only or Key only, it is enough to match specified option, even if scope has both options set up. So you are in control of strategy of scope selection.
-
-- `Reuse.InResolutionScopeOf<T>(key = null, outermost: false)` has additional option `outermost`: it commands to lookup for outermost matched ancestor instead of nearest/closest one.
-
-
-## Reuse.InCurrentScope
-
-Before explanation of current scope reuse, let's talk about the idea of scope itself.
+`Reuse.Scoped` or specifically its type `CurrentScopeReuse` is the base type for the rest of predefined reuses in DryIoc. 
+But before explaining it, let's talk about the notion of Scope.
 
 
 ### What Scope is?
 
-DryIoc uses Scope to implement [Unit-Of-Work](http://msdn.microsoft.com/en-us/magazine/dd882510.aspx) pattern.
+DryIoc uses Scope (`IScope` interface) to implement a [Unit-Of-Work](http://msdn.microsoft.com/en-us/magazine/dd882510.aspx) pattern.
 
-Physically `Scope` is the storage for reused resolved/injected objects. Once created reused object is stored in Scope internal collection and will live there until Scope is disposed.
-Besides Scope ensures that service instance will be created only once in multi-threading scenarios.
+Physically scope is the storage for resolved and injected services registered with non-Transient reuse (except the Disposable Transient). 
+Once created, a reused object is stored in the scope internal collection and will live there until the scope is disposed.
+In addition, Scope ensures that __service instance will be created only once__ in multi-threading scenarios.
 
-_This is the only place in DryIoc where locking is used, the rest of Container is lock-free._
+__Note:__ The scope is the only place in DryIoc where `lock`, is used to prevent multiple creation of the same instance. The rest of DryIox is lock-free.
 
-Also Scope ensures __lazy__ object creation semantics:
-It means that resolving service as `Lazy<T>` or `Func<T>` will not instantiate `T` until someone gets `lazy.Value` or calls function.
-
-In addition Scope has Parent and Name (see in `InCurrentNamedScope` section below).
+Scope also has `Parent` and `Name` properties (see `ScopedTo(name)` reuse explained below).
 
 
 ### What Current Scope is?
 
-Current Scope is created when you call `var scopedContainer = container.OpenScope();`
+Current scope is created when you call `var scopedContainer = container.OpenScope()`, or when you creating a nested scope 
+`var nestedScopedContainer = scopedContainer.OpenScope()`.
 
-The result of this call is `scopedContainer` which shares all the registrations and cached resolutions with original container,
-but contains reference to newly created/opened Scope. So the resolving the service with `Reuse.InCurrentScope` will store the service
-instance in opened scope. When you dispose `scopedContainer` open scope will be disposed as well together with stored service instance.
+The result of this call is `scopedContainer` of type `IResolverContext`. But actually it is a new container, 
+which shares all the registrations and cached resolutions with the original container, 
+but contains a reference to newly opened scope. 
 
-Complete example:
+Resolving a service with `Scoped` reused from `scopedContainer` will store the service instance in the opened scope. 
+When you dispose `scopedContainer`, open scope will be disposed as well together with the stored service instance.
+
+```cs 
+class Scoped_reuse_register_and_resolve
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Car>(Reuse.Scoped);
+
+        // Resolving scoped service outside of scope throws an exception.
+        Assert.Throws<ContainerException>(() => container.Resolve<Car>());
+
+        Car car;
+        using (var scopedContainer = container.OpenScope())
+        {
+            car = scopedContainer.Resolve<Car>();
+            car.DriveToMexico();
+        }
+
+        // Disposable car will be disposed here together with opened scope in scopedContainer.
+        Assert.IsTrue(car.IsDisposed);
+    }
+
+    class Car : IDisposable
+    {
+        public void DriveToMexico() { }
+
+        public void Dispose() => IsDisposed = true;
+        public bool IsDisposed { get; private set; }
+    }
+} 
 ```
-#!c#
-   container.Register<Car>(Reuse.InCurrentScope);
-   // container.Resolve<Car>(); // throws ContainerException here because there is no opened current scope in container.
-   using (var scopedContainer = container.OpenScope())
-   {
-       var car = scopedContainer.Resolve<Car>();
-       car.DriveMeToMexico();
-   }
-   // Disposable car will be disposed here together with opened scope in scopedContainer.
-```
-Interesting thing, that you may resolve `Car` from container in example below if you are resolving it as `Func<Car>` or `Lazy<Car>`.
 
-Does not throw: `var carFactory = container.Resolve<Func<Car>>();`
+Interesting thing, if you resolve `Car` from container wrapped in `Func<Car>` or `Lazy<Car>`, it won't throw. 
+But when you try to use a lazy value in open scope it will throw.
 
-It is because you are not creating actual car here. If you open scope and invoke `carFactory` inside `using` then factory will return car object.
-```
-#!c#
-   container.Register<Car>(Reuse.InCurrentScope);
-   var carFactory = container.Resolve<Func<Car>>(); // Does not throw.
-   using (var scopedContainer = container.OpenScope())
-   {
-       var car = carFactory();
-       car.DriveMeToMexico();
-   }
+```cs 
+class Scoped_reuse_resolve_wrapped_in_Func
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<Car>(Reuse.Scoped);
+
+        var carFactory = container.Resolve<Lazy<Car>>(); // Does not throw.
+        Car car = null;
+        using (var scopedContainer = container.OpenScope())
+        {
+            Assert.Throws<ContainerException>(() => car = carFactory.Value);
+        }
+    }
+
+    class Car
+    {
+        public void DriveToMexico() { }
+    }
+} 
 ```
 
+It happens because scope is the part of container. When resolving from top container id does not have the opened scope part, 
+but laziness of `Lazy` and `Func` prevents throwing, cause we are not accessing scope yet.
+When opening scope we are creating another container with the __bound scope__ part. But previously resolved services does not 
+aware of the new container and new scope, therefore attempt to get actual value throws an exception.
+
+There is way to support such a lazy scenario, check the next section. 
 
 ### ScopeContext
 
@@ -656,6 +574,132 @@ __Note:__ In tests you may change scope context without changing reuse, e.g. cha
 __Note:__ If you want to emulate Request Begin/End in test just `OpenScope` with corresponding name: `using (var scope = testContainer.OpenScope(Reuse.WebRequestScopeName)) { }`.
 
 No need to touch reuse in registrations, everything still works.
+
+
+
+## Reuse.InResolutionScope
+
+The same instance per Resolution Root, which means the same instance inside `Resolve` method call. 
+It is similar to assigning resolved service to variable and then reusing this variable during service creation.
+
+So the manual code:
+```
+#!c#
+   Foo Create()
+   {
+       var log = new Log();
+       return new Foo(log, new Dependency(new SubDependency(log), log))
+   }
+```
+
+Translates to container setup:
+```
+#!c#
+   container.Register<Log>(Reuse.InResolutionScope);
+   container.Register<Foo>(); 
+   container.Register<Dependency>(); 
+   container.Register<SubDependency>();
+   
+   // create Foo
+   var foo = container.Resolve<Foo>();
+   Assert.AreTheSame(foo.Log, foo.Dependency.Log);
+```
+
+What if `Log` is `IDisposable`? How it could be disposed?
+
+Container does track current `ResolutionScope` but it may be injected as `IDisposable` as one of service dependencies.
+So the service can dispose the scope when the time comes.
+
+```
+#!c#
+   public class Foo : IDisposable
+   {
+       public Foo(Log log, Dependency dep, IDisposable scope) {}
+       
+       public void Dispose()
+       {
+           _scope.Dispose(); // Will dispose resolution scope together with Log instance
+       }
+}
+```
+
+__Note:__ When [disposable transients tracking](ReuseAndScopes#markdown-header-disposable-transient) is turned On then resolution scope
+`IDisposable` dependency will be disposed automatically, as a normal disposable transient.
+
+
+
+## Reuse.InResolutionScopeOf
+
+Works similar to [Castle Winsdor Bound LifeStyle](http://docs.castleproject.org/Default.aspx?Page=LifeStyles&NS=Windsor&AspxAutoDetectCookieSupport=1#Bound_8) or
+to [Autofac InstancePerOwned Lifestyle](http://docs.autofac.org/en/latest/lifetime/instance-scope.html#instance-per-owned).
+
+Service is reused in specified resolution sub-graph. For instance we want to share `Log` instance inside `XViewModel` object and its dependencies. 
+It means that in another `XViewModel` there will be another `Log` instance.
+```
+#!c#
+   public class Presentation 
+   {
+       public XViewModel Area1, Area2;
+       public Presentation(XViewModel area1, XViewModel area2) 
+       { 
+           Area1 = area1; 
+           Area2 = area2; 
+       }
+   }
+   
+   public class XViewModel 
+   {
+       public YViewModel SubArea; public Log Log;
+       public XViewModel(YViewModel subArea, Log log) { SubArea = subArea; Log = log; }
+   }
+   
+   public class YViewModel 
+   {
+       public Log Log;
+       public YViewModel(Log log) { Log = log; }
+   }
+   
+   // Container setup:
+   c.Register<Presentation>(); c.Register<YViewModel>();
+   
+   c.Register<XViewModel>(setup: Setup.With(openResolutionScope: true));
+   c.Register<Log>(Reuse.InResolutionScopeOf<XViewModel>());
+   
+   var p = c.Resolve<Presentation>();
+   Assert.AreSame(p.Area1.Log, p.Area1.SubArea.Log);
+   Assert.AreNotSame(p.Area1.Log, p.Area2.Log);
+```
+
+If no matching scope found, container will throw exception because __never fail silently until it explicitly said__.
+
+### How it works?
+
+- When you are calling `container.Resolve` the top-level resolution scope is created - actually it is created on first access for performance reasons.
+
+- If service creation expression contains nested Resolve call: 
+
+   `(state, r, scope) => new Client(r.Resolver.Resolve<Service>(..., scope)`
+
+   (_you can setup it with_ `c.Register<Service>(setup: Setup.With(openResolutionScope: true))`)
+
+   The new scope is created inside new `Resolve` with top-level scope set as `IScope.Parent`. 
+   And the same happens for further nested resolves.
+   The result is hierarchy of resolution scopes.
+
+- When nested scope is created, it also captures resolved service Type and service Key (_if specified_).
+   In example above: `Service` is service Type. This information is used to find matching scope in hierarchy if 
+   you register as following: 
+   `c.Register<ServiceDependency>(Reuse.InResolutionScopeOf<Service>(serviceKey: optionalKey));`
+
+   __Note:__ 
+
+ - You may register to match not only with exact `Service` type but with it base class/interfaces: `c.Register<ServiceDependency>(Reuse.InResolutionScopeOf<ServiceBaseClass>())`.
+
+ - If both Type and Key specified then they both should match the scope. But for Type only or Key only, it is enough to match specified option, even if scope has both options set up. So you are in control of strategy of scope selection.
+
+- `Reuse.InResolutionScopeOf<T>(key = null, outermost: false)` has additional option `outermost`: it commands to lookup for outermost matched ancestor instead of nearest/closest one.
+
+
 
 
 ## Setup.UseParentReuse
