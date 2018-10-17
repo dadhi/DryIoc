@@ -107,6 +107,26 @@ postponing a registration.
 There is still a possibility to postpone a service registration:
 
 - One is via [`RegisterPlaceholder`](RegisterResolve#markdown-header-registerplaceholder)
+- Another one is globally, via `Rules.WithFuncAndLazyWithoutRegistration()`, see below:
+
+```cs 
+class Func_works_without_registration
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
+        var getA = container.Resolve<Func<A>>();
+
+        // later register an `A`
+        container.Register<A>();
+        var a = getA();
+        Assert.IsNotNull(a);
+    }
+
+    class A { }
+} 
+```
 
 ### Func of A with parameters
 
