@@ -106,7 +106,7 @@ postponing a registration.
 
 There is still a possibility to postpone a service registration:
 
-- One is via [`RegisterPlaceholder`](RegisterResolve#markdown-header-registerplaceholder)
+- One is via [`RegisterPlaceholder`](RegisterResolve#markdown-header-registerplaceholder).
 - Another one is globally, via `Rules.WithFuncAndLazyWithoutRegistration()`, see below:
 
 ```cs 
@@ -130,28 +130,104 @@ class Func_works_without_registration
 
 ### Func of A with parameters
 
-- Delegates creation of service to the user and allows to supply subset of dependencies. The rest of dependencies are injected by container as usual. 
+Delegates creation of service to the user and allows to supply subset of dependencies. The rest of dependencies are injected by container as usual. 
 
-    - Alternatively it may be viewed as override of normally injected dependencies with custom ones, provided via arguments. 
-    - Or as "currying" of service creation constructor or method.
-    - Sometimes Func with parameters is used to pass primitive values, e.g. Strings, ints, etc.
+More details:
+
+- It may be viewed as an override of normally injected dependencies with custom ones, provided via arguments. 
+- Or as "currying" of service creation constructor or method.
+- Sometimes Func with parameters is used to pass primitive values, e.g. `string`, `int`, etc.
+- Always injected as inline creation expression: `new B((dep1, dep2) => new A(dep1, new D(), dep2))`
+- [recursive dependency] is permitted.
 
 
-- Always injected as inline creation expression:
+Provided arguments are matched with parameters by type and in passed order. 
+If matched argument is not found then the argument will be injected by container, as `D` in the example above. 
+The arguments order may differ from parameters order.
 
-        new B((dep1, dep2) => new A(dep1, new D(), dep2))
-
-    Provided arguments are matched with parameters by type and in passed order. If matched argument is not found then the argument will be injected by container, as `D` in the example above. The arguments order may differ from parameters order.
-
-    What if provided arguments are of the same type? DryIoc will track already used arguments and will skip them in subsequent match. Means that dep1 and dep2 from example may be strings and still both used as in example.
+What if provided arguments are of the same type? DryIoc will track already used arguments and will skip them in subsequent match. 
+Means that `dep1` and `dep2` from the example may be a string and still both used.
 
 __Note:__ In case when passed argument is not used then DryIoc will proceed to match it for nested dependencies (if any):
+```cs
+new B(arg => new A(new D(arg)))
+```
 
-    new B(str => new A(new D(str)))
+When passed argument was not used it is maybe a mistake but may be is not. It was a hard choice, but DryIoc will ignore this for now.
+```cs 
+class Passed_argument_was_not_used
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<A>();
 
-- When passed argument was not matched then it is probably a mistake. DryIoc won't be silent and will throw exception with corresponding message to help you fix the error.
+        // Can be used, the argument will be ignored
+        var getA = container.Resolve<Func<string, A>>();
 
-- It is impossible to use Func with parameters for a Resolution Root dependency, because there is no way to propagate arguments through Resolve method boundaries. Therefore [recursive dependency] is not permitted.
+        Assert.IsNotNull(getA("ignore me"));
+    }
+
+    class A { }
+}
+```
+
+There is an other caveat related to reuse. You may say that passing a different argument to create a service likely may produce a different service.
+But what happens when service is registered with non-transient reuse? 
+By default DryIoc will use the first call to `Func` to create a service and ignore the rest. 
+```cs 
+class Func_with_args_and_reuse
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<A>(Reuse.Singleton);
+
+        // Can be used, the argument will be ignored
+        var getA = container.Resolve<Func<string, A>>();
+
+        Assert.AreEqual("Hi, Alpha", getA("Hi, Alpha").Greeting);
+
+        // The result still be the same as before, so the second invocation and its arguments are ignored
+        Assert.AreEqual("Hi, Alpha", getA("Hi, Beta").Greeting);
+    }
+
+    class A
+    {
+        public string Greeting { get; }
+        public A(string greeting) { Greeting = greeting; }
+    }
+}
+```
+
+If you don't like it this way, you may use a rule `Rules.WithIgnoringReuseForFuncWithArgs()`
+```cs 
+class Func_with_args_with_rule_ignoring_reuse
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.WithIgnoringReuseForFuncWithArgs());
+        container.Register<A>(Reuse.Singleton);
+
+        // Can be used, the argument will be ignored
+        var getA = container.Resolve<Func<string, A>>();
+
+        Assert.AreEqual("Hi, Alpha", getA("Hi, Alpha").Greeting);
+
+        // That's expected now.
+        Assert.AreEqual("Hi, Beta", getA("Hi, Beta").Greeting);
+    }
+
+    class A
+    {
+        public string Greeting { get; }
+        public A(string greeting) { Greeting = greeting; }
+    }
+}
+```
 
 
 ### KeyValuePair of Service Key and A
