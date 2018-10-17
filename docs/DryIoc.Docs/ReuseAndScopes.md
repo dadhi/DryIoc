@@ -776,106 +776,96 @@ class Reuse_lifespan_mismatch_detection
         {
             // Throws an exception with captive dependency detected:
             // dependency Scoped lifespan is less than parent Singleton lifespan 
-            Assert.Throws<ContainerException>(() => container.Resolve<Mercedes>());
+            Assert.Throws<ContainerException>(() => scope.Resolve<Mercedes>());
+        }
+    }
+
+    class Mercedes { public Mercedes(Wheels wheels) { } }
+    class Wheels { }
+}
+```
+
+If you really want (say temporary) you may suppress the error via 
+
+The error message is saying how to turn Off this error via rule `Rules.WithoutThrowIfDependencyHasShorterReuseLifespan()`
+```cs 
+class Reuse_lifespan_mismatch_error_suppress
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
+
+        container.Register<Mercedes>(Reuse.Singleton);
+        container.Register<Wheels>(Reuse.Scoped);
+
+        Mercedes car;
+        using (var scope = container.OpenScope())
+        {
+            car = scope.Resolve<Mercedes>();
+        }
+
+        // Here the singleton is still exist and valid but its `Wheels` scoped dependency is disposed
+        Assert.IsTrue(car.Wheels.IsDisposed);
+    }
+
+    class Mercedes
+    {
+        public Mercedes(Wheels wheels) { Wheels = wheels; }
+        public Wheels Wheels { get;  }
+    }
+
+    class Wheels : IDisposable
+    {
+        public void Dispose() => IsDisposed = true;
+        public bool IsDisposed { get; private set; }
+    }
+}
+```
+
+Another way to prevent the exception is wrapping a shorter reused dependency in a `Func` [wrapper](Wrappers). 
+Here dependency user decides when to create a dependency value and to start its lifetime, 
+possibly creating a multiple values. 
+```cs 
+class Avoiding_reuse_lifespan_mismatch_for_Lazy_dependency
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Mercedes>(Reuse.Singleton);
+        container.Register<Wheels>(Reuse.Scoped);
+
+        using (var scope = container.OpenScope())
+        {
+            var car = scope.Resolve<Mercedes>();
+            var wheels = car.GetWheels();
         }
     }
 
     class Mercedes
     {
-        public Mercedes(Wheels wheels) { }
+        public Mercedes(Func<Wheels> getWheels) { GetWheels = getWheels; }
+        public readonly Func<Wheels> GetWheels;
     }
 
     class Wheels { }
 }
 ```
 
-The error message is saying how to turn Off this error via rule:
-```
-#!c#
-   var c = new Container(rules => rules.WithoutThrowIfDepenedencyHasShorterReuseLifespan());
-   // ...
-   var car = c.Resolve<Car>(); // works but may surprise Car with disposed Wheels!
-```
-
-__Note:__ Another way to prevent the exception is wrapping reused dependency in a `Func` [wrapper](Wrappers). 
-When using `Func` you are actually saying that you want to control or postpone creation of dependency:
-```
-#!c#
-   class Car 
-   {
-       public Car(Func<Wheels> getWheels) {} // Car is in control when to get new Wheels.
-   }
-```
-
-
-## Reuse for externally created objects
-
-Externally created objects may be registered into Container with `RegisterInstance` method. The method accepts _reuse_ parameter:
-
-- By default when no reuse parameter provided, instance will be registered as Singleton. That make sense because singleton lifetime is directly associated with lifetime of container, so living in container instance will have the same lifetime as singleton.
-
-- Instance may be registered with `Reuse.InCurrentScope` only when current scope is available. That way instance will be directly placed in current scope. If no current scope at the moment then exception will be thrown.
-
-- Registering instance with `Reuse.InResolutionScope` is not permitted because resolution scope does not exist when registration is done. Therefor attempt to register will throw exception.
-
-Examples of instance registrations:
-```
-#!c#
-   var service = new Service();
-
-   // Places service into singleton scope
-   container.RegisterInstance(service, Reuse.Singleton);
-   // the same as above
-   container.RegisterInstance(service);
-
-   // Places service into current opened scope
-   using (var scope = conitainer.OpenScope())
-       container.RegisterInstance(service, Reuse.InCurrentScope);
-
-   // Fails with exception because of no current scope
-   container.RegisterInstance(service, Reuse.InCurrentScope);
-
-   // Fails as well
-   container.RegisterInstance(service, Reuse.InResolutionScope);
-```
-
-If `IDisposable` instance is registered as singleton by default, it also means that it will be disposed when container is disposed. The same is true for the current scope - instance will be disposed together with scope.
-
-You may prevent disposal of the instance by providing [preventDisposal setup](ReuseAndScope#markdown-header-prevent-disposal-of-reused-service).
-```
-#!c#
-   container.RegisterInstance(service, setup: Setup.With(preventDisposal: true));
-```
-
-Another option is to store instance as WeakReference:
-```
-#!c#
-   container.RegisterInstance(service, setup: Setup.With(weaklyReferenced: true));
-```
-
-__Note:__ If you register instance with `IfAlreadyRegistered.Replace` option, then existing reused instance will be directly replaced by the new one - Container wills keep original factory and cache intact. This approach provides faster performance and less allocations, so the replacing registered instance is cheap.
-
 
 ## Weakly Referenced reused service
 
 You may specify to store reused object as `WeakReference`:
-```
-#!c#
-   container.Register<Service>(Reuse.Singleton, setup: Setup.With(weaklyReferenced: true));
+```cs
+container.Register<Service>(Reuse.Singleton, setup: Setup.With(weaklyReferenced: true));
 ```
 
 
 ## Prevent Disposal of reused service
 
-By default DryIoc will dispose `IDisposable` reused service together with its scope. To prevent that you may register service with as following:
-```
-#!c#
-   container.Register<Service>(Reuse.Singleton, setup: Setup.With(preventDisposal: true));
-```
-
-__Note:__ `preventDisposal` should be used with weakly referenced service too in order to override default behavior, or weakly referenced `IDisposable` service will be disposed.
-```
-#!c#
-   container.Register<Service>(Reuse.Singleton, 
-       setup: Setup.With(preventDisposal: true, weaklyReferenced: true);
+By default DryIoc will dispose `IDisposable` reused service together with its scope. To prevent that you may register service with following:
+```cs
+container.Register<Service>(Reuse.Singleton, setup: Setup.With(preventDisposal: true));
 ```
