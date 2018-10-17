@@ -421,14 +421,29 @@ class Filtering_not_resolved_services
 
 #### Open-generics
 
-If container has registered both closed and open-generic implementation of service, then the both services will be included into result collection (_it may be obvious but I want to set clear expectations on this topic_):
-```
-#!c#
-    container.Register<Foo<int>, IntBar>();
-    container.Register(typeof(IFoo<>), typeof(Bar<>));
-    
-    var foos = container.Resolve<Foo<int>[]>();
-    Assert.AreEqual(2, foos.Length); // includes both IntBar and Bar<int>
+If you registered both closed and open-generic implementation of the service, 
+then the both types will be present in the result collection 
+(_it may be obvious but I wanted to be clear on this_):
+
+```cs 
+class Both_open_and_closed_generic_included_in_collection
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo<int>, IntFoo>();
+        container.Register(typeof(IFoo<>), typeof(Foo<>));
+
+        var items = container.Resolve<IFoo<int>[]>();
+        Assert.AreEqual(2, items.Length); // includes both `IntFoo` and `Foo<>`
+    }
+
+    interface IFoo<T> { }
+    class IntFoo : IFoo<int> { }
+    class Foo<T> : IFoo<T> { }
+} 
 ```
 
 
@@ -628,7 +643,7 @@ Example of non-generic wrapper:
     container.Resolve<MyWrapper[]>(requiredServiceType: typeof(IService));
 ```
 
-When injecting `MyWrapper` as dependency you may specify required service type for the dependency:
+When injecting `MyWrapper` as a dependency you may specify the required service type for the dependency:
 ```
 #!c#
     public class UseMyWrapper { public UseMyWrapper(MyWrapper wr) { } }
