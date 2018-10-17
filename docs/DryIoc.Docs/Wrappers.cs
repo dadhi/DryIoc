@@ -66,25 +66,48 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 ### Lazy of A
 
 - Provides instance of `A` created on first access.
-- Injected as call to container Resolve: `r => new Lazy(() => r.Resolve<A>())`, therefore `A` may not be yet available when `Lazy` is injected.
-- Permits [recursive dependency] in resolution graph.
+- Internally implemented as a call to a container Resolve: `r => new Lazy(() => r.Resolve<A>())`, therefore `A` may not be yet available when `Lazy` is injected.
+- Permits a [recursive dependency] in resolution graph, because uses a `Resolve` to postpone to getting an actual service value.
 
 ### Func of A
 
 - Delegates creation of `A` to user code.
-- By default injected as inline service creation: `new B(() => new A())`. Therefore `A` should be available at moment of `Func<A>` resolution.
-- By default does not permit [recursive dependency].
-- Alternatively, inline `A` creation may be changed to `Resolve` call:
+- By default, injected as inline service creation: `new B(() => new A())`. Therefore `A` should be available at the moment of `Func<A>` resolution.
+- By default, does not permit [recursive dependency].
+- Alternatively, inline `A` creation may be changed to a `Resolve` call:
 
     `container.Register<A>(setup: Setup.With(asResolutionCall: true));`
 
-    or additionally opening resolution scope:
-
-    `container.Register<A>(setup: Setup.With(openResolutionScope: true));`
-
     - This way `Func<A>` will be injected as: `new B(() => r.Resolver.Resolve<A>())`    
-    - Service `A` may not be available yet at `Func` resolution time
     - Permits [recursive dependency] in resolution graph.
+
+### Really "lazy" Lazy and Func
+
+The important thing about `Lazy` and `Func` is that the wrapped dependency should be registered into container when injecting a wrappers.
+```cs md*/
+class Lazy_and_Func_require_services_to_be_registered
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        // Throws cause `A` is not registered
+        Assert.Throws<ContainerException>(() => 
+            container.Resolve<Lazy<A>>());
+    }
+
+    class A { }
+} /*md
+```
+
+This was done intentionally to be able to construct as much of object graph as possible to verify it correctness.
+The default DryIoc laziness of `Func` and `Lazy` is about postponing a creation of service value, and not about 
+postponing a registration.
+
+There is still a possibility to postpone a service registration:
+
+- One is via [`RegisterPlaceholder`](RegisterResolve#markdown-header-registerplaceholder)
 
 ### Func of A with parameters
 

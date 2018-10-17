@@ -943,6 +943,38 @@ container.RegisterInitializer<IDisposable>(
     (disposable, resolver) => resolver.Resolve<Logger>().Log("resolved disposable " + disposable));
 ```
 
+## RegisterPlaceholder
+
+Sometimes, you maybe not yet decided on the service implementation or maybe you want to provide it at later time.
+In this case you may use a `RegisterPlaceholder<IService>()`, then later do `Register<IService, Foo>(ifAlreadyRegistered:IfAlreadyRegistered.Replace)`.
+
+```cs md*/
+class Register_placeholder
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.RegisterPlaceholder<IService>();
+        var getService = container.Resolve<Func<IService>>();
+
+        // Throws because service is just a placeholder and does not have implementation registered yet
+        IService service;
+        Assert.Throws<ContainerException>(() => service = getService());
+
+        // Replace placeholder with a real implementation
+        container.Register<IService, Foo>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+        service = getService();
+        Assert.IsInstanceOf<Foo>(service);
+    }
+
+    interface IService { }
+    class Foo : IService { }
+}
+/*md
+```
+
 ## RegisterDisposer
 
 The normal way to cleanup things is to implement `IDisposable` interface. 
