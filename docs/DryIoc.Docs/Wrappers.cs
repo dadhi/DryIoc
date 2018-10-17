@@ -26,6 +26,7 @@ More info:
 Wrapper example:
 ```cs md*/
 using System;
+using System.Collections.Generic;
 using DryIoc;
 using NUnit.Framework;
 
@@ -68,6 +69,7 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 - Provides instance of `A` created on first access.
 - Internally implemented as a call to a container Resolve: `r => new Lazy(() => r.Resolve<A>())`, therefore `A` may not be yet available when `Lazy` is injected.
 - Permits a [recursive dependency] in resolution graph, because uses a `Resolve` to postpone to getting an actual service value.
+
 
 ### Func of A
 
@@ -233,35 +235,107 @@ class Func_with_args_with_rule_ignoring_reuse
 
 ### KeyValuePair of Service Key and A
 
-- Wraps registered service key together with resolved service. May be used to filter service based on its key. Usually used together with Func or Lazy wrapper and nested inside collection: `IEnumerable<KeyValuePair<string, Func<A>>>`
+Wraps a registered service key together with the resolved service. 
+May be used to filter service based on its key. Usually used together with Func or Lazy wrapper and nested inside collection: `IEnumerable<KeyValuePair<string, Func<A>>>`.
 
-More on the KeyValuePair usage is [here](RegisterResolve#markdown-header-resolving-as-keyvaluepair-wrapper).
+More on the `KeyValuePair` usage is [here](RegisterResolve#markdown-header-resolving-as-keyvaluepair-wrapper).
+
 
 ### Meta or Tuple of A with Metadata
 
-- Packs together resolved service A and associated metadata object. A bit similar to KeyValuePair but with metadata instead of key. You may think of metadata the same way as of attribute defined for implementation type. Metadata may be provided with attributes when using [MefAttributedModel](Extensions/MefAttributedModel). 
+Packs together resolved service A and associated metadata object. A bit similar to `KeyValuePair` but with metadata instead of key. 
+You may think of the metadata the same way as of `Attribute` defined for the implementation type. 
+Metadata may be provided with attributes when using [MefAttributedModel](Extensions/MefAttributedModel). 
+```cs md*/
+class Providing_metadata
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-        container.Register<A>(setup: Setup.With(metadata: "some string data"));
+        container.Register<A>(setup: Setup.With(metadataOrFuncOfMetadata: "XYZ"));
 
-        var a = container.Resolve<Meta<A, string>>();
-        var _ = container.Resolve<Tuple<A, string>>(); // is the same thing
+        var a1 = container.Resolve<Meta<A, string>>();
+        var a2 = container.Resolve<Tuple<A, string>>(); // is the same thing
 
-__Note:__ You may choose to use `Tuple<,>` over `Meta<,>` because former is container agnostic and does not require DryIoc reference. `Meta<,>` may be a good choice if you are migrating from [Autofac](http://docs.autofac.org/en/latest/resolve/relationships.html#metadata-interrogation-meta-b-meta-b-x) or if you want to register `Tuple<,>` with different meaning.
+        Assert.AreEqual("XYZ", a1.Metadata);
+        Assert.AreEqual("XYZ", a2.Item2);
+    }
+} /*md
+```
 
-- If no metadata setup then resolving as Meta will throw ContainerException with corresponding message and code.
+__Note:__ You may choose to use `System.Tuple<,>` over `DryIoc.Meta<,>` because former does not require DryIoc reference. 
 
-- In example above registered and resolved metadata types are the same. DryIoc will throw exception in case they are not assignable, e.g. when resolving as `Meta<A, int>`. But resolving as `Meta<A, object>` is fine because string is object.
+`Meta<,>` may be a good choice if you are migrating from [Autofac](http://docs.autofac.org/en/latest/resolve/relationships.html#metadata-interrogation-meta-b-meta-b-x), 
+or if you want to register `Tuple<,>` with the different meaning.
 
-- When nested in collection wrapper, and metadata is not registered or not assignable, then no exception will be thrown. Instead the service will be skipped and collection may be empty as the result:
+If no metadata provided in `setup`, then the resolving as `Meta` will throw a `ContainerException` with corresponding message and code.
+In the example above registered and resolved metadata types are the same. DryIoc will throw exception in case they are not assignable, 
+e.g. when registered as `string` but resolving with `int` metadata type. Resolving as `Meta<A, object>` is always fine because string is object.
 
-        var atems = container.Resolve<Meta<A, int>[]>;
-        // atems array is empty
+Metadata maybe also used for collection filtering. When nested in collection wrapper, and the metadata is not registered or not assignable, 
+then no exception will be thrown. Instead the service item will be filtered out from collection (and collection may be empty as the result):
+```cs md*/
+class Filtering_based_on_metadata
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        var items = container.Resolve<Meta<A, int>[]>();
+        Assert.IsEmpty(items);
+    }
+}/*md
+```
 
-    It works the same way for KeyValuePair.
+__Note:__ Filtering works the same way for `KeyValuePair<TKey, TService>`
 
-- Wrappers may combined further with Func or Lazy of A, or even with KeyValuePair to provide filterable collection of lazy services:
+Wrappers maybe combined further with `Func` or `Lazy`, or even with `KeyValuePair` to provide a filtered collection of lazy services:
+```cs
+container.Resolve<Meta<string, Func<int, A>>[]>();
+```
 
-        container.Resolve<Meta<string, Func<int, A>>[]>();
+#### Dictionary Metadata
+
+Metadata value can be a non-primitive object or a `IDictionary<string, object>`. 
+In latter case you may `Resolve` by providing the type of any `object` value in a dictionary:
+
+```cs md*/
+class Resolve_value_out_of_metadata_dictionary
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<A>(setup: Setup.With(
+            new Dictionary<string, object>
+            {
+                { "color", "red" },
+                { "quantity", 15 }
+            }));
+
+        container.Register<A, B>(setup: Setup.With(
+            new Dictionary<string, object>
+            {
+                { "color", "red" },
+                { "special", true }
+            }));
+
+        // we have `A` and `B`
+        var items = container.Resolve<Meta<A, IDictionary<string, object>>[]>();
+        Assert.AreEqual(2, items.Length);
+
+        // here we have only `A` cause its metadata contains an `int` metadata value
+        var itemQuantities = container.Resolve<Meta<A, int>[]>();
+        Assert.AreEqual(1, itemQuantities.Length);
+        Assert.AreEqual(15, itemQuantities[0].Metadata);
+    }
+
+    class A { }
+    class B : A { }
+}/*md
+```
 
 
 ### IEnumerable or array of A
