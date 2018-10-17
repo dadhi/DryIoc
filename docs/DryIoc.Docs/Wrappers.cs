@@ -340,26 +340,85 @@ class Resolve_value_out_of_metadata_dictionary
 
 ### IEnumerable or array of A
 
-- Returns all registered service implementations to the user. The actual returned expression is array initializer:
+Injects a collection of registered service values to the consumer. 
+The collection basically a fully initialized "fixed" array:
+```cs
+var items = new B(new A[] { new Impl1(), new Impl2(), new Impl3() });
+```
 
-        new B(new A[] { new AImpl1(), new AImpl2(), new AImpl3() })
+The result array expression is generated __only once__ using all found services and 
+will not change if new service is added afterwards, or existing one is updated or removed. 
+You may use `LazyEnumerable<T>` explained below to address this limitation.
 
-    __Note:__ Expression is generated only once using all found services and will not change if new service is added afterwards, or existing one updated or removed. You may use LazyEnumerable explained below to address this limitation. IContainer.ResolveMany method may provide results as fixed array or as LazyEnumerable based on passed option. Default is lazy option.
+__Note:__ Another way to use a `LazyEnumerable<T>` when resolving `IEnumerable<T>` is to specify it 
+globally via `Rules.WithResolveIEnumerableAsLazyEnumerable`.
 
-- Due the fact that .NET Array implements number of collection interfaces: IEnumerable<>, IList<>, ICollection<>, IReadOnlyList<>, IReadOnlyCollection<>, DryIoc allows to inject these interfaces. So you may consider them as a wrappers with the same behavior.
+There is an alternate way to `Resolve` rather than inject a collection: 
+via `IResolver.ResolveMany` method. `ResolveMany` may provide results as a fixed array or as a 
+`LazyEnumerable` based on the passed option. Default is the `LazyEnumerable` option.
 
-- Resolved services are ordered in registration order for default services and without specific order for keyed services. Despite being ordered, the default services may be mixed up with keyed services.
+Due the fact that .NET `Array` implements number of collection interfaces: 
+`IEnumerable<>`, `IList<>`, `ICollection<>`, `IReadOnlyList<>`, `IReadOnlyCollection<>`, 
+DryIoc allows to inject these interfaces. So you may consider them as a same collection wrapper.
 
-- The fixed array nature implies that all services will be created when wrapper is resolved or injected. But may be you need filter only some services (or inspect service count) and do not want to create the rest. Nested Func or Lazy will help in this case:
+Resolved services are ordered in registration order for default services, 
+and without specific order for the keyed services. 
+Despite being ordered, the default services may be mixed up with keyed services.
 
-        var aas = container.Resolve<IList≤Func<A>>>();
-        if (aas.Count == 1) { }
+The fixed array nature implies that all services will be created when wrapper is resolved or injected. 
+But may be you need filter only some services (or inspect service count) and do not want to create the rest. 
+Nested `Func` or `Lazy` will help in this case:
+```cs md*/
+class Collection_of_Lazy_things
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<A>();
 
-- DryIoc supports filtering of result services when using nested KeyValuePair or Meta wrappers. Basically when nested wrapper is not resolved because of not compatible Key or Metadata type, then the item will be excluded from array. Combining with Func it looks like:
+        var items = container.Resolve<IReadOnlyList<Func<A>>>();
+        if (items.Count == 1)
+        {
+            // Creating an `A` on demand 
+            var a = items[0].Invoke();
+        }
+    }
 
-        container.Resolve<KeyValuePair<MyKeyEnum, Func<A>>>();
+    class A { }
+}/*md
+```
 
-- If specific service implementation is not resolvable it will not be in result collection. If all implementations are not resolvable then collection will be empty and no exception will be thrown. By not resolvable I mean that registration exist but still could not be resolved due missing dependency or other reason.
+DryIoc supports filtering of result services when using nested `KeyValuePair` or `Meta` wrappers. 
+Basically when nested wrapper is not resolved because of not compatible Key or Metadata type, 
+then the item will be excluded from array. 
+
+When service is not resolvable due the missing (not registered) dependency, 
+the collection wrapper will throw an exception instead of skipping the item. 
+In all other cases, the item will filtered out of collection.
+
+```cs md*/
+class Filtering_not_resolved_services
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<B>();
+
+        // `A` is not registered
+        //container.Register<A>();
+
+        Assert.Throws<ContainerException>(() => container.Resolve<B[]>());
+    }
+
+    class A { }
+    class B
+    {
+        public B(A a) { }
+    }
+} /*md
+```
 
 #### Open-generics
 
