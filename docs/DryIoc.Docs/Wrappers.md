@@ -6,44 +6,60 @@
 
 [TOC]
 
-Wrapper is the type that provides some additional functionality over registered service, usually wrapper contains service as its Property or Field. 
+Wrapper in DryIoc is some useful data structure which operates on registered service or services.. 
 
 - Wrapper may be either an open-generic type with generic argument identifying service type to wrap. Examples are `Func<TService>`, `Lazy<TService>`, `IEnumerable<TService>`. 
-- Or even non-generic type, in that case wrapped service is identified with [RequiredServiceType](RequiredServiceType): e.g. `LambdaExpression`.
+- Or non-generic type, in that case a wrapped service is identified with [RequiredServiceType](RequiredServiceType): e.g. `LambdaExpression`.
 
-__Note:__ Open-generic wrapper with multiple type arguments may wrap one service type only, e.g. `Func<TArg0, TArg1, TService>` wraps `TService`. Wrapping of multiple services in one wrapper is not supported.
+__Note:__ Open-generic wrapper with multiple type arguments may wrap one service type only, e.g. `Func<TArg0, TArg1, TService>` wraps `TService`. 
+Wrapping a multiple services in one wrapper is not supported.
 
 More info:
 
 - Wrappers are composable through nesting: e.g. `IEnumerable<Lazy<TService>>`.
-- Similar concept in Autofac is [relationship types](http://docs.autofac.org/en/latest/resolve/relationships.html).
+- A similar concept in Autofac is [relationship types](http://docs.autofac.org/en/latest/resolve/relationships.html).
 - DryIoc supports both predefined and [user-defined wrappers](Wrappers#markdown-header-user-defined-wrappers).
-- Registering predefined wrapper type (e.g. `Func<>` or `Lazy<>`) as normal service overrides corresponding wrapper registration.
-- The actual difference between normal open-generic service and wrapper [explained here](Wrappers#markdown-header-user-defined-wrappers).
+- Explicitly registering a wrapper type (e.g. `Func<>` or `Lazy<>`) as a normal service overrides corresponding wrapper registration.
+- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers#markdown-header-user-defined-wrappers).
 
 Wrapper example:
-```
-#!c#
-    class A	{}
-    class B 
+```cs 
+using System;
+using DryIoc;
+using NUnit.Framework;
+
+class Wrapper_example 
+{
+    [Test]
+    public void Example()
     {
-        public B(Lazy<A> a) { ... }
+        var container = new Container();
+
+        // The actual service registrations
+        container.Register<A>();
+        container.Register<B>();
+
+        // Lazy is available without registration!
+        container.Resolve<B>();
     }
 
-    // required registrations:
-    container.Register<A>();
-    container.Register<B>();
-
-    // Lazy is available without registration!
-    container.Resolve<B>();
+    class A { }
+    class B
+    {
+        public B(Lazy<A> a) { }
+    }
+}
 ```
 
 
 ## Predefined wrappers
 
-Predefined wrappers are always available - you don't need to Register them, but may Unregister then if you want.
+Predefined wrappers are always available, you don't need to `Register` them, but may `Unregister` then if you want.
 
-Predefined wrapper types were selected to be DryIoc agnostic, to keep your business logic as POCO as possible without depending on specific IoC infrastructure. The only exception is `Meta<,>` which helps to migrate from Autofac but you may use `Tuple<,>` instead.
+Predefined wrapper types were selected to be DryIoc agnostic, to keep your business logic as _POCO_ as possible without 
+depending on specific IoC library. It means all of wrapper types except `DryIoc.Meta<,>` are available without DryIoc. 
+
+__Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you may use `System.Tuple<,>` instead.
 
 
 ### Lazy of A
