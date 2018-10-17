@@ -70,6 +70,10 @@
         <Generator>CsToMd</Generator>
         <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
       </Compile>
+      <Compile Update="Wrappers.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>Wrappers.md</LastGenOutput>
+      </Compile>
     </ItemGroup>
 
     <ItemGroup>
@@ -127,6 +131,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>UsingInTestsWithMockingLibrary.cs</DependentUpon>
+      </None>
+      <None Update="Wrappers.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Wrappers.cs</DependentUpon>
       </None>
     </ItemGroup>
 

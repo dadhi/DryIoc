@@ -10508,11 +10508,11 @@ namespace DryIoc.Messages
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
     {
-        /// Handles message and passes to the next middlewar
+        /// Handles message and passes to the next middleware
         Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
     }
 
-    /// Base class for implmenting async handlers
+    /// Base class for implementing async handlers
     public abstract class AsyncMessageHandler<M, R> : IMessageHandler<M, R>
         where M : IMessage<R>
     {
@@ -10523,7 +10523,7 @@ namespace DryIoc.Messages
             await Handle(message, cancellationToken).ConfigureAwait(false);
     }
 
-    /// Sequencial middleware type of message handler decorator
+    /// Sequential middleware type of message handler decorator
     public class MiddlewareMessageHandler<M, R> : IMessageHandler<M, R> where M : IMessage<R>
     {
         private readonly IMessageHandler<M, R> _handler;
