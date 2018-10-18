@@ -6567,14 +6567,14 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0)
-            => wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
-               !openResolutionScope && !asResolutionCall && !preventDisposal && !weaklyReferenced &&
-               !allowDisposableTransient && !trackDisposableTransient && condition == null && disposalOrder == 0
-                ? Wrapper
-                : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
-                    condition, openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced,
-                    allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder);
+            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0) => 
+                wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
+                !openResolutionScope && !asResolutionCall && !preventDisposal && !weaklyReferenced &&
+                !allowDisposableTransient && !trackDisposableTransient && condition == null && disposalOrder == 0
+                    ? Wrapper
+                    : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
+                        condition, openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced,
+                        allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder);
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
@@ -8156,6 +8156,18 @@ namespace DryIoc
 
         /// <summary>Clones the scope.</summary>
         IScope Clone();
+    }
+
+    // todo: not yet used, planned for optimizing scope resolution root resolve.
+    /// Extension methods for `IScope`
+    public static class ScopeTools
+    {
+        /// Sets or add the service to scope and immediately returns it for further fluent operation. 
+        public static object GetOrSet(this IScope scope, int id, object service)
+        {
+            scope.SetOrAdd(id, service);
+            return service;
+        }
     }
 
     /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
