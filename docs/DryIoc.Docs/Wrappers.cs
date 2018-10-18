@@ -519,25 +519,58 @@ class Covariant_generics_collection_suppressed
 
 #### Composite Pattern support
 
-Collection wrapper by default supports [Composite pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite pattern is observed when service implementation depends on the collection of other implementations of the same service. For example:
+Collection wrapper by default supports a [Composite pattern](http://en.wikipedia.org/wiki/Composite_pattern). 
+Composite pattern is observed when service implementation depends on the collection of other implementations of the same service. 
+For example:
+```cs md*/
 
-    class Composite : A
-    {
-        public Composite(A[] aas) {}
-    }
-
+class Composite_example
+{
     class A1 : A {}
     class A2 : A {}
+    class Composite : A { public Composite(A[] items) { } }
+} /*md
+```
 
-In this example we expect that _aas_ in Composite will be composed of A1 and A2 objects, but not of composite itself despite the fact Composite is also an A. Including composite into _aas_ will produce infinite recursion in the construction of object graph. Therefore Composite pattern may be looked like a way to avoid such recursion by excluding composite from its dependencies. DryIoc does exactly that:
+In this example we expect that `items` in Composite will be composed of `A1` and `A2` objects, 
+but not of composite itself despite the fact Composite is also an `A`. 
+Including composite into `items` will produce infinite recursion in the construction of object graph. 
+Therefore, a Composite pattern may be looked like a way to avoid such recursion by excluding composite from its dependencies. 
+DryIoc does exactly that:
 
-    container.Register<A, Composite>();
-    container.Register<A, A1>();
-    container.Register<A, A2>();
-    
-    container.Resolve<IEnumerable<A>>();
+```cs md*/
+class DryIoc_composite_pattern
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-The Resolve will return three instances of A, where first will be composite with only two instances of A: of A1 and A2.
+        container.Register<A, Composite>();
+        container.Register<A, A1>();
+        container.Register<A, A2>();
+
+        // Contains all three items including the `Composite`
+        var items = container.Resolve<IEnumerable<A>>().ToArray();
+        Assert.AreEqual(3, items.Length);
+
+        // Composite contains `A1` and `A2` instance and not itself (which should cause StackOverflow exception)
+        var composite = items.OfType<Composite>().First();
+        Assert.AreEqual(2, composite.Items.Length);
+    }
+
+    class A1 : A { }
+    class A2 : A { }
+    class Composite : A
+    {
+        public A[] Items { get; }
+        public Composite(A[] items) { Items = items; }
+    }
+}
+/*md
+```
+
+The `Resolve` will return three instances of `A`, where first one will be a composite with only two instances of `A`: of `A1` and `A2`.
 
 
 ### LazyEnumerable of A
