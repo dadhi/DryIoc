@@ -7,13 +7,13 @@
 
 [TOC]
 
-Wrapper in DryIoc is some useful data structure which operates on registered service or services.. 
+Wrapper in DryIoc is some useful data structure which operates on registered service or services. 
 
-- Wrapper may be either an open-generic type with generic argument identifying service type to wrap. Examples are `Func<TService>`, `Lazy<TService>`, `IEnumerable<TService>`. 
+- A wrapper may be either an open-generic type with generic argument identifying service type to wrap. Examples are `Func<TService>`, `Lazy<TService>`, `IEnumerable<TService>`. 
 - Or non-generic type, in that case a wrapped service is identified with [RequiredServiceType](RequiredServiceType): e.g. `LambdaExpression`.
 
 __Note:__ Open-generic wrapper with multiple type arguments may wrap one service type only, e.g. `Func<TArg0, TArg1, TService>` wraps `TService`. 
-Wrapping a multiple services in one wrapper is not supported.
+Wrapping multiple services in one wrapper is not supported.
 
 More info:
 
@@ -27,10 +27,12 @@ Wrapper example:
 ```cs md*/
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using DryIoc;
 using NUnit.Framework;
+// ReSharper disable UnusedVariable
 
-class Wrapper_example 
+class Wrapper_example
 {
     [Test]
     public void Example()
@@ -58,15 +60,14 @@ class Wrapper_example
 
 Predefined wrappers are always available, you don't need to `Register` them, but may `Unregister` then if you want.
 
-Predefined wrapper types were selected to be DryIoc agnostic, to keep your business logic as _POCO_ as possible without 
-depending on specific IoC library. It means all of wrapper types except `DryIoc.Meta<,>` are available without DryIoc. 
+Predefined wrapper types were selected to be DryIoc agnostic, to keep your business logic as _POCO_ as possible without depending on specific IoC library. It means all of the wrapper types except `DryIoc.Meta<,>` are available without DryIoc. 
 
 __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you may use `System.Tuple<,>` instead.
 
 
 ### Lazy of A
 
-- Provides instance of `A` created on first access.
+- Provides an instance of `A` created on first access.
 - Internally implemented as a call to a container Resolve: `r => new Lazy(() => r.Resolve<A>())`, therefore `A` may not be yet available when `Lazy` is injected.
 - Permits a [recursive dependency] in resolution graph, because uses a `Resolve` to postpone to getting an actual service value.
 
@@ -85,7 +86,7 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 
 ### Really "lazy" Lazy and Func
 
-The important thing about `Lazy` and `Func` is that the wrapped dependency should be registered into container when injecting a wrappers.
+The important thing about `Lazy` and `Func` is that the wrapped dependency should be registered into the container when injecting wrappers.
 ```cs md*/
 class Lazy_and_Func_require_services_to_be_registered
 {
@@ -95,7 +96,7 @@ class Lazy_and_Func_require_services_to_be_registered
         var container = new Container();
 
         // Throws cause `A` is not registered
-        Assert.Throws<ContainerException>(() => 
+        Assert.Throws<ContainerException>(() =>
             container.Resolve<Lazy<A>>());
     }
 
@@ -103,7 +104,7 @@ class Lazy_and_Func_require_services_to_be_registered
 } /*md
 ```
 
-This was done intentionally to be able to construct as much of object graph as possible to verify it correctness.
+This was done intentionally to be able to construct as much of the object graph as possible to verify its correctness.
 The default DryIoc laziness of `Func` and `Lazy` is about postponing a creation of service value, and not about 
 postponing a registration.
 
@@ -133,7 +134,7 @@ class Func_works_without_registration
 
 ### Func of A with parameters
 
-Delegates creation of service to the user and allows to supply subset of dependencies. The rest of dependencies are injected by container as usual. 
+Delegates creation of service to the user and allows supplying a subset of dependencies. The rest of dependencies are injected by the container as usual. 
 
 More details:
 
@@ -145,18 +146,18 @@ More details:
 
 
 Provided arguments are matched with parameters by type and in passed order. 
-If matched argument is not found then the argument will be injected by container, as `D` in the example above. 
+If the matched argument is not found then the argument will be injected by the container, like `D` in the example above. 
 The arguments order may differ from parameters order.
 
-What if provided arguments are of the same type? DryIoc will track already used arguments and will skip them in subsequent match. 
+What if provided arguments are of the same type? DryIoc will track already used arguments and will skip them in the subsequent match. 
 Means that `dep1` and `dep2` from the example may be a string and still both used.
 
-__Note:__ In case when passed argument is not used then DryIoc will proceed to match it for nested dependencies (if any):
+__Note:__ In case when the passed argument is not used then DryIoc will proceed to match it for nested dependencies (if any):
 ```cs
 new B(arg => new A(new D(arg)))
 ```
 
-When passed argument was not used it is maybe a mistake but may be is not. It was a hard choice, but DryIoc will ignore this for now.
+When the passed argument was not used it is maybe a mistake but maybe is not. It was a hard choice, but DryIoc will ignore this for now.
 ```cs md*/
 class Passed_argument_was_not_used
 {
@@ -176,9 +177,9 @@ class Passed_argument_was_not_used
 }/*md
 ```
 
-There is an other caveat related to reuse. You may say that passing a different argument to create a service likely may produce a different service.
+There is another caveat related to reuse. You may say that passing a different argument to create a service likely may produce a different service.
 But what happens when service is registered with non-transient reuse? 
-By default DryIoc will use the first call to `Func` to create a service and ignore the rest. 
+By default, DryIoc will use the first call to `Func` to create a service and ignore the rest. 
 ```cs md*/
 class Func_with_args_and_reuse
 {
@@ -243,7 +244,7 @@ More on the `KeyValuePair` usage is [here](RegisterResolve#markdown-header-resol
 
 ### Meta or Tuple of A with Metadata
 
-Packs together resolved service A and associated metadata object. A bit similar to `KeyValuePair` but with metadata instead of key. 
+Packs together resolved service A and associated metadata object. A bit similar to `KeyValuePair` but with metadata instead of the key. 
 You may think of the metadata the same way as of `Attribute` defined for the implementation type. 
 Metadata may be provided with attributes when using [MefAttributedModel](Extensions/MefAttributedModel). 
 ```cs md*/
@@ -265,17 +266,16 @@ class Providing_metadata
 } /*md
 ```
 
-__Note:__ You may choose to use `System.Tuple<,>` over `DryIoc.Meta<,>` because former does not require DryIoc reference. 
+__Note:__ You may choose to use `System.Tuple<,>` over `DryIoc.Meta<,>` because former does not require the DryIoc reference. 
 
 `Meta<,>` may be a good choice if you are migrating from [Autofac](http://docs.autofac.org/en/latest/resolve/relationships.html#metadata-interrogation-meta-b-meta-b-x), 
 or if you want to register `Tuple<,>` with the different meaning.
 
 If no metadata provided in `setup`, then the resolving as `Meta` will throw a `ContainerException` with corresponding message and code.
-In the example above registered and resolved metadata types are the same. DryIoc will throw exception in case they are not assignable, 
-e.g. when registered as `string` but resolving with `int` metadata type. Resolving as `Meta<A, object>` is always fine because string is object.
+In the example above registered and resolved metadata types are the same. DryIoc will throw an exception in case they are not assignable, 
+e.g. when registered as `string` but resolving with `int` metadata type. Resolving as `Meta<A, object>` is always fine because a string is an object.
 
-Metadata maybe also used for collection filtering. When nested in collection wrapper, and the metadata is not registered or not assignable, 
-then no exception will be thrown. Instead the service item will be filtered out from collection (and collection may be empty as the result):
+Metadata may be also used for collection filtering. When nesting in collection wrapper, and when the metadata is not registered or not assignable, then no exception will be thrown. Instead, a service item will be filtered out from the collection (and collection may be empty as the result):
 ```cs md*/
 class Filtering_based_on_metadata
 {
@@ -291,14 +291,14 @@ class Filtering_based_on_metadata
 
 __Note:__ Filtering works the same way for `KeyValuePair<TKey, TService>`
 
-Wrappers maybe combined further with `Func` or `Lazy`, or even with `KeyValuePair` to provide a filtered collection of lazy services:
+Wrappers may be combined further with `Func` or `Lazy`, or even with `KeyValuePair` to provide a filtered collection of lazy services:
 ```cs
 container.Resolve<Meta<string, Func<int, A>>[]>();
 ```
 
 #### Dictionary Metadata
 
-Metadata value can be a non-primitive object or a `IDictionary<string, object>`. 
+Metadata value can be a non-primitive object or an `IDictionary<string, object>`. 
 In latter case you may `Resolve` by providing the type of any `object` value in a dictionary:
 
 ```cs md*/
@@ -346,27 +346,25 @@ The collection basically a fully initialized "fixed" array:
 var items = new B(new A[] { new Impl1(), new Impl2(), new Impl3() });
 ```
 
-The result array expression is generated __only once__ using all found services and 
-will not change if new service is added afterwards, or existing one is updated or removed. 
+The result array expression is generated __only once__ using all found services and will not change if new service is added afterward, or the existing one is updated or removed. 
 You may use `LazyEnumerable<T>` explained below to address this limitation.
 
-__Note:__ Another way to use a `LazyEnumerable<T>` when resolving `IEnumerable<T>` is to specify it 
-globally via `Rules.WithResolveIEnumerableAsLazyEnumerable`.
+__Note:__ Another way to use a `LazyEnumerable<T>` when resolving `IEnumerable<T>` is to specify it globally via `Rules.WithResolveIEnumerableAsLazyEnumerable`.
 
 There is an alternate way to `Resolve` rather than inject a collection: 
 via `IResolver.ResolveMany` method. `ResolveMany` may provide results as a fixed array or as a 
-`LazyEnumerable` based on the passed option. Default is the `LazyEnumerable` option.
+`LazyEnumerable` based on the passed option. The default is the `LazyEnumerable` option.
 
-Due the fact that .NET `Array` implements number of collection interfaces: 
+Due to the fact that .NET `Array` implements a number of collection interfaces: 
 `IEnumerable<>`, `IList<>`, `ICollection<>`, `IReadOnlyList<>`, `IReadOnlyCollection<>`, 
-DryIoc allows to inject these interfaces. So you may consider them as a same collection wrapper.
+DryIoc allows injecting these interfaces. So you may consider them as the same collection wrapper.
 
 Resolved services are ordered in registration order for default services, 
-and without specific order for the keyed services. 
+and without the specific order for the keyed services. 
 Despite being ordered, the default services may be mixed up with keyed services.
 
-The fixed array nature implies that all services will be created when wrapper is resolved or injected. 
-But may be you need filter only some services (or inspect service count) and do not want to create the rest. 
+The fixed array nature implies that all services will be created when the wrapper is resolved or injected. 
+But maybe you need filter only some services (or inspect service count) and do not want to create the rest. 
 Nested `Func` or `Lazy` will help in this case:
 ```cs md*/
 class Collection_of_Lazy_things
@@ -390,12 +388,12 @@ class Collection_of_Lazy_things
 ```
 
 DryIoc supports filtering of result services when using nested `KeyValuePair` or `Meta` wrappers. 
-Basically when nested wrapper is not resolved because of not compatible Key or Metadata type, 
-then the item will be excluded from array. 
+Basically when the nested wrapper is not resolved because of not compatible Key or Metadata type, 
+then the item will be excluded from the array. 
 
-When service is not resolvable due the missing (not registered) dependency, 
+When service is not resolvable due to the missing (not registered) dependency, 
 the collection wrapper will throw an exception instead of skipping the item. 
-In all other cases, the item will filtered out of collection.
+In all other cases, the item will be filtered out of the collection.
 
 ```cs md*/
 class Filtering_not_resolved_services
@@ -423,7 +421,7 @@ class Filtering_not_resolved_services
 #### Open-generics
 
 If you registered both closed and open-generic implementation of the service, 
-then the both types will be present in the result collection 
+then both types will be present in the result collection 
 (_it may be obvious but I wanted to be clear on this_):
 
 ```cs md*/
@@ -448,51 +446,80 @@ class Both_open_and_closed_generic_included_in_collection
 ```
 
 
-#### Contravariant generics
+#### Co-variant generics
 
-DryIoc by default will include [contravariant](https://msdn.microsoft.com/en-us/library/dd799517(v=vs.110).aspx) generic services into resolved collection.
+DryIoc by default will include [co-variant](https://msdn.microsoft.com/en-us/library/dd799517(v=vs.110).aspx) 
+generic services into resolved collection. 
 
-Example:
+What does it mean? In C# you may declare a co-variant open-generic interface with `out` modifier: `IHandler<out T>`.
+Then if you have a class `B` assignable to `A` (`class B : A {}), then their handlers are assignable as well 
+`IHandler<B> b = null; IHandler<A> a = b;`.
+
+Proceeding to collections, you may have an `IEnumerable<IHandler<A>>` with elements of type `IHandler<A>` and `IHandler<B>`.
+
+```cs md*/
+class Covariant_generics_collection
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        // Using batch registration for convenience
+        container.RegisterMany(
+            implTypes: new[] { typeof(MoveHandler), typeof(MoveAbroadHandler) },
+            nonPublicServiceTypes: true);
+
+        // Collection will include `IHandler<MoveAbroadEvent>` as well as `IHandler<MoveEvent>`
+        var moveHandlers = container.Resolve<IEnumerable<IHandler<MoveEvent>>>();
+        Assert.AreEqual(2, moveHandlers.Count());
+
+        // Now we narrow the collection type to `IHandler<MoveAbroadEvent>`, so it will include only one item now
+        var moveAbroadHandlers = container.Resolve<IEnumerable<IHandler<MoveAbroadEvent>>>();
+        Assert.AreEqual(1, moveAbroadHandlers.Count());
+    }
+
+    interface IHandler<out TEvent> { } // contra-variant interface
+    class MoveEvent { }
+    class MoveHandler : IHandler<MoveEvent> { }
+    class MoveAbroadEvent : MoveEvent { }
+    class MoveAbroadHandler : IHandler<MoveAbroadEvent> { }
+} /*md
 ```
-#!c#
-    interface IHandler<in TEvent> {} // contra-variant interface
-    
-    class MoveEvent {}
-    class MoveAbroadEvent : MoveEvent {}
 
-    class MoveHandler : IHandler<MoveEvent> {}
-    class MoveAbroadHandler : IHandler<MoveAbroadEvent> {}
+If you don't want the co-variant types to be included into collection, you may disable this behavior
+via `Rules.WithoutVariantGenericTypesInResolvedCollection()`:
 
-    // Using batch registration for convenience:
-    container.RegisterMany(new[] { typeof(MoveHandler<>), typeof(MoveAbroadHandler) });
+```cs md*/
+class Covariant_generics_collection_suppressed
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.WithoutVariantGenericTypesInResolvedCollection());
 
-    // Resolve:
-    var moveHandlers = container.Resolve<IEnumerable<IHandler<MoveEvent>>>();
-    Assert.AreEqual(2, moveHandlers.Count()); // handlers of both Move and MoveAbroad events
+        // Using batch registration for convenience
+        container.RegisterMany(
+            implTypes: new[] { typeof(MoveHandler), typeof(MoveAbroadHandler) },
+            nonPublicServiceTypes: true);
 
-    var moveAbroadHandlers = container.Resolve<IEnumerable<IHandler<MoveAbroadEvent>>>();
-    Assert.AreEqual(1, moveAbroadHandlers.Count());
-```
+        // Now it as only one handler
+        var moveHandlers = container.Resolve<IEnumerable<IHandler<MoveEvent>>>();
+        Assert.AreEqual(1, moveHandlers.Count());
+    }
 
-In this example IHandler<MoveAbroadEvent> is compatible with IHandler<MoveEvent> due variance rules, and therefore included into result `moveHandlers`.
-
-It is possible to disable this behavior per container:
-
-```
-#!c#
-     var container = new Container(rules => rules
-        .WithoutVariantGenericTypesInResolvedCollection());
-
-    // ... the same setup
-
-    var moveHandlers = container.Resolve<IEnumerable<IHandler<MoveEvent>>>();
-    Assert.AreEqual(1, moveHandlers.Count()); // exactly one MoveHandler is resolved
+    interface IHandler<out TEvent> { } // contra-variant interface
+    class MoveEvent { }
+    class MoveHandler : IHandler<MoveEvent> { }
+    class MoveAbroadEvent : MoveEvent { }
+    class MoveAbroadHandler : IHandler<MoveAbroadEvent> { }
+} /*md
 ```
 
 
 #### Composite Pattern support
 
-Collection wrapper by default supports [Composite pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite pattern is observed when service implementation depends on collection of other implementations of the same service. For example:
+Collection wrapper by default supports [Composite pattern](http://en.wikipedia.org/wiki/Composite_pattern). Composite pattern is observed when service implementation depends on the collection of other implementations of the same service. For example:
 
     class Composite : A
     {
@@ -502,7 +529,7 @@ Collection wrapper by default supports [Composite pattern](http://en.wikipedia.o
     class A1 : A {}
     class A2 : A {}
 
-In this example we expect that _aas_ in Composite will be composed of A1 and A2 objects, but not of composite itself despite the fact Composite is also an A. Including composite into _aas_ will produce infinite recursion in construction of object graph. Therefore Composite pattern may be looked as a way to avoid such recursion by excluding composite from its dependencies. DryIoc does exactly that:
+In this example we expect that _aas_ in Composite will be composed of A1 and A2 objects, but not of composite itself despite the fact Composite is also an A. Including composite into _aas_ will produce infinite recursion in the construction of object graph. Therefore Composite pattern may be looked like a way to avoid such recursion by excluding composite from its dependencies. DryIoc does exactly that:
 
     container.Register<A, Composite>();
     container.Register<A, A1>();
@@ -515,7 +542,7 @@ The Resolve will return three instances of A, where first will be composite with
 
 ### LazyEnumerable of A
 
-`LazyEnumerable<>` is different from `IEnumerable<>` wrapper in a way that it wraps `ResolveMany` call instead of initialized array expression. When enumerating it will call `ResolveMany` and will return up-to-date services registered in Container. By comparison array wrapper always returns fixed set of services.
+`LazyEnumerable<>` is different from `IEnumerable<>` wrapper in a way that it wraps `ResolveMany` call instead of the initialized array expression. When enumerating it will call `ResolveMany` and will return up-to-date services registered in Container. By comparison array wrapper always returns a fixed set of services.
 
 ```
 #!c#
@@ -530,7 +557,7 @@ The Resolve will return three instances of A, where first will be composite with
     aList = lazyAList.ToArray(); // aList now contains A1 and A2 instances
 ```
 
-`LazyEnumerable<>` implements `IEumerable<>` so you can inject the interface by specifying `LazyEnumerable<>` as required service type. It allows you to override default array injection per dependency:
+`LazyEnumerable<>` implements `IEumerable<>` so you can inject the interface by specifying `LazyEnumerable<>` as the required service type. It allows you to override default array injection per dependency:
 
 ```
 #!c#
@@ -553,10 +580,10 @@ Another option is to specify `LazyEnumerable<>` implementation for `IEnumerable<
 
 ### LambdaExpression
 
-Allows to get actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by Container to resolve specific service. 
+Allows getting actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by Container to resolve specific service. 
 
-- It may be used either for diagnostics - to check if Container creates the service in expected way.
-- In code generation scenarios - by converting expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. It may be done even at compile-time.
+- It may be used either for diagnostics - to check if Container creates the service in an expected way.
+- In code generation scenarios - by converting the expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. It may be done even at compile-time.
 - To understand how DryIoc works internally.
 
 Example:
@@ -568,13 +595,13 @@ Example:
     // the result expr may look as following:
     // (object[] state, DryIoc.IResolverContext r, DryIoc.IScope scope) => new Service()
 
-The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDelegate>` which has signature as in example.
+The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDelegate>` which has a signature as in the example.
 
 __Note:__ Resolving as `LambdaExpression` does not create actual service.
 
 ## Nested wrappers
 
-Wrappers may be nested to provide combined functionality. Common use-case is to resolve collection of registered services as `Func` or `Lazy`, then filter and create what you need.
+Wrappers may be nested to provide combined functionality. A common use-case is to resolve the collection of registered services as `Func` or `Lazy`, then filter and create what you need.
 
 Examples: 
 
@@ -590,7 +617,7 @@ With registered keys:
 
 With typed metadata:
 
-	container.Resolve<IEnumerable<Meta<MyMetadata, Func<IA>>>>();
+    container.Resolve<IEnumerable<Meta<MyMetadata, Func<IA>>>>();
 
 Other combinations:
 
@@ -630,9 +657,9 @@ __Note:__ The main difference between wrapper and non-wrapper is how they are tr
 
 If open-generic wrapper has more than one type argument (e.g. `Meta<A, Metadata>`) you need to specify wrapped argument index: `setup: Setup.WrapperWith(0)`.
 
-You may register non-generic wrapper. In this case when resolved you should identify wrapped service with [Required Service Type](RequiredServiceType).
+You may register non-generic wrapper. In this case, when resolved you should identify wrapped service with [Required Service Type](RequiredServiceType).
 
-Example of non-generic wrapper:
+Example of the non-generic wrapper:
 ```
 #!c#
     

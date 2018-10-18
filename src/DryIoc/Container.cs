@@ -2909,11 +2909,10 @@ namespace DryIoc
                 rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations()
-                    .Match(it =>
-                        it.ServiceType.IsGeneric() &&
-                        it.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
-                        it.ServiceType != requiredItemType &&
-                        it.ServiceType.IsAssignableTo(requiredItemType))
+                    .Match(x =>
+                        x.ServiceType.IsGeneric() &&
+                        x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
+                        x.ServiceType != requiredItemType && x.ServiceType.IsAssignableTo(requiredItemType))
                     .ToArrayOrSelf();
                 items = items.Append(variantGenericItems);
             }
