@@ -127,7 +127,7 @@ namespace DryIoc.UnitTests
             container.Register<IHandler<int>, FooHandler<int>>();
             container.Register<IHandler<int>, BarHandler<int>>();
             container.Register<IHandler<int>, CompositeHandler<int>>(
-                setup: Setup.With(preferOverMultipleResolved: true));
+                setup: Setup.With(preferInSingleServiceResolve: true));
 
             var h = container.Resolve<IHandler<int>>();
 

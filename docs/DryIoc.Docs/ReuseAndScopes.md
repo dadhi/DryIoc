@@ -1,3 +1,4 @@
+
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Reuse and Scopes
@@ -9,7 +10,7 @@
 Reuse (or lifestyle) instructs container to create service once and then return the same instance on every resolve or inject.
 Created service becomes shared between its consumers.
 
-One type of reuse is well known in software development as [Singleton](http://en.wikipedia.org/wiki/Singleton_pattern). IoC Containers implement Singleton in a way that make it easy to test and replace.
+One type of reuse is well known in software development as [Singleton](http://en.wikipedia.org/wiki/Singleton_pattern). IoC Containers implement Singleton in a way that makes it easy to test and replace.
 
 DryIoc provides following basic types of reuse:
 
@@ -58,7 +59,7 @@ container.Register<IFoo, Foo>();
 When you register transient service implementing `IDisposable` interface it becomes problematic who is responsible for service disposal.
 Let's look at two situations to understand why it is a problem:
 
-First case, if you resolve a transient disposable service via `Resolve` method.
+The first case, if you resolve a transient disposable service via `Resolve` method.
 
 __Note__: DryIoc does not support transient disposable registration by default (explained later). You need to use `allowDisposableTransient: true` to setup 
 an individual registration or `Rules.WithoutThrowOnRegisteringDisposableTransient()` to allow per container.
@@ -87,13 +88,14 @@ class Disposable_transient_as_resolved_service
 
     class X : IDisposable { public void Dispose() { } }
 }
+
 ```
 
-In this case, using container is very similar to using a `new` operator. 
+In this case, using the container is very similar to using a `new` operator. 
 You are controlling the resolved service and may decide when it is no longer needed and call `x.Dispose();`.
 No problem in this case.
 
-Second case, when the disposable transient is injected as dependency:
+The second case, when the disposable transient is injected as a dependency:
 ```cs 
 class Disposable_transient_as_injected_dependency
 {
@@ -118,17 +120,18 @@ class Disposable_transient_as_injected_dependency
     class X : IDisposable { public void Dispose() { } }
     class XUser { public XUser(X x) { } }
 }
+
 ```
 
 Here `XUser` just accepts `X` parameter without knowing its reuse, is it shared or not. 
-Given the parameter alone it is not enough to decide if `XUser` can dispose `x`, or may be `x` is still used by other consumers.
+Given the parameter alone it is not enough to decide if `XUser` can dispose `x`, or maybe `x` is still used by other consumers.
 `XUser` may even don't know that `X` implementation implements `IDisposable`. 
 
 That means the responsibility for Disposing injected dependency should be on injecting side - IoC Container.
 
-In order to control (have an access) transient disposable object, container should somehow track (store) transient disposable object somewhere.
+In order to control (have an access) transient disposable object, the container should somehow track (store) transient disposable object somewhere.
 
-DryIoc provides a way to track a transient disposable object in the current open scope (if any) or in the singleton scope in container.
+DryIoc provides a way to track a transient disposable object in the current open scope (if any) or in the singleton scope in the container.
 
 ```cs 
 class Tracking_disposable_transient
@@ -168,7 +171,7 @@ class Tracking_disposable_transient
 } 
 ```
 
-If case, you want for some reason to prevent tracking of specific service, there are couple of options:
+If for some reason you want to prevent tracking of specific service, there are a couple of options:
 
 Using `preventDisposal` setup option:
 ```cs
@@ -214,13 +217,14 @@ class Prevent_disposable_tracking_with_Func
         public void Dispose() => IsDisposed = true;
     }
 }
+
 ```
 
 
 ### Different default Reuse instead of Transient
 
 Sometimes you may want to apply another default reuse instead of Transient. 
-Possible reasons maybe: to minimize clutter in registrations, 
+Possible reasons may be: to minimize clutter in registrations, 
 or to automatically provide reuse preferred to your use-case.
 
 You can achieve this by setting the Container Rules:
@@ -245,14 +249,12 @@ class Default_reuse_per_container
 } 
 ```
 
-What if I want a Transient reuse when `DefaultReuse` is different from Transient. In this case you need to 
-specify `Reuse.Transient` explicitly: `container.Register<X>(Reuse.Transient)`.
+What if I want a Transient reuse when `DefaultReuse` is different from Transient. In this case, you need to specify `Reuse.Transient` explicitly: `container.Register<X>(Reuse.Transient)`.
 
 
 ## Reuse.Singleton
 
-The same single instance per Container. Service instance will be created on first resolve or injection and will live until
-container is disposed. If instance type is `IDisposable` then it will be disposed together with container.
+The same single instance per Container. Service instance will be created on first resolve or injection and will live until the container is disposed. If instance type is `IDisposable` then it will be disposed together with the container.
 
 ```cs 
 class Singleton_reuse
@@ -273,7 +275,7 @@ class Singleton_reuse
 
 ## Reuse.Scoped
 
-`Reuse.Scoped` or specifically its type `CurrentScopeReuse` is the base type for the rest of predefined reuses in DryIoc. 
+`Reuse.Scoped` or specifically, its type `CurrentScopeReuse` is the base type for the rest of predefined reuses in DryIoc. 
 But before explaining it, let's talk about the notion of Scope.
 
 
@@ -285,7 +287,7 @@ Physically scope is the storage for resolved and injected services registered wi
 Once created, a reused object is stored in the scope internal collection and will live there until the scope is disposed.
 In addition, Scope ensures that __service instance will be created only once__ in multi-threading scenarios.
 
-__Note:__ The scope is the only place in DryIoc where `lock`, is used to prevent multiple creation of the same instance. The rest of DryIox is lock-free.
+__Note:__ The scope is the only place in DryIoc where `lock`, is used to prevent multiple creations of the same instance. The rest of DryIox is lock-free.
 
 Scope also has `Parent` and `Name` properties (see `ScopedTo(name)` reuse explained below).
 
@@ -300,7 +302,7 @@ which shares all the registrations and cached resolutions with the original cont
 but contains a reference to newly opened scope. 
 
 Resolving a service with `Scoped` reused from `scopedContainer` will store the service instance in the opened scope. 
-When you dispose `scopedContainer`, open scope will be disposed as well together with the stored service instance.
+When you dispose `scopedContainer`, the open scope will be disposed as well together with the stored service instance.
 
 ```cs 
 class Scoped_reuse_register_and_resolve
@@ -336,7 +338,7 @@ class Scoped_reuse_register_and_resolve
 } 
 ```
 
-Interesting thing, if you resolve `Car` from container wrapped in `Func<Car>` or `Lazy<Car>`, it won't throw. 
+An interesting thing, if you resolve `Car` from container wrapped in `Func<Car>` or `Lazy<Car>`, it won't throw. 
 But when you try to use a lazy value in open scope it will throw.
 
 ```cs 
@@ -363,19 +365,19 @@ class Scoped_reuse_resolve_wrapped_in_Lazy_outside_of_scope
 } 
 ```
 
-It happens because scope is the part of container. When resolving from top container id does not have the opened scope part, 
-but laziness of `Lazy` and `Func` prevents throwing, cause we are not accessing scope yet.
+It happens because a scope is the part of the container. When resolving from top container id does not have the opened scope part, 
+but the laziness of `Lazy` and `Func` prevents throwing, cause we are not accessing scope yet.
 When opening scope we are creating another container with the __bound scope__ part. But previously resolved services does not 
 aware of the new container and new scope, therefore attempt to get actual value throws an exception.
 
-There is way to support such a lazy scenario, check the next section. 
+There is a way to support such a lazy scenario, check the next section. 
 
 ### ScopeContext
 
-ScopeContext (`IScopeContext` interface) is the __shared__ storage and tracking mechanism for current opened scope and its nested scopes.
-By default, `Container` does not have any scope context, and stores a scope directly in itself. When providing with scope context,
-container may share the context with scoped containers, making possible lazy resolve outside of the scope and then getting value
-when scope is available __in shared scope context__.
+ScopeContext (`IScopeContext` interface) is the __shared__ storage and tracking mechanism for the current opened scope and its nested scopes.
+By default, `Container` does not have any scope context and stores a scope directly in itself. When provided with the scope context,
+a container may share the context with scoped containers, making possible lazy resolve outside of the scope and then getting value
+when the scope is available __in shared scope context__.
 
 ```cs 
 class Scoped_reuse_resolve_Lazy_with_scope_context
@@ -414,12 +416,12 @@ Check this [blog post](http://blog.stephencleary.com/2013/04/implicit-async-cont
 
 You may create your own context by implementing `IScopeContext` interface.
 
-__Note:__ `AsyncExecutionFlowScopeContext` maybe considered a default option, when you don't know what to use.
+__Note:__ `AsyncExecutionFlowScopeContext` may be considered a default option when you don't know what to use.
 
 
 ### Nested scopes
 
-The scopes maybe nested either with or without scope context present.
+The scopes may be nested either with or without scope context present.
 
 ```cs 
 class Nested_scopes_without_scope_context
@@ -447,10 +449,9 @@ class Nested_scopes_without_scope_context
 
 Scopes `s1`, `s2`, `s3` form a nested chain where `s1` is parent of `s2` and `s2` is parent of `s3`.
 
-__Note:__ In DryIoc a singleton scope is not a part of scope chain.
+__Note:__ In DryIoc a singleton scope is not a part of the scope chain.
 
-In absence of scope context, all the nested scopes are exist and available __independently__, so you may 
-resolve from any nested scoped container any time getting a different instances from the different scopes. 
+In absence of scope context, all the nested scopes exist and available __independently__, so you may resolve from any nested scoped container any time to get different instances from the different scopes. 
 
 Now we add `ScopeContext` to the mix:
 
@@ -497,12 +498,12 @@ class Nested_scopes_with_scope_context
 
 Scope context associated with `container` has a shared "current" scope property, which references the last / deepest open scope.
 The "current" scope is overridden with new scope open, making it an actual current scope to resolve from. 
-When current scope is disposed, its parent becomes a new current scope.
+When the current scope is disposed, its parent becomes a new current scope.
 
 
 ## Reuse.ScopedTo(name)
 
-You may tag the scope with the distinct "name" to resolve from the specific scope in nested chain using the 
+You may tag the scope with the distinct "name" to resolve from the specific scope in the nested chain using the 
 `Reuse.ScopedTo(object name)` reuse.
 
 It also works both with or without the context scope.
@@ -537,7 +538,7 @@ class Named_open_scopes_and_scoped_to_name
 ```
 
 When resolving or injecting a service with `ScopeTo(name)` reuse DryIoc will look up starting from the current open scope, 
-through chain of its parents until the scope with the name is found or we reached the top scope.
+through the chain of its parents until the scope with the name is found or we reached the top scope.
 
 To define a name you may use object of any type with `Equals(object other)` and `GetHashCode()` available. 
 `Reuse.ScopedTo(42)` or `Reuse.ScopedTo(Flags.Red)` are the valid names.
@@ -559,7 +560,7 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 ## Reuse.ScopeTo{TService}(serviceKey)
 
 `ScopeTo<TService>()` reuse defines to use the same dependency instance in specific service object sub-tree. 
-The concept is similar to assigning dependency object to the variable and then re-using this variable when creating service object.
+The concept is similar to assigning dependency object to the variable and then re-using this variable when creating a service object.
 
 ```cs 
 class Example_of_reusing_dependency_as_variable
@@ -640,11 +641,11 @@ We may desugar it to something like:
 var foo container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>();
 ```
 
-The code also implies that `Foo` itself will be automatically scoped to its scope. It maybe important if you want to access `Foo` recursively from its dependency.
+The code also implies that `Foo` itself will be automatically scoped to its scope. It may be important if you want to access `Foo` recursively from its dependency.
 
 But with such an automatic scoping we still have a problem: how to dispose the scope.
 
-In order to dispose the scope DryIoc should somehow track the reference to it. This is exactly how it works, automatically created scope will be held by either
+In order to dispose the scope, DryIoc should somehow track the reference to it. This is exactly how it works, an automatically created scope will be held by either
 current open scope or by singleton scope. When the current scope or container with singletons is disposed - the automatic scope is disposed to.
 
 ```cs 
@@ -749,17 +750,17 @@ __Note:__ If both `reuse` and `useParentReuse` specified then `reuse` has an upp
 
 ## Reuse lifespan diagnostics
 
-Lifespan diagnostics helps you to find a [Captive Dependencies](http://blog.ploeh.dk/2014/06/02/captive-dependency/) 
+Lifespan diagnostics will help you to find a [Captive Dependencies](http://blog.ploeh.dk/2014/06/02/captive-dependency/) 
 of a service which tends to outlive its parent, making the parent behavior undetermined afterwards.
 
 `IReuse` implementations in DryIoc have an associated `Lifespan` property. This is a relative `int` number of how long the reused object lives, 
-which allows to detect lifespan mismatches by simply comparing the lifespan values.
+which allows detecting lifespan mismatches by simply comparing the lifespan values.
 
 DryIoc reuses have the following lifespans:
 
-- `Singleton`: 1000. Object lives for lifetime of container.
-- `Scoped(To)`: 100. Object lives until current scope is closed which is less the container lifetime.
-- `Transient`: 0. Indicate an absence of reuse and therefore the absence of lifetime.
+- `Singleton`: 1000. Object lives for a lifetime of the container.
+- `Scoped(To)`: 100. Object lives until the current scope is closed, which is less the container lifetime.
+- `Transient`: 0. Indicate an absence of reuse and therefore the absence of a lifetime.
 
 ```cs 
 class Reuse_lifespan_mismatch_detection
@@ -812,7 +813,7 @@ class Reuse_lifespan_mismatch_error_suppress
     class Mercedes
     {
         public Mercedes(Wheels wheels) { Wheels = wheels; }
-        public Wheels Wheels { get;  }
+        public Wheels Wheels { get; }
     }
 
     class Wheels : IDisposable
@@ -824,8 +825,7 @@ class Reuse_lifespan_mismatch_error_suppress
 ```
 
 Another way to prevent the exception is wrapping a shorter reused dependency in a `Func` [wrapper](Wrappers). 
-Here dependency user decides when to create a dependency value and to start its lifetime, 
-possibly creating a multiple values. 
+Here dependency user decides when to create a dependency value and to start its lifetime, possibly creating multiple values. 
 ```cs 
 class Avoiding_reuse_lifespan_mismatch_for_Lazy_dependency
 {
@@ -857,7 +857,7 @@ class Avoiding_reuse_lifespan_mismatch_for_Lazy_dependency
 
 ## Weakly Referenced reused service
 
-You may specify to store reused object as `WeakReference`:
+You may specify to store a reused object as `WeakReference`:
 ```cs
 container.Register<Service>(Reuse.Singleton, setup: Setup.With(weaklyReferenced: true));
 ```
@@ -865,7 +865,8 @@ container.Register<Service>(Reuse.Singleton, setup: Setup.With(weaklyReferenced:
 
 ## Prevent Disposal of reused service
 
-By default DryIoc will dispose `IDisposable` reused service together with its scope. To prevent that you may register service with following:
+By default, DryIoc will dispose `IDisposable` reused service together with its scope. To prevent that you may register service with following:
 ```cs
 container.Register<Service>(Reuse.Singleton, setup: Setup.With(preventDisposal: true));
 ```
+

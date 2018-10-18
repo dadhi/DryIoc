@@ -865,7 +865,7 @@ namespace DryIoc
 
             if (matchedFactories.Length > 1)
             {
-                var preferedFactories = matchedFactories.Match(f => f.Value.Setup.PreferOverMultipleDefaultResolved);
+                var preferedFactories = matchedFactories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
                 if (preferedFactories.Length == 1)
                     matchedFactories = preferedFactories;
             }
@@ -6475,8 +6475,8 @@ namespace DryIoc
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
         public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
         
-        /// <summary>When multiple default services are selуcted, this option will be used at the end to decide what to return.</summary>
-        public bool PreferOverMultipleDefaultResolved => (_settings & Settings.PreferOverMultipleDefaultResolved) != 0;
+        /// <summary>When single service is resolved, but multiple candidates found, this options will be used to prefer this one.</summary>
+        public bool PreferInSingleServiceResolve => (_settings & Settings.PreferInSingleServiceResolve) != 0;
 
         /// <summary>Sets the base settings.</summary>
         private Setup(Func<Request, bool> condition = null,
@@ -6511,7 +6511,7 @@ namespace DryIoc
             if (useParentReuse)
                 _settings |= Settings.UseParentReuse;
             if (preferOverMultipleResolved)
-                _settings |= Settings.PreferOverMultipleDefaultResolved;
+                _settings |= Settings.PreferInSingleServiceResolve;
         }
 
         [Flags]
@@ -6525,7 +6525,7 @@ namespace DryIoc
             TrackDisposableTransient = 1 << 6,
             AsResolutionRoot = 1 << 7,
             UseParentReuse = 1 << 8,
-            PreferOverMultipleDefaultResolved = 1 << 9
+            PreferInSingleServiceResolve = 1 << 9
         }
 
         private Settings _settings; // note: mutable because of setting the AsResolutionCall
@@ -6541,18 +6541,18 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, int disposalOrder = 0, bool preferOverMultipleResolved = false)
+            bool useParentReuse = false, int disposalOrder = 0, bool preferInSingleServiceResolve = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
                 !openResolutionScope && !asResolutionCall && !asResolutionRoot &&
                 !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
-                !useParentReuse && disposalOrder == 0 && !preferOverMultipleResolved)
+                !useParentReuse && disposalOrder == 0 && !preferInSingleServiceResolve)
                 return Default;
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                useParentReuse, disposalOrder, preferOverMultipleResolved);
+                useParentReuse, disposalOrder, preferInSingleServiceResolve);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>

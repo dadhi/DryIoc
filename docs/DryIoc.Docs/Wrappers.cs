@@ -551,10 +551,10 @@ class DryIoc_composite_pattern
         container.Register<A, A2>();
 
         // Contains all three items including the `Composite`
-        var items = container.Resolve<IEnumerable<A>>().ToArray();
+        var items = container.Resolve<A[]>();
         Assert.AreEqual(3, items.Length);
 
-        // Composite contains `A1` and `A2` instance and not itself (which should cause StackOverflow exception)
+        // Composite contains `A1` and `A2` instances
         var composite = items.OfType<Composite>().First();
         Assert.AreEqual(2, composite.Items.Length);
     }
@@ -570,7 +570,41 @@ class DryIoc_composite_pattern
 /*md
 ```
 
-The `Resolve` will return three instances of `A`, where first one will be a composite with only two instances of `A`: of `A1` and `A2`.
+__Note:__ If the Composite pattern support was missing in DryIoc you would be getting a "recursive dependency detected" `ContainerException`.
+
+Whether with composite or not, when you try to do `container.Resolve<A>()` the exception will be thrown, 
+because multiple implementation are registered. But sometimes you may prefer to resolve a composite if it is registered.
+
+```cs md*/
+class Prefer_composite_when_resolving_a_single_service
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        // Here is the setup option needed
+        container.Register<A, Composite>(setup: Setup.With(preferInSingleServiceResolve: true));
+        container.Register<A, A1>();
+        container.Register<A, A2>();
+
+        // Contains all three items including the `Composite`
+        var item = container.Resolve<A>();
+        Assert.IsInstanceOf<Composite>(item);
+    }
+
+    class A1 : A { }
+    class A2 : A { }
+    class Composite : A
+    {
+        public A[] Items { get; }
+        public Composite(A[] items) { Items = items; }
+    }
+}
+/*md
+```
+
+
 
 
 ### LazyEnumerable of A
