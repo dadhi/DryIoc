@@ -605,43 +605,79 @@ class Prefer_composite_when_resolving_a_single_service
 ```
 
 
-
-
 ### LazyEnumerable of A
 
-`LazyEnumerable<>` is different from `IEnumerable<>` wrapper in a way that it wraps `ResolveMany` call instead of the initialized array expression. When enumerating it will call `ResolveMany` and will return up-to-date services registered in Container. By comparison array wrapper always returns a fixed set of services.
+`LazyEnumerable<T>` is an implementation of `IEnumerable<T>`interface. It is different from `IEnumerable<T>` array wrapper in a way, 
+that it wraps a `ResolveMany` call instead of an initialized array expression. 
+When enumerating the collection, it will call `IResolver.ResolveMany` and will return up-to-date services registered in the container. 
+By comparison, an array wrapper always returns a fixed set of services ignoring whatever was added or removed after resolve.
 
+```cs md*/
+class LazeEnumerable_example
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<A, A1>();
+
+        // At that point, not even `A1` is resolved
+        var items = container.Resolve<LazyEnumerable<A>>();
+
+        // `A1` is resolved
+        var materializedItems = items.ToArray();
+        Assert.IsInstanceOf<A1>(materializedItems.Single());
+
+        // Adding a new service
+        container.Register<A, A2>();
+        items = container.Resolve<LazyEnumerable<A>>();
+        materializedItems = items.ToArray();
+
+        // Now result collection contains `A1` and `A2`
+        Assert.AreEqual(2, materializedItems.Length);
+    }
+
+    class A { } 
+    class A1 : A { } 
+    class A2 : A { } 
+}/*md
 ```
-#!c#
-    container.Register<A, A1>();
-    var lazyAList = container.Resolve<LazyEnumerable<A>>();
-    // at that point not even A1 is resolved
-    
-    var aList = lazyAList.ToArray(); // A1 is resolved and aList contains it
 
-    container.Register<A, A2>();
-    var lazyAList = container.Resolve<LazyEnumerable<A>>();
-    aList = lazyAList.ToArray(); // aList now contains A1 and A2 instances
+Because `LazyEnumerable<>` implements `IEnumerable<>` interface, you can inject the interface by specifying a `LazyEnumerable<>` 
+as the `requiredServiceType`. It allows you to override default array injection per dependency:
+
+```cs md*/
+
+class Specify_LazyEnumerable_per_dependency
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        
+        // using `Made.Of` expression to specify how to construct a type value
+        container.Register(Made.Of(() => new Handler(Arg.Of<LazyEnumerable<A>>())));
+    }
+
+    public class Handler { public Handler(IEnumerable<A> items) { } }
+} /*md
 ```
 
-`LazyEnumerable<>` implements `IEumerable<>` so you can inject the interface by specifying `LazyEnumerable<>` as the required service type. It allows you to override default array injection per dependency:
+__Note:__ The important thing in dependency specification above, is that your code remains POCO depending on `IEnumerable<>` abstraction and separated from 
+the implementation provided at registration time. It also keeps code container-agnostic without adding DryIoc namespace into the business logic.
 
-```
-#!c#
-    public class AListHandler { public AListHandler(IEnumerable<A> aList) { } }
-    
-    // Register handler by specifying its dependency as LazyEnumerable<>:
-    container.Register(Made.Of(() => new AListHandler(Arg.Of<LazyEnumerable<A>>())));
-```
+Another option is to specify `LazyEnumerable<>` implementation for `IEnumerable<>` globally via rules:
 
-__Note:__ The important thing in dependency specification above, is that your code remains POCO depending on `IEnumerable<>` abstraction and separated from implementation provided at registration time. It also keeps code container-agnostic without introducing DryIoc infrastructure into your business logic.
-
-Another option is to specify `LazyEnumerable<>` implementation for `IEnumerable<>` as a rule per Container:
-
-```
-#!c#
-    var container = new Container(rules => 
-        rules.WithResolveIEnumerableAsLazyEnumerable());
+```cs md*/
+class Specify_to_use_LazyEnumerable_for_all_IEnumerable
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
+    }
+} /*md
 ```
 
 
