@@ -28,6 +28,7 @@ Wrapper example:
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
@@ -683,24 +684,40 @@ class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 
 ### LambdaExpression
 
-Allows getting actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by Container to resolve specific service. 
+Allows getting an actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by container to resolve a service. 
 
-- It may be used either for diagnostics - to check if Container creates the service in an expected way.
-- In code generation scenarios - by converting the expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. It may be done even at compile-time.
+- It may be used either for diagnostics, to check if container creates the service in an expected way.
+- In code generation scenarios, by converting the expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. 
+It may be done even at compile-time.
 - To understand how DryIoc works internally.
 
-Example:
+```cs 
+class Resolve_expression
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-    container.Register<IService, Service>();
+        container.Register<IService, Service>();
 
-    var expr = container.Resolve<LambdaExpression>(typeof(IService));
+        var expr = container.Resolve<LambdaExpression>(typeof(IService));
 
-    // the result expr may look as following:
-    // (object[] state, DryIoc.IResolverContext r, DryIoc.IScope scope) => new Service()
+        StringAssert.Contains("r => new Service()", expr.ToString());
+
+        // The result expression is of type `Expression<FactoryDelegate>`, like this:
+        Expression<FactoryDelegate> f = (IResolverContext r) => new Service();
+    }
+
+    interface IService { }
+    class Service : IService { }
+}
+```
 
 The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDelegate>` which has a signature as in the example.
 
-__Note:__ Resolving as `LambdaExpression` does not create actual service.
+__Note:__ Resolving as `LambdaExpression` does not create an actual service.
+
 
 ## Nested wrappers
 
