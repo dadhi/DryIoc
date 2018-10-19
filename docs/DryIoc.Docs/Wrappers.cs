@@ -795,7 +795,6 @@ you should identify wrapped service with [Required Service Type](RequiredService
 
 Example of the non-generic wrapper:
 ```cs md*/
-
 class Non_generic_wrapper
 {
     [Test]
