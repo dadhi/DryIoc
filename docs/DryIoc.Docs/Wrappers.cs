@@ -721,83 +721,101 @@ __Note:__ Resolving as `LambdaExpression` does not create an actual service.
 
 ## Nested wrappers
 
-Wrappers may be nested to provide combined functionality. A common use-case is to resolve the collection of registered services as `Func` or `Lazy`, then filter and create what you need.
+Wrappers may be nested to provide combined functionality. 
+A common use-case is to resolve the collection of registered services as `Func` or `Lazy`, then filter and create what you need.
 
 Examples: 
 
 As collection of `Func`:
-
-    container.Resolve<IEnumerable<Func<IA>>>();
+```cs
+container.Resolve<IEnumerable<Func<IA>>>();
+```
 
 With registered keys:
-    
-    container.Resolve<IEnumerable<KeyValuePair<object, Func<IA>>>>()
-        .Where(x => Filter(x.Key))  // filter based on key
-        .Select(x => x.Value());    // create IA by invoking Func
+```cs
+container.Resolve<IEnumerable<KeyValuePair<object, Func<IA>>>>()
+    .Where(x => Filter(x.Key))  // filter based on key
+    .Select(x => x.Value());    // create IA by invoking Func
+```
 
 With typed metadata:
-
-    container.Resolve<IEnumerable<Meta<MyMetadata, Func<IA>>>>();
+```cs
+container.Resolve<IEnumerable<Meta<MyMetadata, Func<IA>>>>();
+```
 
 Other combinations:
-
-    container.Resolve<IEnumerable<KeyValuePair<object, Meta<Lazy<IA>, MyMetadata>>>>();
-    container.Resolve<Func<Arg1, Arg2, IA>[]>();
-    container.Resolve<Meta<Func<Arg1, Arg2, IA>, object>>();
-    // etc.
+```cs
+container.Resolve<IEnumerable<KeyValuePair<object, Meta<Lazy<IA>, MyMetadata>>>>();
+container.Resolve<Func<Arg1, Arg2, IA>[]>();
+container.Resolve<Meta<Func<Arg1, Arg2, IA>, object>>();
+// etc.
+```
 
 ## User-defined wrappers
 
 To register your own wrapper just specify setup parameter as `Setup.Wrapper` or `Setup.WrapperWith`:
-```
-#!c#
+```cs md*/
+class User_defined_wrappers
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<ICmd, X>();
+        container.Register<ICmd, Y>();
+
+        // Register a wrapper
+        container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
+
+        var items = container.Resolve<MenuItem<ICmd>[]>();
+        Assert.AreEqual(2, items.Length);
+    }
 
     public interface ICmd { }
     public class X : ICmd { }
     public class Y : ICmd { }
 
-    // Here the wrapper!
+    // Here is the wrapper
     public class MenuItem<T> where T : ICmd { }
-
-    // Register
-    container.Register<ICmd, X>();
-    container.Register<ICmd, Y>();
-
-    // Register wrapper!
-    container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
-
-    var items = container.Resolve<MenuItem<ICmd>[]>();
-    Assert.AreEqual(2, items.Length);
+}/*md
 ```
 
-__Note:__ The main difference between wrapper and non-wrapper is how they are treated by ResolveMany and collection wrappers:
+The main difference between wrapper and non-wrapper is how they are treated by `ResolveMany` and collection wrappers:
 
-- When `MenuItem` registered normally - array will contain single item as result - because of single `MenuItem` registration.
-- When `MenuItem` registered as wrapper it is treated specially by collection resolution: resolver will try to find all wrapped types first (`ICmd`), and then wrap each found type in `MenuItem`.
+- When `MenuItem` registered normally, array will contain single item as a result, because of a single `MenuItem` registration.
+- When `MenuItem` registered as a wrapper, it is treated in a special way: resolver will try to find all wrapped types first (`ICmd`), 
+and then wrap each found type in a `MenuItem`.
 
-If open-generic wrapper has more than one type argument (e.g. `Meta<A, Metadata>`) you need to specify wrapped argument index: `setup: Setup.WrapperWith(0)`.
+If open-generic wrapper has more than one type argument (e.g. `Meta<A, Metadata>`) 
+you need to specify wrapped argument index: `setup: Setup.WrapperWith(0)`.
 
-You may register non-generic wrapper. In this case, when resolved you should identify wrapped service with [Required Service Type](RequiredServiceType).
+You may register a non-generic wrapper. In this case when resolved, 
+you should identify wrapped service with [Required Service Type](RequiredServiceType).
 
 Example of the non-generic wrapper:
-```
-#!c#
-    
-    public class MyWrapper { public MyWrapper(IService service) { } }
+```cs md*/
 
-    container.Register<IService, MyService>();
-    container.Register<MyWrapper>(setup: Setup.Wrapper);
+class Non_generic_wrapper
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-    container.Resolve<MyWrapper[]>(requiredServiceType: typeof(IService));
-```
+        container.Register<IService, Foo>();
+        container.Register<IService, Bar>();
+        container.Register<MyWrapper>(setup: Setup.Wrapper);
 
-When injecting `MyWrapper` as a dependency you may specify the required service type for the dependency:
-```
-#!c#
-    public class UseMyWrapper { public UseMyWrapper(MyWrapper wr) { } }
+        var items = container.Resolve<MyWrapper[]>(requiredServiceType: typeof(IService));
+        Assert.AreEqual(2, items.Length);
+    }
 
-    // Using Made expression for registration
-    container.Register<UseMyWrapper>(
-        Made.Of(() => new UseMyWrapper(Arg.Of<MyWrapper, IService>())));
+    interface IService { }
+    class Foo : IService { }
+    class Bar : IService { }
+
+    class MyWrapper { public MyWrapper(IService service) { } }
+}/*md
 ```
 md*/
