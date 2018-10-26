@@ -39,6 +39,8 @@ Additionally after the service is found, DryIoc will look for any matching [Deco
 - DryIoc allows to register multiple default (without key) services. 
 Actually, multiple services mean multiple implementations of the single service type:
 ```cs md*/
+
+using System.Linq.Expressions;
 using DryIoc;
 using NUnit.Framework;
 
@@ -169,101 +171,121 @@ class Select_last_registered_service
 By default DryIoc is injecting dependency by directly putting dependency creation expression into dependency holder constructor 
 (or property, field, factory method).
 
-Like this:
-```
-#!c#
-    public class Dep : IDep {}
-
-    public class Holder 
+```cs md*/
+class AsResolutionCall_setup
+{
+    [Test]
+    public void Example()
     {
-        public Holder(IDep dep) {}
+        var container = new Container();
+
+        container.Register<IDep, Dep>();
+        container.Register<Holder>();
+
+        var expr = container.Resolve<LambdaExpression>(typeof(Holder));
+
+        // To make resolve possible, DryIoc constructs and then calls the following delegate (pseudo-code)
+        Assert.AreEqual("r => new Holder(new Dep())", expr.ToString());
     }
 
-
-    var container = new Container();
-    
-    container.Register<IDep, Dep>();
-    container.Register<Holder>();
-    
-    var holder = container.Resolve<Holder>();
-
-    // To make resolve possible, DryIoc constructs and then calls the following delegate (pseudocode):
-    // resolver => new Holder(new Dep());
+    interface IDep { }
+    class Dep : IDep { }
+    class Holder
+    {
+        public Holder(IDep dep) { }
+    }
+} /*md
 ```
 
-Pretty straightforward. It will be more complecated for reused dependency, but the `new Dep()` still be there, embedded into holder expression. 
+Pretty straightforward, it will be more complicated for reused dependency, 
+but the `new Dep()` still be there, embedded into the holder expression. 
 
-Such approach also exposes the reason why is the recursive creation of `Dep` is not possible, the expression would've been infinite: 
+Such approach also exposes the reason why is the recursive creation of `Dep` is not possible, 
+the expression would've been infinite: 
+```cs
+    new Dep(new Dep(new Dep(... // to infinity 
+```
 
-    new Dep(new Dep(new Dep.....to infinity 
+But sometimes the recursion or generally the "dynamic" resolution of dependency is required. 
+For instance when injecting a [Lazy](Wrappers#markdown-header-lazy-of-a) we can expect the recursion to be possible.
 
-But sometimes the recursion, or generally the dynamic resolution of dependency is required. 
-For instance when injecting [Lazy](Wrappers#markdown-header-lazy-of-a) we can expect the recursion to be possible.
-
-Given approach with embedded expression, it is not possible:
-
+Given approach with embedded expression:
+```cs
     public class Holder 
     {
         public Holder(Lazy<IDep> dep) {}
     }
 
-    // resolver => new Holder(new Lazy(() => new Dep()))
+    // r => new Holder(new Lazy(() => new Dep()))
+```
 
-Therefore DryIoc supports the special factory setup option `asResolutionCall`. 
+Therefore DryIoc supports a special factory setup option `asResolutionCall`. 
 `Lazy` wrapper has this option enabled by default. 
 
-To enable it to for normal dependency you need to change the `Dep` registration:
-```
-#!c#
-    var container = new Container();
-    
-    container.Register<IDep, Dep>(setup: Setup.With(asResolutionCall: true));
-    container.Register<Holder>();
-    
-    var holder = container.Resolve<Holder>();
-    
-    // will produce two delegates:
-    // 1. resolver => new Holder(resolver.Resolve<IDep>())
-
-    // The second will be created on resolver.Resolve<IDep>() call:
-    // 2. resolver => new Dep()
+To enable it to for normal dependency you need to change the `Dep` registration to: 
+```cs
+container.Register<IDep, Dep>(setup: Setup.With(asResolutionCall: true))
 ```
 
-Instead of inlined expression DryIoc will embed the nested call to `Resolve` method, which black boxes the dependency creation for its holder.
-Such approach will make the recursion generally possible for `Lazy` and `Func` wrappers.
+Instead of inlined expression DryIoc will embed the nested call to `Resolve` method, 
+which black boxes the dependency creation for its holder. Such approach will make the recursion 
+generally possible for `Lazy` and `Func` wrappers.
 
 
 ## Implicit registration selection based on scope
 
-By default Container will implicitly skip the services that do not have matching __Current__ or __Resolution__ scopes.
+By default DryIoc will implicitly filter out a service that does not have matching scope.
 
-Let's illustrate this with example:
-```
-#!c#
-    var container = new Container();
-    container.Register<I, A>(Reuse.InCurrentScope("a"));
-    container.Register<I, B>(Reuse.InCurrentScope("b"));
-
-    using (var scopeB = container.OpenScope("b")) 
+```cs md*/
+class Filter_out_service_that_do_not_have_a_matching_scope
+{
+    [Test]
+    public void Example()
     {
-        var b = scope.Resolve<I>(); // will skip A registration because open scope has different name.
-        Assert.IsInstanceOf<B>(b);
+        var container = new Container();
+        container.Register<I, A>(Reuse.ScopedTo("a"));
+        container.Register<I, B>(Reuse.ScopedTo("b"));
+
+        using (var scopeB = container.OpenScope("b"))
+        {
+            // will skip a registration of `A` because the open scope has different name
+            var b = scopeB.Resolve<I>();
+            Assert.IsInstanceOf<B>(b);
+        }
     }
+
+    interface I { }
+    class A : I { }
+    class B : I { }
+} /*md
 ```
 
-__Note:__ This way you may identify services based on their reuse rather than using explicit service keys.
+__Note:__ This way, you may identify a service based on its reuse rather than having a specific service key.
 
-The rule could be turned Off:
-```
-#!c#
-    var container = new Container(rules =>
-        rules.WithoutImplicitCheckForReuseMatchingScope());
+A usual, the rule could be turned off:
+```cs md*/
+class Turning_matching_scope_filtering_Off
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules =>
+            rules.WithoutImplicitCheckForReuseMatchingScope());
 
-    container.Register<I, A>(Reuse.InCurrentScope("a"));
-    container.Register<I, B>(Reuse.InCurrentScope("b"));
+        container.Register<I, A>(Reuse.ScopedTo("a"));
+        container.Register<I, B>(Reuse.ScopedTo("b"));
 
-    using (var scopeB = container.OpenScope("b")) 
-        scope.Resolve<I>(); // Throws exception because of multiple I registrations available
+        using (var scopeB = container.OpenScope("b"))
+        {
+            // Throws an exception because of the multiple `I` registrations found
+            Assert.Throws<ContainerException>(() => scopeB.Resolve<I>());
+        }
+    }
+
+    interface I { }
+    class A : I { }
+    class B : I { }
+} /*md
 ```
 
 
