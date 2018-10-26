@@ -2148,10 +2148,7 @@ namespace DryIoc
 
         /// <summary>Prepares container for expression generation.</summary>
         public static IContainer WithExpressionGeneration(this IContainer container) =>
-            container.With(rules => rules
-                .WithoutEagerCachingSingletonForFasterAccess()
-                .WithoutImplicitCheckForReuseMatchingScope()
-                .WithDependencyResolutionCallExpressions());
+            container.With(rules => rules.ForExpressionGeneration().WithDependencyResolutionCallExpressions());
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
@@ -2677,7 +2674,9 @@ namespace DryIoc
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expr GetRootOrSelfExpr(Request request) =>
-            request.DirectParent.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope
+            request.DirectParent.IsSingletonOrDependencyOfSingleton 
+            && !request.OpensResolutionScope 
+            && !request.IsDirectlyWrappedInFunc()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -3644,6 +3643,12 @@ namespace DryIoc
         /// The Condition filters out factory without matching scope.</summary>
         public Rules WithoutImplicitCheckForReuseMatchingScope() =>
             WithSettings(_settings & ~Settings.ImplicitCheckForReuseMatchingScope);
+
+        /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
+        public Rules ForExpressionGeneration() =>
+            WithSettings(_settings 
+                         & ~Settings.EagerCachingSingletonForFasterAccess 
+                         & ~Settings.ImplicitCheckForReuseMatchingScope);
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
         public bool ResolveIEnumerableAsLazyEnumerable =>
@@ -5894,9 +5899,12 @@ namespace DryIoc
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
-        /// <summary>Checks if request is wrapped in Func,
-        /// where Func is the one of request immediate wrappers.</summary>
+        /// <summary>Checks if the request Or its parent is wrapped in Func.
+        /// Use <see cref="IsDirectlyWrappedInFunc"/> for the direct Func wrapper.</summary>
         public bool IsWrappedInFunc() => (Flags & RequestFlags.IsWrappedInFunc) != 0;
+
+        /// <summary>Checks if the request is directly wrapped in Func</summary>
+        public bool IsDirectlyWrappedInFunc() => (Flags & RequestFlags.IsDirectlyWrappedInFunc) != 0;
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
         public bool IsWrappedInFuncWithArgs() => InputArgExprs != null;

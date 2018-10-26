@@ -54,6 +54,10 @@
         <Generator>CsToMd</Generator>
         <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
       </Compile>
+      <Compile Update="OpenGenerics.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>OpenGenerics.md</LastGenOutput>
+      </Compile>
       <Compile Update="RegisterResolve.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>RegisterResolve.md</LastGenOutput>
@@ -111,6 +115,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>KindsOfChildContainer.cs</DependentUpon>
+      </None>
+      <None Update="OpenGenerics.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>OpenGenerics.cs</DependentUpon>
       </None>
       <None Update="RegisterResolve.md">
         <DesignTime>True</DesignTime>

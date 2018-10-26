@@ -1,4 +1,3 @@
-
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Wrappers
@@ -568,7 +567,6 @@ class DryIoc_composite_pattern
         public Composite(A[] items) { Items = items; }
     }
 }
-
 ```
 
 __Note:__ If the Composite pattern support was missing in DryIoc you would be getting a "recursive dependency detected" `ContainerException`.
@@ -602,7 +600,6 @@ class Prefer_composite_when_resolving_a_single_service
         public Composite(A[] items) { Items = items; }
     }
 }
-
 ```
 
 
@@ -719,6 +716,46 @@ The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDele
 __Note:__ Resolving as `LambdaExpression` does not create an actual service.
 
 
+#### DryIoc is not a magic
+
+Looking how resolved `LambdaExpression` is look like, you see that what DryIoc does is not a magic.
+
+It is just automates the generation of the object graph taking lifetime into consideration.
+
+Given that you now have an expression, you may even compile (and cache) it yourself :-) doing the last "magical" part.
+
+It may even open some new possibilities:
+
+```cs 
+class Swap_container_in_factory_delegate
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules.ForExpressionGeneration());
+
+        container.Register<A>(Reuse.Singleton);
+        container.Register<B>(Reuse.Scoped);
+
+        var expr = container.Resolve<LambdaExpression>(typeof(A));
+        var a = (FactoryDelegate)expr.Compile();
+
+        using (var scope = container.OpenScope())
+        {
+            var a1 = (A)a.Invoke(scope);
+            Assert.AreSame(a1.GetB(), a1.GetB());
+        }
+    }
+
+    class A
+    {
+        public Func<B> GetB { get; }
+        public A(Func<B> getB) { GetB = getB; }
+    }
+}
+```
+
+
 ## Nested wrappers
 
 Wrappers may be nested to provide combined functionality. 
@@ -817,4 +854,3 @@ class Non_generic_wrapper
     class MyWrapper { public MyWrapper(IService service) { } }
 }
 ```
-
