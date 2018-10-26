@@ -8,10 +8,10 @@
 
 Registering open-generic is no different from the non-generic service. 
 The only limitation is imposed by C# itself - it is impossible to specify type statically, you need to use `typeof`.
-```cs 
 
+```cs 
 using System;
-using System.Collections.Generic;
+using System.Linq;
 using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedTypeParameter
@@ -129,7 +129,7 @@ Example:
 class Fill_in_type_arguments_from_constraints
 {
     [Test]
-    public void Can_fill_in_type_argument_from_constraint()
+    public void Example()
     {
         var container = new Container();
         container.Register(typeof(ICommandHandler<>), typeof(UpdateCommandHandler<,>));
@@ -160,37 +160,61 @@ __Note:__ This example is not so uncommon in the modern world, say in [MediatR](
 
 ## Generic variance when resolving many services
 
-When resolving many or collection of generic types DryIoc will include variance-compatible types. By example:
+When resolving the collection of generic types DryIoc will include variance-compatible types:
+```cs 
+class Generic_variance_thingy
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-    public interface IHandler<out TEvent> {} // covariant handler
+        container.Register<IHandler<A>, AHandler>();
+        container.Register<IHandler<B>, BHandler>();
 
-    public class A {}
-    public class B : A {}
+        // get all handlers of A
+        var aHandlers = container.ResolveMany<IHandler<A>>();
 
-    public class AHandler : IHandler<A> {}
-    public class BHandler : IHandler<B> {}
+        // Result contains both `AHandler` and `BHandler`, 
+        // because `IHandler<B>` is assignable to `IHandler<A>` due variance rules
+        Assert.AreEqual(2, aHandlers.Count());
 
-    // register handlers
-    container.Register<IHandler<A>, AHandler>();
-    container.Register<IHandler<B>, BHandler>();
+        // Result contains only `BHandler`
+        var bHandlers = container.ResolveMany<IHandler<B>>();
+        Assert.AreEqual(1, bHandlers.Count());
+    }
 
-    // get all handlers of A
-    var ahandlers = container.ResolveMany<IHandler<A>>();
+    public interface IHandler<out TEvent> { } // covariant handler
+    public class A { }
+    public class B : A { }
+    public class AHandler : IHandler<A> { }
+    public class BHandler : IHandler<B> { }
+} 
+```
 
-    // Result contains both AHandler and BHandler, 
-    // because IHandler<B> is assignable to IHandler<A> due variance rules
-    Assert.AreEqual(2, ahandlers.Count());
+This rule is enabled by default, but you can turn it off:
+```cs 
+class Turn_off_generic_variance_in_collections
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules =>
+            rules.WithoutVariantGenericTypesInResolvedCollection());
 
-    // Result contains only BHandler
-    var bhandlers = container.ResolveMany<IHandler<B>>();
-    Assert.AreEqual(1, bhandlers.Count());
+        container.Register<IHandler<A>, AHandler>();
+        container.Register<IHandler<B>, BHandler>();
 
-This rule is enabled by default. To turn it off:
+        // the same setup, but result contains `AHandler` only
+        var aHandlers = container.ResolveMany<IHandler<A>>();
+        Assert.AreEqual(1, aHandlers.Count());
+    }
 
-    var container = new Container(rules =>
-        rules.WithoutVariantGenericTypesInResolvedCollection());
+    public interface IHandler<out TEvent> { } // covariant handler
+    public class A { }
+    public class B : A { }
+    public class AHandler : IHandler<A> { }
+    public class BHandler : IHandler<B> { }
+} 
+```
 
-    // the same setup ...
-    // but result contains AHandler only
-    var ahandlers = container.ResolveMany<IHandler<A>>();
-    Assert.AreEqual(1, ahandlers.Count());
