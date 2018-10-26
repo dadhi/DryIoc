@@ -10,6 +10,9 @@
 Registering open-generic is no different from the non-generic service. 
 The only limitation is imposed by C# itself - it is impossible to specify type statically, you need to use `typeof`.
 ```cs md*/
+
+using System;
+using System.Collections.Generic;
 using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedTypeParameter
@@ -96,19 +99,28 @@ DryIoc will evaluate type argument constraints when resolving open-generic. Let'
 ### Filter services in collection based on constraints
 
 Example:
-```
-#!c#
-    public interface I<T> { }
-    public A<T> : I<T> where T : IDisposable { }
-    public B<T> : I<T> { }
-    
-    container.RegisterMany(new[] { typeof(A<>), typeof(B<>) });
-    
-    var items = container.Resolve<IEnumerable<I<string>>>();
-    
-    // The only result item will be of type B<> 
-    // An A<> was filtered out because string is matching to IDisposable constraint.
-    Assert.IsInstanceOf<B<string>>(items.Single()); 
+
+```cs md*/
+class Matching_open_generic_type_constraints
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.RegisterMany(new[] { typeof(A<>), typeof(B<>) }, nonPublicServiceTypes: true);
+
+        var items = container.Resolve<I<string>[]>();
+
+        // The only result item will be of type `B<string>` 
+        // An `A<T>` was filtered out because `string` is not matching to a `IDisposable` constraint.
+        Assert.AreEqual(1, items.Length);
+        Assert.IsInstanceOf<B<string>>(items[0]);
+    }
+
+    interface I<T> { }
+    class A<T> : I<T> where T : IDisposable { }
+    class B<T> : I<T> { }
+} /*md
 ```
 
 
@@ -116,33 +128,37 @@ Example:
 
 Example:
 
-```
-#!c#
-    public interface ICommandHandler<TCommand> { }
-    public class SpecialEntity { }
-    public class UpdateCommand<TEntity> { }
-    
-    public class UpdateCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
-        where TEntity : SpecialEntity
-        where TCommand : UpdateCommand<TEntity> { }
-    
-    public class MyEntity : SpecialEntity { }
-    
+```cs md*/
+class Fill_in_type_arguments_from_constraints
+{
     [Test]
     public void Can_fill_in_type_argument_from_constraint()
     {
         var container = new Container();
         container.Register(typeof(ICommandHandler<>), typeof(UpdateCommandHandler<,>));
-    
+
         var handler = container.Resolve<ICommandHandler<UpdateCommand<MyEntity>>>();
-    
+
         Assert.IsInstanceOf<UpdateCommandHandler<MyEntity, UpdateCommand<MyEntity>>>(handler);
     }
+
+    public interface ICommandHandler<TCommand> { }
+    public class SpecialEntity { }
+    public class UpdateCommand<TEntity> { }
+
+    public class UpdateCommandHandler<TEntity, TCommand> : ICommandHandler<TCommand>
+        where TEntity : SpecialEntity
+        where TCommand : UpdateCommand<TEntity>
+    { }
+
+    public class MyEntity : SpecialEntity { }
+} /*md
 ```
 
-In this example DryIoc is smart enough to use `MyEntity` as `UpdateCommandHandler` first type argument, given rules provided by constraints.
+In this example DryIoc is the smart enough to use `MyEntity` as `UpdateCommandHandler` first type argument, 
+given the rules defined by constraints.
 
-__Note:__ This example is not so uncommon in a modern world, e.g. [MediatR](https://github.com/jbogard/MediatR).
+__Note:__ This example is not so uncommon in the modern world, say in [MediatR](https://github.com/jbogard/MediatR).
 
 
 ## Generic variance when resolving many services
