@@ -14,9 +14,12 @@ because of "never fail silently" and "be smart but not smarter than you".
 __Note:__ DryIoc does leading towards the Best Practices and the Pit-Of-Success by providing a more simple, less noisy, 
 configured by default API, rather than a opinionated feature prohibition.
 
-- DryIoc designed to be unobtrusive, with ability to start using DI with legacy code and 3rd party libraries. It has small footprint and no particular requirements for consumer code.
+- DryIoc designed to be unobtrusive, with ability to start using DI with legacy code and 3rd party libraries. 
+It has small footprint and no particular requirements for consumer code.
 
-- DryIoc provides sensible defaults but allows to override them. Based on defaults nature they may be overridden per Container(s) with Rules or per Service with optional parameters and Setup object. Rules per Container(__s__) mean that Rules object may be created once for your typical needs and then reused in many containers.
+- DryIoc provides sensible defaults but allows to override them. 
+Based on defaults nature they may be overridden per container(s) with `Rules` or per service with optional parameters and `Setup` object. 
+Rules per container(s) mean that `Rules` object may be created once for your typical needs and then reused in many containers.
 
 
 ## Resolution order
@@ -290,52 +293,75 @@ class Turning_matching_scope_filtering_Off
 
 
 ## Implicitly available services
-
+ 
 DryIoc automatically (without registration) will resolve: `IResolver`, `IRegistrator`, `IContainer`, 
 and `IDisposable`. 
 
 - The first three are interfaces implemented by `Container` class and provide access to corresponding container roles.
 - The `IDisposable` provides access to current [Resolution Scope](ReuseAndScopes#markdown-header-reuseinresolutionscope).
 
+
 ### Container interfaces
 
-Normally using container directly in your services indicates a smell and referred as [Service Locator anti-pattern](http://blog.ploeh.dk/2010/02/03/ServiceLocatorisanAnti-Pattern/).
+Normally using container directly in your services indicates a "code-smell" and referred as a 
+[Service Locator anti-pattern](http://blog.ploeh.dk/2010/02/03/ServiceLocatorisanAnti-Pattern/).
 
 There are still number of cases when it may be useful. For instance, integration with other libraries.
 
-DryIoc made these interfaces automatically available because registering them manually may be tricky, especially 
-in presence of Open Scope.
-```
-#!c#
-    class X 
-    { 
-        public readonly IResolver Resolver;
-        public X(IResolver resolver) { Resolver = resolver; } 
-    }
+DryIoc makes `Container` interfaces automatically available (injected) because registering them manually may be tricky, 
+especially in presence of the scope.
 
-    var container = new Container();
-    container.Register<X>(Reuse.InCurrenScope);
-
-    using (var scope = container.OpenScope()) 
+```cs md*/
+class Automatically_injected_container_interfaces
+{
+    [Test]
+    public void Example()
     {
-        var x = scope.Resolve<X>();
-        
-        // the expected behavior is that x.Resolver will be the one from scope, not from container
-        Assert.AreSame(scope, x.Resolver); // green!
+        var container = new Container();
+        container.Register<X>(Reuse.Scoped);
+
+        using (var scope = container.OpenScope())
+        {
+            var x = scope.Resolve<X>();
+
+            // the expected behavior is that `x.Resolver` will be the one from scope, not from container
+            Assert.AreSame(scope, x.Resolver);
+        }
     }
+
+    class X
+    {
+        public readonly IResolver Resolver;
+        public X(IResolver resolver) { Resolver = resolver; }
+    }
+} /*md
 ```
 
-Given the example you can see that registering `container` object will not get you `scope` for scoped services.
+Given the example you can see that registering a `Container` object will not get you a `scope` for scoped services.
 
-The right way to register container interfaces manually __with correct scoping behavior__:
-```
-#!c#
-    container.RegisterDelegate<IResolver>(resolver => resolver, setup: setup.Setup(allowTransientDisposable: true));
-    container.RegisterDelegate<IRegistrator>(resolver => (IRegistrator)resolver, setup: setup.Setup(allowTransientDisposable: true));
-    container.RegisterDelegate<IContainer>(resolver => (IContainer)resolver setup: setup.Setup(allowTransientDisposable: true));
+The right way to register container interfaces manually with the correct scoping behavior maybe this:
+```cs md*/
+
+class Registering_container_interfaces_by_hand
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.RegisterDelegate<IResolver>(resolver => resolver, 
+            setup: Setup.With(allowDisposableTransient: true));
+
+        container.RegisterDelegate<IRegistrator>(resolver => (IRegistrator)resolver, 
+            setup: Setup.With(allowDisposableTransient: true));
+
+        container.RegisterDelegate<IContainer>(resolver => (IContainer)resolver, 
+            setup: Setup.With(allowDisposableTransient: true));
+    }
+} /*md
 ```
 
-The above registrations look rather complex and __leaky with all this casting in place__.
+The above registrations look rather complex and leaky with all this casting in place.
 
 There is much easy and error-prone for User to make these registrations always available. 
 
@@ -344,48 +370,12 @@ and they override the implicit behavior. It is possible because internally these
 Wrapper resolution has a lower priority comparing to normal Service resolution and will be resolved as fallback.
 
 
-### IDisposable
-
-Injected `IDisposable` object provides access to current [Resolution Scope](ReuseAndScopes#markdown-header-reuseinresolutionscope) 
-and allows to dispose the scope together with reused services. 
-
-```
-#!c#
-    container.Register<A>(setup: Setup.With(openResolutionScope: true));
-    container.Register<B>();
-    container.Register<C>(reuse: Reuse.InResolutionScope);
-
-    public class B { public B(C c) { } }
-
-    public class A : IDisposable 
-    {
-        public A(B b, IDisposable scope) { }
-        public void Dispose() 
-        {
-            // Will dispose scope with all nested scoped dependencies 
-            // including C used by B
-            _scope.Dispose(); 
-        } 
-    }
-```
-
-__Note:__ Usage of `IDisposable` here is similar to [Autofac Owned relationship type](http://docs.autofac.org/en/latest/resolve/relationships.html#controlled-lifetime-owned-b), but it does not require your code to depend on IoC library.
-
-To inject any other service as `IDisposable` you may specify [Required Service Type](RequiredServiceType).
-
-```
-#!c#
-    container.Register<A>();
-    container.Register<Disposer>(Made.Of(() => new Disposer(Arg.Of<A>())));
-
-    public class Disposer { public Disposer(IDisposable thing) { } }
-```
-
 ## Default constructor selection
 
-By default DryIoc expects from registered type to have __single public constructor__. 
+By default DryIoc expects from registered type to have a __single public constructor__. 
 
-If no or multiple constructors available it will throw corresponding exception. The reason for this is to be as deterministic as possible and prevent hard-to-find errors.
+If no or multiple constructors available it will throw corresponding exception. 
+The reason for this is to be as deterministic as possible and to prevent hard-to-find errors.
 
 But the default behavior may be changed in different ways:
 
