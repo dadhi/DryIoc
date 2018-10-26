@@ -7,17 +7,21 @@
 
 ## General Approach
 
-- DryIoc strives to be as deterministic as possible. By default in uncertain case it will rather throw exception than hinder the case with convention - because "never fail silently" and "be smart but not smarter than you". 
+- DryIoc strives to be as deterministic as possible. 
+By default in uncertain case it will rather throw exception than hinder the case with convention - 
+because of "never fail silently" and "be smart but not smarter than you". 
 
-    __Note:__ Leading towards the Best Practices and Pit-Of-Success implemented by providing more simple, less noisy, configured by default API, rather than feature prohibition.
+__Note:__ DryIoc does leading towards the Best Practices and the Pit-Of-Success by providing a more simple, less noisy, 
+configured by default API, rather than a opinionated feature prohibition.
 
 - DryIoc designed to be unobtrusive, with ability to start using DI with legacy code and 3rd party libraries. It has small footprint and no particular requirements for consumer code.
 
 - DryIoc provides sensible defaults but allows to override them. Based on defaults nature they may be overridden per Container(s) with Rules or per Service with optional parameters and Setup object. Rules per Container(__s__) mean that Rules object may be created once for your typical needs and then reused in many containers.
 
+
 ## Resolution order
 
-DryIoc follows certain order when looking for service to resolve:
+DryIoc follows a certain order when looking for the service to resolve:
 
 1. Look for concrete type registration. For generic service it means looking for closed-generic registration.
 2. If not found and service is generic: Look for open-generic service registration.
@@ -25,63 +29,138 @@ DryIoc follows certain order when looking for service to resolve:
 4. If not found: Resolve from Fallback Containers if any.
 5. If not resolved: Resolve with Unknown Service Resolver rules if any.
 
-Additionally after service is found Container will look for any matching [Decorators](Decorators).
+Additionally after the service is found, DryIoc will look for any matching [Decorators](Decorators).
 
 
 ## Multiple services
 
 ### Registering multiple default services
 
-- DryIoc allows to register multiple default (without key) services. Actually multiple services mean multiple implementations of single service type:
+- DryIoc allows to register multiple default (without key) services. 
+Actually, multiple services mean multiple implementations of the single service type:
+```cs md*/
+using DryIoc;
+using NUnit.Framework;
 
+class Register_many_implementation
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
         container.Register<ICommand, Copy>();
         container.Register<ICommand, Paste>();
 
-    This default behavior specified with default value of _ifAlreadyRegistered_ optional parameter in Register method. The equivalent to the previous code would be: 
+        var commands = container.Resolve<ICommand[]>();
+        Assert.AreEqual(2, commands.Length);
+    }
 
-        container.Register<ICommand, Copy>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNonKeyed);
-        container.Register<ICommand, Paste>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNonKeyed); 
+    interface ICommand {}
+    class Copy : ICommand { }
+    class Paste : ICommand { }
+} /*md
+```
 
-Other options are Throw, Keep, Replace:
+This default behavior is specified with the default value of `ifAlreadyRegistered` optional parameter in Register method. 
+The equivalent to the previous code would be: 
+```cs md*/
+class Register_many_implementation_with_default_if_already_registered_behavior
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+        container.Register<ICommand, Copy>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+        container.Register<ICommand, Paste>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+
+        var commands = container.Resolve<ICommand[]>();
+        Assert.AreEqual(2, commands.Length);
+    }
+
+    interface ICommand { }
+    class Copy : ICommand { }
+    class Paste : ICommand { }
+} /*md
+```
+
+The other options are `Throw`, `Keep`, `Replace`, and `AppendNewImplementation`:
 
 - `Throw` will throw exception on second registration for the same service type.
 - `Keep` will preserve all previous registrations for the service type, basically it turns method Register to Register Once.
-- `Replace` will replace __all__ previous service registrations with the new one. 
+- `Replace` will replace all previous service registrations with the new one. 
+- `AppendNewImplementation` will add the the new implementation for the service, 
+otherwise (if implementation is the same) it will be kept intact. This option is for having a single same implementation of the service.
 
-__Note:__ The result of `Replace` may be not what you expect if first service was already resolved and cached by Container. 
-To enable replace after resolve you should __specifically register for it__:
+__Note:__ The result of `Replace` may be NOT what you expect if the first service was already resolved and cached by DryIoc. 
+To ensure `Replace` to work after `Resolve` you should __specifically register for it__.
 
-    - Registering with `asResolutionCall` setup makes consumers depend on call to `Resolve` instead of inline service creation which is not replaceable:
+Registering with `asResolutionCall` `setup` makes consumers depend on the call to `Resolve` instead of 
+inline service creation (which is not replaceable):
 
-            container.Register<ICommand, Copy>(
-                setup: Setup.With(asResolutionCall: true));
-            container.Register<Menu>(); // depends on commands
-            container.Resolve<Menu>(); // gets Copy
-        
-            container.Register<ICommand, FastCopy>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            container.Resolve<Menu>(); // gets FastCopy
+```cs md*/
+class Register_with_ifAlreadyReplaced_option
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
 
-- `AppendNewImplementation`:
+        container.Register<ICommand, Copy>(setup: Setup.With(asResolutionCall: true));
+        container.Register<CopyMenu>();
 
-    - will add new Implementation type (__if specified__) for the service type, 
-    - will skip the registration if the Implementation type is already registered for this service type,
-    - will add registration without Implementation type, e.g. from `RegisterDelegate` or register with `Made.Of`. 
+        // now resolve the menu with `Copy` command
+        var menu = container.Resolve<CopyMenu>();
+        Assert.IsInstanceOf<Copy>(menu.Command);
+
+        container.Register<ICommand, FastCopy>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+        // resolve a new menu
+        menu = container.Resolve<CopyMenu>();
+        Assert.IsInstanceOf<FastCopy>(menu.Command);
+    }
+
+    interface ICommand { }
+    class Copy : ICommand { }
+    class FastCopy : ICommand { }
+    class CopyMenu
+    {
+        public ICommand Command { get; }
+        public CopyMenu(ICommand command) { Command = command; }
+    }
+}/*md
+```
 
 
 ### Resolving from multiple default services
 
-- DryIoc does not use any smart policy to select from multiple defaults. Sometimes multiple registrations are due error, sometimes you want to get latest. But container most be defensive, deterministic and fail fast. Therefore when resolving single service from multiple available it will throw `ContainerException` with message "Unable to select from multiple default <registration list> ...".
+- DryIoc does not use any smart policy to select from multiple defaults. 
+Sometimes multiple registrations are due error, sometimes you want to get latest. 
+But container most be defensive, deterministic and fail fast. Therefore when resolving single service from 
+multiple available it will throw `ContainerException` with message 
+`"Unable to select from multiple default <registration list> ..."`.
 
-- You may change the Rules for service selection per Container. For instance to select latest registration:
-```
-#!c#
-    var container = new Container(rules => rules
-        .WithFactorySelector(Rules.SelectLastRegisteredFactory));
-    
-    container.Register<ILetter, A>();
-    container.Register<ILetter, B>();
-    
-    var letter = container.Resolve<ILetter>(); // will return B without exception
+You may alter the container `Rules` how to select a service from multiple available. 
+For instance, to select the latest registration:
+```cs md*/
+class Select_last_registered_service
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules
+            .WithFactorySelector(Rules.SelectLastRegisteredFactory()));
+
+        container.Register<ILetter, A>();
+        container.Register<ILetter, B>();
+
+        var letter = container.Resolve<ILetter>(); // will return `B` without exception
+        Assert.IsInstanceOf<B>(letter);
+    }
+
+    interface ILetter {}
+    class A : ILetter {}
+    class B : ILetter {}
+} /*md
 ```
 
 

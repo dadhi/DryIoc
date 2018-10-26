@@ -70,6 +70,10 @@
         <Generator>CsToMd</Generator>
         <LastGenOutput>ReuseAndScopes.md</LastGenOutput>
       </Compile>
+      <Compile Update="RulesAndDefaultConventions.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>RulesAndDefaultConventions.md</LastGenOutput>
+      </Compile>
       <Compile Update="UsingInTestsWithMockingLibrary.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
@@ -135,6 +139,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>ReuseAndScopes.cs</DependentUpon>
+      </None>
+      <None Update="RulesAndDefaultConventions.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>RulesAndDefaultConventions.cs</DependentUpon>
       </None>
       <None Update="UsingInTestsWithMockingLibrary.md">
         <DesignTime>True</DesignTime>
