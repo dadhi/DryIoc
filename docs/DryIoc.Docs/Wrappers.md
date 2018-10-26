@@ -722,9 +722,14 @@ Looking how resolved `LambdaExpression` is look like, you see that what DryIoc d
 
 It is just automates the generation of the object graph taking lifetime into consideration.
 
-Given that you now have an expression, you may even compile (and cache) it yourself :-) doing the last "magical" part.
+Given that you now have an expression, you may even `Compile` (and cache) it yourself :-) doing the last "magical" part.
 
-It may even open some new possibilities:
+It may open some new possibilities:
+
+For instance, below is the example which is "normally" won't work without shared `scopeContext`. 
+Specifically we have a singleton holding on the `Func` of scoped service. Now we are getting an expression out 
+of container, compiling it and providing it with the scope (or any other container we want) 
+as a `IResolverContext` argument to the compiled factory.
 
 ```cs 
 class Swap_container_in_factory_delegate
@@ -738,11 +743,11 @@ class Swap_container_in_factory_delegate
         container.Register<B>(Reuse.Scoped);
 
         var expr = container.Resolve<LambdaExpression>(typeof(A));
-        var a = (FactoryDelegate)expr.Compile();
+        var factory = (FactoryDelegate)expr.Compile();
 
         using (var scope = container.OpenScope())
         {
-            var a1 = (A)a.Invoke(scope);
+            var a1 = (A)factory(scope);
             Assert.AreSame(a1.GetB(), a1.GetB());
         }
     }
