@@ -3,14 +3,15 @@
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
         <!-- net452 and not net45, because it is a minimal ExpressionToCodeLib target -->
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net452;netstandard1.0;netstandard2.0</TargetFrameworks>
-        <AssemblyTitle>DryIocZero</AssemblyTitle>
-        <Description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc</Description>
-        <Copyright>Copyright © 2016-2018 Maksim Volkau</Copyright>
 
+        <Product>DryIocZero</Product>
         <VersionPrefix>4.1.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
-        <AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
-        <FileVersion>$(VersionPrefix)</FileVersion>
+ 
+        <AssemblyName>$(Product)</AssemblyName>
+        <AssemblyTitle>$(AssemblyName)</AssemblyTitle>
+
+        <Description>Slim IoC Container based on service factory delegates generated at compile-time by DryIoc</Description>
 
         <IsPackable>false</IsPackable>
     </PropertyGroup>

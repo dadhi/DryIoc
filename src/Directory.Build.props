@@ -3,14 +3,26 @@
     <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" 
         Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
 
+   <PropertyGroup>
+        <Authors>Maksim Volkau</Authors>
+        <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
+        <NeutralLanguage>en</NeutralLanguage>
+        <PackageLicenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicenseUrl>
+        <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
+        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
+        <RepositoryType>git</RepositoryType>
+        <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
+    </PropertyGroup>
+
     <PropertyGroup>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
-    
+
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
         <DebugType>embedded</DebugType>
         <DebugSymbols>true</DebugSymbols>
+        <!-- <RunCodeAnalysis>true</RunCodeAnalysis> -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>

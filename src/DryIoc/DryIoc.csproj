@@ -1,25 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
+        <Product>DryIoc</Product>
         <VersionPrefix>3.1.0</VersionPrefix>
         <VersionSuffix>preview-05</VersionSuffix>
 
-        <AssemblyName>DryIoc</AssemblyName>
+        <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
-        <Title>$(AssemblyName).dll</Title>
-        <PackageId>$(AssemblyName).dll</PackageId>
 
+        <PackageId>$(Product).dll</PackageId>
+        <Title>$(Product).dll</Title>
         <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
-        <Authors>Maksim Volkau</Authors>
-        <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
-        <NeutralLanguage>en</NeutralLanguage>
-        <PackageLicenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicenseUrl>
-        <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
-        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
-        <RepositoryType>git</RepositoryType>
-        <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
