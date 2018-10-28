@@ -2,35 +2,47 @@
   <PropertyGroup>
     <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
-    <AssemblyTitle>DryIoc.Owin</AssemblyTitle>
+ 
+    <Product>DryIoc.Owin</Product>
+    <VersionPrefix>3.1.0</VersionPrefix>
+    <VersionSuffix>preview-01</VersionSuffix>
+
+    <AssemblyName>$(Product)</AssemblyName>
+    <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
+ 
+    <PackageId>>$(Product).dll</PackageId>
+    <Title>>$(Product).dll</Title>
     <Description>DryIoc extension for OWIN</Description>
-    <Copyright>Copyright © 2014 Maksim Volkau</Copyright>
-    <Version>3.0.0</Version>
-    <AssemblyVersion>3.0.0</AssemblyVersion>
-    <FileVersion>3.0.0</FileVersion>
-    <OutputPath>..\bin\$(Configuration)\</OutputPath>
+        <PackageTags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
+        <PackageReleaseNotes>
+            <![CDATA[
+v3.1.0:
+- Support for DryIoc v3.1
+v3.0.0:
+- Support for DryIoc v3
+v2.2.0
+- changed: (for #460) `UseDryIocOwinMiddleware` to simply call `InsertOpenScope` then `UseRegisteredMiddlewares`
+- changed: Methods return `IAppBuilder` to enable fluent method chaining
+- fixed: #460 Sequence of Owin Middleware with external libraries
+v2.1.0
+- chnaged: Reference to latest DryIoc 2.10
+v2.0.3
+- chnaged: Reference to latest DryIoc 2.8.3
+v2.0.2
+- fixed: #306: DryIoc.Owin: Use registered middlewares in service key then registration order
+v2.0.1
+- fixed: #209: Possible leak in UseDryIocOwinMiddleware
+    ]]>
+        </PackageReleaseNotes>  
+  
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <DocumentationFile>..\bin\$(Configuration)\DryIoc.Owin.XML</DocumentationFile>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup>
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
-  </Target>
+ 
   <ItemGroup>
     <PackageReference Include="Microsoft.Owin" Version="3.0.1" />
     <PackageReference Include="Owin" Version="1.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
   </ItemGroup>
 </Project>
