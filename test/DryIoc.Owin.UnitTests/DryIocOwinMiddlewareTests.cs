@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Owin;
 using Microsoft.Owin;
 using Microsoft.Owin.Testing;
@@ -10,7 +10,7 @@ namespace DryIoc.Owin.UnitTests
     public class DryIocOwinMiddlewareTests
     {
         [Test]
-        public async void Scoped_container_is_used_in_pipeline()
+        public async Task Scoped_container_is_used_in_pipeline()
         {
             var container = new Container();
 
@@ -26,7 +26,7 @@ namespace DryIoc.Owin.UnitTests
         }
 
         [Test]
-        public async void Registered_test_middleware_is_used_in_pipeline()
+        public async Task Registered_test_middleware_is_used_in_pipeline()
         {
             var container = new Container();
 
@@ -41,7 +41,7 @@ namespace DryIoc.Owin.UnitTests
         }
 
         [Test]
-        public async void Should_ignore_unresolved_middleware_due_missing_dependency()
+        public async Task Should_ignore_unresolved_middleware_due_missing_dependency()
         {
             var container = new Container();
             container.Register<TestGreetingMiddleware>();
@@ -55,7 +55,7 @@ namespace DryIoc.Owin.UnitTests
         }
 
         [Test]
-        public async void Can_register_to_context_request()
+        public async Task Can_register_to_context_request()
         {
             var container = new Container();
 

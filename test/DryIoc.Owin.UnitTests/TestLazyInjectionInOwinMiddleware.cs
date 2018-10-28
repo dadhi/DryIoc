@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Owin;
 using Microsoft.Owin.Testing;
@@ -29,7 +29,7 @@ namespace DryIoc.Owin.UnitTests
         }
 
         [Test]
-        public async void TestLazyWithOwin()
+        public async Task TestLazyWithOwin()
         {
             using (var server = TestServer.Create<Startup>())
             {
