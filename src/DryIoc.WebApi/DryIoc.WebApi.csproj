@@ -1,40 +1,50 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net45</TargetFramework>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
-    <AssemblyTitle>DryIoc.WebApi</AssemblyTitle>
-    <Description>DryIoc extension for ASP.NET WebAPI</Description>
-    <Copyright>Copyright © 2014-2016 Maksim Volkau</Copyright>
-    <Version>3.0.0</Version>
-    <AssemblyVersion>3.0.0</AssemblyVersion>
-    <FileVersion>3.0.0</FileVersion>
-    <OutputPath>..\bin\$(Configuration)\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <DocumentationFile>..\bin\$(Configuration)\DryIoc.WebApi.XML</DocumentationFile>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup>
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+        <TargetFramework>net45</TargetFramework>
+        <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
+
+        <Product>DryIoc.WebApi</Product>
+        <VersionPrefix>3.1.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
+
+        <AssemblyName>$(Product)</AssemblyName>
+        <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
+
+        <PackageId>>$(Product)</PackageId>
+        <Description>DryIoc extension for ASP.NET WebAPI</Description>
+        <PackageTags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
+        <PackageReleaseNotes>
+            <![CDATA[
+v3.1.0:
+- Support for DryIoc v3.1
+v3.0.0:
+- Support for DryIoc v3
+v2.2:
+- changed: Reference latest DryIoc 2.10
+v2.1.2:
+- workaround for: #379: Trouble with Batch Request - Made DryIocDependencyResolver constructor public
+v2.1.1:
+- fixed: #341: DryIoc WebApi: Unable to resolve constructor for internal web api controllers
+v2.1.0:
+- added: Optional ThrowIfUnresolved parameter in WithWebApi, DryIocDependencyResolver
+- added: Helper DryIocWebApi.IsController method which relies on DefaultHttpControllerTypeResolver
+    ]]>
+        </PackageReleaseNotes>
+
     </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
-  </Target>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.6" />
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="System.Net.Http" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Net45\DryIoc\DryIoc.csproj" />
-  </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
+        <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.6" />
+        <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="System.Net.Http" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+    </ItemGroup>
+
 </Project>

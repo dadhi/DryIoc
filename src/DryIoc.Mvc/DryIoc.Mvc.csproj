@@ -1,19 +1,21 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net45</TargetFramework>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
-    
-    <Product>DryIoc.Mvc</Product>
-    <VersionPrefix>3.1.0</VersionPrefix>
-    <VersionSuffix>preview-01</VersionSuffix>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net45</TargetFramework>
+        <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
 
-    <AssemblyName>$(Product)</AssemblyName>
-    <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
+        <Product>DryIoc.Mvc</Product>
+        <VersionPrefix>3.1.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
-    <Title>$(Product)</Title>
-    <Description>DryIoc extension for ASP.NET MVC</Description>
-    <PackageTags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
-    <PackageReleaseNotes><![CDATA[
+        <AssemblyName>$(Product)</AssemblyName>
+        <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
+
+        <PackageId>>$(Product)</PackageId>
+        <Title>$(Product)</Title>
+        <Description>DryIoc extension for ASP.NET MVC</Description>
+        <PackageTags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
+        <PackageReleaseNotes>
+            <![CDATA[
 v3.1.0:
 - Support for DryIoc v3.1
 v3.0.0:
@@ -32,24 +34,24 @@ v2.1.0:
 v2.0.1
 - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
     ]]>
-    </PackageReleaseNotes>
+        </PackageReleaseNotes>
 
-  </PropertyGroup>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.Razor" Version="3.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebPages" Version="3.2.6" />
-    <PackageReference Include="Microsoft.Web.Infrastructure" Version="1.0.0.0" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.2.6" />
+        <PackageReference Include="Microsoft.AspNet.Razor" Version="3.2.6" />
+        <PackageReference Include="Microsoft.AspNet.WebPages" Version="3.2.6" />
+        <PackageReference Include="Microsoft.Web.Infrastructure" Version="1.0.0.0" />
+    </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="System.ComponentModel.DataAnnotations" />
-    <Reference Include="System.Web" />
-  </ItemGroup>
+    <ItemGroup>
+        <Reference Include="System.ComponentModel.DataAnnotations" />
+        <Reference Include="System.Web" />
+    </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
-    <ProjectReference Include="..\DryIoc.Web\DryIoc.Web.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+        <ProjectReference Include="..\DryIoc.Web\DryIoc.Web.csproj" />
+    </ItemGroup>
 </Project>
