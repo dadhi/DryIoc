@@ -2,5 +2,9 @@
     <PropertyGroup>
         <!--Set to true to minimize number of target frameworks, to fasten the build :-) -->
         <DevMode>true</DevMode>
+
+        <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+        <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+
     </PropertyGroup>
 </Project>
