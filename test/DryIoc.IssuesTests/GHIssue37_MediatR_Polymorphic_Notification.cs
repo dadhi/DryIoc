@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using ImTools;
 using MediatR;
 using NUnit.Framework;
+using DryIoc.Messages;
 // ReSharper disable RedundantCast
 // ReSharper disable RedundantExtendsListEntry
 
@@ -12,7 +13,7 @@ namespace DryIoc.IssuesTests
     public class GHIssue37_MediatR_Polymorphic_Notification
     {
         [Test]
-        public void Publish_Notification_with_MediatR()
+        public async Task Publish_Notification_with_MediatR()
         {
             var container = new Container();
 
@@ -24,7 +25,7 @@ namespace DryIoc.IssuesTests
             container.RegisterMany<InventoryDenormalizer>(Reuse.Singleton, serviceTypeCondition: Registrator.Interfaces);
 
             var mediator = container.Resolve<IMediator>();
-            mediator.Publish(new InventoryNotificationReceived());
+            await mediator.Publish(new InventoryNotificationReceived());
 
             var inventoryDenormalizer = (InventoryDenormalizer)container.Resolve<INotificationHandler<InventoryNotificationReceived>>();
             Assert.AreEqual(2, inventoryDenormalizer.HandledInventoryNotificationReceived);
@@ -62,29 +63,71 @@ namespace DryIoc.IssuesTests
 
             Assert.AreEqual(2, inventoryDenormalizer.HandledInventoryNotificationReceived);
         }
+
+        public class InventoryDenormalizer :
+            INotificationHandler<InventoryNotificationBase>,
+            INotificationHandler<InventoryNotificationReceived>
+        {
+            public int HandledInventoryNotificationReceived;
+            public int HandleInventoryNotificationBase;
+
+            public Task Handle(InventoryNotificationReceived notification, CancellationToken cancellationToken)
+            {
+                HandledInventoryNotificationReceived++;
+                return Task.CompletedTask;  // This is called twice.
+            }
+
+            public Task Handle(InventoryNotificationBase notification, CancellationToken cancellationToken)
+            {
+                HandleInventoryNotificationBase++;
+                return Task.CompletedTask;  // This is never called.
+            }
+        }
+
+        public class InventoryNotificationBase : INotification { }
+
+        public class InventoryNotificationReceived : InventoryNotificationBase, INotification { }
     }
 
-    public class InventoryDenormalizer :
-        INotificationHandler<InventoryNotificationBase>,
-        INotificationHandler<InventoryNotificationReceived>
+    [TestFixture]
+    public class Messages_Test
     {
-        public int HandledInventoryNotificationReceived;
-        public int HandleInventoryNotificationBase;
-
-        public Task Handle(InventoryNotificationReceived notification, CancellationToken cancellationToken)
+        [Test]
+        public async Task Publish_Message()
         {
-            HandledInventoryNotificationReceived++;
-            return Task.CompletedTask;  // This is called twice.
+            var container = new Container();
+
+            container.Register(typeof(BroadcastMessageHandler<>));
+            container.RegisterMany<InventoryDenormalizer>(Reuse.Singleton);
+
+            var handler = container.Resolve<BroadcastMessageHandler<InventoryNotificationReceived>>();
+            await handler.Handle(new InventoryNotificationReceived(), CancellationToken.None);
+
+            var inventoryDenormalizer = container.Resolve<InventoryDenormalizer>();
+            Assert.AreEqual(2, inventoryDenormalizer.HandledInventoryNotificationReceived);
         }
 
-        public Task Handle(InventoryNotificationBase notification, CancellationToken cancellationToken)
+        public class InventoryDenormalizer :
+            IMessageHandler<InventoryNotificationBase>,
+            IMessageHandler<InventoryNotificationReceived>
         {
-            HandleInventoryNotificationBase++;
-            return Task.CompletedTask;  // This is never called.
+            public int HandledInventoryNotificationReceived;
+            public int HandleInventoryNotificationBase;
+
+            public Task<EmptyResponse> Handle(InventoryNotificationReceived notification, CancellationToken cancellationToken)
+            {
+                HandledInventoryNotificationReceived++;
+                return EmptyResponse.Task; // This is called twice.
+            }
+
+            public Task<EmptyResponse> Handle(InventoryNotificationBase notification, CancellationToken cancellationToken)
+            {
+                HandleInventoryNotificationBase++;
+                return EmptyResponse.Task; // This is never called.
+            }
         }
+
+        public class InventoryNotificationBase : IMessage { }
+        public class InventoryNotificationReceived : InventoryNotificationBase, IMessage { }
     }
-
-    public class InventoryNotificationBase : INotification { }
-
-    public class InventoryNotificationReceived : InventoryNotificationBase, INotification {}
 }

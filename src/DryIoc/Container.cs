@@ -10515,6 +10515,9 @@ namespace DryIoc.Messages
     {
         /// Single value
         public static readonly EmptyResponse Value = new EmptyResponse();
+
+        /// Single completed task
+        public static readonly Task<EmptyResponse> Task = System.Threading.Tasks.Task.FromResult(Value);
     }
 
     /// Base message handler
@@ -10523,6 +10526,9 @@ namespace DryIoc.Messages
         /// Generic handler
         Task<R> Handle(M message, CancellationToken cancellationToken);
     }
+
+    /// Base message handler for message with empty response
+    public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage {}
 
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
