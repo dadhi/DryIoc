@@ -21,7 +21,7 @@ namespace DryIoc.IssuesTests
             container.RegisterMany(typeof(IMediator).GetAssembly().One(), Registrator.Interfaces);
 
             // User code
-            container.RegisterMany<InventoryDenormalizer>(Reuse.Singleton);
+            container.RegisterMany<InventoryDenormalizer>(Reuse.Singleton, serviceTypeCondition: Registrator.Interfaces);
 
             var mediator = container.Resolve<IMediator>();
             mediator.Publish(new InventoryNotificationReceived());
