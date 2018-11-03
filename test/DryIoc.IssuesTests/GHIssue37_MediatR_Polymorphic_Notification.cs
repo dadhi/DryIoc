@@ -74,13 +74,13 @@ namespace DryIoc.IssuesTests
             public Task Handle(InventoryNotificationReceived notification, CancellationToken cancellationToken)
             {
                 HandledInventoryNotificationReceived++;
-                return Task.CompletedTask;  // This is called twice.
+                return Task.FromResult(0);  // This is called twice.
             }
 
             public Task Handle(InventoryNotificationBase notification, CancellationToken cancellationToken)
             {
                 HandleInventoryNotificationBase++;
-                return Task.CompletedTask;  // This is never called.
+                return Task.FromResult(0);  // This is never called.
             }
         }
 

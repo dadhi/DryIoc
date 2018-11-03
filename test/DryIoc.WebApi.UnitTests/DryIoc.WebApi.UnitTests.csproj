@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net45</TargetFramework>
         <AssemblyTitle>DryIoc.WebApi.UnitTests</AssemblyTitle>
@@ -23,6 +23,7 @@
         <Reference Include="System.Net.Http" />
     </ItemGroup>
     <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIoc.WebApi\DryIoc.WebApi.csproj" />
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
     </ItemGroup>
     <ItemGroup>

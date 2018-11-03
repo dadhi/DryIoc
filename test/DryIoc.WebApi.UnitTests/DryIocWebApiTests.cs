@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
@@ -116,7 +116,7 @@ namespace DryIoc.WebApi.UnitTests
                 var ex = Assert.Throws<ContainerException>(() =>
                     scope.GetService(typeof(MissingDependencyController)));
 
-                Assert.AreEqual(DryIoc.Error.UnableToResolveUnknownService, ex.Error);
+                Assert.AreEqual(Error.UnableToResolveUnknownService, ex.Error);
             }
         }
 

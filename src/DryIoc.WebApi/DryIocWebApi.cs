@@ -229,7 +229,7 @@ namespace DryIoc.WebApi
     }
 
     /// <summary>Registers current <see cref="HttpRequestMessage"/> into dependency scope.</summary>
-    internal sealed class RegisterRequestMessageHandler : DelegatingHandler
+    public sealed class RegisterRequestMessageHandler : DelegatingHandler
     {
         /// <summary>Registers request into dependency scope and sends proceed the pipeline.</summary> 
         /// <param name="request">The HTTP request message to send to the server.</param>
