@@ -1,7 +1,7 @@
-﻿/*
+/*
 The MIT License (MIT)
 
-Copyright © 2014 Maksim Volkau and Contributors
+Copyright © 2013-2018 Maksim Volkau and Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

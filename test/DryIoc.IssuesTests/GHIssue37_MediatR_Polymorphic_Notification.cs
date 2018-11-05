@@ -85,7 +85,6 @@ namespace DryIoc.IssuesTests
         }
 
         public class InventoryNotificationBase : INotification { }
-
         public class InventoryNotificationReceived : InventoryNotificationBase, INotification { }
     }
 

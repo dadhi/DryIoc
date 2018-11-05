@@ -1,21 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net45</TargetFramework>
-        <AssemblyTitle>DryIoc.Web.UnitTests</AssemblyTitle>
     </PropertyGroup>
-    <ItemGroup>
-        <PackageReference Include="nunit" Version="3.11.0" />
-        <PackageReference Include="NUnit3TestAdapter" Version="3.11.0" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
-    </ItemGroup>
     <ItemGroup>
         <Reference Include="System.Web" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
         <ProjectReference Include="..\..\src\DryIoc.Web\DryIoc.Web.csproj" />
-    </ItemGroup>
-    <ItemGroup>
-        <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
     </ItemGroup>
 </Project>

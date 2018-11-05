@@ -5,6 +5,10 @@
 
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Remove="**\*.orig" />
+        <None Remove="**\*.ncrunch*" />
+    </ItemGroup>
 </Project>

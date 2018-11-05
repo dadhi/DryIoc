@@ -121,10 +121,8 @@ namespace DryIoc.WebApi.UnitTests
         }
 
         [Test]
-        public void IsController_will_not_recognize_type_without_controller_suffix()
-        {
+        public void IsController_will_not_recognize_type_without_controller_suffix() => 
             Assert.IsFalse(typeof(ControllerWithWrongName).IsController());
-        }
 
         [Test]
         public void Controller_with_property_injection()
@@ -255,22 +253,13 @@ namespace DryIoc.WebApi.UnitTests
 
         public class DummyContext : IScopeContext
         {
-            public string RootScopeName
-            {
-                get { return string.Empty; }
-            }
+            public string RootScopeName => string.Empty;
 
             public void Dispose() { }
 
-            public IScope GetCurrentOrDefault()
-            {
-                return new Scope();
-            }
+            public IScope GetCurrentOrDefault() => new Scope();
 
-            public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
-            {
-                return setCurrentScope(new Scope());
-            }
+            public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope) => setCurrentScope(new Scope());
         }
     }
 }

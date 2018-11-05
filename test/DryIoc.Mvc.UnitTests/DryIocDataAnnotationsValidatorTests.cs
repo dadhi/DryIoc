@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Web.Mvc;
 using NUnit.Framework;
@@ -66,11 +66,11 @@ namespace DryIoc.Mvc.UnitTests
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForProperty(() => user.Login, typeof(UserModel), "Login");
 
-            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(_serviceProvider, metadata,
+            var dataAnnotationValidator = new DryIocDataAnnotationsModelValidator(_serviceProvider, metadata,
                 new ControllerContext(),
                 new RequiredAttribute());
 
-            return dataAnnorationValidator.Validate(user);
+            return dataAnnotationValidator.Validate(user);
         }
 
         [Test]
