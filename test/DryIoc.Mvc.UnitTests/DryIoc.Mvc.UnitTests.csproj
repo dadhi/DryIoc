@@ -6,7 +6,11 @@
     <ItemGroup>
         <Reference Include="System.ComponentModel.DataAnnotations" />
     </ItemGroup>
-    
+
+    <ItemGroup>
+        <PackageReference Include="NSubstitute" Version="3.1.0" />
+    </ItemGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
         <ProjectReference Include="..\..\src\DryIoc.Mvc\DryIoc.Mvc.csproj" />

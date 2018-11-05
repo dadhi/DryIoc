@@ -1,7 +1,18 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-set SLN="DryIoc.sln"
+set SLN=DryIoc.sln
+
+rem: Optional
+rem dotnet clean --verbosity:minimal
+
+echo:
+echo:## Starting: DOTNET RESTORE... ##
+echo: 
+dotnet restore /p:DevMode=false %SLN%
+echo:
+echo:## Finished: DOTNET RESTORE ##
+echo: 
 
 rem Looking for MSBuild.exe path
 set MSB="C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\15.0\bin\MSBuild.exe"
@@ -10,16 +21,14 @@ if not exist %MSB% for /f "tokens=4 delims='" %%p IN ('.nuget\nuget.exe restore 
 echo:
 echo:## Using MSBuild: %MSB%
 echo:
-echo:## Starting: RESTORE and BUILD... ##
+echo:## Starting: MSBUILD /t:REBUILD... ##
 echo: 
 
-rem dotnet clean --verbosity:minimal
-
 rem: Turning Off the $(DevMode) from the Directory.Build.props to alway build an ALL TARGETS
-call %MSB% %SLN% /t:Restore;Rebuild /p:DevMode=false /p:Configuration=Release /m /verbosity:minimal /bl /fl /flp:LogFile=MSBuild.log
+call %MSB% %SLN% /t:Rebuild /p:DevMode=false /p:Configuration=Release /m /verbosity:minimal /bl /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 goto :error
 echo:
-echo:## Finished: RESTORE and BUILD ##
+echo:## Finished: REBUILD ##
 echo:
 echo:## Starting: TESTS... ##
 echo:

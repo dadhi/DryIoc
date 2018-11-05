@@ -33,6 +33,7 @@
     <!--Probing for portable targets, it could be either MS Visual Studio or 'dotnet\sdk' locations-->
     <PropertyGroup>
         <PortableTargetsDir>C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\Microsoft\Portable</PortableTargetsDir>
+        <PortableTargetsDir Condition="!Exists('$(PortableTargetsDir)')">C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\Microsoft\Portable</PortableTargetsDir>
         <PortableTargetsDir Condition="!Exists('$(PortableTargetsDir)')">$(MSBuildExtensionsPath32)\Microsoft\Portable</PortableTargetsDir>
     </PropertyGroup>
 
