@@ -10,6 +10,7 @@ echo:
 echo:## Starting: DOTNET RESTORE... ##
 echo: 
 dotnet restore /p:DevMode=false %SLN%
+if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: DOTNET RESTORE ##
 echo: 
@@ -23,34 +24,38 @@ echo:## Using MSBuild: %MSB%
 echo:
 echo:## Starting: MSBUILD /t:REBUILD... ##
 echo: 
-
 rem: Turning Off the $(DevMode) from the Directory.Build.props to alway build an ALL TARGETS
-call %MSB% %SLN% /t:Rebuild /p:DevMode=false /p:Configuration=Release /m /verbosity:minimal /bl /fl /flp:LogFile=MSBuild.log
+call %MSB% %SLN% /t:Rebuild /p:DevMode=false;Configuration=Release /m /v:m /bl /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: REBUILD ##
+
 echo:
 echo:## Starting: TESTS... ##
 echo:
-
-dotnet test -c:Release --no-build .\docs\DryIoc.Docs
-dotnet test -c:Release --no-build .\test\DryIoc.UnitTests
-dotnet test -c:Release --no-build .\test\DryIoc.IssuesTests
-dotnet test -c:Release --no-build .\test\DryIoc.MefAttributedModel.UnitTests
-dotnet test -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
+dotnet test /p:DevMode=false -c:Release --no-build .\docs\DryIoc.Docs
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.IssuesTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.MefAttributedModel.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests
+REM dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests
 if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: TESTS ##
+
 echo:
 echo:## Starting: PACKAGING... ##
 echo:
-
-dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc\DryIoc.csproj
-dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIocAttributes\DryIocAttributes.csproj
-dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj
-dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj
-dotnet pack -c:Release --no-build -o:..\..\.dist\packages .\src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj
-if %ERRORLEVEL% neq 0 call :error "PACKAGING"
+call %MSB% .\src\DryIoc\DryIoc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIocAttributes\DryIocAttributes.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.Web\DryIoc.Web.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.Mvc\DryIoc.Mvc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.WebApi\DryIoc.WebApi.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+if %ERRORLEVEL% neq 0 goto :error
 
 call BuildScripts\NugetPack.bat
 if %ERRORLEVEL% neq 0 call :error "PACKAGING SOURCE PACKAGES"

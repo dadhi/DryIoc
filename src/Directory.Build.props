@@ -8,10 +8,11 @@
         <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
         <NeutralLanguage>en</NeutralLanguage>
         <PackageLicenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicenseUrl>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
+        <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <RepositoryUrl>https://github.com/dadhi/DryIoc</RepositoryUrl>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -21,7 +22,6 @@
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
         <DebugType>embedded</DebugType>
         <DebugSymbols>true</DebugSymbols>
-        <!-- <RunCodeAnalysis>true</RunCodeAnalysis> -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 

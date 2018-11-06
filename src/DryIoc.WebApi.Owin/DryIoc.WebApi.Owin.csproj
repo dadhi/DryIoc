@@ -17,9 +17,11 @@
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="Owin" Version="1.0" />
   </ItemGroup>
+
   <ItemGroup>
     <Reference Include="System.Net.Http" />
   </ItemGroup>
+  
   <ItemGroup>
     <ProjectReference Include="..\src\DryIoc\DryIoc.csproj" />
     <ProjectReference Include="..\src\DryIoc.Owin\DryIoc.Owin.csproj" />

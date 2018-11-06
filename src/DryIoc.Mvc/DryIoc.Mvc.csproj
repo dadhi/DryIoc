@@ -9,7 +9,7 @@
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
 
-        <PackageId>>$(Product).dll</PackageId>
+        <PackageId>$(Product).dll</PackageId>
         <Title>$(Product).dll</Title>
         <Description>DryIoc extension for ASP.NET MVC</Description>
         <PackageTags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
@@ -34,7 +34,6 @@ v2.0.1
 - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
     ]]>
         </PackageReleaseNotes>
-
     </PropertyGroup>
 
     <ItemGroup>
