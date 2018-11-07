@@ -3,24 +3,21 @@
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
 
+        <Product>DryIoc.Microsoft.Hosting</Product>
         <VersionPrefix>1.0.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix>preview-02</VersionSuffix>
 
-        <AssemblyName>DryIoc.Microsoft.Hosting</AssemblyName>
+        <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
-        <Title>$(AssemblyName).dll</Title>
-        <PackageId>$(AssemblyName)</PackageId>
 
-        <Description>DryIoc as DI for generic IHost via extension methods on IHostBuilder</Description>
-        <Summary>
+        <PackageId>$(AssemblyName)</PackageId>
+        <Title>$(AssemblyName)</Title>
+        <Description>
             <![CDATA[
 DryIoc as DI for generic IHost via extension methods on IHostBuilder.
 See this SO answer: https://stackoverflow.com/questions/51872490/use-hostbuilder-configureservices-with-dryioc-container/51877235#51877235
         ]]>
-        </Summary>
-        <Authors>Maksim Volkau</Authors>
-        <Copyright>Copyright © 2018 Maksim Volkau</Copyright>
-        <NeutralLanguage>en</NeutralLanguage>
+        </Description>
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;AspNetCore;NetCore;WebHost;GenericHost;WebHostBuilder;HostBuilder</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[

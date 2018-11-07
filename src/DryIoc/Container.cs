@@ -6404,9 +6404,11 @@ namespace DryIoc
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
 
-            if (factoryType == FactoryType.Service && 
-                (Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
-                _builtExpressions = Ref.Of(ImMap<Expr>.Empty);
+            if (factoryType == FactoryType.Service)
+            {
+                if ((Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
+                    _builtExpressions = Ref.Of(ImMap<Expr>.Empty);
+            }
         }
     }
 
@@ -8169,20 +8171,11 @@ namespace DryIoc
         /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
         void SetOrAdd(int id, object item);
 
+        /// <summary>Gets and existing value at specified id, or adds a new value if no-one was added in between.</summary>
+        object GetOrTryAdd(int id, object item, int disposalOrder);
+
         /// <summary>Clones the scope.</summary>
         IScope Clone();
-    }
-
-    // todo: not yet used, planned for optimizing scope resolution root resolve.
-    /// Extension methods for `IScope`
-    public static class ScopeTools
-    {
-        /// Sets or add the service to scope and immediately returns it for further fluent operation. 
-        public static object GetOrSet(this IScope scope, int id, object service)
-        {
-            scope.SetOrAdd(id, service);
-            return service;
-        }
     }
 
     /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
@@ -8267,6 +8260,32 @@ namespace DryIoc
             var disposable = item as IDisposable;
             if (disposable != null && disposable != this)
                 TrackDisposable(disposable, NextDisposalIndex());
+        }
+
+        /// Try to set the value if it is not already set
+        public object GetOrTryAdd(int id, object newItem, int disposalOrder)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            if (!_items.IsEmpty && _items.TryFind(id, out item))
+                return item;
+
+            var items = _items;
+            lock (_locker)
+            {
+                // if items did not change or we did found the item (now), let's return it
+                if (!_items.IsEmpty && _items.TryFind(id, out item))
+                    return item;
+
+                _items = _items.AddOrUpdate(id, newItem);
+                var disposable = newItem as IDisposable;
+                if (disposable != null && disposable != this)
+                    TrackDisposable(disposable, NextDisposalIndex());
+            }
+
+            return newItem;
         }
 
         /// <inheritdoc />
@@ -8503,18 +8522,42 @@ namespace DryIoc
             }
             else
             {
-                var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
                 var idExpr = Constant(request.FactoryID);
                 var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
-                if (ScopedOrSingleton)
-                    return Call(_getScopedOrSingletonMethod, resolverExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
 
-                var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
-                if (Name == null)
-                    return Call(_getScopedMethod, resolverExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
+                // Simplify creation of scoped service at the root of the scope, e.g. a controller,
+                // by not wrapping it unnecessary in nested lambda.
+                if (request.IsResolutionCall)
+                {
+                    if (ScopedOrSingleton)
+                        return Call(_getScopedOrSingletonWithValueMethod, resolverExpr, 
+                            idExpr, serviceFactoryExpr, disposalOrderExpr);
 
-                var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(_getNameScopedMethod, resolverExpr, nameExpr, ifNoScopeThrowExpr, idExpr, factoryLambdaExpr, disposalOrderExpr);
+                    if (Name == null)
+                        return Call(_getScopedMethodWithValue, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                            idExpr, serviceFactoryExpr, disposalOrderExpr);
+
+                    return Call(_getNameScopedMethodWithValue, resolverExpr,
+                        request.Container.GetConstantExpression(Name, typeof(object)),
+                        Constant(request.IfUnresolved == IfUnresolved.Throw),
+                        idExpr, serviceFactoryExpr, disposalOrderExpr);
+                }
+                else
+                {
+                    var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
+                    if (ScopedOrSingleton)
+                        return Call(_getScopedOrSingletonMethod, resolverExpr, 
+                            idExpr, factoryLambdaExpr, disposalOrderExpr);
+
+                    if (Name == null)
+                        return Call(_getScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                            idExpr, factoryLambdaExpr, disposalOrderExpr);
+
+                    return Call(_getNameScopedMethod, resolverExpr, 
+                        request.Container.GetConstantExpression(Name, typeof(object)), 
+                        Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                        idExpr, factoryLambdaExpr, disposalOrderExpr);
+                }
             }
         }
 
@@ -8558,6 +8601,13 @@ namespace DryIoc
         private static readonly MethodInfo _getScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedOrSingleton), true);
 
+        internal static object GetScopedOrSingletonWithValue(IResolverContext r,
+            int id, object value, int disposalIndex) =>
+            (r.CurrentScope ?? r.SingletonScope).GetOrTryAdd(id, value, disposalIndex);
+
+        private static readonly MethodInfo _getScopedOrSingletonWithValueMethod =
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedOrSingletonWithValue), true);
+
         internal static object GetScoped(IResolverContext r,
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
@@ -8565,12 +8615,26 @@ namespace DryIoc
         private static readonly MethodInfo _getScopedMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetScoped), true);
 
+        internal static object GetScopedWithValue(IResolverContext r,
+            bool throwIfNoScope, int id, object value, int disposalIndex) =>
+            r.GetCurrentScope(throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
+
+        private static readonly MethodInfo _getScopedMethodWithValue =
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedWithValue), true);
+
         internal static object GetNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
         private static readonly MethodInfo _getNameScopedMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScoped), true);
+
+        internal static object GetNameScopedWithValue(IResolverContext r,
+            object scopeName, bool throwIfNoScope, int id, object value, int disposalIndex) =>
+            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
+
+        private static readonly MethodInfo _getNameScopedMethodWithValue =
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScopedWithValue), true);
 
         internal static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
             r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);

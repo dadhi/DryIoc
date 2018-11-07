@@ -3,24 +3,21 @@
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard1.0;netstandard2.0</TargetFrameworks>
 
+        <Product>DryIoc.Microsoft.DependencyInjection</Product>
         <VersionPrefix>2.2.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix>preview-02</VersionSuffix>
 
-        <AssemblyName>DryIoc.Microsoft.DependencyInjection</AssemblyName>
+        <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
-        <Title>$(AssemblyName)</Title>
+        
         <PackageId>$(AssemblyName)</PackageId>
-
+        <Title>$(AssemblyName)</Title>
         <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
-        <Summary>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Summary>
-        <Authors>Maksim Volkau</Authors>
-        <Copyright>Copyright © 2016-2018 Maksim Volkau</Copyright>
-        <NeutralLanguage>en</NeutralLanguage>
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
 v2.2.0:
-- updated: To DryIoc v3.1
+- updated: To DryIoc v3.1.0-preview-06
 v2.1.0:
 - added: Split WithCompositionRoot and BuildServiceProvider extension methods
 - removed: Preventing to use Container with ambient ScopeContext

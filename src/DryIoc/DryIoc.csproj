@@ -5,7 +5,7 @@
 
         <Product>DryIoc</Product>
         <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-05</VersionSuffix>
+        <VersionSuffix>preview-06</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -25,6 +25,7 @@ v3.1.0
 - fixed: #28 FastExpressionCompiler is not used in Net Standard 1.3, 2.0 packages and not used in .Net Core
 - fixed: #29 Resolve caches object[] args values
 - fixed: #33 Memory leak with ResolveManyBehavior.AzLazyEnumerable?
+- fixed: #41 ErrorCode: RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType
 - fixed: BB-593 Add auto-generated tag to PCL FEC
 - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
 - fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
