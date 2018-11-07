@@ -9,8 +9,8 @@
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
 
-        <PackageId>>$(Product).dll</PackageId>
-        <Title>>$(Product).dll</Title>
+        <PackageId>$(Product).dll</PackageId>
+        <Title>$(Product).dll</Title>
         <Description>DryIoc extension for OWIN</Description>
         <PackageTags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
@@ -42,6 +42,6 @@ v2.0.1
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+        <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
     </ItemGroup>
 </Project>

@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <Product>DryIoc</Product>
         <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-07</VersionSuffix>
+        <VersionSuffix>preview-06</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -40,6 +40,7 @@ v3.1.0
 - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
 - added: IRegistrator.GetRegisteredFactories
 - added: FactoryType to Registrator.RegisterMapping
+- added: AsyncExecutionFlowScopeContext.Default member
 - changed: [generation] Using run-time request object 
 
 v3.0.2

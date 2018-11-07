@@ -40,8 +40,9 @@ dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.MefAttributedMo
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Owin.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.CommonServiceLocator.UnitTests
-REM dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests
 if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: TESTS ##
@@ -56,6 +57,7 @@ call %MSB% .\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.Dependenc
 call %MSB% .\src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.Web\DryIoc.Web.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.Mvc\DryIoc.Mvc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.Owin\DryIoc.Owin.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.WebApi\DryIoc.WebApi.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 if %ERRORLEVEL% neq 0 goto :error

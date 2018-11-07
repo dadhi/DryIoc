@@ -2,10 +2,12 @@
     <PropertyGroup>
         <TargetFramework>net45</TargetFramework>
     </PropertyGroup>
+    <ItemGroup>
+      <PackageReference Include="NSubstitute" Version="3.1.0" />
+    </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
         <ProjectReference Include="..\..\src\DryIoc.WebApi\DryIoc.WebApi.csproj" />
     </ItemGroup>
-    
 </Project>
