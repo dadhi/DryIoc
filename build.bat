@@ -42,6 +42,7 @@ dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Owin.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.SignalR.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.CommonServiceLocator.UnitTests
 if %ERRORLEVEL% neq 0 goto :error
 echo:
@@ -59,6 +60,7 @@ call %MSB% .\src\DryIoc.Web\DryIoc.Web.csproj /v:m /t:Pack /p:DevMode=false;Conf
 call %MSB% .\src\DryIoc.Mvc\DryIoc.Mvc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.Owin\DryIoc.Owin.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.WebApi\DryIoc.WebApi.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.WebApi\DryIoc.SignalR.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 if %ERRORLEVEL% neq 0 goto :error
 
