@@ -3223,7 +3223,7 @@ namespace DryIoc
         public static readonly Rules Default = new Rules();
 
         /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
-        public const int DefaultDependencyDepthToSplitObjectGraph = 4;
+        public const int DefaultDependencyDepthToSplitObjectGraph = 5;
 
         /// <summary>Nested dependency depth to split an object graph</summary>
         public int DependencyDepthToSplitObjectGraph { get; private set; }
@@ -9619,8 +9619,18 @@ namespace DryIoc
         public static bool IsEnum(this Type type) =>
             type.GetTypeInfo().IsEnum;
 
+        /// <summary>Returns true if type is assignable to <paramref name="other"/> type
+        /// or can be casted with conversion operators.</summary>
+        public static bool IsCastableTo(this Type type, Type other) => 
+            type != null && other != null && 
+            (other.IsAssignableFrom(type) ||
+            type.GetTypeInfo().DeclaredMethods
+                .Match(m => m.IsPublic && m.IsStatic && (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
+                .Any());
+
         /// <summary>Returns true if type is assignable to <paramref name="other"/> type.</summary>
         public static bool IsAssignableTo(this Type type, Type other) =>
+            //type.IsCastableTo(other);
             type != null && other != null && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
 
         /// <summary>Returns true if type is assignable to <typeparamref name="T"/> type.</summary>
