@@ -71,18 +71,20 @@ namespace DryIoc.Mvc
         /// (if container does not have its own context specified).</param>
         /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
         /// for unresolved type instead of fallback to default Resolver.</param>
+        /// <param name="controllerReuse">(optional) Defaults to <see cref="Reuse.InWebRequest"/></param>
         /// <returns>New container with applied Web context.</returns>
         public static IContainer WithMvc(this IContainer container,
             IEnumerable<Assembly> controllerAssemblies = null,
             IScopeContext scopeContext = null,
-            Func<Type, bool> throwIfUnresolved = null)
+            Func<Type, bool> throwIfUnresolved = null,
+            IReuse controllerReuse = null)
         {
             container.ThrowIfNull();
 
             if (container.ScopeContext == null)
                 container = container.With(scopeContext: scopeContext ?? new HttpContextScopeContext());
 
-            container.RegisterMvcControllers(controllerAssemblies);
+            container.RegisterMvcControllers(controllerAssemblies, controllerReuse);
 
             container.SetFilterAttributeFilterProvider(FilterProviders.Providers);
 
@@ -103,10 +105,15 @@ namespace DryIoc.Mvc
         /// <summary>Registers controllers types in container with InWebRequest reuse.</summary>
         /// <param name="container">Container to register controllers to.</param>
         /// <param name="controllerAssemblies">(optional) Uses <see cref="BuildManager.GetReferencedAssemblies"/> by default.</param>
-        public static void RegisterMvcControllers(this IContainer container, IEnumerable<Assembly> controllerAssemblies = null)
+        /// <param name="controllerReuse">(optional) Defaults to <see cref="Reuse.InWebRequest"/></param>
+        public static void RegisterMvcControllers(this IContainer container, 
+            IEnumerable<Assembly> controllerAssemblies = null, IReuse controllerReuse = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
-            container.RegisterMany(controllerAssemblies, IsController, Reuse.InWebRequest, FactoryMethod.ConstructorWithResolvableArguments);
+            controllerReuse = controllerReuse ?? Reuse.InWebRequest;
+
+            container.RegisterMany(controllerAssemblies, IsController, controllerReuse, 
+                FactoryMethod.ConstructorWithResolvableArguments);
         }
 
         /// <summary>Replaces default Filter Providers with instance of <see cref="DryIocFilterAttributeFilterProvider"/>,
@@ -295,5 +302,27 @@ namespace DryIoc.Mvc
         }
 
         private readonly IServiceProvider _serviceProvider;
+    }
+
+    /// <summary>Implements request begin / end handlers based on <see cref="HttpContextScopeContext"/>.</summary>
+    public class AsyncExecutionFlowScopeContextRequestHandler : IDryIocHttpModuleRequestHandler
+    {
+        /// Uses a default instance of shared scope context that can be propagated throw async / await boundaries
+        internal static IScopeContext DefaultScopeContext = AsyncExecutionFlowScopeContext.Default;
+
+        /// <inheritdoc />
+        public void OnBeginRequest(object sender, EventArgs _)
+        {
+            DefaultScopeContext.SetCurrent(scope =>
+                scope ?? new Scope(parent: null, name: Reuse.WebRequestScopeName));
+        }
+
+        /// <inheritdoc />
+        public void OnEndRequest(object sender, EventArgs _)
+        {
+            var scope = DefaultScopeContext.GetCurrentOrDefault();
+            if (scope?.Name.Equals(Reuse.WebRequestScopeName) == true)
+                scope.Dispose();
+        }
     }
 }

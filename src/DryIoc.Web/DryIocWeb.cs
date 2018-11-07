@@ -56,49 +56,67 @@ namespace DryIoc.Web
         private static int _initialized;
     }
 
-    /// <summary>Hooks up <see cref="ResolverContext.OpenScope"/> on request beginning and scope dispose on request end.</summary>
-    public sealed class DryIocHttpModule : IHttpModule
+    /// <summary>Defines API for request begin / end handlers</summary>
+    public interface IDryIocHttpModuleRequestHandler
     {
+        /// On request begin handler
+        void OnBeginRequest(object sender, EventArgs eventArgs);
+
+        /// On request end handler
+        void OnEndRequest(object sender, EventArgs eventArgs);
+    }
+
+    /// <summary>Hooks up <see cref="ResolverContext.OpenScope"/> on request beginning and scope dispose on request end.</summary>
+    public class DryIocHttpModule : IHttpModule
+    {
+        /// Defaults to HttpContextScopeContext
+        public static IDryIocHttpModuleRequestHandler RequestHandler = new HttpContextScopeContextRequestHandler(); 
+
         /// <summary>Initializes a module and prepares it to handle requests. </summary>
         /// <param name="context">An <see cref="T:System.Web.HttpApplication"/> that provides access to the methods, properties, and events common to all application objects within an ASP.NET application </param>
         void IHttpModule.Init(HttpApplication context)
         {
-            context.BeginRequest += (sender, _) =>
-            {
-                var httpContext = ((HttpApplication)sender).Context;
-                var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
-
-                scopeContext.SetCurrent(SetOrKeepCurrentRequestScope);
-            };
-
-            context.EndRequest += (sender, _) =>
-            {
-                var httpContext = ((HttpApplication)sender).Context;
-                var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
-
-                var currentScope = scopeContext.GetCurrentOrDefault();
-                if (currentScope != null && Reuse.WebRequestScopeName.Equals(currentScope.Name))
-                    currentScope.Dispose();
-            };
-        }
-
-        // If current scope does not have WebRequestScopeName 
-        // then create new scope with this name, 
-        // otherwise - use current.
-        private static IScope SetOrKeepCurrentRequestScope(IScope current)
-        {
-            return current != null && Reuse.WebRequestScopeName.Equals(current.Name)
-                ? current
-                : new Scope(current, Reuse.WebRequestScopeName);
+            context.BeginRequest += RequestHandler.OnBeginRequest;
+            context.EndRequest += RequestHandler.OnEndRequest;
         }
 
         /// <summary>Disposes of the resources (other than memory) used by the module  that implements <see cref="IHttpModule"/>.</summary>
         void IHttpModule.Dispose() { }
     }
 
+    /// <summary>Implements request begin / end handlers based on <see cref="HttpContextScopeContext"/>.</summary>
+    public class HttpContextScopeContextRequestHandler : IDryIocHttpModuleRequestHandler
+    {
+        /// <inheritdoc />
+        public void OnBeginRequest(object sender, EventArgs _)
+        {
+            var httpContext = ((HttpApplication)sender).Context;
+            var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
+            scopeContext.SetCurrent(SetOrKeepCurrentRequestScope);
+        }
+
+        /// <inheritdoc />
+        public void OnEndRequest(object sender, EventArgs _)
+        {
+            var httpContext = ((HttpApplication)sender).Context;
+            var scopeContext = new HttpContextScopeContext(() => httpContext.Items);
+
+            var currentScope = scopeContext.GetCurrentOrDefault();
+            if (currentScope != null && Reuse.WebRequestScopeName.Equals(currentScope.Name)) currentScope.Dispose();
+        }
+
+        // If current scope does not have WebRequestScopeName 
+        // then create new scope with this name, 
+        // otherwise - use current.
+        private static IScope SetOrKeepCurrentRequestScope(IScope current) => 
+            current != null && Reuse.WebRequestScopeName.Equals(current.Name)
+                ? current
+                : new Scope(current, Reuse.WebRequestScopeName);
+    }
+
     /// <summary>Stores current scope in <see cref="HttpContext.Items"/>.</summary>
     /// <remarks>Stateless context, so could be created multiple times and used from different places without side-effects.</remarks>
-    public sealed class HttpContextScopeContext : IScopeContext, IDisposable
+    public sealed class HttpContextScopeContext : IScopeContext
     {
         /// <summary>Provides default context items dictionary using <see cref="HttpContext.Current"/>.
         /// Could be overridden with any key-value dictionary where <see cref="HttpContext"/> is not available, e.g. in tests.</summary>

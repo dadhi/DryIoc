@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013 Maksim Volkau
+Copyright (c) 2013-2018 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -10168,6 +10168,9 @@ namespace DryIoc
     {
         /// <summary>Statically known name of root scope in this context.</summary>
         public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
+
+        /// It is fine to use a default instance, cause the async local scope are actually a static one
+        public static readonly AsyncExecutionFlowScopeContext Default = new AsyncExecutionFlowScopeContext();
 
         private static readonly AsyncLocal<IScope> _ambientScope = new AsyncLocal<IScope>();
 
