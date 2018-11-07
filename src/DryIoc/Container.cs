@@ -3223,7 +3223,7 @@ namespace DryIoc
         public static readonly Rules Default = new Rules();
 
         /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
-        public const int DefaultDependencyDepthToSplitObjectGraph = 20;
+        public const int DefaultDependencyDepthToSplitObjectGraph = 4;
 
         /// <summary>Nested dependency depth to split an object graph</summary>
         public int DependencyDepthToSplitObjectGraph { get; private set; }
@@ -10119,6 +10119,9 @@ namespace DryIoc
     {
         /// <summary>Statically known name of root scope in this context.</summary>
         public static readonly string ScopeContextName = typeof(AsyncExecutionFlowScopeContext).FullName;
+
+        /// It is fine to use a default instance, cause the async local scope are actually a static one
+        public static readonly AsyncExecutionFlowScopeContext Default = new AsyncExecutionFlowScopeContext();
 
         [Serializable]
         internal sealed class ScopeEntry<T> : MarshalByRefObject
