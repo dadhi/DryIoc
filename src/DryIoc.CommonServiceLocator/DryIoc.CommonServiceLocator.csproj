@@ -1,13 +1,35 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net45</TargetFramework>
-    <AssemblyTitle>DryIoc.CommonServiceLocator</AssemblyTitle>
+    <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(DevMode)' != 'true'">net40;netstandard1.0;netstandard2.0</TargetFrameworks>
+
+    <Product>DryIoc.CommonServiceLocator</Product>
+    <VersionPrefix>3.1.0</VersionPrefix>
+    <VersionSuffix>preview-01</VersionSuffix>
+
+    <AssemblyName>$(Product)</AssemblyName>
+    <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
+    
+    <PackageId>$(Product).dll</PackageId>
+    <Title>$(Product).dll</Title>
     <Description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://commonservicelocator.codeplex.com/</Description>
+    <PackageTags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
+    <PackageReleaseNotes>
+<![CDATA[
+v3.1.0:
+- Support for DryIoc v3.1
+v3.0.0:
+- Support for DryIoc v3
+- Support for CommonServiceLocator v2
+]]>
+        </PackageReleaseNotes>
   </PropertyGroup>
+  
   <ItemGroup>
     <PackageReference Include="CommonServiceLocator" Version="2.0.3" />
   </ItemGroup>
+  
   <ItemGroup>
-    <ProjectReference Include="..\src\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
   </ItemGroup>
 </Project>

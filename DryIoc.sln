@@ -58,6 +58,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.WebApi", "src\DryIoc
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Mvc.UnitTests", "test\DryIoc.Mvc.UnitTests\DryIoc.Mvc.UnitTests.csproj", "{E6FC663D-839C-42CC-937C-61FA3B619633}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.CommonServiceLocator", "src\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj", "{79E231D2-A344-4E1E-AA35-163697D03030}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -132,6 +134,10 @@ Global
 		{E6FC663D-839C-42CC-937C-61FA3B619633}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E6FC663D-839C-42CC-937C-61FA3B619633}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E6FC663D-839C-42CC-937C-61FA3B619633}.Release|Any CPU.Build.0 = Release|Any CPU
+		{79E231D2-A344-4E1E-AA35-163697D03030}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{79E231D2-A344-4E1E-AA35-163697D03030}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{79E231D2-A344-4E1E-AA35-163697D03030}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{79E231D2-A344-4E1E-AA35-163697D03030}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -154,6 +160,7 @@ Global
 		{AAAAF6CD-A10D-4D24-8FE2-45A24885C977} = {258FA031-1B82-403A-B235-9A25B17A024A}
 		{168ED4A4-5391-47EA-8553-B7B2832A7A77} = {258FA031-1B82-403A-B235-9A25B17A024A}
 		{E6FC663D-839C-42CC-937C-61FA3B619633} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
+		{79E231D2-A344-4E1E-AA35-163697D03030} = {258FA031-1B82-403A-B235-9A25B17A024A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}
