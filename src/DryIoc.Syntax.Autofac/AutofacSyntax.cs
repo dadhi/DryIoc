@@ -1,7 +1,7 @@
-﻿/*
+/*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2013-2018 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -30,14 +30,17 @@ using DryIoc;
 
 namespace Autofac
 {
+    /// Oops, a container builder
     public class ContainerBuilder
     {
+        /// Default conventions to use with Autofac
         public static Rules WithDefaultAutofacRules(Rules rules) => rules
             .With(FactoryMethod.ConstructorWithResolvableArguments)
             .WithFactorySelector(Rules.SelectLastRegisteredFactory())
             .WithTrackingDisposableTransients()
             .WithUnknownServiceResolvers(ThrowDependencyResolutionException);
 
+        /// Throws an exception
         public static Factory ThrowDependencyResolutionException(Request request)
         {
             if (!request.IsResolutionRoot)
@@ -45,12 +48,16 @@ namespace Autofac
             return null;
         }
 
+        /// Container
         public readonly IContainer Container;
 
+        /// List of registrations
         public readonly List<RegistrationInfo> Registrations;
 
+        /// Constructs a builder
         public ContainerBuilder() : this(new Container(WithDefaultAutofacRules)) {}
 
+        /// Constructs a real builder using the container
         public ContainerBuilder(IContainer container)
         {
             Container = container;
@@ -60,10 +67,8 @@ namespace Autofac
                 setup: Setup.WrapperWith(openResolutionScope: true, preventDisposal: true));
         }
 
-        public ContainerAdapter Build()
-        {
-            return Build(true);
-        }
+        /// Builds a container adapter
+        public ContainerAdapter Build() => Build(true);
 
         private ContainerAdapter Build(bool withModules)
         {
@@ -95,29 +100,38 @@ namespace Autofac
         }
     }
 
+    /// Oops, a lifetime scope
     public interface ILifetimeScope
     {
+        /// Container
         IResolverContext Container { get; }
     }
 
+    /// A lot of stuff
     public static class RegistrationExtensions
     {
+        /// Registers a type
         public static RegistrationInfo RegisterType<TImplementation>(this ContainerBuilder builder) => 
             builder.Add(typeof(TImplementation), typeof(TImplementation));
 
+        /// Registers a generic type definition
         public static RegistrationInfo RegisterGeneric(this ContainerBuilder builder, Type genericTypeDefinition) => 
             builder.Add(genericTypeDefinition, genericTypeDefinition);
 
+        /// Registers a type
         public static RegistrationInfo Register<TService>(
             this ContainerBuilder builder, Func<IResolver, TService> factory) => 
             builder.Add(typeof(TService), factory: resolver => factory(resolver));
 
+        /// Registers an instance
         public static RegistrationInfo RegisterInstance<T>(this ContainerBuilder builder, T instance) where T : class => 
             builder.Add(typeof(T), instance: instance);
 
+        /// Registers a module
         public static void RegisterModule<TModule>(this ContainerBuilder builder) where TModule : IModule => 
             builder.RegisterType<TModule>().As<IModule>().SingleInstance();
 
+        /// Registers a module
         public static void RegisterModule(this ContainerBuilder builder, IModule module) => 
             builder.RegisterInstance(module);
 
@@ -139,43 +153,61 @@ namespace Autofac
         }
     }
 
+    /// Oops, a component context
     public interface IComponentContext
     {
+        /// More containers
         IResolverContext Container { get; }
     }
 
+    /// Container adapter
     public class ContainerAdapter : IComponentContext, ILifetimeScope, IDisposable
     {
+        /// A container
         public IResolverContext Container { get; }
 
+        /// Constructs an adapter
         public ContainerAdapter(IResolverContext container)
         {
             Container = container;
         }
 
+        /// Disposes a container
         public void Dispose() => Container?.Dispose();
     }
 
+    /// Oops, resolution stuff
     public static class ContainerExtensions
     {
+        /// Actual Resolve method
         public static T Resolve<T>(this IComponentContext context) => 
             context.Container.Resolve<T>();
 
+        /// Opens a scope
         public static ContainerAdapter BeginLifetimeScope(this ILifetimeScope scope) => 
             new ContainerAdapter(scope.Container.OpenScope());
     }
 
+    /// Dto to hold a registration info
     public class RegistrationInfo
     {
+        /// Service type
         public Type ServiceType;
+
+        /// Reuse
         public IReuse Reuse;
 
-        // one of all
+        /// Impl. type
         public Type ImplementationType;
+
+        /// Delegate
         public Func<IResolver, object> Factory;
+
+        /// Instance
         public object Instance;
     }
 
+    /// Registration builder
     public static class RegistrationBuilderExtensions
     {
         private static RegistrationInfo WithReuse(this RegistrationInfo info, IReuse reuse)
@@ -184,21 +216,16 @@ namespace Autofac
             return info;
         }
 
-        public static RegistrationInfo SingleInstance(this RegistrationInfo info)
-        {
-            return info.WithReuse(Reuse.Singleton);
-        }
+        /// Reuse.Singleton
+        public static RegistrationInfo SingleInstance(this RegistrationInfo info) => info.WithReuse(Reuse.Singleton);
 
-        public static RegistrationInfo InstancePerOwned<TService>(this RegistrationInfo info)
-        {
-            return info.WithReuse(Reuse.ScopedTo<Owned<TService>>());
-        }
+        /// Reuse.ScopedTo{TService}()
+        public static RegistrationInfo InstancePerOwned<TService>(this RegistrationInfo info) => info.WithReuse(Reuse.ScopedTo<Owned<TService>>());
 
-        public static RegistrationInfo InstancePerMatchingLifetimeScope(this RegistrationInfo info, object scopeName)
-        {
-            return info.WithReuse(Reuse.ScopedTo(scopeName));
-        }
+        /// Reuse.ScopeTo(name)
+        public static RegistrationInfo InstancePerMatchingLifetimeScope(this RegistrationInfo info, object scopeName) => info.WithReuse(Reuse.ScopedTo(scopeName));
 
+        /// Service type
         public static RegistrationInfo As<TService>(this RegistrationInfo info)
         {
             Throw.IfImplementationIsNotAssignableToService(info.ImplementationType, typeof(TService));
@@ -207,51 +234,59 @@ namespace Autofac
         }
     }
 
+    /// Module
     public abstract class Module : IModule
     {
+        /// Load builder
         protected abstract void Load(ContainerBuilder moduleBuilder);
 
-        public void Configure(ContainerBuilder moduleBuilder)
-        {
-            Load(moduleBuilder);
-        }
+        /// Configures builder
+        public void Configure(ContainerBuilder moduleBuilder) => Load(moduleBuilder);
     }
 
+    /// Throws
     public static class Throw
     {
-        public static void IfImplementationIsNotAssignableToService(Type implementationType, Type serviceType)
-        {
+        /// Some checks
+        public static void IfImplementationIsNotAssignableToService(Type implementationType, Type serviceType) => 
             serviceType.ThrowIfNotImplementedBy(implementationType);
-        }
     }
 }
 
 namespace Autofac.Core
 {
+    /// Module
     public interface IModule
     {
+        /// Configure
         void Configure(ContainerBuilder moduleBuilder);
     }
 
+    /// Exception
     public class DependencyResolutionException : Exception
     {
+        /// Creates a thingy
         public DependencyResolutionException(string message) : base(message) { }
     }
 }
 
 namespace Autofac.Features.OwnedInstances
 {
+    /// Controls a Dispose
     public class Owned<T> : IDisposable
     {
+        /// Wrapped value
         public T Value { get; }
         private readonly IDisposable _lifetime;
 
+        /// Constructs a wrapper
         public Owned(T value, IResolverContext lifetime)
         {
             _lifetime = lifetime;
             Value = value;
         }
 
+        /// Disposes
         public void Dispose()
         {
             _lifetime?.Dispose();
@@ -262,8 +297,10 @@ namespace Autofac.Features.OwnedInstances
 
 namespace Autofac.Core.Registration
 {
+    /// More exceptions
     public class ComponentNotRegisteredException : DependencyResolutionException
     {
+        /// Constructor
         public ComponentNotRegisteredException(string message) : base(message) {}
     }
 }

@@ -72,6 +72,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.SignalR", "src\DryIo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.SignalR.UnitTests", "test\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj", "{C0C5441D-594D-4740-A960-36802BE59069}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Syntax.Autofac", "src\DryIoc.Syntax.Autofac\DryIoc.Syntax.Autofac.csproj", "{05A29B15-712C-495E-A17C-28B85D51F49D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Syntax.Autofac.UnitTests", "test\DryIoc.Syntax.Autofac.UnitTests\DryIoc.Syntax.Autofac.UnitTests.csproj", "{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -174,6 +178,14 @@ Global
 		{C0C5441D-594D-4740-A960-36802BE59069}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C0C5441D-594D-4740-A960-36802BE59069}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C0C5441D-594D-4740-A960-36802BE59069}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05A29B15-712C-495E-A17C-28B85D51F49D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05A29B15-712C-495E-A17C-28B85D51F49D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05A29B15-712C-495E-A17C-28B85D51F49D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05A29B15-712C-495E-A17C-28B85D51F49D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -203,6 +215,8 @@ Global
 		{7FBAFB6E-E3F7-4E49-B9E7-6103EE7034B5} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{1BEDA08B-BC11-4525-A2F9-48CFC7A4A964} = {258FA031-1B82-403A-B235-9A25B17A024A}
 		{C0C5441D-594D-4740-A960-36802BE59069} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
+		{05A29B15-712C-495E-A17C-28B85D51F49D} = {258FA031-1B82-403A-B235-9A25B17A024A}
+		{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}
