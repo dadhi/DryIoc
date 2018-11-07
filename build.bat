@@ -51,6 +51,7 @@ echo:
 call %MSB% .\src\DryIoc\DryIoc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIocAttributes\DryIocAttributes.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
+call %MSB% .\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.Web\DryIoc.Web.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
 call %MSB% .\src\DryIoc.Mvc\DryIoc.Mvc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
