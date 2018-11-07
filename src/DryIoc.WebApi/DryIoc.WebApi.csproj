@@ -30,7 +30,6 @@ v2.1.0:
 - added: Helper DryIocWebApi.IsController method which relies on DefaultHttpControllerTypeResolver
     ]]>
         </PackageReleaseNotes>
-
     </PropertyGroup>
 
     <ItemGroup>

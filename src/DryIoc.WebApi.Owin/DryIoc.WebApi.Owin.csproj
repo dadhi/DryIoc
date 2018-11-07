@@ -1,13 +1,30 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net45</TargetFramework>
+      <TargetFramework>net45</TargetFramework>
 
-    <VersionPrefix>3.0.0</VersionPrefix>
-    
-    <AssemblyTitle>DryIoc.WebApi.Owin</AssemblyTitle>
-    
-    <Description>DryIoc extension for ASP.NET WebAPI with OWIN</Description>
+        <Product>DryIoc.WebApi.Owin</Product>
+        <VersionPrefix>3.1.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
+     
+        <AssemblyName>$(Product)</AssemblyName>
+        <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
 
+        <PackageId>$(Product).dll</PackageId>
+        <Title>$(Product).dll</Title>
+        <Description>DryIoc extension for ASP.NET WebAPI with OWIN</Description>
+        <PackageTags>Web ASP WebApi OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
+        <PackageReleaseNotes>
+<![CDATA[
+v3.1.0:
+- Support for DryIoc v3.1
+v3.0.0:
+- Support for DryIoc v3
+v2.2:
+- changed: Reference latest DryIoc 2.10, DI.Owin 2.1 and DI.WebApi 2.2
+v2.0.1:
+- changed: Reference to latest DryIoc 2.8 and DI.Owin 2.0.3 and DI.WebApi 2.1.1
+]]>
+        </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
@@ -23,8 +40,8 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\src\DryIoc\DryIoc.csproj" />
-    <ProjectReference Include="..\src\DryIoc.Owin\DryIoc.Owin.csproj" />
-    <ProjectReference Include="..\src\DryIoc.WebApi\DryIoc.WebApi.csproj" />
+    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\DryIoc.Owin\DryIoc.Owin.csproj" />
+    <ProjectReference Include="..\DryIoc.WebApi\DryIoc.WebApi.csproj" />
   </ItemGroup>
 </Project>
