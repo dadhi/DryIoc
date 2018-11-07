@@ -40,6 +40,7 @@ dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.MefAttributedMo
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests
 dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.CommonServiceLocator.UnitTests
 REM dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests
 if %ERRORLEVEL% neq 0 goto :error
 echo:

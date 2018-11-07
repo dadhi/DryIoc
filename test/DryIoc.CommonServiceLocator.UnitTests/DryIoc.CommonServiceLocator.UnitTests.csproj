@@ -1,12 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net45</TargetFramework>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="CommonServiceLocator" Version="2.0.3" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
-    <ProjectReference Include="..\..\src\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj" />
-  </ItemGroup>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netcoreapp2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp2.0;net45</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="CommonServiceLocator" Version="2.0.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+        <ProjectReference Include="..\..\src\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj" />
+    </ItemGroup>
 </Project>
