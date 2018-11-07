@@ -2075,9 +2075,17 @@ namespace DryIoc
         private static readonly ParamExpr[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
 
         /// <summary>Strips the unnecessary or adds the necessary cast to expression return result.</summary>
-        public static Expr NormalizeExpression(this Expr expr) => 
-            expr.NodeType == ExpressionType.Convert ? ((UnaryExpr)expr).Operand :
-            expr.Type != typeof(void) && expr.Type.IsValueType() ? Convert(expr, typeof(object)) : expr;
+        public static Expr NormalizeExpression(this Expr expr)
+        {
+            if (expr.NodeType == ExpressionType.Convert)
+            {
+                var operandExpr = ((UnaryExpr)expr).Operand;
+                if (operandExpr.Type.IsAssignableTo(expr.Type))
+                    return operandExpr;
+            }
+
+            return expr.Type != typeof(void) && expr.Type.IsValueType() ? Convert(expr, typeof(object)) : expr;
+        }
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static FactoryDelegateExpr WrapInFactoryExpression(this Expr expression) =>
@@ -2094,11 +2102,6 @@ namespace DryIoc
             {
                 var value = ((ConstExpr)expression).Value;
                 return _ => value;
-            }
-
-            if (expression.Type == typeof(void))
-            {
-                ;
             }
 
             var factoryDelegate = ExpressionCompiler.TryCompile<FactoryDelegate>(
@@ -7663,8 +7666,10 @@ namespace DryIoc
             else if (factoryMethodResultType != null
                   && factoryMethodResultType != implType)
             {
-                implType.ThrowIfNotImplementedBy(factoryMethodResultType,
-                    Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType);
+                if (!factoryMethodResultType.IsAssignableTo(implType) &&
+                    !factoryMethodResultType.IsCastableTo(implType))
+                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, 
+                        implType, factoryMethodResultType);
             }
 
             var openGenericImplType = knownImplType ?? implType;
@@ -7764,10 +7769,12 @@ namespace DryIoc
                 : (Expr)Field(factoryExpr, (FieldInfo)ctorOrMember);
 
             var requestedServiceType = request.GetActualServiceType();
-            if (serviceExpr.Type == typeof(object))
+            var serviceExprType = serviceExpr.Type;
+            if (serviceExprType == typeof(object))
                 return Convert(serviceExpr, requestedServiceType);
 
-            return serviceExpr.Type.IsAssignableTo(requestedServiceType) ? serviceExpr
+            return serviceExprType.IsAssignableTo(requestedServiceType) ? serviceExpr
+                : serviceExprType.IsCastableTo(requestedServiceType) ? Convert(serviceExpr, requestedServiceType)
                 : request.IfUnresolved != IfUnresolved.Throw ? null
                 : Throw.For<Expr>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
         }
@@ -9123,7 +9130,7 @@ namespace DryIoc
             RegisteringImplementationNotAssignableToServiceType = Of(
                 "Registering implementation type {0} is not assignable to service type {1}."),
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
-                "Registered factory method return type {1} should be assignable to implementation type {0} but it is not."),
+                "Registered factory method return type {1} should be assignable Or castable to implementation type {0} but it is not."),
             RegisteringOpenGenericRequiresFactoryProvider = Of(
                 "Unable to register delegate factory for open-generic service {0}." + NewLine +
                 "You need to specify concrete (closed) service type returned by delegate."),
@@ -9619,14 +9626,13 @@ namespace DryIoc
         public static bool IsEnum(this Type type) =>
             type.GetTypeInfo().IsEnum;
 
-        /// <summary>Returns true if type is assignable to <paramref name="other"/> type
-        /// or can be casted with conversion operators.</summary>
-        public static bool IsCastableTo(this Type type, Type other) => 
-            type != null && other != null && 
-            (other.IsAssignableFrom(type) ||
-            type.GetTypeInfo().DeclaredMethods
-                .Match(m => m.IsPublic && m.IsStatic && (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
-                .Any());
+        /// <summary>Returns true if type can be casted with conversion operators.</summary>
+        public static bool IsCastableTo(this Type @from, Type to) => 
+            @from != null && to != null &&
+            @from.GetTypeInfo().DeclaredMethods
+                .Match(m => m.IsPublic && m.IsStatic && m.ReturnType == to &&
+                    (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
+                .Any();
 
         /// <summary>Returns true if type is assignable to <paramref name="other"/> type.</summary>
         public static bool IsAssignableTo(this Type type, Type other) =>

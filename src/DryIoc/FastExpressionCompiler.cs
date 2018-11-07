@@ -354,7 +354,7 @@ namespace FastExpressionCompiler
         {
             var ignored = new ClosureInfo(false);
             return (TDelegate)TryCompile(ref ignored, typeof(TDelegate),
-                paramTypes, returnType, bodyExpr, bodyExpr.NodeType, returnType, paramExprs.AsArray());
+                paramTypes, returnType, bodyExpr, bodyExpr.NodeType, bodyExpr.Type, paramExprs.AsArray());
         }
 
         /// <summary>Compiles expression to delegate by emitting the IL. 
