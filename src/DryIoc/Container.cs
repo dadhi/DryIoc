@@ -2474,11 +2474,7 @@ namespace DryIoc
 
             // When not for generation, using run-time request object to Minimize generated object graph.
             if (!container.Rules.UsedForExpressionGeneration)
-            {
-                // Empty the cache for built expression, to prevent a memory leak by capturing the expression in constant expr
-                r.BuiltExpressions = null;
                 return Constant(r);
-            }
 
             // recursively ask for parent expression until it is empty
             var parentExpr = container.GetRequestExpression(request.DirectParent);
@@ -5886,8 +5882,8 @@ namespace DryIoc
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
         public readonly int DependencyDepth;
 
-        /// Holds the resolved expressions in root request only
-        public Ref<ImMap<Expr>> BuiltExpressions;
+        /// Holds the resolved expressions
+        public readonly Ref<ImMap<Expr>> BuiltExpressions;
 
 #endregion
 
