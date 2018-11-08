@@ -20,10 +20,15 @@
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-        <DebugType>embedded</DebugType>
-        <DebugSymbols>true</DebugSymbols>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <!--<GeneratePackageOnBuild>true</GeneratePackageOnBuild>-->
+        <!--<IncludeSymbols>false</IncludeSymbols>-->
+        <DebugType>embedded</DebugType>
     </PropertyGroup>
+    
+    <ItemGroup>        
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta-62925-02" PrivateAssets="All" />
+    </ItemGroup> 
 
     <ItemGroup>
         <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" Visible="false" />
