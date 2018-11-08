@@ -1,7 +1,5 @@
 <Project>
-    <!-- Enables to go up and search for parent Directory.Build.props if defined. -->
-    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))"
-        Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))"/>
+    <Import Project="..\Directory.Build.props"/>
 
     <PropertyGroup>
         <Authors>Maksim Volkau</Authors>
