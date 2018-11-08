@@ -80,6 +80,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.WebApi.Owin.UnitTest
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.WebApi.Owin", "src\DryIoc.WebApi.Owin\DryIoc.WebApi.Owin.csproj", "{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "playground", "playground", "{85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "playground\Playground\Playground.csproj", "{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -198,6 +202,10 @@ Global
 		{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -231,6 +239,7 @@ Global
 		{11ACD7DF-4D2D-4FAF-A9A6-82DD123E8060} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{20995002-41F6-491A-85D3-C9019D615240} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1} = {258FA031-1B82-403A-B235-9A25B17A024A}
+		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

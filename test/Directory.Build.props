@@ -2,8 +2,6 @@
     <Import Project="..\Directory.Build.props"/>
 
     <PropertyGroup>
-        <Authors>Maksim Volkau</Authors>
-        <Copyright>Copyright © 2013-2018 Maksim Volkau</Copyright>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 
