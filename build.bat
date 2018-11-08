@@ -22,13 +22,13 @@ if not exist %MSB% for /f "tokens=4 delims='" %%p IN ('.nuget\nuget.exe restore 
 echo:
 echo:## Using MSBuild: %MSB%
 echo:
-echo:## Starting: MSBUILD /t:REBUILD... ##
+echo:## Starting: BUILD and PACKAGING... ##
 echo: 
 rem: Turning Off the $(DevMode) from the Directory.Build.props to alway build an ALL TARGETS
 call %MSB% %SLN% /t:Rebuild /p:DevMode=false;Configuration=Release /m /v:m /bl /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 goto :error
 echo:
-echo:## Finished: REBUILD ##
+echo:## Finished: BUILD and PACKAGING ##
 
 echo:
 echo:## Starting: TESTS... ##
@@ -49,24 +49,6 @@ dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Syntax.Autofac.
 if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: TESTS ##
-
-echo:
-echo:## Starting: PACKAGING... ##
-echo:
-call %MSB% .\src\DryIoc\DryIoc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIocAttributes\DryIocAttributes.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.Microsoft.Hosting\DryIoc.Microsoft.Hosting.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.Web\DryIoc.Web.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.Mvc\DryIoc.Mvc.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.Owin\DryIoc.Owin.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.WebApi\DryIoc.WebApi.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.WebApi.Owin\DryIoc.WebApi.Owin.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.SignalR\DryIoc.SignalR.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.CommonServiceLocator\DryIoc.CommonServiceLocator.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-call %MSB% .\src\DryIoc.Syntax.Autofac\DryIoc.Syntax.Autofac.csproj /v:m /t:Pack /p:DevMode=false;Configuration=Release;PackageOutputPath=..\..\.dist
-if %ERRORLEVEL% neq 0 goto :error
 
 call BuildScripts\NugetPack.bat
 if %ERRORLEVEL% neq 0 call :error "PACKAGING SOURCE PACKAGES"
