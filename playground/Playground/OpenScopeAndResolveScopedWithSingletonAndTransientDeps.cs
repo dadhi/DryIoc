@@ -1,22 +1,17 @@
-﻿using Autofac;
+using Autofac;
 using BenchmarkDotNet.Attributes;
 using DryIoc;
-using NUnit.Framework;
 using IContainer = Autofac.IContainer;
 
 namespace PerformanceTests
 {
-    [TestFixture]
     public class OpenScopeAndResolveScopedWithSingletonAndTransientDeps
     {
-        [Test]
         public void DryIoc_test()
         {
             Measure(PrepareDryIoc());
         }
 
-        // This test is for profiling
-        [Test, Explicit]
         public void DryIoc_test_1000_times()
         {
             for (var i = 0; i < 1000; i++)
@@ -42,7 +37,6 @@ namespace PerformanceTests
                 return scope.Resolve<ScopedBlah>();
         }
 
-        [Test]
         public void Autofac_test()
         {
             Measure(PrepareAutofac());
@@ -86,6 +80,14 @@ namespace PerformanceTests
 
         #endregion
 
+        /* 9.11.2018
+        Method |       Mean |       Error |      StdDev |     Median | Ratio | RatioSD |
+ ------------- |-----------:|------------:|------------:|-----------:|------:|--------:|
+  BmarkAutofac | 2,267.0 ns | 224.7508 ns | 662.6829 ns | 1,953.0 ns | 20.66 |    4.49 |
+   BmarkDryIoc |   127.1 ns |   0.8580 ns |   0.7165 ns |   127.0 ns |  1.00 |    0.00 |
+
+         */
+
         public class BenchmarkResolution
         {
             private IContainer _autofac = PrepareAutofac();
@@ -110,6 +112,18 @@ namespace PerformanceTests
         // BmarkAutofac |  47.0789 us | 0.6439 us | 6.4390 us |  44.9588 us |   0.12 |          0.02 | 7.7637 |  14.39 kB |
         //  BmarkDryIoc | 393.8075 us | 1.1701 us | 4.3782 us | 393.4204 us |   1.00 |          0.00 |      - |    6.4 kB |
         //
+        // 09.11.2018
+        //-----------
+        //BenchmarkDotNet=v0.11.2, OS=Windows 10.0.17134.345 (1803/April2018Update/Redstone4)
+        //Intel Core i7-8750H CPU 2.20GHz(Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+        //Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
+        //    .NET Core SDK=2.1.403
+        //[Host]     : .NET Core 2.1.5 (CoreCLR 4.6.26919.02, CoreFX 4.6.26919.02), 64bit RyuJIT
+        //DefaultJob : .NET Core 2.1.5 (CoreCLR 4.6.26919.02, CoreFX 4.6.26919.02), 64bit RyuJIT
+        //Method       |      Mean |     Error |   StdDev |    Median | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+        //-------------|----------:|----------:|---------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+        //BmarkAutofac |  47.21 us |  4.363 us | 12.86 us |  54.11 us |  0.17 |    0.05 |      5.1880 |           - |           - |            24.15 KB |
+        //BmarkDryIoc  | 282.05 us | 12.234 us | 10.85 us | 279.34 us |  1.00 |    0.00 |      1.4648 |      0.4883 |           - |             8.19 KB |
         [MemoryDiagnoser]
         public class BenchmarkRegistrationAndResolution
         {

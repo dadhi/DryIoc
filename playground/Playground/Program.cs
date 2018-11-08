@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -15,16 +15,15 @@ namespace Playground
 {
     public class Program
     {
-        static void Main()
+        public static void Main(string[] args)
         {
-            //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
 
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
-
             //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
+            //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_all_matches>();
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();

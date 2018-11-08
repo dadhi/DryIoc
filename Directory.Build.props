@@ -12,6 +12,6 @@
 
     <ItemGroup>
         <None Remove="**\*.orig" />
-        <None Remove="**\*.ncrunch*" />
+        <None Remove="**\*.ncrunchproject" />
     </ItemGroup>
 </Project>

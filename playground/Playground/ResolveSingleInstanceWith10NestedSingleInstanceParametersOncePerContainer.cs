@@ -1,21 +1,17 @@
-﻿using Autofac;
+using Autofac;
 using BenchmarkDotNet.Attributes;
 using DryIoc;
-using NUnit.Framework;
 using IContainer = Autofac.IContainer;
 
 namespace PerformanceTests
 {
-    [TestFixture]
     public class ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer
     {
-        [Test]
         public void DryIoc_test()
         {
             Measure(PrepareDryIoc());
         }
 
-        [Test, Explicit]
         public void DryIoc_test_1000_times()
         {
             for (var i = 0; i < 1000; i++)
@@ -48,7 +44,6 @@ namespace PerformanceTests
             return container.Resolve<SingleInstance>();
         }
 
-        [Test]
         public void Autofac_test()
         {
             Measure(PrepareAutofac());
