@@ -1,11 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<!-- <Project Sdk="Microsoft.NET.Sdk"> -->
+<Project Sdk="MSBuild.Sdk.Extras/1.6.61">
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;Xamarin.iOS10;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <Product>DryIoc</Product>
         <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-06</VersionSuffix>
+        <VersionSuffix>preview-07</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -26,6 +27,7 @@ v3.1.0
 - fixed: #29 Resolve caches object[] args values
 - fixed: #33 Memory leak with ResolveManyBehavior.AzLazyEnumerable?
 - fixed: #41 ErrorCode: RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType
+- fixed: #46 Operation is not supported on this platform exception on Xamarin iOS
 - fixed: BB-593 Add auto-generated tag to PCL FEC
 - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
 - fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
@@ -55,6 +57,11 @@ v3.0.0
         ]]></PackageReleaseNotes>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(TargetFramework)' == 'Xamarin.iOS10'">
+        <AssemblyTitle>$(AssemblyName) Xamarin.iOS</AssemblyTitle>
+        <DefineConstants>XAMARIN;XAMARINIOS</DefineConstants>
+    </PropertyGroup>
+
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.3'">
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
     </ItemGroup>
@@ -62,4 +69,9 @@ v3.0.0
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
     </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'Xamarin.iOS10'">
+        <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
+    </ItemGroup>
+
 </Project>
