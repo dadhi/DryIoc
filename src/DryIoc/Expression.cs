@@ -884,7 +884,7 @@ namespace FastExpressionCompiler.LightExpression
         public override Type Type => PropertyInfo.PropertyType;
         public PropertyInfo PropertyInfo => (PropertyInfo)Member;
 
-        public override SysExpr ToExpression() => SysExpr.Property(Expression.ToExpression(), PropertyInfo);
+        public override SysExpr ToExpression() => SysExpr.Property(Expression?.ToExpression(), PropertyInfo);
 
         internal PropertyExpression(Expression instance, PropertyInfo property) : base(instance, property) { }
     }
@@ -894,7 +894,7 @@ namespace FastExpressionCompiler.LightExpression
         public override Type Type => FieldInfo.FieldType;
         public FieldInfo FieldInfo => (FieldInfo)Member;
 
-        public override SysExpr ToExpression() => SysExpr.Field(Expression.ToExpression(), FieldInfo);
+        public override SysExpr ToExpression() => SysExpr.Field(Expression?.ToExpression(), FieldInfo);
 
         internal FieldExpression(Expression instance, FieldInfo field)
             : base(instance, field) { }
