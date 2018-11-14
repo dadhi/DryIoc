@@ -1479,7 +1479,7 @@ namespace DryIoc
                 {
                     var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                     if (decoratedExpr != null)
-                        return decoratedExpr.CompileToFactoryDelegate();
+                        return decoratedExpr.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
                 }
 
                 return GetInstanceFromScopeChainOrSingletons;
@@ -2072,7 +2072,8 @@ namespace DryIoc
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        public static FactoryDelegate CompileToFactoryDelegate(this Expression expression)
+        public static FactoryDelegate CompileToFactoryDelegate(this Expression expression,
+            bool useFastExpressionCompiler = false)
         {
             expression = expression.NormalizeExpression();
 
@@ -2083,11 +2084,14 @@ namespace DryIoc
                 return _ => value;
             }
 
-            var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
-                expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
-
-            if (factoryDelegate != null)
-                return factoryDelegate;
+            // Try FastExpressionCompiler first
+            if (useFastExpressionCompiler)
+            {
+                var factoryDelegate = expression.TryCompile<FactoryDelegate>(
+                    _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                if (factoryDelegate != null)
+                    return factoryDelegate;
+            }
 
             // fallback for platforms when FastExpressionCompiler is not supported,
             // or just in case when some expression is not supported (did not found one yet)
@@ -3692,6 +3696,14 @@ namespace DryIoc
         public Rules WithFuncAndLazyWithoutRegistration() =>
             WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
 
+        /// <summary>Commands to use FastExpressionCompiler - set by default.</summary>
+        public bool ShouldUseFastExpressionCompiler =>
+            (_settings & Settings.ShouldUseFastExpressionCompilerIfPlatformSupported) != 0;
+
+        /// <summary>Fallbacks to system `Expression.Compile()`</summary>
+        public Rules WithoutFastExpressionCompiler() =>
+            WithSettings(_settings & ~Settings.ShouldUseFastExpressionCompilerIfPlatformSupported);
+
         /// <summary>Outputs most notable non-default rules</summary>
         public override string ToString()
         {
@@ -3789,7 +3801,8 @@ namespace DryIoc
             FuncAndLazyWithoutRegistration = 1 << 13,
             AutoConcreteTypeResolution = 1 << 14, // informational flag
             SelectLastRegisteredFactory = 1 << 15,// informational flag
-            UsedForExpressionGeneration = 1 << 16
+            UsedForExpressionGeneration = 1 << 16,
+            ShouldUseFastExpressionCompilerIfPlatformSupported = 1 << 17
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -3797,7 +3810,8 @@ namespace DryIoc
             | Settings.ThrowOnRegisteringDisposableTransient
             | Settings.ImplicitCheckForReuseMatchingScope
             | Settings.VariantGenericTypesInResolvedCollection
-            | Settings.EagerCachingSingletonForFasterAccess;
+            | Settings.EagerCachingSingletonForFasterAccess
+            | Settings.ShouldUseFastExpressionCompilerIfPlatformSupported;
 
         private Settings _settings;
 
@@ -6933,23 +6947,24 @@ namespace DryIoc
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
             var reuse = request.Reuse;
+            var rules = request.Rules;
 
             // optimization for already activated singleton
             if (serviceExpr.NodeType == System.Linq.Expressions.ExpressionType.Constant &&
-                reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
+                reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
                 !Setup.PreventDisposal && !Setup.WeaklyReferenced)
                 return serviceExpr;
 
             // Optimize: eagerly create singleton during the construction of object graph,
             // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
             if (reuse is SingletonReuse &&
-                request.Rules.EagerCachingSingletonForFasterAccess &&
+                rules.EagerCachingSingletonForFasterAccess &&
                 // except: For decorators and wrappers, when tracking transient disposable and for lazy consumption in Func
                 FactoryType == FactoryType.Service &&
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var factoryDelegate = serviceExpr.CompileToFactoryDelegate();
+                var factoryDelegate = serviceExpr.CompileToFactoryDelegate(rules.ShouldUseFastExpressionCompiler);
                 var factory = factoryDelegate;
 
                 if (Setup.WeaklyReferenced)
@@ -6985,7 +7000,7 @@ namespace DryIoc
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
-            GetExpressionOrDefault(request)?.CompileToFactoryDelegate();
+            GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
 
         internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
