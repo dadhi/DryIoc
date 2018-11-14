@@ -31,7 +31,7 @@ namespace FastExpressionCompiler.LightExpression
     /// <summary>Polyfill for absence of FastExpressionCompiler: https://github.com/dadhi/FastExpressionCompiler </summary>
     public static class ExpressionCompiler
     {
-        internal static TDelegate TryCompile<TDelegate>(this Expression bodyExpr,
+        internal static TDelegate TryCompile<TDelegate>(Expression bodyExpr,
             ParameterExpression[] paramExprs, Type[] paramTypes, Type returnType) where TDelegate : class => null;
 
         internal static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
@@ -216,7 +216,7 @@ namespace FastExpressionCompiler.LightExpression
         /// If sub-expressions are not supported by emitter, then the method returns null.
         /// The usage should be calling the method, if result is null then calling the Expression.Compile.</summary>
         public static TDelegate TryCompile<TDelegate>(
-            this Expression bodyExpr, IReadOnlyList<ParameterExpression> paramExprs, Type[] paramTypes, Type returnType)
+            Expression bodyExpr, IReadOnlyList<ParameterExpression> paramExprs, Type[] paramTypes, Type returnType)
             where TDelegate : class
         {
             var ignored = new ClosureInfo(false);

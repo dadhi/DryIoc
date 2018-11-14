@@ -2084,11 +2084,10 @@ namespace DryIoc
                 return _ => value;
             }
 
-            // Try FastExpressionCompiler first
             if (useFastExpressionCompiler)
             {
-                var factoryDelegate = expression.TryCompile<FactoryDelegate>(
-                    _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
+                    expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
