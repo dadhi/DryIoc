@@ -22,7 +22,8 @@
         <IncludeSymbols>false</IncludeSymbols>
         <DebugType>embedded</DebugType>
     </PropertyGroup>
-    
+
+    <!-- SourceLink support -->
     <ItemGroup>
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta-62925-02" PrivateAssets="All" />
     </ItemGroup> 
@@ -60,4 +61,5 @@
         <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile328</NugetTargetMoniker>
         <LanguageTargets>$(PortableTargetsDir)\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
     </PropertyGroup>
+
 </Project>

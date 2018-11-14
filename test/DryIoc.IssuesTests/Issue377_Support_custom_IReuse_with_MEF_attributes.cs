@@ -4,9 +4,13 @@ using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using DryIocAttributes;
 
-using static FastExpressionCompiler.ExpressionInfo;
-using Expr = FastExpressionCompiler.ExpressionInfo;
-
+#if NET45 || NETCOREAPP2_0
+using FastExpressionCompiler.LightExpression;
+using static FastExpressionCompiler.LightExpression.Expression;
+#else
+using System.Linq.Expressions;
+using static System.Linq.Expressions.Expression;
+#endif
 
 namespace DryIoc.IssuesTests
 {
@@ -37,7 +41,7 @@ namespace DryIoc.IssuesTests
             /// <inheritdoc />
             public object Name { get { return null; } }
 
-            public Expr Apply(Request request, Expr serviceFactoryExpr)
+            public Expression Apply(Request request, Expression serviceFactoryExpr)
             {
                 return Reuse.Singleton.Apply(request, serviceFactoryExpr);
             }
@@ -47,8 +51,8 @@ namespace DryIoc.IssuesTests
                 return true;
             }
 
-            private static Expr _valueExpr = Field(null, typeof(CustomReuse).Field(nameof(Value)));
-            public Expr ToExpression(Func<object, Expr> fallbackConverter) => _valueExpr;
+            private static Expression _valueExpr = Field(null, typeof(CustomReuse).Field(nameof(Value)));
+            public Expression ToExpression(Func<object, Expression> fallbackConverter) => _valueExpr;
         }
     }
 }

@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
-using static FastExpressionCompiler.ExpressionInfo;
+using static FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.UnitTests
 {

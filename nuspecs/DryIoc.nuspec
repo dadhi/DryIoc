@@ -95,6 +95,7 @@ v3.0.0
         <file src="..\src\DryIoc\Container.cs" target="content\net45\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="content\net45\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs" target="content\net45\DryIoc" />
 
         <!-- .netstandard 1.0 (based on PCL Profile259) -->
         <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
@@ -105,11 +106,13 @@ v3.0.0
         <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
 
         <!-- .netstandard 2.0 (based on PCL Profile259 except for FEC) -->
         <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
 
         <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
         <file src="..\src\DryIoc\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
@@ -120,11 +123,6 @@ v3.0.0
         <file src="..\src\DryIoc\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-
-        <!--Xamarin.iOS-->
-        <file src="..\src\DryIoc\Container.cs" target="content\xamarimios10" />
-        <file src="..\src\DryIoc\ImTools.cs" target="content\xamarimios10" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="content\xamarimios10" />
 
     </files>
 </package>

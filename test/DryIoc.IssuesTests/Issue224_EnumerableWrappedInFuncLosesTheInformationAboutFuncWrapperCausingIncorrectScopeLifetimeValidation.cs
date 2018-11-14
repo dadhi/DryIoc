@@ -2,8 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using Expr = FastExpressionCompiler.ExpressionInfo;
 
+#if NET45 || NETCOREAPP2_0
+using FastExpressionCompiler.LightExpression;
+using static FastExpressionCompiler.LightExpression.Expression;
+#else
+using System.Linq.Expressions;
+using static System.Linq.Expressions.Expression;
+#endif
 
 namespace DryIoc.IssuesTests
 {
@@ -37,24 +43,16 @@ namespace DryIoc.IssuesTests
 
         class ShortReuse : IReuse
         {
-            public int Lifespan { get { return 10; } }
+            public int Lifespan => 10;
 
-            public object Name { get { return null; } }
+            public object Name => null;
 
-            public Expr Apply(Request request, Expr serviceFactoryExpr)
-            {
-                return serviceFactoryExpr;
-            }
+            public Expression Apply(Request request, Expression serviceFactoryExpr) => serviceFactoryExpr;
 
-            public bool CanApply(Request request)
-            {
-                return true;
-            }
+            public bool CanApply(Request request) => true;
 
-            public Expr ToExpression(Func<object, Expr> fallbackConverter)
-            {
-                return fallbackConverter("SpecialScopeName");
-            }
+            public Expression ToExpression(Func<object, Expression> fallbackConverter) => 
+                fallbackConverter("SpecialScopeName");
         }
     }
 }

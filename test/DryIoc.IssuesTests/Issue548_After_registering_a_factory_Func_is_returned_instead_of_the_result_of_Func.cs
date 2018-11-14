@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using static FastExpressionCompiler.ExpressionInfo;
+using static FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.IssuesTests
 {

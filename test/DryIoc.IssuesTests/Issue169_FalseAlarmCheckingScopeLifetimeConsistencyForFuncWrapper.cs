@@ -2,8 +2,13 @@ using System;
 using NUnit.Framework;
 using ImTools;
 
-using static FastExpressionCompiler.ExpressionInfo;
-using Expr = FastExpressionCompiler.ExpressionInfo;
+#if NET45 || NETCOREAPP2_0
+using FastExpressionCompiler.LightExpression;
+using static FastExpressionCompiler.LightExpression.Expression;
+#else
+using System.Linq.Expressions;
+using static System.Linq.Expressions.Expression;
+#endif
 
 namespace DryIoc.IssuesTests
 {
@@ -47,7 +52,7 @@ namespace DryIoc.IssuesTests
 
         public object Name { get { return null; } }
 
-        public Expr Apply(Request request, Expr serviceFactoryExpr)
+        public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
             return Reuse.Singleton.Apply(request, serviceFactoryExpr);
         }
@@ -57,9 +62,9 @@ namespace DryIoc.IssuesTests
             return true;
         }
 
-        public Expr ToExpression(Func<object, Expr> fallbackConverter)
+        public Expression ToExpression(Func<object, Expression> fallbackConverter)
         {
-            return New(GetType().GetConstructors()[0], ArrayTools.Empty<Expr>());
+            return New(GetType().GetConstructors()[0], ArrayTools.Empty<Expression>());
         }
     }
 }
