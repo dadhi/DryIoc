@@ -30,7 +30,7 @@ using System.Reflection;
 
 public static class DryIocInterception
 {
-    static readonly DefaultProxyBuilder _proxyBuilder = new DefaultProxyBuilder();
+    private static readonly DefaultProxyBuilder _proxyBuilder = new DefaultProxyBuilder();
 
     public static void Intercept<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null) 
         where TInterceptor : class, IInterceptor
@@ -42,14 +42,14 @@ public static class DryIocInterception
             proxyType = _proxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(
                 serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
         else if (serviceType.IsClass())
-            proxyType = _proxyBuilder.CreateClassProxyType(
+            proxyType = _proxyBuilder.CreateClassProxyTypeWithTarget(
                 serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
         else
             throw new ArgumentException(
                 $"Intercepted service type {serviceType} is not a supported, cause it is nor a class nor an interface");
 
         registrator.Register(serviceType, proxyType,
-            made: Made.Of(pType => pType.PublicConstructors().FindFirst(ctor => ctor.GetParameters().Length != 0),
+            made: Made.Of(pt => pt.PublicConstructors().FindFirst(ctor => ctor.GetParameters().Length != 0),
                 Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))),
             setup: Setup.DecoratorOf(useDecorateeReuse: true, decorateeServiceKey: serviceKey));
     }
@@ -80,6 +80,7 @@ public class Register_and_use_interceptor
     {
         void Greet();
     }
+
     public class Foo : IFoo
     {
         public void Greet() { }

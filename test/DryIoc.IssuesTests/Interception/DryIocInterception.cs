@@ -1,5 +1,4 @@
-﻿using System;
-using System.Linq;
+using System;
 using Castle.DynamicProxy;
 using ImTools;
 
@@ -18,24 +17,19 @@ namespace DryIoc.Interception
                 proxyType = ProxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(
                     serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
             else if (serviceType.IsClass())
-                proxyType = ProxyBuilder.CreateClassProxyType(
+                proxyType = ProxyBuilder.CreateClassProxyTypeWithTarget(
                     serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
             else
-                throw new ArgumentException(string.Format(
-                    "Intercepted service type {0} is not a supported: it is nor class nor interface", serviceType));
-
-            var decoratorSetup = serviceKey == null
-                ? Setup.DecoratorWith(useDecorateeReuse: true)
-                : Setup.DecoratorWith(r => serviceKey.Equals(r.ServiceKey), useDecorateeReuse: true);
+                throw new ArgumentException(
+                    $"Intercepted service type {serviceType} is not a supported, cause it is nor a class nor an interface");
 
             registrator.Register(serviceType, proxyType,
-                made: Made.Of(type => type.PublicConstructors().SingleOrDefault(c => c.GetParameters().Length != 0),
+                made: Made.Of(pt => pt.PublicConstructors().FindFirst(ctor => ctor.GetParameters().Length != 0),
                     Parameters.Of.Type<IInterceptor[]>(typeof(TInterceptor[]))),
-                setup: decoratorSetup);
+                setup: Setup.DecoratorOf(useDecorateeReuse: true, decorateeServiceKey: serviceKey));
         }
 
         private static DefaultProxyBuilder ProxyBuilder => _proxyBuilder ?? (_proxyBuilder = new DefaultProxyBuilder());
-
         private static DefaultProxyBuilder _proxyBuilder;
     }
 }
