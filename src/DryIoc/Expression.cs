@@ -54,6 +54,20 @@ namespace FastExpressionCompiler.LightExpression
         /// <summary>Reduces the Expression to simple ones</summary>
         public virtual Expression Reduce() => this;
 
+        internal static SysExpr[] ToExpressions(IReadOnlyList<Expression> exprs)
+        {
+            if (exprs.Count == 0)
+                return Tools.Empty<SysExpr>();
+
+            if (exprs.Count == 1)
+                return new[] { exprs[0].ToExpression() };
+
+            var result = new SysExpr[exprs.Count];
+            for (var i = 0; i < result.Length; ++i)
+                result[i] = exprs[i].ToExpression();
+            return result;
+        }
+
         public static ParameterExpression Parameter(Type type, string name = null) =>
             new ParameterExpression(type.IsByRef ? type.GetElementType() : type, name, type.IsByRef);
 
@@ -743,7 +757,7 @@ namespace FastExpressionCompiler.LightExpression
         public readonly IReadOnlyList<MemberBinding> Bindings;
 
         public override SysExpr ToExpression() =>
-            SysExpr.MemberInit(NewExpression.ToNewExpression(), Bindings.Map(b => b.ToMemberBinding()));
+            SysExpr.MemberInit(NewExpression.ToNewExpression(), MemberBinding.BindingsToExpressions(Bindings));
 
         internal MemberInitExpression(NewExpression newExpression, MemberBinding[] bindings)
             : this((Expression)newExpression, bindings) { }
@@ -767,6 +781,21 @@ namespace FastExpressionCompiler.LightExpression
 
         public System.Linq.Expressions.ParameterExpression ToParameterExpression() =>
             _paramExpr ?? (_paramExpr = SysExpr.Parameter(IsByRef ? Type.MakeByRefType() : Type, Name));
+
+        internal static System.Linq.Expressions.ParameterExpression[] ToParameterExpressions(
+            IReadOnlyList<ParameterExpression> ps)
+        {
+            if (ps.Count == 0)
+                return Tools.Empty<System.Linq.Expressions.ParameterExpression>();
+
+            if (ps.Count == 1)
+                return new[] { ps[0].ToParameterExpression() };
+
+            var result = new System.Linq.Expressions.ParameterExpression[ps.Count];
+            for (var i = 0; i < result.Length; ++i)
+                result[i] = ps[i].ToParameterExpression();
+            return result;
+        }
 
         internal ParameterExpression(Type type, string name, bool isByRef)
         {
@@ -799,7 +828,7 @@ namespace FastExpressionCompiler.LightExpression
     {
         public readonly IReadOnlyList<Expression> Arguments;
 
-        protected SysExpr[] ArgumentsToExpressions() => Arguments.Map(info => info.ToExpression());
+        protected SysExpr[] ArgumentsToExpressions() => ToExpressions(Arguments);
 
         protected ArgumentsExpression(IReadOnlyList<Expression> arguments)
         {
@@ -907,6 +936,20 @@ namespace FastExpressionCompiler.LightExpression
         public abstract MemberBindingType BindingType { get; }
         public abstract System.Linq.Expressions.MemberBinding ToMemberBinding();
 
+        internal static System.Linq.Expressions.MemberBinding[] BindingsToExpressions(IReadOnlyList<MemberBinding> ms)
+        {
+            if (ms.Count == 0)
+                return Tools.Empty<System.Linq.Expressions.MemberBinding>();
+
+            if (ms.Count == 1)
+                return new[] { ms[0].ToMemberBinding() };
+
+            var result = new System.Linq.Expressions.MemberBinding[ms.Count];
+            for (var i = 0; i < result.Length; ++i)
+                result[i] = ms[i].ToMemberBinding();
+            return result;
+        }
+
         internal MemberBinding(MemberInfo member)
         {
             Member = member;
@@ -1011,14 +1054,14 @@ namespace FastExpressionCompiler.LightExpression
 
         public override SysExpr ToExpression() => SysExpr.Block(
             Type,
-            Variables.Map(x => x.ToParameterExpression()),
-            Expressions.Map(x => x.ToExpression()));
+            ParameterExpression.ToParameterExpressions(Variables),
+            ToExpressions(Expressions));
 
         internal BlockExpression(Type type, IReadOnlyList<ParameterExpression> variables, IReadOnlyList<Expression> expressions)
         {
-            Variables = variables;
-            Expressions = expressions;
-            Result = expressions[expressions.Count - 1];
+            Variables = variables ?? Tools.Empty<ParameterExpression>();
+            Expressions = expressions ?? Tools.Empty<Expression>();
+            Result = Expressions[Expressions.Count - 1];
             Type = type;
         }
     }
@@ -1130,16 +1173,31 @@ namespace FastExpressionCompiler.LightExpression
         public override ExpressionType NodeType { get; }
         public override Type Type { get; }
 
-        public override SysExpr ToExpression() => SysExpr.Switch(SwitchValue.ToExpression(), DefaultBody.ToExpression(),
-            Comparison, Cases.Map(x => x.ToSwitchCase()));
+        public override SysExpr ToExpression() => SysExpr.Switch(
+            SwitchValue.ToExpression(), DefaultBody.ToExpression(),
+            Comparison, ToSwitchCaseExpressions(Cases));
+
+        internal static System.Linq.Expressions.SwitchCase[] ToSwitchCaseExpressions(IReadOnlyList<SwitchCase> sw)
+        {
+            if (sw.Count == 0)
+                return Tools.Empty<System.Linq.Expressions.SwitchCase>();
+
+            if (sw.Count == 1)
+                return new[] { sw[0].ToSwitchCase() };
+
+            var result = new System.Linq.Expressions.SwitchCase[sw.Count];
+            for (var i = 0; i < result.Length; ++i)
+                result[i] = sw[i].ToSwitchCase();
+            return result;
+        }
 
         public readonly Expression SwitchValue;
         public readonly IReadOnlyList<SwitchCase> Cases;
         public readonly Expression DefaultBody;
         public readonly MethodInfo Comparison;
 
-
-        public SwitchExpression(Type type, Expression switchValue, Expression defaultBody, MethodInfo comparison, IEnumerable<SwitchCase> cases)
+        public SwitchExpression(Type type, Expression switchValue, Expression defaultBody, MethodInfo comparison, 
+            IEnumerable<SwitchCase> cases)
         {
             NodeType = ExpressionType.Switch;
             Type = type;
@@ -1162,7 +1220,7 @@ namespace FastExpressionCompiler.LightExpression
         public override SysExpr ToExpression() => ToLambdaExpression();
 
         public System.Linq.Expressions.LambdaExpression ToLambdaExpression() =>
-            SysExpr.Lambda(Type, Body.ToExpression(), Parameters.Map(p => p.ToParameterExpression()));
+            SysExpr.Lambda(Type, Body.ToExpression(), ParameterExpression.ToParameterExpressions(Parameters));
 
         internal LambdaExpression(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters)
         {
@@ -1185,9 +1243,9 @@ namespace FastExpressionCompiler.LightExpression
     public sealed class Expression<TDelegate> : LambdaExpression
     {
         public new System.Linq.Expressions.Expression<TDelegate> ToLambdaExpression() =>
-            SysExpr.Lambda<TDelegate>(Body.ToExpression(), Parameters.Map(p => p.ToParameterExpression()));
+            SysExpr.Lambda<TDelegate>(Body.ToExpression(), ParameterExpression.ToParameterExpressions(Parameters));
 
-        internal Expression(Expression body, ParameterExpression[] parameters)
+        internal Expression(Expression body, IReadOnlyList<ParameterExpression> parameters)
             : base(typeof(TDelegate), body, parameters) { }
     }
 }
