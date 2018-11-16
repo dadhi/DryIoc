@@ -88,6 +88,7 @@ namespace PerformanceTests
 
          */
 
+        [MemoryDiagnoser]
         public class BenchmarkResolution
         {
             private IContainer _autofac = PrepareAutofac();

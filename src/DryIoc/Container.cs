@@ -2133,7 +2133,7 @@ namespace DryIoc
 
         /// <summary>Prepares container for expression generation.</summary>
         public static IContainer WithExpressionGeneration(this IContainer container) =>
-            container.With(rules => rules.ForExpressionGeneration().WithDependencyResolutionCallExpressions());
+            container.With(rules => rules.WithDependencyResolutionCallExpressions());
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
@@ -3615,7 +3615,7 @@ namespace DryIoc
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
         public Rules WithDependencyResolutionCallExpressions() =>
-            new Rules(_settings | Settings.UsedForExpressionGeneration, FactorySelector, DefaultReuse,
+            new Rules(GetSettingsForExpressionGeneration(), FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -3630,10 +3630,12 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.ImplicitCheckForReuseMatchingScope);
 
         /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
-        public Rules ForExpressionGeneration() =>
-            WithSettings(_settings 
-                         & ~Settings.EagerCachingSingletonForFasterAccess 
-                         & ~Settings.ImplicitCheckForReuseMatchingScope);
+        public Rules ForExpressionGeneration() => WithSettings(GetSettingsForExpressionGeneration());
+
+        private Settings GetSettingsForExpressionGeneration() => 
+            _settings & ~Settings.EagerCachingSingletonForFasterAccess 
+                      & ~Settings.ImplicitCheckForReuseMatchingScope
+                      | Settings.UsedForExpressionGeneration;
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
         public bool ResolveIEnumerableAsLazyEnumerable =>
@@ -5885,7 +5887,7 @@ namespace DryIoc
         public readonly int DependencyDepth;
 
         /// Holds the resolved expressions
-        public readonly Ref<ImMap<Expression>> BuiltExpressions;
+        private readonly Ref<ImMap<Expression>> _builtExpressions;
 
 #endregion
 
@@ -6337,9 +6339,9 @@ namespace DryIoc
         public Ref<ImMap<Expression>> GetBuiltExpressions()
         {
             var req = this;
-            while (!req.IsEmpty && req.BuiltExpressions == null)
+            while (!req.IsEmpty && req._builtExpressions == null)
                 req = req.DirectParent;
-            return req.BuiltExpressions;
+            return req._builtExpressions;
         }
 
         /// <summary>Prints whole request chain.</summary>
@@ -6382,7 +6384,6 @@ namespace DryIoc
         private Request(IContainer container, Request parent, RequestFlags flags,
             IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
-            Container = container;
             DirectParent = parent;
             Flags = flags;
             _serviceInfo = serviceInfo;
@@ -6390,26 +6391,31 @@ namespace DryIoc
 
             if (parent != null)
                 DependencyDepth = parent.DependencyDepth + 1;
+
+            // runtime state
+            Container = container;
         }
 
-        // Request with resolved factory
+        // Request with resolved factory state
         private Request(IContainer container, Request parent, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
             Factory factory, int factoryID, FactoryType factoryType, Type factoryImplType, IReuse reuse,
             int decoratedFactoryID)
             : this(container, parent, flags, serviceInfo, inputArgExprs)
         {
-            Factory = factory; // runtime state
             FactoryID = factoryID;
-            _hashCode = Hasher.Combine(parent?._hashCode ?? 0, FactoryID);
             FactoryType = factoryType;
-            _factoryImplType = factoryImplType;
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
 
+            _hashCode = Hasher.Combine(parent?._hashCode ?? 0, FactoryID);
+            _factoryImplType = factoryImplType;
+
+            // runtime state
+            Factory = factory; 
             if (factoryType == FactoryType.Service)
             {
                 if ((Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
-                    BuiltExpressions = Ref.Of(ImMap<Expression>.Empty);
+                    _builtExpressions = Ref.Of(ImMap<Expression>.Empty);
             }
         }
     }
