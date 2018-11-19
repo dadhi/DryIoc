@@ -1133,9 +1133,13 @@ namespace DryIoc
                 actualItemType.IsAssignableTo<Type>())
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
-            if (actualItemType.IsArray)
-                return GetArrayOfConstantsExpression(
-                    (object[])item, actualItemType.GetElementType().ThrowIfNull(), throwIfStateRequired);
+            // don't try to recover the non primitive type of element,
+            // cause it is a too much work to find the base commont element type in array
+            var arrayElemType = actualItemType.GetArrayElementTypeOrNull();
+            if (arrayElemType != null && arrayElemType != typeof(object) && 
+               (arrayElemType.IsPrimitive() || actualItemType.IsAssignableTo<Type>()))
+                return NewArrayInit(arrayElemType, 
+                    ((object[])item).Map(x => GetConstantExpression(x, arrayElemType, throwIfStateRequired)));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
@@ -1145,26 +1149,6 @@ namespace DryIoc
                 Error.StateIsRequiredToUseItem, item);
 
             return itemType == null ? Constant(item) : Constant(item, itemType);
-        }
-
-        private Expression GetArrayOfConstantsExpression(object[] elems, Type elemType, bool throwIfStateRequired)
-        {
-            if (elems.Length == 0)
-                return NewArrayInit(elemType, ArrayTools.Empty<Expression>());
-
-            var finalElemType = elems[0]?.GetType() ?? elemType;
-            if (elems.Length == 1)
-                return NewArrayInit(finalElemType, GetConstantExpression(elems[0], finalElemType, throwIfStateRequired));
-
-            // select less specific base type of elements, or object type otherwise
-            for (var i = 1; i < elems.Length; ++i)
-            {
-                var t = elems[0]?.GetType() ?? elemType;
-                if (t != finalElemType && (finalElemType == typeof(object) || finalElemType.IsAssignableTo(t)))
-                    finalElemType = t;
-            }
-
-            return NewArrayInit(finalElemType, elems.Map(it => GetConstantExpression(it, finalElemType, throwIfStateRequired)));
         }
 
         private static readonly MethodInfo _kvOfMethod = typeof(KV).SingleMethod(nameof(KV.Of));
@@ -4435,6 +4419,10 @@ namespace DryIoc
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata);
         }
 
+        internal static T[] ObjectArrayCastTo<T>(object[] array) => array.Map(x => (T)x);
+        private static readonly MethodInfo _objectArrayCastToMethod = 
+            typeof(Made).SingleMethod(nameof(ObjectArrayCastTo), includeNonPublic: true);
+
         private static object GetArgExpressionValueOrThrow(
             System.Linq.Expressions.Expression wholeServiceExpr,
             System.Linq.Expressions.Expression argExpr)
@@ -4464,14 +4452,15 @@ namespace DryIoc
                 for (var i = 0; i < itemExprs.Count; i++)
                     items[i] = GetArgExpressionValueOrThrow(wholeServiceExpr, itemExprs[i]);
 
-                return items;
+                var itemType = newArrExpr.Type.GetElementType();
+                return _objectArrayCastToMethod.MakeGenericMethod(itemType).Invoke(null, items.One());
             }
 
             return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf, 
                 argExpr, wholeServiceExpr);
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
@@ -7144,29 +7133,6 @@ namespace DryIoc
             string name, Func<Request, object> getCustomValue) =>
              source.Name(name, (r, p) => ServiceDetails.Of(getCustomValue(r)));
 
-        /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
-        /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param>
-        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
-        /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
-        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
-        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
-        /// <returns>Combined selector.</returns>
-        public static ParameterSelector Type<T>(this ParameterSelector source,
-            Type requiredServiceType = null, object serviceKey = null,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
-            string metadataKey = null, object metadata = null) =>
-            source.Details((r, p) => !typeof(T).IsAssignableTo(p.ParameterType) ? null
-                : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
-
-        /// <summary>Specify parameter by type and set its details.</summary>
-        public static ParameterSelector Type<T>(this ParameterSelector source,
-            Func<Request, ParameterInfo, ServiceDetails> getServiceDetails) =>
-            source.Details((r, p) => p.ParameterType == typeof(T) ? getServiceDetails(r, p) : null);
-
-        /// <summary>Specify parameter by type and set custom value to it.</summary>
-        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue) =>
-            source.Type<T>((r, p) => ServiceDetails.Of(getCustomValue(r)));
-
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <paramref name="parameterType"/>.</summary>
         /// <param name="source">Source selector.</param> <param name="parameterType">The type of the parameter.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
@@ -7180,6 +7146,28 @@ namespace DryIoc
             string metadataKey = null, object metadata = null) =>
             source.Details((r, p) => !parameterType.IsAssignableTo(p.ParameterType) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
+
+        /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by type <typeparamref name="T"/>.</summary>
+        /// <typeparam name="T">Type of parameter.</typeparam> <param name="source">Source selector.</param>
+        /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
+        /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
+        /// <param name="defaultValue">(optional) Specifies default value to use when unresolved.</param>
+        /// <param name="metadataKey">(optional) Required metadata key</param> <param name="metadata">Required metadata or value.</param>
+        /// <returns>Combined selector.</returns>
+        public static ParameterSelector Type<T>(this ParameterSelector source,
+            Type requiredServiceType = null, object serviceKey = null,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
+            string metadataKey = null, object metadata = null) =>
+            source.Type(typeof(T), requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata);
+
+        /// <summary>Specify parameter by type and set its details.</summary>
+        public static ParameterSelector Type<T>(this ParameterSelector source,
+            Func<Request, ParameterInfo, ServiceDetails> getServiceDetails) =>
+            source.Details((r, p) => p.ParameterType == typeof(T) ? getServiceDetails(r, p) : null);
+
+        /// <summary>Specify parameter by type and set custom value to it.</summary>
+        public static ParameterSelector Type<T>(this ParameterSelector source, Func<Request, T> getCustomValue) =>
+            source.Type<T>((r, p) => ServiceDetails.Of(getCustomValue(r)));
 
         /// <summary>Specify parameter by type and set custom value to it.</summary>
         /// <param name="source">Original parameters rules.</param>
