@@ -40,17 +40,17 @@ REM %NUGET% pack %NUSPECS%\DryIoc.CommonServiceLocator.nuspec -Version %VER% -Ou
 echo:
 echo:DryIoc.Web
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.Web.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.Web.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.Mvc
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.Mvc.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.Mvc.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.WebApi
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.WebApi.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.WebApi.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.Owin

@@ -14,7 +14,7 @@
         <Description>DryIoc extension for ASP.NET MVC</Description>
         <PackageTags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
+<![CDATA[
 v3.1.0:
 - added: Support for DryIoc v3.1
 - added: Support for optional `controllerReuse` parameter in `WithMvc` method
@@ -34,7 +34,7 @@ v2.1.0:
 - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
 v2.0.1
 - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
-    ]]>
+]]>
         </PackageReleaseNotes>
     </PropertyGroup>
 
