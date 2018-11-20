@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
         <!-- net452 and not net45, because it is a minimal ExpressionToCodeLib target -->
@@ -20,7 +20,6 @@
 
     <ItemGroup>
         <None Include="DryIocZero.props" />
-        <None Include="Registrations.ttinclude" />
     </ItemGroup>
 
     <ItemGroup>

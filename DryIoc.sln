@@ -84,6 +84,32 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "playground", "playground", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "playground\Playground\Playground.csproj", "{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "nuspecs", "nuspecs", "{78204655-2AD6-4729-B436-44B370317EC1}"
+	ProjectSection(SolutionItems) = preProject
+		nuspecs\DryIoc.nuspec = nuspecs\DryIoc.nuspec
+		nuspecs\DryIoc.snk = nuspecs\DryIoc.snk
+		nuspecs\DryIocZero.nuspec = nuspecs\DryIocZero.nuspec
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIocZero", "DryIocZero", "{05C475EB-310F-4234-98CC-886ECB312AB9}"
+	ProjectSection(SolutionItems) = preProject
+		nuspecs\DryIocZero\readme.txt = nuspecs\DryIocZero\readme.txt
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{3F44053C-AE96-45F0-BF2D-B263E526FF00}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{6384FD6C-BC54-4AAE-B564-4BBD768C348F}"
+	ProjectSection(SolutionItems) = preProject
+		nuspecs\DryIocZero\build\DryIocZero.props = nuspecs\DryIocZero\build\DryIocZero.props
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScripts", "{06163480-12C7-4313-B4FB-1781020FE1FE}"
+	ProjectSection(SolutionItems) = preProject
+		BuildScripts\MakeInternal.ps1 = BuildScripts\MakeInternal.ps1
+		BuildScripts\NuGetPack.bat = BuildScripts\NuGetPack.bat
+		BuildScripts\NuGetPublish.bat = BuildScripts\NuGetPublish.bat
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -240,6 +266,9 @@ Global
 		{20995002-41F6-491A-85D3-C9019D615240} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1} = {258FA031-1B82-403A-B235-9A25B17A024A}
 		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
+		{05C475EB-310F-4234-98CC-886ECB312AB9} = {78204655-2AD6-4729-B436-44B370317EC1}
+		{3F44053C-AE96-45F0-BF2D-B263E526FF00} = {05C475EB-310F-4234-98CC-886ECB312AB9}
+		{6384FD6C-BC54-4AAE-B564-4BBD768C348F} = {05C475EB-310F-4234-98CC-886ECB312AB9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

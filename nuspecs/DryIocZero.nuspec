@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIocZero</id>
@@ -14,7 +14,7 @@
     <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory No-Container Pure-DI Poor-Man-DI</tags>
     <releaseNotes><![CDATA[
       v4.1.0:
-      - updated: to DryIoc v3.1.0
+      - updated: to DryIoc v3.1.0-preview-07
       v4.0.0:
       - updated: DryIoc to 3.0.2
       - updated: ExpressionToCodeLib to v2.6.0
@@ -51,25 +51,25 @@
     <!--net45-->
     <file src="..\src\DryIocZero\Container.cs" target="content\net45\DryIocZero" />
     <file src="..\src\DryIocZero\Container.Generated.tt" target="content\net45\DryIocZero" />
-    <file src="..\src\DryIocZero\Registrations.ttinclude" target="content\net45\DryIocZero" />
+    <file src="..\src\DryIocZero\DryIocZero\Registrations.ttinclude" target="content\net45\DryIocZero" />
     <file src="..\src\DryIocZero\ImTools.cs" target="content\net45\DryIocZero" />
 
     <!-- netstandard 1.0 -->
     <file src="..\src\DryIocZero\Container.cs"  target="content\netstandard1.0\DryIocZero" />
     <file src="..\src\DryIocZero\Container.Generated.tt" target="content\netstandard1.0\DryIocZero" />
-    <file src="..\src\DryIocZero\Registrations.ttinclude" target="content\netstandard1.0\DryIocZero" />
+    <file src="..\src\DryIocZero\DryIocZero\Registrations.ttinclude" target="content\netstandard1.0\DryIocZero" />
     <file src="..\src\DryIocZero\ImTools.cs" target="content\netstandard1.0\DryIocZero" />
 
     <!-- netstandard 2.0 -->
     <file src="..\src\DryIocZero\Container.cs"  target="content\netstandard2.0\DryIocZero" />
     <file src="..\src\DryIocZero\Container.Generated.tt" target="content\netstandard2.0\DryIocZero" />
-    <file src="..\src\DryIocZero\Registrations.ttinclude" target="content\netstandard2.0\DryIocZero" />
+    <file src="..\src\DryIocZero\DryIocZero\Registrations.ttinclude" target="content\netstandard2.0\DryIocZero" />
     <file src="..\src\DryIocZero\ImTools.cs" target="content\netstandard2.0\DryIocZero" />
 
      <!-- Workaround for SDK Project System -->
     <file src="..\src\DryIocZero\Container.cs" target="tools\content" />
     <file src="..\src\DryIocZero\Container.Generated.tt" target="tools\content" />
-    <file src="..\src\DryIocZero\Registrations.ttinclude" target="tools\content" />
+    <file src="..\src\DryIocZero\DryIocZero\Registrations.ttinclude" target="tools\content" />
     <file src="..\src\DryIocZero\ImTools.cs" target="tools\content" />
 
   </files>

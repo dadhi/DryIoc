@@ -34,7 +34,7 @@ THE SOFTWARE.
 <#@ assembly Name="System.Runtime" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
-<#@ include File="$(ProjectDir)\Registrations.ttinclude" #>
+<#@ include File="$(ProjectDir)DryIocZero\Registrations.ttinclude" #>
 <#
 var container = GetContainerWithRegistrations()
     .With(rules => rules.WithThrowIfRuntimeStateRequired());

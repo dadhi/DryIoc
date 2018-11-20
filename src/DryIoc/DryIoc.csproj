@@ -42,6 +42,7 @@ v3.1.0
 - added: IRegistrator.GetRegisteredFactories
 - added: FactoryType to Registrator.RegisterMapping
 - added: AsyncExecutionFlowScopeContext.Default member
+- added: Support for FEC v2.0-preview-03
 - changed: [generation] Using run-time request object 
 
 v3.0.2

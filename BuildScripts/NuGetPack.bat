@@ -4,9 +4,6 @@ setlocal EnableDelayedExpansion
 set NUGET=.nuget\NuGet.exe
 set NUSPECS=nuspecs
 set PACKAGEDIR=.dist\packages
-REM set NUGET=..\.nuget\NuGet.exe
-REM set NUSPECS=..\nuspecs
-REM set PACKAGEDIR=..\.dist\packages
 
 echo:
 echo:Packing NuGet packages into %PACKAGEDIR% . . .

@@ -1,11 +1,8 @@
 $inputFiles = @(
     ".\DryIoc\Container.cs",
     ".\DryIoc\ImTools.cs",
-    ".\DryIoc\Ported-net40.cs",
-    ".\DryIoc\Ported-net45.cs",
-    ".\PCL\DryIoc\Ported-net.cs",
-    ".\Net45\DryIoc\FastExpressionCompiler.cs",
-    ".\Net45\DryIoc\AsyncExecutionFlowScopeContext.cs"
+    ".\DryIoc\FastExpressionCompiler.cs",
+    ".\DryIoc\Expression.cs"
 )
 $outputFolder = ".\DryIoc.Internal"
 
