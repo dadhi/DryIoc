@@ -39,6 +39,8 @@ namespace DryIoc
     using static ImTools.ArrayTools;
     using static System.Environment;
 
+    using ExprType = System.Linq.Expressions.ExpressionType;
+
 #if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
     using FastExpressionCompiler.LightExpression;
     using static FastExpressionCompiler.LightExpression.Expression;
@@ -228,7 +230,7 @@ namespace DryIoc
                     return null;
 
                 // 1) try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
-                var isInrepreted = TryInterpretExpression(out object result);
+                var isInrepreted = TryInterpretExpression(expr, out object result);
                 if (isInrepreted)
                 {
                     CacheDefaultFactory(serviceType, expr);
@@ -260,10 +262,56 @@ namespace DryIoc
                 cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factory));
         }
 
-        private bool TryInterpretExpression(out object result)
+        private bool TryInterpretExpression(Expression expr, out object result)
         {
             result = null;
+            switch (expr.NodeType)
+            {
+                case ExprType.New:
+                {
+                    var newExpr = (NewExpression)expr;
+                    if (!newExpr.Constructor.IsPublic) // todo: skipping non-public constructors for now
+                        return false;
+
+                    if (!TryInterpretArgs(newExpr.Arguments, out var args))
+                        return false;
+
+                    result = Activator.CreateInstance(newExpr.Type, args);
+                    return true;
+                }
+                case ExprType.Call:
+                {
+                    var callExpr = (MethodCallExpression) expr;
+
+                    if (!TryInterpretArgs(callExpr.Arguments, out var args))
+                        return false;
+
+                    object instance = null;
+                    if (callExpr.Object != null && !TryInterpretExpression(callExpr.Object, out instance))
+                        return false;
+
+                    result = callExpr.Method.Invoke(instance, args);
+                    return true;
+                }
+            }
+
             return false;
+        }
+
+        private bool TryInterpretArgs(IReadOnlyList<Expression> argExprs, out object[] args)
+        {
+            args = argExprs.Count == 0 ? ArrayTools.Empty<object>() : new object[argExprs.Count];
+
+            if (args.Length != 0)
+                for (var i = 0; i < args.Length; i++)
+                {
+                    var argExpr = argExprs[i];
+                    if (!TryInterpretExpression(argExpr, out object arg))
+                        return false;
+                    args[i] = arg;
+                }
+
+            return true;
         }
 
         //object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved) =>
