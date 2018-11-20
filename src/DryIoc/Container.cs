@@ -180,13 +180,95 @@ namespace DryIoc
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
         }
 
-#endregion
+        #endregion
 
-#region IResolver
+        #region IResolver
 
-        object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved) =>
-            _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType)?.Invoke(this) ??
-            ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
+        object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
+        {
+            var cacheRef = _registry.Value.DefaultFactoryCache;
+            var cachedItem = cacheRef.Value.GetValueOrDefault(serviceType);
+
+            var cachedDelegate = cachedItem as FactoryDelegate;
+            if (cachedDelegate != null)
+                return cachedDelegate(this);
+
+            // todo: optimize for inlining by moving into separate method
+
+            var cachedExpr = cachedItem as Expression;
+            if (cachedExpr != null)
+            {
+                var factoryDelegate = cachedExpr.CompileToFactoryDelegate(Rules.UsedForExpressionGeneration);
+                var cache = cacheRef.Value;
+                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
+                    cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
+                return factoryDelegate(this);
+            }
+
+            return ResolveAndCacheDefaultFactoryDelegate2(serviceType, ifUnresolved);
+        }
+
+        private object ResolveAndCacheDefaultFactoryDelegate2(Type serviceType, IfUnresolved ifUnresolved)
+        {
+            ThrowIfContainerDisposed();
+
+            var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
+            var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
+
+            // Delegate to full blown Resolve aware of service key, open scope, etc.
+            var serviceKey = request.ServiceKey;
+            if (serviceKey != null || CurrentScope?.Name != null)
+                return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
+
+            FactoryDelegate factoryDelegate;
+            if (factory is ReflectionFactory)
+            {
+                var expr = factory.GetExpressionOrDefault(request);
+                if (expr == null)
+                    return null;
+
+                // 1) try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
+                var isInrepreted = TryInterpretExpression(out object result);
+                if (isInrepreted)
+                {
+                    CacheDefaultFactory(serviceType, expr);
+                    return result;
+                }
+
+                // 2) fallback to expression compilation
+                factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
+            }
+
+            factoryDelegate = factory?.GetDelegateOrDefault(request);
+            if (factoryDelegate == null)
+                return null;
+
+            CacheDefaultFactory(serviceType, factoryDelegate);
+            return factoryDelegate(this);
+        }
+
+        private void CacheDefaultFactory(Type serviceType, object factory)
+        {
+            // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
+            var registry = _registry.Value;
+            if (registry.Services.IsEmpty)
+                return;
+
+            var cacheRef = registry.DefaultFactoryCache;
+            var cache = cacheRef.Value;
+            if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
+                cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factory));
+        }
+
+        private bool TryInterpretExpression(out object result)
+        {
+            result = null;
+            return false;
+        }
+
+        //object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved) =>
+        //    _registry.Value.DefaultFactoryDelegateCache.Value.GetValueOrDefault(serviceType)?.Invoke(this) ??
+        //    ResolveAndCacheDefaultFactoryDelegate(serviceType, ifUnresolved);
 
         private object ResolveAndCacheDefaultFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -195,7 +277,7 @@ namespace DryIoc
             var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
-            // The situation is possible for multiple default services registered.
+            // Delegate to full blown Resolve aware of service key, open scope, etc.
             var serviceKey = request.ServiceKey;
             if (serviceKey != null || CurrentScope?.Name != null)
                 return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
@@ -1520,6 +1602,9 @@ namespace DryIoc
 
             // Resolved Delegate Cache:
             public readonly Ref<ImHashMap<Type, FactoryDelegate>> DefaultFactoryDelegateCache;
+
+            // FactoryDelegate or Expression<FactoryDelegate>
+            public readonly Ref<ImHashMap<Type, object>> DefaultFactoryCache = Ref.Of(ImHashMap<Type, object>.Empty);
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and ImHashMap<{requiredServiceType+preResolvedParent}, FactoryDelegate>

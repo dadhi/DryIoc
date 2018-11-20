@@ -61,21 +61,13 @@ namespace PerformanceTests
 
         #region CUT
 
-        internal class Parameter1
-        {
+        internal class Parameter1 { }
 
-        }
-
-        internal class Parameter2
-        {
-
-        }
+        internal class Parameter2 { }
 
         internal class ScopedBlah
         {
-            public ScopedBlah(Parameter1 parameter1, Parameter2 parameter2)
-            {
-            }
+            public ScopedBlah(Parameter1 parameter1, Parameter2 parameter2) { }
         }
 
         #endregion
