@@ -285,6 +285,9 @@ namespace DryIoc
                         var callExpr = (MethodCallExpression)expr;
                         var callArgs = callExpr.Arguments.ToListOrSelf();
 
+                        if (callExpr.Method == CurrentScopeReuse.GetScopedWithValueMethod)
+                            return TryInterpretGetScopedWithValue(ref result, callArgs);
+
                         if (callExpr.Method == CurrentScopeReuse.GetNameScopedWithValueMethod)
                             return TryInterpretGetNameScopedWithValue(ref result, callArgs);
 
@@ -330,6 +333,17 @@ namespace DryIoc
             }
 
             return false;
+        }
+
+        private bool TryInterpretGetScopedWithValue(ref object result, IList<Expression> args)
+        {
+            if (!TryInterpret(args[3], out var service))
+                return false;
+
+            result = CurrentScopeReuse.GetScopedWithValue(
+                this, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
+                service, (int)ConstValue(args[4]));
+            return true;
         }
 
         private bool TryInterpretGetNameScopedWithValue(ref object result, IList<Expression> args)
@@ -8685,7 +8699,7 @@ namespace DryIoc
                             idExpr, serviceFactoryExpr, disposalOrderExpr);
 
                     if (Name == null)
-                        return Call(_getScopedMethodWithValue, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
+                        return Call(GetScopedWithValueMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
                             idExpr, serviceFactoryExpr, disposalOrderExpr);
 
                     return Call(GetNameScopedWithValueMethod, resolverExpr,
@@ -8770,9 +8784,6 @@ namespace DryIoc
             bool throwIfNoScope, int id, object value, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
 
-        private static readonly MethodInfo _getScopedMethodWithValue =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedWithValue), true);
-
         internal static object GetNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
@@ -8784,11 +8795,17 @@ namespace DryIoc
             object scopeName, bool throwIfNoScope, int id, object value, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
 
-// todo: apply the trick for the rest of the services
+        // todo: apply the trick for the rest of the services
 #if !NETSTANDARD2_0 && !NET45
+        internal static readonly MethodInfo GetScopedWithValueMethod =
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedWithValue), true);
+
         internal static readonly MethodInfo GetNameScopedWithValueMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScopedWithValue), true);
 #else
+        internal static readonly MethodInfo GetScopedWithValueMethod =
+            ((Func<IResolverContext, bool, int, object, int, object>)GetScopedWithValue).Method;
+
         internal static readonly MethodInfo GetNameScopedWithValueMethod =
             ((Func<IResolverContext, object, bool, int, object, int, object>)GetNameScopedWithValue).Method;
 #endif
