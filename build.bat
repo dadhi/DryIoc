@@ -25,7 +25,7 @@ echo:
 echo:## Starting: BUILD and PACKAGING... ##
 echo: 
 rem: Turning Off the $(DevMode) from the Directory.Build.props to alway build an ALL TARGETS
-call %MSB% %SLN% /t:Rebuild /p:DevMode=false;Configuration=Release /m /v:m /bl /fl /flp:LogFile=MSBuild.log
+call %MSB% %SLN% /t:Rebuild /p:DevMode=false;Configuration=Release /nowarn:VSX1000 /m /v:m /bl /fl /flp:LogFile=MSBuild.log
 if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: BUILD and PACKAGING ##
