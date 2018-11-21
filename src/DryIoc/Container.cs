@@ -124,7 +124,7 @@ namespace DryIoc
             }
         }
 
-#region IRegistrator
+        #region IRegistrator
 
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
@@ -134,7 +134,7 @@ namespace DryIoc
         /// <summary>Searches for registered factories by type, and key (if specified),
         /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
         /// May return empty, 1 or multiple factories.</summary>
-        public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType) => 
+        public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType) =>
             _registry.Value.GetRegisteredFactories(serviceType, serviceKey, factoryType, Fun.Always);
 
         /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
@@ -230,7 +230,7 @@ namespace DryIoc
                     return null;
 
                 // 1) try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
-                var isInrepreted = TryInterpretExpression(expr, out object result);
+                var isInrepreted = TryInterpret(expr, out object result);
                 if (isInrepreted)
                 {
                     CacheDefaultFactory(serviceType, expr);
@@ -262,73 +262,98 @@ namespace DryIoc
                 cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factory));
         }
 
-        private bool TryInterpretExpression(Expression expr, out object result)
+        private bool TryInterpret(Expression expr, out object result)
         {
             result = null;
             switch (expr.NodeType)
             {
                 case ExprType.New:
-                {
-                    var newExpr = (NewExpression)expr;
-                    if (!newExpr.Constructor.IsPublic) // todo: skipping non-public constructors for now
-                        return false;
+                    {
+                        var newExpr = (NewExpression)expr;
+                        if (!newExpr.Constructor.IsPublic) // todo: skipping non-public constructors for now
+                            return false;
 
-                    if (!TryInterpretArgs(newExpr.Arguments, out var args))
-                        return false;
+                        if (!TryInterpretMany(newExpr.Arguments, out var args))
+                            return false;
 
-                    result = Activator.CreateInstance(newExpr.Type, args);
-                    return true;
-                }
+                        result = Activator.CreateInstance(newExpr.Type, args);
+                        return true;
+                    }
                 case ExprType.Call:
-                {
-                    var callExpr = (MethodCallExpression) expr;
+                    {
+                        var callExpr = (MethodCallExpression)expr;
+                        var callArgs = callExpr.Arguments;
 
-                    if (!TryInterpretArgs(callExpr.Arguments, out var args))
-                        return false;
+                        if (callExpr.Method == CurrentScopeReuse.GetNameScopedWithValueMethod)
+                            return TryInterpretGetNameScopedWithValue(ref result, callArgs);
 
-                    object instance = null;
-                    if (callExpr.Object != null && !TryInterpretExpression(callExpr.Object, out instance))
-                        return false;
+                        if (!TryInterpretMany(callArgs, out var args))
+                            return false;
 
-                    result = callExpr.Method.Invoke(instance, args);
-                    return true;
-                }
+                        object instance = null;
+                        if (callExpr.Object != null && !TryInterpret(callExpr.Object, out instance))
+                            return false;
+
+                        result = callExpr.Method.Invoke(instance, args);
+                        return true;
+                    }
                 case ExprType.Constant:
-                {
-                    break;
-                }
+                    {
+                        var constExpr = (ConstantExpression)expr;
+                        result = constExpr.Value;
+                        return true;
+                    }
                 case ExprType.Convert:
-                {
-                    var convertExpr = (UnaryExpression)expr;
-                    if (!TryInterpretExpression(convertExpr.Operand, out object instance))
-                        return false;
+                    {
+                        var convertExpr = (UnaryExpression)expr;
+                        if (!TryInterpret(convertExpr.Operand, out object instance))
+                            return false;
 
-                    result = Converter.Convert(instance, convertExpr.Type);
-                    return true;
-                }
+                        result = Converter.Convert(instance, convertExpr.Type);
+                        return true;
+                    }
                 case ExprType.Parameter:
-                {
-                    break;
-                }
+                    {
+                        // todo: handles only resolver parameter for now
+                        if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
+                            return false;
+
+                        result = this;
+                        return true;
+                    }
                 case ExprType.MemberAccess:
-                {
-                    break;
-                }
+                    {
+
+                        break;
+                    }
             }
 
             return false;
         }
 
+        private bool TryInterpretGetNameScopedWithValue(ref object result, IReadOnlyList<Expression> args)
+        {
+            if (!TryInterpret(args[4], out var service))
+                return false;
+
+            result = CurrentScopeReuse.GetNameScopedWithValue(
+                this, ConstValue(args[1]), (bool)ConstValue(args[2]), (int)ConstValue(args[3]), 
+                service, (int)ConstValue(args[5]));
+            return true;
+        }
+
+        private static object ConstValue(Expression expr) => ((ConstantExpression)expr).Value;
+
         internal static class Converter
         {
-            public static object Convert(object source, Type targetType) => 
+            public static object Convert(object source, Type targetType) =>
                 _convertMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
 
             internal static R DoConvert<R>(object it) => (R)it;
             private static readonly MethodInfo _convertMethod = typeof(Converter).SingleMethod(nameof(DoConvert), true);
         }
 
-        private bool TryInterpretArgs(IReadOnlyList<Expression> argExprs, out object[] args)
+        private bool TryInterpretMany(IReadOnlyList<Expression> argExprs, out object[] args)
         {
             args = argExprs.Count == 0 ? ArrayTools.Empty<object>() : new object[argExprs.Count];
 
@@ -336,7 +361,7 @@ namespace DryIoc
                 for (var i = 0; i < args.Length; i++)
                 {
                     var argExpr = argExprs[i];
-                    if (!TryInterpretExpression(argExpr, out object arg))
+                    if (!TryInterpret(argExpr, out object arg))
                         return false;
                     args[i] = arg;
                 }
@@ -826,7 +851,7 @@ namespace DryIoc
             With(_parent, rules, scopeContext, registrySharing, singletonScope, _ownCurrentScope);
 
         /// <inheritdoc />
-        public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext, 
+        public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
             RegistrySharing registrySharing, IScope singletonScope, IScope curentScope)
         {
             ThrowIfContainerDisposed();
@@ -849,7 +874,7 @@ namespace DryIoc
         /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
         /// Throws exception by default.</param>
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false) =>
-            new Container(Rules, 
+            new Container(Rules,
                 Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow)),
                 _singletonScope, _scopeContext, _ownCurrentScope,
                 _disposed, _disposeStackTrace, _parent);
@@ -920,7 +945,7 @@ namespace DryIoc
             Type serviceType;
             var requiredServiceType = request.RequiredServiceType;
             if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
-                serviceType =  requiredServiceType;
+                serviceType = requiredServiceType;
             else
             {
                 // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
@@ -980,7 +1005,7 @@ namespace DryIoc
             if (matchedFactories.Length == 1)
             {
                 // Changes service key for resolution call to identify single factory in cache and prevent wrong hit
-                if (defaultFactories.Length > 1 && request.IsResolutionCall) 
+                if (defaultFactories.Length > 1 && request.IsResolutionCall)
                     request.ChangeServiceKey(matchedFactories[0].Key);
 
                 return matchedFactories[0].Value;
@@ -1073,7 +1098,7 @@ namespace DryIoc
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
             if (arrayElementType != null)
-                request = request.WithChangedServiceInfo(x => 
+                request = request.WithChangedServiceInfo(x =>
                     x.With(typeof(IEnumerable<>).MakeGenericType(arrayElementType)));
 
             var container = request.Container;
@@ -1263,9 +1288,9 @@ namespace DryIoc
             // don't try to recover the non primitive type of element,
             // cause it is a too much work to find the base commont element type in array
             var arrayElemType = actualItemType.GetArrayElementTypeOrNull();
-            if (arrayElemType != null && arrayElemType != typeof(object) && 
+            if (arrayElemType != null && arrayElemType != typeof(object) &&
                (arrayElemType.IsPrimitive() || actualItemType.IsAssignableTo<Type>()))
-                return NewArrayInit(arrayElemType, 
+                return NewArrayInit(arrayElemType,
                     ((object[])item).Map(x => GetConstantExpression(x, arrayElemType, throwIfStateRequired)));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
@@ -1334,7 +1359,7 @@ namespace DryIoc
                 return null;
 
             var factory = entry as Factory;
-            return factory != null 
+            return factory != null
                 ? new KV<object, Factory>(DefaultKey.Value, factory).One()
                 : ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
         }
@@ -1934,14 +1959,14 @@ namespace DryIoc
                         Factory removedWrapper = null;
                         var registry = WithWrappers(Wrappers.Update(serviceType, null, (factory, _null) =>
                         {
-                            if (factory != null && condition != null && !condition(factory)) 
+                            if (factory != null && condition != null && !condition(factory))
                                 return factory;
                             removedWrapper = factory;
                             return null;
 
                         }));
 
-                        if (removedWrapper == null) 
+                        if (removedWrapper == null)
                             return this;
                         registry.DropFactoryCache(removedWrapper, serviceType);
                         return registry;
@@ -1954,7 +1979,7 @@ namespace DryIoc
                             return removedDecorators == factories ? null : factories.Except(removedDecorators).ToArray();
                         }));
 
-                        if (removedDecorators.IsNullOrEmpty()) 
+                        if (removedDecorators.IsNullOrEmpty())
                             return this;
 
                         foreach (var removedDecorator in removedDecorators)
@@ -2051,12 +2076,12 @@ namespace DryIoc
 
             internal void DropFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
             {
-                if (!DefaultFactoryCache.Value.IsEmpty || 
+                if (!DefaultFactoryCache.Value.IsEmpty ||
                     !KeyedFactoryDelegateCache.Value.IsEmpty)
                 {
                     if (factory.FactoryGenerator == null)
                         SetCachedFactoryValueToNull(serviceType, serviceKey);
-                    else 
+                    else
                     {
                         // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
                         // a safe alternative is dropping the whole cache
@@ -2136,7 +2161,7 @@ namespace DryIoc
         public override int GetHashCode() => Hasher.Combine(RequiredServiceType, ServiceKey);
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter) => 
+        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
             New(_ctor, Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
 
         private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey).SingleConstructor();
@@ -2343,7 +2368,7 @@ namespace DryIoc
         /// <remarks>Does nothing if registration is already exists.</remarks>
         public static void RegisterMapping<TService, TRegisteredService>(this IContainer container,
             object serviceKey = null, object registeredServiceKey = null) =>
-            Registrator.RegisterMapping(container, 
+            Registrator.RegisterMapping(container,
                 typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
 
         // todo: Remove in VNext?
@@ -2770,8 +2795,8 @@ namespace DryIoc
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.DirectParent.IsSingletonOrDependencyOfSingleton 
-            && !request.OpensResolutionScope 
+            request.DirectParent.IsSingletonOrDependencyOfSingleton
+            && !request.OpensResolutionScope
             && !request.IsDirectlyWrappedInFunc()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
@@ -2853,7 +2878,7 @@ namespace DryIoc
             return r.WithCurrentScope(scope);
         }
 
-        private static IScope SetCurrentContextScope(IResolverContext r, object name) => 
+        private static IScope SetCurrentContextScope(IResolverContext r, object name) =>
             r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
     }
 
@@ -3380,7 +3405,7 @@ namespace DryIoc
 
         /// <summary>Sets the <see cref="DefaultRegistrationServiceKey"/></summary>
         public Rules WithDefaultRegistrationServiceKey(object serviceKey) =>
-            serviceKey == null ? this : 
+            serviceKey == null ? this :
                 new Rules(_settings, FactorySelector, DefaultReuse,
                     _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
@@ -3398,8 +3423,8 @@ namespace DryIoc
         public FactorySelectorRule FactorySelector { get; }
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
-        public Rules WithFactorySelector(FactorySelectorRule rule) => 
-            new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)), 
+        public Rules WithFactorySelector(FactorySelectorRule rule) =>
+            new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
                 rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -3423,7 +3448,7 @@ namespace DryIoc
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
-            (r, fs) => fs.FindFirst(f => f.Key.Equals(serviceKey)).Value ?? 
+            (r, fs) => fs.FindFirst(f => f.Key.Equals(serviceKey)).Value ??
                        fs.FindFirst(f => f.Key.Equals(null)).Value;
 
         /// <summary>Specify the method signature for returning multiple keyed factories.
@@ -3497,7 +3522,7 @@ namespace DryIoc
             request =>
             {
                 var concreteType = request.GetActualServiceType();
-                if (!concreteType.IsImplementationType() || concreteType.IsPrimitive() || 
+                if (!concreteType.IsImplementationType() || concreteType.IsPrimitive() ||
                     condition != null && !condition(request))
                     return null;
 
@@ -3521,7 +3546,7 @@ namespace DryIoc
         /// <param name="reuse">(optional) Reuse for concrete types.</param>
         /// <returns>New rule.</returns>
         public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
-            Func<Type, object, bool> condition = null, IReuse reuse = null) => 
+            Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
             {
                 if (serviceType.IsAbstract() ||
@@ -3743,8 +3768,8 @@ namespace DryIoc
         /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
         public Rules ForExpressionGeneration() => WithSettings(GetSettingsForExpressionGeneration());
 
-        private Settings GetSettingsForExpressionGeneration() => 
-            _settings & ~Settings.EagerCachingSingletonForFasterAccess 
+        private Settings GetSettingsForExpressionGeneration() =>
+            _settings & ~Settings.EagerCachingSingletonForFasterAccess
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       | Settings.UsedForExpressionGeneration;
 
@@ -3828,7 +3853,7 @@ namespace DryIoc
                 var addedSettings = _settings & ~DEFAULT_SETTINGS;
                 if (addedSettings != 0)
                     s = "Rules with {" + addedSettings + "}";
-                var removedSettings = DEFAULT_SETTINGS & ~ _settings;
+                var removedSettings = DEFAULT_SETTINGS & ~_settings;
                 if (removedSettings != 0)
                     s += (s != "" ? " and without {" : "Rules without {") + removedSettings + "}";
             }
@@ -4016,7 +4041,7 @@ namespace DryIoc
 
             // First the check for normal resolution without Func<a, b, c>
             if (!request.IsWrappedInFuncWithArgs())
-                return Of(ctorsWithMaxParamsFirst.FindFirst(x => 
+                return Of(ctorsWithMaxParamsFirst.FindFirst(x =>
                         x.GetParameters().FindFirst(p => !IsResolvableParameter(p, paramSelector, request)) == null)
                     .ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request));
 
@@ -4086,7 +4111,7 @@ namespace DryIoc
         };
 
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
-        public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request => 
+        public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
                 .GetConstructorOrNull(includeNonPublic, Empty<Type>())
                 ?.Do(ctor => Of(ctor));
@@ -4208,7 +4233,7 @@ namespace DryIoc
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             bool isConditionalImlementation = false) =>
-            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation ? Default : 
+            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation ? Default :
             new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
@@ -4311,7 +4336,7 @@ namespace DryIoc
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
             if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.Convert) // proceed without Cast expression.
                 return FromExpression<TService>(getFactoryMethodSelector,
-                    System.Linq.Expressions.Expression.Lambda(((System.Linq.Expressions.UnaryExpression)callExpr).Operand, 
+                    System.Linq.Expressions.Expression.Lambda(((System.Linq.Expressions.UnaryExpression)callExpr).Operand,
                         Empty<System.Linq.Expressions.ParameterExpression>()),
                     argValues);
 
@@ -4320,7 +4345,7 @@ namespace DryIoc
             IList<System.Linq.Expressions.MemberBinding> memberBindingExprs = null;
             ParameterInfo[] parameters = null;
 
-            if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.New || 
+            if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.New ||
                 callExpr.NodeType == System.Linq.Expressions.ExpressionType.MemberInit)
             {
                 var newExpr = callExpr as System.Linq.Expressions.NewExpression ?? ((System.Linq.Expressions.MemberInitExpression)callExpr).NewExpression;
@@ -4359,15 +4384,15 @@ namespace DryIoc
             var hasCustomValue = false;
 
             var parameterSelector = parameters.IsNullOrEmpty() ? null
-                : ComposeParameterSelectorFromArgs(ref hasCustomValue, 
+                : ComposeParameterSelectorFromArgs(ref hasCustomValue,
                     serviceReturningExpr, parameters, argExprs, argValues);
 
             var propertiesAndFieldsSelector =
                 memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
-                : ComposePropertiesAndFieldsSelector(ref hasCustomValue, 
+                : ComposePropertiesAndFieldsSelector(ref hasCustomValue,
                     serviceReturningExpr, memberBindingExprs, argValues);
 
-            return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember), 
+            return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember),
                 parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
 
@@ -4395,8 +4420,8 @@ namespace DryIoc
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
-            System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos, 
-            IList<System.Linq.Expressions.Expression> argExprs, 
+            System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
+            IList<System.Linq.Expressions.Expression> argExprs,
             params Func<Request, object>[] argValues)
         {
             var paramSelector = DryIoc.Parameters.Of;
@@ -4433,7 +4458,7 @@ namespace DryIoc
         }
 
         private static PropertiesAndFieldsSelector ComposePropertiesAndFieldsSelector(ref bool hasCustomValue,
-            System.Linq.Expressions.Expression wholeServiceExpr, IList<System.Linq.Expressions.MemberBinding> memberBindings, 
+            System.Linq.Expressions.Expression wholeServiceExpr, IList<System.Linq.Expressions.MemberBinding> memberBindings,
             params Func<Request, object>[] argValues)
         {
             var propertiesAndFields = DryIoc.PropertiesAndFields.Of;
@@ -4483,7 +4508,7 @@ namespace DryIoc
 
         private static Func<Request, object> GetArgCustomValueProvider(
             System.Linq.Expressions.Expression wholeServiceExpr,
-            System.Linq.Expressions.MethodCallExpression methodCallExpr,  Func<Request, object>[] argValues)
+            System.Linq.Expressions.MethodCallExpression methodCallExpr, Func<Request, object>[] argValues)
         {
             Throw.If(argValues.IsNullOrEmpty(), Error.ArgValueIndexIsProvidedButNoArgValues, wholeServiceExpr);
 
@@ -4496,7 +4521,7 @@ namespace DryIoc
 
         private static ServiceDetails GetArgServiceDetails(
             System.Linq.Expressions.Expression wholeServiceExpr,
-            System.Linq.Expressions.MethodCallExpression methodCallExpr, 
+            System.Linq.Expressions.MethodCallExpression methodCallExpr,
             Type dependencyType, IfUnresolved defaultIfUnresolved, object defaultValue)
         {
             var requiredServiceType = methodCallExpr.Method.GetGenericArguments().Last();
@@ -4547,7 +4572,7 @@ namespace DryIoc
         }
 
         internal static T[] ObjectArrayCastTo<T>(object[] array) => array.Map(x => (T)x);
-        private static readonly MethodInfo _objectArrayCastToMethod = 
+        private static readonly MethodInfo _objectArrayCastToMethod =
             typeof(Made).SingleMethod(nameof(ObjectArrayCastTo), includeNonPublic: true);
 
         private static object GetArgExpressionValueOrThrow(
@@ -4560,7 +4585,7 @@ namespace DryIoc
 
             var convert = argExpr as System.Linq.Expressions.UnaryExpression; // e.g. (object)SomeEnum.Value
             if (convert != null && convert.NodeType == System.Linq.Expressions.ExpressionType.Convert)
-                return GetArgExpressionValueOrThrow(wholeServiceExpr, 
+                return GetArgExpressionValueOrThrow(wholeServiceExpr,
                     convert.Operand as System.Linq.Expressions.ConstantExpression);
 
             var member = argExpr as System.Linq.Expressions.MemberExpression;
@@ -4583,11 +4608,11 @@ namespace DryIoc
                 return _objectArrayCastToMethod.MakeGenericMethod(itemType).Invoke(null, items.One());
             }
 
-            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf, 
+            return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf,
                 argExpr, wholeServiceExpr);
         }
 
-        #endregion
+#endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
@@ -4711,7 +4736,7 @@ namespace DryIoc
             ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
 
         /// <summary>Checks that type can be used a service type.</summary>
-        public static bool IsServiceType(this Type type) => 
+        public static bool IsServiceType(this Type type) =>
             !type.IsPrimitive() && !type.IsCompilerGenerated() && !type.IsExcludedGeneralPurposeServiceType();
 
         /// <summary>Checks if type can be used as implementation type for reflection factory,
@@ -5010,7 +5035,7 @@ namespace DryIoc
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                     // specify ResolverContext as parameter to prevent applying initializer for injected resolver too
                     parameters: Parameters.Of
-                        .Type(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope 
+                        .Type(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope
                             ? r.Container.RootOrSelf() : r.Container)
                         .Type(_ => initialize)),
                 setup: Setup.DecoratorWith(
@@ -5039,7 +5064,7 @@ namespace DryIoc
             registrator.RegisterDelegate(_ => new Disposer<TService>(dispose),
                 serviceKey: disposerKey,
                 // tracking instead of parent reuse, so that I can use one disposer for multiple services
-                setup: Setup.With(trackDisposableTransient: true)); 
+                setup: Setup.With(trackDisposableTransient: true));
 
             var disposerType = typeof(Disposer<>).MakeGenericType(typeof(TService));
             registrator.Register<object>(
@@ -5047,7 +5072,7 @@ namespace DryIoc
                     r => disposerType.SingleMethod("TrackForDispose").MakeGenericMethod(r.ServiceType),
                     ServiceInfo.Of(disposerType, serviceKey: disposerKey)),
                 setup: Setup.DecoratorWith(
-                    r => r.ServiceType.IsAssignableTo<TService>() && (condition == null || condition(r)), 
+                    r => r.ServiceType.IsAssignableTo<TService>() && (condition == null || condition(r)),
                     useDecorateeReuse: true));
         }
 
@@ -5290,7 +5315,7 @@ namespace DryIoc
 
         internal static Expression CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
-            if (request.Rules.DependencyResolutionCallExprs != null && 
+            if (request.Rules.DependencyResolutionCallExprs != null &&
                 request.Factory != null && !request.Factory.HasRuntimeState)
                 PopulateDependencyResolutionCallExpressions(request);
 
@@ -5360,7 +5385,7 @@ namespace DryIoc
             if (factoryExpr == null)
                 return;
 
-            request.Container.Rules.DependencyResolutionCallExprs.Swap(x => 
+            request.Container.Rules.DependencyResolutionCallExprs.Swap(x =>
                 x.AddOrUpdate(request, factoryExpr
 #if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
                         .ToExpression()
@@ -5818,7 +5843,7 @@ namespace DryIoc
 
             public override void SetValue(object holder, object value) => _property.SetValue(holder, value, null);
 
-            public override string ToString() => 
+            public override string ToString() =>
                 new StringBuilder().Print(this).Append(" as property ").Print(_property.Name).ToString();
 
             private readonly PropertyInfo _property;
@@ -5844,14 +5869,14 @@ namespace DryIoc
         {
             public override Type ServiceType => _field.FieldType;
 
-            public override IServiceInfo Create(Type serviceType, ServiceDetails details) => 
+            public override IServiceInfo Create(Type serviceType, ServiceDetails details) =>
                 serviceType == null ? new WithDetails(_field, details) : new TypeWithDetails(_field, serviceType, details);
 
             public override MemberInfo Member => _field;
 
             public override void SetValue(object holder, object value) => _field.SetValue(holder, value);
 
-            public override string ToString() => 
+            public override string ToString() =>
                 new StringBuilder().Print(this).Append(" as field ").Print(_field.Name).ToString();
 
             private readonly FieldInfo _field;
@@ -5911,7 +5936,7 @@ namespace DryIoc
         internal static readonly RequestFlags InheritedFlags
             = RequestFlags.IsSingletonOrDependencyOfSingleton
             | RequestFlags.IsWrappedInFunc;
- 
+
         private const RequestFlags DefaultFlags = default(RequestFlags);
 
         /// <summary>Empty terminal request.</summary>
@@ -6076,7 +6101,7 @@ namespace DryIoc
         public Type ServiceType => _serviceInfo.ServiceType;
 
         /// <summary>Compatible required or service type.</summary>
-        public Type GetActualServiceType() => 
+        public Type GetActualServiceType() =>
             _actualServiceType ?? (_actualServiceType = _serviceInfo.GetActualServiceType());
 
         private Type _actualServiceType; // saving result once
@@ -6118,8 +6143,8 @@ namespace DryIoc
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and Pushes the new request.</summary>
         public Request Push(Type serviceType, object serviceKey = null,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null, RequestFlags flags = DefaultFlags) => 
-            Push(ServiceInfo.Of(serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible), 
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null, RequestFlags flags = DefaultFlags) =>
+            Push(ServiceInfo.Of(serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible),
                 requiredServiceType, ifUnresolved, serviceKey), flags);
 
 #region Used in generated expression
@@ -6183,7 +6208,7 @@ namespace DryIoc
         }
 
         /// <summary>Updates the flags</summary>
-        public Request WithFlags(RequestFlags newFlags) => 
+        public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container, DirectParent, newFlags, _serviceInfo, InputArgExprs,
                 Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
 
@@ -6227,7 +6252,7 @@ namespace DryIoc
             }
 
             // checking the service types only cause wrapper and decorators may be used multiple times
-            if (!skipRecursiveDependencyCheck && 
+            if (!skipRecursiveDependencyCheck &&
                 factory.FactoryType == FactoryType.Service &&
                 HasRecursiveParent(factory.FactoryID))
                 Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
@@ -6323,7 +6348,7 @@ namespace DryIoc
                     parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
                     break;
 
-                if (parent.FactoryType == FactoryType.Service && 
+                if (parent.FactoryType == FactoryType.Service &&
                     parent.ReuseLifespan > reuse.Lifespan)
                     Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
             }
@@ -6527,7 +6552,7 @@ namespace DryIoc
             _factoryImplType = factoryImplType;
 
             // runtime state
-            Factory = factory; 
+            Factory = factory;
             if (factoryType == FactoryType.Service)
             {
                 if ((Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
@@ -6611,7 +6636,7 @@ namespace DryIoc
 
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
         public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
-        
+
         /// <summary>When single service is resolved, but multiple candidates found, this options will be used to prefer this one.</summary>
         public bool PreferInSingleServiceResolve => (_settings & Settings.PreferInSingleServiceResolve) != 0;
 
@@ -6704,7 +6729,7 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0) => 
+            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0) =>
                 wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
                 !openResolutionScope && !asResolutionCall && !preventDisposal && !weaklyReferenced &&
                 !allowDisposableTransient && !trackDisposableTransient && condition == null && disposalOrder == 0
@@ -7010,9 +7035,9 @@ namespace DryIoc
                 !request.OpensResolutionScope && // preventing recursion
                (Setup.OpenResolutionScope ||
                !request.IsResolutionCall && // preventing recursion
-               (Setup.AsResolutionCall || Setup.UseParentReuse || request.ShouldSplitObjectGraph()) && 
+               (Setup.AsResolutionCall || Setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
                request.GetActualServiceType() != typeof(void)))
-               return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
+                return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator
             if (FactoryType != FactoryType.Decorator)
@@ -7570,7 +7595,7 @@ namespace DryIoc
                     var customValue = paramInfo.Details.CustomValue;
 
                     if (customValue != null && !customValue.GetType().IsArray)
-                        customValue.ThrowIfNotInstanceOf(paramServiceType, 
+                        customValue.ThrowIfNotInstanceOf(paramServiceType,
                             Error.InjectedCustomValueIsOfDifferentType, paramRequest);
 
                     paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
@@ -7581,15 +7606,15 @@ namespace DryIoc
                 var paramExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
                 if (paramExpr == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
-                    paramInfo.Details.DefaultValue != null && 
-                    paramExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit && 
+                    paramInfo.Details.DefaultValue != null &&
+                    paramExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
                     ((NewArrayExpression)paramExpr).Expressions.Count == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
                     if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
                         return null;
-                        
+
                     var defaultValue = paramInfo.Details.DefaultValue;
                     paramExpr = defaultValue != null
                         ? container.GetConstantExpression(defaultValue)
@@ -7795,7 +7820,7 @@ namespace DryIoc
             {
                 if (!factoryMethodResultType.IsAssignableTo(implType) &&
                     !factoryMethodResultType.IsCastableTo(implType))
-                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, 
+                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType,
                         implType, factoryMethodResultType);
             }
 
@@ -7984,7 +8009,7 @@ namespace DryIoc
                     continue; // skip yet unknown type arg
 
                 var implTypeParamConstraints = implTypeParams[i].GetGenericParamConstraints();
-                if (implTypeParamConstraints.IsNullOrEmpty()) 
+                if (implTypeParamConstraints.IsNullOrEmpty())
                     continue; // skip case with no constraints
 
                 // match type parameters inside constraint
@@ -8351,7 +8376,7 @@ namespace DryIoc
             lock (_locker)
             {
                 // re-check if items where changed in between (double check locking)
-                if (_items != items && _items.TryFind(id, out item)) 
+                if (_items != items && _items.TryFind(id, out item))
                     return item;
 
                 item = createValue();
@@ -8601,7 +8626,7 @@ namespace DryIoc
                 Constant(request.FactoryID), Lambda<CreateScopedValue>(serviceFactoryExpr),
                     Constant(request.Factory.Setup.DisposalOrder));
 
-        private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() => 
+        private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
             Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
 
         /// <inheritdoc />
@@ -8655,14 +8680,14 @@ namespace DryIoc
                 if (request.IsResolutionCall)
                 {
                     if (ScopedOrSingleton)
-                        return Call(_getScopedOrSingletonWithValueMethod, resolverExpr, 
+                        return Call(_getScopedOrSingletonWithValueMethod, resolverExpr,
                             idExpr, serviceFactoryExpr, disposalOrderExpr);
 
                     if (Name == null)
-                        return Call(_getScopedMethodWithValue, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                        return Call(_getScopedMethodWithValue, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
                             idExpr, serviceFactoryExpr, disposalOrderExpr);
 
-                    return Call(_getNameScopedMethodWithValue, resolverExpr,
+                    return Call(GetNameScopedWithValueMethod, resolverExpr,
                         request.Container.GetConstantExpression(Name, typeof(object)),
                         Constant(request.IfUnresolved == IfUnresolved.Throw),
                         idExpr, serviceFactoryExpr, disposalOrderExpr);
@@ -8671,16 +8696,16 @@ namespace DryIoc
                 {
                     var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
                     if (ScopedOrSingleton)
-                        return Call(_getScopedOrSingletonMethod, resolverExpr, 
+                        return Call(_getScopedOrSingletonMethod, resolverExpr,
                             idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                     if (Name == null)
-                        return Call(_getScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                        return Call(_getScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
                             idExpr, factoryLambdaExpr, disposalOrderExpr);
 
-                    return Call(_getNameScopedMethod, resolverExpr, 
-                        request.Container.GetConstantExpression(Name, typeof(object)), 
-                        Constant(request.IfUnresolved == IfUnresolved.Throw), 
+                    return Call(_getNameScopedMethod, resolverExpr,
+                        request.Container.GetConstantExpression(Name, typeof(object)),
+                        Constant(request.IfUnresolved == IfUnresolved.Throw),
                         idExpr, factoryLambdaExpr, disposalOrderExpr);
                 }
             }
@@ -8758,9 +8783,14 @@ namespace DryIoc
             object scopeName, bool throwIfNoScope, int id, object value, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
 
-        private static readonly MethodInfo _getNameScopedMethodWithValue =
+// todo: apply the trick for the rest of the services
+#if !NETSTANDARD2_0 && !NET45
+        internal static readonly MethodInfo GetNameScopedWithValueMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScopedWithValue), true);
-
+#else
+        internal static readonly MethodInfo GetNameScopedWithValueMethod =
+            ((Func<IResolverContext, object, bool, int, object, int, object>)GetNameScopedWithValue).Method;
+#endif
         internal static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
             r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);
 
@@ -8847,11 +8877,11 @@ namespace DryIoc
         public bool Match(object scopeName)
         {
             var name = scopeName as ResolutionScopeName;
-            return name != null && 
+            return name != null &&
                    (ServiceType == null ||
                    name.ServiceType.IsAssignableTo(ServiceType) ||
-                   ServiceType.IsOpenGeneric() && 
-                   name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) && 
+                   ServiceType.IsOpenGeneric() &&
+                   name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
                    (ServiceKey == null || ServiceKey.Equals(name.ServiceKey));
         }
 
@@ -8883,7 +8913,7 @@ namespace DryIoc
 
         /// <summary>Scoped to multiple names.</summary>
         public static IReuse ScopedTo(params object[] names) =>
-            names.IsNullOrEmpty() ? Scoped 
+            names.IsNullOrEmpty() ? Scoped
             : names.Length == 1 ? ScopedTo(names[0]) : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
@@ -9141,7 +9171,7 @@ namespace DryIoc
         /// If the null or default values are provided then the default or new values will be applied.
         /// Nothing will be inherited from the current container.
         /// If you want to inherit something you need to provide it as parameter.</summary>
-        IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext, 
+        IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
             RegistrySharing registrySharing, IScope singletonScope, IScope currentScope);
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -9816,7 +9846,7 @@ namespace DryIoc
             type.GetTypeInfo().IsEnum;
 
         /// <summary>Returns true if type can be casted with conversion operators.</summary>
-        public static bool IsCastableTo(this Type @from, Type to) => 
+        public static bool IsCastableTo(this Type @from, Type to) =>
             @from != null && to != null &&
             @from.GetTypeInfo().DeclaredMethods
                 .Match(m => m.IsPublic && m.IsStatic && m.ReturnType == to &&
@@ -9886,7 +9916,7 @@ namespace DryIoc
             var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
             if (!includeNonPublic)
                 ctors = ctors.Match(c => c.IsPublic);
-            
+
             for (var i = 0; i < ctors.Length; i++)
             {
                 var ctor = ctors[i];
@@ -10191,7 +10221,7 @@ namespace DryIoc
         /// <paramref name="getTypeName"/>Allows to specify if you want Name instead of FullName.</summary>
         public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
         {
-            if (type == null) 
+            if (type == null)
                 return s;
 
             var isArray = type.IsArray;
@@ -10309,7 +10339,7 @@ namespace DryIoc
         /// <remarks>Important: <paramref name="changeCurrentScope"/> may be called multiple times in concurrent environment.
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. It is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
-        public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) => 
+        public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) =>
             _ambientScope.Value = changeCurrentScope(GetCurrentOrDefault());
 
         /// <summary>Nothing to dispose.</summary>
@@ -10740,7 +10770,7 @@ namespace DryIoc.Messages
     }
 
     /// Base message handler for message with empty response
-    public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage {}
+    public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage { }
 
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
@@ -10785,7 +10815,7 @@ namespace DryIoc.Messages
     public interface IMessage : IMessage<EmptyResponse> { }
 
     /// Broadcasting type of message handler decorator
-    public class BroadcastMessageHandler<M> : IMessageHandler<M, EmptyResponse> 
+    public class BroadcastMessageHandler<M> : IMessageHandler<M, EmptyResponse>
         where M : IMessage
     {
         private readonly IEnumerable<IMessageHandler<M, EmptyResponse>> _handlers;
@@ -10822,6 +10852,6 @@ namespace DryIoc.Messages
         /// Sends message with empty response to resolved handlers
         public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage =>
             _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
-    } 
+    }
 }
 #endif
