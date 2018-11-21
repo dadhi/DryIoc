@@ -20,8 +20,6 @@ namespace DryIoc.IssuesTests
                 var blah = scope.Resolve<ScopedBlah>();
                 Assert.IsNotNull(blah);
             }
-
-            Assert.Fail();
         }
 
         internal class Parameter1 { }

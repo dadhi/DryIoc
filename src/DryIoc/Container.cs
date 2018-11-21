@@ -240,8 +240,11 @@ namespace DryIoc
                 // 2) fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
             }
+            else
+            {
+                factoryDelegate = factory?.GetDelegateOrDefault(request);
+            }
 
-            factoryDelegate = factory?.GetDelegateOrDefault(request);
             if (factoryDelegate == null)
                 return null;
 
@@ -313,7 +316,11 @@ namespace DryIoc
                         if (!TryInterpret(convertExpr.Operand, out object instance))
                             return false;
 
-                        result = Converter.Convert(instance, convertExpr.Type);
+                        // skip conversion for null and for directly assignable type
+                        if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
+                            result = instance;
+                        else
+                            result = Converter.Convert(instance, convertExpr.Type);
                         return true;
                     }
                 case ExprType.Parameter:
