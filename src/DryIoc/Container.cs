@@ -223,19 +223,19 @@ namespace DryIoc
                 return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
 
             FactoryDelegate factoryDelegate;
-            if (factory is ReflectionFactory)
+            if (factory is ReflectionFactory) // todo: hacking ReflectionFactory.GetDelegateOrDefault, find a better way
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
                     return null;
 
+                // Cache expressio first, so that parallel resolutions may already use it
+                // and UseInstance may correctly evict the cache if needed
+                CacheDefaultFactory(serviceType, expr);
+
                 // 1) try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
-                var isInrepreted = TryInterpret(expr, out object result);
-                if (isInrepreted)
-                {
-                    CacheDefaultFactory(serviceType, expr);
+                if (TryInterpret(expr, out object result))
                     return result;
-                }
 
                 // 2) fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
@@ -317,10 +317,9 @@ namespace DryIoc
                             return false;
 
                         // skip conversion for null and for directly assignable type
-                        if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
-                            result = instance;
-                        else
-                            result = Converter.Convert(instance, convertExpr.Type);
+                        result = instance == null || instance.GetType().IsAssignableTo(convertExpr.Type)
+                            ? instance
+                            : Converter.Convert(instance, convertExpr.Type);
                         return true;
                     }
                 case ExprType.Parameter:
