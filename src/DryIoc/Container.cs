@@ -273,7 +273,8 @@ namespace DryIoc
                         if (!newExpr.Constructor.IsPublic) // todo: skipping non-public constructors for now
                             return false;
 
-                        if (!TryInterpretMany(newExpr.Arguments, out var args))
+                        var newArgs = newExpr.Arguments.ToListOrSelf();
+                        if (!TryInterpretMany(newArgs, out var args))
                             return false;
 
                         result = Activator.CreateInstance(newExpr.Type, args);
@@ -282,7 +283,7 @@ namespace DryIoc
                 case ExprType.Call:
                     {
                         var callExpr = (MethodCallExpression)expr;
-                        var callArgs = callExpr.Arguments;
+                        var callArgs = callExpr.Arguments.ToListOrSelf();
 
                         if (callExpr.Method == CurrentScopeReuse.GetNameScopedWithValueMethod)
                             return TryInterpretGetNameScopedWithValue(ref result, callArgs);
@@ -331,7 +332,7 @@ namespace DryIoc
             return false;
         }
 
-        private bool TryInterpretGetNameScopedWithValue(ref object result, IReadOnlyList<Expression> args)
+        private bool TryInterpretGetNameScopedWithValue(ref object result, IList<Expression> args)
         {
             if (!TryInterpret(args[4], out var service))
                 return false;
@@ -353,7 +354,7 @@ namespace DryIoc
             private static readonly MethodInfo _convertMethod = typeof(Converter).SingleMethod(nameof(DoConvert), true);
         }
 
-        private bool TryInterpretMany(IReadOnlyList<Expression> argExprs, out object[] args)
+        private bool TryInterpretMany(IList<Expression> argExprs, out object[] args)
         {
             args = argExprs.Count == 0 ? ArrayTools.Empty<object>() : new object[argExprs.Count];
 

@@ -77,9 +77,13 @@ namespace ImTools
         /// <summary>Returns empty array instead of null, or source array otherwise.</summary> <typeparam name="T">Type of array item.</typeparam>
         public static T[] EmptyIfNull<T>(this T[] source) => source ?? Empty<T>();
 
-        /// <summary>Returns source enumerable if it is array, otherwise converts source to array.</summary>
+        /// Returns source enumerable if it is array, otherwise converts source to array or an empty array if null.
         public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source) =>
             source == null ? Empty<T>() : (source as T[] ?? source.ToArray());
+
+        /// Returns source enumerable if it is list, otherwise converts source to IList or an empty array if null.
+        public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
+            source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
 
         /// <summary>Returns new array consisting from all items from source array then all items from added array.
         /// If source is null or empty, then added array will be returned.
