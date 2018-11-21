@@ -117,6 +117,21 @@ namespace PerformanceTests
         //-------------|----------:|----------:|---------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
         //BmarkAutofac |  47.21 us |  4.363 us | 12.86 us |  54.11 us |  0.17 |    0.05 |      5.1880 |           - |           - |            24.15 KB |
         //BmarkDryIoc  | 282.05 us | 12.234 us | 10.85 us | 279.34 us |  1.00 |    0.00 |      1.4648 |      0.4883 |           - |             8.19 KB |
+
+        // OMG !!!: Result with TryInterpret
+        //
+        //BenchmarkDotNet=v0.11.2, OS=Windows 10.0.17134.345 (1803/April2018Update/Redstone4)
+        //Intel Core i7-8750H CPU 2.20GHz(Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+        //Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
+        //.NET Core SDK=2.1.500
+        //  [Host]     : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
+        //  DefaultJob : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
+
+        //       Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+        //------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+        // BmarkAutofac | 29.542 us | 0.3323 us | 0.3108 us |  5.60 |    0.07 |      5.2185 |           - |           - |            24.15 KB |
+        //  BmarkDryIoc |  5.280 us | 0.0382 us | 0.0357 us |  1.00 |    0.00 |      1.4114 |           - |           - |             6.52 KB |
+
         [MemoryDiagnoser]
         public class BenchmarkRegistrationAndResolution
         {

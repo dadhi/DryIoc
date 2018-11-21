@@ -30,9 +30,6 @@ v2.0.0:
 - breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
         ]]>
         </PackageReleaseNotes>
-        <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
-        <PackageLicenseUrl>http://opensource.org/licenses/MIT</PackageLicenseUrl>
-        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</PackageIconUrl>
     </PropertyGroup>
 
     <ItemGroup>
