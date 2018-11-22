@@ -222,8 +222,10 @@ namespace DryIoc
             if (serviceKey != null || CurrentScope?.Name != null)
                 return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
 
+            // todo: hacking ReflectionFactory.GetDelegateOrDefault, find a better way
+            // todo: handle ExpressionFactory
             FactoryDelegate factoryDelegate;
-            if (factory is ReflectionFactory) // todo: hacking ReflectionFactory.GetDelegateOrDefault, find a better way
+            if (factory is ReflectionFactory)
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -234,8 +236,17 @@ namespace DryIoc
                 CacheDefaultFactory(serviceType, expr);
 
                 // 1) Try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
-                if (TryInterpret(expr, out object result))
-                    return result;
+                try
+                {
+                    if (TryInterpret(expr, out object result))
+                        return result;
+                }
+                catch (TargetInvocationException tex)
+                {
+                    if (tex.InnerException is ContainerException)
+                        throw tex.InnerException; // unpack the internal exception if any
+                    throw;
+                }
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
@@ -273,14 +284,12 @@ namespace DryIoc
                 case ExprType.New:
                     {
                         var newExpr = (NewExpression)expr;
-                        if (!newExpr.Constructor.IsPublic) // todo: skipping non-public constructors for now
-                            return false;
 
                         var newArgs = newExpr.Arguments.ToListOrSelf();
                         if (!TryInterpretMany(newArgs, out var args))
                             return false;
 
-                        result = Activator.CreateInstance(newExpr.Type, args);
+                        result = newExpr.Constructor.Invoke(args);
                         return true;
                     }
                 case ExprType.Call:
@@ -293,6 +302,10 @@ namespace DryIoc
 
                         if (callExpr.Method == CurrentScopeReuse.GetNameScopedWithValueMethod)
                             return TryInterpretGetNameScopedWithValue(ref result, callArgs);
+
+                        // Method with nested lambda parameter of type `CreateScopedValue` is not supported
+                        if (callExpr.Method == CurrentScopeReuse.GetNameScopedMethod)
+                            return false;
 
                         if (!TryInterpretMany(callArgs, out var args))
                             return false;
@@ -8749,7 +8762,7 @@ namespace DryIoc
                         return Call(_getScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
                             idExpr, factoryLambdaExpr, disposalOrderExpr);
 
-                    return Call(_getNameScopedMethod, resolverExpr,
+                    return Call(GetNameScopedMethod, resolverExpr,
                         request.Container.GetConstantExpression(Name, typeof(object)),
                         Constant(request.IfUnresolved == IfUnresolved.Throw),
                         idExpr, factoryLambdaExpr, disposalOrderExpr);
@@ -8819,21 +8832,24 @@ namespace DryIoc
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
-        private static readonly MethodInfo _getNameScopedMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScoped), true);
-
         internal static object GetNameScopedWithValue(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, object value, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
 
         // todo: apply the trick for the rest of the services
 #if !NETSTANDARD2_0 && !NET45
+        internal static readonly MethodInfo GetNameScopedMethod =
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScoped), true);
+
         internal static readonly MethodInfo GetScopedWithValueMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedWithValue), true);
 
         internal static readonly MethodInfo GetNameScopedWithValueMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScopedWithValue), true);
 #else
+        internal static readonly MethodInfo GetNameScopedMethod =
+            ((Func<IResolverContext, object, bool, int, CreateScopedValue, int, object>)GetNameScoped).Method;
+
         internal static readonly MethodInfo GetScopedWithValueMethod =
             ((Func<IResolverContext, bool, int, object, int, object>)GetScopedWithValue).Method;
 

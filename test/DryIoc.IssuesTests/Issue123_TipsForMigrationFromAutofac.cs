@@ -461,7 +461,7 @@ namespace DryIoc.IssuesTests
             container.Resolve<A>();
         }
 
-        [Test, Ignore("todo: fix System.Reflection.Ambiguous")]
+        [Test]
         public void DryIoc_constructor_selection_plus_specs()
         {
             var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
