@@ -200,7 +200,7 @@ namespace DryIoc
             var cachedExpr = cachedItem as Expression;
             if (cachedExpr != null)
             {
-                var factoryDelegate = cachedExpr.CompileToFactoryDelegate(Rules.UsedForExpressionGeneration);
+                var factoryDelegate = cachedExpr.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
                 var cache = cacheRef.Value;
                 if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
                     cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
@@ -233,12 +233,12 @@ namespace DryIoc
                 // and UseInstance may correctly evict the cache if needed
                 CacheDefaultFactory(serviceType, expr);
 
-                // 1) try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
+                // 1) Try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
                 if (TryInterpret(expr, out object result))
                     return result;
 
-                // 2) fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
+                // 2) Fallback to expression compilation
+                factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
             }
             else
             {
@@ -1636,7 +1636,7 @@ namespace DryIoc
                 {
                     var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                     if (decoratedExpr != null)
-                        return decoratedExpr.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
+                        return decoratedExpr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
                 }
 
                 return GetInstanceFromScopeChainOrSingletons;
@@ -3855,12 +3855,12 @@ namespace DryIoc
             WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
 
         /// <summary>Commands to use FastExpressionCompiler - set by default.</summary>
-        public bool ShouldUseFastExpressionCompiler =>
-            (_settings & Settings.ShouldUseFastExpressionCompilerIfPlatformSupported) != 0;
+        public bool UseFastExpressionCompiler =>
+            (_settings & Settings.UseFastExpressionCompilerIfPlatformSupported) != 0;
 
         /// <summary>Fallbacks to system `Expression.Compile()`</summary>
         public Rules WithoutFastExpressionCompiler() =>
-            WithSettings(_settings & ~Settings.ShouldUseFastExpressionCompilerIfPlatformSupported);
+            WithSettings(_settings & ~Settings.UseFastExpressionCompilerIfPlatformSupported);
 
         /// <summary>Outputs most notable non-default rules</summary>
         public override string ToString()
@@ -3960,7 +3960,7 @@ namespace DryIoc
             AutoConcreteTypeResolution = 1 << 14, // informational flag
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
-            ShouldUseFastExpressionCompilerIfPlatformSupported = 1 << 17
+            UseFastExpressionCompilerIfPlatformSupported = 1 << 17
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -3969,7 +3969,7 @@ namespace DryIoc
             | Settings.ImplicitCheckForReuseMatchingScope
             | Settings.VariantGenericTypesInResolvedCollection
             | Settings.EagerCachingSingletonForFasterAccess
-            | Settings.ShouldUseFastExpressionCompilerIfPlatformSupported;
+            | Settings.UseFastExpressionCompilerIfPlatformSupported;
 
         private Settings _settings;
 
@@ -7131,7 +7131,7 @@ namespace DryIoc
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var factoryDelegate = serviceExpr.CompileToFactoryDelegate(rules.ShouldUseFastExpressionCompiler);
+                var factoryDelegate = serviceExpr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler);
                 var factory = factoryDelegate;
 
                 if (Setup.WeaklyReferenced)
@@ -7167,7 +7167,7 @@ namespace DryIoc
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
-            GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.ShouldUseFastExpressionCompiler);
+            GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
 
         internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
