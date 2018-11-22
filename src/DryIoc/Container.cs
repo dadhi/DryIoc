@@ -229,7 +229,7 @@ namespace DryIoc
                 if (expr == null)
                     return null;
 
-                // Cache expressio first, so that parallel resolutions may already use it
+                // Cache expression first, so that parallel resolutions may already use it
                 // and UseInstance may correctly evict the cache if needed
                 CacheDefaultFactory(serviceType, expr);
 
@@ -2706,7 +2706,11 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
+#if !NETSTANDARD2_0 && !NET45
             typeof(DefaultKey).SingleMethod(nameof(Of));
+#else
+            ((Func<int, DefaultKey>)Of).Method;
+#endif
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
@@ -2745,7 +2749,11 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultDynamicKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
+#if !NETSTANDARD2_0 && !NET45
             typeof(DefaultDynamicKey).SingleMethod(nameof(Of));
+#else
+            ((Func<int, DefaultDynamicKey>)Of).Method;
+#endif
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
@@ -2812,7 +2820,11 @@ namespace DryIoc
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
+#if !NETSTANDARD2_0 && !NET45
             typeof(ResolverContext).SingleMethod(nameof(OpenScope));
+#else
+            ((Func<IResolverContext, object, bool, IResolverContext>)OpenScope).Method;
+#endif
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
@@ -2828,7 +2840,13 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression RootOrSelfExpr =
-            Call(typeof(ResolverContext).SingleMethod(nameof(RootOrSelf)), FactoryDelegateCompiler.ResolverContextParamExpr);
+            Call(
+#if !NETSTANDARD2_0 && !NET45
+                typeof(ResolverContext).SingleMethod(nameof(RootOrSelf)), 
+#else
+                ((Func<IResolverContext, IResolverContext>)RootOrSelf).Method,
+#endif
+                FactoryDelegateCompiler.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression SingletonScopeExpr =
@@ -4592,7 +4610,14 @@ namespace DryIoc
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata);
         }
 
-        internal static T[] ObjectArrayCastTo<T>(object[] array) => array.Map(x => (T)x);
+        internal static T[] ObjectArrayCastTo<T>(object[] source)
+        {
+            var target = new T[source.Length];
+            for (var i = 0; i < source.Length; i++)
+                target[i] = (T)source[i];
+            return target;
+        }
+
         private static readonly MethodInfo _objectArrayCastToMethod =
             typeof(Made).SingleMethod(nameof(ObjectArrayCastTo), includeNonPublic: true);
 
@@ -9990,6 +10015,7 @@ namespace DryIoc
                 .Match(m => (includeNonPublic || m.IsPublic) && m.Name == name)
                 .SingleOrDefaultIfMany();
 
+        // todo: Replace with `GetDeclaredMethod(name)` for supported platforms
         /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
         public static MethodInfo SingleMethod(this Type type, string name, bool includeNonPublic = false) =>
             type.GetSingleMethodOrNull(name, includeNonPublic).ThrowIfNull(
@@ -10124,7 +10150,7 @@ namespace DryIoc
 
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         public static Expression GetDefaultValueExpression(this Type type) =>
-            Call(_getDefaultMethod.Value.MakeGenericMethod(type), Empty<Expression>());
+            Call(_getDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
 
 #region Implementation
 
@@ -10175,9 +10201,7 @@ namespace DryIoc
         }
 
         internal static T GetDefault<T>() => default(T);
-
-        private static readonly Lazy<MethodInfo> _getDefaultMethod = Lazy.Of(() =>
-            typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true));
+        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true);
 
 #endregion
     }
