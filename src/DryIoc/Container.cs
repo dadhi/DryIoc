@@ -297,14 +297,16 @@ namespace DryIoc
                         var callExpr = (MethodCallExpression)expr;
                         var callArgs = callExpr.Arguments.ToListOrSelf();
 
-                        if (callExpr.Method == CurrentScopeReuse.GetScopedWithValueMethod)
+                        var callMethod = callExpr.Method;
+                        if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
                             return TryInterpretGetScopedWithValue(ref result, callArgs);
 
-                        if (callExpr.Method == CurrentScopeReuse.GetNameScopedWithValueMethod)
+                        if (callMethod == CurrentScopeReuse.GetNameScopedWithValueMethod)
                             return TryInterpretGetNameScopedWithValue(ref result, callArgs);
 
-                        // Method with nested lambda parameter of type `CreateScopedValue` is not supported
-                        if (callExpr.Method == CurrentScopeReuse.GetNameScopedMethod)
+                        // Methods with nested lambda parameter of type `CreateScopedValue` is not supported
+                        if (callMethod == CurrentScopeReuse.GetScopedMethod ||
+                            callMethod == CurrentScopeReuse.GetNameScopedMethod)
                             return false;
 
                         if (!TryInterpretMany(callArgs, out var args))
@@ -314,7 +316,7 @@ namespace DryIoc
                         if (callExpr.Object != null && !TryInterpret(callExpr.Object, out instance))
                             return false;
 
-                        result = callExpr.Method.Invoke(instance, args);
+                        result = callMethod.Invoke(instance, args);
                         return true;
                     }
                 case ExprType.Constant:
@@ -337,7 +339,7 @@ namespace DryIoc
                     }
                 case ExprType.Parameter:
                     {
-                        // todo: handles only resolver parameter for now
+                        // todo: handles only IResolverContext parameter for now
                         if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
                             return false;
 
@@ -8759,7 +8761,7 @@ namespace DryIoc
                             idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                     if (Name == null)
-                        return Call(_getScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
+                        return Call(GetScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
                             idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                     return Call(GetNameScopedMethod, resolverExpr,
@@ -8821,9 +8823,6 @@ namespace DryIoc
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
-        private static readonly MethodInfo _getScopedMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScoped), true);
-
         internal static object GetScopedWithValue(IResolverContext r,
             bool throwIfNoScope, int id, object value, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
@@ -8838,6 +8837,9 @@ namespace DryIoc
 
         // todo: apply the trick for the rest of the services
 #if !NETSTANDARD2_0 && !NET45
+        internal static readonly MethodInfo GetScopedMethod =
+            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScoped), true);
+
         internal static readonly MethodInfo GetNameScopedMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScoped), true);
 
@@ -8847,6 +8849,9 @@ namespace DryIoc
         internal static readonly MethodInfo GetNameScopedWithValueMethod =
             typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScopedWithValue), true);
 #else
+        internal static readonly MethodInfo GetScopedMethod =
+            ((Func<IResolverContext, bool, int, CreateScopedValue, int, object>)GetScoped).Method;
+
         internal static readonly MethodInfo GetNameScopedMethod =
             ((Func<IResolverContext, object, bool, int, CreateScopedValue, int, object>)GetNameScoped).Method;
 
