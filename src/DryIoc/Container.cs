@@ -357,6 +357,26 @@ namespace DryIoc
                     }
                 case ExprType.MemberAccess:
                     {
+                        var memberExpr = (MemberExpression)expr;
+                        object instance = null;
+                        if (memberExpr.Expression != null && 
+                            !TryInterpret(memberExpr.Expression, out instance))
+                            return false;
+
+                        var field = memberExpr.Member as FieldInfo;
+                        if (field != null)
+                        {
+                            result = field.GetValue(instance);
+                            return true;
+                        }
+
+                        var prop = memberExpr.Member as PropertyInfo;
+                        if (prop != null)
+                        {
+                            result = prop.GetValue(instance, null);
+                            return true;
+                        }
+
                         break;
                     }
                 case ExprType.MemberInit:
