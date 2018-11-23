@@ -295,9 +295,18 @@ namespace DryIoc
                 case ExprType.Call:
                     {
                         var callExpr = (MethodCallExpression)expr;
-                        var callArgs = callExpr.Arguments.ToListOrSelf();
-
                         var callMethod = callExpr.Method;
+                        var callObject = callExpr.Object;
+                        var callArgs   = callExpr.Arguments.ToListOrSelf();
+
+                        if (callMethod == Resolver.ResolveMethod)
+                            return TryInterpret(callObject, out var resolver) && 
+                                   TryInterpretResolve((IResolver)resolver, callArgs, out result);
+
+                        if (callMethod == Resolver.ResolveManyMethod)
+                            return TryInterpret(callObject, out var resolver) &&
+                                   TryInterpretResolveMany((IResolver)resolver, callArgs, out result);
+
                         if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
                             return TryInterpretGetScopedWithValue(ref result, callArgs);
 
@@ -313,7 +322,7 @@ namespace DryIoc
                             return false;
 
                         object instance = null;
-                        if (callExpr.Object != null && !TryInterpret(callExpr.Object, out instance))
+                        if (callObject != null && !TryInterpret(callObject, out instance))
                             return false;
 
                         result = callMethod.Invoke(instance, args);
@@ -348,12 +357,51 @@ namespace DryIoc
                     }
                 case ExprType.MemberAccess:
                     {
-
                         break;
                     }
+                case ExprType.MemberInit:
+                    {
+                        break;
+                    }
+                case ExprType.NewArrayInit:
+                    {
+                        break;
+                    }
+                case ExprType.Lambda:
+                    break;
+                default:
+                    break;
             }
 
             return false;
+        }
+
+        private bool TryInterpretResolve(IResolver r, IList<Expression> args, out object result)
+        {
+            result = null;
+            if (!TryInterpret(args[1], out var serviceKey))
+                return false;
+            if (!TryInterpret(args[4], out var preResolveParent))
+                return false;
+            if (!TryInterpret(args[5], out var resolveArgs))
+                return false;
+            result = r.Resolve((Type)ConstValue(args[0]), serviceKey, (IfUnresolved)ConstValue(args[2]), (Type)ConstValue(args[3]),
+                (Request)preResolveParent, (object[])resolveArgs);
+            return true;
+        }
+
+        private bool TryInterpretResolveMany(IResolver r, IList<Expression> args, out object result)
+        {
+            result = null;
+            if (!TryInterpret(args[1], out var serviceKey))
+                return false;
+            if (!TryInterpret(args[3], out var preResolveParent))
+                return false;
+            if (!TryInterpret(args[4], out var resolveArgs))
+                return false;
+            result = r.ResolveMany((Type)ConstValue(args[0]), serviceKey, (Type)ConstValue(args[2]),
+                (Request) preResolveParent, (object[]) resolveArgs);
+            return true;
         }
 
         private bool TryInterpretGetScopedWithValue(ref object result, IList<Expression> args)
