@@ -7241,27 +7241,28 @@ namespace DryIoc
                 !Setup.PreventDisposal && !Setup.WeaklyReferenced)
                 return serviceExpr;
 
-            // Optimize: eagerly create singleton during the construction of object graph,
-            // but only for root singleton and not for singleton dependency inside singleton, because of double compilation work
-            if (reuse is SingletonReuse &&
-                rules.EagerCachingSingletonForFasterAccess &&
-                // except: For decorators and wrappers, when tracking transient disposable and for lazy consumption in Func
+            // Optimization: eagerly creates a singleton during the construction of object graph
+            if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
+                // except: For decorators and wrappers, when tracking transient disposable and
+                // for lazy creation in Func
                 FactoryType == FactoryType.Service &&
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                // todo: TryInterpret
+                var container = request.Container;
+                CreateScopedValue createSingleton = () =>
+                {
+                    if (!Interpreter.TryInterpret(container, serviceExpr, out var instance))
+                        instance = serviceExpr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler)(container);
 
-                var factoryDelegate = serviceExpr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler);
-                var factory = factoryDelegate;
+                    if (Setup.WeaklyReferenced)
+                        instance = new WeakReference(instance);
+                    else if (Setup.PreventDisposal)
+                        instance = new HiddenDisposable(instance);
+                    return instance;
+                };
 
-                if (Setup.WeaklyReferenced)
-                    factoryDelegate = r => new WeakReference(factory(r));
-                else if (Setup.PreventDisposal)
-                    factoryDelegate = r => new HiddenDisposable(factory(r));
-
-                var singleton = request.SingletonScope
-                    .GetOrAdd(FactoryID, () => factoryDelegate(request.Container), Setup.DisposalOrder);
+                var singleton = request.SingletonScope.GetOrAdd(FactoryID, createSingleton, Setup.DisposalOrder);
                 serviceExpr = Constant(singleton);
             }
             else
@@ -7984,35 +7985,9 @@ namespace DryIoc
             if (ctor == null)
                 return CreateNonConstructorServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
 
-            // Optimize singleton creation by bypassing Expression.New and using Activator.CreateInstance.
-            // Why? Because singleton is created only once and it does not make sense
-            // to create an optimal delegate for multiple singleton creation. We spend more time 
-            // to create the delegate itself.
-            // Moreover, the singleton dependency may be a singleton or Transient,
-            // so we may activate Transients on a spot as well.
-            var rules = request.Rules;
-            //if (request.Reuse is SingletonReuse &&
-            //    rules.EagerCachingSingletonForFasterAccess &&
-
-            //    //ctor.IsPublic &&
-            //    //rules.PropertiesAndFields == null &&
-            //    //Made.PropertiesAndFields == null &&
-
-            //    FactoryType == FactoryType.Service &&
-            //    !Setup.PreventDisposal &&
-            //    !Setup.WeaklyReferenced &&
-            //    !request.TracksTransientDisposable &&
-            //    !request.IsWrappedInFunc())
-            //{
-            //    var singletonFactory = GetActivator(ctor.DeclaringType, paramExprs);
-            //    if (singletonFactory != null)
-            //    {
-            //        var singleton = request.SingletonScope.GetOrAdd(FactoryID, singletonFactory, Setup.DisposalOrder);
-            //        return Constant(singleton);
-            //    }
-            //}
-
             var newServiceExpr = New(ctor, paramExprs);
+
+            var rules = request.Rules;
             if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
                 return newServiceExpr;
 
