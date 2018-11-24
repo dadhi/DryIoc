@@ -238,7 +238,7 @@ namespace DryIoc
                 // 1) Try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
                 try
                 {
-                    if (TryInterpret(expr, out object result))
+                    if (Interpreter.TryInterpret(this, expr, out object result))
                         return result;
                 }
                 catch (TargetInvocationException tex)
@@ -274,203 +274,6 @@ namespace DryIoc
             var cache = cacheRef.Value;
             if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
                 cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factory));
-        }
-
-        private bool TryInterpret(Expression expr, out object result)
-        {
-            result = null;
-            switch (expr.NodeType)
-            {
-                case ExprType.New:
-                    {
-                        var newExpr = (NewExpression)expr;
-
-                        var newArgs = newExpr.Arguments.ToListOrSelf();
-                        if (!TryInterpretMany(newArgs, out var args))
-                            return false;
-
-                        result = newExpr.Constructor.Invoke(args);
-                        return true;
-                    }
-                case ExprType.Call:
-                    {
-                        var callExpr = (MethodCallExpression)expr;
-                        var callMethod = callExpr.Method;
-                        var callObject = callExpr.Object;
-                        var callArgs   = callExpr.Arguments.ToListOrSelf();
-
-                        if (callMethod == Resolver.ResolveMethod)
-                            return TryInterpret(callObject, out var resolver) && 
-                                   TryInterpretResolve((IResolver)resolver, callArgs, out result);
-
-                        if (callMethod == Resolver.ResolveManyMethod)
-                            return TryInterpret(callObject, out var resolver) &&
-                                   TryInterpretResolveMany((IResolver)resolver, callArgs, out result);
-
-                        if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
-                            return TryInterpretGetScopedWithValue(ref result, callArgs);
-
-                        if (callMethod == CurrentScopeReuse.GetNameScopedWithValueMethod)
-                            return TryInterpretGetNameScopedWithValue(ref result, callArgs);
-
-                        // Methods with nested lambda parameter of type `CreateScopedValue` is not supported
-                        if (callMethod == CurrentScopeReuse.GetScopedMethod ||
-                            callMethod == CurrentScopeReuse.GetNameScopedMethod)
-                            return false;
-
-                        if (!TryInterpretMany(callArgs, out var args))
-                            return false;
-
-                        object instance = null;
-                        if (callObject != null && !TryInterpret(callObject, out instance))
-                            return false;
-
-                        result = callMethod.Invoke(instance, args);
-                        return true;
-                    }
-                case ExprType.Constant:
-                    {
-                        var constExpr = (ConstantExpression)expr;
-                        result = constExpr.Value;
-                        return true;
-                    }
-                case ExprType.Convert:
-                    {
-                        var convertExpr = (UnaryExpression)expr;
-                        if (!TryInterpret(convertExpr.Operand, out object instance))
-                            return false;
-
-                        // skip conversion for null and for directly assignable type
-                        result = instance == null || instance.GetType().IsAssignableTo(convertExpr.Type)
-                            ? instance
-                            : Converter.Convert(instance, convertExpr.Type);
-                        return true;
-                    }
-                case ExprType.Parameter:
-                    {
-                        // todo: handles only IResolverContext parameter for now
-                        if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
-                            return false;
-
-                        result = this;
-                        return true;
-                    }
-                case ExprType.MemberAccess:
-                    {
-                        var memberExpr = (MemberExpression)expr;
-                        object instance = null;
-                        if (memberExpr.Expression != null && 
-                            !TryInterpret(memberExpr.Expression, out instance))
-                            return false;
-
-                        var field = memberExpr.Member as FieldInfo;
-                        if (field != null)
-                        {
-                            result = field.GetValue(instance);
-                            return true;
-                        }
-
-                        var prop = memberExpr.Member as PropertyInfo;
-                        if (prop != null)
-                        {
-                            result = prop.GetValue(instance, null);
-                            return true;
-                        }
-
-                        break;
-                    }
-                case ExprType.MemberInit:
-                    {
-                        break;
-                    }
-                case ExprType.NewArrayInit:
-                    {
-                        break;
-                    }
-                case ExprType.Lambda:
-                    break;
-                default:
-                    break;
-            }
-
-            return false;
-        }
-
-        private bool TryInterpretResolve(IResolver r, IList<Expression> args, out object result)
-        {
-            result = null;
-            if (!TryInterpret(args[1], out var serviceKey))
-                return false;
-            if (!TryInterpret(args[4], out var preResolveParent))
-                return false;
-            if (!TryInterpret(args[5], out var resolveArgs))
-                return false;
-            result = r.Resolve((Type)ConstValue(args[0]), serviceKey, (IfUnresolved)ConstValue(args[2]), (Type)ConstValue(args[3]),
-                (Request)preResolveParent, (object[])resolveArgs);
-            return true;
-        }
-
-        private bool TryInterpretResolveMany(IResolver r, IList<Expression> args, out object result)
-        {
-            result = null;
-            if (!TryInterpret(args[1], out var serviceKey))
-                return false;
-            if (!TryInterpret(args[3], out var preResolveParent))
-                return false;
-            if (!TryInterpret(args[4], out var resolveArgs))
-                return false;
-            result = r.ResolveMany((Type)ConstValue(args[0]), serviceKey, (Type)ConstValue(args[2]),
-                (Request) preResolveParent, (object[]) resolveArgs);
-            return true;
-        }
-
-        private bool TryInterpretGetScopedWithValue(ref object result, IList<Expression> args)
-        {
-            if (!TryInterpret(args[3], out var service))
-                return false;
-
-            result = CurrentScopeReuse.GetScopedWithValue(
-                this, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
-                service, (int)ConstValue(args[4]));
-            return true;
-        }
-
-        private bool TryInterpretGetNameScopedWithValue(ref object result, IList<Expression> args)
-        {
-            if (!TryInterpret(args[4], out var service))
-                return false;
-
-            result = CurrentScopeReuse.GetNameScopedWithValue(
-                this, ConstValue(args[1]), (bool)ConstValue(args[2]), (int)ConstValue(args[3]), 
-                service, (int)ConstValue(args[5]));
-            return true;
-        }
-
-        private static object ConstValue(Expression expr) => ((ConstantExpression)expr).Value;
-
-        internal static class Converter
-        {
-            public static object Convert(object source, Type targetType) =>
-                _convertMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
-
-            internal static R DoConvert<R>(object it) => (R)it;
-            private static readonly MethodInfo _convertMethod = typeof(Converter).SingleMethod(nameof(DoConvert), true);
-        }
-
-        private bool TryInterpretMany(IList<Expression> argExprs, out object[] args)
-        {
-            args = argExprs.Count == 0 ? ArrayTools.Empty<object>() : new object[argExprs.Count];
-
-            if (args.Length != 0)
-                for (var i = 0; i < args.Length; i++)
-                {
-                    var argExpr = argExprs[i];
-                    if (!TryInterpret(argExpr, out object arg))
-                        return false;
-                    args[i] = arg;
-                }
-
-            return true;
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey,
@@ -2282,6 +2085,214 @@ namespace DryIoc
 
         /// <summary>Wraps the value</summary>
         public HiddenDisposable(object value) { Value = value; }
+    }
+
+    internal static class Interpreter
+    {
+        public static bool TryInterpret(IResolverContext r, Expression expr, out object result)
+        {
+            result = null;
+            switch (expr.NodeType)
+            {
+                case ExprType.New:
+                    {
+                        var newExpr = (NewExpression)expr;
+
+                        var newArgs = newExpr.Arguments.ToListOrSelf();
+                        if (!TryInterpretMany(r, newArgs, out var args))
+                            return false;
+
+                        result = newExpr.Constructor.Invoke(args);
+                        return true;
+                    }
+                case ExprType.Call:
+                    {
+                        var callExpr = (MethodCallExpression)expr;
+                        var callMethod = callExpr.Method;
+                        var callObject = callExpr.Object;
+                        var callArgs = callExpr.Arguments.ToListOrSelf();
+
+                        if (callMethod == Resolver.ResolveMethod)
+                            return TryInterpret(r, callObject, out var resolver) &&
+                                   TryInterpretResolve((IResolverContext)resolver, callArgs, out result);
+
+                        if (callMethod == Resolver.ResolveManyMethod)
+                            return TryInterpret(r, callObject, out var resolver) &&
+                                   TryInterpretResolveMany((IResolverContext)resolver, callArgs, out result);
+
+                        if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
+                            return TryInterpretGetScopedWithValue(r, callArgs, ref result);
+
+                        if (callMethod == CurrentScopeReuse.GetNameScopedWithValueMethod)
+                            return TryInterpretGetNameScopedWithValue(r, callArgs, ref result);
+
+                        // Methods with nested lambda parameter of type `CreateScopedValue` is not supported
+                        if (callMethod == CurrentScopeReuse.GetScopedMethod ||
+                            callMethod == CurrentScopeReuse.GetNameScopedMethod)
+                            return false;
+
+                        if (!TryInterpretMany(r, callArgs, out var args))
+                            return false;
+
+                        object instance = null;
+                        if (callObject != null && !TryInterpret(r, callObject, out instance))
+                            return false;
+
+                        result = callMethod.Invoke(instance, args);
+                        return true;
+                    }
+                case ExprType.Constant:
+                    {
+                        var constExpr = (ConstantExpression)expr;
+                        result = constExpr.Value;
+                        return true;
+                    }
+                case ExprType.Convert:
+                    {
+                        var convertExpr = (UnaryExpression)expr;
+                        if (!TryInterpret(r, convertExpr.Operand, out object instance))
+                            return false;
+
+                        // skip conversion for null and for directly assignable type
+                        result = instance == null || instance.GetType().IsAssignableTo(convertExpr.Type)
+                            ? instance
+                            : Converter.Convert(instance, convertExpr.Type);
+                        return true;
+                    }
+                case ExprType.Parameter:
+                    {
+                        // todo: handles only IResolverContext parameter for now
+                        if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
+                            return false;
+
+                        result = r;
+                        return true;
+                    }
+                case ExprType.MemberAccess:
+                    {
+                        var memberExpr = (MemberExpression)expr;
+                        object instance = null;
+                        if (memberExpr.Expression != null &&
+                            !TryInterpret(r, memberExpr.Expression, out instance))
+                            return false;
+
+                        var field = memberExpr.Member as FieldInfo;
+                        if (field != null)
+                        {
+                            result = field.GetValue(instance);
+                            return true;
+                        }
+
+                        var prop = memberExpr.Member as PropertyInfo;
+                        if (prop != null)
+                        {
+                            result = prop.GetValue(instance, null);
+                            return true;
+                        }
+
+                        break;
+                    }
+                case ExprType.MemberInit:
+                    {
+                        break;
+                    }
+                case ExprType.NewArrayInit:
+                    {
+                        break;
+                    }
+                case ExprType.Lambda:
+                    break;
+                default:
+                    break;
+            }
+
+            return false;
+        }
+
+        private static bool TryInterpretResolve(IResolverContext r, IList<Expression> args, out object result)
+        {
+            result = null;
+            if (!TryInterpret(r, args[1], out var serviceKey))
+                return false;
+            if (!TryInterpret(r, args[4], out var preResolveParent))
+                return false;
+            if (!TryInterpret(r, args[5], out var resolveArgs))
+                return false;
+            result = r.Resolve((Type)ConstValue(args[0]), serviceKey, (IfUnresolved)ConstValue(args[2]), (Type)ConstValue(args[3]),
+                (Request)preResolveParent, (object[])resolveArgs);
+            return true;
+        }
+
+        private static bool TryInterpretResolveMany(IResolverContext r, IList<Expression> args, out object result)
+        {
+            result = null;
+            if (!TryInterpret(r, args[1], out var serviceKey))
+                return false;
+            if (!TryInterpret(r, args[3], out var preResolveParent))
+                return false;
+            if (!TryInterpret(r, args[4], out var resolveArgs))
+                return false;
+            result = r.ResolveMany((Type)ConstValue(args[0]), serviceKey, (Type)ConstValue(args[2]),
+                (Request)preResolveParent, (object[])resolveArgs);
+            return true;
+        }
+
+        private static bool TryInterpretGetScopedWithValue(IResolverContext r, IList<Expression> args,
+            ref object result)
+        {
+            if (!TryInterpret(r, args[0], out var resolver))
+                return false;
+
+            if (!TryInterpret(r, args[3], out var service))
+                return false;
+
+            result = CurrentScopeReuse.GetScopedWithValue(
+                (IResolverContext)resolver, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
+                service, (int)ConstValue(args[4]));
+            return true;
+        }
+
+        private static bool TryInterpretGetNameScopedWithValue(IResolverContext r, IList<Expression> args,
+            ref object result)
+        {
+            if (!TryInterpret(r, args[0], out var resolver))
+                return false;
+
+            if (!TryInterpret(r, args[4], out var service))
+                return false;
+
+            result = CurrentScopeReuse.GetNameScopedWithValue(
+                (IResolverContext)resolver, ConstValue(args[1]), (bool)ConstValue(args[2]), 
+                (int)ConstValue(args[3]), service, (int)ConstValue(args[5]));
+            return true;
+        }
+
+        private static bool TryInterpretMany(IResolverContext r, IList<Expression> argExprs, out object[] args)
+        {
+            args = argExprs.Count == 0 ? ArrayTools.Empty<object>() : new object[argExprs.Count];
+
+            if (args.Length != 0)
+                for (var i = 0; i < args.Length; i++)
+                {
+                    var argExpr = argExprs[i];
+                    if (!TryInterpret(r, argExpr, out object arg))
+                        return false;
+                    args[i] = arg;
+                }
+
+            return true;
+        }
+
+        private static object ConstValue(Expression expr) => ((ConstantExpression)expr).Value;
+
+        internal static class Converter
+        {
+            public static object Convert(object source, Type targetType) =>
+                _convertMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
+
+            internal static R DoConvert<R>(object it) => (R)it;
+            private static readonly MethodInfo _convertMethod = typeof(Converter).SingleMethod(nameof(DoConvert), true);
+        }
     }
 
     /// <summary>Compiles expression to factory delegate.</summary>
@@ -7239,6 +7250,8 @@ namespace DryIoc
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
+                // todo: TryInterpret
+
                 var factoryDelegate = serviceExpr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler);
                 var factory = factoryDelegate;
 
@@ -7978,26 +7991,26 @@ namespace DryIoc
             // Moreover, the singleton dependency may be a singleton or Transient,
             // so we may activate Transients on a spot as well.
             var rules = request.Rules;
-            if (request.Reuse is SingletonReuse &&
-                rules.EagerCachingSingletonForFasterAccess &&
+            //if (request.Reuse is SingletonReuse &&
+            //    rules.EagerCachingSingletonForFasterAccess &&
 
-                ctor.IsPublic &&
-                rules.PropertiesAndFields == null &&
-                Made.PropertiesAndFields == null &&
+            //    //ctor.IsPublic &&
+            //    //rules.PropertiesAndFields == null &&
+            //    //Made.PropertiesAndFields == null &&
 
-                FactoryType == FactoryType.Service &&
-                !Setup.PreventDisposal &&
-                !Setup.WeaklyReferenced &&
-                !request.TracksTransientDisposable &&
-                !request.IsWrappedInFunc())
-            {
-                var singletonFactory = GetActivator(ctor.DeclaringType, paramExprs);
-                if (singletonFactory != null)
-                {
-                    var singleton = request.SingletonScope.GetOrAdd(FactoryID, singletonFactory, Setup.DisposalOrder);
-                    return Constant(singleton);
-                }
-            }
+            //    FactoryType == FactoryType.Service &&
+            //    !Setup.PreventDisposal &&
+            //    !Setup.WeaklyReferenced &&
+            //    !request.TracksTransientDisposable &&
+            //    !request.IsWrappedInFunc())
+            //{
+            //    var singletonFactory = GetActivator(ctor.DeclaringType, paramExprs);
+            //    if (singletonFactory != null)
+            //    {
+            //        var singleton = request.SingletonScope.GetOrAdd(FactoryID, singletonFactory, Setup.DisposalOrder);
+            //        return Constant(singleton);
+            //    }
+            //}
 
             var newServiceExpr = New(ctor, paramExprs);
             if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
@@ -8060,38 +8073,38 @@ namespace DryIoc
                 : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
         }
 
-        private static CreateScopedValue GetActivator(Type type, IList<object> argExprs)
-        {
-            if (argExprs == null || argExprs.Count == 0)
-                return () => Activator.CreateInstance(type, Empty<object>());
+        //private static CreateScopedValue GetActivator(Type type, IList<object> argExprs)
+        //{
+        //    if (argExprs == null || argExprs.Count == 0)
+        //        return () => Activator.CreateInstance(type, Empty<object>());
 
-            var args = new object[argExprs.Count];
-            for (var i = 0; i < args.Length; ++i)
-            {
-                var argExpr = argExprs[i];
-                var convertExpr = argExpr as UnaryExpression;
-                if (convertExpr != null && convertExpr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
-                    argExpr = convertExpr.Operand;
+        //    var args = new object[argExprs.Count];
+        //    for (var i = 0; i < args.Length; ++i)
+        //    {
+        //        var argExpr = argExprs[i];
+        //        var convertExpr = argExpr as UnaryExpression;
+        //        if (convertExpr != null && convertExpr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
+        //            argExpr = convertExpr.Operand;
 
-                var constExpr = argExpr as ConstantExpression;
-                if (constExpr != null)
-                    args[i] = constExpr.Value;
-                else
-                {
-                    var argNewExpr = argExpr as NewExpression;
-                    if (argNewExpr == null)
-                        return null;
+        //        var constExpr = argExpr as ConstantExpression;
+        //        if (constExpr != null)
+        //            args[i] = constExpr.Value;
+        //        else
+        //        {
+        //            var argNewExpr = argExpr as NewExpression;
+        //            if (argNewExpr == null)
+        //                return null;
 
-                    var activator = GetActivator(argNewExpr.Type, argNewExpr.Arguments.ToArrayOrSelf());
-                    if (activator == null)
-                        return null;
+        //            var activator = GetActivator(argNewExpr.Type, argNewExpr.Arguments.ToArrayOrSelf());
+        //            if (activator == null)
+        //                return null;
 
-                    args[i] = activator();
-                }
-            }
+        //            args[i] = activator();
+        //        }
+        //    }
 
-            return () => Activator.CreateInstance(type, args);
-        }
+        //    return () => Activator.CreateInstance(type, args);
+        //}
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
             Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
