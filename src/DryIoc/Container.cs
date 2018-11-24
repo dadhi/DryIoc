@@ -235,18 +235,9 @@ namespace DryIoc
                 // and UseInstance may correctly evict the cache if needed
                 CacheDefaultFactory(serviceType, expr);
 
-                // 1) Try to interpret expression via Activator.CreateInstance and MethodInfo.Invoke
-                try
-                {
-                    if (Interpreter.TryInterpret(this, expr, out object result))
-                        return result;
-                }
-                catch (TargetInvocationException tex)
-                {
-                    if (tex.InnerException is ContainerException)
-                        throw tex.InnerException; // unpack the internal exception if any
-                    throw;
-                }
+                // 1) First try to interpret
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
+                    return instance;
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
@@ -2089,6 +2080,20 @@ namespace DryIoc
 
     internal static class Interpreter
     {
+        public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, out object result)
+        {
+            try
+            {
+                return Interpreter.TryInterpret(r, expr, out result);
+            }
+            catch (TargetInvocationException tex)
+            {
+                if (tex.InnerException is ContainerException)
+                    throw tex.InnerException; // unpack the internal exception if any
+                throw;
+            }
+        }
+
         public static bool TryInterpret(IResolverContext r, Expression expr, out object result)
         {
             result = null;
@@ -2194,14 +2199,41 @@ namespace DryIoc
                     }
                 case ExprType.MemberInit:
                     {
-                        break;
+                        var memberInit = (MemberInitExpression)expr;
+                        if (!TryInterpret(r, memberInit.NewExpression, out var instance))
+                            return false;
+
+                        var bindings = memberInit.Bindings;
+                        for (var i = 0; i < bindings.Count; i++)
+                        {
+                            var binding = (MemberAssignment)bindings[i];
+                            if (!TryInterpret(r, binding.Expression, out var memberValue))
+                                return false;
+
+                            var field = binding.Member as FieldInfo;
+                            if (field != null)
+                                field.SetValue(instance, memberValue);
+                            else
+                                ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
+                        }
+
+                        result = instance;
+                        return true;
                     }
                 case ExprType.NewArrayInit:
                     {
-                        break;
+                        var newArray = (NewArrayExpression)expr;
+
+                        var itemExprs = newArray.Expressions.ToListOrSelf();
+                        if (!TryInterpretMany(r, itemExprs, out var items))
+                            return false;
+
+                        result = Converter.ConvertMany(items, newArray.Type.GetElementType());
+                        return true;
                     }
+                // not supported expressions (nested lambdas)
                 case ExprType.Lambda:
-                    break;
+                case ExprType.Invoke: // todo: what if nested lambda is kust a constant?
                 default:
                     break;
             }
@@ -2290,8 +2322,25 @@ namespace DryIoc
             public static object Convert(object source, Type targetType) =>
                 _convertMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
 
+            public static object ConvertMany(object[] source, Type targetType) =>
+                _convertManyMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
+
             internal static R DoConvert<R>(object it) => (R)it;
             private static readonly MethodInfo _convertMethod = typeof(Converter).SingleMethod(nameof(DoConvert), true);
+
+            internal static R[] DoConvertMany<R>(object[] items)
+            {
+                if (items == null && items.Length == 0)
+                    return ArrayTools.Empty<R>();
+
+                var results = new R[items.Length];
+                for (var i = 0; i < items.Length; i++)
+                    results[i] = (R)items[i];
+                return results;
+            }
+
+            private static readonly MethodInfo _convertManyMethod = 
+                typeof(Converter).SingleMethod(nameof(DoConvertMany), true);
         }
     }
 
@@ -7252,7 +7301,7 @@ namespace DryIoc
                 var container = request.Container;
                 CreateScopedValue createSingleton = () =>
                 {
-                    if (!Interpreter.TryInterpret(container, serviceExpr, out var instance))
+                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out var instance))
                         instance = serviceExpr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler)(container);
 
                     if (Setup.WeaklyReferenced)
