@@ -188,26 +188,22 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var cacheRef = _registry.Value.DefaultFactoryCache;
-            var cachedItem = cacheRef.Value.GetValueOrDefault(serviceType);
+            var cachedItem = _registry.Value.DefaultFactoryCache.Value.GetValueOrDefault(serviceType);
+            if (cachedItem == null)
+                return ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
 
             var cachedDelegate = cachedItem as FactoryDelegate;
-            if (cachedDelegate != null)
-                return cachedDelegate(this);
+            return cachedDelegate != null ? cachedDelegate(this) : 
+                   CompileAndCacheFactoryDelegate(serviceType, (Expression)cachedItem, _registry.Value.DefaultFactoryCache);
+        }
 
-            // todo: optimize for inlining by moving into separate method
-
-            var cachedExpr = cachedItem as Expression;
-            if (cachedExpr != null)
-            {
-                var factoryDelegate = cachedExpr.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-                var cache = cacheRef.Value;
-                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
-                    cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factoryDelegate));
-                return factoryDelegate(this);
-            }
-
-            return ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
+        private object CompileAndCacheFactoryDelegate(Type serviceType, Expression cachedExpr, Ref<ImHashMap<Type, object>> cacheRef)
+        {
+            var factoryDelegate = cachedExpr.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+            var cache = cacheRef.Value;
+            if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
+                cacheRef.AddOrUpdate(serviceType, factoryDelegate);
+            return factoryDelegate(this);
         }
 
         private object ResolveAndCacheFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
@@ -264,7 +260,7 @@ namespace DryIoc
             var cacheRef = registry.DefaultFactoryCache;
             var cache = cacheRef.Value;
             if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
-                cacheRef.Swap(_ => _.AddOrUpdate(serviceType, factory));
+                cacheRef.AddOrUpdate(serviceType, factory);
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey,
@@ -7336,7 +7332,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// <summary>Creates factory delegate from service expression and returns it.</summary>
+        /// Creates factory delegate from service expression and returns it.
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
             GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
 
@@ -8382,8 +8378,7 @@ namespace DryIoc
         /// <summary>Wraps provided delegate into factory.</summary>
         /// <param name="getServiceExpression">Delegate that will be used internally to create service expression.</param>
         /// <param name="reuse">(optional) Reuse.</param> <param name="setup">(optional) Setup.</param>
-        public ExpressionFactory(Func<Request, Expression> getServiceExpression,
-            IReuse reuse = null, Setup setup = null)
+        public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
             : base(reuse, setup)
         {
             _getServiceExpression = getServiceExpression.ThrowIfNull();
@@ -8434,8 +8429,7 @@ namespace DryIoc
 
             // Wrap the delegate in respective expression for non-simple use
             if (request.Reuse != DryIoc.Reuse.Transient ||
-                FactoryType == FactoryType.Service &&
-                request.Container.GetDecoratorExpressionOrDefault(request) != null)
+                FactoryType == FactoryType.Service && request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
             // Otherwise just use delegate as-is
@@ -9838,6 +9832,13 @@ namespace DryIoc
             if (obj == null) Throw.It(Error.WeakRefReuseWrapperGCed);
             return obj;
         }
+    }
+
+    internal static class RefTools
+    {
+        /// Hiding the lambda in the method call
+        public static void AddOrUpdate<K, V>(this Ref<ImHashMap<K, V>> map, K key, V value) =>
+            map.Swap(_ => _.AddOrUpdate(key, value));
     }
 
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>
