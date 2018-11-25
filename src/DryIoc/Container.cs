@@ -2231,9 +2231,9 @@ namespace DryIoc
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                         return true;
                     }
-                // not supported expressions (nested lambdas)
-                case ExprType.Lambda:
+
                 case ExprType.Invoke: // todo: what if nested lambda is kust a constant?
+                case ExprType.Lambda: // not supported expressions (nested lambdas)
                 default:
                     break;
             }
