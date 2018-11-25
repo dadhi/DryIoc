@@ -218,18 +218,19 @@ namespace DryIoc
             if (serviceKey != null || CurrentScope?.Name != null)
                 return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
 
-            // todo: hacking ReflectionFactory.GetDelegateOrDefault, find a better way
-            // todo: handle ExpressionFactory
+            if (factory == null)
+                return null;
+
             FactoryDelegate factoryDelegate;
-            if (factory is ReflectionFactory)
+            if (factory.TryInterpretation(request))
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
                     return null;
 
-                // Cache expression first, so that parallel resolutions may already use it
-                // and UseInstance may correctly evict the cache if needed
-                CacheDefaultFactory(serviceType, expr);
+                // Important to cache expression first before tying to interpret,
+                // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
+                _registry.Value.CacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
@@ -240,27 +241,14 @@ namespace DryIoc
             }
             else
             {
-                factoryDelegate = factory?.GetDelegateOrDefault(request);
+                factoryDelegate = factory.GetDelegateOrDefault(request);
             }
 
             if (factoryDelegate == null)
                 return null;
 
-            CacheDefaultFactory(serviceType, factoryDelegate);
+            _registry.Value.CacheDefaultFactory(serviceType, factoryDelegate);
             return factoryDelegate(this);
-        }
-
-        private void CacheDefaultFactory(Type serviceType, object factory)
-        {
-            // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            var registry = _registry.Value;
-            if (registry.Services.IsEmpty)
-                return;
-
-            var cacheRef = registry.DefaultFactoryCache;
-            var cache = cacheRef.Value;
-            if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
-                cacheRef.AddOrUpdate(serviceType, factory);
         }
 
         object IResolver.Resolve(Type serviceType, object serviceKey,
@@ -297,11 +285,12 @@ namespace DryIoc
             }
 
             // Try get from cache first
-            var keyedCache = _registry.Value.KeyedFactoryDelegateCache;
-            var cacheEntry = keyedCache.Value.GetValueOrDefault(cacheEntryKey);
+            var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
+            var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
             if (cacheEntry != null)
             {
-                var cachedFactoryDelegate = cacheContextKey == null ? cacheEntry.Key
+                var cachedFactoryDelegate = cacheContextKey == null 
+                    ? cacheEntry.Key
                     : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
                 if (cachedFactoryDelegate != null)
                     return cachedFactoryDelegate(this);
@@ -319,13 +308,15 @@ namespace DryIoc
             if (serviceKey == null && request.ServiceKey != null)
             {
                 cacheEntryKey = KV.Of(serviceType, request.ServiceKey);
-                cacheEntry = keyedCache.Value.GetValueOrDefault(cacheEntryKey);
+
+                cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
                 if (cacheEntry != null)
                 {
-                    var cachedDelegate = cacheContextKey == null ? cacheEntry.Key
+                    var cachedFactoryDelegate = cacheContextKey == null 
+                        ? cacheEntry.Key
                         : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
-                    if (cachedDelegate != null)
-                        return cachedDelegate(this);
+                    if (cachedFactoryDelegate != null)
+                        return cachedFactoryDelegate(this);
                 }
             }
 
@@ -342,9 +333,9 @@ namespace DryIoc
                     ? KV.Of(factoryDelegate, cachedFactories)
                     : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
 
-                var cache = keyedCache.Value;
-                if (!keyedCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(cacheEntryKey, cacheEntry)))
-                    keyedCache.Swap(it => it.AddOrUpdate(cacheEntryKey, cacheEntry));
+                var cache = cacheRef.Value;
+                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(cacheEntryKey, cacheEntry)))
+                    cacheRef.AddOrUpdate(cacheEntryKey, cacheEntry);
             }
 
             return factoryDelegate(this);
@@ -1502,7 +1493,11 @@ namespace DryIoc
                 scopeToAdd?.SetOrAdd(FactoryID, instance);
             }
 
-            /// <summary>Called from Resolve method</summary>
+            // todo: figure it out
+            /// Switched off until I (or someone) will figure it out.
+            public override bool TryInterpretation(Request request) => false;
+
+            /// Tries to return instance directly from scope or sigleton, and fallbacks to expression for decorator.
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
                 if (request.IsResolutionRoot)
@@ -1996,6 +1991,17 @@ namespace DryIoc
                 new Registry(Services, Decorators, Wrappers,
                     DefaultFactoryCache, KeyedFactoryDelegateCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
+
+            public void CacheDefaultFactory(Type serviceType, object factory)
+            {
+                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
+                if (Services.IsEmpty)
+                    return;
+
+                var cache = DefaultFactoryCache.Value;
+                if (!DefaultFactoryCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
+                    DefaultFactoryCache.AddOrUpdate(serviceType, factory);
+            }
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
@@ -4011,13 +4017,21 @@ namespace DryIoc
         public Rules WithFuncAndLazyWithoutRegistration() =>
             WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
 
-        /// <summary>Commands to use FastExpressionCompiler - set by default.</summary>
+        /// Commands to use FastExpressionCompiler - set by default.
         public bool UseFastExpressionCompiler =>
             (_settings & Settings.UseFastExpressionCompilerIfPlatformSupported) != 0;
 
-        /// <summary>Fallbacks to system `Expression.Compile()`</summary>
+        /// Fallbacks to system `Expression.Compile()`
         public Rules WithoutFastExpressionCompiler() =>
             WithSettings(_settings & ~Settings.UseFastExpressionCompilerIfPlatformSupported);
+
+        /// Subject-subject
+        public bool TryInterpretationForTheFirstResolution =>
+            (_settings & Settings.TryInterpretationForTheFirstResolution) != 0;
+
+        /// Fallbacks to system `Expression.Compile()`
+        public Rules WithoutInterpretationForTheFirstResolution() =>
+            WithSettings(_settings & ~Settings.TryInterpretationForTheFirstResolution);
 
         /// <summary>Outputs most notable non-default rules</summary>
         public override string ToString()
@@ -4117,7 +4131,8 @@ namespace DryIoc
             AutoConcreteTypeResolution = 1 << 14, // informational flag
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
-            UseFastExpressionCompilerIfPlatformSupported = 1 << 17
+            UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
+            TryInterpretationForTheFirstResolution = 1 << 18 
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -4126,7 +4141,8 @@ namespace DryIoc
             | Settings.ImplicitCheckForReuseMatchingScope
             | Settings.VariantGenericTypesInResolvedCollection
             | Settings.EagerCachingSingletonForFasterAccess
-            | Settings.UseFastExpressionCompilerIfPlatformSupported;
+            | Settings.UseFastExpressionCompilerIfPlatformSupported
+            | Settings.TryInterpretationForTheFirstResolution;
 
         private Settings _settings;
 
@@ -7332,6 +7348,9 @@ namespace DryIoc
             return serviceExpr;
         }
 
+        /// Instructs to ignore GetDelegateOrDefault and try the interpreter 
+        public virtual bool TryInterpretation(Request request) => request.Rules.TryInterpretationForTheFirstResolution;
+
         /// Creates factory delegate from service expression and returns it.
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
             GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
@@ -8419,6 +8438,10 @@ namespace DryIoc
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
         }
 
+        // todo: figure it out
+        /// Switched off until I (or someone) will figure it out.
+        public override bool TryInterpretation(Request request) => false;
+
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
         /// If decorator found for request then factory fall-backs to expression creation.</summary>
         /// <param name="request">Request to resolve.</param>
@@ -8429,7 +8452,8 @@ namespace DryIoc
 
             // Wrap the delegate in respective expression for non-simple use
             if (request.Reuse != DryIoc.Reuse.Transient ||
-                FactoryType == FactoryType.Service && request.Container.GetDecoratorExpressionOrDefault(request) != null)
+                FactoryType == FactoryType.Service && 
+                request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
             // Otherwise just use delegate as-is
