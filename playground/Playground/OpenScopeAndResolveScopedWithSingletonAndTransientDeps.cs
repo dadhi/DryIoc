@@ -2,7 +2,6 @@ using Autofac;
 using BenchmarkDotNet.Attributes;
 using DryIoc;
 using Grace.DependencyInjection;
-using Grace.DependencyInjection.Lifestyle;
 using LightInject;
 using IContainer = Autofac.IContainer;
 
@@ -10,20 +9,7 @@ namespace PerformanceTests
 {
     public class OpenScopeAndResolveScopedWithSingletonAndTransientDeps
     {
-        public void DryIoc_test()
-        {
-            Measure(PrepareDryIoc());
-        }
-
-        public void DryIoc_test_1000_times()
-        {
-            for (var i = 0; i < 1000; i++)
-            {
-                Measure(PrepareDryIoc());
-            }
-        }
-
-        public static global::DryIoc.IContainer PrepareDryIoc()
+        public static DryIoc.IContainer PrepareDryIoc()
         {
             var container = new Container();
 
@@ -34,15 +20,10 @@ namespace PerformanceTests
             return container;
         }
 
-        public static object Measure(global::DryIoc.IContainer container)
+        public static object Measure(DryIoc.IContainer container)
         {
             using (var scope = container.OpenScope())
                 return scope.Resolve<ScopedBlah>();
-        }
-
-        public void Autofac_test()
-        {
-            Measure(PrepareAutofac());
         }
 
         public static IContainer PrepareAutofac()
@@ -138,7 +119,7 @@ namespace PerformanceTests
         public class FirstTime_OpenScope_Resolve
         {
             private static readonly IContainer _autofac = PrepareAutofac();
-            private static readonly global::DryIoc.IContainer _dryioc = PrepareDryIoc();
+            private static readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
             private static readonly DependencyInjectionContainer _grace = PrepareGrace();
             private static readonly ServiceContainer _lightInject = PrepareLightInject();
 
