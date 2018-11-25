@@ -5,7 +5,7 @@
 
         <Product>DryIoc</Product>
         <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-07</VersionSuffix>
+        <VersionSuffix>preview-08</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -15,7 +15,7 @@
         <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
+<![CDATA[
 v3.1.0
 - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
 - fixed: #7 Context-based injection
@@ -37,6 +37,7 @@ v3.1.0
 - added: #11 Resolution root bound dependency expression de-duplication
 - added: #17 Rules.DefaultRegistrationServiceKey enhancement
 - added: #20 Enhance error message with current container Rules info
+- ADDED!!!: #45 Consider expression interpretation to speed-up first time resolution
 - added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
 - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
 - added: IRegistrator.GetRegisteredFactories
@@ -53,8 +54,8 @@ v3.0.1
 
 v3.0.0
 - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
-
-        ]]></PackageReleaseNotes>
+]]>
+    </PackageReleaseNotes>
     </PropertyGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.3'">

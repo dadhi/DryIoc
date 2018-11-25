@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>3.1.0-preview-07</version>
+        <version>3.1.0-preview-08</version>
         <!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2018 Maksim Volkau</copyright>
@@ -34,6 +34,7 @@ v3.1.0
 - added: #11 Resolution root bound dependency expression de-duplication
 - added: #17 Rules.DefaultRegistrationServiceKey enhancement
 - added: #20 Enhance error message with current container Rules info
+- ADDED!!!: #45 Consider expression interpretation to speed-up first time resolution
 - added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
 - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
 - added: IRegistrator.GetRegisteredFactories
