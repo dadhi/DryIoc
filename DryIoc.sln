@@ -116,6 +116,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScript
 		BuildScripts\NuGetPublish.bat = BuildScripts\NuGetPublish.bat
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleLibWithSdkExtras", "SampleLibWithSdkExtras\SampleLibWithSdkExtras.csproj", "{EE551181-940F-4DFA-8E84-6E514F5E8611}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -238,6 +240,10 @@ Global
 		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE551181-940F-4DFA-8E84-6E514F5E8611}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE551181-940F-4DFA-8E84-6E514F5E8611}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE551181-940F-4DFA-8E84-6E514F5E8611}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE551181-940F-4DFA-8E84-6E514F5E8611}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -275,6 +281,7 @@ Global
 		{05C475EB-310F-4234-98CC-886ECB312AB9} = {78204655-2AD6-4729-B436-44B370317EC1}
 		{3F44053C-AE96-45F0-BF2D-B263E526FF00} = {05C475EB-310F-4234-98CC-886ECB312AB9}
 		{6384FD6C-BC54-4AAE-B564-4BBD768C348F} = {05C475EB-310F-4234-98CC-886ECB312AB9}
+		{EE551181-940F-4DFA-8E84-6E514F5E8611} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

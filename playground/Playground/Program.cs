@@ -17,16 +17,18 @@ namespace Playground
     {
         public static void Main(string[] args)
         {
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkResolution>();
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
+
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.Register_FirstTime_OpenScope_Resolve>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.FirstTime_OpenScope_Resolve>();
+
+            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
 
             //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
             //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_all_matches>();
-            //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<BenchmarkResolution>();
@@ -60,7 +62,7 @@ namespace Playground
             public K CtorInvoke()
             {
                 var uninitializedX = FormatterServices.GetUninitializedObject(typeof(K));
-                return (K)typeof(K).GetConstructors()[0].Invoke(uninitializedX, new object[]{ _m });
+                return (K)typeof(K).GetConstructors()[0].Invoke(uninitializedX, new object[] { _m });
             }
         }
 
@@ -138,7 +140,7 @@ namespace Playground
         public class ExpressionCompileVsEmit
         {
             private static Expression<Func<object[], object>> _funcExpr = CreateComplexExpression();
-            
+
             [Benchmark]
             public void Compile()
             {
@@ -193,17 +195,17 @@ namespace Playground
 
         private static Expression<Func<object[], object>> CreateComplexExpression()
         {
-            var stateParamExpr = Expression.Parameter(typeof(object[])); 
+            var stateParamExpr = Expression.Parameter(typeof(object[]));
 
             var funcExpr = Expression.Lambda<Func<object[], object>>(
                 Expression.MemberInit(
                     Expression.New(typeof(A).GetConstructors()[0],
                         Expression.New(typeof(B).GetConstructors()[0]),
                         Expression.Convert(Expression.ArrayIndex(stateParamExpr, Expression.Constant(11)), typeof(string)),
-                        Expression.NewArrayInit(typeof(ID), 
+                        Expression.NewArrayInit(typeof(ID),
                             Expression.New(typeof(D1).GetConstructors()[0]),
                             Expression.New(typeof(D2).GetConstructors()[0]))),
-                    Expression.Bind(typeof(A).GetProperty("Prop"), 
+                    Expression.Bind(typeof(A).GetProperty("Prop"),
                         Expression.New(typeof(P).GetConstructors()[0],
                             Expression.New(typeof(B).GetConstructors()[0]))),
                     Expression.Bind(typeof(A).GetField("Bop"),

@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -98,7 +98,9 @@ namespace DryIoc.IssuesTests
             container.Register<IScopedFactory, ScopedFactory>(Reuse.Transient);
 
             var scopedFactory1 = container.Resolve<IScopedFactory>();
+
             var scopedFactory2 = scopedFactory1.Resolve<IScopedFactory>();
+
             Assert.AreSame(scopedFactory1, scopedFactory2);
 
             // doing the same once again
@@ -138,7 +140,7 @@ namespace DryIoc.IssuesTests
 
         class ScopedFactory : IScopedFactory
         {
-            private IResolverContext _scope;
+            private readonly IResolverContext _scope;
 
             public ScopedFactory(IResolverContext context)
             {
@@ -148,10 +150,7 @@ namespace DryIoc.IssuesTests
                 _scope.UseInstance<IScopedFactory>(this);
             }
 
-            public T Resolve<T>()
-            {
-                return _scope.Resolve<T>();
-            }
+            public T Resolve<T>() => _scope.Resolve<T>();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace DryIoc.WebApi.UnitTests
@@ -18,12 +18,12 @@ namespace DryIoc.WebApi.UnitTests
             }
         }
 
-        [Test] // todo: sometimes fails so fix this
+        [Test] // todo: sometimes fails, so fix this
         public void Register_request_message_in_current_scope()
-        {
+         {
             // Create container with AsyncExecutionFlowScopeContext which works across async/await boundaries.
             // In case of MVC it may be changed to HttpContextScopeContext.
-            var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+            var container = new Container(scopeContext: AsyncExecutionFlowScopeContext.Default);
 
             container.Register<A>();
 
@@ -41,10 +41,13 @@ namespace DryIoc.WebApi.UnitTests
                         scope.UseInstance(message);
 
                         var a = scope.Resolve<A>();
+
                         Assert.AreSame(message, a.Message);
-                        await Task.Delay(5);//processing request
-                        Assert.IsNotNull(a.Message);
-                        Assert.AreSame(a.Message, scope.Resolve<A>().Message);
+
+                        await Task.Delay(5); //processing request
+
+                        var a2 = scope.Resolve<A>();
+                        Assert.AreSame(a.Message, a2.Message);
                     }
                 });
             }
