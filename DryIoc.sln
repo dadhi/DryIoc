@@ -81,6 +81,9 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.WebApi.Owin", "src\DryIoc.WebApi.Owin\DryIoc.WebApi.Owin.csproj", "{3EFFF87A-2B70-496B-9AB8-BF025A24A3D1}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "playground", "playground", "{85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}"
+	ProjectSection(SolutionItems) = preProject
+		playground\Directory.Build.props = playground\Directory.Build.props
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "playground\Playground\Playground.csproj", "{A31246B7-761B-4687-8BF3-5BCE70A7C6E2}"
 EndProject
@@ -116,7 +119,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScript
 		BuildScripts\NuGetPublish.bat = BuildScripts\NuGetPublish.bat
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleLibWithSdkExtras", "SampleLibWithSdkExtras\SampleLibWithSdkExtras.csproj", "{EE551181-940F-4DFA-8E84-6E514F5E8611}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SampleLibWithSdkExtras", "SampleLibWithSdkExtras\SampleLibWithSdkExtras.csproj", "{EE551181-940F-4DFA-8E84-6E514F5E8611}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

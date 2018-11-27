@@ -204,9 +204,8 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
         internal static ExportFactory<T, TMetadata> CreateExportFactoryWithMetadata<T, TMetadata>(
-            Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container)
-        {
-            return new ExportFactory<T, TMetadata>(() =>
+            Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container) => 
+            new ExportFactory<T, TMetadata>(() =>
             {
                 var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
                 try
@@ -219,8 +218,8 @@ namespace DryIoc.MefAttributedModel
                     scope.Dispose();
                     throw;
                 }
-            }, metaFactory.Metadata);
-        }
+            }, 
+            metaFactory.Metadata);
 
         private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
             typeof(AttributedModel).SingleMethod(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
@@ -255,11 +254,10 @@ namespace DryIoc.MefAttributedModel
             typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
             parameters: Parameters.Of.Type(request => request.ServiceKey));
 
-        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey)
-        {
-            return serviceKey == null
-                ? source.Select(x => x.Value)
-                : source.Where(x =>
+        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) => 
+            serviceKey == null
+            ? source.Select(x => x.Value)
+            : source.Where(x =>
                 {
                     if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
                         return false;
@@ -269,7 +267,6 @@ namespace DryIoc.MefAttributedModel
                     return multiKey != null && serviceKey.Equals(multiKey.Key);
                 })
                 .Select(x => x.Value);
-        }
 
         #endregion
 
@@ -649,10 +646,9 @@ namespace DryIoc.MefAttributedModel
         private static KeyValuePair<string, object> GetRequiredMetadata(Attribute[] attributes)
         {
             var withMetadataAttr = GetSingleAttributeOrDefault<WithMetadataAttribute>(attributes);
-            var metadata = withMetadataAttr == null ? null : withMetadataAttr.Metadata;
+            var metadata = withMetadataAttr?.Metadata;
             var metadataKey = withMetadataAttr == null ? null
-                : withMetadataAttr.MetadataKey == null ? Constants.ExportMetadataDefaultKey
-                : withMetadataAttr.MetadataKey;
+                : withMetadataAttr.MetadataKey ?? Constants.ExportMetadataDefaultKey;
 
             return metadataKey.Pair(metadata);
         }
@@ -1144,7 +1140,7 @@ namespace DryIoc.MefAttributedModel
         public static StringBuilder AppendMany<T>(this StringBuilder code, IEnumerable<T> items)
         {
             code.Append("new ").Print(typeof(T)).Print("[] {");
-            int count = 0;
+            var count = 0;
             foreach (var item in items)
             {
                 if (count++ != 0)

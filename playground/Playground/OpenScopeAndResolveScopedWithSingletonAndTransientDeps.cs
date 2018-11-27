@@ -80,6 +80,20 @@ namespace PerformanceTests
                 return scope.GetInstance<ScopedBlah>();
         }
 
+        //public static Lamar.Container PrepareLamar() => 
+        //    new Lamar.Container(c =>
+        //    {
+        //        c.AddTransient<Parameter1>();
+        //        c.AddSingleton<Parameter2>();
+        //        c.AddScoped<ScopedBlah>();
+        //    });
+
+        //public static object Measure(Lamar.Container container)
+        //{
+        //    using (var scope = container.CreateScope())
+        //        return scope.ServiceProvider.GetService<ScopedBlah>();
+        //}
+
         #region CUT
 
         internal class Parameter1 { }
@@ -88,7 +102,14 @@ namespace PerformanceTests
 
         internal class ScopedBlah
         {
-            public ScopedBlah(Parameter1 parameter1, Parameter2 parameter2) { }
+            public Parameter1 Parameter1 { get; }
+            public Parameter2 Parameter2 { get; }
+
+            public ScopedBlah(Parameter1 parameter1, Parameter2 parameter2)
+            {
+                Parameter1 = parameter1;
+                Parameter2 = parameter2;
+            }
         }
 
         #endregion
@@ -122,6 +143,7 @@ namespace PerformanceTests
             private static readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
             private static readonly DependencyInjectionContainer _grace = PrepareGrace();
             private static readonly ServiceContainer _lightInject = PrepareLightInject();
+            //private static readonly Lamar.Container _lamar = PrepareLamar();
 
             [Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
@@ -134,6 +156,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkLightInject() => Measure(_lightInject);
+
+            //[Benchmark] // you can add to see how Roslyn based container is compared
+            //public object BmarkLamar() => Measure(_lamar);
         }
 
         /*
@@ -189,7 +214,6 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
  BmarkLightInject |   648.4 ns |  5.4780 ns |   5.1241 ns |  4.87 |    0.05 |      0.1488 |           - |           - |               704 B |
 
  */
-
         [MemoryDiagnoser]
         public class Register_FirstTime_OpenScope_Resolve
         {
@@ -204,6 +228,10 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
 
             [Benchmark]
             public object BmarkLightInject() => Measure(PrepareLightInject());
+
+            // you can add to see how Roslyn based container is compared
+            //[Benchmark] // excluding cause number are too big
+            //public object BmarkLamar() => Measure(PrepareLamar());
         }
     }
 }

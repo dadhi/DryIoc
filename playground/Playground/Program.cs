@@ -19,8 +19,8 @@ namespace Playground
         {
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.Register_FirstTime_OpenScope_Resolve>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.FirstTime_OpenScope_Resolve>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.Register_FirstTime_OpenScope_Resolve>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonAndTransientDeps.FirstTime_OpenScope_Resolve>();
 
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
@@ -100,9 +100,9 @@ namespace Playground
             }
         }
 
-        public class IfVsNullСoalesceOperator
+        public class IfVsNullСoalescingOperator
         {
-            private object x = "a";
+            private readonly object x = "a";
 
             [Benchmark]
             public string If()
@@ -113,7 +113,7 @@ namespace Playground
             }
 
             [Benchmark]
-            public string NullCoalescOperator()
+            public string NullCoalescingOperator()
             {
                 return (x as string) ?? string.Empty;
             }
@@ -121,7 +121,7 @@ namespace Playground
 
         public class IfVsTernaryOperator
         {
-            private object x = "a";
+            private readonly object x = "a";
 
             [Benchmark]
             public string If()

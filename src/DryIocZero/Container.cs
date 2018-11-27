@@ -1245,7 +1245,7 @@ namespace DryIocZero
         public readonly IReuse Reuse;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
-        public int ReuseLifespan => Reuse == null ? 0 : Reuse.Lifespan;
+        public int ReuseLifespan => Reuse?.Lifespan ?? 0;
 
         /// <summary><see cref="RequestFlags"/>.</summary>
         public readonly RequestFlags Flags;

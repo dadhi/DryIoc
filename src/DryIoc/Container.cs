@@ -189,21 +189,16 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             var cachedItem = _registry.Value.DefaultFactoryCache.Value.GetValueOrDefault(serviceType);
-            if (cachedItem == null)
-                return ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
-
-            var cachedDelegate = cachedItem as FactoryDelegate;
-            return cachedDelegate != null ? cachedDelegate(this) : 
-                   CompileAndCacheFactoryDelegate(serviceType, (Expression)cachedItem, _registry.Value.DefaultFactoryCache);
+            return cachedItem == null 
+                ? ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved) 
+                : (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem))(this);
         }
 
-        private object CompileAndCacheFactoryDelegate(Type serviceType, Expression cachedExpr, Ref<ImHashMap<Type, object>> cacheRef)
+        private FactoryDelegate CompileAndCacheFactoryDelegate(Type serviceType, object expr)
         {
-            var factoryDelegate = cachedExpr.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-            var cache = cacheRef.Value;
-            if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factoryDelegate)))
-                cacheRef.AddOrUpdate(serviceType, factoryDelegate);
-            return factoryDelegate(this);
+            var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+            _registry.Value.CacheDefaultFactory(serviceType, factoryDelegate);
+            return factoryDelegate;
         }
 
         private object ResolveAndCacheFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
@@ -229,11 +224,12 @@ namespace DryIoc
                     return null;
 
                 // Important to cache expression first before tying to interpret,
-                // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
+                // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
                 _registry.Value.CacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
+                object instance;
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
@@ -248,6 +244,7 @@ namespace DryIoc
                 return null;
 
             _registry.Value.CacheDefaultFactory(serviceType, factoryDelegate);
+
             return factoryDelegate(this);
         }
 
@@ -261,40 +258,17 @@ namespace DryIoc
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
             }
 
-            var cacheEntryKey = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
-            object cacheContextKey = requiredServiceType;
+            var key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
+            var entryKey = GetResolveCacheEntryKeyOrDefault(requiredServiceType, preResolveParent, args);
 
-            if (preResolveParent == null)
-                preResolveParent = Request.Empty;
-
-            if (!preResolveParent.IsEmpty)
-                cacheContextKey = cacheContextKey == null ? preResolveParent : (object)KV.Of(cacheContextKey, preResolveParent);
-            else if (preResolveParent.OpensResolutionScope)
-                cacheContextKey = cacheContextKey == null ? true : (object)KV.Of(cacheContextKey, true);
-
-            var currentScopeName = CurrentScope?.Name;
-            if (currentScopeName != null)
-                cacheContextKey = cacheContextKey == null ? currentScopeName : KV.Of(cacheContextKey, currentScopeName);
-
-            if (!args.IsNullOrEmpty())
-            {
-                if (args.Length == 1)
-                    cacheContextKey = cacheContextKey == null ? args[0] : (object)KV.Of(cacheContextKey, args[0]);
-                else
-                    cacheContextKey = cacheContextKey == null ? args : (object)KV.Of(cacheContextKey, args);
-            }
+            FactoryDelegate factoryDelegate;
 
             // Try get from cache first
             var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
-            var cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
-            if (cacheEntry != null)
-            {
-                var cachedFactoryDelegate = cacheContextKey == null 
-                    ? cacheEntry.Key
-                    : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
-                if (cachedFactoryDelegate != null)
-                    return cachedFactoryDelegate(this);
-            }
+            var cacheEntry = cacheRef.Value.GetValueOrDefault(key);
+            if (cacheEntry != null && 
+                GetCachedOrCompileAndCacheFactoryDelegate(cacheRef, key, cacheEntry, entryKey, out factoryDelegate))
+                return factoryDelegate(this);
 
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
@@ -307,38 +281,117 @@ namespace DryIoc
             // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
             if (serviceKey == null && request.ServiceKey != null)
             {
-                cacheEntryKey = KV.Of(serviceType, request.ServiceKey);
-
-                cacheEntry = cacheRef.Value.GetValueOrDefault(cacheEntryKey);
-                if (cacheEntry != null)
-                {
-                    var cachedFactoryDelegate = cacheContextKey == null 
-                        ? cacheEntry.Key
-                        : (cacheEntry.Value ?? ImHashMap<object, FactoryDelegate>.Empty).GetValueOrDefault(cacheContextKey);
-                    if (cachedFactoryDelegate != null)
-                        return cachedFactoryDelegate(this);
-                }
+                key = KV.Of(serviceType, request.ServiceKey);
+                cacheEntry = cacheRef.Value.GetValueOrDefault(key);
+                if (GetCachedOrCompileAndCacheFactoryDelegate(cacheRef, key, cacheEntry, entryKey, out factoryDelegate))
+                    return factoryDelegate(this);
             }
 
-            var factoryDelegate = factory?.GetDelegateOrDefault(request);
+            if (factory == null)
+                return null;
+
+            if (factory.TryInterpretation(request))
+            {
+                var expr = factory.GetExpressionOrDefault(request);
+                if (expr == null)
+                    return null;
+
+                // Important to cache expression first before tying to interpret,
+                // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
+                CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, expr);
+
+                // 1) First try to interpret
+                object instance;
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out instance))
+                    return instance;
+
+                // 2) Fallback to expression compilation
+                factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
+            }
+            else
+            {
+                factoryDelegate = factory.GetDelegateOrDefault(request);
+            }
+
             if (factoryDelegate == null)
                 return null;
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            if (!_registry.Value.Services.IsEmpty)
-            {
-                var cachedFactories = cacheEntry?.Value ?? ImHashMap<object, FactoryDelegate>.Empty;
-                cacheEntry = cacheContextKey == null
-                    ? KV.Of(factoryDelegate, cachedFactories)
-                    : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(cacheContextKey, factoryDelegate));
-
-                var cache = cacheRef.Value;
-                if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(cacheEntryKey, cacheEntry)))
-                    cacheRef.AddOrUpdate(cacheEntryKey, cacheEntry);
-            }
+            CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
 
             return factoryDelegate(this);
+        }
+
+        private object GetResolveCacheEntryKeyOrDefault(Type requiredServiceType, Request preResolveParent, object[] args)
+        {
+            object entryKey = requiredServiceType;
+
+            if (preResolveParent == null)
+                preResolveParent = Request.Empty;
+
+            if (!preResolveParent.IsEmpty)
+                entryKey = entryKey == null ? (object)preResolveParent : KV.Of(entryKey, preResolveParent);
+            else if (preResolveParent.OpensResolutionScope)
+                entryKey = entryKey == null ? (object)true : KV.Of(entryKey, true);
+
+            var currentScopeName = CurrentScope?.Name;
+            if (currentScopeName != null)
+                entryKey = entryKey == null ? currentScopeName : KV.Of(entryKey, currentScopeName);
+
+            if (!args.IsNullOrEmpty())
+            {
+                if (args.Length == 1)
+                    entryKey = entryKey == null ? (object)args[0] : KV.Of(entryKey, args[0]);
+                else
+                    entryKey = entryKey == null ? (object)args : KV.Of(entryKey, args);
+            }
+
+            return entryKey;
+        }
+
+        private void CacheKeyedFactoryDelegateOrExpression(
+            Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key,
+            KV<object, ImHashMap<object, object>> cacheEntry, object сontextKey, 
+            object factory)
+        {
+            if (_registry.Value.Services.IsEmpty)
+                return;
+
+            var cachedFactories = cacheEntry?.Value ?? ImHashMap<object, object>.Empty;
+            cacheEntry = сontextKey == null
+                ? KV.Of(factory, cachedFactories)
+                : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(сontextKey, factory));
+
+            var cache = cacheRef.Value;
+            if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(key, cacheEntry)))
+                cacheRef.AddOrUpdate(key, cacheEntry);
+        }
+
+        private bool GetCachedOrCompileAndCacheFactoryDelegate(
+            Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key, 
+            KV<object, ImHashMap<object, object>> cacheEntry, object entryKey, 
+            out FactoryDelegate factoryDelegate)
+        {
+            var cachedFactory = cacheEntry == null ? null :
+                entryKey == null ? cacheEntry.Key :
+                cacheEntry.Value != null ? cacheEntry.Value.GetValueOrDefault(entryKey) :
+                null;
+
+            if (cachedFactory != null)
+            {
+                factoryDelegate = cachedFactory as FactoryDelegate;
+                if (factoryDelegate == null)
+                {
+                    factoryDelegate = ((Expression)cachedFactory).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                    CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
+                }
+
+                return true;
+            }
+
+            factoryDelegate = null;
+            return false;
         }
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey,
@@ -444,9 +497,9 @@ namespace DryIoc
                 Throw.It(Error.ContainerIsDisposed, ToString());
         }
 
-#endregion
+        #endregion
 
-#region IResolverContext
+        #region IResolverContext
 
         /// <inheritdoc />
         public IResolverContext Parent => _parent;
@@ -718,9 +771,9 @@ namespace DryIoc
                 }
         }
 
-#endregion
+        #endregion
 
-#region IContainer
+        #region IContainer
 
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
@@ -1190,9 +1243,9 @@ namespace DryIoc
 
         private static readonly MethodInfo _kvOfMethod = typeof(KV).SingleMethod(nameof(KV.Of));
 
-#endregion
+        #endregion
 
-#region Factories Add/Get
+        #region Factories Add/Get
 
         internal sealed class FactoriesEntry
         {
@@ -1468,9 +1521,9 @@ namespace DryIoc
             return factory;
         }
 
-#endregion
+        #endregion
 
-#region Implementation
+        #region Implementation
 
         private int _disposed;
         private StackTrace _disposeStackTrace;
@@ -1521,7 +1574,7 @@ namespace DryIoc
             public override Expression CreateExpressionOrDefault(Request request) =>
                 Resolver.CreateResolutionExpression(request);
 
-#region Implementation
+            #region Implementation
 
             private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
             {
@@ -1546,7 +1599,7 @@ namespace DryIoc
                    ?? value;
             }
 
-#endregion
+            #endregion
         }
 
         internal sealed class Registry
@@ -1564,8 +1617,7 @@ namespace DryIoc
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and ImHashMap<{requiredServiceType+preResolvedParent}, FactoryDelegate>
-            public readonly Ref<ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>>
-                KeyedFactoryDelegateCache;
+            public readonly Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> KeyedFactoryDelegateCache;
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
             private readonly IsChangePermitted _isChangePermitted;
@@ -1575,7 +1627,7 @@ namespace DryIoc
                     ImHashMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
                     Ref.Of(ImHashMap<Type, object>.Empty),
-                    Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImHashMap<object, KV<object, ImHashMap<object, object>>>.Empty),
                     IsChangePermitted.Permitted)
             { }
 
@@ -1584,7 +1636,7 @@ namespace DryIoc
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
                 Ref<ImHashMap<Type, object>> defaultFactoryCache,
-                Ref<ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>> keyedFactoryDelegateCache,
+                Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> keyedFactoryDelegateCache,
                 IsChangePermitted isChangePermitted)
             {
                 Services = services;
@@ -1598,7 +1650,7 @@ namespace DryIoc
             public Registry WithoutCache() =>
                 new Registry(Services, Decorators, Wrappers,
                     Ref.Of(ImHashMap<Type, object>.Empty),
-                    Ref.Of(ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty),
+                    Ref.Of(ImHashMap<object, KV<object, ImHashMap<object, object>>>.Empty),
                     _isChangePermitted);
 
             internal Registry WithServices(ImHashMap<Type, object> services) =>
@@ -1975,7 +2027,7 @@ namespace DryIoc
                         // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
                         // a safe alternative is dropping the whole cache
                         DefaultFactoryCache.Swap(x => ImHashMap<Type, object>.Empty);
-                        KeyedFactoryDelegateCache.Swap(x => ImHashMap<object, KV<FactoryDelegate, ImHashMap<object, FactoryDelegate>>>.Empty);
+                        KeyedFactoryDelegateCache.Swap(x => ImHashMap<object, KV<object, ImHashMap<object, object>>>.Empty);
                     }
                 }
             }
@@ -2023,7 +2075,7 @@ namespace DryIoc
             _parent = parent;
         }
 
-#endregion
+        #endregion
     }
 
     /// Special service key with info about open-generic service type
@@ -2089,9 +2141,10 @@ namespace DryIoc
                 return Interpreter.TryInterpret(r, expr, out result);
             }
             catch (TargetInvocationException tex)
-            {
+            { 
+                // unpack the internal container exception if any
                 if (tex.InnerException is ContainerException)
-                    throw tex.InnerException; // unpack the internal exception if any
+                    throw tex.InnerException;
                 throw;
             }
         }
@@ -2150,8 +2203,7 @@ namespace DryIoc
                     }
                 case ExprType.Constant:
                     {
-                        var constExpr = (ConstantExpression)expr;
-                        result = constExpr.Value;
+                        result = ((ConstantExpression)expr).Value;
                         return true;
                     }
                 case ExprType.Convert:
@@ -2161,9 +2213,10 @@ namespace DryIoc
                             return false;
 
                         // skip conversion for null and for directly assignable type
-                        result = instance == null || instance.GetType().IsAssignableTo(convertExpr.Type)
-                            ? instance
-                            : Converter.Convert(instance, convertExpr.Type);
+                        if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
+                            result = instance;
+                        else
+                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
                         return true;
                     }
                 case ExprType.Parameter:
@@ -2296,7 +2349,7 @@ namespace DryIoc
                 return false;
 
             result = CurrentScopeReuse.GetNameScopedWithValue(
-                (IResolverContext)resolver, ConstValue(args[1]), (bool)ConstValue(args[2]), 
+                (IResolverContext)resolver, ConstValue(args[1]), (bool)ConstValue(args[2]),
                 (int)ConstValue(args[3]), service, (int)ConstValue(args[5]));
             return true;
         }
@@ -2321,14 +2374,21 @@ namespace DryIoc
 
         internal static class Converter
         {
-            public static object Convert(object source, Type targetType) =>
-                _convertMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
+            public static object ConvertWithOperator(object source, Type targetType, Expression expr)
+            {
+                var sourceType = source.GetType();
+                var sourceConvertOp = sourceType.GetSourceConversionOperatorToTarget(targetType);
+                if (sourceConvertOp != null)
+                    return sourceConvertOp.Invoke(null, new[] { source });
+
+                var targetConvertOp = sourceType.GetTargetConversionOperatorFromSource(targetType);
+                if (targetConvertOp == null)
+                    Throw.It(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression, expr);
+                return targetConvertOp.Invoke(null, new[] { source });
+            }
 
             public static object ConvertMany(object[] source, Type targetType) =>
                 _convertManyMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
-
-            internal static R DoConvert<R>(object it) => (R)it;
-            private static readonly MethodInfo _convertMethod = typeof(Converter).SingleMethod(nameof(DoConvert), true);
 
             internal static R[] DoConvertMany<R>(object[] items)
             {
@@ -2341,7 +2401,7 @@ namespace DryIoc
                 return results;
             }
 
-            private static readonly MethodInfo _convertManyMethod = 
+            private static readonly MethodInfo _convertManyMethod =
                 typeof(Converter).SingleMethod(nameof(DoConvertMany), true);
         }
     }
@@ -4068,7 +4128,7 @@ namespace DryIoc
             return s;
         }
 
-#region Implementation
+        #region Implementation
 
         private Rules()
         {
@@ -4132,7 +4192,7 @@ namespace DryIoc
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
             UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
-            TryInterpretationForTheFirstResolution = 1 << 18 
+            TryInterpretationForTheFirstResolution = 1 << 18
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -4146,7 +4206,7 @@ namespace DryIoc
 
         private Settings _settings;
 
-#endregion
+        #endregion
     }
 
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
@@ -4600,7 +4660,7 @@ namespace DryIoc
             { }
         }
 
-#region Implementation
+        #region Implementation
 
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false)
@@ -4813,7 +4873,7 @@ namespace DryIoc
                 argExpr, wholeServiceExpr);
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
@@ -5917,7 +5977,7 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).ToString();
 
-#region Implementation
+        #region Implementation
 
         private ServiceInfo(Type serviceType) { ServiceType = serviceType; }
 
@@ -5935,7 +5995,7 @@ namespace DryIoc
             private readonly ServiceDetails _details;
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Provides <see cref="IServiceInfo"/> for parameter,
@@ -5979,7 +6039,7 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
-#region Implementation
+        #region Implementation
 
         private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
 
@@ -6001,7 +6061,7 @@ namespace DryIoc
             private readonly Type _serviceType;
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Base class for property and field dependency info.</summary>
@@ -6031,7 +6091,7 @@ namespace DryIoc
         /// <param name="holder">Holder of property or field.</param> <param name="value">Value to set.</param>
         public abstract void SetValue(object holder, object value);
 
-#region Implementation
+        #region Implementation
 
         private class Property : PropertyOrFieldServiceInfo
         {
@@ -6099,7 +6159,7 @@ namespace DryIoc
             }
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Stored check results of two kinds: inherited down dependency chain and not.</summary>
@@ -6185,7 +6245,7 @@ namespace DryIoc
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
 
-#region State carried with each request
+        #region State carried with each request
 
         /// <summary>Available in runtime only, provides access to container initiated request.</summary>
         public readonly IContainer Container;
@@ -6231,7 +6291,7 @@ namespace DryIoc
         /// Holds the resolved expressions
         private readonly Ref<ImMap<Expression>> _builtExpressions;
 
-#endregion
+        #endregion
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -6348,7 +6408,7 @@ namespace DryIoc
             Push(ServiceInfo.Of(serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible),
                 requiredServiceType, ifUnresolved, serviceKey), flags);
 
-#region Used in generated expression
+        #region Used in generated expression
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
@@ -6396,7 +6456,7 @@ namespace DryIoc
             typeof(Type), typeof(Type), typeof(object), typeof(string), typeof(object), typeof(IfUnresolved),
             typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags), typeof(int)));
 
-#endregion
+        #endregion
 
         /// <summary>Allow to switch current service info to the new one, e.g. in decorators.
         /// If info did not change then return the same this request.</summary>
@@ -7418,13 +7478,13 @@ namespace DryIoc
             return s.Append("}").ToString();
         }
 
-#region Implementation
+        #region Implementation
 
         private static int _lastFactoryID;
         private IReuse _reuse;
         private Setup _setup;
 
-#endregion
+        #endregion
     }
 
     /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
@@ -7800,13 +7860,21 @@ namespace DryIoc
                 if (paramInfo.Details.HasCustomValue)
                 {
                     var customValue = paramInfo.Details.CustomValue;
-
+                    var hasConversionOperator = false;
                     if (customValue != null && !customValue.GetType().IsArray)
-                        customValue.ThrowIfNotInstanceOf(paramServiceType,
-                            Error.InjectedCustomValueIsOfDifferentType, paramRequest);
+                    {
+                        if (!customValue.GetType().IsAssignableTo(paramServiceType) &&
+                            !(hasConversionOperator = customValue.GetType().HasConversionOperatorTo(paramServiceType)))
+                            Throw.It(Error.InjectedCustomValueIsOfDifferentType, customValue, paramServiceType, paramRequest);
+                    }
 
-                    paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
-                    continue; // done, parameter is by provided via custom value specified in registration
+                    if (hasConversionOperator)
+                        paramExprs[i] = Convert(container.GetConstantExpression(customValue), paramServiceType);
+                    else
+                        paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
+
+                    // done, parameter is provided via custom value specified in registration
+                    continue;
                 }
 
                 var paramFactory = container.ResolveFactory(paramRequest);
@@ -7910,7 +7978,7 @@ namespace DryIoc
                     implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
         }
 
-#region Implementation
+        #region Implementation
 
         private Type _implementationType; // non-readonly to be set by lazy type provider
         private readonly Func<Type> _implementationTypeProvider;
@@ -8026,7 +8094,7 @@ namespace DryIoc
                   && factoryMethodResultType != implType)
             {
                 if (!factoryMethodResultType.IsAssignableTo(implType) &&
-                    !factoryMethodResultType.IsCastableTo(implType))
+                    !factoryMethodResultType.HasConversionOperatorTo(implType))
                     Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType,
                         implType, factoryMethodResultType);
             }
@@ -8075,7 +8143,8 @@ namespace DryIoc
                 if (member.Details.HasCustomValue)
                 {
                     var customValue = member.Details.CustomValue;
-                    customValue?.ThrowIfNotInstanceOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                    customValue?.ThrowIfNotInstanceOf(
+                        memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
                     memberExpr = container.GetConstantExpression(customValue, memberRequest.ServiceType);
                 }
                 else
@@ -8107,7 +8176,7 @@ namespace DryIoc
                 return Convert(serviceExpr, requestedServiceType);
 
             return serviceExprType.IsAssignableTo(requestedServiceType) ? serviceExpr
-                : serviceExprType.IsCastableTo(requestedServiceType) ? Convert(serviceExpr, requestedServiceType)
+                : serviceExprType.HasConversionOperatorTo(requestedServiceType) ? Convert(serviceExpr, requestedServiceType)
                 : request.IfUnresolved != IfUnresolved.Throw ? null
                 : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
         }
@@ -8388,7 +8457,7 @@ namespace DryIoc
             return FactoryMethod.Of(factoryMember, factoryInfo);
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Creates service expression using client provided expression factory delegate.</summary>
@@ -8452,7 +8521,7 @@ namespace DryIoc
 
             // Wrap the delegate in respective expression for non-simple use
             if (request.Reuse != DryIoc.Reuse.Transient ||
-                FactoryType == FactoryType.Service && 
+                FactoryType == FactoryType.Service &&
                 request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
@@ -8699,7 +8768,7 @@ namespace DryIoc
             + (Parent != null ? ", Parent=" + Parent : "")
             + "}";
 
-#region Implementation
+        #region Implementation
 
         private ImMap<object> _items;
         private ImMap<IDisposable> _disposables;
@@ -8710,7 +8779,7 @@ namespace DryIoc
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
 
-#endregion
+        #endregion
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -9155,7 +9224,7 @@ namespace DryIoc
         /// If you need to distinguish nested scope, give names to them instead of naming the top web request scope.</summary>
         public static readonly IReuse InWebRequest = ScopedTo(WebRequestScopeName);
 
-#region Implementation
+        #region Implementation
 
         private sealed class TransientReuse : IReuse
         {
@@ -9176,7 +9245,7 @@ namespace DryIoc
             public override string ToString() => "TransientReuse";
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Policy to handle unresolved service.</summary>
@@ -9638,7 +9707,9 @@ namespace DryIoc
                 "Expected `ConstantExpression` for value of parameter, property, or field, but found `{0}` " + NewLine +
                 "in Made.Of expression: `{1}`"),
             InjectedCustomValueIsOfDifferentType = Of(
-                "Injected value {0} is not assignable to {2}."),
+                "Injected value {0} is not assignable to {1} when resolving: {2}"),
+            NoConversionOperatorFoundWhenInterpretingTheConvertExpression = Of(
+                "There is no explicit or implicit conversion operator found when interpreting the expression: {0}"),
             StateIsRequiredToUseItem = Of(
                 "Runtime state is required to inject (or use) the: {0}. " + NewLine +
                 "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
@@ -10046,16 +10117,28 @@ namespace DryIoc
             type.GetTypeInfo().IsEnum;
 
         /// <summary>Returns true if type can be casted with conversion operators.</summary>
-        public static bool IsCastableTo(this Type @from, Type to) =>
-            @from != null && to != null &&
-            @from.GetTypeInfo().DeclaredMethods
-                .Match(m => m.IsPublic && m.IsStatic && m.ReturnType == to &&
-                    (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
-                .Any();
+        public static bool HasConversionOperatorTo(this Type sourceType, Type targetType) =>
+            sourceType != null && targetType != null &&
+            (sourceType.GetSourceConversionOperatorToTarget(targetType) ?? 
+             sourceType.GetTargetConversionOperatorFromSource(targetType)) != null;
+
+        /// Returns `target source.op_(Explicit|Implicit)(source)` or null if not found
+        public static MethodInfo GetSourceConversionOperatorToTarget(this Type sourceType, Type targetType) => 
+            sourceType?.GetTypeInfo().DeclaredMethods.Match(m => 
+                m.IsPublic && m.IsStatic && m.ReturnType == targetType &&
+                (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
+            .SingleOrDefaultIfMany();
+
+        /// Returns `target target.op_(Explicit|Implicit)(source)` or null if not found
+        public static MethodInfo GetTargetConversionOperatorFromSource(this Type sourceType, Type targetType) =>
+            targetType?.GetTypeInfo().DeclaredMethods.Match(m =>
+                m.IsPublic && m.IsStatic && m.ReturnType == targetType && 
+                m.GetParameters().SingleOrDefaultIfMany()?.ParameterType == sourceType &&
+                (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
+                .SingleOrDefaultIfMany();
 
         /// <summary>Returns true if type is assignable to <paramref name="other"/> type.</summary>
         public static bool IsAssignableTo(this Type type, Type other) =>
-            //type.IsCastableTo(other);
             type != null && other != null && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
 
         /// <summary>Returns true if type is assignable to <typeparamref name="T"/> type.</summary>
@@ -10303,7 +10386,7 @@ namespace DryIoc
         public static Expression GetDefaultValueExpression(this Type type) =>
             Call(_getDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
 
-#region Implementation
+        #region Implementation
 
         private static void ClearGenericParametersReferencedInConstraints(Type[] genericParams)
         {
@@ -10354,7 +10437,7 @@ namespace DryIoc
         internal static T GetDefault<T>() => default(T);
         private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true);
 
-#endregion
+        #endregion
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>
@@ -10649,6 +10732,10 @@ namespace System.Reflection
 
         public Assembly Assembly => _type.Assembly;
 
+        public MethodInfo GetDeclaredMethod(string name) => _type.GetMethod(name);
+        public PropertyInfo GetDeclaredProperty(string name) => _type.GetProperty(name);
+        public FieldInfo GetDeclaredField(string name) => _type.GetField(name);
+
         public IEnumerable<ConstructorInfo> DeclaredConstructors =>
             _type.GetConstructors(ALL_DECLARED ^ BindingFlags.Static);
 
@@ -10707,18 +10794,6 @@ namespace System.Reflection
 namespace System
 {
     /// <summary>Func with 5 input parameters.</summary>
-    /// <typeparam name="T1"></typeparam>
-    /// <typeparam name="T2"></typeparam>
-    /// <typeparam name="T3"></typeparam>
-    /// <typeparam name="T4"></typeparam>
-    /// <typeparam name="T5"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="arg1"></param>
-    /// <param name="arg2"></param>
-    /// <param name="arg3"></param>
-    /// <param name="arg4"></param>
-    /// <param name="arg5"></param>
-    /// <returns></returns>
     public delegate TResult Func<T1, T2, T3, T4, T5, TResult>(
         T1 arg1,
         T2 arg2,
@@ -10727,20 +10802,6 @@ namespace System
         T5 arg5);
 
     /// <summary>Func with 6 input parameters.</summary>
-    /// <typeparam name="T1"></typeparam>
-    /// <typeparam name="T2"></typeparam>
-    /// <typeparam name="T3"></typeparam>
-    /// <typeparam name="T4"></typeparam>
-    /// <typeparam name="T5"></typeparam>
-    /// <typeparam name="T6"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="arg1"></param>
-    /// <param name="arg2"></param>
-    /// <param name="arg3"></param>
-    /// <param name="arg4"></param>
-    /// <param name="arg5"></param>
-    /// <param name="arg6"></param>
-    /// <returns></returns>
     public delegate TResult Func<T1, T2, T3, T4, T5, T6, TResult>(
         T1 arg1,
         T2 arg2,
@@ -10750,22 +10811,6 @@ namespace System
         T6 arg6);
 
     /// <summary>Func with 7 input parameters.</summary>
-    /// <typeparam name="T1"></typeparam>
-    /// <typeparam name="T2"></typeparam>
-    /// <typeparam name="T3"></typeparam>
-    /// <typeparam name="T4"></typeparam>
-    /// <typeparam name="T5"></typeparam>
-    /// <typeparam name="T6"></typeparam>
-    /// <typeparam name="T7"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="arg1"></param>
-    /// <param name="arg2"></param>
-    /// <param name="arg3"></param>
-    /// <param name="arg4"></param>
-    /// <param name="arg5"></param>
-    /// <param name="arg6"></param>
-    /// <param name="arg7"></param>
-    /// <returns></returns>
     public delegate TResult Func<T1, T2, T3, T4, T5, T6, T7, TResult>(
         T1 arg1,
         T2 arg2,
@@ -10776,16 +10821,6 @@ namespace System
         T7 arg7);
 
     /// <summary>Action with 5 input parameters.</summary>
-    /// <typeparam name="T1"></typeparam>
-    /// <typeparam name="T2"></typeparam>
-    /// <typeparam name="T3"></typeparam>
-    /// <typeparam name="T4"></typeparam>
-    /// <typeparam name="T5"></typeparam>
-    /// <param name="arg1"></param>
-    /// <param name="arg2"></param>
-    /// <param name="arg3"></param>
-    /// <param name="arg4"></param>
-    /// <param name="arg5"></param>
     public delegate void Action<T1, T2, T3, T4, T5>(
         T1 arg1,
         T2 arg2,
@@ -10794,18 +10829,6 @@ namespace System
         T5 arg5);
 
     /// <summary>Action with 6 input parameters.</summary>
-    /// <typeparam name="T1"></typeparam>
-    /// <typeparam name="T2"></typeparam>
-    /// <typeparam name="T3"></typeparam>
-    /// <typeparam name="T4"></typeparam>
-    /// <typeparam name="T5"></typeparam>
-    /// <typeparam name="T6"></typeparam>
-    /// <param name="arg1"></param>
-    /// <param name="arg2"></param>
-    /// <param name="arg3"></param>
-    /// <param name="arg4"></param>
-    /// <param name="arg5"></param>
-    /// <param name="arg6"></param>
     public delegate void Action<T1, T2, T3, T4, T5, T6>(
         T1 arg1,
         T2 arg2,
@@ -10815,20 +10838,6 @@ namespace System
         T6 arg6);
 
     /// <summary>Action with 7 input parameters.</summary>
-    /// <typeparam name="T1"></typeparam>
-    /// <typeparam name="T2"></typeparam>
-    /// <typeparam name="T3"></typeparam>
-    /// <typeparam name="T4"></typeparam>
-    /// <typeparam name="T5"></typeparam>
-    /// <typeparam name="T6"></typeparam>
-    /// <typeparam name="T7"></typeparam>
-    /// <param name="arg1"></param>
-    /// <param name="arg2"></param>
-    /// <param name="arg3"></param>
-    /// <param name="arg4"></param>
-    /// <param name="arg5"></param>
-    /// <param name="arg6"></param>
-    /// <param name="arg7"></param>
     public delegate void Action<T1, T2, T3, T4, T5, T6, T7>(
         T1 arg1,
         T2 arg2,
