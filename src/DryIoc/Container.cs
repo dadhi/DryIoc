@@ -106,23 +106,31 @@ namespace DryIoc
 
             // nice to have, but we can live without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
-                try { _disposeStackTrace = new StackTrace(); } catch { }
+                NewStackTrace();
 
             if (_ownCurrentScope != null) // scoped container
             {
-                var currentScope = _ownCurrentScope;
-                _scopeContext?.SetCurrent(scope => scope == currentScope ? scope.Parent : scope);
+                SetCurrentScopeToScopeContext(_ownCurrentScope);
                 _ownCurrentScope.Dispose();
             }
             else // whole Container with singletons.
             {
                 _registry.Swap(Registry.Empty);
                 Rules = Rules.Default;
-
                 _singletonScope.Dispose(); // will also dispose any tracked scopes
                 _scopeContext?.Dispose();
             }
         }
+
+        // hiding nested lambda to reduce allocations
+        private void NewStackTrace()
+        {
+            try { _disposeStackTrace = new StackTrace(); } catch {}
+        }
+
+        // hiding nested lambda to reduce allocations
+        private void SetCurrentScopeToScopeContext(IScope scope) => 
+            _scopeContext?.SetCurrent(s => s == scope ? s.Parent : s);
 
         #region IRegistrator
 
@@ -164,8 +172,12 @@ namespace DryIoc
             var registry = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(registry,
                 registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
-                _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
+                RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
+
+        // hiding nested lambda in method to reduce allocations
+        private Registry RegistrySwap(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered) => 
+            _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
 
         /// <inheritdoc />
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
@@ -7363,7 +7375,7 @@ namespace DryIoc
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
 
-                builtExprs?.Swap(x => x.AddOrUpdate(FactoryID, serviceExpr));
+                builtExprs?.AddOrUpdate(FactoryID, serviceExpr);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -8074,7 +8086,7 @@ namespace DryIoc
 
                 var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup);
                 closedGenericFactory.GeneratorFactoryID = openFactory.FactoryID;
-                _generatedFactories.Swap(_ => _.AddOrUpdate(generatedFactoryKey, closedGenericFactory));
+                _generatedFactories.AddOrUpdate(generatedFactoryKey, closedGenericFactory);
                 return closedGenericFactory;
             }
 
@@ -8657,7 +8669,7 @@ namespace DryIoc
                 // Swap is required because if _items changed inside createValue, then we need to retry
                 items = _items;
                 if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                    Ref.Swap(ref _items, x => x.AddOrUpdate(id, item));
+                    RefMap.AddOrUpdate(ref _items, id, item);
             }
 
             var disposable = item as IDisposable;
@@ -8741,7 +8753,7 @@ namespace DryIoc
         {
             var ds = _disposables;
             if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                Ref.Swap(ref _disposables, x => x.AddOrUpdate(disposalOrder, disposable));
+                RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
@@ -9949,11 +9961,20 @@ namespace DryIoc
         }
     }
 
-    internal static class RefTools
+    /// Hiding the lambda in the method call, so it is not needed it won't be allocated
+    internal static class RefMap
     {
-        /// Hiding the lambda in the method call
+        public static void AddOrUpdate<V>(this Ref<ImMap<V>> map, int key, V value) =>
+            map.Swap(_ => _.AddOrUpdate(key, value));
+
+        public static void AddOrUpdate<V>(ref ImMap<V> map, int key, V value) =>
+            Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
+
         public static void AddOrUpdate<K, V>(this Ref<ImHashMap<K, V>> map, K key, V value) =>
             map.Swap(_ => _.AddOrUpdate(key, value));
+
+        public static void AddOrUpdate<K, V>(ref ImHashMap<K, V> map, K key, V value) =>
+            Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
     }
 
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>
