@@ -2286,9 +2286,29 @@ namespace DryIoc
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                         return true;
                     }
+#if NETSTANDARD2_0 || NET35 || NET40 || NET45
+                // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Open for ideas
+                case ExprType.Invoke:
+                    {
+                        var invokeExpr = (InvocationExpression)expr;
+                        if (invokeExpr.Expression.NodeType == ExprType.Lambda)
+                            break;
 
-                case ExprType.Invoke: // todo: what if nested lambda is kust a constant?
-                case ExprType.Lambda: // not supported expressions (nested lambdas)
+                        object lambdaObj;
+                        if (!TryInterpret(r, invokeExpr.Expression, out lambdaObj))
+                            break;
+
+                        object[] args;
+                        if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), out args))
+                            break;
+
+                        var lambda = (Delegate)lambdaObj;
+                        result = lambda.Method.Invoke(lambda.Target, args);
+                        return true;
+                    }
+#endif
+                case ExprType.Lambda:
+                    break; // not supported nested lambdas
                 default:
                     break;
             }
