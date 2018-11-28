@@ -1,13 +1,15 @@
+using System;
 using Autofac;
 using BenchmarkDotNet.Attributes;
 using DryIoc;
 using Grace.DependencyInjection;
 using LightInject;
+using Microsoft.Extensions.DependencyInjection;
 using IContainer = Autofac.IContainer;
 
 namespace PerformanceTests
 {
-    public class OpenScopeAndResolveScopedWithSingletonAndTransientDeps
+    public class OpenScopeAndResolveScopedWithSingletonTransientDeps
     {
         public static DryIoc.IContainer PrepareDryIoc()
         {
@@ -15,6 +17,7 @@ namespace PerformanceTests
 
             container.Register<Parameter1>(Reuse.Transient);
             container.Register<Parameter2>(Reuse.Singleton);
+
             container.Register<ScopedBlah>(Reuse.Scoped);
 
             return container;
@@ -26,12 +29,31 @@ namespace PerformanceTests
                 return scope.Resolve<ScopedBlah>();
         }
 
+        public static IServiceProvider PrepareMsDi()
+        {
+            var services = new ServiceCollection();
+
+            services.AddTransient<Parameter1>();
+            services.AddSingleton<Parameter2>();
+
+            services.AddScoped<ScopedBlah>();
+
+            return services.BuildServiceProvider();
+        }
+
+        public static object Measure(IServiceProvider serviceProvider)
+        {
+            using (var scope = serviceProvider.CreateScope())
+                return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
+        }
+
         public static IContainer PrepareAutofac()
         {
             var builder = new ContainerBuilder();
 
             builder.RegisterType<Parameter1>().AsSelf().InstancePerDependency();
             builder.RegisterType<Parameter2>().AsSelf().SingleInstance();
+
             builder.RegisterType<ScopedBlah>().AsSelf().InstancePerLifetimeScope();
 
             return builder.Build();
@@ -97,7 +119,6 @@ namespace PerformanceTests
         #region CUT
 
         internal class Parameter1 { }
-
         internal class Parameter2 { }
 
         internal class ScopedBlah
@@ -135,30 +156,40 @@ namespace PerformanceTests
           BmarkDryIoc |   131.3 ns | 0.6650 ns | 0.5895 ns |  1.00 |    0.00 |      0.0608 |           - |           - |               288 B |
            BmarkGrace |   148.0 ns | 0.7295 ns | 0.6823 ns |  1.13 |    0.01 |      0.0608 |           - |           - |               288 B |
 
+         ## 25.11.2018: Adding MS.DI as reference
+
+                            Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                      BmarkAutofac | 1,554.5 ns | 7.3436 ns | 6.1322 ns |  6.49 |    0.06 |      0.5322 |           - |           - |              2512 B |
+                       BmarkDryIoc |   131.3 ns | 0.2331 ns | 0.2181 ns |  0.55 |    0.00 |      0.0627 |           - |           - |               296 B |
+ BmarkMicrosoftDependencyInjection |   239.5 ns | 1.5359 ns | 1.4367 ns |  1.00 |    0.00 |      0.0691 |           - |           - |               328 B |
+                        BmarkGrace |   146.3 ns | 0.8087 ns | 0.7565 ns |  0.61 |    0.01 |      0.0677 |           - |           - |               320 B |
+                  BmarkLightInject |   593.7 ns | 1.5277 ns | 1.4290 ns |  2.48 |    0.02 |      0.1554 |           - |           - |               736 B |
+
         */
         [MemoryDiagnoser]
-        public class FirstTime_OpenScope_Resolve
+        public class FirstTimeOpenScopeResolve
         {
-            private static readonly IContainer _autofac = PrepareAutofac();
-            private static readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
-            private static readonly DependencyInjectionContainer _grace = PrepareGrace();
-            private static readonly ServiceContainer _lightInject = PrepareLightInject();
-            //private static readonly Lamar.Container _lamar = PrepareLamar();
+            private readonly IContainer _autofac = PrepareAutofac();
+            private readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
+            private readonly IServiceProvider _msDi = PrepareMsDi();
+            private readonly DependencyInjectionContainer _grace = PrepareGrace();
+            private readonly ServiceContainer _lightInject = PrepareLightInject();
 
             [Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
 
-            [Benchmark(Baseline = true)]
+            [Benchmark]
             public object BmarkDryIoc() => Measure(_dryioc);
+
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
 
             [Benchmark]
             public object BmarkGrace() => Measure(_grace);
 
             [Benchmark]
             public object BmarkLightInject() => Measure(_lightInject);
-
-            //[Benchmark] // you can add to see how Roslyn based container is compared
-            //public object BmarkLamar() => Measure(_lamar);
         }
 
         /*
@@ -213,25 +244,34 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
        BmarkGrace |   148.5 ns |  0.6353 ns |   0.5943 ns |  1.11 |    0.00 |      0.0608 |           - |           - |               288 B |
  BmarkLightInject |   648.4 ns |  5.4780 ns |   5.1241 ns |  4.87 |    0.05 |      0.1488 |           - |           - |               704 B |
 
+            ## 25.11.2018: Adding MS.DI as reference
+
+                            Method |       Mean |     Error |    StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|----------:|----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+                      BmarkAutofac |  29.486 us | 0.1535 us | 0.1436 us |   7.75 |    0.08 |      5.2185 |           - |           - |            24.15 KB |
+                       BmarkDryIoc |   4.032 us | 0.0175 us | 0.0163 us |   1.06 |    0.01 |      1.2131 |           - |           - |             5.61 KB |
+ BmarkMicrosoftDependencyInjection |   3.803 us | 0.0273 us | 0.0255 us |   1.00 |    0.00 |      0.9232 |           - |           - |             4.26 KB |
+                        BmarkGrace | 540.672 us | 4.1734 us | 3.9038 us | 142.19 |    1.34 |      5.8594 |      2.9297 |           - |            30.24 KB |
+                  BmarkLightInject | 426.462 us | 4.2650 us | 3.9895 us | 112.15 |    1.27 |      6.8359 |      3.4180 |           - |            32.42 KB |
+
  */
         [MemoryDiagnoser]
-        public class Register_FirstTime_OpenScope_Resolve
+        public class CreateContainerRegister_FirstTimeOpenScopeResolve
         {
             [Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
-            [Benchmark(Baseline = true)]
+            [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
+
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
 
             [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
             [Benchmark]
             public object BmarkLightInject() => Measure(PrepareLightInject());
-
-            // you can add to see how Roslyn based container is compared
-            //[Benchmark] // excluding cause number are too big
-            //public object BmarkLamar() => Measure(PrepareLamar());
         }
     }
 }

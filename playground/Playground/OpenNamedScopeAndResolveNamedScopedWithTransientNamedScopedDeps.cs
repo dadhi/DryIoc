@@ -5,7 +5,7 @@ using IContainer = Autofac.IContainer;
 
 namespace PerformanceTests
 {
-    public class OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps
+    public class OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps
     {
         public void DryIoc_test()
         {
