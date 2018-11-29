@@ -1227,8 +1227,8 @@ namespace DryIoc
             {
                 var kvArgTypes = actualItemType.GetGenericParamsAndArgs();
                 return Call(_kvOfMethod.MakeGenericMethod(kvArgTypes),
-                    GetConstantExpression(actualItemType.Field("Key").GetValue(item), kvArgTypes[0], throwIfStateRequired),
-                    GetConstantExpression(actualItemType.Field("Value").GetValue(item), kvArgTypes[1], throwIfStateRequired));
+                    GetConstantExpression(actualItemType.GetTypeInfo().GetDeclaredField("Key").GetValue(item), kvArgTypes[0], throwIfStateRequired),
+                    GetConstantExpression(actualItemType.GetTypeInfo().GetDeclaredField("Value").GetValue(item), kvArgTypes[1], throwIfStateRequired));
             }
 
             if (actualItemType.IsPrimitive() ||
@@ -4741,11 +4741,8 @@ namespace DryIoc
                 if (methodCallExpr == null) // not an Arg.Of: e.g. constant or variable
                 {
                     var customValue = GetArgExpressionValueOrThrow(wholeServiceExpr, memberAssignment.Expression);
-                    propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
-                    {
-                        PropertyOrFieldServiceInfo.Of(member)
-                            .WithDetails(ServiceDetails.Of(customValue))
-                    });
+                    propertiesAndFields = propertiesAndFields.OverrideWith(r =>
+                        PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(customValue)).One());
                 }
                 else
                 {
@@ -4755,21 +4752,16 @@ namespace DryIoc
                     if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) // handle custom value
                     {
                         var getArgValue = GetArgCustomValueProvider(wholeServiceExpr, methodCallExpr, argValues);
-                        propertiesAndFields = propertiesAndFields.OverrideWith(req => new[]
-                        {
-                            PropertyOrFieldServiceInfo.Of(member)
-                                .WithDetails(ServiceDetails.Of(getArgValue(req)))
-                        });
+                        propertiesAndFields = propertiesAndFields.OverrideWith(req => 
+                            PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(getArgValue(req))).One());
                         hasCustomValue = true;
                     }
                     else
                     {
                         var memberType = member.GetReturnTypeOrDefault();
                         var argServiceDetails = GetArgServiceDetails(wholeServiceExpr, methodCallExpr, memberType, IfUnresolved.ReturnDefault, null);
-                        propertiesAndFields = propertiesAndFields.OverrideWith(r => new[]
-                        {
-                            PropertyOrFieldServiceInfo.Of(member).WithDetails(argServiceDetails)
-                        });
+                        propertiesAndFields = propertiesAndFields.OverrideWith(r =>
+                            PropertyOrFieldServiceInfo.Of(member).WithDetails(argServiceDetails).One());
                     }
                 }
             }
@@ -4850,7 +4842,7 @@ namespace DryIoc
                 return valueExpr.Value;
 
             var convert = argExpr as System.Linq.Expressions.UnaryExpression; // e.g. (object)SomeEnum.Value
-            if (convert != null && convert.NodeType == System.Linq.Expressions.ExpressionType.Convert)
+            if (convert != null && convert.NodeType == ExprType.Convert)
                 return GetArgExpressionValueOrThrow(wholeServiceExpr,
                     convert.Operand as System.Linq.Expressions.ConstantExpression);
 
@@ -5456,7 +5448,7 @@ namespace DryIoc
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
 
         internal static readonly MethodInfo ResolveManyMethod =
-            typeof(IResolver).SingleMethod(nameof(IResolver.ResolveMany));
+            typeof(IResolver).GetTypeInfo().GetDeclaredMethod(nameof(IResolver.ResolveMany));
 
         /// <summary>Resolves instance of service type from container. Throws exception if unable to resolve.</summary>
         public static object Resolve(this IResolver resolver, Type serviceType) =>
@@ -7403,7 +7395,7 @@ namespace DryIoc
             // Unwrap WeakReference or HiddenDisposable
             if (Setup.WeaklyReferenced)
                 serviceExpr = Call(
-                    typeof(ThrowInGeneratedCode).SingleMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
+                    typeof(ThrowInGeneratedCode).GetTypeInfo().GetDeclaredMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
                     Property(Convert(serviceExpr, typeof(WeakReference)),
                         typeof(WeakReference).Property(nameof(WeakReference.Target))));
             else if (Setup.PreventDisposal)
@@ -8614,7 +8606,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
-            typeof(IScope).SingleMethod(nameof(IScope.GetOrAdd));
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAdd));
 
         /// <inheritdoc />
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
@@ -8708,7 +8700,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
-            typeof(IScope).SingleMethod(nameof(IScope.TrackDisposable));
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
 
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
@@ -8970,9 +8962,11 @@ namespace DryIoc
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            Name == null && !ScopedOrSingleton ? _scopedExpr.Value
-                : ScopedOrSingleton ? _scopedOrSingletonExpr.Value
-                : Call(_scopedToMethod.Value, fallbackConverter(Name));
+            Name == null && !ScopedOrSingleton 
+                ? Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.Scoped)))
+                : ScopedOrSingleton 
+                    ? (Expression) Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
+                    : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -8995,89 +8989,74 @@ namespace DryIoc
         /// <summary>Flag indicating that it is a scope or singleton.</summary>
         public readonly bool ScopedOrSingleton;
 
-        internal static object TrackScopedOrSingleton(IResolverContext r, object item) =>
-            (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
-
-        private static readonly MethodInfo _trackScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(TrackScopedOrSingleton), true);
-
-        internal static object GetScopedOrSingleton(IResolverContext r,
+        /// Subject
+        public static object GetScopedOrSingleton(IResolverContext r,
             int id, CreateScopedValue createValue, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
 
         private static readonly MethodInfo _getScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedOrSingleton), true);
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingleton));
 
-        internal static object GetScopedOrSingletonWithValue(IResolverContext r,
+        /// Subject
+        public static object GetScopedOrSingletonWithValue(IResolverContext r,
             int id, object value, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrTryAdd(id, value, disposalIndex);
 
         private static readonly MethodInfo _getScopedOrSingletonWithValueMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedOrSingletonWithValue), true);
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingletonWithValue));
 
-        internal static object GetScoped(IResolverContext r,
+        /// Subject
+        public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
+            (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
+
+        private static readonly MethodInfo _trackScopedOrSingletonMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
+
+        /// Subject
+        public static object GetScoped(IResolverContext r,
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
-        internal static object GetScopedWithValue(IResolverContext r,
-            bool throwIfNoScope, int id, object value, int disposalIndex) =>
-            r.GetCurrentScope(throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
+        internal static readonly MethodInfo GetScopedMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScoped));
 
-        internal static object GetNameScoped(IResolverContext r,
+        /// Subject
+        public static object GetNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
-        internal static object GetNameScopedWithValue(IResolverContext r,
+        internal static readonly MethodInfo GetNameScopedMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScoped));
+
+        /// Subject
+        public static object GetScopedWithValue(IResolverContext r,
+            bool throwIfNoScope, int id, object value, int disposalIndex) =>
+            r.GetCurrentScope(throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
+
+        internal static readonly MethodInfo GetScopedWithValueMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedWithValue));
+
+        /// Subject
+        public static object GetNameScopedWithValue(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, object value, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrTryAdd(id, value, disposalIndex);
 
-        // todo: apply the trick for the rest of the services
-#if !NETSTANDARD2_0 && !NET45
-        internal static readonly MethodInfo GetScopedMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScoped), true);
-
-        internal static readonly MethodInfo GetNameScopedMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScoped), true);
-
-        internal static readonly MethodInfo GetScopedWithValueMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetScopedWithValue), true);
-
         internal static readonly MethodInfo GetNameScopedWithValueMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(GetNameScopedWithValue), true);
-#else
-        internal static readonly MethodInfo GetScopedMethod =
-            ((Func<IResolverContext, bool, int, CreateScopedValue, int, object>)GetScoped).Method;
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScopedWithValue));
 
-        internal static readonly MethodInfo GetNameScopedMethod =
-            ((Func<IResolverContext, object, bool, int, CreateScopedValue, int, object>)GetNameScoped).Method;
-
-        internal static readonly MethodInfo GetScopedWithValueMethod =
-            ((Func<IResolverContext, bool, int, object, int, object>)GetScopedWithValue).Method;
-
-        internal static readonly MethodInfo GetNameScopedWithValueMethod =
-            ((Func<IResolverContext, object, bool, int, object, int, object>)GetNameScopedWithValue).Method;
-#endif
-        internal static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
+        /// Subject
+        public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
             r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);
 
-        private static readonly MethodInfo _trackScopedMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(TrackScoped), true);
+        internal static readonly MethodInfo _trackScopedMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScoped));
 
-        internal static object TrackNameScoped(IResolverContext r,
-            object scopeName, bool throwIfNoScope, object item) =>
+        /// Subject
+        public static object TrackNameScoped(IResolverContext r, object scopeName, bool throwIfNoScope, object item) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(item);
 
-        private static readonly MethodInfo _trackNameScopedMethod =
-            typeof(CurrentScopeReuse).SingleMethod(nameof(TrackNameScoped), true);
-
-        private readonly Lazy<Expression> _scopedExpr = Lazy.Of<Expression>(() =>
-            Field(null, typeof(Reuse).Field(nameof(Reuse.Scoped))));
-
-        private readonly Lazy<MethodInfo> _scopedToMethod = Lazy.Of(() =>
-            typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)));
-
-        private readonly Lazy<Expression> _scopedOrSingletonExpr = Lazy.Of<Expression>(() =>
-            Field(null, typeof(Reuse).Field(nameof(Reuse.ScopedOrSingleton))));
+        internal static readonly MethodInfo _trackNameScopedMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackNameScoped));
     }
 
     /// <summary>Abstracts way to match reuse and scope names</summary>
@@ -10262,7 +10241,7 @@ namespace DryIoc
                 .Match(m => (includeNonPublic || m.IsPublic) && m.Name == name)
                 .SingleOrDefaultIfMany();
 
-        // todo: Replace with `GetDeclaredMethod(name)` for supported platforms
+        // note: Prefer `GetDeclaredMethod(name)` for supported platforms
         /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
         public static MethodInfo SingleMethod(this Type type, string name, bool includeNonPublic = false) =>
             type.GetSingleMethodOrNull(name, includeNonPublic).ThrowIfNull(
