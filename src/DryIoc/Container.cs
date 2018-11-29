@@ -1147,7 +1147,7 @@ namespace DryIoc
 
             // decorator of arrays should be converted back from IEnumerable to array.
             if (arrayElementType != null)
-                decoratorExpr = Call(WrappersSupport.ToArrayMethod.Value.MakeGenericMethod(arrayElementType), decoratorExpr);
+                decoratorExpr = Call(WrappersSupport.ToArrayMethod.MakeGenericMethod(arrayElementType), decoratorExpr);
 
             return decoratorExpr;
         }
@@ -1253,7 +1253,8 @@ namespace DryIoc
             return itemType == null ? Constant(item) : Constant(item, itemType);
         }
 
-        private static readonly MethodInfo _kvOfMethod = typeof(KV).SingleMethod(nameof(KV.Of));
+        private static readonly MethodInfo _kvOfMethod =
+            typeof(KV).GetTypeInfo().GetDeclaredMethod(nameof(KV.Of));
 
         #endregion
 
@@ -2403,39 +2404,39 @@ namespace DryIoc
         }
 
         private static object ConstValue(Expression expr) => ((ConstantExpression)expr).Value;
+    }
 
-        internal static class Converter
+    internal static class Converter
+    {
+        public static object ConvertWithOperator(object source, Type targetType, Expression expr)
         {
-            public static object ConvertWithOperator(object source, Type targetType, Expression expr)
-            {
-                var sourceType = source.GetType();
-                var sourceConvertOp = sourceType.GetSourceConversionOperatorToTarget(targetType);
-                if (sourceConvertOp != null)
-                    return sourceConvertOp.Invoke(null, new[] { source });
+            var sourceType = source.GetType();
+            var sourceConvertOp = sourceType.GetSourceConversionOperatorToTarget(targetType);
+            if (sourceConvertOp != null)
+                return sourceConvertOp.Invoke(null, new[] { source });
 
-                var targetConvertOp = sourceType.GetTargetConversionOperatorFromSource(targetType);
-                if (targetConvertOp == null)
-                    Throw.It(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression, expr);
-                return targetConvertOp.Invoke(null, new[] { source });
-            }
-
-            public static object ConvertMany(object[] source, Type targetType) =>
-                _convertManyMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
-
-            internal static R[] DoConvertMany<R>(object[] items)
-            {
-                if (items == null && items.Length == 0)
-                    return ArrayTools.Empty<R>();
-
-                var results = new R[items.Length];
-                for (var i = 0; i < items.Length; i++)
-                    results[i] = (R)items[i];
-                return results;
-            }
-
-            private static readonly MethodInfo _convertManyMethod =
-                typeof(Converter).SingleMethod(nameof(DoConvertMany), true);
+            var targetConvertOp = sourceType.GetTargetConversionOperatorFromSource(targetType);
+            if (targetConvertOp == null)
+                Throw.It(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression, expr);
+            return targetConvertOp.Invoke(null, new[] { source });
         }
+
+        public static object ConvertMany(object[] source, Type targetType) =>
+            _convertManyMethod.MakeGenericMethod(targetType).Invoke(null, source.One());
+
+        public static R[] DoConvertMany<R>(object[] items)
+        {
+            if (items == null && items.Length == 0)
+                return ArrayTools.Empty<R>();
+
+            var results = new R[items.Length];
+            for (var i = 0; i < items.Length; i++)
+                results[i] = (R)items[i];
+            return results;
+        }
+
+        private static readonly MethodInfo _convertManyMethod =
+            typeof(Converter).GetTypeInfo().GetDeclaredMethod(nameof(DoConvertMany));
     }
 
     /// <summary>Compiles expression to factory delegate.</summary>
@@ -2943,11 +2944,7 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
-#if !NETSTANDARD2_0 && !NET45
-            typeof(DefaultKey).SingleMethod(nameof(Of));
-#else
-            ((Func<int, DefaultKey>)Of).Method;
-#endif
+            typeof(DefaultKey).GetTypeInfo().GetDeclaredMethod(nameof(Of));
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
@@ -2986,11 +2983,7 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultDynamicKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
-#if !NETSTANDARD2_0 && !NET45
-            typeof(DefaultDynamicKey).SingleMethod(nameof(Of));
-#else
-            ((Func<int, DefaultDynamicKey>)Of).Method;
-#endif
+            typeof(DefaultDynamicKey).GetTypeInfo().GetDeclaredMethod(nameof(Of));
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
@@ -3057,11 +3050,7 @@ namespace DryIoc
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
-#if !NETSTANDARD2_0 && !NET45
-            typeof(ResolverContext).SingleMethod(nameof(OpenScope));
-#else
-            ((Func<IResolverContext, object, bool, IResolverContext>)OpenScope).Method;
-#endif
+            typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(OpenScope));
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
@@ -3077,12 +3066,7 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression RootOrSelfExpr =
-            Call(
-#if !NETSTANDARD2_0 && !NET45
-                typeof(ResolverContext).SingleMethod(nameof(RootOrSelf)), 
-#else
-                ((Func<IResolverContext, IResolverContext>)RootOrSelf).Method,
-#endif
+            Call(typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(RootOrSelf)), 
                 FactoryDelegateCompiler.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
@@ -3264,8 +3248,8 @@ namespace DryIoc
             return wrappers;
         }
 
-        internal static readonly Lazy<MethodInfo> ToArrayMethod =
-            Lazy.Of(() => typeof(ArrayTools).SingleMethod(nameof(ArrayTools.ToArrayOrSelf)));
+        internal static readonly MethodInfo ToArrayMethod =
+            typeof(ArrayTools).GetTypeInfo().GetDeclaredMethod(nameof(ArrayTools.ToArrayOrSelf));
 
         private static Expression GetArrayExpression(Request request)
         {
@@ -3279,7 +3263,7 @@ namespace DryIoc
             {
                 var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request);
                 return collectionType.GetGenericDefinitionOrNull() != typeof(IEnumerable<>)
-                    ? Call(ToArrayMethod.Value.MakeGenericMethod(itemType), lazyEnumerableExpr)
+                    ? Call(ToArrayMethod.MakeGenericMethod(itemType), lazyEnumerableExpr)
                     : lazyEnumerableExpr;
             }
 
@@ -3378,18 +3362,18 @@ namespace DryIoc
 
             // cast to object is not required cause Resolve already returns IEnumerable<object>
             if (itemType != typeof(object))
-                resolveManyExpr = Call(_enumerableCastMethod.Value.MakeGenericMethod(itemType), resolveManyExpr);
+                resolveManyExpr = Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr);
 
             return New(typeof(LazyEnumerable<>).MakeGenericType(itemType).SingleConstructor(), resolveManyExpr);
         }
 
-        private static readonly Lazy<MethodInfo> _enumerableCastMethod = Lazy.Of(() =>
-            typeof(Enumerable).SingleMethod(nameof(Enumerable.Cast)));
+        private static readonly MethodInfo _enumerableCastMethod =
+            typeof(Enumerable).GetTypeInfo().GetDeclaredMethod(nameof(Enumerable.Cast));
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
         /// <param name="nullWrapperForUnresolvedService">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
-        /// <returns>Expression: r => new Lazy{TService}(() => r.Resolve{TService}(key, ifUnresolved, requiredType));</returns>
+        /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
         public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
         {
             var lazyType = request.GetActualServiceType();
@@ -4648,11 +4632,11 @@ namespace DryIoc
                 parameters = methodCallExpr.Method.GetParameters();
                 argExprs = methodCallExpr.Arguments;
             }
-            else if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.Invoke)
+            else if (callExpr.NodeType == ExprType.Invoke)
             {
                 var invokeExpr = (System.Linq.Expressions.InvocationExpression)callExpr;
                 var invokedDelegateExpr = invokeExpr.Expression;
-                var invokeMethod = invokedDelegateExpr.Type.SingleMethod(nameof(Action.Invoke));
+                var invokeMethod = invokedDelegateExpr.Type.GetTypeInfo().GetDeclaredMethod(nameof(Action.Invoke));
                 ctorOrMethodOrMember = invokeMethod;
                 parameters = invokeMethod.GetParameters();
                 argExprs = invokeExpr.Arguments;
@@ -4857,17 +4841,6 @@ namespace DryIoc
             return ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata);
         }
 
-        internal static T[] ObjectArrayCastTo<T>(object[] source)
-        {
-            var target = new T[source.Length];
-            for (var i = 0; i < source.Length; i++)
-                target[i] = (T)source[i];
-            return target;
-        }
-
-        private static readonly MethodInfo _objectArrayCastToMethod =
-            typeof(Made).SingleMethod(nameof(ObjectArrayCastTo), includeNonPublic: true);
-
         private static object GetArgExpressionValueOrThrow(
             System.Linq.Expressions.Expression wholeServiceExpr,
             System.Linq.Expressions.Expression argExpr)
@@ -4897,8 +4870,7 @@ namespace DryIoc
                 for (var i = 0; i < itemExprs.Count; i++)
                     items[i] = GetArgExpressionValueOrThrow(wholeServiceExpr, itemExprs[i]);
 
-                var itemType = newArrExpr.Type.GetElementType();
-                return _objectArrayCastToMethod.MakeGenericMethod(itemType).Invoke(null, items.One());
+                return Converter.ConvertMany(items, newArrExpr.Type.GetElementType());
             }
 
             return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf,
