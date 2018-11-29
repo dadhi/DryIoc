@@ -1,10 +1,14 @@
 using System;
 using Autofac;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Order;
 using DryIoc;
 using Grace.DependencyInjection;
 using LightInject;
 using Microsoft.Extensions.DependencyInjection;
+using SimpleInjector;
+using SimpleInjector.Lifestyles;
+using Container = DryIoc.Container;
 using IContainer = Autofac.IContainer;
 
 namespace PerformanceTests
@@ -15,7 +19,7 @@ namespace PerformanceTests
         {
             var container = new Container();
 
-            container.Register<Parameter1>(Reuse.Transient);
+            //container.Register<Parameter1>(Reuse.Transient);
             container.Register<Parameter2>(Reuse.Singleton);
             container.Register<Parameter3>(Reuse.Scoped);
 
@@ -34,7 +38,7 @@ namespace PerformanceTests
         {
             var services = new ServiceCollection();
 
-            services.AddTransient<Parameter1>();
+            //services.AddTransient<Parameter1>();
             services.AddSingleton<Parameter2>();
             services.AddScoped<Parameter3>();
 
@@ -53,7 +57,7 @@ namespace PerformanceTests
         {
             var builder = new ContainerBuilder();
 
-            builder.RegisterType<Parameter1>().AsSelf().InstancePerDependency();
+            //builder.RegisterType<Parameter1>().AsSelf().InstancePerDependency();
             builder.RegisterType<Parameter2>().AsSelf().SingleInstance();
             builder.RegisterType<Parameter3>().AsSelf().InstancePerLifetimeScope();
 
@@ -74,7 +78,7 @@ namespace PerformanceTests
 
             container.Configure(c =>
             {
-                c.Export<Parameter1>();
+                //c.Export<Parameter1>();
                 c.Export<Parameter2>().Lifestyle.Singleton();
                 c.Export<Parameter3>().Lifestyle.SingletonPerScope();
 
@@ -90,11 +94,11 @@ namespace PerformanceTests
                 return scope.Locate<ScopedBlah>();
         }
 
-        public static ServiceContainer PrepareLightInject()
+        public static LightInject.ServiceContainer PrepareLightInject()
         {
-            var c = new ServiceContainer();
+            var c = new LightInject.ServiceContainer();
 
-            c.Register<Parameter1>();
+            //c.Register<Parameter1>();
             c.Register<Parameter2>(new PerContainerLifetime());
             c.Register<Parameter3>(new PerScopeLifetime());
 
@@ -103,25 +107,48 @@ namespace PerformanceTests
             return c;
         }
 
-        public static object Measure(ServiceContainer container)
+        public static object Measure(LightInject.ServiceContainer container)
         {
             using (var scope = container.BeginScope())
                 return scope.GetInstance<ScopedBlah>();
         }
 
-        internal class Parameter1 { }
+        public static SimpleInjector.Container PrepareSimpleInjector()
+        {
+            var c = new SimpleInjector.Container();
+            c.Options.DefaultScopedLifestyle = new AsyncScopedLifestyle();
+
+            //c.Register<Parameter1>(Lifestyle.Singleton);
+            c.Register<Parameter2>(Lifestyle.Singleton);
+            c.Register<Parameter3>(Lifestyle.Scoped);
+
+            c.Register<ScopedBlah>(Lifestyle.Scoped);
+
+            return c;
+        }
+
+        public static object Measure(SimpleInjector.Container container)
+        {
+            using (AsyncScopedLifestyle.BeginScope(container))
+                return container.GetInstance<ScopedBlah>();
+        }
+
+        //internal class Parameter1 { }
         internal class Parameter2 { }
         internal class Parameter3 { }
 
         internal class ScopedBlah
         {
-            public Parameter1 Parameter1 { get; }
+            //public Parameter1 Parameter1 { get; }
             public Parameter2 Parameter2 { get; }
             public Parameter3 Parameter3 { get; }
 
-            public ScopedBlah(Parameter1 parameter1, Parameter2 parameter2, Parameter3 parameter3)
+            public ScopedBlah(
+                //Parameter1 parameter1, 
+                Parameter2 parameter2, 
+                Parameter3 parameter3)
             {
-                Parameter1 = parameter1;
+                //Parameter1 = parameter1;
                 Parameter2 = parameter2;
                 Parameter3 = parameter3;
             }
@@ -154,6 +181,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             private readonly IServiceProvider _msDi = PrepareMsDi();
             private readonly DependencyInjectionContainer _grace = PrepareGrace();
             private readonly ServiceContainer _lightInject = PrepareLightInject();
+            private readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
 
             [Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
@@ -169,6 +197,9 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
 
             [Benchmark]
             public object BmarkLightInject() => Measure(_lightInject);
+
+            [Benchmark]
+            public object BmarkSimpleInjector() => Measure(_simpleInjector);
         }
 
         /*
@@ -190,7 +221,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
                    BmarkLightInject | 666.277 us | 6.2531 us | 5.8492 us | 136.72 |    1.38 |      8.7891 |      3.9063 |           - |            43.12 KB |
 
         */
-        [MemoryDiagnoser]
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {
             [Benchmark]
@@ -200,13 +231,16 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
 
             [Benchmark(Baseline = true)]
-            public object BmarkMicrosoftSDependencyInjection() => Measure(PrepareMsDi());
+            public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
 
             [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
             [Benchmark]
             public object BmarkLightInject() => Measure(PrepareLightInject());
+
+            [Benchmark]
+            public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
         }
     }
 }
