@@ -241,11 +241,12 @@ namespace DryIoc
 
                 // 1) First try to interpret
                 object instance;
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out instance))
+                var useFec = Rules.UseFastExpressionCompiler;
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
+                factoryDelegate = expr.CompileToFactoryDelegate(useFec);
             }
             else
             {
@@ -313,12 +314,14 @@ namespace DryIoc
                 CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, expr);
 
                 // 1) First try to interpret
+                var useFec = Rules.UseFastExpressionCompiler;
+
                 object instance;
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
+                factoryDelegate = expr.CompileToFactoryDelegate(useFec);
             }
             else
             {
@@ -2147,11 +2150,12 @@ namespace DryIoc
 
     internal static class Interpreter
     {
-        public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, out object result)
+        public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, bool useFec,
+            out object result)
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, out result);
+                return Interpreter.TryInterpret(r, expr, useFec, out result);
             }
             catch (TargetInvocationException tex)
             { 
@@ -2162,7 +2166,7 @@ namespace DryIoc
             }
         }
 
-        public static bool TryInterpret(IResolverContext r, Expression expr, out object result)
+        public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
         {
             result = null;
             switch (expr.NodeType)
@@ -2172,7 +2176,8 @@ namespace DryIoc
                         var newExpr = (NewExpression)expr;
 
                         var newArgs = newExpr.Arguments.ToListOrSelf();
-                        if (!TryInterpretMany(r, newArgs, out var args))
+                        object[] args;
+                        if (!TryInterpretMany(r, newArgs, useFec, out args))
                             return false;
 
                         result = newExpr.Constructor.Invoke(args);
@@ -2185,30 +2190,33 @@ namespace DryIoc
                         var callObject = callExpr.Object;
                         var callArgs = callExpr.Arguments.ToListOrSelf();
 
+                        object resolver;
                         if (callMethod == Resolver.ResolveMethod)
-                            return TryInterpret(r, callObject, out var resolver) &&
-                                   TryInterpretResolve((IResolverContext)resolver, callArgs, out result);
+                            return TryInterpret(r, callObject, useFec, out resolver) &&
+                                   TryInterpretResolve((IResolverContext)resolver, callArgs, useFec, out result);
 
                         if (callMethod == Resolver.ResolveManyMethod)
-                            return TryInterpret(r, callObject, out var resolver) &&
-                                   TryInterpretResolveMany((IResolverContext)resolver, callArgs, out result);
+                            return TryInterpret(r, callObject, useFec, out resolver) &&
+                                   TryInterpretResolveMany((IResolverContext)resolver, callArgs, useFec, out result);
 
                         if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
-                            return TryInterpretGetScopedWithValue(r, callArgs, ref result);
+                            return TryInterpretGetScopedWithValue(r, callArgs, useFec, out result);
 
                         if (callMethod == CurrentScopeReuse.GetNameScopedWithValueMethod)
-                            return TryInterpretGetNameScopedWithValue(r, callArgs, ref result);
+                            return TryInterpretGetNameScopedWithValue(r, callArgs, useFec, out result);
 
-                        // Methods with nested lambda parameter of type `CreateScopedValue` is not supported
-                        if (callMethod == CurrentScopeReuse.GetScopedMethod ||
-                            callMethod == CurrentScopeReuse.GetNameScopedMethod)
-                            return false;
+                        if (callMethod == CurrentScopeReuse.GetScopedMethod)
+                            return TryInterpretGetScoped(r, callArgs, useFec, out result);
 
-                        if (!TryInterpretMany(r, callArgs, out var args))
+                        if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
+                            return TryInterpretGetNameScoped(r, callArgs, useFec, out result);
+
+                        object[] args;
+                        if (!TryInterpretMany(r, callArgs, useFec, out args))
                             return false;
 
                         object instance = null;
-                        if (callObject != null && !TryInterpret(r, callObject, out instance))
+                        if (callObject != null && !TryInterpret(r, callObject, useFec, out instance))
                             return false;
 
                         result = callMethod.Invoke(instance, args);
@@ -2222,22 +2230,22 @@ namespace DryIoc
                 case ExprType.Convert:
                     {
                         var convertExpr = (UnaryExpression)expr;
-                        if (!TryInterpret(r, convertExpr.Operand, out object instance))
+
+                        object instance;
+                        if (!TryInterpret(r, convertExpr.Operand, useFec, out instance))
                             return false;
 
                         // skip conversion for null and for directly assignable type
-                        if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
-                            result = instance;
-                        else
-                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
+                        result = instance == null || instance.GetType().IsAssignableTo(convertExpr.Type)
+                            ? instance
+                            : Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
                         return true;
                     }
                 case ExprType.Parameter:
                     {
-                        // todo: handles only IResolverContext parameter for now
+                        // todo: handles IResolverContext only for now
                         if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
                             return false;
-
                         result = r;
                         return true;
                     }
@@ -2246,7 +2254,7 @@ namespace DryIoc
                         var memberExpr = (MemberExpression)expr;
                         object instance = null;
                         if (memberExpr.Expression != null &&
-                            !TryInterpret(r, memberExpr.Expression, out instance))
+                            !TryInterpret(r, memberExpr.Expression, useFec, out instance))
                             return false;
 
                         var field = memberExpr.Member as FieldInfo;
@@ -2268,14 +2276,14 @@ namespace DryIoc
                 case ExprType.MemberInit:
                     {
                         var memberInit = (MemberInitExpression)expr;
-                        if (!TryInterpret(r, memberInit.NewExpression, out var instance))
+                        if (!TryInterpret(r, memberInit.NewExpression, useFec, out var instance))
                             return false;
 
                         var bindings = memberInit.Bindings;
                         for (var i = 0; i < bindings.Count; i++)
                         {
                             var binding = (MemberAssignment)bindings[i];
-                            if (!TryInterpret(r, binding.Expression, out var memberValue))
+                            if (!TryInterpret(r, binding.Expression, useFec, out var memberValue))
                                 return false;
 
                             var field = binding.Member as FieldInfo;
@@ -2293,14 +2301,15 @@ namespace DryIoc
                         var newArray = (NewArrayExpression)expr;
 
                         var itemExprs = newArray.Expressions.ToListOrSelf();
-                        if (!TryInterpretMany(r, itemExprs, out var items))
+                        object[] items;
+                        if (!TryInterpretMany(r, itemExprs, useFec, out items))
                             return false;
 
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                         return true;
                     }
 #if NETSTANDARD2_0 || NET35 || NET40 || NET45
-                // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Open for ideas
+                // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Need help!
                 case ExprType.Invoke:
                     {
                         var invokeExpr = (InvocationExpression)expr;
@@ -2308,11 +2317,11 @@ namespace DryIoc
                             break;
 
                         object lambdaObj;
-                        if (!TryInterpret(r, invokeExpr.Expression, out lambdaObj))
+                        if (!TryInterpret(r, invokeExpr.Expression, useFec, out lambdaObj))
                             break;
 
                         object[] args;
-                        if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), out args))
+                        if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), useFec, out args))
                             break;
 
                         var lambda = (Delegate)lambdaObj;
@@ -2329,42 +2338,45 @@ namespace DryIoc
             return false;
         }
 
-        private static bool TryInterpretResolve(IResolverContext r, IList<Expression> args, out object result)
+        private static bool TryInterpretResolve(IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
-            result = null;
-            if (!TryInterpret(r, args[1], out var serviceKey))
+            if (!TryInterpret(r, args[1], useFec, out var serviceKey) ||
+                !TryInterpret(r, args[4], useFec, out var preResolveParent) ||
+                !TryInterpret(r, args[5], useFec, out var resolveArgs))
+            {
+                result = null;
                 return false;
-            if (!TryInterpret(r, args[4], out var preResolveParent))
-                return false;
-            if (!TryInterpret(r, args[5], out var resolveArgs))
-                return false;
-            result = r.Resolve((Type)ConstValue(args[0]), serviceKey, (IfUnresolved)ConstValue(args[2]), (Type)ConstValue(args[3]),
-                (Request)preResolveParent, (object[])resolveArgs);
+            }
+
+            result = r.Resolve((Type)ConstValue(args[0]), serviceKey, (IfUnresolved)ConstValue(args[2]), 
+                (Type)ConstValue(args[3]), (Request)preResolveParent, (object[])resolveArgs);
             return true;
         }
 
-        private static bool TryInterpretResolveMany(IResolverContext r, IList<Expression> args, out object result)
+        private static bool TryInterpretResolveMany(IResolverContext r, IList<Expression> args, bool useFec, 
+            out object result)
         {
-            result = null;
-            if (!TryInterpret(r, args[1], out var serviceKey))
+            if (!TryInterpret(r, args[1], useFec, out var serviceKey) ||
+                !TryInterpret(r, args[3], useFec, out var preResolveParent) ||
+                !TryInterpret(r, args[4], useFec, out var resolveArgs))
+            {
+                result = null;
                 return false;
-            if (!TryInterpret(r, args[3], out var preResolveParent))
-                return false;
-            if (!TryInterpret(r, args[4], out var resolveArgs))
-                return false;
+            }
             result = r.ResolveMany((Type)ConstValue(args[0]), serviceKey, (Type)ConstValue(args[2]),
                 (Request)preResolveParent, (object[])resolveArgs);
             return true;
         }
 
-        private static bool TryInterpretGetScopedWithValue(IResolverContext r, IList<Expression> args,
-            ref object result)
+        private static bool TryInterpretGetScopedWithValue(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
-            if (!TryInterpret(r, args[0], out var resolver))
+            if (!TryInterpret(r, args[0], useFec, out var resolver) ||
+                !TryInterpret(r, args[3], useFec, out var service))
+            {
+                result = null;
                 return false;
-
-            if (!TryInterpret(r, args[3], out var service))
-                return false;
+            }
 
             result = CurrentScopeReuse.GetScopedWithValue(
                 (IResolverContext)resolver, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
@@ -2372,14 +2384,16 @@ namespace DryIoc
             return true;
         }
 
-        private static bool TryInterpretGetNameScopedWithValue(IResolverContext r, IList<Expression> args,
-            ref object result)
+        private static bool TryInterpretGetNameScopedWithValue(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
-            if (!TryInterpret(r, args[0], out var resolver))
+            object resolver = null, service = null;
+            if (!TryInterpret(r, args[0], useFec, out resolver) ||
+                !TryInterpret(r, args[4], useFec, out service))
+            {
+                result = false;
                 return false;
-
-            if (!TryInterpret(r, args[4], out var service))
-                return false;
+            }
 
             result = CurrentScopeReuse.GetNameScopedWithValue(
                 (IResolverContext)resolver, ConstValue(args[1]), (bool)ConstValue(args[2]),
@@ -2387,7 +2401,60 @@ namespace DryIoc
             return true;
         }
 
-        private static bool TryInterpretMany(IResolverContext r, IList<Expression> argExprs, out object[] args)
+        private static bool TryInterpretGetScoped(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            result = null;
+            object resolverObj;
+            if (!TryInterpret(r, args[0], useFec, out resolverObj))
+                return false;
+
+            var resolverContext = (IResolverContext)resolverObj;
+
+            // todo: Check that scope already contains the value
+            var createExpr = ((LambdaExpression)args[3]).Body;
+            CreateScopedValue createValue = () =>
+            {
+                object value;
+                if (!TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out value))
+                    value = createExpr.CompileToFactoryDelegate(useFec)(resolverContext);
+                return value;
+            };
+
+            result = CurrentScopeReuse.GetScoped(
+                resolverContext, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
+                createValue, (int)ConstValue(args[4]));
+            return true;
+        }
+
+        private static bool TryInterpretGetNameScoped(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            result = null;
+            object resolverObj;
+            if (!TryInterpret(r, args[0], useFec, out resolverObj))
+                return false;
+
+            var resolverContext = (IResolverContext)resolverObj;
+
+            // todo: Check that scope already contains the value
+            var createExpr = ((LambdaExpression)args[4]).Body;
+            CreateScopedValue createValue = () =>
+            {
+                object value;
+                if (!TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out value))
+                    value = createExpr.CompileToFactoryDelegate(useFec)(resolverContext);
+                return value;
+            };
+
+            result = CurrentScopeReuse.GetNameScoped(
+                resolverContext, ConstValue(args[1]), (bool)ConstValue(args[2]), (int)ConstValue(args[3]),
+                createValue, (int)ConstValue(args[5]));
+            return true;
+        }
+
+        private static bool TryInterpretMany(
+            IResolverContext r, IList<Expression> argExprs, bool useFec, out object[] args)
         {
             args = argExprs.Count == 0 ? ArrayTools.Empty<object>() : new object[argExprs.Count];
 
@@ -2395,7 +2462,8 @@ namespace DryIoc
                 for (var i = 0; i < args.Length; i++)
                 {
                     var argExpr = argExprs[i];
-                    if (!TryInterpret(r, argExpr, out object arg))
+                    object arg;
+                    if (!TryInterpret(r, argExpr, useFec, out arg))
                         return false;
                     args[i] = arg;
                 }
@@ -7367,10 +7435,12 @@ namespace DryIoc
                 !request.IsWrappedInFunc())
             {
                 var container = request.Container;
+                var useFec = rules.UseFastExpressionCompiler;
                 CreateScopedValue createSingleton = () =>
                 {
-                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out var instance))
-                        instance = serviceExpr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler)(container);
+                    object instance;
+                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out instance))
+                        instance = serviceExpr.CompileToFactoryDelegate(useFec)(container);
 
                     if (Setup.WeaklyReferenced)
                         instance = new WeakReference(instance);

@@ -19,7 +19,7 @@ namespace PerformanceTests
         {
             var container = new Container();
 
-            //container.Register<Parameter1>(Reuse.Transient);
+            container.Register<Parameter1>(Reuse.Transient);
             container.Register<Parameter2>(Reuse.Singleton);
             container.Register<Parameter3>(Reuse.Scoped);
 
@@ -38,7 +38,7 @@ namespace PerformanceTests
         {
             var services = new ServiceCollection();
 
-            //services.AddTransient<Parameter1>();
+            services.AddTransient<Parameter1>();
             services.AddSingleton<Parameter2>();
             services.AddScoped<Parameter3>();
 
@@ -57,7 +57,7 @@ namespace PerformanceTests
         {
             var builder = new ContainerBuilder();
 
-            //builder.RegisterType<Parameter1>().AsSelf().InstancePerDependency();
+            builder.RegisterType<Parameter1>().AsSelf().InstancePerDependency();
             builder.RegisterType<Parameter2>().AsSelf().SingleInstance();
             builder.RegisterType<Parameter3>().AsSelf().InstancePerLifetimeScope();
 
@@ -78,7 +78,7 @@ namespace PerformanceTests
 
             container.Configure(c =>
             {
-                //c.Export<Parameter1>();
+                c.Export<Parameter1>();
                 c.Export<Parameter2>().Lifestyle.Singleton();
                 c.Export<Parameter3>().Lifestyle.SingletonPerScope();
 
@@ -98,7 +98,7 @@ namespace PerformanceTests
         {
             var c = new LightInject.ServiceContainer();
 
-            //c.Register<Parameter1>();
+            c.Register<Parameter1>();
             c.Register<Parameter2>(new PerContainerLifetime());
             c.Register<Parameter3>(new PerScopeLifetime());
 
@@ -113,12 +113,31 @@ namespace PerformanceTests
                 return scope.GetInstance<ScopedBlah>();
         }
 
+        public static Lamar.Container PrepareLamar()
+        {
+            return new Lamar.Container(c =>
+            {
+                c.AddTransient<Parameter1>();
+                c.AddSingleton<Parameter2>();
+                c.AddScoped<Parameter3>();
+
+                c.AddScoped<ScopedBlah>();
+            });
+        }
+
+        public static object Measure(Lamar.Container container)
+        {
+            using (var scope = container.CreateScope())
+                return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
+        }
+
+
         public static SimpleInjector.Container PrepareSimpleInjector()
         {
             var c = new SimpleInjector.Container();
             c.Options.DefaultScopedLifestyle = new AsyncScopedLifestyle();
 
-            //c.Register<Parameter1>(Lifestyle.Singleton);
+            c.Register<Parameter1>(Lifestyle.Singleton);
             c.Register<Parameter2>(Lifestyle.Singleton);
             c.Register<Parameter3>(Lifestyle.Scoped);
 
@@ -133,22 +152,22 @@ namespace PerformanceTests
                 return container.GetInstance<ScopedBlah>();
         }
 
-        //internal class Parameter1 { }
-        internal class Parameter2 { }
-        internal class Parameter3 { }
+        public class Parameter1 { }
+        public class Parameter2 { }
+        public class Parameter3 { }
 
-        internal class ScopedBlah
+        public class ScopedBlah
         {
-            //public Parameter1 Parameter1 { get; }
+            public Parameter1 Parameter1 { get; }
             public Parameter2 Parameter2 { get; }
             public Parameter3 Parameter3 { get; }
 
             public ScopedBlah(
-                //Parameter1 parameter1, 
+                Parameter1 parameter1,
                 Parameter2 parameter2, 
                 Parameter3 parameter3)
             {
-                //Parameter1 = parameter1;
+                Parameter1 = parameter1;
                 Parameter2 = parameter2;
                 Parameter3 = parameter3;
             }
@@ -173,7 +192,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
                    BmarkLightInject |   998.6 ns |  4.589 ns |  4.0676 ns |  3.64 |    0.02 |      0.2422 |           - |           - |              1144 B |
 
         */
-        [MemoryDiagnoser]
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class FirstTimeOpenScopeResolve
         {
             private readonly IContainer _autofac = PrepareAutofac();
@@ -181,6 +200,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             private readonly IServiceProvider _msDi = PrepareMsDi();
             private readonly DependencyInjectionContainer _grace = PrepareGrace();
             private readonly ServiceContainer _lightInject = PrepareLightInject();
+            private readonly Lamar.Container _lamar = PrepareLamar();
             private readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
 
             [Benchmark]
@@ -199,12 +219,16 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             public object BmarkLightInject() => Measure(_lightInject);
 
             [Benchmark]
+            public object BmarkLamar() => Measure(_lamar);
+
+            //[Benchmark]
             public object BmarkSimpleInjector() => Measure(_simpleInjector);
         }
 
         /*
-        ## 28.11.2018
-        BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
+## 28.11.2018: Starting point - no scoped dependency interpretation for DryIoc yet
+
+BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
 Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
 .NET Core SDK=2.1.500
@@ -220,7 +244,17 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
                          BmarkGrace | 783.044 us | 3.8283 us | 3.5810 us | 160.68 |    1.18 |      8.7891 |      3.9063 |           - |            42.44 KB |
                    BmarkLightInject | 666.277 us | 6.2531 us | 5.8492 us | 136.72 |    1.38 |      8.7891 |      3.9063 |           - |            43.12 KB |
 
-        */
+## 30.11.2018: First DryIoc version with interpreted scoped dependency
+
+                            Method |       Mean |      Error |      StdDev |     Median |          P95 |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|-----------:|------------:|-----------:|-------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |   4.797 us |  0.1125 us |   0.2904 us |   4.724 us |     5.754 us |   1.00 |    0.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc |   5.547 us |  0.0401 us |   0.0313 us |   5.535 us |     5.594 us |   1.17 |    0.01 |      1.6251 |           - |           - |             7.49 KB |
+                      BmarkAutofac |  36.195 us |  0.1435 us |   0.1198 us |  36.232 us |    36.332 us |   7.64 |    0.03 |      6.4697 |           - |           - |            29.83 KB |
+                        BmarkGrace | 776.478 us |  5.3626 us |   4.4780 us | 774.993 us |   783.422 us | 163.89 |    1.13 |      8.7891 |      3.9063 |           - |            42.44 KB |
+                  BmarkLightInject | 799.472 us | 79.1998 us | 231.0294 us | 658.761 us | 1,299.696 us | 169.62 |   51.94 |      8.7891 |      3.9063 |           - |            43.12 KB |
+
+*/
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {
@@ -240,6 +274,9 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             public object BmarkLightInject() => Measure(PrepareLightInject());
 
             [Benchmark]
+            public object BmarkLamar() => Measure(PrepareLamar());
+
+            //[Benchmark]
             public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
         }
     }
