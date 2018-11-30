@@ -279,5 +279,53 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             //[Benchmark]
             public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
         }
+
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        public class OpenScopeResolveAfterWarmUp
+        {
+            private static readonly IContainer _autofac = PrepareAutofac();
+            private static readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
+            private static readonly IServiceProvider _msDi = PrepareMsDi();
+            private static readonly DependencyInjectionContainer _grace = PrepareGrace();
+            private static readonly ServiceContainer _lightInject = PrepareLightInject();
+            private static readonly Lamar.Container _lamar = PrepareLamar();
+            private static readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
+
+            [GlobalSetup]
+            public void WarmUp()
+            {
+                for (var i = 0; i < 5; i++)
+                {
+                    Measure(_autofac);
+                    Measure(_dryioc);
+                    Measure(_msDi);
+                    Measure(_grace);
+                    Measure(_lightInject);
+                    Measure(_lamar);
+                }
+            }
+
+            [Benchmark]
+            public object BmarkAutofac() => Measure(_autofac);
+
+            [Benchmark]
+            public object BmarkDryIoc() => Measure(_dryioc);
+
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftSDependencyInjection() => Measure(_msDi);
+
+            [Benchmark]
+            public object BmarkGrace() => Measure(_grace);
+
+            [Benchmark]
+            public object BmarkLightInject() => Measure(_lightInject);
+
+            [Benchmark]
+            public object BmarkLamar() => Measure(_lamar);
+
+            //[Benchmark]
+            public object BmarkSimpleInjector() => Measure(_simpleInjector);
+        }
+
     }
 }
