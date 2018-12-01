@@ -229,7 +229,7 @@ namespace DryIoc
                 return null;
 
             FactoryDelegate factoryDelegate;
-            if (factory.TryInterpretation(request))
+            if (factory.UseInterpretation(request))
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -303,7 +303,7 @@ namespace DryIoc
             if (factory == null)
                 return null;
 
-            if (factory.TryInterpretation(request))
+            if (factory.UseInterpretation(request))
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -1218,6 +1218,10 @@ namespace DryIoc
         /// <summary>Converts known item into literal expression or wraps it in a constant expression.</summary>
         public Expression GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
+            // Check for UsedForExpressionGeneration, and if not set just short-circuit to Expression.Constant
+            if (!throwIfStateRequired && !Rules.ThrowIfRuntimeStateRequired && !Rules.UsedForExpressionGeneration)
+                return Constant(item, itemType);
+
             if (item == null)
                 return itemType == null || itemType == typeof(object) ? Constant(null) : Constant(null, itemType);
 
@@ -1564,7 +1568,7 @@ namespace DryIoc
 
             // todo: figure it out
             /// Switched off until I (or someone) will figure it out.
-            public override bool TryInterpretation(Request request) => false;
+            public override bool UseInterpretation(Request request) => false;
 
             /// Tries to return instance directly from scope or sigleton, and fallbacks to expression for decorator.
             public override FactoryDelegate GetDelegateOrDefault(Request request)
@@ -2211,6 +2215,16 @@ namespace DryIoc
                         if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
                             return TryInterpretGetNameScoped(r, callArgs, useFec, out result);
 
+                        // todo: handle the rest of the methods
+                        if (callMethod == CurrentScopeReuse.GetScopedOrSingletonMethod ||
+                            callMethod == CurrentScopeReuse.GetScopedOrSingletonWithValueMethod ||
+                            callMethod == CurrentScopeReuse.TrackScopedOrSingletonMethod ||
+                            callMethod == CurrentScopeReuse.TrackNameScopedMethod ||
+                            callMethod == CurrentScopeReuse.TrackScopedMethod)
+                        {
+                            ;
+                        }
+
                         object[] args;
                         if (!TryInterpretMany(r, callArgs, useFec, out args))
                             return false;
@@ -2243,7 +2257,7 @@ namespace DryIoc
                     }
                 case ExprType.Parameter:
                     {
-                        // todo: handles IResolverContext only for now
+                        // todo: handles IResolverContext only
                         if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
                             return false;
                         result = r;
@@ -2340,9 +2354,10 @@ namespace DryIoc
 
         private static bool TryInterpretResolve(IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
-            if (!TryInterpret(r, args[1], useFec, out var serviceKey) ||
-                !TryInterpret(r, args[4], useFec, out var preResolveParent) ||
-                !TryInterpret(r, args[5], useFec, out var resolveArgs))
+            object serviceKey = null, preResolveParent = null, resolveArgs = null;
+            if (!TryInterpret(r, args[1], useFec, out serviceKey) ||
+                !TryInterpret(r, args[4], useFec, out preResolveParent) ||
+                !TryInterpret(r, args[5], useFec, out resolveArgs))
             {
                 result = null;
                 return false;
@@ -2356,9 +2371,10 @@ namespace DryIoc
         private static bool TryInterpretResolveMany(IResolverContext r, IList<Expression> args, bool useFec, 
             out object result)
         {
-            if (!TryInterpret(r, args[1], useFec, out var serviceKey) ||
-                !TryInterpret(r, args[3], useFec, out var preResolveParent) ||
-                !TryInterpret(r, args[4], useFec, out var resolveArgs))
+            object serviceKey = null, preResolveParent = null, resolveArgs = null;
+            if (!TryInterpret(r, args[1], useFec, out serviceKey) ||
+                !TryInterpret(r, args[3], useFec, out preResolveParent) ||
+                !TryInterpret(r, args[4], useFec, out resolveArgs))
             {
                 result = null;
                 return false;
@@ -2408,10 +2424,18 @@ namespace DryIoc
             object resolverObj;
             if (!TryInterpret(r, args[0], useFec, out resolverObj))
                 return false;
-
             var resolverContext = (IResolverContext)resolverObj;
 
-            // todo: Check that scope already contains the value
+            var throwIfNoScope = (bool)ConstValue(args[1]);
+            var scope = resolverContext.GetCurrentScope(throwIfNoScope);
+            if (scope == null)
+                return true; // result is null in this case
+        
+            // check if scoped dependency is already in scope, then just return it
+            var id = (int)ConstValue(args[2]);
+            if (scope.TryGet(out result, id))
+                return true;
+
             var createExpr = ((LambdaExpression)args[3]).Body;
             CreateScopedValue createValue = () =>
             {
@@ -2421,9 +2445,8 @@ namespace DryIoc
                 return value;
             };
 
-            result = CurrentScopeReuse.GetScoped(
-                resolverContext, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
-                createValue, (int)ConstValue(args[4]));
+            var disposalIndex = (int)ConstValue(args[4]);
+            result = CurrentScopeReuse.GetScoped(resolverContext, throwIfNoScope, id, createValue, disposalIndex);
             return true;
         }
 
@@ -2434,10 +2457,19 @@ namespace DryIoc
             object resolverObj;
             if (!TryInterpret(r, args[0], useFec, out resolverObj))
                 return false;
-
             var resolverContext = (IResolverContext)resolverObj;
 
-            // todo: Check that scope already contains the value
+            var scopeName = ConstValue(args[1]);
+            var throwIfNoScope = (bool)ConstValue(args[2]);
+            var scope = resolverContext.GetNamedScope(scopeName, throwIfNoScope);
+            if (scope == null)
+                return true; // result is null in this case
+
+            // check if scoped dependency is already in scope, then just return it
+            var id = (int)ConstValue(args[3]);
+            if (scope.TryGet(out result, id))
+                return true;
+
             var createExpr = ((LambdaExpression)args[4]).Body;
             CreateScopedValue createValue = () =>
             {
@@ -2447,9 +2479,8 @@ namespace DryIoc
                 return value;
             };
 
-            result = CurrentScopeReuse.GetNameScoped(
-                resolverContext, ConstValue(args[1]), (bool)ConstValue(args[2]), (int)ConstValue(args[3]),
-                createValue, (int)ConstValue(args[5]));
+            var disposalIndex = (int)ConstValue(args[5]);
+            result = CurrentScopeReuse.GetNameScoped(resolverContext, scopeName, throwIfNoScope, id, createValue, disposalIndex);
             return true;
         }
 
@@ -4099,6 +4130,8 @@ namespace DryIoc
         private Settings GetSettingsForExpressionGeneration() =>
             _settings & ~Settings.EagerCachingSingletonForFasterAccess
                       & ~Settings.ImplicitCheckForReuseMatchingScope
+                      & ~Settings.UseInterpretationForTheFirstResolution
+                      | Settings.ThrowIfRuntimeStateRequired
                       | Settings.UsedForExpressionGeneration;
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
@@ -4170,12 +4203,12 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.UseFastExpressionCompilerIfPlatformSupported);
 
         /// Subject-subject
-        public bool TryInterpretationForTheFirstResolution =>
-            (_settings & Settings.TryInterpretationForTheFirstResolution) != 0;
+        public bool UseInterpretationForTheFirstResolution =>
+            (_settings & Settings.UseInterpretationForTheFirstResolution) != 0;
 
         /// Fallbacks to system `Expression.Compile()`
         public Rules WithoutInterpretationForTheFirstResolution() =>
-            WithSettings(_settings & ~Settings.TryInterpretationForTheFirstResolution);
+            WithSettings(_settings & ~Settings.UseInterpretationForTheFirstResolution);
 
         /// <summary>Outputs most notable non-default rules</summary>
         public override string ToString()
@@ -4276,7 +4309,7 @@ namespace DryIoc
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
             UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
-            TryInterpretationForTheFirstResolution = 1 << 18
+            UseInterpretationForTheFirstResolution = 1 << 18
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -4286,7 +4319,7 @@ namespace DryIoc
             | Settings.VariantGenericTypesInResolvedCollection
             | Settings.EagerCachingSingletonForFasterAccess
             | Settings.UseFastExpressionCompilerIfPlatformSupported
-            | Settings.TryInterpretationForTheFirstResolution;
+            | Settings.UseInterpretationForTheFirstResolution;
 
         private Settings _settings;
 
@@ -7475,7 +7508,7 @@ namespace DryIoc
         }
 
         /// Instructs to ignore GetDelegateOrDefault and try the interpreter 
-        public virtual bool TryInterpretation(Request request) => request.Rules.TryInterpretationForTheFirstResolution;
+        public virtual bool UseInterpretation(Request request) => request.Rules.UseInterpretationForTheFirstResolution;
 
         /// Creates factory delegate from service expression and returns it.
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
@@ -8575,7 +8608,7 @@ namespace DryIoc
 
         // todo: figure it out
         /// Switched off until I (or someone) will figure it out.
-        public override bool TryInterpretation(Request request) => false;
+        public override bool UseInterpretation(Request request) => false;
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
         /// If decorator found for request then factory fall-backs to expression creation.</summary>
@@ -8980,14 +9013,14 @@ namespace DryIoc
             if (request.TracksTransientDisposable)
             {
                 if (ScopedOrSingleton)
-                    return Call(_trackScopedOrSingletonMethod, resolverExpr, serviceFactoryExpr);
+                    return Call(TrackScopedOrSingletonMethod, resolverExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(_trackScopedMethod, resolverExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                    return Call(TrackScopedMethod, resolverExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(_trackNameScopedMethod, resolverExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                return Call(TrackNameScopedMethod, resolverExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
             {
@@ -8999,7 +9032,7 @@ namespace DryIoc
                 if (request.IsResolutionCall)
                 {
                     if (ScopedOrSingleton)
-                        return Call(_getScopedOrSingletonWithValueMethod, resolverExpr,
+                        return Call(GetScopedOrSingletonWithValueMethod, resolverExpr,
                             idExpr, serviceFactoryExpr, disposalOrderExpr);
 
                     if (Name == null)
@@ -9015,7 +9048,7 @@ namespace DryIoc
                 {
                     var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
                     if (ScopedOrSingleton)
-                        return Call(_getScopedOrSingletonMethod, resolverExpr,
+                        return Call(GetScopedOrSingletonMethod, resolverExpr,
                             idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                     if (Name == null)
@@ -9064,7 +9097,7 @@ namespace DryIoc
             int id, CreateScopedValue createValue, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
 
-        private static readonly MethodInfo _getScopedOrSingletonMethod =
+        internal static readonly MethodInfo GetScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingleton));
 
         /// Subject
@@ -9072,14 +9105,14 @@ namespace DryIoc
             int id, object value, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrTryAdd(id, value, disposalIndex);
 
-        private static readonly MethodInfo _getScopedOrSingletonWithValueMethod =
+        internal static readonly MethodInfo GetScopedOrSingletonWithValueMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingletonWithValue));
 
         /// Subject
         public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
             (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
 
-        private static readonly MethodInfo _trackScopedOrSingletonMethod =
+        internal static readonly MethodInfo TrackScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
 
         /// Subject
@@ -9118,14 +9151,14 @@ namespace DryIoc
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
             r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);
 
-        internal static readonly MethodInfo _trackScopedMethod =
+        internal static readonly MethodInfo TrackScopedMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScoped));
 
         /// Subject
         public static object TrackNameScoped(IResolverContext r, object scopeName, bool throwIfNoScope, object item) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(item);
 
-        internal static readonly MethodInfo _trackNameScopedMethod =
+        internal static readonly MethodInfo TrackNameScopedMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackNameScoped));
     }
 

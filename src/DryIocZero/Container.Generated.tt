@@ -36,8 +36,7 @@ THE SOFTWARE.
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ include File="$(ProjectDir)DryIocZero\Registrations.ttinclude" #>
 <#
-var container = GetContainerWithRegistrations()
-    .With(rules => rules.WithThrowIfRuntimeStateRequired());
+var container = GetContainerWithRegistrations().With(rules => rules.ForExpressionGeneration());
 
 var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 

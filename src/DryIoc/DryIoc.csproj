@@ -4,8 +4,8 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-08</VersionSuffix>
+        <VersionPrefix>4.0.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -16,7 +16,7 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-v3.1.0
+v4.0.0
 - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
 - fixed: #7 Context-based injection
 - fixed: #16 AutoConcreteTypeResolution should not consider a primitive type
