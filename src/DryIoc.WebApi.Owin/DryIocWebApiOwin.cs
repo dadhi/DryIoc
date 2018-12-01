@@ -1,7 +1,7 @@
-﻿/*
+/*
 The MIT License (MIT)
 
-Copyright (c) 2014 Maksim Volkau
+Copyright (c) 2013-2018 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -48,7 +48,7 @@ namespace DryIoc.WebApi.Owin
     }
 
     /// <summary>Inserts <see cref="DryIocDependencyScope"/>from OWIN context to Request properties.</summary>
-    internal sealed class SetRequestDependencyScopeHandler : DelegatingHandler
+    public sealed class SetRequestDependencyScopeHandler : DelegatingHandler
     {
         /// <summary>Inserts <see cref="DryIocDependencyScope"/>from OWIN context to Request properties.</summary>
         /// <param name="request">Target request</param> <param name="cancellationToken"></param>

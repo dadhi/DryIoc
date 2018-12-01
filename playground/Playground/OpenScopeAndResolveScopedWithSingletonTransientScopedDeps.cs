@@ -301,7 +301,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
                     Measure(_msDi);
                     Measure(_grace);
                     Measure(_lightInject);
-                    Measure(_lamar);
+                    //Measure(_lamar);
                 }
             }
 
@@ -320,7 +320,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             [Benchmark]
             public object BmarkLightInject() => Measure(_lightInject);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkLamar() => Measure(_lamar);
 
             //[Benchmark]

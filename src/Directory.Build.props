@@ -1,6 +1,7 @@
 <Project>
     <Import Project="..\Directory.Build.props"/>
 
+    <!--Package details-->
     <PropertyGroup>
         <NeutralLanguage>en-US</NeutralLanguage>
         <PackageLicense>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicense>
@@ -9,6 +10,12 @@
         <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+    </PropertyGroup>
+
+    <!--Signing all packages, oh boy-->
+    <PropertyGroup>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>..\..\DryIoc.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>
 
     <PropertyGroup>
