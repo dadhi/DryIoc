@@ -53,7 +53,7 @@ namespace DryIoc
     public sealed partial class Container : IContainer
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
-        public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope())
+        public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), new object(), new Dictionary<Type, Tuple<bool, object>>())
         { }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
@@ -61,7 +61,7 @@ namespace DryIoc
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext)
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), new object(), new Dictionary<Type, Tuple<bool, object>>(), scopeContext)
         { }
 
         /// <summary>Creates new container with configured rules.</summary>
@@ -276,6 +276,34 @@ namespace DryIoc
 
             FactoryDelegate factoryDelegate;
 
+            // get the lock state and object for the service type
+            Tuple<bool, object> requireLockAndLockObj;
+            lock (_locksLock)
+            {
+                if (!_locks.TryGetValue(serviceType, out requireLockAndLockObj))
+                {
+                    requireLockAndLockObj = Tuple.Create(true, new object());
+                    _locks[serviceType] = requireLockAndLockObj;
+                }
+            }
+
+            object __lockObj = requireLockAndLockObj.Item2;
+            bool __lockWasTaken = false;
+            try
+            {
+                // if the factory delegate wasn't cached yet
+                // we need to lock here. Otherwise the factoryDeletegate
+                // will be created until it gets into the cache
+                if (requireLockAndLockObj.Item1)
+                {
+#if NET35
+                    Monitor.Enter(__lockObj);
+                    __lockWasTaken = true;
+#else
+                    Monitor.Enter(__lockObj, ref __lockWasTaken);
+#endif
+                }
+
             // Try get from cache first
             var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
             var cacheEntry = cacheRef.Value.GetValueOrDefault(key);
@@ -335,7 +363,18 @@ namespace DryIoc
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
 
+            // we now cached the factoryDelegate so we do not need to lock again
+            lock (_locksLock)
+            {
+                _locks[serviceType] = Tuple.Create(false, requireLockAndLockObj.Item2);
+            }
+
             return factoryDelegate(this);
+            }
+            finally
+            {
+                if (__lockWasTaken) Monitor.Exit(__lockObj);
+            }
         }
 
         private object GetResolveCacheEntryKeyOrDefault(Type requiredServiceType, Request preResolveParent, object[] args)
@@ -373,6 +412,11 @@ namespace DryIoc
             if (_registry.Value.Services.IsEmpty)
                 return;
 
+            lock (_registry)
+            {
+                cacheRef = _registry.Value.KeyedFactoryDelegateCache;
+                cacheEntry = cacheRef.Value.GetValueOrDefault(key);
+
             var cachedFactories = cacheEntry?.Value ?? ImHashMap<object, object>.Empty;
             cacheEntry = сontextKey == null
                 ? KV.Of(factory, cachedFactories)
@@ -381,6 +425,7 @@ namespace DryIoc
             var cache = cacheRef.Value;
             if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(key, cacheEntry)))
                 cacheRef.AddOrUpdate(key, cacheEntry);
+            }
         }
 
         private bool GetCachedOrCompileAndCacheFactoryDelegate(
@@ -547,7 +592,7 @@ namespace DryIoc
         public IResolverContext WithCurrentScope(IScope scope)
         {
             ThrowIfContainerDisposed();
-            return new Container(Rules, _registry, _singletonScope, _scopeContext,
+            return new Container(Rules, _registry, _singletonScope, _locksLock, _locks, _scopeContext,
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
@@ -569,6 +614,8 @@ namespace DryIoc
             var reuse = scope == _singletonScope ? Reuse.Singleton : Reuse.Scoped;
             var instanceType = instance?.GetType() ?? typeof(object);
 
+            lock (_registry)
+            {
             _registry.Swap(r =>
             {
                 var entry = r.Services.GetValueOrDefault(serviceType);
@@ -746,6 +793,7 @@ namespace DryIoc
 
                 return registry;
             });
+            }
         }
 
         void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
@@ -819,7 +867,7 @@ namespace DryIoc
             curentScope = curentScope ?? _ownCurrentScope;
             parent = parent ?? _parent;
 
-            return new Container(rules, registry, singletonScope, scopeContext,
+            return new Container(rules, registry, singletonScope, _locksLock, _locks, scopeContext,
                 _ownCurrentScope, _disposed, _disposeStackTrace, _parent);
         }
 
@@ -829,7 +877,7 @@ namespace DryIoc
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false) =>
             new Container(Rules,
                 Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow)),
-                _singletonScope, _scopeContext, _ownCurrentScope,
+                _singletonScope, _locksLock, _locks, _scopeContext, _ownCurrentScope,
                 _disposed, _disposeStackTrace, _parent);
 
         /// <inheritdoc />
@@ -2076,7 +2124,10 @@ namespace DryIoc
             }
         }
 
-        private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
+        private object _locksLock;
+        private IDictionary<Type, Tuple<bool, object>> _locks;
+
+        private Container(Rules rules, Ref<Registry> registry, IScope singletonScope, object locksLock, IDictionary<Type, Tuple<bool, object>> locks,
             IScopeContext scopeContext = null, IScope ownCurrentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null)
@@ -2093,6 +2144,9 @@ namespace DryIoc
             _disposeStackTrace = disposeStackTrace;
 
             _parent = parent;
+
+            _locks = locks;
+            _locksLock = locksLock;
         }
 
         #endregion

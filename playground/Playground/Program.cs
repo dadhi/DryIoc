@@ -6,16 +6,73 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using DryIoc;
 using ImTools;
 using PerformanceTests;
 
 namespace Playground
 {
+
+
+    class FakeContext { }
+
+    class SlowService
+    {
+        private static int id = 0;
+
+        public void Do()
+        {
+            Console.WriteLine("Do" + id++);
+        }
+    }
+
     public class Program
     {
-        public static void Main()
+
+        static void Main(string[] args)
+        {
+            var container = new Container(r => r.WithoutInterpretationForTheFirstResolution());
+            container.Register<SlowService>();
+
+            //Warmup(container);
+
+            var enumerable = Gen(container).Take(100);
+
+            Task.WaitAll(enumerable.ToArray());
+
+            Console.WriteLine("Done");
+            Console.ReadLine();
+        }
+
+        private static IEnumerable<Task> Gen(IContainer container)
+        {
+            while (true)
+            {
+                //Thread.Sleep(100);
+                yield return Task.Run(() =>
+                {
+                    var fakeContext = new FakeContext();
+                    using (var scope = container.OpenScope("Test"))
+                    {
+                        scope.UseInstance(fakeContext);
+                        var slowService = scope.Resolve<SlowService>();
+                        slowService.Do();
+                    }
+                });
+            }
+        }
+
+        private static void Warmup(Container container)
+        {
+            Gen(container).First().Wait();
+        }
+
+
+        public static void Main2()
         {
             //BenchmarkRunner.Run<FindMethodInClass>();
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
