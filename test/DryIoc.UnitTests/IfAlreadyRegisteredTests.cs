@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -71,7 +71,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IService, Service>(serviceKey: EnumKey.Some);
-            container.Register<IService, AnotherService>(serviceKey: EnumKey.Some,
+            container.Register<IService, AnotherService>(
+                serviceKey: EnumKey.Some,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var service = container.Resolve<IService>(EnumKey.Some);

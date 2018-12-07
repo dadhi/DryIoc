@@ -788,20 +788,17 @@ namespace ImTools
         }
 
         /// <summary>Copies list to array.</summary> 
-        /// <param name="source">list to convert.</param> 
-        /// <returns>Array with list items.</returns>
-        public static T[] ToArray<T>(this ImList<T> source)
-        {
-            if (source.IsEmpty)
-                return ArrayTools.Empty<T>();
-            if (source.Tail.IsEmpty)
-                return new[] { source.Head };
-            return source.Enumerate().ToArray();
-        }
+        public static T[] ToArray<T>(this ImList<T> source) => 
+            source.IsEmpty ? ArrayTools.Empty<T>() :
+            source.Tail.IsEmpty ? new[] {source.Head} : 
+            source.Enumerate().ToArray();
     }
 
-    /// <summary>Given the old value should and the new value should return result updated value.</summary>
+    /// Given the old value should and the new value should return result updated value.
     public delegate V Update<V>(V oldValue, V newValue);
+
+    /// Update handler including the key
+    public delegate V Update<K, V>(K key, V oldValue, V newValue);
 
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree with integer keys and <typeparamref name="V"/> values.</summary>
     public sealed class ImMap<V>
@@ -1108,8 +1105,8 @@ namespace ImTools
             AddOrUpdate(key.GetHashCode(), key, value, update);
 
         /// Returns the previous value if updated
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool updated, out V oldValue, Update<V> update) =>
-            AddOrUpdate(key.GetHashCode(), key, value, update, out updated, out oldValue);
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V updatedOldValue, Update<K, V> update) =>
+            AddOrUpdate(key.GetHashCode(), key, value, update, out isUpdated, out updatedOldValue);
 
         /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
         /// runs custom update handler (<paramref name="update"/>) with old and new value to get the updated result.</summary>
@@ -1285,7 +1282,8 @@ namespace ImTools
                     .KeepBalance());
         }
 
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, out bool updated, out V oldValue)
+        private ImHashMap<K, V> AddOrUpdate(
+            int hash, K key, V value, Update<K, V> update, out bool updated, out V oldValue)
         {
             updated = false;
             oldValue = default(V);
@@ -1297,7 +1295,7 @@ namespace ImTools
             {
                 if (ReferenceEquals(Key, key) || Key.Equals(key))
                 {
-                    var newValue = update(Value, value);
+                    var newValue = update(Key, Value, value);
                     if (ReferenceEquals(newValue, Value) || newValue?.Equals(Value) == true)
                         return this;
 
@@ -1353,8 +1351,8 @@ namespace ImTools
             return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
         }
 
-        private ImHashMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, 
-            bool updateOnly, ref bool updated, ref V oldValue)
+        private ImHashMap<K, V> UpdateValueAndResolveConflicts(
+            K key, V value, Update<K, V> update, bool updateOnly, ref bool updated, ref V oldValue)
         {
             if (Conflicts == null) // add only if updateOnly is false.
                 return updateOnly ? this
@@ -1379,13 +1377,13 @@ namespace ImTools
                 conflicts[found] = new KV<K, V>(key, value);
             else
             {
-                var currentValue = conflicts[found].Value;
-                var newValue = update(currentValue, value);
-                if (ReferenceEquals(newValue, currentValue) || newValue?.Equals(currentValue) == true)
+                var conflict = conflicts[found];
+                var newValue = update(conflict.Key, conflict.Value, value);
+                if (ReferenceEquals(newValue, conflict.Value) || newValue?.Equals(conflict.Value) == true)
                     return this;
 
                 updated = true;
-                oldValue = currentValue;    
+                oldValue = conflict.Value;
                 conflicts[found] = new KV<K, V>(key, newValue);
             }
 

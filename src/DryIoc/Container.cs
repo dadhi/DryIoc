@@ -1785,17 +1785,17 @@ namespace DryIoc
                     WithDefaultService(factory, serviceType, ifAlreadyRegistered) : 
                     WithKeyedService(factory, serviceType, ifAlreadyRegistered, serviceKey);
 
-            private static object IfAlreadyRegisteredAppendNotKeyedDefaultService(object oldEntry, object newEntry) =>
+            private static object IfAlreadyRegisteredAppendNotKeyedDefaultService(Type _, object oldEntry, object newEntry) =>
                 oldEntry == null ? newEntry :
                (oldEntry as FactoriesEntry ?? FactoriesEntry.Empty.With((Factory)oldEntry)).With((Factory)newEntry);
 
-            private static object IfAlreadyRegisteredThrowDefaultService(object oldEntry, object newEntry) => 
+            private static object IfAlreadyRegisteredThrowDefaultService(Type serviceType, object oldEntry, object newEntry) => 
                 oldEntry == null ? newEntry
                 : oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
                     ? (object)oldFactoriesEntry.With((Factory) newEntry)
-                    : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, newEntry, oldEntry);
+                    : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, newEntry, oldEntry);
 
-            private static object IfAlreadyRegisteredReplaceDefaultService(object oldEntry, object newEntry)
+            private static object IfAlreadyRegisteredReplaceDefaultService(Type _, object oldEntry, object newEntry)
             {
                 if (oldEntry is FactoriesEntry oldFactoriesEntry)
                 {
@@ -1817,7 +1817,7 @@ namespace DryIoc
                 return newEntry;
             }
 
-            private static object IfAlreadyRegisteredAppendNewImplDefaultService(object oldEntry, object newEntry)
+            private static object IfAlreadyRegisteredAppendNewImplDefaultService(Type _, object oldEntry, object newEntry)
             {
                 if (oldEntry == null)
                     return newEntry;
@@ -1850,7 +1850,7 @@ namespace DryIoc
                 return oldEntry;
             }
 
-            private static object IfAlreadyRegisteredKeepDefaultService(object oldEntry, object newEntry) =>
+            private static object IfAlreadyRegisteredKeepDefaultService(Type _, object oldEntry, object newEntry) =>
                 oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
                     ? oldFactoriesEntry.With((Factory) newEntry)
                     : oldEntry;
@@ -1862,20 +1862,22 @@ namespace DryIoc
                     ifAlreadyRegistered == IfAlreadyRegistered.Throw ? IfAlreadyRegisteredThrowDefaultService :
                     ifAlreadyRegistered == IfAlreadyRegistered.Replace ? IfAlreadyRegisteredReplaceDefaultService :
                     ifAlreadyRegistered == IfAlreadyRegistered.AppendNewImplementation ? IfAlreadyRegisteredAppendNewImplDefaultService :
-                    (Update<object>)IfAlreadyRegisteredKeepDefaultService;
+                    (Update<Type, object>)IfAlreadyRegisteredKeepDefaultService;
 
                 var registry = this;
-                var newServices = registry.Services.AddOrUpdate(serviceType, factory, out var updated, out var oldEntry, updateOldEntry);
+                var newServices = registry.Services.AddOrUpdate(
+                    serviceType, factory, out var isUpdated, out var updatedOldEntry, updateOldEntry);
+
                 if (registry.Services != newServices)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
                         DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
 
-                    if (updated)
+                    if (isUpdated)
                     {
-                        if (oldEntry is Factory oldFactory)
+                        if (updatedOldEntry is Factory oldFactory)
                             registry.DropFactoryCache(oldFactory, serviceType);
-                        else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
+                        else if (updatedOldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
                             foreach (var f in oldFactoriesEntry.Factories.Enumerate())
                                 if (f.Key is DefaultKey)
                                     registry.DropFactoryCache(f.Value, serviceType);
@@ -1885,45 +1887,72 @@ namespace DryIoc
                 return registry;
             }
 
+            private static object IfAlreadyRegisteredKeepKeyedService(object _, object oldEntry, object newEntry)
+            {
+                if (oldEntry == null)
+                    return newEntry;
+
+                if (oldEntry is Factory)
+                    return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
+
+                return new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
+                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(
+                        ((FactoriesEntry)newEntry).Factories.Key, ((FactoriesEntry)newEntry).Factories.Value,
+                        out var isUpdatedFactory, out var updatedOldFactory,
+                        (key, oldFactory, newFactory) => oldFactory == null ? newFactory : oldFactory));
+            }
+
+            private static object IfAlreadyRegisteredReplaceKeyedService(object _, object oldEntry, object newEntry)
+            {
+                if (oldEntry == null)
+                    return newEntry;
+
+                if (oldEntry is Factory)
+                    return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
+
+                return new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
+                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(
+                    ((FactoriesEntry)newEntry).Factories.Key, ((FactoriesEntry)newEntry).Factories.Value));
+            }
+
+            private static object IfAlreadyRegisteredThrowKeyedService(Type serviceType, object oldEntry, object newEntry)
+            {
+                if (oldEntry == null)
+                    return newEntry;
+
+                if (oldEntry is Factory)
+                    return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
+
+                return new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
+                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(
+                        ((FactoriesEntry)newEntry).Factories.Key, ((FactoriesEntry)newEntry).Factories.Value,
+                        out var isUpdatedFactory, out var updatedOldFactory,
+                        (key, oldFactory, newFactory) => oldFactory == null ? newFactory
+                            : Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, key, newFactory, oldFactory)));
+            }
+
             private Registry WithKeyedService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, 
                 object serviceKey)
             {
-                var oldFactory = default(Factory);
-                var newServices = Services.AddOrUpdate(serviceType, FactoriesEntry.Empty.With(factory, serviceKey), (oldEntry, newEntry) =>
-                {
-                    if (oldEntry == null) return newEntry;
-
-                    if (oldEntry is Factory) // if registered is default, just add it to new entry
-                        return ((FactoriesEntry) newEntry).With((Factory)oldEntry);
-
-                    var oldFactories = (FactoriesEntry) oldEntry;
-
-                    return new FactoriesEntry(oldFactories.LastDefaultKey,
-                        oldFactories.Factories.AddOrUpdate(serviceKey, factory, (a, b) =>
-                        {
-                            if (a == null) return b;
-
-                            switch (ifAlreadyRegistered)
-                            {
-                                case IfAlreadyRegistered.Keep:
-                                    return a;
-                                case IfAlreadyRegistered.Replace:
-                                    oldFactory = a;
-                                    return b;
-                                default:
-                                    return Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, a);
-                            }
-                        }));
-                });
+                var updateOldEntry =
+                    ifAlreadyRegistered == IfAlreadyRegistered.Keep ? IfAlreadyRegisteredKeepKeyedService :
+                    ifAlreadyRegistered == IfAlreadyRegistered.Replace ? IfAlreadyRegisteredReplaceKeyedService :
+                    (Update<Type, object>)IfAlreadyRegisteredThrowKeyedService;
 
                 var registry = this;
-                if (registry.Services != newServices)
+                var newServices = registry.Services.AddOrUpdate(
+                    serviceType, FactoriesEntry.Empty.With(factory, serviceKey),
+                    out var isUpdated, out var updatedOldEntry, updateOldEntry);
+
+                if (newServices != registry.Services)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
                         DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
 
-                    if (oldFactory != null)
-                        registry.DropFactoryCache(oldFactory, serviceType, serviceKey);
+                    if (isUpdated && ifAlreadyRegistered == IfAlreadyRegistered.Replace && 
+                        updatedOldEntry is FactoriesEntry updatedOldFactories &&
+                        updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
+                        registry.DropFactoryCache(droppedFactory, serviceType, serviceKey);
                 }
 
                 return registry;
@@ -9783,10 +9812,10 @@ namespace DryIoc
             GotNullConstructorFromFactoryMethod = Of(
                 "Got null constructor when resolving {0}"),
             UnableToRegisterDuplicateDefault = Of(
-                "The default service without key {0} is already registered as {1}."),
+                "The default service {0} without key {1} is already registered as {2}."),
             UnableToRegisterDuplicateKey = Of(
-                "Unable to register service {0} with duplicate key '{1}'" + NewLine +
-                " There is already registered service with the same key: {2}."),
+                "Unable to register service with duplicate key '{0}': {1}" + NewLine +
+                " There is already registered service with the same key {2}."),
             NoCurrentScope = Of(
                 "No current scope is available: probably you are registering to, or resolving from outside of the scope. " + NewLine +
                 "Current resolver context is: {0}."),
