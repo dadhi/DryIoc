@@ -273,7 +273,57 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             [Benchmark]
             public object BmarkLightInject() => Measure(PrepareLightInject());
 
+            //[Benchmark]
+            public object BmarkLamar() => Measure(PrepareLamar());
+
+            //[Benchmark]
+            public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
+        }
+
+        /*
+         ## Initial:
+                                    Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+        ---------------------------------- |----------:|----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+         BmarkMicrosoftDependencyInjection |  1.071 us | 0.0224 us | 0.0306 us |  1.065 us |  1.00 |    0.00 |      0.5436 |           - |           - |             2.51 KB |
+                               BmarkDryIoc |  1.228 us | 0.0260 us | 0.0587 us |  1.209 us |  1.16 |    0.08 |      0.4864 |           - |           - |             2.25 KB |
+                                BmarkGrace |  8.158 us | 0.9760 us | 2.8776 us |  8.028 us |  8.30 |    2.68 |      1.4801 |           - |           - |             6.84 KB |
+                          BmarkLightInject |  8.511 us | 1.0015 us | 2.9529 us |  7.533 us |  6.18 |    1.49 |      3.8376 |      0.0076 |           - |             17.7 KB |
+                              BmarkAutofac | 32.694 us | 3.3321 us | 9.7725 us | 30.384 us | 33.91 |   10.09 |      4.5471 |      0.0305 |           - |            20.96 KB |
+
+        ## After converting lambdas to local functions in Register:
+
+                                    Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+        ---------------------------------- |---------:|----------:|----------:|---------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+         BmarkMicrosoftDependencyInjection | 1.078 us | 0.0039 us | 0.0030 us | 1.078 us |  1.00 |    0.00 |      0.5436 |           - |           - |             2.51 KB |
+                               BmarkDryIoc | 1.373 us | 0.0670 us | 0.1812 us | 1.284 us |  1.22 |    0.20 |      0.4807 |           - |           - |             2.22 KB |
+
+        ## After removing lambdas altogether in Register:
+
+                                    Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+        ---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+         BmarkMicrosoftDependencyInjection | 1.054 us | 0.0069 us | 0.0061 us |  1.00 |      0.5436 |           - |           - |             2.51 KB |
+                               BmarkDryIoc | 1.190 us | 0.0082 us | 0.0077 us |  1.13 |      0.4253 |           - |           - |             1.97 KB |
+
+        */
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        public class CreateContainerAndRegister
+        {
+            //[Benchmark]
+            public object BmarkAutofac() => PrepareAutofac();
+
             [Benchmark]
+            public object BmarkDryIoc() => PrepareDryIoc();
+
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => PrepareMsDi();
+
+            //[Benchmark]
+            public object BmarkGrace() => PrepareGrace();
+
+            //[Benchmark]
+            public object BmarkLightInject() => PrepareLightInject();
+
+            //[Benchmark]
             public object BmarkLamar() => Measure(PrepareLamar());
 
             //[Benchmark]

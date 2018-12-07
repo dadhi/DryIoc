@@ -217,24 +217,18 @@ namespace ImTools
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>
         /// <returns>First item matching condition or default value.</returns>
-        public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate)
-        {
-            var sourceArr = source as T[];
-            if (sourceArr != null)
-                return sourceArr.FindFirst(predicate);
-            return source.FirstOrDefault(predicate);
-        }
+        public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) => 
+            source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
 
         /// <summary>Returns element if collection consist on single element, otherwise returns default value.
         /// It does not throw for collection with many elements</summary>
         public static T SingleOrDefaultIfMany<T>(this IEnumerable<T> source)
         {
+            if (source is IList<T> list)
+                return list.Count == 1 ? list[0] : default(T);
+
             if (source == null)
                 return default(T);
-
-            var list = source as IList<T>;
-            if (list != null)
-                return list.Count == 1 ? list[0] : default(T);
 
             using (var e = source.GetEnumerator())
             {
@@ -463,30 +457,16 @@ namespace ImTools
         /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
         /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
         /// <returns>Converted items</returns>
-        public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map)
-        {
-            if (source == null)
-                return null;
-            var arr = source as T[];
-            if (arr != null)
-                return arr.Map(map);
-            return source.Select(map);
-        }
+        public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map) => 
+            source is T[] arr ? arr.Map(map) : source?.Select(map);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
         /// <typeparam name="T">Type of source items.</typeparam>
         /// <param name="source">If null, the null will be returned.</param>
         /// <param name="condition">Condition to keep items.</param>
         /// <returns>Result items, may be an array.</returns>
-        public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition)
-        {
-            if (source == null)
-                return null;
-            var arr = source as T[];
-            if (arr != null)
-                return arr.Match(condition);
-            return source.Where(condition);
-        }
+        public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) => 
+            source is T[] arr ? arr.Match(condition) : source?.Where(condition);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
         /// otherwise just calls Where, Select</summary>
@@ -494,15 +474,8 @@ namespace ImTools
         /// <param name="source">If null, the null will be returned.</param>
         /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
         /// <returns>Result items, may be an array.</returns>
-        public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map)
-        {
-            if (source == null)
-                return null;
-            var arr = source as T[];
-            if (arr != null)
-                return arr.Match(condition, map);
-            return source.Where(condition).Select(map);
-        }
+        public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) => 
+            source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
     }
 
     /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
@@ -1134,6 +1107,10 @@ namespace ImTools
         public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
             AddOrUpdate(key.GetHashCode(), key, value, update);
 
+        /// Returns the previous value if updated
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool updated, out V oldValue, Update<V> update) =>
+            AddOrUpdate(key.GetHashCode(), key, value, update, out updated, out oldValue);
+
         /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
         /// runs custom update handler (<paramref name="update"/>) with old and new value to get the updated result.</summary>
         /// <param name="key">Key to look for.</param>
@@ -1308,6 +1285,40 @@ namespace ImTools
                     .KeepBalance());
         }
 
+        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update, out bool updated, out V oldValue)
+        {
+            updated = false;
+            oldValue = default(V);
+
+            if (Height == 0)
+                return new ImHashMap<K, V>(new Data(hash, key, value));
+
+            if (hash == Hash)
+            {
+                if (ReferenceEquals(Key, key) || Key.Equals(key))
+                {
+                    var newValue = update(Value, value);
+                    if (ReferenceEquals(newValue, Value) || newValue?.Equals(Value) == true)
+                        return this;
+
+                    updated = true;
+                    oldValue = Value;
+                    return new ImHashMap<K, V>(new Data(hash, key, newValue, Conflicts), Left, Right);
+                }
+
+                return UpdateValueAndResolveConflicts(key, value, update, false, ref updated, ref oldValue);
+            }
+
+            var newNode = hash < Hash
+                ? With(Left.AddOrUpdate(hash, key, value, update, out updated, out oldValue), Right)
+                : With(Left, Right.AddOrUpdate(hash, key, value, update, out updated, out oldValue));
+
+            if (newNode == this)
+                return this;
+            return newNode.KeepBalance();
+        }
+
+
         // todo: made public for benchmarking
         /// <summary>It is fine</summary>
         public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update)
@@ -1345,6 +1356,33 @@ namespace ImTools
             conflicts[found] = new KV<K, V>(key, update == null ? value : update(Conflicts[found].Value, value));
             return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
         }
+
+        private ImHashMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, 
+            bool updateOnly, ref bool updated, ref V oldValue)
+        {
+            if (Conflicts == null) // add only if updateOnly is false.
+                return updateOnly ? this
+                    : new ImHashMap<K, V>(new Data(Hash, Key, Value, new[] { new KV<K, V>(key, value) }), Left, Right);
+
+            var found = Conflicts.Length - 1;
+            while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
+            if (found == -1)
+            {
+                if (updateOnly) return this;
+                var newConflicts = new KV<K, V>[Conflicts.Length + 1];
+                Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
+                newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
+                return new ImHashMap<K, V>(new Data(Hash, Key, Value, newConflicts), Left, Right);
+            }
+
+            updated = true;
+            var conflicts = new KV<K, V>[Conflicts.Length];
+            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
+            conflicts[found] = new KV<K, V>(key, 
+                update == null ? value : update(oldValue = Conflicts[found].Value, value));
+            return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
+        }
+
 
         // todo: temporary made public for benchmarking
         /// <summary>It is fine</summary>
