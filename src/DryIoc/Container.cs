@@ -3275,10 +3275,30 @@ namespace DryIoc
         public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
             // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
-            var scope = r.ScopeContext != null ? SetCurrentContextScope(r, name) : new Scope(r.CurrentScope, name);
+            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope, name) : SetCurrentContextScope(r, name);
 
             if (trackInParent)
                 (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
+
+            return r.WithCurrentScope(scope);
+        }
+
+        /// Opens scope and immediately adds some instances into it.
+        public static IResolverContext OpenScopeWithPresetServices(this IResolverContext r, 
+            object name = null, bool trackInParent = false, params object[] instances)
+        {
+            // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
+            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope, name) : SetCurrentContextScope(r, name);
+
+            if (trackInParent)
+                (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
+
+            if (instances?.Length > 0)
+                for (var i = 0; i < instances.Length; i++)
+                {
+                    var instance = instances[i];
+                    scope.AddOrSetInstance(instance.GetType(), instance);
+                }
 
             return r.WithCurrentScope(scope);
         }
@@ -7982,15 +8002,28 @@ namespace DryIoc
             {
                 var param = parameters[i];
 
-                // check not yet used func arguments
+                // check for the not yet used func arguments
                 if (argExprs != null)
+                {
                     for (var a = 0; a < argExprs.Length; ++a)
+                    {
                         if ((argsUsedMask & 1 << a) == 0 && argExprs[a].Type.IsAssignableTo(param.ParameterType))
                         {
                             argsUsedMask |= 1 << a; // mark that argument was used
                             paramExprs[i] = argExprs[a];
                             break;
                         }
+                    }
+                }
+
+                // check for the instance in current scope
+                if (paramExprs[i] == null)
+                {
+                    var scope = request.CurrentScope;
+                    if (scope != null)
+                        if (scope.TryGetInstance(out var instance, param.ParameterType))
+                            paramExprs[i] = Constant(instance, param.ParameterType);
+                }
 
                 if (paramExprs[i] != null)
                     continue; // done, parameter is by provided via input argument
@@ -8703,8 +8736,14 @@ namespace DryIoc
         /// <summary>True if scope is disposed.</summary>
         bool IsDisposed { get; }
 
-        /// <summary>Looks up for stored item by id.</summary>
+        /// Looks up for stored item by id.
         bool TryGet(out object item, int id);
+
+        /// Sets (replaces) value at specified id, or adds value if no existing id found.
+        void AddOrSetInstance(Type type, object instance);
+
+        /// Looks up for stored item by type.
+        bool TryGetInstance(out object instance, Type type);
 
         /// <summary>Creates, stores, and returns stored disposable by id.</summary>
         object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
@@ -8713,7 +8752,7 @@ namespace DryIoc
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
         object TrackDisposable(object item, int disposalOrder = 0);
 
-        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
+        /// Sets (replaces) value at specified id, or adds value if no existing id found.
         void SetOrAdd(int id, object item);
 
         /// <summary>Gets and existing value at specified id, or adds a new value if no-one was added in between.</summary>
@@ -8738,17 +8777,20 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, ImMap<object>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(parent, name, ImMap<object>.Empty, ImHashMap<Type, object>.Empty, 
+                ImMap<IDisposable>.Empty, int.MaxValue)
         { }
 
         private Scope(IScope parent, object name, ImMap<object> items,
-            ImMap<IDisposable> disposables, int nextDisposalIndex)
+            ImHashMap<Type, object> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
         {
             Parent = parent;
             Name = name;
             _items = items;
+            _instances = instances;
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
+            _instances = ImHashMap<Type, object>.Empty;
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
@@ -8757,9 +8799,8 @@ namespace DryIoc
         /// <inheritdoc />
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
-            object value;
             var items = _items;
-            return items.TryFind(id, out value) ? value : TryGetOrAdd(items, id, createValue, disposalOrder);
+            return items.TryFind(id, out var value) ? value : TryGetOrAdd(items, id, createValue, disposalOrder);
         }
 
         private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
@@ -8795,15 +8836,14 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            var items = _items;
 
-            // try to atomically replaced items with the one set item, if attempt failed then lock and replace
+            // Try to atomically replaced items with the one set item, if attempt failed then lock and replace
+            var items = _items;
             if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
                 lock (_locker)
                     _items = _items.AddOrUpdate(id, item);
 
-            var disposable = item as IDisposable;
-            if (disposable != null && disposable != this)
+            if (item is IDisposable disposable && disposable != this)
                 TrackDisposable(disposable, NextDisposalIndex());
         }
 
@@ -8835,7 +8875,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IScope Clone() =>
-            new Scope(Parent, Name, _items, _disposables, _nextDisposalIndex);
+            new Scope(Parent, Name, _items, _instances, _disposables, _nextDisposalIndex);
 
         /// <inheritdoc />
         public bool TryGet(out object item, int id)
@@ -8843,6 +8883,22 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
             return _items.TryFind(id, out item);
+        }
+
+        /// Add instance to the list
+        public void AddOrSetInstance(Type type, object instance)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+            _instances = _instances.AddOrUpdate(type, instance);
+        }
+
+        /// Try get item by type
+        public bool TryGetInstance(out object instance, Type type)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+            return _instances.TryFind(type, out instance);
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
@@ -8901,6 +8957,7 @@ namespace DryIoc
 
             _disposables = ImMap<IDisposable>.Empty;
             _items = ImMap<object>.Empty;
+            _instances = ImHashMap<Type, object>.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
@@ -8913,6 +8970,7 @@ namespace DryIoc
         #region Implementation
 
         private ImMap<object> _items;
+        private ImHashMap<Type, object> _instances;
         private ImMap<IDisposable> _disposables;
         private int _nextDisposalIndex;
         private int _disposed;
