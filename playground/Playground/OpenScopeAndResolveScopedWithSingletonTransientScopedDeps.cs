@@ -254,11 +254,19 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
                         BmarkGrace | 776.478 us |  5.3626 us |   4.4780 us | 774.993 us |   783.422 us | 163.89 |    1.13 |      8.7891 |      3.9063 |           - |            42.44 KB |
                   BmarkLightInject | 799.472 us | 79.1998 us | 231.0294 us | 658.761 us | 1,299.696 us | 169.62 |   51.94 |      8.7891 |      3.9063 |           - |            43.12 KB |
 
-*/
+
+## 09.12.2018: Shaved some bites from registration phase
+
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.689 us | 0.0256 us | 0.0239 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 5.519 us | 0.0571 us | 0.0534 us |  1.18 |      1.5488 |           - |           - |             7.17 KB |
+
+             */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
             [Benchmark]
@@ -267,10 +275,10 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkLightInject() => Measure(PrepareLightInject());
 
             //[Benchmark]
