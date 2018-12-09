@@ -262,6 +262,21 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
  BmarkMicrosoftDependencyInjection | 4.689 us | 0.0256 us | 0.0239 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 5.519 us | 0.0571 us | 0.0534 us |  1.18 |      1.5488 |           - |           - |             7.17 KB |
 
+
+NO DIFFERENCE FROM Asp.NET / Core 2.2
+
+            BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+Frequency=2156250 Hz, Resolution=463.7681 ns, Timer=TSC
+.NET Core SDK=2.2.100
+  [Host]     : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
+  DefaultJob : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
+
+
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.729 us | 0.0231 us | 0.0193 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 5.314 us | 0.0461 us | 0.0431 us |  1.12 |      1.5488 |           - |           - |             7.17 KB |
              */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
