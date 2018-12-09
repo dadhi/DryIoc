@@ -952,10 +952,10 @@ namespace ImTools
                     : (key < Key  // search for node
                         ? (Height == 1
                             ? new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, height: 2)
-                            : new ImMap<V>(Key, Value, Left.AddOrUpdateImpl(key, value), Right).KeepBalance())
+                            : CreateBalanced(Key, Value, Left.AddOrUpdateImpl(key, value), Right))
                         : (Height == 1
                             ? new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), height: 2)
-                            : new ImMap<V>(Key, Value, Left, Right.AddOrUpdateImpl(key, value)).KeepBalance())));
+                            : CreateBalanced(Key, Value, Left, Right.AddOrUpdateImpl(key, value)))));
         }
 
         private ImMap<V> AddOrUpdateImpl(int key, V value, bool updateOnly, Update<V> update)
@@ -965,17 +965,15 @@ namespace ImTools
                 : (key == Key ? // actual update
                     new ImMap<V>(key, update == null ? value : update(Value, value), Left, Right)
                     : (key < Key    // try update on left or right sub-tree
-                        ? new ImMap<V>(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
-                        : new ImMap<V>(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update)))
-                    .KeepBalance());
+                        ? CreateBalanced(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
+                        : CreateBalanced(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
         }
 
-        private ImMap<V> KeepBalance()
+        private static ImMap<V> CreateBalanced(int key, V value, ImMap<V> left, ImMap<V> right)
         {
-            var delta = Left.Height - Right.Height;
+            var delta = left.Height - right.Height;
             if (delta >= 2) // left is longer by 2, rotate left
             {
-                var left = Left;
                 var leftLeft = left.Left;
                 var leftRight = left.Right;
                 if (leftRight.Height - leftLeft.Height == 1)
@@ -987,8 +985,8 @@ namespace ImTools
                     //    3        1
                     return new ImMap<V>(leftRight.Key, leftRight.Value,
                         left: new ImMap<V>(left.Key, left.Value,
-                            left: leftLeft, right: leftRight.Left), right: new ImMap<V>(Key, Value,
-                            left: leftRight.Right, right: Right));
+                            left: leftLeft, right: leftRight.Left), right: new ImMap<V>(key, value,
+                            left: leftRight.Right, right: right));
                 }
 
                 // todo: do we need this?
@@ -997,29 +995,28 @@ namespace ImTools
                 //   2     6      1     5
                 // 1   4              4   6
                 return new ImMap<V>(left.Key, left.Value,
-                    left: leftLeft, right: new ImMap<V>(Key, Value,
-                        left: leftRight, right: Right));
+                    left: leftLeft, right: new ImMap<V>(key, value,
+                        left: leftRight, right: right));
             }
 
             if (delta <= -2)
             {
-                var right = Right;
                 var rightLeft = right.Left;
                 var rightRight = right.Right;
                 if (rightLeft.Height - rightRight.Height == 1)
                 {
                     return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        left: new ImMap<V>(Key, Value,
-                            left: Left, right: rightLeft.Left), right: new ImMap<V>(right.Key, right.Value,
+                        left: new ImMap<V>(key, value,
+                            left: left, right: rightLeft.Left), right: new ImMap<V>(right.Key, right.Value,
                             left: rightLeft.Right, right: rightRight));
                 }
 
                 return new ImMap<V>(right.Key, right.Value,
-                    left: new ImMap<V>(Key, Value,
-                        left: Left, right: rightLeft), right: rightRight);
+                    left: new ImMap<V>(key, value,
+                        left: left, right: rightLeft), right: rightRight);
             }
 
-            return this;
+            return new ImMap<V>(key, value, left, right);
         }
 
         private ImMap<V> RemoveImpl(int key, bool ignoreKey = false)
@@ -1047,11 +1044,11 @@ namespace ImTools
                 }
             }
             else if (key < Key)
-                result = new ImMap<V>(Key, Value, Left.RemoveImpl(key), Right);
+                result = CreateBalanced(Key, Value, Left.RemoveImpl(key), Right);
             else
-                result = new ImMap<V>(Key, Value, Left, Right.RemoveImpl(key));
+                result = CreateBalanced(Key, Value, Left, Right.RemoveImpl(key));
 
-            return result.KeepBalance();
+            return result;
         }
 
         #endregion
