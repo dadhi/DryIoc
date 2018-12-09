@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using BenchmarkDotNet.Attributes;
 
 namespace DryIoc
@@ -12,10 +11,22 @@ namespace DryIoc
         private static readonly HM2 _hm2 = new HM2();
 
         [Benchmark]
-        public List<int> Test1() => _hm.Enumerate().ToList();
+        public int YieldEnumerable()
+        {
+            var last = 0;
+            foreach (var n in _hm.Enumerate())
+                last = n;
+            return last;
+        }
 
         [Benchmark(Baseline = true)]
-        public List<int> Test2() => _hm2.Enumerate().ToList();
+        public int StructEnumerable()
+        {
+            var last = 0;
+            foreach (var n in _hm2.Enumerate())
+                last = n;
+            return last;
+        }
 
         class HM
         {
@@ -30,9 +41,9 @@ namespace DryIoc
         class HM2
         {
             private static readonly int[] _ints = { 1, 2, 3, 4, 5 };
-            public IEnumerable<int> Enumerate() => new E(_ints);
+            public E Enumerate() => new E(_ints);
 
-            struct E : IEnumerable<int>
+            public struct E : IEnumerable<int>
             {
                 private readonly int[] _ints;
                 public E(int[] ints) { _ints = ints; }
