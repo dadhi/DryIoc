@@ -17,11 +17,13 @@ namespace Playground
     {
         public static void Main()
         {
+            BenchmarkRunner.Run<PropertyAccess>();
+
             //BenchmarkRunner.Run<FindMethodInClass>();
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister_FirstTimeOpenScopeResolve>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.FirstTimeOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.OpenScopeResolveAfterWarmUp>();
 
