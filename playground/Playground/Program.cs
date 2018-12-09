@@ -8,6 +8,7 @@ using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using DryIoc;
 using ImTools;
 using PerformanceTests;
 
@@ -17,7 +18,8 @@ namespace Playground
     {
         public static void Main()
         {
-            BenchmarkRunner.Run<PropertyAccess>();
+            BenchmarkRunner.Run<StructEnumerableTest>();
+            //BenchmarkRunner.Run<PropertyAccess>();
 
             //BenchmarkRunner.Run<FindMethodInClass>();
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
