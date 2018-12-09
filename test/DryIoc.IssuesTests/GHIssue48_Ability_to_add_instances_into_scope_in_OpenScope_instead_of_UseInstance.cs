@@ -17,6 +17,9 @@ namespace DryIoc.IssuesTests
                 var a = scope.Resolve<A>();
                 Assert.IsNotNull(a);
             }
+
+            // todo: does not work yet
+            //Assert.Throws<ContainerException>(() => container.Resolve<A>());
         }
 
         public class A
