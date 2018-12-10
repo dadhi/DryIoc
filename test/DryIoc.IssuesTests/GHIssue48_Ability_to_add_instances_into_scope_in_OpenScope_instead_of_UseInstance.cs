@@ -12,14 +12,13 @@ namespace DryIoc.IssuesTests
             container.Register<A>();
 
             var b = new B();
-            using (var scope = container.OpenScopeWithPresetServices(instances: b))
+            using (var scope = container.OpenScopeWithPresetServices("ScopeName", instances: b))
             {
                 var a = scope.Resolve<A>();
                 Assert.IsNotNull(a);
             }
 
-            // todo: does not work yet
-            //Assert.Throws<ContainerException>(() => container.Resolve<A>());
+            Assert.Throws<ContainerException>(() => container.Resolve<A>());
         }
 
         public class A
