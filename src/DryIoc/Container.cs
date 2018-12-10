@@ -364,10 +364,13 @@ namespace DryIoc
             CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
 
             // we now cached the factoryDelegate so we do not need to lock again
+                if (__lockWasTaken)
+                {
             lock (_locksLock)
             {
                 _locks[serviceType] = Tuple.Create(false, requireLockAndLockObj.Item2);
             }
+                }
 
             return factoryDelegate(this);
             }
