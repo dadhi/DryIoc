@@ -6407,32 +6407,32 @@ namespace DryIoc
         internal readonly Expression[] InputArgExprs;
 
         /// <summary>Runtime known resolve factory, otherwise is <c>null</c></summary>
-        internal readonly Factory Factory;
+        internal Factory Factory;
 
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
-        public readonly int FactoryID;
+        public int FactoryID { get; private set; }
 
         // based on FactoryID
-        private readonly int _hashCode;
+        private int _hashCode;
 
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
-        public readonly FactoryType FactoryType;
+        public FactoryType FactoryType { get; private set; }
 
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryImplType ?? (_factoryImplType = Factory?.ImplementationType);
         private Type _factoryImplType;
 
         /// <summary>Service reuse.</summary>
-        public readonly IReuse Reuse;
+        public IReuse Reuse { get; private set; }
 
         /// <summary>ID of decorated factory in case of decorator factory type</summary>
-        public readonly int DecoratedFactoryID;
+        public int DecoratedFactoryID { get; private set; }
 
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
         public readonly int DependencyDepth;
 
         /// Holds the resolved expressions
-        private readonly Ref<ImMap<Expression>> _builtExpressions;
+        private Ref<ImMap<Expression>> _builtExpressions;
 
         #endregion
 
@@ -6533,7 +6533,7 @@ namespace DryIoc
 
         /// <summary>Creates new request with provided info, and links current request as a parent.
         /// Allows to set some additional flags. Existing/parent request should be resolved to 
-        /// factory (<see cref="WithResolvedFactory"/>), before pushing info into it.</summary>
+        /// factory via `WithResolvedFactory` before pushing info into it.</summary>
         public Request Push(IServiceInfo info, RequestFlags additionalFlags = DefaultFlags)
         {
             if (FactoryID == 0)
@@ -6639,10 +6639,10 @@ namespace DryIoc
         /// <param name="skipRecursiveDependencyCheck">(optional) does not check for recursive dependency.
         /// Use with caution. Make sense for Resolution expression.</param>
         /// <param name="skipCaptiveDependencyCheck">(optional) allows to skip reuse mismatch aka captive dependency check.</param>
+        /// <param name="copyRequest">Make a defensive copy of request.</param>
         /// <returns>New request with set factory.</returns>
         public Request WithResolvedFactory(Factory factory,
-            bool skipRecursiveDependencyCheck = false,
-            bool skipCaptiveDependencyCheck = false)
+            bool skipRecursiveDependencyCheck = false, bool skipCaptiveDependencyCheck = false, bool copyRequest = false)
         {
             var decoratedFactoryID = 0;
             if (Factory != null) // resolving the factory for the second time, usually happens in decorators
@@ -6688,10 +6688,15 @@ namespace DryIoc
                     flags |= RequestFlags.TracksTransientDisposable;
             }
 
-            return new Request(Container, DirectParent, flags, _serviceInfo, InputArgExprs,
-                factory, factory.FactoryID, factory.FactoryType,
-                null, // factoryImplType: null, so that implementation type can be lazily retrieved from `factory`
-                reuse, decoratedFactoryID);
+            if (copyRequest)
+                return new Request(Container, DirectParent, flags, _serviceInfo, InputArgExprs,
+                    factory, factory.FactoryID, factory.FactoryType,
+                    null, // factoryImplType: null, so that implementation type can be lazily retrieved from `factory`
+                    reuse, decoratedFactoryID);
+
+            Flags = flags;
+            SetResolvedFactory(factory, factory.FactoryID, factory.FactoryType, null, reuse, decoratedFactoryID);
+            return this;
         }
 
         /// <summary>Check for the parents.</summary>
@@ -6948,12 +6953,18 @@ namespace DryIoc
             int decoratedFactoryID)
             : this(container, parent, flags, serviceInfo, inputArgExprs)
         {
+            SetResolvedFactory(factory , factoryID, factoryType, factoryImplType, reuse, decoratedFactoryID);
+        }
+
+        private void SetResolvedFactory(Factory factory, int factoryID, FactoryType factoryType,
+            Type factoryImplType, IReuse reuse, int decoratedFactoryID)
+        {
             FactoryID = factoryID;
             FactoryType = factoryType;
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
 
-            _hashCode = Hasher.Combine(parent?._hashCode ?? 0, FactoryID);
+            _hashCode = Hasher.Combine(DirectParent?._hashCode ?? 0, FactoryID);
             _factoryImplType = factoryImplType;
 
             // runtime state
@@ -7438,10 +7449,10 @@ namespace DryIoc
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && // preventing recursion
-               (Setup.OpenResolutionScope ||
-               !request.IsResolutionCall && // preventing recursion
-               (Setup.AsResolutionCall || Setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
-               request.GetActualServiceType() != typeof(void)))
+                (Setup.OpenResolutionScope ||
+                !request.IsResolutionCall && // preventing recursion
+                (Setup.AsResolutionCall || Setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
+                request.GetActualServiceType() != typeof(void)))
                 return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator
@@ -8154,7 +8165,7 @@ namespace DryIoc
                 if (made.FactoryMethod != null)
                 {
                     // resolve request with factory to specify the implementation tyoe may be required by FactoryMethod or GetClosed...
-                    request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault);
+                    request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
                     var factoryMethod = made.FactoryMethod(request);
                     if (factoryMethod == null)
                         return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);

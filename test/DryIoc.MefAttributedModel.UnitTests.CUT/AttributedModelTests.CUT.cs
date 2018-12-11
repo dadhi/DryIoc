@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
@@ -82,14 +82,14 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    public interface IServiceWithMultipleImplentations
+    public interface IServiceWithMultipleImplementations
     {
         string Message { get; }
     }
 
-    [ExportWithDisplayName(typeof(IServiceWithMultipleImplentations), "One")]
+    [ExportWithDisplayName(typeof(IServiceWithMultipleImplementations), "One")]
     [PartCreationPolicy(CreationPolicy.NonShared)]
-    public class OneTransientService : IServiceWithMultipleImplentations
+    public class OneTransientService : IServiceWithMultipleImplementations
     {
         public string Message { get; private set; }
 
@@ -99,9 +99,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         }
     }
 
-    [Export(typeof(IServiceWithMultipleImplentations))]
+    [Export(typeof(IServiceWithMultipleImplementations))]
     [PartCreationPolicy(CreationPolicy.NonShared)]
-    public class AnotherTransientService : IServiceWithMultipleImplentations
+    public class AnotherTransientService : IServiceWithMultipleImplementations
     {
         public string Message { get; private set; }
 

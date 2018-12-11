@@ -81,7 +81,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void I_can_resolve_array_of_func_with_one_parameter()
         {
-            var factories = _container.Resolve<Func<string, IServiceWithMultipleImplentations>[]>();
+            var factories = _container.Resolve<Func<string, IServiceWithMultipleImplementations>[]>();
             Assert.That(factories.Length, Is.EqualTo(2));
 
             var oneService = factories[0].Invoke("0");
