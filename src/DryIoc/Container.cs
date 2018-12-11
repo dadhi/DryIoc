@@ -6432,7 +6432,7 @@ namespace DryIoc
         public readonly int DependencyDepth;
 
         /// Holds the resolved expressions
-        private Ref<ImMap<Expression>> _builtExpressions;
+        internal ImMap<Expression> ExprCache;
 
         #endregion
 
@@ -6886,12 +6886,12 @@ namespace DryIoc
         }
 
         /// <summary>Built expressions stored in resolution root (call).</summary>
-        public Ref<ImMap<Expression>> GetBuiltExpressions()
+        internal Request GetParentWithExprCache()
         {
             var req = this;
-            while (!req.IsEmpty && req._builtExpressions == null)
+            while (!req.IsEmpty && req.ExprCache == null)
                 req = req.DirectParent;
-            return req._builtExpressions;
+            return req;
         }
 
         /// <summary>Prints whole request chain.</summary>
@@ -6969,11 +6969,11 @@ namespace DryIoc
 
             // runtime state
             Factory = factory;
-            if (factoryType == FactoryType.Service)
-            {
-                if ((Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
-                    _builtExpressions = Ref.Of(ImMap<Expression>.Empty);
-            }
+
+            // if for service that is resolution root or service starting from the func, create a cache there
+            if (factoryType == FactoryType.Service && 
+                (Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
+                ExprCache = ImMap<Expression>.Empty;
         }
     }
 
@@ -7471,13 +7471,13 @@ namespace DryIoc
                     return Constant(singleton, request.ServiceType);
             }
 
-            Ref<ImMap<Expression>> builtExprs = null;
+            Request exprCacheReq = null;
             if (FactoryType == FactoryType.Service)
             {
-                builtExprs = request.GetBuiltExpressions();
-                var builtExpr = builtExprs?.Value.GetValueOrDefault(FactoryID);
-                if (builtExpr != null)
-                    return builtExpr;
+                exprCacheReq = request.GetParentWithExprCache();
+                var cachedExpr = exprCacheReq.ExprCache?.GetValueOrDefault(FactoryID);
+                if (cachedExpr != null)
+                    return cachedExpr;
             }
 
             // Then create new expression
@@ -7495,7 +7495,8 @@ namespace DryIoc
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
 
-                builtExprs?.AddOrUpdate(FactoryID, serviceExpr);
+                if (exprCacheReq?.ExprCache != null)
+                    exprCacheReq.ExprCache = exprCacheReq.ExprCache.AddOrUpdate(FactoryID, serviceExpr);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
