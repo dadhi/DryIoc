@@ -265,12 +265,20 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
 
 NO DIFFERENCE FROM Asp.NET / Core 2.2
 
-## 12.11.2018: Shaved almost a 1kb by optimizing Request allocations
+## 11.12.2018: Shaved almost a 1kb by optimizing Request allocations
 
                             Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
  BmarkMicrosoftDependencyInjection | 4.876 us | 0.0346 us | 0.0307 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 5.524 us | 0.0505 us | 0.0447 us |  1.13 |      1.3733 |           - |           - |             6.33 KB |
+
+## 13.12.2018: Never know where you can win until you measure!
+
+                            Method |     Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc | 4.920 us | 0.0229 us | 0.0191 us |  0.99 |    0.06 |      1.1444 |           - |           - |              5.3 KB |
+ BmarkMicrosoftDependencyInjection | 4.982 us | 0.3916 us | 0.3472 us |  1.00 |    0.00 |      1.0529 |           - |           - |             4.87 KB |
+
 
              */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
