@@ -239,9 +239,8 @@ namespace DryIoc
                 _registry.Value.CacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
-                object instance;
                 var useFec = Rules.UseFastExpressionCompiler;
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out var instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
@@ -893,9 +892,33 @@ namespace DryIoc
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
             var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
+            if (Rules.FactorySelector != null && serviceKey == null)
+            {
+                var allFactories = ((IContainer)this)
+                    .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
+                    .ToArrayOrSelf();
 
-            if (serviceKey == null && Rules.FactorySelector != null)
-                return GetRuleSelectedServiceFactoryOrDefault(Rules.FactorySelector, request, serviceType);
+                if (allFactories.Length == 0)
+                    return null;
+
+                // Sort in registration order
+                if (allFactories.Length > 1)
+                    Array.Sort(allFactories, _lastFactoryIDWinsComparer);
+
+                var matchedFactories1 = MatchFactories(allFactories, request);
+                if (matchedFactories1.Length == 0)
+                    return null;
+
+                var factory1 = Rules.FactorySelector(request, matchedFactories1.Map(f => f.Key.Pair(f.Value)));
+                if (factory1 == null)
+                    return null;
+
+                // Issue: #508
+                if (allFactories.Length > 1)
+                    request.ChangeServiceKey(matchedFactories1.FindFirst(f => f.Value.FactoryID == factory1.FactoryID).Key);
+
+                return factory1;
+            }
 
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -947,9 +970,8 @@ namespace DryIoc
             if (defaultFactories.Length == 0)
                 return null;
 
-            var matchedFactories = MatchFactories(defaultFactories, request);
-
             // For multiple matched factories, if the single one has a condition, then use it
+            var matchedFactories = MatchFactories(defaultFactories, request);
             if (matchedFactories.Length > 1)
             {
                 var conditionedFactories = matchedFactories.Match(f => f.Value.Setup.Condition != null);
@@ -1432,34 +1454,6 @@ namespace DryIoc
         }
 
         // todo: Optimize memory and performance cause SelectLastRegisteredFactory is common use-case
-        private Factory GetRuleSelectedServiceFactoryOrDefault(
-            Rules.FactorySelectorRule factorySelector, Request request, Type serviceType)
-        {
-            var allFactories = ((IContainer)this)
-                .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
-                .ToArrayOrSelf();
-
-            if (allFactories.Length == 0)
-                return null;
-
-            // Sort in registration order
-            if (allFactories.Length > 1)
-                Array.Sort(allFactories, _lastFactoryIDWinsComparer);
-
-            var matchedFactories = MatchFactories(allFactories, request);
-            if (matchedFactories.Length == 0)
-                return null;
-
-            var factory = factorySelector(request, matchedFactories.Map(f => f.Key.Pair(f.Value)));
-            if (factory == null)
-                return null;
-
-            // Issue: #508
-            if (allFactories.Length > 1)
-                request.ChangeServiceKey(matchedFactories.FindFirst(f => f.Value.FactoryID == factory.FactoryID).Key);
-
-            return factory;
-        }
 
         private static readonly LastFactoryIDWinsComparer _lastFactoryIDWinsComparer = new LastFactoryIDWinsComparer();
         private struct LastFactoryIDWinsComparer : IComparer<KV<object, Factory>>
@@ -2193,7 +2187,7 @@ namespace DryIoc
     public sealed class HiddenDisposable
     {
         internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetTypeInfo().DeclaredConstructors.First();
-        internal static FieldInfo ValueField = typeof(HiddenDisposable).GetTypeInfo().DeclaredFields.First();
+        internal static FieldInfo ValueField = typeof(HiddenDisposable).GetTypeInfo().GetDeclaredField(nameof(Value));
 
         /// <summary>Wrapped value</summary>
         public readonly object Value;
@@ -2204,8 +2198,8 @@ namespace DryIoc
 
     internal static class Interpreter
     {
-        public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, bool useFec,
-            out object result)
+        public static bool TryInterpretAndUnwrapContainerException(
+            IResolverContext r, Expression expr, bool useFec, out object result)
         {
             try
             {
@@ -2316,15 +2310,13 @@ namespace DryIoc
                             !TryInterpret(r, memberExpr.Expression, useFec, out instance))
                             return false;
 
-                        var field = memberExpr.Member as FieldInfo;
-                        if (field != null)
+                        if (memberExpr.Member is FieldInfo field)
                         {
                             result = field.GetValue(instance);
                             return true;
                         }
 
-                        var prop = memberExpr.Member as PropertyInfo;
-                        if (prop != null)
+                        if (memberExpr.Member is PropertyInfo prop)
                         {
                             result = prop.GetValue(instance, null);
                             return true;
@@ -2360,8 +2352,7 @@ namespace DryIoc
                         var newArray = (NewArrayExpression)expr;
 
                         var itemExprs = newArray.Expressions.ToListOrSelf();
-                        object[] items;
-                        if (!TryInterpretMany(r, itemExprs, useFec, out items))
+                        if (!TryInterpretMany(r, itemExprs, useFec, out var items))
                             return false;
 
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
@@ -2375,12 +2366,10 @@ namespace DryIoc
                         if (invokeExpr.Expression.NodeType == ExprType.Lambda)
                             break;
 
-                        object lambdaObj;
-                        if (!TryInterpret(r, invokeExpr.Expression, useFec, out lambdaObj))
+                        if (!TryInterpret(r, invokeExpr.Expression, useFec, out var lambdaObj))
                             break;
 
-                        object[] args;
-                        if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), useFec, out args))
+                        if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), useFec, out var args))
                             break;
 
                         var lambda = (Delegate)lambdaObj;
@@ -2484,8 +2473,7 @@ namespace DryIoc
             var createExpr = ((LambdaExpression)args[3]).Body;
             CreateScopedValue createValue = () =>
             {
-                object value;
-                if (!TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out value))
+                if (!TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value))
                     value = createExpr.CompileToFactoryDelegate(useFec)(resolverContext);
                 return value;
             };
@@ -3823,7 +3811,7 @@ namespace DryIoc
 
         /// <summary>Rules to select single matched factory default and keyed registered factory/factories.
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
-        /// Default behavior is throw on multiple registered default factories, cause it is not obvious what to use.</summary>
+        /// Default behavior is to throw on multiple registered default factories, cause it is not obvious what to use.</summary>
         public FactorySelectorRule FactorySelector { get; }
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>

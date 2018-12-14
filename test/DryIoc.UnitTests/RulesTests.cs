@@ -234,7 +234,7 @@ namespace DryIoc.UnitTests
             container.Register<IService, Service>(Reuse.Singleton);
             var service = container.Resolve(typeof(IService), IfUnresolved.ReturnDefault);
 
-            Assert.That(service, Is.Null);
+            Assert.IsNull(service);
         }
 
         public static Func<ParameterInfo, ParameterServiceInfo> GetServiceInfoFromImportAttribute(Request request)
