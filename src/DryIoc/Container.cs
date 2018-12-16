@@ -2609,10 +2609,11 @@ namespace DryIoc
                 for (var i = 0; i < args.Length; i++)
                 {
                     var argExpr = argExprs[i];
-                    object arg;
-                    if (!TryInterpret(r, argExpr, useFec, out arg))
-                        return false;
-                    args[i] = arg;
+                    if (argExpr is ConstantExpression constExpr)
+                        args[i] = constExpr.Value;
+                    else if (TryInterpret(r, argExpr, useFec, out var arg))
+                        args[i] = arg;
+                    else return false;
                 }
 
             return true;
