@@ -286,7 +286,16 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
  BmarkMicrosoftDependencyInjection | 4.728 us | 0.0065 us | 0.0058 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 4.928 us | 0.0246 us | 0.0230 us |  1.04 |      1.0834 |           - |           - |                5 KB |
 
-*/
+## 16.12.2018: Removing internal Data class from ImHashMap
+
+            
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.742 us | 0.0101 us | 0.0095 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 4.786 us | 0.0340 us | 0.0318 us |  1.01 |      1.0605 |           - |           - |             4.91 KB |
+
+
+ */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {

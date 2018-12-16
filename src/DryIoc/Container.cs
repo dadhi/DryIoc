@@ -909,15 +909,15 @@ namespace DryIoc
                 if (matchedFactories1.Length == 0)
                     return null;
 
-                var factory1 = Rules.FactorySelector(request, matchedFactories1.Map(f => f.Key.Pair(f.Value)));
-                if (factory1 == null)
+                var selectedFactory = Rules.FactorySelector(request, matchedFactories1.Map(f => f.Key.Pair(f.Value)));
+                if (selectedFactory == null)
                     return null;
 
                 // Issue: #508
                 if (allFactories.Length > 1)
-                    request.ChangeServiceKey(matchedFactories1.FindFirst(f => f.Value.FactoryID == factory1.FactoryID).Key);
+                    request.ChangeServiceKey(matchedFactories1.FindFirst(f => f.Value.FactoryID == selectedFactory.FactoryID).Key);
 
-                return factory1;
+                return selectedFactory;
             }
 
             var serviceFactories = _registry.Value.Services;
