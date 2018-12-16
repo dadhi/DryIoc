@@ -187,8 +187,7 @@ namespace DryIoc.MefAttributedModel
                 var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
                 try
                 {
-                    var it = scope.Resolve<T>();
-                    return new PartAndDisposeActionPair<T>(it, scope.Dispose);
+                    return new PartAndDisposeActionPair<T>(scope.Resolve<T>(), scope.Dispose);
                 }
                 catch
                 {

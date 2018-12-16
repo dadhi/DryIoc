@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DryIoc.UnitTests.CUT;
@@ -293,13 +293,11 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IEnumerable<AD>>().ToArray());
 
-            Assert.AreEqual(
-                Error.NameOf(Error.UnableToResolveUnknownService),
-                Error.NameOf(ex.Error));
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), ex.ErrorName);
         }
 
         [Test]
-        public void Lazy_enumerable_of_enumerable_of_array_dep_should_throw_for_nested_enumarable_of_ResolveThrow()
+        public void Lazy_enumerable_of_enumerable_of_array_dep_should_throw_for_nested_enumerable_of_ResolveThrow()
         {
             var container = new Container(rules =>
                 rules.WithResolveIEnumerableAsLazyEnumerable());

@@ -2206,8 +2206,8 @@ namespace DryIoc
                 return Interpreter.TryInterpret(r, expr, useFec, out result);
             }
             catch (TargetInvocationException tex)
-            { 
-                // unpack the internal container exception if any
+            {
+                // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
                 if (tex.InnerException is ContainerException)
                     throw tex.InnerException;
                 throw;
@@ -2245,26 +2245,34 @@ namespace DryIoc
                             return TryInterpret(r, callObject, useFec, out resolver) &&
                                    TryInterpretResolveMany((IResolverContext)resolver, callArgs, useFec, out result);
 
-                        if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
-                            return TryInterpretGetScopedWithValue(r, callArgs, useFec, out result);
-
-                        if (callMethod == CurrentScopeReuse.GetNameScopedWithValueMethod)
-                            return TryInterpretGetNameScopedWithValue(r, callArgs, useFec, out result);
-
-                        if (callMethod == CurrentScopeReuse.GetScopedMethod)
-                            return TryInterpretGetScoped(r, callArgs, useFec, out result);
-
-                        if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
-                            return TryInterpretGetNameScoped(r, callArgs, useFec, out result);
-
-                        // todo: handle the rest of the methods
-                        if (callMethod == CurrentScopeReuse.GetScopedOrSingletonMethod ||
-                            callMethod == CurrentScopeReuse.GetScopedOrSingletonWithValueMethod ||
-                            callMethod == CurrentScopeReuse.TrackScopedOrSingletonMethod ||
-                            callMethod == CurrentScopeReuse.TrackNameScopedMethod ||
-                            callMethod == CurrentScopeReuse.TrackScopedMethod)
+                        if (callMethod.DeclaringType == typeof(CurrentScopeReuse))
                         {
-                            ;
+                            if (callMethod == CurrentScopeReuse.GetScopedWithValueMethod)
+                                return TryInterpretGetScopedWithValue(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.GetScopedMethod)
+                                return InterpretGetScoped(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.GetNameScopedWithValueMethod)
+                                return TryInterpretGetNameScopedWithValue(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
+                                return InterpretGetNameScoped(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonMethod)
+                                return InterpretGetScopedOrSingleton(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonWithValueMethod)
+                                return TryInterpretGetScopedOrSingletonWithValue(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.TrackScopedOrSingletonMethod)
+                                return TryInterpretTrackScopedOrSingleton(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.TrackScopedMethod)
+                                return TryInterpretTrackScoped(r, callArgs, useFec, out result);
+
+                            if (callMethod == CurrentScopeReuse.TrackNameScopedMethod)
+                                return TryInterpretTrackNameScoped(r, callArgs, useFec, out result);
                         }
 
                         if (!TryInterpretMany(r, callArgs, useFec, out var args))
@@ -2388,31 +2396,27 @@ namespace DryIoc
 
         private static bool TryInterpretResolve(IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
+            result = null;
             object serviceKey = null, preResolveParent = null, resolveArgs = null;
             if (!TryInterpret(r, args[1], useFec, out serviceKey) ||
                 !TryInterpret(r, args[4], useFec, out preResolveParent) ||
                 !TryInterpret(r, args[5], useFec, out resolveArgs))
-            {
-                result = null;
                 return false;
-            }
 
             result = r.Resolve((Type)ConstValue(args[0]), serviceKey, (IfUnresolved)ConstValue(args[2]), 
                 (Type)ConstValue(args[3]), (Request)preResolveParent, (object[])resolveArgs);
             return true;
         }
 
-        private static bool TryInterpretResolveMany(IResolverContext r, IList<Expression> args, bool useFec, 
-            out object result)
+        private static bool TryInterpretResolveMany(IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
+            result = null;
             object serviceKey = null, preResolveParent = null, resolveArgs = null;
             if (!TryInterpret(r, args[1], useFec, out serviceKey) ||
                 !TryInterpret(r, args[3], useFec, out preResolveParent) ||
                 !TryInterpret(r, args[4], useFec, out resolveArgs))
-            {
-                result = null;
                 return false;
-            }
+
             result = r.ResolveMany((Type)ConstValue(args[0]), serviceKey, (Type)ConstValue(args[2]),
                 (Request)preResolveParent, (object[])resolveArgs);
             return true;
@@ -2421,75 +2425,69 @@ namespace DryIoc
         private static bool TryInterpretGetScopedWithValue(
             IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
-            if (!TryInterpret(r, args[0], useFec, out var resolver) ||
-                !TryInterpret(r, args[3], useFec, out var service))
-            {
-                result = null;
-                return false;
-            }
+            TryInterpret(r, args[0], useFec, out var resolverObj);
+            var resolver = (IResolverContext)resolverObj;
 
-            result = CurrentScopeReuse.GetScopedWithValue(
-                (IResolverContext)resolver, (bool)ConstValue(args[1]), (int)ConstValue(args[2]),
-                service, (int)ConstValue(args[4]));
-            return true;
-        }
-
-        private static bool TryInterpretGetNameScopedWithValue(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
-        {
-            object resolver = null, service = null;
-            if (!TryInterpret(r, args[0], useFec, out resolver) ||
-                !TryInterpret(r, args[4], useFec, out service))
-            {
-                result = false;
-                return false;
-            }
-
-            result = CurrentScopeReuse.GetNameScopedWithValue(
-                (IResolverContext)resolver, ConstValue(args[1]), (bool)ConstValue(args[2]),
-                (int)ConstValue(args[3]), service, (int)ConstValue(args[5]));
-            return true;
-        }
-
-        private static bool TryInterpretGetScoped(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
-        {
             result = null;
-            object resolverObj;
-            if (!TryInterpret(r, args[0], useFec, out resolverObj))
+            var scope = resolver.GetCurrentScope((bool)ConstValue(args[1]));
+            if (scope == null)
+                return true;
+
+            // check if scoped dependency is already in scope, then just return it
+            var id = (int)ConstValue(args[2]);
+            if (scope.TryGet(out result, id)) 
+                return true; // this is fine, cause `throwIfNoScope == false` and result is null in this case
+
+            if (!TryInterpret(r, args[3], useFec, out var service))
                 return false;
+
+            result = scope.GetOrTryAdd(id, service, (int)ConstValue(args[4]));
+            return true;
+        }
+
+        private static bool InterpretGetScoped(IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            TryInterpret(r, args[0], useFec, out var resolverObj);
             var resolverContext = (IResolverContext)resolverObj;
 
-            var throwIfNoScope = (bool)ConstValue(args[1]);
-            var scope = resolverContext.GetCurrentScope(throwIfNoScope);
+            result = null;
+            var scope = resolverContext.GetCurrentScope((bool)ConstValue(args[1]));
             if (scope == null)
-                return true; // result is null in this case
-        
+                return true; // this is fine, cause `throwIfNoScope == false` and result is null in this case
+
             // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[2]);
             if (scope.TryGet(out result, id))
                 return true;
 
             var createExpr = ((LambdaExpression)args[3]).Body;
-            CreateScopedValue createValue = () =>
-            {
-                if (!TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value))
-                    value = createExpr.CompileToFactoryDelegate(useFec)(resolverContext);
-                return value;
-            };
 
-            var disposalIndex = (int)ConstValue(args[4]);
-            result = CurrentScopeReuse.GetScoped(resolverContext, throwIfNoScope, id, createValue, disposalIndex);
+            result = scope.GetOrAdd(id, () => 
+                TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) ? value
+                : createExpr.CompileToFactoryDelegate(useFec)(resolverContext),
+                (int)ConstValue(args[4]));
             return true;
         }
 
-        private static bool TryInterpretGetNameScoped(
+        private static bool TryInterpretGetNameScopedWithValue(
             IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
             result = null;
-            object resolverObj;
-            if (!TryInterpret(r, args[0], useFec, out resolverObj))
+            if (!TryInterpret(r, args[4], useFec, out var service))
                 return false;
+
+            TryInterpret(r, args[0], useFec, out var resolver);
+            result = CurrentScopeReuse.GetNameScopedWithValue(
+                (IResolverContext)resolver, ConstValue(args[1]), (bool)ConstValue(args[2]),
+                (int)ConstValue(args[3]), service, (int)ConstValue(args[5]));
+            return true;
+        }
+
+        private static bool InterpretGetNameScoped(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            result = null;
+            TryInterpret(r, args[0], useFec, out var resolverObj);
             var resolverContext = (IResolverContext)resolverObj;
 
             var scopeName = ConstValue(args[1]);
@@ -2504,16 +2502,100 @@ namespace DryIoc
                 return true;
 
             var createExpr = ((LambdaExpression)args[4]).Body;
-            CreateScopedValue createValue = () =>
-            {
-                object value;
-                if (!TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out value))
-                    value = createExpr.CompileToFactoryDelegate(useFec)(resolverContext);
-                return value;
-            };
-
             var disposalIndex = (int)ConstValue(args[5]);
-            result = CurrentScopeReuse.GetNameScoped(resolverContext, scopeName, throwIfNoScope, id, createValue, disposalIndex);
+
+            result = CurrentScopeReuse.GetNameScoped(resolverContext, scopeName, throwIfNoScope, id, 
+                () => TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) ? value
+                    : createExpr.CompileToFactoryDelegate(useFec)(resolverContext), 
+                disposalIndex);
+
+            return true;
+        }
+
+        private static bool InterpretGetScopedOrSingleton(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            TryInterpret(r, args[0], useFec, out var resolverObj);
+            var resolverContext = (IResolverContext)resolverObj;
+
+            var id = (int)ConstValue(args[1]);
+            var createExpr = ((LambdaExpression)args[2]).Body;
+            var disposalIndex = (int)ConstValue(args[3]);
+
+            result = CurrentScopeReuse.GetScopedOrSingleton(resolverContext, id,
+                () => TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) ? value
+                    : createExpr.CompileToFactoryDelegate(useFec)(resolverContext),
+                disposalIndex);
+
+            return true;
+        }
+
+        private static bool TryInterpretGetScopedOrSingletonWithValue(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            result = null;
+            TryInterpret(r, args[0], useFec, out var resolverObj);
+            var resolverContext = (IResolverContext)resolverObj;
+
+            if (!TryInterpret(r, args[2], useFec, out var service))
+                return false;
+
+            var id = (int)ConstValue(args[1]);
+            var disposalIndex = (int)ConstValue(args[3]);
+            result = CurrentScopeReuse.GetScopedOrSingletonWithValue(resolverContext, id, service, disposalIndex);
+            return true;
+        }
+
+        private static bool TryInterpretTrackScopedOrSingleton(
+            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            TryInterpret(r, args[0], useFec, out var resolverObj);
+            var resolverContext = (IResolverContext)resolverObj;
+
+            result = null;
+            if (!TryInterpret(r, args[1], useFec, out var service))
+                return false;
+
+            result = CurrentScopeReuse.TrackScopedOrSingleton(resolverContext, service);
+            return true;
+        }
+
+        private static bool TryInterpretTrackScoped(IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            TryInterpret(r, args[0], useFec, out var resolverObj);
+            var resolverContext = (IResolverContext)resolverObj;
+
+            result = null;
+            var throwIfNoScope = (bool)ConstValue(args[1]);
+            var scope = resolverContext.GetCurrentScope(throwIfNoScope);
+            if (scope == null)
+                return true; // result is null in this case
+
+            // check if scoped dependency is already in scope, then just return it
+            if (!TryInterpret(r, args[2], useFec, out var service))
+                return false;
+
+            result = scope.TrackDisposable(service);
+            return true;
+        }
+
+        private static bool TryInterpretTrackNameScoped(IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        {
+            TryInterpret(r, args[0], useFec, out var resolverObj);
+            var resolverContext = (IResolverContext)resolverObj;
+
+            result = null;
+            var scopeName = ConstValue(args[1]);
+            var throwIfNoScope = (bool)ConstValue(args[2]);
+            var scope = resolverContext.GetNamedScope(scopeName, throwIfNoScope);
+            if (scope == null)
+                return true; // result is null in this case
+
+            // check if scoped dependency is already in scope, then just return it
+            if (!TryInterpret(r, args[3], useFec, out var service))
+                return false;
+
+            result = scope.TrackDisposable(service);
             return true;
         }
 
@@ -7511,11 +7593,11 @@ namespace DryIoc
                 !request.IsWrappedInFunc())
             {
                 var container = request.Container;
-                var useFec = rules.UseFastExpressionCompiler;
-                CreateScopedValue createSingleton = () =>
+
+                var singleton = request.SingletonScope.GetOrAdd(FactoryID, () =>
                 {
-                    object instance;
-                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out instance))
+                    var useFec = container.Rules.UseFastExpressionCompiler;
+                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out var instance))
                         instance = serviceExpr.CompileToFactoryDelegate(useFec)(container);
 
                     if (Setup.WeaklyReferenced)
@@ -7523,9 +7605,7 @@ namespace DryIoc
                     else if (Setup.PreventDisposal)
                         instance = new HiddenDisposable(instance);
                     return instance;
-                };
-
-                var singleton = request.SingletonScope.GetOrAdd(FactoryID, createSingleton, Setup.DisposalOrder);
+                }, Setup.DisposalOrder);
                 serviceExpr = Constant(singleton);
             }
             else
@@ -10521,7 +10601,7 @@ namespace DryIoc
 
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         public static Expression GetDefaultValueExpression(this Type type) =>
-            Call(_getDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
+            Call(GetDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
 
         #region Implementation
 
@@ -10572,7 +10652,8 @@ namespace DryIoc
         }
 
         internal static T GetDefault<T>() => default(T);
-        private static readonly MethodInfo _getDefaultMethod = typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true);
+        internal static readonly MethodInfo GetDefaultMethod = 
+            typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true);
 
         #endregion
     }
