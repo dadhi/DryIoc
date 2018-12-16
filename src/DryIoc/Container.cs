@@ -2462,10 +2462,11 @@ namespace DryIoc
 
             var createExpr = ((LambdaExpression)args[3]).Body;
 
-            result = scope.GetOrAdd(id, () => 
-                TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) ? value
-                : createExpr.CompileToFactoryDelegate(useFec)(resolverContext),
+            result = scope.TryGetOrAddWithoutClosure(id, resolverContext, createExpr, useFec, (rc, e, uf) => 
+                TryInterpretAndUnwrapContainerException(rc, e, uf, out var value) ? value
+                : e.CompileToFactoryDelegate(uf)(rc),
                 (int)ConstValue(args[4]));
+
             return true;
         }
 
@@ -7579,7 +7580,7 @@ namespace DryIoc
             var rules = request.Rules;
 
             // optimization for already activated singleton
-            if (serviceExpr.NodeType == System.Linq.Expressions.ExpressionType.Constant &&
+            if (serviceExpr.NodeType == ExprType.Constant &&
                 reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
                 !Setup.PreventDisposal && !Setup.WeaklyReferenced)
                 return serviceExpr;
@@ -7592,20 +7593,23 @@ namespace DryIoc
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
+                var createSingleton = 
+                    Setup.WeaklyReferenced ? (Func<IResolverContext, Expression, bool, object>)(
+                        (r, e, u) => new WeakReference(
+                        Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
+                            ? instance : e.CompileToFactoryDelegate(u)(r))) :
+                    Setup.PreventDisposal ? (Func<IResolverContext, Expression, bool, object>)(
+                        (r, e, u) => (object)new HiddenDisposable(
+                        Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
+                            ? instance : e.CompileToFactoryDelegate(u)(r))) :
+                        (r, e, u) => 
+                        Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
+                            ? instance : e.CompileToFactoryDelegate(u)(r);
+
                 var container = request.Container;
+                var singleton = container.SingletonScope.TryGetOrAddWithoutClosure(FactoryID, 
+                    container, serviceExpr, rules.UseFastExpressionCompiler, createSingleton, Setup.DisposalOrder);
 
-                var singleton = request.SingletonScope.GetOrAdd(FactoryID, () =>
-                {
-                    var useFec = container.Rules.UseFastExpressionCompiler;
-                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out var instance))
-                        instance = serviceExpr.CompileToFactoryDelegate(useFec)(container);
-
-                    if (Setup.WeaklyReferenced)
-                        instance = new WeakReference(instance);
-                    else if (Setup.PreventDisposal)
-                        instance = new HiddenDisposable(instance);
-                    return instance;
-                }, Setup.DisposalOrder);
                 serviceExpr = Constant(singleton);
             }
             else
@@ -8785,8 +8789,13 @@ namespace DryIoc
         /// <summary>Looks up for stored item by id.</summary>
         bool TryGet(out object item, int id);
 
-        /// <summary>Creates, stores, and returns stored disposable by id.</summary>
+        /// Creates, stores, and returns created item
         object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
+
+        /// Creates, stores, and returns created item
+        object TryGetOrAddWithoutClosure(int id,
+            IResolverContext resolveContext, Expression expr, bool useFec,
+            Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0);
 
         /// <summary>Tracked item will be disposed with the scope. 
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
@@ -8836,9 +8845,8 @@ namespace DryIoc
         /// <inheritdoc />
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
-            object value;
             var items = _items;
-            return items.TryFind(id, out value) ? value : TryGetOrAdd(items, id, createValue, disposalOrder);
+            return items.TryFind(id, out var value) ? value : TryGetOrAdd(items, id, createValue, disposalOrder);
         }
 
         private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
@@ -8863,6 +8871,36 @@ namespace DryIoc
 
             var disposable = item as IDisposable;
             if (disposable != null && disposable != this)
+                TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
+
+            return item;
+        }
+
+        /// <inheritdoc />
+        public object TryGetOrAddWithoutClosure(int id,
+            IResolverContext resolveContext, Expression expr, bool useFec,
+            Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            var items = _items;
+            lock (_locker)
+            {
+                // re-check if items where changed in between (double check locking)
+                if (_items != items && _items.TryFind(id, out item))
+                    return item;
+
+                item = createValue(resolveContext, expr, useFec);
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                items = _items;
+                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref _items, id, item);
+            }
+
+            if (item is IDisposable disposable && disposable != this)
                 TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
 
             return item;

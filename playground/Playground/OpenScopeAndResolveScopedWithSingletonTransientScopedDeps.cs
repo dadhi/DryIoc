@@ -279,8 +279,14 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                        BmarkDryIoc | 4.920 us | 0.0229 us | 0.0191 us |  0.99 |    0.06 |      1.1444 |           - |           - |              5.3 KB |
  BmarkMicrosoftDependencyInjection | 4.982 us | 0.3916 us | 0.3472 us |  1.00 |    0.00 |      1.0529 |           - |           - |             4.87 KB |
 
+## 16.12.2018: Removing more closure - now in `Scope.GetOrAdd` method family
 
-             */
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.728 us | 0.0065 us | 0.0058 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 4.928 us | 0.0246 us | 0.0230 us |  1.04 |      1.0834 |           - |           - |                5 KB |
+
+*/
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {
