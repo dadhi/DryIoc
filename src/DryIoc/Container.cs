@@ -1096,8 +1096,7 @@ namespace DryIoc
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return factories;
 
-            return CombineRegisteredWithDynamicFactories(
-                factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
+            return CombineRegisteredWithDynamicFactories(factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
         }
 
         private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry) =>

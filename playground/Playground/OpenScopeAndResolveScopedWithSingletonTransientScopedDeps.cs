@@ -294,7 +294,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                        BmarkDryIoc | 4.786 us | 0.0340 us | 0.0318 us |  1.01 |      1.0605 |           - |           - |             4.91 KB |
 
 
-## 25.12.2018: Stripping conflicts from ImHashMap - Win in memory over MS.DI
+## 25.12.2018: Split conflicts from ImHashMap - Win in memory over MS.DI
 
                             Method |       Mean |     Error |    StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |-----------:|----------:|----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -304,11 +304,19 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                   BmarkLightInject | 649.004 us | 5.4030 us | 5.0539 us | 138.18 |    1.04 |      8.7891 |      3.9063 |           - |            43.12 KB |
                         BmarkGrace | 768.939 us | 3.1469 us | 2.9437 us | 163.71 |    0.66 |      8.7891 |      3.9063 |           - |            42.44 KB |
 
- */
+## 25.12.2018: Split Branch from Node from ImHashMap
+
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.640 us | 0.0168 us | 0.0140 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 4.872 us | 0.0303 us | 0.0283 us |  1.05 |      1.0300 |           - |           - |             4.76 KB |
+
+
+*/
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
             [Benchmark]
@@ -317,10 +325,10 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkLightInject() => Measure(PrepareLightInject());
 
             //[Benchmark]
