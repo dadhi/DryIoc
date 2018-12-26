@@ -859,11 +859,9 @@ namespace ImTools
         /// <returns>True if key found, false otherwise.</returns>
         public bool TryFind(int key, out V value)
         {
-            var hash = key.GetHashCode();
-
             var node = this;
             while (node.Height != 0 && node.Key != key)
-                node = hash < node.Key ? node.Left : node.Right;
+                node = key < node.Key ? node.Left : node.Right;
 
             if (node.Height != 0)
             {
