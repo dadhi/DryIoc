@@ -801,10 +801,10 @@ namespace ImTools
     public delegate V Update<K, V>(K key, V oldValue, V newValue);
 
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree with integer keys and <typeparamref name="V"/> values.</summary>
-    public sealed class ImMap<V>
+    public class ImMap<V>
     {
         /// <summary>Empty tree to start with.</summary>
-        public static readonly ImMap<V> Empty = new ImMap<V>();
+        public static readonly ImMap<V> Empty = new Branch();
 
         /// <summary>Key.</summary>
         public readonly int Key;
@@ -813,19 +813,52 @@ namespace ImTools
         public readonly V Value;
 
         /// <summary>Left sub-tree/branch, or empty.</summary>
-        public readonly ImMap<V> Left;
+        public virtual ImMap<V> Left => Empty;
 
         /// <summary>Right sub-tree/branch, or empty.</summary>
-        public readonly ImMap<V> Right;
+        public virtual ImMap<V> Right => Empty;
 
         /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
-        public readonly int Height;
+        public virtual int Height => 1;
 
         /// <summary>Returns true is tree is empty.</summary>
         public bool IsEmpty => Height == 0;
 
+        /// The branch node.
+        private sealed class Branch : ImMap<V>
+        {
+            /// <summary>Left sub-tree/branch, or empty.</summary>
+            public override ImMap<V> Left => _left;
+
+            /// <summary>Right sub-tree/branch, or empty.</summary>
+            public override ImMap<V> Right => _right;
+
+            /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
+            public override int Height => _height;
+
+            private readonly int _height;
+            private readonly ImMap<V> _right;
+            private readonly ImMap<V> _left;
+
+            public Branch() { }
+
+            public Branch(int key, V value, ImMap<V> left, ImMap<V> right) : base(key, value)
+            {
+                _left = left;
+                _right = right;
+                _height = left.Height > right.Height ? left.Height + 1 : right.Height + 1;
+            }
+
+            public Branch(int key, V value, ImMap<V> left, ImMap<V> right, int height) : base(key, value)
+            {
+                _left = left;
+                _right = right;
+                _height = height;
+            }
+        }
+
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
-        /// <param name="key"></param> <param name="value"></param>
+        /// <param name="key"></param> <param name="value"></param >
         /// <returns>New tree.</returns>
         public ImMap<V> AddOrUpdate(int key, V value) =>
             AddOrUpdateImpl(key, value);
@@ -918,27 +951,13 @@ namespace ImTools
         {
             Key = key;
             Value = value;
-            Left = Empty;
-            Right = Empty;
-            Height = 1;
         }
 
-        private ImMap(int key, V value, ImMap<V> left, ImMap<V> right, int height)
+        private static ImMap<V> BranchOrLeaf(int key, V value, ImMap<V> left, ImMap<V> right)
         {
-            Key = key;
-            Value = value;
-            Left = left;
-            Right = right;
-            Height = height;
-        }
-
-        private ImMap(int key, V value, ImMap<V> left, ImMap<V> right)
-        {
-            Key = key;
-            Value = value;
-            Left = left;
-            Right = right;
-            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
+            if (left.Height == 0 && right.Height == 0)
+                return new ImMap<V>(key, value);
+            return new Branch(key, value, left, right);
         }
 
         private ImMap<V> AddOrUpdateImpl(int key, V value)
@@ -946,14 +965,14 @@ namespace ImTools
             return Height == 0  // add new node
                 ? new ImMap<V>(key, value)
                 : (key == Key // update found node
-                    ? new ImMap<V>(key, value, Left, Right)
+                    ? new Branch(key, value, Left, Right, Height)
                     : (key < Key  // search for node
                         ? (Height == 1
-                            ? new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, height: 2)
-                            : CreateBalanced(Key, Value, Left.AddOrUpdateImpl(key, value), Right))
+                            ? new Branch(Key, Value, new ImMap<V>(key, value), Right, height: 2)
+                            : Balance(Key, Value, Left.AddOrUpdateImpl(key, value), Right))
                         : (Height == 1
-                            ? new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), height: 2)
-                            : CreateBalanced(Key, Value, Left, Right.AddOrUpdateImpl(key, value)))));
+                            ? new Branch(Key, Value, Left, new ImMap<V>(key, value), height: 2)
+                            : Balance(Key, Value, Left, Right.AddOrUpdateImpl(key, value)))));
         }
 
         private ImMap<V> AddOrUpdateImpl(int key, V value, bool updateOnly, Update<V> update)
@@ -961,13 +980,13 @@ namespace ImTools
             return Height == 0 ? // tree is empty
                 (updateOnly ? this : new ImMap<V>(key, value))
                 : (key == Key ? // actual update
-                    new ImMap<V>(key, update == null ? value : update(Value, value), Left, Right)
+                    new Branch(key, update == null ? value : update(Value, value), Left, Right, Height)
                     : (key < Key    // try update on left or right sub-tree
-                        ? CreateBalanced(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
-                        : CreateBalanced(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
+                        ? Balance(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
+                        : Balance(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
         }
 
-        private static ImMap<V> CreateBalanced(int key, V value, ImMap<V> left, ImMap<V> right)
+        private static ImMap<V> Balance(int key, V value, ImMap<V> left, ImMap<V> right)
         {
             var delta = left.Height - right.Height;
             if (delta >= 2) // left is longer by 2, rotate left
@@ -981,10 +1000,9 @@ namespace ImTools
                     //   2     6      4     6      2     5
                     // 1   4        2   3        1   3     6
                     //    3        1
-                    return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        left: new ImMap<V>(left.Key, left.Value,
-                            left: leftLeft, right: leftRight.Left), right: new ImMap<V>(key, value,
-                            left: leftRight.Right, right: right));
+                    return new Branch(leftRight.Key, leftRight.Value,
+                        BranchOrLeaf(left.Key, left.Value, leftLeft, leftRight.Left), 
+                        BranchOrLeaf(key, value, leftRight.Right, right));
                 }
 
                 // todo: do we need this?
@@ -992,9 +1010,7 @@ namespace ImTools
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImMap<V>(left.Key, left.Value,
-                    left: leftLeft, right: new ImMap<V>(key, value,
-                        left: leftRight, right: right));
+                return new Branch(left.Key, left.Value, leftLeft, BranchOrLeaf(key, value, leftRight, right));
             }
 
             if (delta <= -2)
@@ -1003,18 +1019,15 @@ namespace ImTools
                 var rightRight = right.Right;
                 if (rightLeft.Height - rightRight.Height == 1)
                 {
-                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        left: new ImMap<V>(key, value,
-                            left: left, right: rightLeft.Left), right: new ImMap<V>(right.Key, right.Value,
-                            left: rightLeft.Right, right: rightRight));
+                    return new Branch(rightLeft.Key, rightLeft.Value,
+                        BranchOrLeaf(key, value, left, rightLeft.Left),
+                        BranchOrLeaf(right.Key, right.Value, rightLeft.Right, rightRight));
                 }
 
-                return new ImMap<V>(right.Key, right.Value,
-                    left: new ImMap<V>(key, value,
-                        left: left, right: rightLeft), right: rightRight);
+                return new Branch(right.Key, right.Value, BranchOrLeaf(key, value, left, rightLeft), rightRight);
             }
 
-            return new ImMap<V>(key, value, left, right);
+            return new Branch(key, value, left, right);
         }
 
         private ImMap<V> RemoveImpl(int key, bool ignoreKey = false)
@@ -1028,23 +1041,24 @@ namespace ImTools
                 if (Height == 1) // remove node
                     return Empty;
 
-                if (Right.IsEmpty)
+                if (Right.Height == 0)
                     result = Left;
-                else if (Left.IsEmpty)
+                else if (Left.Height == 0)
                     result = Right;
                 else
                 {
                     // we have two children, so remove the next highest node and replace this node with it.
                     var successor = Right;
-                    while (!successor.Left.IsEmpty) successor = successor.Left;
-                    result = new ImMap<V>(successor.Key, successor.Value,
-                        Left, Right.RemoveImpl(successor.Key, ignoreKey: true));
+                    while (successor.Left.Height != 0)
+                        successor = successor.Left;
+
+                    result = BranchOrLeaf(successor.Key, successor.Value, Left, Right.RemoveImpl(successor.Key, true));
                 }
             }
             else if (key < Key)
-                result = CreateBalanced(Key, Value, Left.RemoveImpl(key), Right);
+                result = Balance(Key, Value, Left.RemoveImpl(key), Right);
             else
-                result = CreateBalanced(Key, Value, Left, Right.RemoveImpl(key));
+                result = Balance(Key, Value, Left, Right.RemoveImpl(key));
 
             return result;
         }
