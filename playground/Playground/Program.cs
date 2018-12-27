@@ -18,6 +18,8 @@ namespace Playground
     {
         public static void Main()
         {
+            //BenchmarkRunner.Run<ImMapBenchmarks>();
+
             //BenchmarkRunner.Run<StructEnumerableTest>();
             //BenchmarkRunner.Run<PropertyAccess>();
 

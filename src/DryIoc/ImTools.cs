@@ -806,54 +806,43 @@ namespace ImTools
         /// <summary>Empty tree to start with.</summary>
         public static readonly ImMap<V> Empty = new Branch();
 
+        /// <summary>Returns true is tree is empty.</summary>
+        public bool IsEmpty => this == Empty;
+
         /// <summary>Key.</summary>
         public readonly int Key;
 
         /// <summary>Value.</summary>
         public readonly V Value;
 
-        /// <summary>Left sub-tree/branch, or empty.</summary>
-        public virtual ImMap<V> Left => Empty;
-
-        /// <summary>Right sub-tree/branch, or empty.</summary>
-        public virtual ImMap<V> Right => Empty;
-
-        /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
-        public virtual int Height => 1;
-
-        /// <summary>Returns true is tree is empty.</summary>
-        public bool IsEmpty => Height == 0;
-
         /// The branch node.
-        private sealed class Branch : ImMap<V>
+        internal sealed class Branch : ImMap<V>
         {
             /// <summary>Left sub-tree/branch, or empty.</summary>
-            public override ImMap<V> Left => _left;
+            public readonly ImMap<V> Left;
 
             /// <summary>Right sub-tree/branch, or empty.</summary>
-            public override ImMap<V> Right => _right;
+            public readonly ImMap<V> Right;
 
             /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
-            public override int Height => _height;
-
-            private readonly int _height;
-            private readonly ImMap<V> _right;
-            private readonly ImMap<V> _left;
+            public readonly int Height;
 
             public Branch() { }
 
             public Branch(int key, V value, ImMap<V> left, ImMap<V> right) : base(key, value)
             {
-                _left = left;
-                _right = right;
-                _height = left.Height > right.Height ? left.Height + 1 : right.Height + 1;
+                Left = left;
+                Right = right;
+                var leftHeight = left.GetHeight();
+                var rightHeight = right.GetHeight();
+                Height = 1 + (leftHeight > rightHeight ? leftHeight : rightHeight);
             }
 
             public Branch(int key, V value, ImMap<V> left, ImMap<V> right, int height) : base(key, value)
             {
-                _left = left;
-                _right = right;
-                _height = height;
+                Left = left;
+                Right = right;
+                Height = height;
             }
         }
 
@@ -876,59 +865,29 @@ namespace ImTools
         public ImMap<V> Update(int key, V value) =>
             AddOrUpdateImpl(key, value, true, null);
 
-        /// <summary>Get value for found key or null otherwise.</summary>
-        /// <param name="key"></param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
-        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        public V GetValueOrDefault(int key, V defaultValue = default(V))
-        {
-            var node = this;
-            while (node.Height != 0 && node.Key != key)
-                node = key < node.Key ? node.Left : node.Right;
-            return node.Height != 0 ? node.Value : defaultValue;
-        }
-
-        /// <summary>Returns true if key is found and sets the value.</summary>
-        /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
-        /// <returns>True if key found, false otherwise.</returns>
-        public bool TryFind(int key, out V value)
-        {
-            var node = this;
-            while (node.Height != 0 && node.Key != key)
-                node = key < node.Key ? node.Left : node.Right;
-
-            if (node.Height != 0)
-            {
-                value = node.Value;
-                return true;
-            }
-
-            value = default(V);
-            return false;
-        }
-
         /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
         /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
         public IEnumerable<ImMap<V>> Enumerate()
         {
-            if (Height == 0)
+            if (IsEmpty)
                 yield break;
 
-            var parents = new ImMap<V>[Height];
+            var parents = new ImMap<V>[this.GetHeight()];
 
             var node = this;
             var parentCount = -1;
-            while (node.Height != 0 || parentCount != -1)
+            while (!node.IsEmpty || parentCount != -1)
             {
-                if (node.Height != 0)
+                if (!node.IsEmpty)
                 {
                     parents[++parentCount] = node;
-                    node = node.Left;
+                    node = node.GetLeft();
                 }
                 else
                 {
                     node = parents[parentCount--];
                     yield return node;
-                    node = node.Right;
+                    node = node.GetRight();
                 }
             }
         }
@@ -952,48 +911,50 @@ namespace ImTools
             Key = key;
             Value = value;
         }
-
+    
         private static ImMap<V> BranchOrLeaf(int key, V value, ImMap<V> left, ImMap<V> right)
         {
-            if (left.Height == 0 && right.Height == 0)
+            if (left == Empty && right == Empty)
                 return new ImMap<V>(key, value);
             return new Branch(key, value, left, right);
         }
 
         private ImMap<V> AddOrUpdateImpl(int key, V value)
         {
-            return Height == 0  // add new node
+            var height = this.GetHeight();
+            return height == 0  // add new node
                 ? new ImMap<V>(key, value)
                 : (key == Key // update found node
-                    ? new Branch(key, value, Left, Right, Height)
+                    ? new Branch(key, value, this.GetLeft(), this.GetRight(), height)
                     : (key < Key  // search for node
-                        ? (Height == 1
-                            ? new Branch(Key, Value, new ImMap<V>(key, value), Right, height: 2)
-                            : Balance(Key, Value, Left.AddOrUpdateImpl(key, value), Right))
-                        : (Height == 1
-                            ? new Branch(Key, Value, Left, new ImMap<V>(key, value), height: 2)
-                            : Balance(Key, Value, Left, Right.AddOrUpdateImpl(key, value)))));
+                        ? (height == 1
+                            ? new Branch(Key, Value, new ImMap<V>(key, value), this.GetRight(), height: 2)
+                            : Balance(Key, Value, this.GetLeft().AddOrUpdateImpl(key, value), this.GetRight()))
+                        : (height == 1
+                            ? new Branch(Key, Value, this.GetLeft(), new ImMap<V>(key, value), height: 2)
+                            : Balance(Key, Value, this.GetLeft(), this.GetRight().AddOrUpdateImpl(key, value)))));
         }
 
         private ImMap<V> AddOrUpdateImpl(int key, V value, bool updateOnly, Update<V> update)
         {
-            return Height == 0 ? // tree is empty
+            var height = this.GetHeight();
+            return height == 0 ? // tree is empty
                 (updateOnly ? this : new ImMap<V>(key, value))
                 : (key == Key ? // actual update
-                    new Branch(key, update == null ? value : update(Value, value), Left, Right, Height)
+                    new Branch(key, update == null ? value : update(Value, value), this.GetLeft(), this.GetRight(), height)
                     : (key < Key    // try update on left or right sub-tree
-                        ? Balance(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
-                        : Balance(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
+                        ? Balance(Key, Value, this.GetLeft().AddOrUpdateImpl(key, value, updateOnly, update), this.GetRight())
+                        : Balance(Key, Value, this.GetLeft(), this.GetRight().AddOrUpdateImpl(key, value, updateOnly, update))));
         }
 
         private static ImMap<V> Balance(int key, V value, ImMap<V> left, ImMap<V> right)
         {
-            var delta = left.Height - right.Height;
+            var delta = left.GetHeight() - right.GetHeight();
             if (delta >= 2) // left is longer by 2, rotate left
             {
-                var leftLeft = left.Left;
-                var leftRight = left.Right;
-                if (leftRight.Height - leftLeft.Height == 1)
+                var leftLeft = left.GetLeft();
+                var leftRight = left.GetRight();
+                if (leftRight.GetHeight() - leftLeft.GetHeight() == 1)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
@@ -1001,8 +962,8 @@ namespace ImTools
                     // 1   4        2   3        1   3     6
                     //    3        1
                     return new Branch(leftRight.Key, leftRight.Value,
-                        BranchOrLeaf(left.Key, left.Value, leftLeft, leftRight.Left), 
-                        BranchOrLeaf(key, value, leftRight.Right, right));
+                        BranchOrLeaf(left.Key, left.Value, leftLeft, leftRight.GetLeft()), 
+                        BranchOrLeaf(key, value, leftRight.GetRight(), right));
                 }
 
                 // todo: do we need this?
@@ -1015,13 +976,13 @@ namespace ImTools
 
             if (delta <= -2)
             {
-                var rightLeft = right.Left;
-                var rightRight = right.Right;
-                if (rightLeft.Height - rightRight.Height == 1)
+                var rightLeft = right.GetLeft();
+                var rightRight = right.GetRight();
+                if (rightLeft.GetHeight() - rightRight.GetHeight() == 1)
                 {
                     return new Branch(rightLeft.Key, rightLeft.Value,
-                        BranchOrLeaf(key, value, left, rightLeft.Left),
-                        BranchOrLeaf(right.Key, right.Value, rightLeft.Right, rightRight));
+                        BranchOrLeaf(key, value, left, rightLeft.GetLeft()),
+                        BranchOrLeaf(right.Key, right.Value, rightLeft.GetRight(), rightRight));
                 }
 
                 return new Branch(right.Key, right.Value, BranchOrLeaf(key, value, left, rightLeft), rightRight);
@@ -1032,33 +993,34 @@ namespace ImTools
 
         private ImMap<V> RemoveImpl(int key, bool ignoreKey = false)
         {
-            if (Height == 0)
+            if (IsEmpty)
                 return this;
 
             ImMap<V> result;
             if (key == Key || ignoreKey) // found node
             {
-                if (Height == 1) // remove node
+                if (this.GetHeight() == 1) // remove node
                     return Empty;
 
-                if (Right.Height == 0)
-                    result = Left;
-                else if (Left.Height == 0)
-                    result = Right;
+                if (this.GetRight().GetHeight() == 0)
+                    result = this.GetLeft();
+                else if (this.GetLeft().GetHeight() == 0)
+                    result = this.GetRight();
                 else
                 {
                     // we have two children, so remove the next highest node and replace this node with it.
-                    var successor = Right;
-                    while (successor.Left.Height != 0)
-                        successor = successor.Left;
+                    var successor = this.GetRight();
+                    while (successor.GetLeft().GetHeight() != 0)
+                        successor = successor.GetLeft();
 
-                    result = BranchOrLeaf(successor.Key, successor.Value, Left, Right.RemoveImpl(successor.Key, true));
+                    result = BranchOrLeaf(successor.Key, successor.Value, 
+                        this.GetLeft(), this.GetRight().RemoveImpl(successor.Key, true));
                 }
             }
             else if (key < Key)
-                result = Balance(Key, Value, Left.RemoveImpl(key), Right);
+                result = Balance(Key, Value, this.GetLeft().RemoveImpl(key), this.GetRight());
             else
-                result = Balance(Key, Value, Left, Right.RemoveImpl(key));
+                result = Balance(Key, Value, this.GetLeft(), this.GetRight().RemoveImpl(key));
 
             return result;
         }
@@ -1066,8 +1028,69 @@ namespace ImTools
         #endregion
     }
 
-    /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree 
-    /// where node key is the hash code of <typeparamref name="K"/>.</summary>
+    /// Map methods
+    public static class ImMap
+    {
+        /// Left sub-tree/branch, or empty.
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> GetLeft<V>(this ImMap<V> map) => map is ImMap<V>.Branch b ? b.Left : ImMap<V>.Empty;
+
+        /// Right sub-tree/branch, or empty.
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> GetRight<V>(this ImMap<V> map) => map is ImMap<V>.Branch b ? b.Right : ImMap<V>.Empty;
+
+        /// Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.
+        [MethodImpl((MethodImplOptions)256)]
+        public static int GetHeight<V>(this ImMap<V> map) => map is ImMap<V>.Branch b ? b.Height : 1;
+
+        /// Get value for found key or default value otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImMap<V> map, int key, V defaultValue = default(V))
+        {
+            int mapKey;
+            var empty = ImMap<V>.Empty;
+            while (map != empty)
+            {
+                if ((mapKey = map.Key) == key)
+                    return map.Value;
+
+                var br = map as ImMap<V>.Branch;
+                if (br == null)
+                    break;
+
+                map = key < mapKey ? br.Left : br.Right;
+            }
+            return defaultValue;
+        }
+
+        /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
+        {
+            int mapKey;
+            var empty = ImMap<V>.Empty;
+            while (map != empty)
+            {
+                if ((mapKey = map.Key) == key)
+                {
+                    value = map.Value;
+                    return true;
+                }
+
+                var br = map as ImMap<V>.Branch;
+                if (br == null)
+                    break;
+                map = key < mapKey ? br.Left : br.Right;
+            }
+
+            value = default(V);
+            return false;
+        }
+
+    }
+
+    /// Immutable http://en.wikipedia.org/wiki/AVL_tree 
+    /// where node key is the hash code of <typeparamref name="K"/>.
     public class ImHashMap<K, V>
     {
         /// Empty tree to start with.
