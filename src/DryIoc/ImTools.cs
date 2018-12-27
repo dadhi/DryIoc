@@ -827,9 +827,9 @@ namespace ImTools
             /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
             public readonly int Height;
 
-            public Branch() { }
+            internal Branch() { }
 
-            public Branch(int key, V value, ImMap<V> left, ImMap<V> right) : base(key, value)
+            internal Branch(int key, V value, ImMap<V> left, ImMap<V> right) : base(key, value)
             {
                 Left = left;
                 Right = right;
@@ -838,7 +838,7 @@ namespace ImTools
                 Height = 1 + (leftHeight > rightHeight ? leftHeight : rightHeight);
             }
 
-            public Branch(int key, V value, ImMap<V> left, ImMap<V> right, int height) : base(key, value)
+            internal Branch(int key, V value, ImMap<V> left, ImMap<V> right, int height) : base(key, value)
             {
                 Left = left;
                 Right = right;
@@ -906,7 +906,7 @@ namespace ImTools
 
         private ImMap() { }
 
-        private ImMap(int key, V value)
+        internal ImMap(int key, V value)
         {
             Key = key;
             Value = value;
@@ -1087,6 +1087,89 @@ namespace ImTools
             return false;
         }
 
+        ///Returns new tree with added or updated value for specified key.
+        public static ImMap<V> AddOrUpdateOptimized<V>(this ImMap<V> map, int key, V value)
+        {
+            var mapKey = map.Key;
+
+            var br = map as ImMap<V>.Branch;
+            if (br == null) // means the leaf node
+            {
+                // update the leaf
+                if (mapKey == key)
+                    return new ImMap<V>(key, value);
+
+                return key < mapKey // search for node
+                    ? new ImMap<V>.Branch(mapKey, map.Value, new ImMap<V>(key, value), ImMap<V>.Empty, height: 2)
+                    : new ImMap<V>.Branch(mapKey, map.Value, ImMap<V>.Empty, new ImMap<V>(key, value));
+            }
+
+            // the empty node
+            var height = br.Height;
+            if (height == 0)
+                return new ImMap<V>(key, value);
+
+            // update the branch
+            if (mapKey == key)
+                return new ImMap<V>.Branch(key, value, br.Left, br.Right, height);
+
+            return key < mapKey // search for node
+                ? Balance(mapKey, map.Value, br.Left.AddOrUpdateOptimized(key, value), br.Right)
+                : Balance(mapKey, map.Value, br.Left, br.Right.AddOrUpdateOptimized(key, value));
+        }
+
+        private static ImMap<V> Balance<V>(int key, V value, ImMap<V> left, ImMap<V> right)
+        {
+            var delta = left.GetHeight() - right.GetHeight();
+            if (delta >= 2) // left is longer by 2, rotate left
+            {
+                var leftLeft = left.GetLeft();
+                var leftRight = left.GetRight();
+                if (leftRight.GetHeight() - leftLeft.GetHeight() == 1)
+                {
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2     6      4     6      2     5
+                    // 1   4        2   3        1   3     6
+                    //    3        1
+                    return new ImMap<V>.Branch(leftRight.Key, leftRight.Value,
+                        BranchOrLeaf(left.Key, left.Value, leftLeft, leftRight.GetLeft()),
+                        BranchOrLeaf(key, value, leftRight.GetRight(), right));
+                }
+
+                // todo: do we need this?
+                // one rotation:
+                //      5     =>     2
+                //   2     6      1     5
+                // 1   4              4   6
+                return new ImMap<V>.Branch(left.Key, left.Value, leftLeft, BranchOrLeaf(key, value, leftRight, right));
+            }
+
+            if (delta <= -2)
+            {
+                var rightLeft = right.GetLeft();
+                var rightRight = right.GetRight();
+                if (rightLeft.GetHeight() - rightRight.GetHeight() == 1)
+                {
+                    return new ImMap<V>.Branch(rightLeft.Key, rightLeft.Value,
+                        BranchOrLeaf(key, value, left, rightLeft.GetLeft()),
+                        BranchOrLeaf(right.Key, right.Value, rightLeft.GetRight(), rightRight));
+                }
+
+                return new ImMap<V>.Branch(right.Key, right.Value, BranchOrLeaf(key, value, left, rightLeft), rightRight);
+            }
+
+            return new ImMap<V>.Branch(key, value, left, right);
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        private static ImMap<V> BranchOrLeaf<V>(int key, V value, ImMap<V> left, ImMap<V> right)
+        {
+            var empty = ImMap<V>.Empty;
+            if (left == empty && right == empty)
+                return new ImMap<V>(key, value);
+            return new ImMap<V>.Branch(key, value, left, right);
+        }
     }
 
     /// Immutable http://en.wikipedia.org/wiki/AVL_tree 
