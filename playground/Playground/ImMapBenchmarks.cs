@@ -17,16 +17,6 @@ namespace Playground
             return map;
         }
 
-        private static ImMap<string> Populate_optimized()
-        {
-            var map = ImMap<string>.Empty;
-
-            for (var i = 0; i < 9; i++)
-                map = map.AddOrUpdateOptimized(i, i.ToString());
-
-            return map;
-        }
-
         //private static readonly ImMap<string> _map = Populate();
 
         [Benchmark(Baseline = true)]
@@ -35,7 +25,7 @@ namespace Playground
             var map = ImMap<string>.Empty;
 
             for (var i = 0; i < 9; i++)
-                map = map.AddOrUpdate(i, i.ToString());
+                map = map.AddOrUpdate2(i, i.ToString());
 
             return map;
         }
@@ -46,7 +36,7 @@ namespace Playground
             var map = ImMap<string>.Empty;
 
             for (var i = 0; i < 9; i++)
-                map = map.AddOrUpdateOptimized(i, i.ToString());
+                map = map.AddOrUpdate(i, i.ToString());
 
             return map;
         }

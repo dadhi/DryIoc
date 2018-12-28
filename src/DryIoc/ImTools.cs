@@ -849,7 +849,7 @@ namespace ImTools
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key"></param> <param name="value"></param >
         /// <returns>New tree.</returns>
-        public ImMap<V> AddOrUpdate(int key, V value) =>
+        public ImMap<V> AddOrUpdate2(int key, V value) =>
             AddOrUpdateImpl(key, value);
 
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
@@ -1088,7 +1088,7 @@ namespace ImTools
         }
 
         ///Returns new tree with added or updated value for specified key.
-        public static ImMap<V> AddOrUpdateOptimized<V>(this ImMap<V> map, int key, V value)
+        public static ImMap<V> AddOrUpdate<V>(this ImMap<V> map, int key, V value)
         {
             var mapKey = map.Key;
 
@@ -1100,8 +1100,8 @@ namespace ImTools
                     return new ImMap<V>(key, value);
 
                 return key < mapKey // search for node
-                    ? new ImMap<V>.Branch(mapKey, map.Value, new ImMap<V>(key, value), ImMap<V>.Empty, height: 2)
-                    : new ImMap<V>.Branch(mapKey, map.Value, ImMap<V>.Empty, new ImMap<V>(key, value));
+                    ? new ImMap<V>.Branch(mapKey, map.Value, new ImMap<V>(key, value), ImMap<V>.Empty, 2)
+                    : new ImMap<V>.Branch(mapKey, map.Value, ImMap<V>.Empty, new ImMap<V>(key, value), 2);
             }
 
             // the empty node
@@ -1109,66 +1109,127 @@ namespace ImTools
             if (height == 0)
                 return new ImMap<V>(key, value);
 
+            var left = br.Left;
+            var right = br.Right;
+
             // update the branch
             if (mapKey == key)
-                return new ImMap<V>.Branch(key, value, br.Left, br.Right, height);
+                return new ImMap<V>.Branch(key, value, left, right, height);
 
-            return key < mapKey // search for node
-                ? Balance(mapKey, map.Value, br.Left.AddOrUpdateOptimized(key, value), br.Right)
-                : Balance(mapKey, map.Value, br.Left, br.Right.AddOrUpdateOptimized(key, value));
+            if (key < mapKey)
+                left = left.AddOrUpdate(key, value);
+            else
+                right = right.AddOrUpdate(key, value);
+            return Balance(mapKey, map.Value, left, right);
         }
 
         private static ImMap<V> Balance<V>(int key, V value, ImMap<V> left, ImMap<V> right)
         {
-            var delta = left.GetHeight() - right.GetHeight();
-            if (delta >= 2) // left is longer by 2, rotate left
+            var empty = ImMap<V>.Empty;
+
+            var lb = left as ImMap<V>.Branch;
+            var lHeight = lb != null ? lb.Height : 1;
+
+            var rb = right as ImMap<V>.Branch;
+            var rHeight = rb != null ? rb.Height : 1;
+
+            var delta = lHeight - rHeight;
+
+            // Left is longer by 2 - rotate left.
+            // Also means left is not a leaf or empty - should be a branch!
+            if (delta > 1)
             {
-                var leftLeft = left.GetLeft();
-                var leftRight = left.GetRight();
-                if (leftRight.GetHeight() - leftLeft.GetHeight() == 1)
+                // ReSharper disable once PossibleNullReferenceException
+                var leftLeft = lb.Left;
+                var leftRight = lb.Right;
+
+                var lrb = leftRight as ImMap<V>.Branch;
+                var lrHeight = lrb != null ? lrb.Height : 1;
+                var llb = leftLeft as ImMap<V>.Branch;
+                var llHeight =  llb != null  ? llb.Height : 1;
+
+                // That also means the `leftRight` is the Leaf or Branch, but not empty.
+                if (lrHeight > llHeight)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
                     //   2     6      4     6      2     5
                     // 1   4        2   3        1   3     6
                     //    3        1
+
+                    // Means that `lrb` is not empty branch, so its `height >= 2`.
+                    if (lrb != null)
+                        return new ImMap<V>.Branch(lrb.Key, lrb.Value,
+                            llHeight == 0 && lrb.Left == empty
+                                ? new ImMap<V>(left.Key, left.Value) 
+                                : new ImMap<V>.Branch(left.Key, left.Value, leftLeft, lrb.Left),
+                            lrb.Right == empty && rHeight == 0 
+                                ? new ImMap<V>(key, value) 
+                                : new ImMap<V>.Branch(key, value, lrb.Right, right));
+                    
+                    // Means that `leftRight` is the leaf, so its left and right may be considered empty.
+                    // In that case `leftLeft` should be empty.
                     return new ImMap<V>.Branch(leftRight.Key, leftRight.Value,
-                        BranchOrLeaf(left.Key, left.Value, leftLeft, leftRight.GetLeft()),
-                        BranchOrLeaf(key, value, leftRight.GetRight(), right));
+                        new ImMap<V>(left.Key, left.Value), // height: 1, so the right branch may either 1 or 2
+                        rHeight == 0 
+                            ? new ImMap<V>(key, value) 
+                            : new ImMap<V>.Branch(key, value, empty, right, 2),
+                        rHeight == 0 ? 2 : 3);
                 }
 
-                // todo: do we need this?
-                // one rotation:
+                // single rotation:
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImMap<V>.Branch(left.Key, left.Value, leftLeft, BranchOrLeaf(key, value, leftRight, right));
+                return new ImMap<V>.Branch(left.Key, left.Value, 
+                    leftLeft,
+                    lrHeight == 0 && rHeight == 0
+                        ? new ImMap<V>(key, value) 
+                        : new ImMap<V>.Branch(key, value, leftRight, right, lrHeight > rHeight ? lrHeight+1 : rHeight+1));
             }
 
-            if (delta <= -2)
+            // right is longer than left by 2, so it may be only the branch node
+            if (delta < -1)
             {
-                var rightLeft = right.GetLeft();
-                var rightRight = right.GetRight();
-                if (rightLeft.GetHeight() - rightRight.GetHeight() == 1)
+                // ReSharper disable once PossibleNullReferenceException
+                var rightLeft = rb.Left;
+                var rightRight = rb.Right;
+
+                var rlb = rightLeft as ImMap<V>.Branch;
+                var rlHeight = rlb != null ? rlb.Height : 1;
+                var rrb = rightRight as ImMap<V>.Branch;
+                var rrHeight = rrb != null ? rrb.Height : 1;
+
+                if (rlHeight > rrHeight)
                 {
+                    // `rlb` is the non empty branch node
+                    if (rlb != null)
+                        return new ImMap<V>.Branch(rlb.Key, rlb.Value,
+                            lHeight == 0 && rlb.Left == empty 
+                                ? new ImMap<V>(key, value) 
+                                : new ImMap<V>.Branch(key, value, left, rlb.Left),
+                            rlb.Right == empty && rrHeight == 0 
+                                ? new ImMap<V>(right.Key, right.Value) 
+                                : new ImMap<V>.Branch(right.Key, right.Value, rlb.Right, rightRight));
+
+                    // `rightLeft` is the leaf node, means its left and right may be considered empty
+                    // then the `rightRight` should be empty
                     return new ImMap<V>.Branch(rightLeft.Key, rightLeft.Value,
-                        BranchOrLeaf(key, value, left, rightLeft.GetLeft()),
-                        BranchOrLeaf(right.Key, right.Value, rightLeft.GetRight(), rightRight));
+                        lHeight == 0
+                            ? new ImMap<V>(key, value) 
+                            : new ImMap<V>.Branch(key, value, left, empty, 2),
+                        new ImMap<V>(right.Key, right.Value),
+                        lHeight == 0 ? 2 : 3);
                 }
 
-                return new ImMap<V>.Branch(right.Key, right.Value, BranchOrLeaf(key, value, left, rightLeft), rightRight);
+                return new ImMap<V>.Branch(right.Key, right.Value, 
+                    lHeight == 0 && rlHeight == 0 
+                        ? new ImMap<V>(key, value) 
+                        : new ImMap<V>.Branch(key, value, left, rightLeft, lHeight > rlHeight ? lHeight+1 : rlHeight+1), 
+                    rightRight);
             }
 
-            return new ImMap<V>.Branch(key, value, left, right);
-        }
-
-        [MethodImpl((MethodImplOptions)256)]
-        private static ImMap<V> BranchOrLeaf<V>(int key, V value, ImMap<V> left, ImMap<V> right)
-        {
-            var empty = ImMap<V>.Empty;
-            if (left == empty && right == empty)
-                return new ImMap<V>(key, value);
-            return new ImMap<V>.Branch(key, value, left, right);
+            return new ImMap<V>.Branch(key, value, left, right, lHeight > rHeight ? lHeight+1 : rHeight+1);
         }
     }
 
