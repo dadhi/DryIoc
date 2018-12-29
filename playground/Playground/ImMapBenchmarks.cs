@@ -7,7 +7,7 @@ namespace Playground
     [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
     public class ImMapBenchmarks
     {
-        //[Benchmark(Baseline = true)]
+        [Benchmark(Baseline = true)]
         public Zero.ImMap<string> AddOrUpdate_v1()
         {
             var map = Zero.ImMap<string>.Empty;
@@ -18,7 +18,7 @@ namespace Playground
             return map;
         }
 
-        [Benchmark(Baseline = true)]
+        //[Benchmark(Baseline = true)]
         public ImMap<string> AddOrUpdate()
         {
             var map = ImMap<string>.Empty;
