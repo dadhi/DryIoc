@@ -854,6 +854,13 @@ namespace ImTools
                 Height = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
             }
 
+            internal Branch(int key, V value, int leftHeight, ImMap<V> left, int rightHeight, ImMap<V> right) : base(key, value)
+            {
+                Left = left;
+                Right = right;
+                Height = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
+            }
+
             internal Branch(int key, V value, ImMap<V> left, ImMap<V> right, int height) : base(key, value)
             {
                 Left = left;
@@ -1203,12 +1210,12 @@ namespace ImTools
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImMap<V>.Branch(left.Key, left.Value,
-                    llHeight, leftLeft,
-                    lrHeight == 0 && rHeight == 0
-                        ? new ImMap<V>(key, value)
-                        : new ImMap<V>.Branch(key, value, leftRight, right,
-                            lrHeight > rHeight ? lrHeight + 1 : rHeight + 1));
+                if (lrHeight == 0 && rHeight == 0)
+                    return new ImMap<V>.Branch(left.Key, left.Value,
+                        llHeight, leftLeft, 1, new ImMap<V>(key, value));
+
+                rb = new ImMap<V>.Branch(key, value, lrHeight, leftRight, rHeight, right);
+                return new ImMap<V>.Branch(left.Key, left.Value, llHeight, leftLeft, rb.Height, rb);
             }
 
             // right is longer than left by 2, so it may be only the branch node
@@ -1247,15 +1254,15 @@ namespace ImTools
                         lHeight == 0 ? 2 : 3);
                 }
 
-                return new ImMap<V>.Branch(right.Key, right.Value,
-                    lHeight == 0 && rlHeight == 0
-                        ? new ImMap<V>(key, value)
-                        : new ImMap<V>.Branch(key, value, left, rightLeft,
-                            lHeight > rlHeight ? lHeight + 1 : rlHeight + 1),
-                    rrHeight, rightRight);
+                if (lHeight == 0 && rlHeight == 0)
+                    return new ImMap<V>.Branch(right.Key, right.Value,
+                        1, new ImMap<V>(key, value), rrHeight, rightRight);
+
+                lb = new ImMap<V>.Branch(key, value, lHeight, left, rlHeight, rightLeft);
+                return new ImMap<V>.Branch(right.Key, right.Value, lb.Height, lb, rrHeight, rightRight);
             }
 
-            return new ImMap<V>.Branch(key, value, left, right, lHeight > rHeight ? lHeight + 1 : rHeight + 1);
+            return new ImMap<V>.Branch(key, value, lHeight, left, rHeight, right);
         }
     }
 

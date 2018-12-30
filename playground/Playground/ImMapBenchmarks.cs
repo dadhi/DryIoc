@@ -1,48 +1,56 @@
+using System.Collections.Concurrent;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
 using ImTools;
 
 namespace Playground
 {
-    [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
     public class ImMapBenchmarks
     {
-        [Benchmark(Baseline = true)]
-        public Zero.ImMap<string> AddOrUpdate_v1()
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        public class Populate
         {
-            var map = Zero.ImMap<string>.Empty;
+            [Params(10)]
+            public int Size;
 
-            for (var i = 0; i < 9; i++)
-                map = map.AddOrUpdate(i, i.ToString());
+            [Benchmark(Baseline = true)]
+            public V1.ImMap<string> AddOrUpdate_v1()
+            {
+                var map = V1.ImMap<string>.Empty;
 
-            return map;
-        }
+                for (var i = 0; i < Size; i++)
+                    map = map.AddOrUpdate(i, i.ToString());
 
-        //[Benchmark(Baseline = true)]
-        public ImMap<string> AddOrUpdate()
-        {
-            var map = ImMap<string>.Empty;
+                return map;
+            }
 
-            for (var i = 0; i < 9; i++)
-                map = map.AddOrUpdate2(i, i.ToString());
+            [Benchmark]
+            public ImMap<string> AddOrUpdate_v2()
+            {
+                var map = ImMap<string>.Empty;
 
-            return map;
-        }
+                for (var i = 0; i < Size; i++)
+                    map = map.AddOrUpdate(i, i.ToString());
 
-        [Benchmark]
-        public ImMap<string> AddOrUpdate_optimized()
-        {
-            var map = ImMap<string>.Empty;
+                return map;
+            }
 
-            for (var i = 0; i < 9; i++)
-                map = map.AddOrUpdate(i, i.ToString());
+            [Benchmark]
+            public ConcurrentDictionary<int, string> ConcurrentDict()
+            {
+                var map = new ConcurrentDictionary<int, string>();
 
-            return map;
+                for (var i = 0; i < Size; i++)
+                    map.TryAdd(i, i.ToString());
+
+                return map;
+            }
+
         }
     }
 }
 
-namespace Zero
+namespace V1
 {
     using System.Collections.Generic;
 
