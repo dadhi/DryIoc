@@ -311,6 +311,12 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
  BmarkMicrosoftDependencyInjection | 4.640 us | 0.0168 us | 0.0140 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 4.872 us | 0.0303 us | 0.0283 us |  1.05 |      1.0300 |           - |           - |             4.76 KB |
 
+## 01.01.2018: Optimized Lookup speed in ImMap
+
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.599 us | 0.0165 us | 0.0147 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 4.773 us | 0.0284 us | 0.0252 us |  1.04 |      1.0300 |           - |           - |             4.76 KB |
 
 */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
