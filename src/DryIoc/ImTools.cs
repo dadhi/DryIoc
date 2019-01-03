@@ -843,36 +843,6 @@ namespace ImTools
         public ImMap<V> Update(int key, V value) =>
             AddOrUpdateImpl(key, value, true, null);
 
-        /// <summary>Get value for found key or null otherwise.</summary>
-        /// <param name="key"></param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
-        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        public V GetValueOrDefault_old(int key, V defaultValue = default(V))
-        {
-            var map = this;
-            while (map.Height != 0 && map.Key != key)
-                map = key < map.Key ? map.Left : map.Right;
-            return map.Height != 0 ? map.Value : defaultValue;
-        }
-
-        /// <summary>Returns true if key is found and sets the value.</summary>
-        /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
-        /// <returns>True if key found, false otherwise.</returns>
-        public bool TryFind_old(int key, out V value)
-        {
-            var map = this;
-            while (map.Height != 0 && map.Key != key)
-                map = key < map.Key ? map.Left : map.Right;
-
-            if (map.Height != 0)
-            {
-                value = map.Value;
-                return true;
-            }
-
-            value = default(V);
-            return false;
-        }
-
         /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
         /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
         public IEnumerable<ImMap<V>> Enumerate()

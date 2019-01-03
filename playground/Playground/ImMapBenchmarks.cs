@@ -129,13 +129,6 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
             }
 
             [Benchmark]
-            public string TryFind_old_instance()
-            {
-                _map.TryFind_old(LookupKey, out var result);
-                return result;
-            }
-
-            //[Benchmark]
             public string TryFind_v2()
             {
                 V2.ImMap.TryFind(_mapV2, LookupKey, out var result);
