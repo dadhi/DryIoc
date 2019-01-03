@@ -10,37 +10,59 @@ namespace Playground
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class Populate
         {
-            [Params(10)]
-            public int Size;
+            [Params(50, 100, 500)]
+            public int Count;
 
             [Benchmark(Baseline = true)]
-            public ImMap<string> AddOrUpdate_v1()
+            public ImMap<string> AddOrUpdate()
             {
                 var map = ImMap<string>.Empty;
 
-                for (var i = 0; i < Size; i++)
-                    map = map.AddOrUpdate(i, i.ToString());
+                for (var i = 0; i < Count; i++)
+                    map = map.AddOrUpdate(i, "a");
 
                 return map;
             }
 
             [Benchmark]
+            public ImMap<string> AddOrUpdate_static()
+            {
+                var map = ImMap<string>.Empty;
+
+                for (var i = 0; i < Count; i++)
+                    map = map.AddOrUpdate_static(i, "a");
+
+                return map;
+            }
+
+            //[Benchmark]
             public V2.ImMap<string> AddOrUpdate_v2()
             {
                 var map = V2.ImMap<string>.Empty;
 
-                for (var i = 0; i < Size; i++)
-                    map = V2.ImMap.AddOrUpdate(map, i, i.ToString());
+                for (var i = 0; i < Count; i++)
+                    map = map.AddOrUpdate(i, "a");
 
                 return map;
             }
 
-            [Benchmark]
+            //[Benchmark]
+            public V2.ImMap<string> AddOrUpdate_v2_static()
+            {
+                var map = V2.ImMap<string>.Empty;
+
+                for (var i = 0; i < Count; i++)
+                    map = V2.ImMap.AddOrUpdate(map, i, "a");
+
+                return map;
+            }
+
+            //[Benchmark]
             public ConcurrentDictionary<int, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<int, string>();
 
-                for (var i = 0; i < Size; i++)
+                for (var i = 0; i < Count; i++)
                     map.TryAdd(i, i.ToString());
 
                 return map;
@@ -217,6 +239,44 @@ namespace V2
                 Right = right;
                 Height = height;
             }
+        }
+
+        /// 
+        public ImMap<V> AddOrUpdate(int key, V value)
+        {
+            var mapKey = Key;
+
+            var b = this as Branch;
+            if (b == null) // means the leaf node
+            {
+                // update the leaf
+                if (mapKey == key)
+                    return new ImMap<V>(key, value);
+
+                return key < mapKey // search for node
+                    ? new Branch(mapKey, Value, new ImMap<V>(key, value), Empty, 2)
+                    : new Branch(mapKey, Value, Empty, new ImMap<V>(key, value), 2);
+            }
+
+            // the empty branch node
+            var height = b.Height;
+            if (height == 0)
+                return new ImMap<V>(key, value);
+
+            // update the branch key and value
+            var left = b.Left;
+            var right = b.Right;
+
+            if (mapKey == key)
+                return new Branch(key, value, left, right, height);
+
+            if (key < mapKey)
+                left = left.AddOrUpdate(key, value);
+            else
+                right = right.AddOrUpdate(key, value);
+
+            // Now balance!!!
+            return ImMap.Balance(mapKey, Value, left, right);
         }
 
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
@@ -492,7 +552,7 @@ namespace V2
             return Balance(mapKey, map.Value, left, right);
         }
 
-        private static ImMap<V> Balance<V>(int key, V value, ImMap<V> left, ImMap<V> right)
+        internal static ImMap<V> Balance<V>(int key, V value, ImMap<V> left, ImMap<V> right)
         {
             var lb = left as ImMap<V>.Branch;
             var rb = right as ImMap<V>.Branch;
