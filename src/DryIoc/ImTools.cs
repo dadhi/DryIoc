@@ -1216,7 +1216,8 @@ namespace ImTools
         public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
             AddOrUpdate(key.GetHashCode(), key, value, update);
 
-        /// Returns the previous value if updated
+        /// Returns the previous value if updated.
+        [MethodImpl((MethodImplOptions)256)]
         public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V updatedOldValue, Update<K, V> update) =>
             AddOrUpdate(key.GetHashCode(), key, value, update, out isUpdated, out updatedOldValue);
 
@@ -1376,16 +1377,24 @@ namespace ImTools
                     return CreateBranch(hash, key, newValue, Conflicts, Left, Right, Height);
                 }
 
+                if (Conflicts == null) // add only if updateOnly is false.
+                    return new ConflictsBranch(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right, Height);
                 return UpdateValueAndResolveConflicts(key, value, update, false, ref updated, ref oldValue);
             }
 
-            return hash < Hash
-                ? With(Left.AddOrUpdate(hash, key, value, update, out updated, out oldValue), Right)
-                : With(Left, Right.AddOrUpdate(hash, key, value, update, out updated, out oldValue));
+            if (hash < Hash)
+            {
+                var newLeft = Left.AddOrUpdate(hash, key, value, update, out updated, out oldValue);
+                return newLeft == Left ? this : Balance(Hash, Key, Value, Conflicts, newLeft, Right);
+            }
+            else
+            {
+                var newRight = Right.AddOrUpdate(hash, key, value, update, out updated, out oldValue);
+                return newRight == Right ? this : Balance(Hash, Key, Value, Conflicts, Left, newRight);
+            }
         }
 
-
-        /// <summary>It is fine</summary>
+        /// It is fine.
         public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update = null)
         {
             return Height == 0 ? this
@@ -1488,16 +1497,29 @@ namespace ImTools
             left == Left && right == Right ? this : Balance(Hash, Key, Value, Conflicts, left, right);
 
         private static ImHashMap<K, V> CreateBranch(int hash, K key, V value, KV<K, V>[] conflicts,
-            ImHashMap<K, V> left, ImHashMap<K, V> right) =>
-            conflicts == null
-                ? new Branch(hash, key, value, left, right)
-                : new ConflictsBranch(hash, key, value, conflicts, left, right);
+            ImHashMap<K, V> left, ImHashMap<K, V> right)
+        {
+            if (conflicts == null)
+            {
+                if (left == Empty && left == right)
+                    return new ImHashMap<K, V>(hash, key, value);
+                return new Branch(hash, key, value, left, right);
+            }
+
+            return new ConflictsBranch(hash, key, value, conflicts, left, right);
+        }
 
         private static ImHashMap<K, V> CreateBranch(int hash, K key, V value, KV<K, V>[] conflicts,
-            ImHashMap<K, V> left, ImHashMap<K, V> right, int height) =>
-            conflicts == null
-                ? new Branch(hash, key, value, left, right, height)
-                : new ConflictsBranch(hash, key, value, conflicts, left, right, height);
+            ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
+        {
+            if (conflicts == null)
+            {
+                if (height == 1)
+                    return new ImHashMap<K, V>(hash, key, value);
+                return new Branch(hash, key, value, left, right, height);
+            }
+            return new ConflictsBranch(hash, key, value, conflicts, left, right, height);
+        }
 
         private static ImHashMap<K, V> Balance(
             int hash, K key, V value, KV<K, V>[] conflicts,
@@ -1508,7 +1530,7 @@ namespace ImTools
             {
                 var leftLeft = left.Left;
                 var leftRight = left.Right;
-                if (leftRight.Height - leftLeft.Height == 1)
+                if (leftRight.Height > leftLeft.Height)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
@@ -1516,36 +1538,32 @@ namespace ImTools
                     // 1   4        2   3        1   3     6
                     //    3        1
                     return CreateBranch(leftRight.Hash, leftRight.Key, leftRight.Value, leftRight.Conflicts,
-                        left: CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts,
-                            left: leftLeft, right: leftRight.Left), right: CreateBranch(hash, key, value, conflicts,
-                            left: leftRight.Right, right: right));
+                        CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts, leftLeft, leftRight.Left),
+                        CreateBranch(hash, key, value, conflicts, leftRight.Right, right));
                 }
 
-                // todo: do we need this?
                 // one rotation:
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
                 return CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts,
-                    left: leftLeft, right: CreateBranch(hash, key, value, conflicts,
-                        left: leftRight, right: right));
+                    leftLeft, CreateBranch(hash, key, value, conflicts, leftRight, right));
             }
 
             if (delta < -1)
             {
                 var rightLeft = right.Left;
                 var rightRight = right.Right;
-                if (rightLeft.Height - rightRight.Height == 1)
+                if (rightLeft.Height > rightRight.Height)
                 {
                     return CreateBranch(rightLeft.Hash, rightLeft.Key, rightLeft.Value, rightLeft.Conflicts,
-                        left: CreateBranch(hash, key, value, conflicts, left: left, right: rightLeft.Left),
-                        right: CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts,
-                            left: rightLeft.Right, right: rightRight));
+                        CreateBranch(hash, key, value, conflicts, left, rightLeft.Left),
+                        CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts, rightLeft.Right, rightRight));
                 }
 
                 return CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts,
-                    left: CreateBranch(hash, key, value, conflicts, left: left, right: rightLeft),
-                    right: rightRight);
+                    CreateBranch(hash, key, value, conflicts, left, rightLeft),
+                    rightRight);
             }
 
             return CreateBranch(hash, key, value, conflicts, left, right);

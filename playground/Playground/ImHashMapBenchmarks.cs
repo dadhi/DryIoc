@@ -15,20 +15,29 @@ namespace Playground
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class Populate
         {
-            [Benchmark(Baseline = true)]
-            public ImHashMap<Type, string> AddOrUpdate_v1()
+            [Benchmark]
+            public ImHashMap<Type, string> AddOrUpdate()
             {
                 var map = ImHashMap<Type, string>.Empty;
 
                 foreach (var key in _keys)
-                    map = map.AddOrUpdate(key, "a");
+                    map = map.AddOrUpdate(key, "a", out _, out _, (type, _, v) => v);
 
-                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!!!");
-
-                return map;
+                return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _, (type, _, v) => v);
             }
 
-            [Benchmark]
+            //[Benchmark(Baseline = true)]
+            //public ImHashMap<Type, string> AddOrUpdate_original()
+            //{
+            //    var map = ImHashMap<Type, string>.Empty;
+
+            //    foreach (var key in _keys)
+            //        map = map.AddOrUpdate_original(key, "a", out _, out _, (type, _, v) => v);
+
+            //    return map.AddOrUpdate_original(typeof(ImHashMapBenchmarks), "!", out _, out _, (type, _, v) => v);
+            //}
+
+            //[Benchmark]
             public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<Type, string>();
