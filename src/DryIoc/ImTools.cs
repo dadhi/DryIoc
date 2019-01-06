@@ -1266,33 +1266,6 @@ namespace ImTools
         public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
             Update(key.GetHashCode(), key, value, update);
 
-        /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
-        /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
-        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public V GetValueOrDefault(K key, V defaultValue = default(V))
-        {
-            var map = this;
-            if (map != Empty)
-            {
-                var hash = key.GetHashCode();
-                do
-                {
-                    if (map.Hash == hash)
-                    {
-                        if (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
-                            return map.Value;
-                        return map.GetConflictedValueOrDefault(key, defaultValue);
-                    }
-
-                    var b = map as Branch;
-                    map = hash < map.Hash ? b?.LeftNode : b?.RightNode;
-                } while (map != null);
-            }
-
-            return defaultValue;
-        }
-
         /// <summary>Returns true if key is found and sets the value.</summary>
         /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
         /// <returns>True if key found, false otherwise.</returns>
@@ -1769,5 +1742,32 @@ namespace ImTools
         }
 
         #endregion
+    }
+
+    /// Map methods
+    public static class ImHashMap
+    {
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
+        {
+            if (map != ImHashMap<K, V>.Empty)
+            {
+                var hash = key.GetHashCode();
+                while (map != null)
+                {
+                    if (map.Hash == hash)
+                        return ReferenceEquals(key, map.Key) || key.Equals(map.Key)
+                            ? map.Value
+                            : map.GetConflictedValueOrDefault(key, defaultValue);
+
+                    var b = map as ImHashMap<K, V>.Branch;
+                    if (b == null)
+                        break;
+                    map = hash < map.Hash ? b.LeftNode : b.RightNode;
+                }
+            }
+            return defaultValue;
+        }
     }
 }

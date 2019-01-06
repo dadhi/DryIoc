@@ -68,6 +68,20 @@ namespace Playground
 
             private static readonly ImHashMap<Type, string> _map = AddOrUpdate();
 
+            public static V1.ImHashMap<Type, string> AddOrUpdate_v1()
+            {
+                var map = V1.ImHashMap<Type, string>.Empty;
+
+                foreach (var key in _keys)
+                    map = map.AddOrUpdate(key, "a");
+
+                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!!!");
+
+                return map;
+            }
+
+            private static readonly V1.ImHashMap<Type, string> _mapV1 = AddOrUpdate_v1();
+
             public static ConcurrentDictionary<Type, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<Type, string>();
@@ -91,23 +105,23 @@ namespace Playground
             //    return result;
             //}
 
-            [Benchmark(Baseline = true)]
+            //[Benchmark(Baseline = true)]
             public string TryFind_static()
             {
                 _map.TryFind(LookupKey, out var result);
                 return result;
             }
 
-            //[Benchmark]
-            //public string GetValueOrDefault_instance()
-            //{
-            //    return _map.GetValueOrDefault_old(LookupKey);
-            //}
-
-            [Benchmark]
-            public string GetValueOrDefault_static()
+            [Benchmark(Baseline = true)]
+            public string GetValueOrDefault()
             {
                 return _map.GetValueOrDefault(LookupKey);
+            }
+
+            [Benchmark]
+            public string GetValueOrDefault_v1()
+            {
+                return _mapV1.GetValueOrDefault(LookupKey);
             }
 
             //[Benchmark]
