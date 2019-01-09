@@ -1042,72 +1042,6 @@ namespace ImTools
             value = default(V);
             return false;
         }
-
-        /// Returns new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrUpdate_static<V>(this ImMap<V> map, int key, V value)
-        {
-            if (map.Height == 0)
-                return new ImMap<V>(key, value);
-
-            if (key == map.Key)
-                return new ImMap<V>(key, value, map.Left, map.Right, map.Height);
-
-            return key < map.Key
-                ? (map.Height == 1
-                    ? new ImMap<V>(map.Key, map.Value, new ImMap<V>(key, value), map.Right, height: 2)
-                    : Balance(map.Key, map.Value, map.Left.AddOrUpdate_static(key, value), map.Right))
-                : (map.Height == 1
-                    ? new ImMap<V>(map.Key, map.Value, map.Left, new ImMap<V>(key, value), height: 2)
-                    : Balance(map.Key, map.Value, map.Left, map.Right.AddOrUpdate_static(key, value)));
-        }
-
-        private static ImMap<V> Balance<V>(int key, V value, ImMap<V> left, ImMap<V> right)
-        {
-            var delta = left.Height - right.Height;
-            if (delta > 1) // left is longer by 2, rotate left
-            {
-                var leftLeft = left.Left;
-                var leftRight = left.Right;
-                if (leftRight.Height - leftLeft.Height == 1)
-                {
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
-                    return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        new ImMap<V>(left.Key, left.Value, leftLeft, leftRight.Left),
-                        new ImMap<V>(key, value, leftRight.Right, right));
-                }
-
-                // one rotation:
-                //      5     =>     2
-                //   2     6      1     5
-                // 1   4              4   6
-                return new ImMap<V>(left.Key, left.Value,
-                    leftLeft,
-                    new ImMap<V>(key, value, leftRight, right));
-            }
-
-            if (delta < -1)
-            {
-                var rightLeft = right.Left;
-                var rightRight = right.Right;
-                if (rightLeft.Height - rightRight.Height == 1)
-                {
-                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        new ImMap<V>(key, value, left, rightLeft.Left),
-                        new ImMap<V>(right.Key, right.Value, rightLeft.Right, rightRight));
-                }
-
-                return new ImMap<V>(right.Key, right.Value,
-                    new ImMap<V>(key, value, left, rightLeft),
-                    rightRight);
-            }
-
-            return new ImMap<V>(key, value, left, right);
-        }
     }
 
     /// Immutable http://en.wikipedia.org/wiki/AVL_tree 
@@ -1130,17 +1064,13 @@ namespace ImTools
         public readonly V Value;
 
         /// The height.
-        public int Height => GetHeight(this);
+        public int Height => this is Branch b ? b.BranchHeight : 1;
 
         /// Left branch.
         public ImHashMap<K, V> Left => (this as Branch)?.LeftNode;
 
         /// Right branch.
         public ImHashMap<K, V> Right => (this as Branch)?.RightNode;
-
-        /// Calculates the height of map tree. Need to be a method to accepts the null
-        [MethodImpl((MethodImplOptions)256)]
-        public static int GetHeight(ImHashMap<K, V> map) => map == null ? 0 : map is Branch b ? b.BranchHeight : 1;
 
         /// Conflicts
         public virtual KV<K, V>[] Conflicts => null;
@@ -1166,8 +1096,8 @@ namespace ImTools
             {
                 LeftNode = left;
                 RightNode = right;
-                var leftHeight = GetHeight(left);
-                var rightHeight = GetHeight(right);
+                var leftHeight = left == null ? 0 : left is Branch lb ? lb.BranchHeight : 1;
+                var rightHeight = right == null ? 0 : right is Branch rb ? rb.BranchHeight : 1;
                 BranchHeight = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
             }
 
@@ -1186,7 +1116,7 @@ namespace ImTools
             {
                 LeftNode = left;
                 RightNode = right;
-                var rightHeight = GetHeight(right);
+                var rightHeight = right == null ? 0 : right is Branch rb ? rb.BranchHeight : 1;
                 BranchHeight = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
             }
 
@@ -1196,7 +1126,7 @@ namespace ImTools
             {
                 LeftNode = left;
                 RightNode = right;
-                var leftHeight = GetHeight(left);
+                var leftHeight = left == null ? 0 : left is Branch lb ? lb.BranchHeight : 1;
                 BranchHeight = leftHeight > rightHeight ? leftHeight + 1: rightHeight + 1;
             }
 
@@ -1207,6 +1137,20 @@ namespace ImTools
                 LeftNode = left;
                 RightNode = right;
                 BranchHeight = height;
+            }
+        }
+
+        /// Branch with the conflicts
+        public sealed class ConflictsLeaf : ImHashMap<K, V>
+        {
+            /// In case of Hash conflicts for different keys contains conflicted keys with their values.
+            public override KV<K, V>[] Conflicts { get; }
+
+            /// Creates the branch node
+            internal ConflictsLeaf(
+                int hash, K key, V value, KV<K, V>[] conflicts) : base(hash, key, value)
+            {
+                Conflicts = conflicts;
             }
         }
 
@@ -1239,6 +1183,7 @@ namespace ImTools
         /// If value with the same key is exist then the value is replaced.</summary>
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <returns>New tree with added or updated key-value.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
             AddOrUpdate(key.GetHashCode(), key, value);
 
@@ -1248,6 +1193,7 @@ namespace ImTools
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <param name="update">Update handler.</param>
         /// <returns>New tree with added or updated key-value.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
             AddOrUpdate(key.GetHashCode(), key, value, update);
 
@@ -1288,8 +1234,8 @@ namespace ImTools
                         return map.TryFindConflictedValue(key, out value);
                     }
 
-                    var b = map as Branch;
-                    map = hash < map.Hash ? b?.LeftNode : b?.RightNode;
+                    var br = map as Branch;
+                    map = hash < map.Hash ? br?.LeftNode : br?.RightNode;
                 } while (map != null);
             }
 
@@ -1306,11 +1252,12 @@ namespace ImTools
                 yield break;
 
             var node = this;
-            var parents = new ImHashMap<K, V>[GetHeight(node)];
+            var height = node is Branch b ? b.BranchHeight : 1;
+            var parents = new ImHashMap<K, V>[height];
             var parentCount = -1;
-            while (GetHeight(node) != 0 || parentCount != -1)
+            while (height != 0 || parentCount != -1)
             {
-                if (GetHeight(node) != 0)
+                if (height != 0)
                 {
                     parents[++parentCount] = node;
                     node = (node as Branch)?.LeftNode; // null is fine cause GetHeight handles the null
@@ -1320,15 +1267,15 @@ namespace ImTools
                     node = parents[parentCount--];
                     yield return new KV<K, V>(node.Key, node.Value);
 
-                    if (node is ConflictsBranch conflictNode)
-                    {
-                        var conflicts = conflictNode.Conflicts;
+                    var conflicts = node.Conflicts;
+                    if (conflicts != null)
                         for (var i = 0; i < conflicts.Length; i++)
                             yield return conflicts[i];
-                    }
 
                     node = (node as Branch)?.RightNode;
                 }
+
+                height = node == null ? 0 : node is Branch br ? br.BranchHeight : 1;
             }
         }
 
@@ -1336,6 +1283,7 @@ namespace ImTools
         /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
         /// <param name="key">Key to look for.</param> 
         /// <returns>New tree with removed or updated value.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImHashMap<K, V> Remove(K key) =>
             Remove(key.GetHashCode(), key);
 
@@ -1355,59 +1303,24 @@ namespace ImTools
         }
 
         /// It is fine
-        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value)
+        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update = null)
         {
-            var height = GetHeight(this);
+            var height = this is Branch b ? b.BranchHeight : 1;
             if (height == 0)
                 return new ImHashMap<K, V>(hash, key, value);
 
             var branch = this as Branch;
             if (hash == Hash)
-                return ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? CreateBranch(hash, key, value, Conflicts, branch?.LeftNode, branch?.RightNode, height)
-                    : UpdateValueAndResolveConflicts(key, value, null, false);
-
-            if (hash < Hash)
             {
-                if (height == 1)
-                    return CreateBranch(Hash, Key, Value, Conflicts,
-                        new ImHashMap<K, V>(hash, key, value), null, height: 2);
-
-                if (branch?.LeftNode == null)
-                    return CreateBranch(Hash, Key, Value, Conflicts,
-                        new ImHashMap<K, V>(hash, key, value), branch?.RightNode, height: 2);
-
-                return Balance(Hash, Key, Value, Conflicts,
-                    branch.LeftNode?.AddOrUpdate(hash, key, value), branch.RightNode);
+                if (ReferenceEquals(Key, key) || Key.Equals(key))
+                    return CreateNode(hash, key, update == null ? value : update(Value, value),
+                        Conflicts, branch?.LeftNode, branch?.RightNode, height);
+                return UpdateValueAndResolveConflicts(key, value, update, false);
             }
 
-            if (height == 1)
-                return CreateBranch(Hash, Key, Value, Conflicts,
-                    branch?.LeftNode, new ImHashMap<K, V>(hash, key, value), height: 2);
-
-            return Balance(Hash, Key, Value, Conflicts,
-                branch?.LeftNode, 
-                branch?.RightNode?.AddOrUpdate(hash, key, value) ?? new ImHashMap<K, V>(hash, key, value));
-        }
-
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update)
-        {
-            var height = GetHeight(this);
-            if (height == 0)
-                return new ImHashMap<K, V>(hash, key, value);
-
-            var branch = this as Branch;
-            if (hash == Hash)
-                return ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? CreateBranch(hash, key, update(Value, value), Conflicts, branch?.LeftNode, branch?.RightNode,
-                        height)
-                    : UpdateValueAndResolveConflicts(key, value, update, false);
-
             return hash < Hash
-                ? With(branch?.LeftNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value), 
-                    branch?.RightNode)
-                : With(branch?.LeftNode, 
-                    branch?.RightNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value));
+                ? With(branch?.LeftNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value), branch?.RightNode)
+                : With(branch?.LeftNode, branch?.RightNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value));
         }
 
         private ImHashMap<K, V> AddOrUpdate(
@@ -1416,11 +1329,11 @@ namespace ImTools
             updated = false;
             oldValue = default(V);
 
-            var height = GetHeight(this);
+            var branch = this as Branch;
+            var height = branch?.BranchHeight ?? 1;
             if (height == 0)
                 return new ImHashMap<K, V>(hash, key, value);
 
-            var branch = this as Branch;
             if (hash == Hash)
             {
                 if (ReferenceEquals(Key, key) || Key.Equals(key))
@@ -1431,11 +1344,11 @@ namespace ImTools
 
                     updated = true;
                     oldValue = Value;
-                    return CreateBranch(hash, key, newValue, Conflicts, branch?.LeftNode, branch?.RightNode, height);
+                    return CreateNode(hash, key, newValue, Conflicts, branch?.LeftNode, branch?.RightNode, height);
                 }
 
                 if (Conflicts == null) // add only if updateOnly is false.
-                    return new ConflictsBranch(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
+                    return CreateConflictsNode(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
                         branch?.LeftNode, branch?.RightNode, height);
 
                 return UpdateValueAndResolveConflicts(key, value, update, false, ref updated, ref oldValue);
@@ -1458,14 +1371,14 @@ namespace ImTools
         /// It is fine.
         public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update = null)
         {
-            var height = GetHeight(this);
+            var branch = this as Branch;
+            var height = branch?.BranchHeight ?? 1;
             if (height == 0)
                 return this;
 
-            var branch = this as Branch;
             return hash == Hash
                 ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? CreateBranch(hash, key, update == null ? value : update(Value, value), Conflicts,
+                    ? CreateNode(hash, key, update == null ? value : update(Value, value), Conflicts,
                         branch?.LeftNode, branch?.RightNode, height)
                     : UpdateValueAndResolveConflicts(key, value, update, true))
                 : (hash < Hash
@@ -1475,10 +1388,15 @@ namespace ImTools
 
         private ImHashMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
         {
+            var br = this as Branch;
+            var height = br?.BranchHeight ?? 1;
             if (Conflicts == null) // add only if updateOnly is false.
-                return updateOnly ? this
-                    : new ConflictsBranch(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, 
-                        (this as Branch)?.LeftNode, (this as Branch)?.RightNode, GetHeight(this));
+            {
+                if (updateOnly)
+                    return this;
+                return CreateConflictsNode(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
+                    br?.LeftNode, br?.RightNode, height);
+            }
 
             var found = Conflicts.Length - 1;
             while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
@@ -1489,24 +1407,29 @@ namespace ImTools
                 var newConflicts = new KV<K, V>[Conflicts.Length + 1];
                 Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
                 newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-                return new ConflictsBranch(Hash, Key, Value, newConflicts,
-                    (this as Branch)?.LeftNode, (this as Branch)?.RightNode, GetHeight(this));
+
+                return CreateConflictsNode(Hash, Key, Value, newConflicts, br?.LeftNode, br?.RightNode, height);
             }
 
             var conflicts = new KV<K, V>[Conflicts.Length];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
             conflicts[found] = new KV<K, V>(key, update == null ? value : update(Conflicts[found].Value, value));
-            return new ConflictsBranch(Hash, Key, Value, conflicts,
-                (this as Branch)?.LeftNode, (this as Branch)?.RightNode, GetHeight(this));
+
+            return CreateConflictsNode(Hash, Key, Value, conflicts, br?.LeftNode, br?.RightNode, height);
         }
 
         private ImHashMap<K, V> UpdateValueAndResolveConflicts(
             K key, V value, Update<K, V> update, bool updateOnly, ref bool updated, ref V oldValue)
         {
+            var br = this as Branch;
+            var height = br?.BranchHeight ?? 1;
             if (Conflicts == null) // add only if updateOnly is false.
-                return updateOnly ? this
-                    : new ConflictsBranch(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
-                        (this as Branch)?.LeftNode, (this as Branch)?.RightNode, GetHeight(this));
+            {
+                if (updateOnly)
+                    return this;
+                return CreateConflictsNode(Hash, Key, Value, new[] {new KV<K, V>(key, value)},
+                    br?.LeftNode, br?.RightNode, height);
+            }
 
             var found = Conflicts.Length - 1;
             while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
@@ -1514,11 +1437,12 @@ namespace ImTools
             {
                 if (updateOnly)
                     return this;
+
                 var newConflicts = new KV<K, V>[Conflicts.Length + 1];
                 Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
                 newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-                return new ConflictsBranch(Hash, Key, Value, newConflicts,
-                    (this as Branch)?.LeftNode, (this as Branch)?.RightNode, GetHeight(this));
+
+                return CreateConflictsNode(Hash, Key, Value, newConflicts, br?.LeftNode, br?.RightNode, height);
             }
 
             var conflicts = new KV<K, V>[Conflicts.Length];
@@ -1538,8 +1462,7 @@ namespace ImTools
                 conflicts[found] = new KV<K, V>(key, newValue);
             }
 
-            return new ConflictsBranch(Hash, Key, Value, conflicts,
-                (this as Branch)?.LeftNode, (this as Branch)?.RightNode, GetHeight(this));
+            return CreateConflictsNode(Hash, Key, Value, conflicts, br?.LeftNode, br?.RightNode, height);
         }
 
         /// It is fine.
@@ -1575,89 +1498,110 @@ namespace ImTools
         private ImHashMap<K, V> With(ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
             var branch = this as Branch;
-            return left == branch?.LeftNode && right == branch?.RightNode
-                ? this
-                : Balance(Hash, Key, Value, Conflicts, left, right);
+            if (left == branch?.LeftNode && right == branch?.RightNode)
+                return this;
+            return Balance(Hash, Key, Value, Conflicts, left, right);
         }
 
-        private static ImHashMap<K, V> CreateBranch(int hash, K key, V value, KV<K, V>[] conflicts,
+        private static ImHashMap<K, V> CreateNode(int hash, K key, V value, KV<K, V>[] conflicts,
             ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
-            if (conflicts == null)
-            {
-                if (left == null && right == null)
-                    return new ImHashMap<K, V>(hash, key, value);
-                return new Branch(hash, key, value, left, right);
-            }
-
-            return new ConflictsBranch(hash, key, value, conflicts, left, right);
+            if (left == null && right == null)
+                return conflicts == null 
+                    ? new ImHashMap<K, V>(hash, key, value)
+                    : new ConflictsLeaf(hash, key, value, conflicts);
+            return conflicts == null
+                ? new Branch(hash, key, value, left, right)
+                : new ConflictsBranch(hash, key, value, conflicts, left, right);
         }
 
-        private static ImHashMap<K, V> CreateBranch(int hash, K key, V value, KV<K, V>[] conflicts,
+        private static ImHashMap<K, V> CreateNode(int hash, K key, V value, KV<K, V>[] conflicts,
             ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
         {
-            if (conflicts == null)
-            {
-                if (height == 1)
-                    return new ImHashMap<K, V>(hash, key, value);
-                return new Branch(hash, key, value, left, right, height);
-            }
-            return new ConflictsBranch(hash, key, value, conflicts, left, right, height);
+            if (height == 1)
+                return conflicts == null
+                    ? new ImHashMap<K, V>(hash, key, value)
+                    : new ConflictsLeaf(hash, key, value, conflicts);
+            return conflicts == null
+                ? new Branch(hash, key, value, left, right, height)
+                : new ConflictsBranch(hash, key, value, conflicts, left, right, height);
         }
 
+        [MethodImpl((MethodImplOptions)256)]
+        private static ImHashMap<K, V> CreateNode(int hash, K key, V value,
+            ImHashMap<K, V> left, ImHashMap<K, V> right, int height) =>
+            height == 1
+                ? new ImHashMap<K, V>(hash, key, value)
+                : new Branch(hash, key, value, left, right, height);
+
+        [MethodImpl((MethodImplOptions)256)]
+        private static ImHashMap<K, V> CreateConflictsNode(int hash, K key, V value, KV<K, V>[] conflicts,
+            ImHashMap<K, V> left, ImHashMap<K, V> right, int height) =>
+            height == 1
+                ? (ImHashMap<K, V>)new ConflictsLeaf(hash, key, value, conflicts)
+                : new ConflictsBranch(hash, key, value, conflicts, left, right, height);
+
         private static ImHashMap<K, V> Balance(
-            int hash, K key, V value, KV<K, V>[] conflicts,
-            ImHashMap<K, V> left, ImHashMap<K, V> right)
+            int hash, K key, V value, KV<K, V>[] conflicts, ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
-            var delta = GetHeight(left) - GetHeight(right);
+            var leftBranch = left as Branch;
+            var leftHeight = left == null ? 0 : leftBranch?.BranchHeight ?? 1;
+
+            var rightBranch = right as Branch;
+            var rightHeight = right == null ? 0 : rightBranch?.BranchHeight ?? 1;
+
+            var delta = leftHeight - rightHeight;
             if (delta > 1) // left is longer by 2, rotate left
             {
-                var leftBranch = left as Branch;
                 var leftLeft = leftBranch?.LeftNode;
                 var leftRight = leftBranch?.RightNode;
-                if (GetHeight(leftRight) > GetHeight(leftLeft))
+                var leftRightHeight = leftRight == null ? 0 : leftRight is Branch lrb ? lrb.BranchHeight : 1;
+                var leftLeftRight = leftLeft == null ? 0 : leftLeft is Branch llb ? llb.BranchHeight : 1;
+                if (leftRightHeight > leftLeftRight)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
                     //   2     6      4     6      2     5
                     // 1   4        2   3        1   3     6
                     //    3        1
-                    return CreateBranch(leftRight.Hash, leftRight.Key, leftRight.Value, leftRight.Conflicts,
-                        CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts, leftLeft, (leftRight as Branch)?.LeftNode),
-                        CreateBranch(hash, key, value, conflicts, (leftRight as Branch)?.RightNode, right));
+                    return CreateNode(leftRight.Hash, leftRight.Key, leftRight.Value, leftRight.Conflicts,
+                        CreateNode(left.Hash, left.Key, left.Value, left.Conflicts, leftLeft, (leftRight as Branch)?.LeftNode),
+                        CreateNode(hash, key, value, conflicts, (leftRight as Branch)?.RightNode, right));
                 }
 
                 // one rotation:
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts,
-                    leftLeft, CreateBranch(hash, key, value, conflicts, leftRight, right));
+                return CreateNode(left.Hash, left.Key, left.Value, left.Conflicts,
+                    leftLeft, CreateNode(hash, key, value, conflicts, leftRight, right));
             }
 
             if (delta < -1)
             {
-                var rightBranch = right as Branch;
                 var rightLeft = rightBranch?.LeftNode;
                 var rightRight = rightBranch?.RightNode;
-                if (GetHeight(rightLeft) > GetHeight(rightRight))
+                var rightLeftHeight = rightLeft == null ? 0 : rightLeft is Branch rlb ? rlb.BranchHeight : 1;
+                var rightRightHeight = rightRight == null ? 0 : rightRight is Branch rrb ? rrb.BranchHeight : 1;
+                if (rightLeftHeight > rightRightHeight)
                 {
-                    return CreateBranch(rightLeft.Hash, rightLeft.Key, rightLeft.Value, rightLeft.Conflicts,
-                        CreateBranch(hash, key, value, conflicts, left, (rightLeft as Branch)?.LeftNode),
-                        CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts, (rightLeft as Branch)?.RightNode, rightRight));
+                    return CreateNode(rightLeft.Hash, rightLeft.Key, rightLeft.Value, rightLeft.Conflicts,
+                        CreateNode(hash, key, value, conflicts, left, (rightLeft as Branch)?.LeftNode),
+                        CreateNode(right.Hash, right.Key, right.Value, right.Conflicts, (rightLeft as Branch)?.RightNode, rightRight));
                 }
 
-                return CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts,
-                    CreateBranch(hash, key, value, conflicts, left, rightLeft),
+                return CreateNode(right.Hash, right.Key, right.Value, right.Conflicts,
+                    CreateNode(hash, key, value, conflicts, left, rightLeft),
                     rightRight);
             }
 
-            return CreateBranch(hash, key, value, conflicts, left, right);
+            return CreateNode(hash, key, value, conflicts, left, right);
         }
 
         internal ImHashMap<K, V> Remove(int hash, K key, bool ignoreKey = false)
         {
-            var height = GetHeight(this);
+            var branch = this as Branch;
+            var height = branch?.BranchHeight ?? 1;
             if (height == 0)
                 return this;
 
@@ -1672,11 +1616,10 @@ namespace ImTools
                     if (height == 1) // remove node
                         return Empty;
 
-                    var branch = this as Branch;
                     if (branch?.RightNode == null)
                         result = branch?.LeftNode;
-                    else if (branch?.LeftNode == null)
-                        result = branch?.RightNode;
+                    else if (branch.LeftNode == null)
+                        result = branch.RightNode;
                     else
                     {
                         // we have two children, so remove the next highest node and replace this node with it.
@@ -1684,7 +1627,7 @@ namespace ImTools
                         while ((successor as Branch)?.LeftNode != null)
                             successor = (successor as Branch)?.LeftNode;
 
-                        result = CreateBranch(
+                        result = CreateNode(
                             successor.Hash, successor.Key, successor.Value, successor.Conflicts,
                             (successor as Branch)?.LeftNode, 
                             (successor as Branch)?.RightNode.Remove(successor.Hash, default(K), ignoreKey: true));
@@ -1697,12 +1640,10 @@ namespace ImTools
             }
             else if (hash < Hash)
             {
-                var branch = this as Branch;
                 result = Balance(Hash, Key, Value, Conflicts, branch?.LeftNode.Remove(hash, key, ignoreKey), branch?.RightNode);
             }
             else
             {
-                var branch = this as Branch;
                 result = Balance(Hash, Key, Value, Conflicts, branch?.LeftNode, branch?.RightNode.Remove(hash, key, ignoreKey));
             }
 
@@ -1716,29 +1657,29 @@ namespace ImTools
             if (index == -1) // key is not found in conflicts - just return
                 return this;
 
-            var height = GetHeight(this);
             var branch = this as Branch;
+            var height = branch?.BranchHeight ?? 1;
             if (Conflicts.Length == 1)
-                return new Branch(Hash, Key, Value, branch?.LeftNode, branch?.RightNode, height);
+                return CreateNode(Hash, Key, Value, branch?.LeftNode, branch?.RightNode, height);
 
             var lessConflicts = new KV<K, V>[Conflicts.Length - 1];
             var newIndex = 0;
             for (var i = 0; i < Conflicts.Length; ++i)
                 if (i != index) lessConflicts[newIndex++] = Conflicts[i];
-            return new ConflictsBranch(Hash, Key, Value, lessConflicts, branch?.LeftNode, branch?.RightNode, height);
+            return CreateConflictsNode(Hash, Key, Value, lessConflicts, branch?.LeftNode, branch?.RightNode, height);
         }
 
         private ImHashMap<K, V> ReplaceRemovedWithConflicted()
         {
-            var height = GetHeight(this);
             var branch = this as Branch;
+            var height = branch?.BranchHeight ?? 1;
 
             if (Conflicts.Length == 1)
-                return new Branch(Hash, Conflicts[0].Key, Conflicts[0].Value, branch?.LeftNode, branch?.RightNode, height);
+                return CreateNode(Hash, Conflicts[0].Key, Conflicts[0].Value, branch?.LeftNode, branch?.RightNode, height);
 
             var lessConflicts = new KV<K, V>[Conflicts.Length - 1];
             Array.Copy(Conflicts, 1, lessConflicts, 0, lessConflicts.Length);
-            return new ConflictsBranch(Hash, Conflicts[0].Key, Conflicts[0].Value, lessConflicts, branch?.LeftNode, branch?.RightNode, height);
+            return CreateConflictsNode(Hash, Conflicts[0].Key, Conflicts[0].Value, lessConflicts, branch?.LeftNode, branch?.RightNode, height);
         }
 
         #endregion
@@ -1762,9 +1703,7 @@ namespace ImTools
                             : map.GetConflictedValueOrDefault(key, defaultValue);
 
                     var b = map as ImHashMap<K, V>.Branch;
-                    if (b == null)
-                        break;
-                    map = hash < map.Hash ? b.LeftNode : b.RightNode;
+                    map = hash < map.Hash ? b?.LeftNode : b?.RightNode;
                 }
             }
             return defaultValue;

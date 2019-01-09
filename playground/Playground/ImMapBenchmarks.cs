@@ -24,17 +24,6 @@ namespace Playground
                 return map;
             }
 
-            [Benchmark]
-            public ImMap<string> AddOrUpdate_static()
-            {
-                var map = ImMap<string>.Empty;
-
-                for (var i = 0; i < Count; i++)
-                    map = map.AddOrUpdate_static(i, "a");
-
-                return map;
-            }
-
             //[Benchmark]
             public V2.ImMap<string> AddOrUpdate_v2()
             {
