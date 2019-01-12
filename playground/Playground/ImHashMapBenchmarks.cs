@@ -61,7 +61,7 @@ namespace Playground
                 foreach (var key in _keys)
                     map = map.AddOrUpdate(key, "a");
 
-                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!!!");
+                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
 
                 return map;
             }
@@ -75,7 +75,7 @@ namespace Playground
                 foreach (var key in _keys)
                     map = map.AddOrUpdate(key, "a");
 
-                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!!!");
+                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
 
                 return map;
             }
@@ -98,27 +98,27 @@ namespace Playground
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
-            //[Benchmark]
-            //public string TryFind_instance()
-            //{
-            //    _map.TryFind_old(LookupKey, out var result);
-            //    return result;
-            //}
-
-            //[Benchmark(Baseline = true)]
-            public string TryFind_static()
+            [Benchmark(Baseline = true)]
+            public string TryFind()
             {
                 _map.TryFind(LookupKey, out var result);
                 return result;
             }
 
-            [Benchmark(Baseline = true)]
+            [Benchmark]
+            public string TryFind_v1()
+            {
+                _mapV1.TryFind(LookupKey, out var result);
+                return result;
+            }
+
+            //[Benchmark(Baseline = true)]
             public string GetValueOrDefault()
             {
                 return _map.GetValueOrDefault(LookupKey);
             }
 
-            [Benchmark]
+            //[Benchmark]
             public string GetValueOrDefault_v1()
             {
                 return _mapV1.GetValueOrDefault(LookupKey);

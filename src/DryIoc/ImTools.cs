@@ -1222,37 +1222,6 @@ namespace ImTools
         public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
             Update(key.GetHashCode(), key, value, update);
 
-        /// <summary>Returns true if key is found and sets the value.</summary>
-        /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
-        /// <returns>True if key found, false otherwise.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public bool TryFind(K key, out V value)
-        {
-            var map = this;
-            if (map != Empty)
-            {
-                var hash = key.GetHashCode();
-                do
-                {
-                    if (map.Hash == hash)
-                    {
-                        if (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
-                        {
-                            value = map.Value;
-                            return true;
-                        }
-                        return map.TryFindConflictedValue(key, out value);
-                    }
-
-                    var br = map as Branch;
-                    map = hash < map.Hash ? br?.LeftNode : br?.RightNode;
-                } while (map != null);
-            }
-
-            value = default(V);
-            return false;
-        }
-
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
         /// <returns>Sequence of enumerated key value pairs.</returns>
@@ -1492,7 +1461,8 @@ namespace ImTools
             return defaultValue;
         }
 
-        private bool TryFindConflictedValue(K key, out V value)
+        /// It is fine.
+        internal bool TryFindConflictedValue(K key, out V value)
         {
             if (Conflicts != null)
             {
@@ -1749,21 +1719,46 @@ namespace ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
         {
-            if (map != ImHashMap<K, V>.Empty)
+            var hash = key.GetHashCode();
+            while (map != null)
             {
-                var hash = key.GetHashCode();
-                while (map != null)
-                {
-                    if (map.Hash == hash)
-                        return ReferenceEquals(key, map.Key) || key.Equals(map.Key)
-                            ? map.Value
-                            : map.GetConflictedValueOrDefault(key, defaultValue);
+                if (map.Hash == hash)
+                    return ReferenceEquals(key, map.Key) || key.Equals(map.Key)
+                        ? map.Value
+                        : map.GetConflictedValueOrDefault(key, defaultValue);
 
-                    var b = map as ImHashMap<K, V>.Branch;
-                    map = hash < map.Hash ? b?.LeftNode : b?.RightNode;
-                }
+                map = hash < map.Hash 
+                    ? (map as ImHashMap<K, V>.Branch)?.LeftNode 
+                    : (map as ImHashMap<K, V>.Branch)?.RightNode;
             }
+
             return defaultValue;
+        }
+
+        /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
+        {
+            var hash = key.GetHashCode();
+            while (map != null)
+            {
+                if (map.Hash == hash)
+                {
+                    if (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
+                    {
+                        value = map.Value;
+                        return true;
+                    }
+                    return map.TryFindConflictedValue(key, out value);
+                }
+
+                map = hash < map.Hash 
+                    ? (map as ImHashMap<K, V>.Branch)?.LeftNode 
+                    : (map as ImHashMap<K, V>.Branch)?.RightNode;
+            }
+
+            value = default(V);
+            return false;
         }
     }
 }

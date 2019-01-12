@@ -318,6 +318,12 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
  BmarkMicrosoftDependencyInjection | 4.599 us | 0.0165 us | 0.0147 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 4.773 us | 0.0284 us | 0.0252 us |  1.04 |      1.0300 |           - |           - |             4.76 KB |
 
+## 11.01.2019: Optimized ImHashMap without virtual methods
+
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc | 4.679 us | 0.0465 us | 0.0435 us |  0.99 |      1.0300 |           - |           - |             4.76 KB |
+ BmarkMicrosoftDependencyInjection | 4.736 us | 0.0236 us | 0.0221 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
 */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
