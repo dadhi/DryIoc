@@ -1298,7 +1298,7 @@ namespace ImTools
                 : With(branch?.LeftNode, branch?.RightNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value));
         }
 
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V updatedOldValue)
+        private ImHashMap<K, V> AddOrUpdate_old(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V updatedOldValue)
         {
             var branch = this as Branch;
             if (hash == Hash)
@@ -1348,6 +1348,190 @@ namespace ImTools
 
                 var newRight = oldRight.AddOrUpdate(hash, key, value, update, ref isUpdated, ref updatedOldValue);
                 return newRight == oldRight ? this : Balance(Hash, Key, Value, Conflicts, branch.LeftNode, newRight);
+            }
+        }
+
+        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V updatedOldValue)
+        {
+            var branch = this as Branch;
+            if (hash == Hash)
+            {
+                if (ReferenceEquals(Key, key) || Key.Equals(key))
+                {
+                    var newValue = update(Key, Value, value);
+                    if (ReferenceEquals(newValue, Value) || newValue?.Equals(Value) == true)
+                        return this;
+
+                    isUpdated = true;
+                    updatedOldValue = Value;
+                    return branch == null
+                        ? CreateLeaf(hash, key, newValue, Conflicts)
+                        : CreateBranch(hash, key, newValue, Conflicts, branch.LeftNode, branch.RightNode, branch.BranchHeight);
+                }
+
+                if (Conflicts == null) // add only if updateOnly is false.
+                    return branch == null
+                        ? (ImHashMap<K, V>)new ConflictsLeaf(Hash, Key, Value, new[] { new KV<K, V>(key, value) })
+                        : new ConflictsBranch(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
+                            branch.LeftNode, branch.RightNode, branch.BranchHeight);
+
+                return UpdateValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref updatedOldValue);
+            }
+
+            if (hash < Hash)
+            {
+                if (branch == null)
+                    return CreateBranch(Hash, Key, Value, Conflicts, new ImHashMap<K, V>(hash, key, value), null, 2);
+
+                var oldLeft = branch.LeftNode;
+                if (oldLeft == null)
+                    return CreateBranch(Hash, Key, Value, Conflicts, new ImHashMap<K, V>(hash, key, value), branch.RightNode, branch.BranchHeight);
+
+                var left = oldLeft.AddOrUpdate(hash, key, value, update, ref isUpdated, ref updatedOldValue);
+                if (left == oldLeft)
+                    return this;
+
+                if (isUpdated)
+                    return CreateBranch(Hash, Key, Value, Conflicts, left, branch.RightNode, branch.BranchHeight);
+
+                var leftBranch = left as Branch;
+                var right = branch.RightNode;
+                if (right == null && leftBranch != null)
+                {
+                    // double rotation
+                    //      5     =>    5     =>    4
+                    //   2           4           2     5
+                    //    4         2
+                    // ReSharper disable once PossibleNullReferenceException
+                    if (leftBranch.LeftNode == null)
+                    {
+                        // leftRight is really a new added key value and no conflicts,
+                        // cause it was not here before, otherwise the tree was not balanced.
+                        return new Branch(hash, key, value,
+                            CreateLeaf(left.Hash, left.Key, left.Value, left.Conflicts), 
+                            CreateLeaf(Hash, Key, Value, Conflicts), 2);
+                    }
+
+                    // one rotation:
+                    //      5     =>     2
+                    //   2            1     5
+                    // 1
+                    return CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts,
+                        new ImHashMap<K, V>(hash, key, value),
+                        CreateLeaf(Hash, Key, Value, Conflicts), 2);
+                }
+
+                var rightBranch = right as Branch;
+                var rightHeight = rightBranch?.BranchHeight ?? 1;
+                var leftHeight = leftBranch?.BranchHeight ?? 1;
+                if (leftHeight - rightHeight <= 1)
+                    return CreateBranch(Hash, Key, Value, Conflicts, left, right,
+                        leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1);
+                
+                // Also means that left is branch and not the leaf
+                // ReSharper disable once PossibleNullReferenceException
+                var leftLeft = leftBranch.LeftNode;
+                var leftRight = leftBranch.RightNode;
+
+                var llb = leftLeft as Branch;
+                var lrb = leftRight as Branch;
+
+                // The left is at least have height >= 2 and assuming that it is balanced, it should not have `null` left or right
+                var leftLeftHeight = leftLeft == null ? 0 : llb?.BranchHeight ?? 1;
+                var leftRightHeight = leftRight == null ? 0 : lrb?.BranchHeight ?? 1;
+                if (leftRightHeight > leftLeftHeight)
+                {
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2     6      4     6      2     5
+                    // 1   4        2   3        1   3     6
+                    //    3        1
+                    // ReSharper disable once PossibleNullReferenceException
+                    return CreateBranch(leftRight.Hash, leftRight.Key, leftRight.Value, leftRight.Conflicts,
+                        CreateNode(left.Hash, left.Key, left.Value, left.Conflicts, leftLeft, lrb?.LeftNode),
+                        CreateNode(Hash, Key, Value, Conflicts, lrb?.RightNode, right));
+                }
+
+                // one rotation:
+                //      5     =>     2
+                //   2     6      1     5
+                // 1   4              4   6
+                var newRightHeight = leftRightHeight > rightHeight ? leftRightHeight + 1 : rightHeight + 1;
+                return CreateBranch(left.Hash, left.Key, left.Value, left.Conflicts,
+                    leftLeft, CreateNode(Hash, Key, Value, Conflicts, leftRight, right, newRightHeight),
+                    leftLeftHeight > newRightHeight ? leftLeftHeight + 1 : newRightHeight + 1);
+            }
+            else
+            {
+                if (branch == null)
+                    return CreateBranch(Hash, Key, Value, Conflicts, null, new ImHashMap<K, V>(hash, key, value), 2);
+
+                var oldRight = branch.RightNode;
+                if (oldRight == null)
+                    return CreateBranch(Hash, Key, Value, Conflicts, branch.LeftNode, new ImHashMap<K, V>(hash, key, value), branch.BranchHeight);
+
+                var right = oldRight.AddOrUpdate(hash, key, value, update, ref isUpdated, ref updatedOldValue);
+                if (right == oldRight)
+                    return this;
+
+                if (isUpdated)
+                    return CreateBranch(Hash, Key, Value, Conflicts, branch.LeftNode, right, branch.BranchHeight);
+
+                var rightBranch = right as Branch;
+                var left = branch.LeftNode;
+                if (left == null && rightBranch != null)
+                {
+                    // double rotation
+                    //      5     =>    5     =>     6
+                    //         8          6        5   8
+                    //        6            8
+                    // ReSharper disable once PossibleNullReferenceException
+                    if (rightBranch.RightNode == null)
+                    {
+                        // leftRight is really a new added key value and no conflicts,
+                        // cause it was not here before, otherwise the tree was not balanced.
+                        return new Branch(hash, key, value,
+                            CreateLeaf(Hash, Key, Value, Conflicts),
+                            CreateLeaf(right.Hash, right.Key, right.Value, right.Conflicts), 2);
+                    }
+
+                    // one rotation:
+                    //      5     =>     6
+                    //        6        5   7
+                    //          7
+                    return CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts,
+                        CreateLeaf(Hash, Key, Value, Conflicts), 
+                        new ImHashMap<K, V>(hash, key, value), 2);
+                }
+
+                var leftBranch = left as Branch;
+                var leftHeight = leftBranch?.BranchHeight ?? 1;
+                var rightHeight = rightBranch?.BranchHeight ?? 1;
+                if (rightHeight - leftHeight <= 1)
+                    return CreateBranch(Hash, Key, Value, Conflicts, left, right,
+                        leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1);
+
+                // ReSharper disable once PossibleNullReferenceException
+                var rightLeft = rightBranch.LeftNode;
+                var rightRight = rightBranch.RightNode;
+
+                var rlb = rightLeft as Branch;
+                var rrb = rightRight as Branch;
+
+                var rightLeftHeight = rightLeft == null ? 0 : rlb?.BranchHeight ?? 1;
+                var rightRightHeight = rightRight == null ? 0 : rrb?.BranchHeight ?? 1;
+                if (rightLeftHeight > rightRightHeight)
+                {
+                    // ReSharper disable once PossibleNullReferenceException
+                    return CreateBranch(rightLeft.Hash, rightLeft.Key, rightLeft.Value, rightLeft.Conflicts,
+                        CreateNode(Hash, Key, Value, Conflicts, left, rlb?.LeftNode),
+                        CreateNode(right.Hash, right.Key, right.Value, right.Conflicts, rlb?.RightNode, rightRight));
+                }
+
+                var newLeftHeight = leftHeight > rightLeftHeight ? leftHeight + 1 : rightLeftHeight + 1;
+                return CreateBranch(right.Hash, right.Key, right.Value, right.Conflicts,
+                    CreateNode(Hash, Key, Value, Conflicts, left, rightLeft, newLeftHeight), rightRight,
+                    newLeftHeight > rightRightHeight ? newLeftHeight + 1 : rightRightHeight + 1);
             }
         }
 
