@@ -15,6 +15,14 @@ namespace Playground
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class Populate
         {
+            /*
+
+                     Method |     Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+            --------------- |---------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                AddOrUpdate | 15.84 us | 0.1065 us | 0.0944 us |  1.00 |    0.00 |      7.3242 |           - |           - |            33.87 KB |
+             AddOrUpdate_v1 | 27.00 us | 0.1792 us | 0.1588 us |  1.71 |    0.02 |      7.7515 |           - |           - |            35.77 KB |
+             */
+
             [Benchmark(Baseline = true)]
             public ImHashMap<Type, string> AddOrUpdate()
             {
