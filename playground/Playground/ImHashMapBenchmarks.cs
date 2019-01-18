@@ -56,7 +56,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
   ImmutableDict |  1000 | 1,516,613.7 ns | 107,376.35 ns | 290,298.20 ns | 1,387,325.2 ns |  4.95 |    1.19 |    140.6250 |      1.9531 |           - |           648.02 KB |
             */
 
-            [Params(100)]
+            [Params(30, 150, 500)]
             public int Count;
 
             [Benchmark(Baseline = true)]
