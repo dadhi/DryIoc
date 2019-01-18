@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
@@ -133,20 +134,20 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
             public int LookupKey; 
 
             [Benchmark(Baseline = true)]
-            public string TryFind_new_static()
+            public string TryFind()
             {
                 _map.TryFind(LookupKey, out var result);
                 return result;
             }
 
-            [Benchmark]
+            //[Benchmark]
             public string TryFind_v2()
             {
                 V2.ImMap.TryFind(_mapV2, LookupKey, out var result);
                 return result;
             }
 
-            [Benchmark]
+            //[Benchmark]
             public string ConcurrentDict_TryGet()
             {
                 _dict.TryGetValue(LookupKey, out var result);

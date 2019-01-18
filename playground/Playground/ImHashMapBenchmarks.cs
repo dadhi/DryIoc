@@ -11,7 +11,7 @@ namespace Playground
 {
     public class ImHashMapBenchmarks
     {
-        private static readonly Type[] _keys = typeof(Dictionary<,>).Assembly.GetTypes().ToArray();
+        private static readonly Type[] _keys = typeof(Dictionary<,>).Assembly.GetTypes().Take(1000).ToArray();
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class Populate
@@ -56,7 +56,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
   ImmutableDict |  1000 | 1,516,613.7 ns | 107,376.35 ns | 290,298.20 ns | 1,387,325.2 ns |  4.95 |    1.19 |    140.6250 |      1.9531 |           - |           648.02 KB |
             */
 
-            [Params(10, 100, 1000)]
+            [Params(1000)]
             public int Count;
 
             [Benchmark(Baseline = true)]
@@ -65,9 +65,9 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 var map = ImHashMap<Type, string>.Empty;
 
                 foreach (var key in _keys.Take(Count))
-                    map = map.AddOrUpdate(key, "a", out _, out _, (type, _, v) => v);
+                    map = map.AddOrUpdate(key, "a", out _, out _);
 
-                return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _, (type, _, v) => v);
+                return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
             }
 
             [Benchmark]
@@ -81,7 +81,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
             }
 
-            [Benchmark]
+            //[Benchmark]
             public V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
@@ -92,7 +92,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _, (type, _, v) => v);
             }
 
-            [Benchmark]
+            //[Benchmark]
             public ImmutableDictionary<Type, string> ImmutableDict()
             {
                 var map = ImmutableDictionary<Type, string>.Empty;
@@ -103,7 +103,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.Add(typeof(ImHashMapBenchmarks), "!");
             }
 
-            [Benchmark]
+            //[Benchmark]
             public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<Type, string>();
@@ -134,7 +134,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             private static readonly ImHashMap<Type, string> _map = AddOrUpdate();
 
-            public static V2.ImHashMap<Type, string> AddOrUpdate_v1()
+            public static V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
 
@@ -146,7 +146,21 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private static readonly V2.ImHashMap<Type, string> _mapV1 = AddOrUpdate_v1();
+            private static readonly V2.ImHashMap<Type, string> _mapV2 = AddOrUpdate_v2();
+
+            public static V1.ImHashMap<Type, string> AddOrUpdate_v1()
+            {
+                var map = V1.ImHashMap<Type, string>.Empty;
+
+                foreach (var key in _keys)
+                    map = map.AddOrUpdate(key, "a");
+
+                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
+
+                return map;
+            }
+
+            private static readonly V1.ImHashMap<Type, string> _mapV1 = AddOrUpdate_v1();
 
             public static ConcurrentDictionary<Type, string> ConcurrentDict()
             {
@@ -164,31 +178,45 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
-            [Benchmark(Baseline = true)]
+            //[Benchmark(Baseline = true)]
             public string TryFind()
+            {
+                _map.TryFind<Type, string>(LookupKey, out var result);
+                return result;
+            }
+
+            //[Benchmark]
+            public string TryFindByRef()
             {
                 _map.TryFind(LookupKey, out var result);
                 return result;
             }
 
-            [Benchmark]
+            //[Benchmark]
             public string TryFind_v1()
             {
                 _mapV1.TryFind(LookupKey, out var result);
                 return result;
             }
 
-            //[Benchmark(Baseline = true)]
-            public string GetValueOrDefault()
+            //[Benchmark]
+            public string TryFind_v2()
             {
-                return _map.GetValueOrDefault(LookupKey);
+                _mapV2.TryFind(LookupKey, out var result);
+                return result;
             }
 
+            [Benchmark(Baseline = true)]
+            public string GetValueOrDefault() => _map.GetValueOrDefault<Type, string>(LookupKey);
+
+            [Benchmark]
+            public string GetValueOrDefault_ByType() => _map.GetValueOrDefault(LookupKey);
+
+            [Benchmark]
+            public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
+
             //[Benchmark]
-            public string GetValueOrDefault_v1()
-            {
-                return _mapV1.GetValueOrDefault(LookupKey);
-            }
+            public string GetValueOrDefault_v2() => _mapV2.GetValueOrDefault(LookupKey);
 
             //[Benchmark]
             public string ConcurrentDict_TryGet()

@@ -947,7 +947,7 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Enables de-duplication of service key by putting key into the pair with index. </summary>
     public sealed class ServiceKeyStore
     {
-        // Mapping of ServiceKey/ContractName to { ContractType, count }[]
+        /// Mapping of ServiceKey/ContractName to { ContractType, count }[]
         private readonly Ref<ImHashMap<object, KV<Type, int>[]>>
             _store = Ref.Of(ImHashMap<object, KV<Type, int>[]>.Empty);
 
@@ -958,7 +958,7 @@ namespace DryIoc.MefAttributedModel
         /// otherwise (for single or nu types) returns passed key as-is..</returns>
         public object EnsureUniqueServiceKey(Type serviceType, object serviceKey)
         {
-            _store.Swap(it => it
+            _store.Swap(x => x
                 .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
                   {
                       var newType = newTypes[0].Key;

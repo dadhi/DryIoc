@@ -1100,24 +1100,25 @@ namespace ImTools
             }
 
             /// Works on the branch
-            public Branch AddOrUpdateBranch(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V updatedOldValue)
+            public Branch AddOrUpdateBranch(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V oldValue)
             {
                 if (hash == Hash)
                 {
                     if (ReferenceEquals(Key, key) || Key.Equals(key))
                     {
-                        var newValue = update(Key, Value, value);
-                        if (ReferenceEquals(newValue, Value) || newValue?.Equals(Value) == true)
+                        if (update != null)
+                            value = update(Key, Value, value);
+                        if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
                             return this;
 
                         isUpdated = true;
-                        updatedOldValue = Value;
-                        return CreateBranch(hash, key, newValue, Conflicts, LeftNode, RightNode, BranchHeight);
+                        oldValue = Value;
+                        return CreateBranch(hash, key, value, Conflicts, LeftNode, RightNode, BranchHeight);
                     }
 
                     return Conflicts == null
                         ? new ConflictsBranch(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, LeftNode, RightNode, BranchHeight)
-                        : UpdateValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref updatedOldValue);
+                        : UpdateBranchValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref oldValue);
                 }
 
                 if (hash < Hash)
@@ -1135,20 +1136,21 @@ namespace ImTools
                         {
                             if (ReferenceEquals(left.Key, key) || left.Key.Equals(key))
                             {
-                                var newValue = update(left.Key, left.Value, value);
-                                if (ReferenceEquals(newValue, left.Value) || newValue?.Equals(left.Value) == true)
+                                if (update != null)
+                                    value = update(left.Key, left.Value, value);
+                                if (ReferenceEquals(value, left.Value) || value?.Equals(left.Value) == true)
                                     return this;
 
                                 isUpdated = true;
-                                updatedOldValue = left.Value;
+                                oldValue = left.Value;
                                 return CreateBranch(Hash, Key, Value, Conflicts,
-                                    CreateLeaf(hash, key, newValue, left.Conflicts), RightNode, BranchHeight);
+                                    CreateLeaf(hash, key, value, left.Conflicts), RightNode, BranchHeight);
                             }
 
                             return CreateBranch(Hash, Key, Value, Conflicts,
                                 left.Conflicts == null
                                     ? new ConflictsLeaf(left.Hash, left.Key, left.Value, new[] { new KV<K, V>(key, value) })
-                                    : left.UpdateValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref updatedOldValue),
+                                    : left.UpdateLeafValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref oldValue),
                                 RightNode, BranchHeight);
                         }
 
@@ -1184,7 +1186,7 @@ namespace ImTools
                     else
                     {
                         var oldLeftBranch = leftBranch;
-                        leftBranch = leftBranch.AddOrUpdateBranch(hash, key, value, update, ref isUpdated, ref updatedOldValue);
+                        leftBranch = leftBranch.AddOrUpdateBranch(hash, key, value, update, ref isUpdated, ref oldValue);
                         if (isUpdated)
                             return CreateBranch(Hash, Key, Value, Conflicts, leftBranch, RightNode, BranchHeight);
                         if (leftBranch == oldLeftBranch)
@@ -1243,20 +1245,21 @@ namespace ImTools
                         {
                             if (ReferenceEquals(right.Key, key) || right.Key.Equals(key))
                             {
-                                var newValue = update(right.Key, right.Value, value);
-                                if (ReferenceEquals(newValue, right.Value) || newValue?.Equals(right.Value) == true)
+                                if (update != null)
+                                    value = update(right.Key, right.Value, value);
+                                if (ReferenceEquals(value, right.Value) || value?.Equals(right.Value) == true)
                                     return this;
 
                                 isUpdated = true;
-                                updatedOldValue = right.Value;
+                                oldValue = right.Value;
                                 return CreateBranch(Hash, Key, Value, Conflicts,
-                                    LeftNode, CreateLeaf(hash, key, newValue, right.Conflicts), BranchHeight);
+                                    LeftNode, CreateLeaf(hash, key, value, right.Conflicts), BranchHeight);
                             }
 
                             return CreateBranch(Hash, Key, Value, Conflicts, LeftNode,
                                 right.Conflicts == null
                                     ? new ConflictsLeaf(right.Hash, right.Key, right.Value, new[] { new KV<K, V>(key, value) })
-                                    : right.UpdateValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref updatedOldValue),
+                                    : right.UpdateLeafValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref oldValue),
                                 BranchHeight);
                         }
 
@@ -1292,7 +1295,7 @@ namespace ImTools
                     else
                     {
                         var oldRightBranch = rightBranch;
-                        rightBranch = rightBranch.AddOrUpdateBranch(hash, key, value, update, ref isUpdated, ref updatedOldValue);
+                        rightBranch = rightBranch.AddOrUpdateBranch(hash, key, value, update, ref isUpdated, ref oldValue);
                         if (isUpdated)
                             return CreateBranch(Hash, Key, Value, Conflicts, LeftNode, rightBranch, BranchHeight);
                         if (rightBranch == oldRightBranch)
@@ -1327,8 +1330,8 @@ namespace ImTools
                 }
             }
 
-            private new Branch UpdateValueAndResolveConflicts(
-                K key, V value, Update<K, V> update, bool updateOnly, ref bool updated, ref V oldValue)
+            private Branch UpdateBranchValueAndResolveConflicts(
+                K key, V value, Update<K, V> update, bool updateOnly, ref bool isUpdated, ref V oldValue)
             {
                 if (Conflicts == null) // add only if updateOnly is false.
                     return updateOnly
@@ -1346,27 +1349,21 @@ namespace ImTools
                     var newConflicts = new KV<K, V>[Conflicts.Length + 1];
                     Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
                     newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-
                     return new ConflictsBranch(Hash, Key, Value, newConflicts, LeftNode, RightNode, BranchHeight);
                 }
 
                 var conflicts = new KV<K, V>[Conflicts.Length];
                 Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
 
-                if (update == null)
-                    conflicts[found] = new KV<K, V>(key, value);
-                else
-                {
-                    var conflict = conflicts[found];
-                    var newValue = update(conflict.Key, conflict.Value, value);
-                    if (ReferenceEquals(newValue, conflict.Value) || newValue?.Equals(conflict.Value) == true)
-                        return this;
+                var conflict = conflicts[found];
+                if (update != null)
+                    value = update(conflict.Key, conflict.Value, value);
+                if (ReferenceEquals(value, conflict.Value) || value?.Equals(conflict.Value) == true)
+                    return this;
 
-                    updated = true;
-                    oldValue = conflict.Value;
-                    conflicts[found] = new KV<K, V>(key, newValue);
-                }
-
+                isUpdated = true;
+                oldValue = conflict.Value;
+                conflicts[found] = new KV<K, V>(key, value);
                 return new ConflictsBranch(Hash, Key, Value, conflicts, LeftNode, RightNode, BranchHeight);
             }
         }
@@ -1406,10 +1403,16 @@ namespace ImTools
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <returns>New tree with added or updated key-value.</returns>
         [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
-            this == Empty
+        public ImHashMap<K, V> AddOrUpdate(K key, V value)
+        {
+            var isUpdated = false;
+            var oldValue = default(V);
+            return this == Empty
                 ? new ImHashMap<K, V>(key.GetHashCode(), key, value)
-                : AddOrUpdate(key.GetHashCode(), key, value);
+                : this is Branch branch
+                    ? branch.AddOrUpdateBranch(key.GetHashCode(), key, value, null, ref isUpdated, ref oldValue)
+                    : AddOrUpdateLeaf(key.GetHashCode(), key, value, null, ref isUpdated, ref oldValue);
+        }
 
         /// <summary>Returns new tree with added key-value. If value with the same key is exist, then
         /// if <paramref name="update"/> is not specified: then existing value will be replaced by <paramref name="value"/>;
@@ -1418,45 +1421,49 @@ namespace ImTools
         /// <param name="update">Update handler.</param>
         /// <returns>New tree with added or updated key-value.</returns>
         [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
-            this == Empty
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update)
+        {
+            var isUpdated = false;
+            var oldValue = default(V);
+            return this == Empty
                 ? new ImHashMap<K, V>(key.GetHashCode(), key, value)
-                : AddOrUpdate(key.GetHashCode(), key, value, update);
+                : this is Branch branch
+                    ? branch.AddOrUpdateBranch(key.GetHashCode(), key, value, (_, a, b) => update(a, b), ref isUpdated, ref oldValue)
+                    : AddOrUpdateLeaf(key.GetHashCode(), key, value, (_, old, x) => update(old, x), ref isUpdated, ref oldValue);
+        }
 
         /// Returns the previous value if updated.
         [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V updatedOldValue, Update<K, V> update)
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V oldValue, Update<K, V> update = null)
         {
             isUpdated = false;
-            updatedOldValue = default(V);
-            var hash = key.GetHashCode();
-            if (this == Empty)
-                return new ImHashMap<K, V>(hash, key, value);
-
-            var branch = this as Branch;
-            return branch == null
-                ? AddOrUpdateLeaf(hash, key, value, update, ref isUpdated, ref updatedOldValue)
-                : branch.AddOrUpdateBranch(hash, key, value, update, ref isUpdated, ref updatedOldValue);
+            oldValue = default(V);
+            return this == Empty
+                ? new ImHashMap<K, V>(key.GetHashCode(), key, value)
+                : this is Branch branch
+                    ? branch.AddOrUpdateBranch(key.GetHashCode(), key, value, update, ref isUpdated, ref oldValue)
+                    : AddOrUpdateLeaf(key.GetHashCode(), key, value, update, ref isUpdated, ref oldValue);
         }
 
-        private ImHashMap<K, V> AddOrUpdateLeaf(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V updatedOldValue)
+        private ImHashMap<K, V> AddOrUpdateLeaf(int hash, K key, V value, Update<K, V> update, ref bool isUpdated, ref V oldValue)
         {
             if (hash == Hash)
             {
                 if (ReferenceEquals(Key, key) || Key.Equals(key))
                 {
-                    var newValue = update(Key, Value, value);
-                    if (ReferenceEquals(newValue, Value) || newValue?.Equals(Value) == true)
+                    if (update != null)
+                        value = update(Key, Value, value);
+                    if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
                         return this;
 
                     isUpdated = true;
-                    updatedOldValue = Value;
-                    return CreateLeaf(hash, key, newValue, Conflicts);
+                    oldValue = Value;
+                    return CreateLeaf(hash, key, value, Conflicts);
                 }
 
                 return Conflicts == null
                     ? new ConflictsLeaf(Hash, Key, Value, new[] { new KV<K, V>(key, value) })
-                    : UpdateValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref updatedOldValue);
+                    : UpdateLeafValueAndResolveConflicts(key, value, update, false, ref isUpdated, ref oldValue);
             }
 
             return hash < Hash
@@ -1533,27 +1540,6 @@ namespace ImTools
             Value = value;
         }
 
-        /// It is fine
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update = null)
-        {
-            var branch = this as Branch;
-            if (hash == Hash)
-            {
-                if (ReferenceEquals(Key, key) || Key.Equals(key))
-                {
-                    value = update == null ? value : update(Value, value);
-                    return branch == null
-                        ? CreateLeaf(hash, key, value, Conflicts)
-                        : CreateBranch(hash, key, value, Conflicts, branch.LeftNode, branch.RightNode, branch.BranchHeight);
-                }
-                return UpdateValueAndResolveConflicts(key, value, update, false);
-            }
-
-            return hash < Hash
-                ? With(branch?.LeftNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value), branch?.RightNode)
-                : With(branch?.LeftNode, branch?.RightNode?.AddOrUpdate(hash, key, value, update) ?? new ImHashMap<K, V>(hash, key, value));
-        }
-
         /// It is fine.
         public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update = null)
         {
@@ -1577,12 +1563,10 @@ namespace ImTools
             var br = this as Branch;
             var height = br?.BranchHeight ?? 1;
             if (Conflicts == null) // add only if updateOnly is false.
-            {
-                if (updateOnly)
-                    return this;
-                return CreateConflictsNode(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
-                    br?.LeftNode, br?.RightNode, height);
-            }
+                return updateOnly
+                    ? this
+                    : CreateConflictsNode(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
+                        br?.LeftNode, br?.RightNode, height);
 
             var found = Conflicts.Length - 1;
             while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
@@ -1604,18 +1588,13 @@ namespace ImTools
             return CreateConflictsNode(Hash, Key, Value, conflicts, br?.LeftNode, br?.RightNode, height);
         }
 
-        private ImHashMap<K, V> UpdateValueAndResolveConflicts(
-            K key, V value, Update<K, V> update, bool updateOnly, ref bool updated, ref V oldValue)
+        private ImHashMap<K, V> UpdateLeafValueAndResolveConflicts(
+            K key, V value, Update<K, V> update, bool updateOnly, ref bool isUpdated, ref V oldValue)
         {
-            var branch = this as Branch;
-            var height = branch?.BranchHeight ?? 1;
             if (Conflicts == null) // add only if updateOnly is false.
-            {
-                if (updateOnly)
-                    return this;
-                return CreateConflictsNode(Hash, Key, Value, new[] { new KV<K, V>(key, value) },
-                    branch?.LeftNode, branch?.RightNode, height);
-            }
+                return updateOnly
+                    ? this
+                    : new ConflictsLeaf(Hash, Key, Value, new[] { new KV<K, V>(key, value) });
 
             var found = Conflicts.Length - 1;
             while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
@@ -1627,28 +1606,22 @@ namespace ImTools
                 var newConflicts = new KV<K, V>[Conflicts.Length + 1];
                 Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
                 newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-
-                return CreateConflictsNode(Hash, Key, Value, newConflicts, branch?.LeftNode, branch?.RightNode, height);
+                return new ConflictsLeaf(Hash, Key, Value, newConflicts);
             }
 
             var conflicts = new KV<K, V>[Conflicts.Length];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
 
-            if (update == null)
-                conflicts[found] = new KV<K, V>(key, value);
-            else
-            {
-                var conflict = conflicts[found];
-                var newValue = update(conflict.Key, conflict.Value, value);
-                if (ReferenceEquals(newValue, conflict.Value) || newValue?.Equals(conflict.Value) == true)
-                    return this;
+            var conflict = conflicts[found];
+            if (update != null)
+                value = update(conflict.Key, conflict.Value, value);
+            if (ReferenceEquals(value, conflict.Value) || value?.Equals(conflict.Value) == true)
+                return this;
 
-                updated = true;
-                oldValue = conflict.Value;
-                conflicts[found] = new KV<K, V>(key, newValue);
-            }
-
-            return CreateConflictsNode(Hash, Key, Value, conflicts, branch?.LeftNode, branch?.RightNode, height);
+            isUpdated = true;
+            oldValue = conflict.Value;
+            conflicts[found] = new KV<K, V>(key, value);
+            return new ConflictsLeaf(Hash, Key, Value, conflicts);
         }
 
         /// It is fine.
@@ -1949,6 +1922,28 @@ namespace ImTools
             return defaultValue;
         }
 
+        /// Looks for the `Type` key in a tree and returns the value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
+        {
+            var hash = key.GetHashCode();
+            while (map != null)
+            {
+                if (ReferenceEquals(key, map.Key))
+                    return map.Value;
+
+                var delta = hash - map.Hash;
+                if (delta < 0)
+                    map = (map as ImHashMap<Type, V>.Branch)?.LeftNode;
+                else if (delta > 0)
+                    map = (map as ImHashMap<Type, V>.Branch)?.RightNode;
+                else
+                    return map.GetConflictedValueOrDefault(key, defaultValue);
+            }
+
+            return defaultValue;
+        }
+
         /// Returns true if key is found and sets the value.
         [MethodImpl((MethodImplOptions)256)]
         public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
@@ -1969,6 +1964,32 @@ namespace ImTools
                 map = hash < map.Hash
                     ? (map as ImHashMap<K, V>.Branch)?.LeftNode
                     : (map as ImHashMap<K, V>.Branch)?.RightNode;
+            }
+
+            value = default(V);
+            return false;
+        }
+
+        /// Returns true if `Type` key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<V>(this ImHashMap<Type, V> map, Type key, out V value)
+        {
+            var hash = key.GetHashCode();
+            while (map != null)
+            {
+                if (ReferenceEquals(map.Key, key))
+                {
+                    value = map.Value;
+                    return true;
+                }
+
+                var delta = hash - map.Hash;
+                if (delta < 0)
+                    map = (map as ImHashMap<Type, V>.Branch)?.LeftNode;
+                else if (delta > 0)
+                    map = (map as ImHashMap<Type, V>.Branch)?.RightNode;
+                else
+                    return map.TryFindConflictedValue(key, out value);
             }
 
             value = default(V);
