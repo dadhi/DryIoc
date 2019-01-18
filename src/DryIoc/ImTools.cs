@@ -1909,14 +1909,13 @@ namespace ImTools
             var hash = key.GetHashCode();
             while (map != null)
             {
-                if (map.Hash == hash)
+                if (hash == map.Hash)
                     return ReferenceEquals(key, map.Key) || key.Equals(map.Key)
                         ? map.Value
                         : map.GetConflictedValueOrDefault(key, defaultValue);
 
-                map = hash < map.Hash
-                    ? (map as ImHashMap<K, V>.Branch)?.LeftNode
-                    : (map as ImHashMap<K, V>.Branch)?.RightNode;
+                var br = map as ImHashMap<K, V>.Branch;
+                map = br == null ? null : hash < map.Hash ? br.LeftNode : br.RightNode;
             }
 
             return defaultValue;
@@ -1929,16 +1928,13 @@ namespace ImTools
             var hash = key.GetHashCode();
             while (map != null)
             {
-                if (ReferenceEquals(key, map.Key))
-                    return map.Value;
+                if (hash == map.Hash)
+                    return ReferenceEquals(key, map.Key)
+                        ? map.Value
+                        : map.GetConflictedValueOrDefault(key, defaultValue);
 
-                var delta = hash - map.Hash;
-                if (delta < 0)
-                    map = (map as ImHashMap<Type, V>.Branch)?.LeftNode;
-                else if (delta > 0)
-                    map = (map as ImHashMap<Type, V>.Branch)?.RightNode;
-                else
-                    return map.GetConflictedValueOrDefault(key, defaultValue);
+                var br = map as ImHashMap<Type, V>.Branch;
+                map = br == null ? null : hash < map.Hash ? br.LeftNode : br.RightNode;
             }
 
             return defaultValue;
