@@ -56,7 +56,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
   ImmutableDict |  1000 | 1,516,613.7 ns | 107,376.35 ns | 290,298.20 ns | 1,387,325.2 ns |  4.95 |    1.19 |    140.6250 |      1.9531 |           - |           648.02 KB |
             */
 
-            [Params(1000)]
+            [Params(100)]
             public int Count;
 
             [Benchmark(Baseline = true)]
@@ -81,7 +81,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
             }
 
-            //[Benchmark]
+            [Benchmark]
             public V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
