@@ -117,7 +117,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 var map = V3.ImHashMap<Type, string>.Empty;
 
                 foreach (var key in _keys.Take(Count))
-                    map = map.AddOrUpdate(key, "a", out _, out _, null);
+                    map = map.AddOrUpdate(key, "a", out _, out _);
 
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
             }

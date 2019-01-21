@@ -18,8 +18,8 @@ namespace Playground
     {
         public static void Main()
         {
-            BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
-            //BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
+            //BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
+            BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
 
             //BenchmarkRunner.Run<ImMapBenchmarks.Populate>();
             //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
