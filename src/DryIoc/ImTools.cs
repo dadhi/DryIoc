@@ -1111,7 +1111,9 @@ namespace ImTools
         {
             isUpdated = false;
             oldValue = default(V);
-            return AddOrUpdate(key.GetHashCode(), key, value, ref isUpdated, ref oldValue, update);
+            return Height == 0 
+                ? new ImHashMap<K, V>(new Data(key.GetHashCode(), key, value)) 
+                : AddOrUpdate(key.GetHashCode(), key, value, ref isUpdated, ref oldValue, update);
         }
 
         /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
@@ -1289,11 +1291,9 @@ namespace ImTools
                     .Balance());
         }
 
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
+        private ImHashMap<K, V> AddOrUpdate(
+            int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
         {
-            if (Height == 0)
-                return new ImHashMap<K, V>(new Data(hash, key, value));
-
             if (hash == Hash)
             {
                 if (ReferenceEquals(Key, key) || Key.Equals(key))
@@ -1312,11 +1312,17 @@ namespace ImTools
 
             if (hash < Hash)
             {
+                if (Left.Height == 0)
+                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right);
+
                 var left = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
                 return left == Left ? this : new ImHashMap<K, V>(_data, left, Right).Balance();
             }
             else
             {
+                if (Right.Height == 0)
+                    return new ImHashMap<K, V>(_data, Left, new ImHashMap<K, V>(new Data(hash, key, value)));
+
                 var right = Right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
                 return right == Right ? this : new ImHashMap<K, V>(_data, Left, right).Balance();
             }
