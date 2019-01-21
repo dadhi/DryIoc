@@ -150,6 +150,17 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class Lookup
         {
+            /*
+            ## 21.01.2019: All versions.
+
+               Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ GetValueOrDefault_v1 | 13.74 ns | 0.0686 ns | 0.0642 ns |  0.79 |           - |           - |           - |                   - |
+    GetValueOrDefault | 17.43 ns | 0.0924 ns | 0.0864 ns |  1.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v2 | 19.15 ns | 0.0786 ns | 0.0656 ns |  1.10 |           - |           - |           - |                   - |
+ GetValueOrDefault_v3 | 25.73 ns | 0.0711 ns | 0.0665 ns |  1.48 |           - |           - |           - |                   - |
+             */
+
             public static ImHashMap<Type, string> AddOrUpdate()
             {
                 var map = ImHashMap<Type, string>.Empty;
@@ -191,6 +202,20 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             }
 
             private static readonly V1.ImHashMap<Type, string> _mapV1 = AddOrUpdate_v1();
+
+            public static V3.ImHashMap<Type, string> AddOrUpdate_v3()
+            {
+                var map = V3.ImHashMap<Type, string>.Empty;
+
+                foreach (var key in _keys)
+                    map = map.AddOrUpdate(key, "a");
+
+                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
+
+                return map;
+            }
+
+            private static readonly V3.ImHashMap<Type, string> _mapV3 = AddOrUpdate_v3();
 
             public static ConcurrentDictionary<Type, string> ConcurrentDict()
             {
@@ -244,6 +269,9 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             [Benchmark]
             public string GetValueOrDefault_v2() => V2.ImHashMap.GetValueOrDefault(_mapV2, LookupKey);
+
+            [Benchmark]
+            public string GetValueOrDefault_v3() => V3.ImHashMap.GetValueOrDefault(_mapV3, LookupKey);
 
             //[Benchmark]
             public string ConcurrentDict_TryGet()
