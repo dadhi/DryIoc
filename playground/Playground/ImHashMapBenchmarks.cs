@@ -224,7 +224,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
         public class Lookup
         {
             /*
-            ## 21.01.2019: All versions.
+## 21.01.2019: All versions.
 
                Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 --------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
@@ -232,16 +232,25 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
     GetValueOrDefault | 17.43 ns | 0.0924 ns | 0.0864 ns |  1.00 |           - |           - |           - |                   - |
  GetValueOrDefault_v2 | 19.15 ns | 0.0786 ns | 0.0656 ns |  1.10 |           - |           - |           - |                   - |
  GetValueOrDefault_v3 | 25.73 ns | 0.0711 ns | 0.0665 ns |  1.48 |           - |           - |           - |                   - |
-             */
 
+## For some reason dropping lookup speed with only changes to AddOrUpdate
+
+               Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ GetValueOrDefault_v1 | 13.89 ns | 0.0938 ns | 0.0877 ns |  0.80 |           - |           - |           - |                   - |
+    GetValueOrDefault | 17.40 ns | 0.0888 ns | 0.0831 ns |  1.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v2 | 19.04 ns | 0.0712 ns | 0.0666 ns |  1.09 |           - |           - |           - |                   - |
+ GetValueOrDefault_v3 | 25.93 ns | 0.0474 ns | 0.0420 ns |  1.49 |           - |           - |           - |                   - |
+
+*/
             public static ImHashMap<Type, string> AddOrUpdate()
             {
                 var map = ImHashMap<Type, string>.Empty;
 
                 foreach (var key in _keys)
-                    map = map.AddOrUpdate(key, "a");
+                    map = map.AddOrUpdate(key, "a", out _, out _);
 
-                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
+                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
 
                 return map;
             }
@@ -305,13 +314,6 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             private static readonly ConcurrentDictionary<Type, string> _dict = ConcurrentDict();
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
-
-            //[Benchmark(Baseline = true)]
-            //public string TryFind()
-            //{
-            //    _map.TryFind<Type, string>(LookupKey, out var result);
-            //    return result;
-            //}
 
             //[Benchmark]
             public string TryFindByRef()
