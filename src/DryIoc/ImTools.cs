@@ -1254,41 +1254,32 @@ namespace ImTools
             Height = height;
         }
 
-        // todo: made public for benchmarking
-        /// <summary>It is fine</summary>
-        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value)
+        /// It is fine, made public for testing 
+        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update = null)
         {
-            return Height == 0  // add new node
-                ? new ImHashMap<K, V>(new Data(hash, key, value))
-                : (hash == Hash // update found node
-                    ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                        ? new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right)
-                        : UpdateValueAndResolveConflicts(key, value, null, false))
-                    : (hash < Hash  // search for node
-                        ? (Height == 1
-                            ? new ImHashMap<K, V>(_data,
-                                new ImHashMap<K, V>(new Data(hash, key, value)), Right, height: 2)
-                            : new ImHashMap<K, V>(_data,
-                                Left.AddOrUpdate(hash, key, value), Right).Balance())
-                        : (Height == 1
-                            ? new ImHashMap<K, V>(_data,
-                                Left, new ImHashMap<K, V>(new Data(hash, key, value)), height: 2)
-                            : new ImHashMap<K, V>(_data,
-                                Left, Right.AddOrUpdate(hash, key, value)).Balance())));
-        }
+            if (Height == 0)
+                return new ImHashMap<K, V>(new Data(hash, key, value));
 
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update)
-        {
-            return Height == 0
-                ? new ImHashMap<K, V>(new Data(hash, key, value))
-                : (hash == Hash // update
-                    ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                        ? new ImHashMap<K, V>(new Data(hash, key, update(Value, value), Conflicts), Left, Right)
-                        : UpdateValueAndResolveConflicts(key, value, update, false))
-                    : (hash < Hash
-                        ? With(Left.AddOrUpdate(hash, key, value, update), Right)
-                        : With(Left, Right.AddOrUpdate(hash, key, value, update)))
-                    .Balance());
+            if (hash == Hash)
+            {
+                if (ReferenceEquals(Key, key) || Key.Equals(key))
+                {
+                    if (update != null)
+                        value = update(Value, value);
+                    return new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right);
+                }
+
+                return UpdateValueAndResolveConflicts(key, value, update, false);
+            }
+
+            if (hash < Hash)
+            {
+                var left = Left.AddOrUpdate(hash, key, value, update);
+                return left == Left ? this : Balance(_data, left, Right);
+            }
+
+            var right = Right.AddOrUpdate(hash, key, value, update);
+            return right == Right ? this : Balance(_data, Left, right);
         }
 
         private ImHashMap<K, V> AddOrUpdate(
@@ -1316,7 +1307,7 @@ namespace ImTools
                     return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right);
 
                 var left = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                return left == Left ? this : new ImHashMap<K, V>(_data, left, Right).Balance();
+                return left == Left ? this : Balance(_data, left, Right);
             }
             else
             {
@@ -1324,22 +1315,37 @@ namespace ImTools
                     return new ImHashMap<K, V>(_data, Left, new ImHashMap<K, V>(new Data(hash, key, value)));
 
                 var right = Right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                return right == Right ? this : new ImHashMap<K, V>(_data, Left, right).Balance();
+                return right == Right ? this : Balance(_data, Left, right);
             }
         }
 
         /// It is fine, made public for testing.
-        public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update)
+        public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update = null)
         {
-            return Height == 0 ? this
-                : (hash == Hash
-                    ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                        ? new ImHashMap<K, V>(new Data(hash, key, update == null ? value : update(Value, value), Conflicts), Left, Right)
-                        : UpdateValueAndResolveConflicts(key, value, update, true))
-                    : (hash < Hash
-                        ? With(Left.Update(hash, key, value, update), Right)
-                        : With(Left, Right.Update(hash, key, value, update)))
-                    .Balance());
+            if (Height == 0)
+                return this;
+
+            if (hash == Hash)
+            {
+                if (ReferenceEquals(Key, key) || Key.Equals(key))
+                {
+                    if (update != null)
+                        value = update(Value, value);
+                    return new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right);
+                }
+
+                return UpdateValueAndResolveConflicts(key, value, update, true);
+            }
+
+            // No need to balance cause we not adding or removing nodes
+            if (hash < Hash)
+            {
+                var left = Left.Update(hash, key, value, update);
+                return left == Left ? this : new ImHashMap<K, V>(_data, left, Right);
+            }
+
+            var right = Right.Update(hash, key, value, update);
+            return right == Right ? this : new ImHashMap<K, V>(_data, Left, right);
         }
 
         private ImHashMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
@@ -1422,15 +1428,14 @@ namespace ImTools
             return false;
         }
 
-        private ImHashMap<K, V> Balance()
+        private static ImHashMap<K, V> Balance(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
-            var delta = Left.Height - Right.Height;
-            if (delta >= 2) // left is longer by 2, rotate left
+            var delta = left.Height - right.Height;
+            if (delta > 1) // left is longer by 2, rotate left
             {
-                var left = Left;
                 var leftLeft = left.Left;
                 var leftRight = left.Right;
-                if (leftRight.Height - leftLeft.Height == 1)
+                if (leftRight.Height > leftLeft.Height)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
@@ -1438,44 +1443,35 @@ namespace ImTools
                     // 1   4        2   3        1   3     6
                     //    3        1
                     return new ImHashMap<K, V>(leftRight._data,
-                        left: new ImHashMap<K, V>(left._data,
-                            left: leftLeft, right: leftRight.Left), right: new ImHashMap<K, V>(_data,
-                            left: leftRight.Right, right: Right));
+                        new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left), 
+                        new ImHashMap<K, V>(data, leftRight.Right, right));
                 }
 
-                // todo: do we need this?
                 // one rotation:
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImHashMap<K, V>(left._data,
-                    left: leftLeft, right: new ImHashMap<K, V>(_data,
-                        left: leftRight, right: Right));
+                return new ImHashMap<K, V>(left._data, 
+                    leftLeft, new ImHashMap<K, V>(data, leftRight, right));
             }
 
-            if (delta <= -2)
+            if (delta < -1)
             {
-                var right = Right;
                 var rightLeft = right.Left;
                 var rightRight = right.Right;
-                if (rightLeft.Height - rightRight.Height == 1)
+                if (rightLeft.Height > rightRight.Height)
                 {
                     return new ImHashMap<K, V>(rightLeft._data,
-                        left: new ImHashMap<K, V>(_data,
-                            left: Left, right: rightLeft.Left), right: new ImHashMap<K, V>(right._data,
-                            left: rightLeft.Right, right: rightRight));
+                        new ImHashMap<K, V>(data, left, rightLeft.Left), 
+                        new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
                 }
 
                 return new ImHashMap<K, V>(right._data,
-                    left: new ImHashMap<K, V>(_data,
-                        left: Left, right: rightLeft), right: rightRight);
+                    new ImHashMap<K, V>(data, left, rightLeft), rightRight);
             }
 
-            return this;
+            return new ImHashMap<K, V>(data, left, right);
         }
-
-        private ImHashMap<K, V> With(ImHashMap<K, V> left, ImHashMap<K, V> right) =>
-            left == Left && right == Right ? this : new ImHashMap<K, V>(_data, left, right);
 
         internal ImHashMap<K, V> Remove(int hash, K key, bool ignoreKey = false)
         {
@@ -1511,15 +1507,12 @@ namespace ImTools
                 else
                     return this; // if key is not matching and no conflicts to lookup - just return
             }
-            else if (hash < Hash)
-                result = new ImHashMap<K, V>(_data, Left.Remove(hash, key, ignoreKey), Right);
             else
-                result = new ImHashMap<K, V>(_data, Left, Right.Remove(hash, key, ignoreKey));
+                result = hash < Hash
+                    ? Balance(_data, Left.Remove(hash, key, ignoreKey), Right)
+                    : Balance(_data, Left, Right.Remove(hash, key, ignoreKey));
 
-            if (result.Height == 1)
-                return result;
-
-            return result.Balance();
+            return result;
         }
 
         private ImHashMap<K, V> TryRemoveConflicted(K key)
