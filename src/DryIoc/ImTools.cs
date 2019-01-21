@@ -68,7 +68,7 @@ namespace ImTools
         public static T[] Empty<T>() => EmptyArray<T>.Value;
 
         /// <summary>Wraps item in array.</summary>
-        public static T[] One<T>(this T one) => new[] {one};
+        public static T[] One<T>(this T one) => new[] { one };
 
         /// <summary>Returns true if array is null or have no items.</summary> <typeparam name="T">Type of array item.</typeparam>
         /// <param name="source">Source array to check.</param> <returns>True if null or has no items, false otherwise.</returns>
@@ -128,7 +128,7 @@ namespace ImTools
         public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
         {
             if (source == null || source.Length == 0)
-                return new[] {value};
+                return new[] { value };
             var sourceLength = source.Length;
             index = index < 0 ? sourceLength : index;
             var result = new T[index < sourceLength ? sourceLength : sourceLength + 1];
@@ -328,9 +328,9 @@ namespace ImTools
             {
                 var condition0 = condition(source[0]);
                 var condition1 = condition(source[1]);
-                return condition0 && condition1 ? new[] {source[0], source[1]}
-                    : condition0 ? new[] {source[0]}
-                    : condition1 ? new[] {source[1]}
+                return condition0 && condition1 ? new[] { source[0], source[1] }
+                    : condition0 ? new[] { source[0] }
+                    : condition1 ? new[] { source[1] }
                     : Empty<T>();
             }
 
@@ -383,16 +383,16 @@ namespace ImTools
             if (source.Length == 1)
             {
                 var item = source[0];
-                return condition(item) ? new[] {map(item)} : Empty<R>();
+                return condition(item) ? new[] { map(item) } : Empty<R>();
             }
 
             if (source.Length == 2)
             {
                 var condition0 = condition(source[0]);
                 var condition1 = condition(source[1]);
-                return condition0 && condition1 ? new[] {map(source[0]), map(source[1])}
-                    : condition0 ? new[] {map(source[0])}
-                    : condition1 ? new[] {map(source[1])}
+                return condition0 && condition1 ? new[] { map(source[0]), map(source[1]) }
+                    : condition0 ? new[] { map(source[0]) }
+                    : condition1 ? new[] { map(source[1]) }
                     : Empty<R>();
             }
 
@@ -442,13 +442,13 @@ namespace ImTools
                 return Empty<R>();
 
             if (sourceCount == 1)
-                return new[] {map(source[0])};
+                return new[] { map(source[0]) };
 
             if (sourceCount == 2)
-                return new[] {map(source[0]), map(source[1])};
+                return new[] { map(source[0]), map(source[1]) };
 
             if (sourceCount == 3)
-                return new[] {map(source[0]), map(source[1]), map(source[2])};
+                return new[] { map(source[0]), map(source[1]), map(source[2]) };
 
             var results = new R[sourceCount];
             for (var i = 0; i < source.Length; i++)
@@ -798,7 +798,7 @@ namespace ImTools
         /// <summary>Copies list to array.</summary> 
         public static T[] ToArray<T>(this ImList<T> source) =>
             source.IsEmpty ? ArrayTools.Empty<T>() :
-            source.Tail.IsEmpty ? new[] {source.Head} :
+            source.Tail.IsEmpty ? new[] { source.Head } :
             source.Enumerate().ToArray();
     }
 
@@ -834,7 +834,7 @@ namespace ImTools
 
         // todo: more optimizations similar to ImHashMap
         /// Returns a new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions) 256)]
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> AddOrUpdate(int key, V value) =>
             Height == 0 // add new node
                 ? new ImMap<V>(key, value)
@@ -1031,7 +1031,7 @@ namespace ImTools
     public static class ImMap
     {
         /// Get value for found key or default value otherwise.
-        [MethodImpl((MethodImplOptions) 256)]
+        [MethodImpl((MethodImplOptions)256)]
         public static V GetValueOrDefault<V>(this ImMap<V> map, int key, V defaultValue = default(V))
         {
             while (map.Height != 0 && map.Key != key)
@@ -1040,7 +1040,7 @@ namespace ImTools
         }
 
         /// Returns true if key is found and sets the value.
-        [MethodImpl((MethodImplOptions) 256)]
+        [MethodImpl((MethodImplOptions)256)]
         public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
         {
             while (map.Height != 0 && map.Key != key)
@@ -1112,8 +1112,8 @@ namespace ImTools
         {
             isUpdated = false;
             oldValue = default(V);
-            return Height == 0 
-                ? new ImHashMap<K, V>(new Data(key.GetHashCode(), key, value)) 
+            return Height == 0
+                ? new ImHashMap<K, V>(new Data(key.GetHashCode(), key, value))
                 : AddOrUpdate(key.GetHashCode(), key, value, ref isUpdated, ref oldValue, update);
         }
 
@@ -1304,11 +1304,49 @@ namespace ImTools
 
             if (hash < Hash)
             {
-                if (Left.Height == 0)
+                var left = Left;
+                if (left.Height == 0)
                     return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right);
 
-                var left = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                return left == Left ? this : Balance(_data, left, Right);
+                if (Right == Empty)
+                {
+                    // the left can be only a single leaf, cause empty case we handled above, and the tree is balanced
+                    if (hash == left.Hash)
+                    {
+                        if (ReferenceEquals(left.Key, key) || left.Key.Equals(key))
+                        {
+                            if (update != null)
+                                value = update(key, left.Value, value);
+                            if (ReferenceEquals(value, left.Value) || value?.Equals(left.Value) == true)
+                                return this;
+                            isUpdated = true;
+                            oldValue = Value;
+                            return new ImHashMap<K, V>(_data,
+                                new ImHashMap<K, V>(new Data(hash, key, value, left.Conflicts)), Empty, 2);
+                        }
+
+                        var updatedLeft = left.UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update, false);
+                        return updatedLeft == left ? this : new ImHashMap<K, V>(_data, updatedLeft, Empty, 2);
+                    }
+
+                    // single rotation:
+                    //      5     =>     2
+                    //   2            1     5
+                    // 1                     
+                    if (hash < left.Hash)
+                        return new ImHashMap<K, V>(left._data,
+                            new ImHashMap<K, V>(new Data(hash, key, value)), new ImHashMap<K, V>(_data), 2);
+
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2            4            2     5
+                    //     4        2                     
+                    return new ImHashMap<K, V>(new Data(hash, key, value),
+                        new ImHashMap<K, V>(left._data), new ImHashMap<K, V>(_data), 2);
+                }
+
+                var newLeft = left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+                return newLeft == left ? this : Balance(_data, newLeft, Right);
             }
             else
             {
@@ -1400,12 +1438,13 @@ namespace ImTools
             if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
                 return this;
 
+            isUpdated = true;
+            oldValue = conflicts[found].Value;
             conflicts[found] = new KV<K, V>(key, value);
             return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
         }
 
-        // todo: temporary made public for benchmarking
-        /// <summary>It is fine</summary>
+        /// It is fine to be public.
         public V GetConflictedValueOrDefault(K key, V defaultValue)
         {
             if (Conflicts != null)
@@ -1444,7 +1483,7 @@ namespace ImTools
                     // 1   4        2   3        1   3     6
                     //    3        1
                     return new ImHashMap<K, V>(leftRight._data,
-                        new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left), 
+                        new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left),
                         new ImHashMap<K, V>(data, leftRight.Right, right));
                 }
 
@@ -1452,7 +1491,7 @@ namespace ImTools
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImHashMap<K, V>(left._data, 
+                return new ImHashMap<K, V>(left._data,
                     leftLeft, new ImHashMap<K, V>(data, leftRight, right));
             }
 
@@ -1463,7 +1502,7 @@ namespace ImTools
                 if (rightLeft.Height > rightRight.Height)
                 {
                     return new ImHashMap<K, V>(rightLeft._data,
-                        new ImHashMap<K, V>(data, left, rightLeft.Left), 
+                        new ImHashMap<K, V>(data, left, rightLeft.Left),
                         new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
                 }
 
