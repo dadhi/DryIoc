@@ -1128,20 +1128,6 @@ namespace ImTools
         public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
             Update(key.GetHashCode(), key, value, update);
 
-        /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
-        /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
-        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public V GetValueOrDefault(K key, V defaultValue = default(V))
-        {
-            var t = this;
-            var hash = key.GetHashCode();
-            while (t.Height != 0 && t.Hash != hash)
-                t = hash < t.Hash ? t.Left : t.Right;
-            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key))
-                ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
-        }
-
         /// <summary>Returns true if key is found and sets the value.</summary>
         /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
         /// <returns>True if key found, false otherwise.</returns>
@@ -1586,18 +1572,28 @@ namespace ImTools
     /// ImHashMap methods for faster performance
     public static class ImHashMap
     {
-        ///// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
-        //[MethodImpl((MethodImplOptions)256)]
-        //public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
-        //{
-        //    var hash = key.GetHashCode();
-        //    while (map.Height != 0 && map.Hash != hash)
-        //        map = hash < map.Hash ? map.Left : map.Right;
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
+        {
+            var hash = key.GetHashCode();
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+            return map.Height != 0 && (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
+                ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+        }
 
-        //    return map.Height != 0 && (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
-        //        ? map.Value
-        //        : map.GetConflictedValueOrDefault(key, defaultValue);
-        //}
+
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
+        {
+            var hash = key.GetHashCode();
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+            return map.Height != 0 && ReferenceEquals(key, map.Key)
+                ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+        }
 
         ///// Looks for `Type` key and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
         //[MethodImpl((MethodImplOptions)256)]
