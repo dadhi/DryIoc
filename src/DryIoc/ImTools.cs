@@ -832,6 +832,7 @@ namespace ImTools
         /// <summary>Returns true is tree is empty.</summary>
         public bool IsEmpty => Height == 0;
 
+        // todo: more optimizations similar to ImHashMap
         /// Returns a new tree with added or updated value for specified key.
         [MethodImpl((MethodImplOptions) 256)]
         public ImMap<V> AddOrUpdate(int key, V value) =>
