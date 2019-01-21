@@ -1267,12 +1267,12 @@ namespace ImTools
                             ? new ImHashMap<K, V>(_data,
                                 new ImHashMap<K, V>(new Data(hash, key, value)), Right, height: 2)
                             : new ImHashMap<K, V>(_data,
-                                Left.AddOrUpdate(hash, key, value), Right).KeepBalance())
+                                Left.AddOrUpdate(hash, key, value), Right).Balance())
                         : (Height == 1
                             ? new ImHashMap<K, V>(_data,
                                 Left, new ImHashMap<K, V>(new Data(hash, key, value)), height: 2)
                             : new ImHashMap<K, V>(_data,
-                                Left, Right.AddOrUpdate(hash, key, value)).KeepBalance())));
+                                Left, Right.AddOrUpdate(hash, key, value)).Balance())));
         }
 
         private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update)
@@ -1286,7 +1286,7 @@ namespace ImTools
                     : (hash < Hash
                         ? With(Left.AddOrUpdate(hash, key, value, update), Right)
                         : With(Left, Right.AddOrUpdate(hash, key, value, update)))
-                    .KeepBalance());
+                    .Balance());
         }
 
         private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
@@ -1310,10 +1310,16 @@ namespace ImTools
                 return UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update, false);
             }
 
-            return (hash < Hash
-                    ? With(Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update), Right)
-                    : With(Left, Right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update)))
-                .KeepBalance();
+            if (hash < Hash)
+            {
+                var left = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+                return left == Left ? this : new ImHashMap<K, V>(_data, left, Right).Balance();
+            }
+            else
+            {
+                var right = Right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+                return right == Right ? this : new ImHashMap<K, V>(_data, Left, right).Balance();
+            }
         }
 
         /// It is fine, made public for testing.
@@ -1327,7 +1333,7 @@ namespace ImTools
                     : (hash < Hash
                         ? With(Left.Update(hash, key, value, update), Right)
                         : With(Left, Right.Update(hash, key, value, update)))
-                    .KeepBalance());
+                    .Balance());
         }
 
         private ImHashMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
@@ -1410,7 +1416,7 @@ namespace ImTools
             return false;
         }
 
-        private ImHashMap<K, V> KeepBalance()
+        private ImHashMap<K, V> Balance()
         {
             var delta = Left.Height - Right.Height;
             if (delta >= 2) // left is longer by 2, rotate left
@@ -1507,7 +1513,7 @@ namespace ImTools
             if (result.Height == 1)
                 return result;
 
-            return result.KeepBalance();
+            return result.Balance();
         }
 
         private ImHashMap<K, V> TryRemoveConflicted(K key)

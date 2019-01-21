@@ -73,7 +73,21 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
  AddOrUpdate_v2 |   500 | 128.650 us | 1.4938 us | 1.3973 us |  0.94 |    0.01 |     58.1055 |      0.2441 |           - |           267.97 KB |
     AddOrUpdate |   500 | 137.325 us | 1.9010 us | 1.7782 us |  1.00 |    0.00 |     63.2324 |      0.2441 |           - |           291.42 KB |
  AddOrUpdate_v3 |   500 | 166.994 us | 1.7109 us | 1.6004 us |  1.22 |    0.02 |     52.7344 |           - |           - |           243.81 KB |
- */
+
+## Inlining With and removing not necessary call to Balance in case of Update. 
+ 
+         Method | Count |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------- |------ |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ AddOrUpdate_v1 |    30 |   3.323 us | 0.0121 us | 0.0107 us |  0.91 |    0.00 |      2.0409 |           - |           - |             9.42 KB |
+    AddOrUpdate |    30 |   3.647 us | 0.0111 us | 0.0093 us |  1.00 |    0.00 |      2.0409 |           - |           - |             9.42 KB |
+                |       |            |           |           |       |         |             |             |             |                     |
+ AddOrUpdate_v1 |   150 |  24.605 us | 0.2023 us | 0.1690 us |  0.92 |    0.02 |     13.5193 |           - |           - |            62.39 KB |
+    AddOrUpdate |   150 |  26.832 us | 0.5300 us | 0.5443 us |  1.00 |    0.00 |     13.5193 |           - |           - |            62.39 KB |
+                |       |            |           |           |       |         |             |             |             |                     |
+ AddOrUpdate_v1 |   500 | 121.799 us | 0.9309 us | 0.8252 us |  0.92 |    0.01 |     54.4434 |           - |           - |           251.95 KB |
+    AddOrUpdate |   500 | 132.886 us | 2.3470 us | 2.0805 us |  1.00 |    0.00 |     54.4434 |           - |           - |           251.95 KB |
+
+                 */
 
             [Params(30, 150, 500)]
             public int Count;
@@ -100,7 +114,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
             }
 
-            [Benchmark]
+            //[Benchmark]
             public V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
@@ -111,7 +125,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
             }
 
-            [Benchmark]
+            //[Benchmark]
             public V3.ImHashMap<Type, string> AddOrUpdate_v3()
             {
                 var map = V3.ImHashMap<Type, string>.Empty;
