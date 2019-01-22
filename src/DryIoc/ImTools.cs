@@ -1331,8 +1331,36 @@ namespace ImTools
                         new ImHashMap<K, V>(Left._data), new ImHashMap<K, V>(_data), 2);
                 }
 
-                var newLeft = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                return newLeft == Left ? this : Balance(_data, newLeft, Right);
+                var left = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+
+                // todo: find out the case when the condition is true or remove the condition
+                if (left == Left)
+                    return this;
+
+                if (left.Height > Right.Height + 1) // left is longer by 2, rotate left
+                {
+                    var leftLeft = left.Left;
+                    var leftRight = left.Right;
+
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2     6      4     6      2     5
+                    // 1   4        2   3        1   3     6
+                    //    3        1
+                    if (leftRight.Height > leftLeft.Height)
+                        return new ImHashMap<K, V>(leftRight._data,
+                            new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left),
+                            new ImHashMap<K, V>(_data, leftRight.Right, Right));
+
+                    // single rotation:
+                    //      5     =>     2
+                    //   2     6      1     5
+                    // 1   4              4   6
+                    return new ImHashMap<K, V>(left._data,
+                        leftLeft, new ImHashMap<K, V>(_data, leftRight, Right));
+                }
+
+                return new ImHashMap<K, V>(_data, left, Right);
             }
             else
             {
@@ -1368,8 +1396,24 @@ namespace ImTools
                         new ImHashMap<K, V>(_data), new ImHashMap<K, V>(new Data(hash, key, value)), 2);
                 }
 
-                var newRight = Right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                return newRight == Right ? this : Balance(_data, Left, newRight);
+                var right = Right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+                if (right == Right)
+                    return this;
+
+                if (right.Height > Left.Height + 1)
+                {
+                    var rightLeft = right.Left;
+                    var rightRight = right.Right;
+                    if (rightLeft.Height > rightRight.Height)
+                        return new ImHashMap<K, V>(rightLeft._data,
+                            new ImHashMap<K, V>(_data, Left, rightLeft.Left),
+                            new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
+
+                    return new ImHashMap<K, V>(right._data,
+                        new ImHashMap<K, V>(_data, Left, rightLeft), rightRight);
+                }
+
+                return new ImHashMap<K, V>(_data, Left, right);
             }
         }
 
