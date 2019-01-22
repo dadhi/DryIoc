@@ -275,8 +275,21 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
  GetValueOrDefault_v2 |  1000 | 16.645 ns | 0.0447 ns | 0.0419 ns |  1.12 |    0.01 |           - |           - |           - |                   - |
  GetValueOrDefault_v3 |  1000 | 27.489 ns | 0.0890 ns | 0.0832 ns |  1.86 |    0.01 |           - |           - |           - |                   - |
 
+## Adding aggressive inlining to the Data { Hash, Key, Value } properties
+
+               Method | Count |      Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------- |------ |----------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+    GetValueOrDefault |     5 |  5.853 ns | 0.0685 ns | 0.0607 ns |  1.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v1 |     5 |  5.913 ns | 0.0373 ns | 0.0349 ns |  1.01 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |             |             |             |                     |
+    GetValueOrDefault |    40 |  9.649 ns | 0.0235 ns | 0.0220 ns |  1.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v1 |    40 | 10.266 ns | 0.0236 ns | 0.0221 ns |  1.06 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |             |             |             |                     |
+    GetValueOrDefault |   200 | 11.613 ns | 0.0554 ns | 0.0491 ns |  1.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v1 |   200 | 12.052 ns | 0.0555 ns | 0.0520 ns |  1.04 |           - |           - |           - |                   - |
+
 */
-            [Params(5, 40, 200, 1000)]
+            [Params(5, 40, 200)]// the 1000 does not add anything as the LookupKey stored higher in the tree, 1000)]
             public int Count;
 
             [GlobalSetup]
@@ -284,8 +297,8 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             {
                 _map = AddOrUpdate();
                 _mapV1 = AddOrUpdate_v1();
-                _mapV2 = AddOrUpdate_v2();
-                _mapV3 = AddOrUpdate_v3();
+                //_mapV2 = AddOrUpdate_v2();
+                //_mapV3 = AddOrUpdate_v3();
                 //_concurDict = ConcurrentDict();
                 //_immutableDict = ImmutableDict();
             }
@@ -401,10 +414,10 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             [Benchmark]
             public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
 
-            [Benchmark]
+            //[Benchmark]
             public string GetValueOrDefault_v2() => V2.ImHashMap.GetValueOrDefault(_mapV2, LookupKey);
 
-            [Benchmark]
+            //[Benchmark]
             public string GetValueOrDefault_v3() => V3.ImHashMap.GetValueOrDefault(_mapV3, LookupKey);
 
             //[Benchmark]

@@ -1065,13 +1065,24 @@ namespace ImTools
         public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
 
         /// <summary>Calculated key hash.</summary>
-        public int Hash => _data.Hash;
+        public int Hash
+        {
+            [MethodImpl((MethodImplOptions) 256)] get => _data.Hash;
+        }
 
         /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
-        public K Key => _data.Key;
+        public K Key
+        {
+            [MethodImpl((MethodImplOptions)256)]
+            get => _data.Key;
+        }
 
         /// <summary>Value of any type V.</summary>
-        public V Value => _data.Value;
+        public V Value
+        {
+            [MethodImpl((MethodImplOptions)256)]
+            get => _data.Value;
+        }
 
         /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
         public KV<K, V>[] Conflicts => _data.Conflicts;
