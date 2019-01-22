@@ -202,17 +202,25 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
          Method | Count |         Mean |        Error |       StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 --------------- |------ |-------------:|-------------:|-------------:|------:|------------:|------------:|------------:|--------------------:|
-    AddOrUpdate |     5 |     466.7 ns |     1.884 ns |     1.762 ns |  1.00 |      0.2437 |           - |           - |             1.13 KB |
- AddOrUpdate_v1 |     5 |     487.4 ns |     2.253 ns |     1.997 ns |  1.04 |      0.2737 |           - |           - |             1.27 KB |
+ AddOrUpdate_v2 |     5 |     418.2 ns |     2.540 ns |     2.376 ns |  0.90 |      0.2170 |           - |           - |              1024 B |
+    AddOrUpdate |     5 |     464.6 ns |     2.301 ns |     2.039 ns |  1.00 |      0.2437 |           - |           - |              1152 B |
+ AddOrUpdate_v1 |     5 |     487.7 ns |     1.769 ns |     1.655 ns |  1.05 |      0.2737 |           - |           - |              1296 B |
+ AddOrUpdate_v3 |     5 |     516.5 ns |     2.289 ns |     2.141 ns |  1.11 |      0.1993 |           - |           - |               944 B |
                 |       |              |              |              |       |             |             |             |                     |
-    AddOrUpdate |    40 |   4,568.8 ns |    18.101 ns |    16.046 ns |  1.00 |      2.6779 |           - |           - |            12.38 KB |
- AddOrUpdate_v1 |    40 |   4,854.0 ns |    18.932 ns |    17.709 ns |  1.06 |      2.9678 |           - |           - |            13.69 KB |
+    AddOrUpdate |    40 |   4,621.6 ns |    19.899 ns |    18.614 ns |  1.00 |      2.6779 |           - |           - |             12672 B |
+ AddOrUpdate_v1 |    40 |   4,910.9 ns |    19.805 ns |    18.525 ns |  1.06 |      2.9678 |           - |           - |             14016 B |
+ AddOrUpdate_v2 |    40 |   5,115.0 ns |    26.410 ns |    23.411 ns |  1.11 |      2.8458 |           - |           - |             13456 B |
+ AddOrUpdate_v3 |    40 |   6,953.3 ns |    24.391 ns |    22.815 ns |  1.50 |      2.6016 |           - |           - |             12304 B |
                 |       |              |              |              |       |             |             |             |                     |
-    AddOrUpdate |   200 |  33,973.8 ns |   193.631 ns |   181.123 ns |  1.00 |     17.1509 |      0.0610 |           - |            79.08 KB |
- AddOrUpdate_v1 |   200 |  35,391.4 ns |   125.384 ns |   117.284 ns |  1.04 |     18.7378 |      0.0610 |           - |            86.53 KB |
+    AddOrUpdate |   200 |  34,250.7 ns |    87.221 ns |    81.586 ns |  1.00 |     17.1509 |      0.0610 |           - |             80976 B |
+ AddOrUpdate_v1 |   200 |  35,425.8 ns |   137.918 ns |   129.008 ns |  1.03 |     18.7378 |      0.0610 |           - |             88608 B |
+ AddOrUpdate_v2 |   200 |  37,942.8 ns |   188.112 ns |   175.960 ns |  1.11 |     19.2261 |           - |           - |             91008 B |
+ AddOrUpdate_v3 |   200 |  50,640.8 ns |    66.485 ns |    55.518 ns |  1.48 |     17.6392 |      0.0610 |           - |             83352 B |
                 |       |              |              |              |       |             |             |             |                     |
-    AddOrUpdate |  1000 | 292,243.8 ns | 1,632.571 ns | 1,447.231 ns |  1.00 |    111.8164 |     32.7148 |           - |           515.39 KB |
- AddOrUpdate_v1 |  1000 | 308,014.0 ns |   894.813 ns |   837.008 ns |  1.05 |    120.6055 |      3.4180 |           - |           556.41 KB |
+    AddOrUpdate |  1000 | 290,830.8 ns |   915.770 ns |   811.806 ns |  1.00 |    111.8164 |     32.7148 |           - |            527760 B |
+ AddOrUpdate_v2 |  1000 | 308,260.3 ns | 2,278.822 ns | 2,020.116 ns |  1.06 |    130.8594 |      0.9766 |           - |            619056 B |
+ AddOrUpdate_v1 |  1000 | 308,355.6 ns | 2,046.461 ns | 1,914.261 ns |  1.06 |    120.6055 |      3.4180 |           - |            569760 B |
+ AddOrUpdate_v3 |  1000 | 375,880.3 ns | 1,710.716 ns | 1,600.205 ns |  1.29 |    118.6523 |      0.4883 |           - |            560440 B |
 
 */
 
@@ -241,7 +249,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
             }
 
-            //[Benchmark]
+            [Benchmark]
             public V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
@@ -252,7 +260,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
             }
 
-            //[Benchmark]
+            [Benchmark]
             public V3.ImHashMap<Type, string> AddOrUpdate_v3()
             {
                 var map = V3.ImHashMap<Type, string>.Empty;
