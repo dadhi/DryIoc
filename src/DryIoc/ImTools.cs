@@ -1067,7 +1067,8 @@ namespace ImTools
         /// <summary>Calculated key hash.</summary>
         public int Hash
         {
-            [MethodImpl((MethodImplOptions) 256)] get => _data.Hash;
+            [MethodImpl((MethodImplOptions) 256)]
+            get => _data.Hash;
         }
 
         /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
@@ -1085,7 +1086,11 @@ namespace ImTools
         }
 
         /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
-        public KV<K, V>[] Conflicts => _data.Conflicts;
+        public KV<K, V>[] Conflicts
+        {
+            [MethodImpl((MethodImplOptions)256)]
+            get => _data.Conflicts;
+        } 
 
         /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImHashMap<K, V> Left;
@@ -1594,7 +1599,6 @@ namespace ImTools
                 ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
         }
 
-
         /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
         [MethodImpl((MethodImplOptions)256)]
         public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
@@ -1602,39 +1606,8 @@ namespace ImTools
             var hash = key.GetHashCode();
             while (map.Height != 0 && map.Hash != hash)
                 map = hash < map.Hash ? map.Left : map.Right;
-            return map.Height != 0 && ReferenceEquals(key, map.Key)
-                ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+            // we don't need to check `Height != 0` again cause in that case `key` will be `null` and `ReferenceEquals` will fail
+            return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
         }
-
-        ///// Looks for `Type` key and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
-        //[MethodImpl((MethodImplOptions)256)]
-        //public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
-        //{
-        //    var hash = key.GetHashCode();
-        //    while (map.Height != 0 && map.Hash != hash)
-        //        map = hash < map.Hash ? map.Left : map.Right;
-
-        //    return map.Height != 0 && ReferenceEquals(key, map.Key)
-        //        ? map.Value
-        //        : map.GetConflictedValueOrDefault(key, defaultValue);
-        //}
-
-        ///// Returns true if key is found and sets the value.
-        //[MethodImpl((MethodImplOptions)256)]
-        //public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
-        //{
-        //    var hash = key.GetHashCode();
-
-        //    while (map.Height != 0 && map.Hash != hash)
-        //        map = hash < map.Hash ? map.Left : map.Right;
-
-        //    if (map.Height != 0 && (ReferenceEquals(key, map.Key) || key.Equals(map.Key)))
-        //    {
-        //        value = map.Value;
-        //        return true;
-        //    }
-
-        //    return map.TryFindConflictedValue(key, out value);
-        //}
     }
 }
