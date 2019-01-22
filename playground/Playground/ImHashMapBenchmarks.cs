@@ -250,12 +250,51 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
     GetValueOrDefault | 16.34 ns | 0.0932 ns | 0.0826 ns |  1.00 |           - |           - |           - |                   - |
  GetValueOrDefault_v2 | 19.18 ns | 0.0460 ns | 0.0430 ns |  1.17 |           - |           - |           - |                   - |
  GetValueOrDefault_v3 | 25.96 ns | 0.0756 ns | 0.0707 ns |  1.59 |           - |           - |           - |                   - |
+
+## Benchmark against variety of inputs on par with Populate benchmark
+
+               Method | Count |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------- |------ |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ GetValueOrDefault_v1 |     5 |  6.155 ns | 0.0321 ns | 0.0301 ns |  0.98 |    0.01 |           - |           - |           - |                   - |
+    GetValueOrDefault |     5 |  6.267 ns | 0.0510 ns | 0.0452 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v2 |     5 |  7.439 ns | 0.0763 ns | 0.0676 ns |  1.19 |    0.02 |           - |           - |           - |                   - |
+ GetValueOrDefault_v3 |     5 |  9.558 ns | 0.0409 ns | 0.0383 ns |  1.52 |    0.01 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |         |             |             |             |                     |
+ GetValueOrDefault_v1 |    40 | 10.897 ns | 0.0673 ns | 0.0629 ns |  0.95 |    0.01 |           - |           - |           - |                   - |
+    GetValueOrDefault |    40 | 11.467 ns | 0.0325 ns | 0.0304 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v2 |    40 | 14.012 ns | 0.1092 ns | 0.1022 ns |  1.22 |    0.01 |           - |           - |           - |                   - |
+ GetValueOrDefault_v3 |    40 | 19.945 ns | 0.1032 ns | 0.0965 ns |  1.74 |    0.01 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |         |             |             |             |                     |
+ GetValueOrDefault_v1 |   200 | 13.664 ns | 0.0291 ns | 0.0258 ns |  0.97 |    0.00 |           - |           - |           - |                   - |
+    GetValueOrDefault |   200 | 14.051 ns | 0.0524 ns | 0.0491 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v2 |   200 | 16.722 ns | 0.0568 ns | 0.0531 ns |  1.19 |    0.01 |           - |           - |           - |                   - |
+ GetValueOrDefault_v3 |   200 | 24.473 ns | 0.0792 ns | 0.0702 ns |  1.74 |    0.01 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |         |             |             |             |                     |
+ GetValueOrDefault_v1 |  1000 | 14.213 ns | 0.1528 ns | 0.1354 ns |  0.96 |    0.01 |           - |           - |           - |                   - |
+    GetValueOrDefault |  1000 | 14.805 ns | 0.0518 ns | 0.0485 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+ GetValueOrDefault_v2 |  1000 | 16.645 ns | 0.0447 ns | 0.0419 ns |  1.12 |    0.01 |           - |           - |           - |                   - |
+ GetValueOrDefault_v3 |  1000 | 27.489 ns | 0.0890 ns | 0.0832 ns |  1.86 |    0.01 |           - |           - |           - |                   - |
+
 */
-            public static ImHashMap<Type, string> AddOrUpdate()
+            [Params(5, 40, 200, 1000)]
+            public int Count;
+
+            [GlobalSetup]
+            public void Populate()
+            {
+                _map = AddOrUpdate();
+                _mapV1 = AddOrUpdate_v1();
+                _mapV2 = AddOrUpdate_v2();
+                _mapV3 = AddOrUpdate_v3();
+                //_concurDict = ConcurrentDict();
+                //_immutableDict = ImmutableDict();
+            }
+
+            public ImHashMap<Type, string> AddOrUpdate()
             {
                 var map = ImHashMap<Type, string>.Empty;
 
-                foreach (var key in _keys)
+                foreach (var key in _keys.Take(Count))
                     map = map.AddOrUpdate(key, "a", out _, out _);
 
                 map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
@@ -263,13 +302,13 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private static readonly ImHashMap<Type, string> _map = AddOrUpdate();
+            private ImHashMap<Type, string> _map;
 
-            public static V2.ImHashMap<Type, string> AddOrUpdate_v2()
+            public V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
 
-                foreach (var key in _keys)
+                foreach (var key in _keys.Take(Count))
                     map = map.AddOrUpdate(key, "a");
 
                 map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
@@ -277,13 +316,13 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private static readonly V2.ImHashMap<Type, string> _mapV2 = AddOrUpdate_v2();
+            private V2.ImHashMap<Type, string> _mapV2;
 
-            public static V1.ImHashMap<Type, string> AddOrUpdate_v1()
+            public V1.ImHashMap<Type, string> AddOrUpdate_v1()
             {
                 var map = V1.ImHashMap<Type, string>.Empty;
 
-                foreach (var key in _keys)
+                foreach (var key in _keys.Take(Count))
                     map = map.AddOrUpdate(key, "a");
 
                 map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
@@ -291,13 +330,13 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private static readonly V1.ImHashMap<Type, string> _mapV1 = AddOrUpdate_v1();
+            private V1.ImHashMap<Type, string> _mapV1;
 
-            public static V3.ImHashMap<Type, string> AddOrUpdate_v3()
+            public V3.ImHashMap<Type, string> AddOrUpdate_v3()
             {
                 var map = V3.ImHashMap<Type, string>.Empty;
 
-                foreach (var key in _keys)
+                foreach (var key in _keys.Take(Count))
                     map = map.AddOrUpdate(key, "a");
 
                 map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
@@ -305,13 +344,13 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private static readonly V3.ImHashMap<Type, string> _mapV3 = AddOrUpdate_v3();
+            private V3.ImHashMap<Type, string> _mapV3;
 
-            public static ConcurrentDictionary<Type, string> ConcurrentDict()
+            public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<Type, string>();
 
-                foreach (var key in _keys)
+                foreach (var key in _keys.Take(Count))
                     map.TryAdd(key, "a");
 
                 map.TryAdd(typeof(ImHashMapBenchmarks), "!!!");
@@ -319,7 +358,19 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private static readonly ConcurrentDictionary<Type, string> _dict = ConcurrentDict();
+            private ConcurrentDictionary<Type, string> _concurDict;
+
+            public ImmutableDictionary<Type, string> ImmutableDict()
+            {
+                var map = ImmutableDictionary<Type, string>.Empty;
+
+                foreach (var key in _keys.Take(Count))
+                    map = map.Add(key, "a");
+
+                return map.Add(typeof(ImHashMapBenchmarks), "!");
+            }
+
+            private ImmutableDictionary<Type, string> _immutableDict;
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
@@ -359,7 +410,13 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             //[Benchmark]
             public string ConcurrentDict_TryGet()
             {
-                _dict.TryGetValue(LookupKey, out var result);
+                _concurDict.TryGetValue(LookupKey, out var result);
+                return result;
+            }
+
+            public string ImmutableDict_TryGet()
+            {
+                _immutableDict.TryGetValue(LookupKey, out var result);
                 return result;
             }
         }
