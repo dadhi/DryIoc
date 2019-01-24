@@ -1301,8 +1301,8 @@ namespace ImTools
                 if (Height == 1)
                     return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
 
-                if (Left.Height == 0)
-                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right);
+                if (Left.Height == 0) 
+                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right, Height);
 
                 if (Right.Height == 0)
                 {
@@ -1332,8 +1332,6 @@ namespace ImTools
                 }
 
                 var left = Left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-
-                // todo: find out the case when the condition is true or remove the condition
                 if (left == Left)
                     return this;
 
@@ -1368,7 +1366,7 @@ namespace ImTools
                     return new ImHashMap<K, V>(_data, Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
 
                 if (Right.Height == 0)
-                    return new ImHashMap<K, V>(_data, Left, new ImHashMap<K, V>(new Data(hash, key, value)));
+                    return new ImHashMap<K, V>(_data, Left, new ImHashMap<K, V>(new Data(hash, key, value)), Height);
 
                 if (Left.Height == 0)
                 {
