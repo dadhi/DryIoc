@@ -19,7 +19,7 @@ namespace Playground
         public static void Main()
         {
             //BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
-            //BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
+            BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
 
             //BenchmarkRunner.Run<ImMapBenchmarks.Populate>();
             //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
@@ -36,7 +36,7 @@ namespace Playground
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.OpenScopeResolveAfterWarmUp>();
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.FirstTimeOpenScopeResolve>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.FirstTimeOpenScopeResolve>();
 
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientAndNamedScopedDeps.BenchmarkResolution>();
