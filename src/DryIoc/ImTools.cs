@@ -834,7 +834,6 @@ namespace ImTools
 
         // todo: more optimizations similar to ImHashMap
         /// Returns a new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> AddOrUpdate(int key, V value)
         {
             if (Height == 0)
@@ -851,10 +850,26 @@ namespace ImTools
                 if (Left.Height == 0)
                     return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, Height);
 
-                //if (Right.Height == 0)
-                //{
-                //    ;
-                //}
+                if (Right.Height == 0)
+                {
+                    if (key == Left.Key)
+                        return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Empty, 2);
+
+                    // single rotation:
+                    //      5     =>     2
+                    //   2            1     5
+                    // 1              
+                    if (key < Left.Key)
+                        return new ImMap<V>(Left.Key, Left.Value,
+                            new ImMap<V>(key, value), new ImMap<V>(Key, Value), 2);
+
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2            4            2     5
+                    //     4        2               
+                    return new ImMap<V>(key, value,
+                        new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
+                }
 
                 return Balance(Key, Value, Left.AddOrUpdate(key, value), Right);
             }
@@ -866,10 +881,26 @@ namespace ImTools
                 if (Right.Height == 0)
                     return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), Height);
 
-                //if (Left.Height == 0)
-                //{
-                //    ;
-                //}
+                if (Left.Height == 0)
+                {
+                    if (key == Right.Key)
+                        return new ImMap<V>(Key, Value, Empty, new ImMap<V>(key, value), 2);
+
+                    // double rotation:
+                    //      5     =>     5     =>     7
+                    //         8            7      5     8
+                    //        7              8
+                    if (key < Right.Key)
+                        return new ImMap<V>(key, value,
+                            new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
+
+                    // single rotation:
+                    //      5     =>     8     
+                    //         8      5     9
+                    //           9
+                    return new ImMap<V>(Right.Key, Right.Value,
+                        new ImMap<V>(Key, Value), new ImMap<V>(key, value), 2);
+                }
 
                 return Balance(Key, Value, Left, Right.AddOrUpdate(key, value));
             }
