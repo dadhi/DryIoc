@@ -835,18 +835,45 @@ namespace ImTools
         // todo: more optimizations similar to ImHashMap
         /// Returns a new tree with added or updated value for specified key.
         [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> AddOrUpdate(int key, V value) =>
-            Height == 0 // add new node
-                ? new ImMap<V>(key, value)
-                : (key == Key // update found node
-                    ? new ImMap<V>(key, value, Left, Right, Height)
-                    : (key < Key // search for node
-                        ? (Height == 1
-                            ? new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, 2)
-                            : Balance(Key, Value, Left.AddOrUpdate(key, value), Right))
-                        : (Height == 1
-                            ? new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), 2)
-                            : Balance(Key, Value, Left, Right.AddOrUpdate(key, value)))));
+        public ImMap<V> AddOrUpdate(int key, V value)
+        {
+            if (Height == 0)
+                return new ImMap<V>(key, value);
+
+            if (key == Key)
+                return new ImMap<V>(key, value, Left, Right, Height);
+
+            if (key < Key)
+            {
+                if (Height == 1)
+                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Empty, 2);
+
+                if (Left.Height == 0)
+                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, Height);
+
+                //if (Right.Height == 0)
+                //{
+                //    ;
+                //}
+
+                return Balance(Key, Value, Left.AddOrUpdate(key, value), Right);
+            }
+            else
+            {
+                if (Height == 1)
+                    return new ImMap<V>(Key, Value, Empty, new ImMap<V>(key, value), 2);
+
+                if (Right.Height == 0)
+                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), Height);
+
+                //if (Left.Height == 0)
+                //{
+                //    ;
+                //}
+
+                return Balance(Key, Value, Left, Right.AddOrUpdate(key, value));
+            }
+        }
 
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key">Key</param> <param name="value">Value</param>
