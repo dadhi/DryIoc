@@ -832,7 +832,6 @@ namespace ImTools
         /// <summary>Returns true is tree is empty.</summary>
         public bool IsEmpty => Height == 0;
 
-        // todo: Split `Height==0` case
         /// Returns a new tree with added or updated value for specified key.
         public ImMap<V> AddOrUpdate(int key, V value)
         {
@@ -842,19 +841,21 @@ namespace ImTools
             if (key == Key)
                 return new ImMap<V>(key, value, Left, Right, Height);
 
+            return AddOrUpdateImpl(key, value);
+        }
+
+        private ImMap<V> AddOrUpdateImpl(int key, V value)
+        {
             if (key < Key)
             {
-                if (Height == 1)
-                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Empty, 2);
-
                 if (Left.Height == 0)
+                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, 2);
+
+                if (Left.Key == key)
                     return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, Height);
 
                 if (Right.Height == 0)
                 {
-                    if (key == Left.Key)
-                        return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Empty, 2);
-
                     // single rotation:
                     //      5     =>     2
                     //   2            1     5
@@ -871,20 +872,19 @@ namespace ImTools
                         new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
                 }
 
-                var left = Left.AddOrUpdate(key, value);
+                var newLeft = Left.AddOrUpdateImpl(key, value);
 
-                var delta = left.Height - Right.Height;
-                if (delta > 1) // left is longer by 2, rotate left
+                if (newLeft.Height > Right.Height + 1) // left is longer by 2, rotate left
                 {
-                    var leftLeft = left.Left;
-                    var leftRight = left.Right;
+                    var leftLeft = newLeft.Left;
+                    var leftRight = newLeft.Right;
 
                     // single rotation:
                     //      5     =>     2
                     //   2     6      1     5
                     // 1   4              4   6
-                    if (leftRight.Height <= leftLeft.Height)
-                        return new ImMap<V>(left.Key, left.Value,
+                    if (leftLeft.Height >= leftRight.Height)
+                        return new ImMap<V>(newLeft.Key, newLeft.Value,
                             leftLeft, new ImMap<V>(Key, Value, leftRight, Right));
                     
                     // double rotation:
@@ -893,25 +893,22 @@ namespace ImTools
                     // 1   4        2   3        1   3     6
                     //    3        1
                     return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        new ImMap<V>(left.Key, left.Value, leftLeft, leftRight.Left),
+                        new ImMap<V>(newLeft.Key, newLeft.Value, leftLeft, leftRight.Left),
                         new ImMap<V>(Key, Value, leftRight.Right, Right));
                 }
 
-                return new ImMap<V>(Key, Value, left, Right);
+                return new ImMap<V>(Key, Value, newLeft, Right);
             }
             else
             {
-                if (Height == 1)
-                    return new ImMap<V>(Key, Value, Empty, new ImMap<V>(key, value), 2);
-
                 if (Right.Height == 0)
+                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), 2);
+
+                if (Right.Key == key)
                     return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), Height);
 
                 if (Left.Height == 0)
                 {
-                    if (key == Right.Key)
-                        return new ImMap<V>(Key, Value, Empty, new ImMap<V>(key, value), 2);
-
                     // single rotation:
                     //      5     =>     8     
                     //         8      5     9
@@ -928,23 +925,23 @@ namespace ImTools
                         new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
                 }
 
-                var right = Right.AddOrUpdate(key, value);
+                var newRight = Right.AddOrUpdateImpl(key, value);
 
-                var delta = Left.Height - right.Height;
-                if (delta < -1)
+                if (newRight.Height > Left.Height + 1)
                 {
-                    var rightLeft = right.Left;
-                    var rightRight = right.Right;
-                    if (rightLeft.Height <= rightRight.Height)
-                        return new ImMap<V>(right.Key, right.Value,
+                    var rightLeft = newRight.Left;
+                    var rightRight = newRight.Right;
+
+                    if (rightRight.Height >= rightLeft.Height)
+                        return new ImMap<V>(newRight.Key, newRight.Value,
                             new ImMap<V>(Key, Value, Left, rightLeft), rightRight);
 
                     return new ImMap<V>(rightLeft.Key, rightLeft.Value,
                         new ImMap<V>(Key, Value, Left, rightLeft.Left),
-                        new ImMap<V>(right.Key, right.Value, rightLeft.Right, rightRight));
+                        new ImMap<V>(newRight.Key, newRight.Value, rightLeft.Right, rightRight));
                 }
 
-                return new ImMap<V>(Key, Value, Left, right);
+                return new ImMap<V>(Key, Value, Left, newRight);
             }
         }
 
