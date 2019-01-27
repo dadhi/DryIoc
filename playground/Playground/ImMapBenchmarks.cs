@@ -97,88 +97,116 @@ namespace Playground
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class Lookup
         {
-/*
-## 2019.01.01 - Hmm, statics with inlining are da best
+            /*
+            ## 2019.01.01 - Hmm, statics with inlining are da best
 
-BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.472 (1803/April2018Update/Redstone4)
-Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
-.NET Core SDK=2.2.100
-  [Host]     : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
-  DefaultJob : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
+            BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.472 (1803/April2018Update/Redstone4)
+            Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+            Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
+            .NET Core SDK=2.2.100
+              [Host]     : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
+              DefaultJob : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
 
 
-                Method | LookupKey |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------- |---------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
-    TryFind_new_static |         1 |  5.772 ns | 0.0364 ns | 0.0340 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
-  TryFind_old_instance |         1 |  9.060 ns | 0.1011 ns | 0.0945 ns |  1.57 |    0.02 |           - |           - |           - |                   - |
- ConcurrentDict_TryGet |         1 | 11.865 ns | 0.0364 ns | 0.0340 ns |  2.06 |    0.01 |           - |           - |           - |                   - |
-                       |           |           |           |           |       |         |             |             |             |                     |
-    TryFind_new_static |        30 |  6.569 ns | 0.0881 ns | 0.0824 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
-  TryFind_old_instance |        30 | 11.112 ns | 0.0766 ns | 0.0679 ns |  1.69 |    0.02 |           - |           - |           - |                   - |
- ConcurrentDict_TryGet |        30 | 11.847 ns | 0.0266 ns | 0.0236 ns |  1.80 |    0.02 |           - |           - |           - |                   - |
-                       |           |           |           |           |       |         |             |             |             |                     |
-    TryFind_new_static |        60 |  7.227 ns | 0.0605 ns | 0.0566 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
-  TryFind_old_instance |        60 | 10.617 ns | 0.0202 ns | 0.0168 ns |  1.47 |    0.01 |           - |           - |           - |                   - |
- ConcurrentDict_TryGet |        60 | 11.855 ns | 0.0481 ns | 0.0426 ns |  1.64 |    0.01 |           - |           - |           - |                   - |
-                       |           |           |           |           |       |         |             |             |             |                     |
-    TryFind_new_static |        90 |  7.446 ns | 0.0228 ns | 0.0213 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
-  TryFind_old_instance |        90 |  9.740 ns | 0.1398 ns | 0.1308 ns |  1.31 |    0.02 |           - |           - |           - |                   - |
- ConcurrentDict_TryGet |        90 | 11.853 ns | 0.0286 ns | 0.0253 ns |  1.59 |    0.01 |           - |           - |           - |                   - |
- */
+                            Method | LookupKey |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+            ---------------------- |---------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                TryFind_new_static |         1 |  5.772 ns | 0.0364 ns | 0.0340 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind_old_instance |         1 |  9.060 ns | 0.1011 ns | 0.0945 ns |  1.57 |    0.02 |           - |           - |           - |                   - |
+             ConcurrentDict_TryGet |         1 | 11.865 ns | 0.0364 ns | 0.0340 ns |  2.06 |    0.01 |           - |           - |           - |                   - |
+                                   |           |           |           |           |       |         |             |             |             |                     |
+                TryFind_new_static |        30 |  6.569 ns | 0.0881 ns | 0.0824 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind_old_instance |        30 | 11.112 ns | 0.0766 ns | 0.0679 ns |  1.69 |    0.02 |           - |           - |           - |                   - |
+             ConcurrentDict_TryGet |        30 | 11.847 ns | 0.0266 ns | 0.0236 ns |  1.80 |    0.02 |           - |           - |           - |                   - |
+                                   |           |           |           |           |       |         |             |             |             |                     |
+                TryFind_new_static |        60 |  7.227 ns | 0.0605 ns | 0.0566 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind_old_instance |        60 | 10.617 ns | 0.0202 ns | 0.0168 ns |  1.47 |    0.01 |           - |           - |           - |                   - |
+             ConcurrentDict_TryGet |        60 | 11.855 ns | 0.0481 ns | 0.0426 ns |  1.64 |    0.01 |           - |           - |           - |                   - |
+                                   |           |           |           |           |       |         |             |             |             |                     |
+                TryFind_new_static |        90 |  7.446 ns | 0.0228 ns | 0.0213 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind_old_instance |        90 |  9.740 ns | 0.1398 ns | 0.1308 ns |  1.31 |    0.02 |           - |           - |           - |                   - |
+             ConcurrentDict_TryGet |        90 | 11.853 ns | 0.0286 ns | 0.0253 ns |  1.59 |    0.01 |           - |           - |           - |                   - |
 
-            public static int Size = 100;
+            ## 27.01.2019: Baseline
 
-            public static V1.ImMap<string> AddOrUpdate_v1()
+                 Method | Count |     Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+            ----------- |------ |---------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                TryFind |     5 | 2.404 ns | 0.0395 ns | 0.0350 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+             TryFind_v2 |     5 | 3.250 ns | 0.0101 ns | 0.0095 ns |  1.35 |    0.02 |           - |           - |           - |                   - |
+             TryFind_v1 |     5 | 4.691 ns | 0.0345 ns | 0.0322 ns |  1.95 |    0.04 |           - |           - |           - |                   - |
+                        |       |          |           |           |       |         |             |             |             |                     |
+                TryFind |    40 | 4.249 ns | 0.0629 ns | 0.0589 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+             TryFind_v1 |    40 | 6.216 ns | 0.0159 ns | 0.0133 ns |  1.46 |    0.02 |           - |           - |           - |                   - |
+             TryFind_v2 |    40 | 6.474 ns | 0.0614 ns | 0.0574 ns |  1.52 |    0.02 |           - |           - |           - |                   - |
+                        |       |          |           |           |       |         |             |             |             |                     |
+                TryFind |   200 | 5.538 ns | 0.0511 ns | 0.0478 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+             TryFind_v1 |   200 | 7.391 ns | 0.1443 ns | 0.1350 ns |  1.33 |    0.02 |           - |           - |           - |                   - |
+             TryFind_v2 |   200 | 8.764 ns | 0.0779 ns | 0.0651 ns |  1.58 |    0.02 |           - |           - |           - |                   - |
+
+                             */
+
+
+            public V1.ImMap<string> AddOrUpdate_v1()
             {
                 var map = V1.ImMap<string>.Empty;
 
-                for (var i = 0; i < Size; i++)
+                for (var i = 0; i < Count; i++)
                     map = map.AddOrUpdate(i, i.ToString());
 
                 return map;
             }
 
-            private static readonly V1.ImMap<string> _mapV1 = AddOrUpdate_v1();
+            private V1.ImMap<string> _mapV1;
 
-            public static V2.ImMap<string> AddOrUpdate_v2()
+            public V2.ImMap<string> AddOrUpdate_v2()
             {
                 var map = V2.ImMap<string>.Empty;
 
-                for (var i = 0; i < Size; i++)
+                for (var i = 0; i < Count; i++)
                     map = V2.ImMap.AddOrUpdate(map, i, i.ToString());
 
                 return map;
             }
 
-            private static readonly V2.ImMap<string> _mapV2 = AddOrUpdate_v2();
+            private V2.ImMap<string> _mapV2;
 
-            public static ImMap<string> AddOrUpdate()
+            public ImMap<string> AddOrUpdate()
             {
                 var map = ImMap<string>.Empty;
 
-                for (var i = 0; i < Size; i++)
+                for (var i = 0; i < Count; i++)
                     map = map.AddOrUpdate(i, i.ToString());
 
                 return map;
             }
 
-            private static readonly ImMap<string> _map = AddOrUpdate();
+            private ImMap<string> _map ;
 
-            public static ConcurrentDictionary<int, string> ConcurrentDict()
+            public ConcurrentDictionary<int, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<int, string>();
 
-                for (var i = 0; i < Size; i++)
+                for (var i = 0; i < Count; i++)
                     map.TryAdd(i, i.ToString());
 
                 return map;
             }
 
-            private static readonly ConcurrentDictionary<int, string> _dict = ConcurrentDict();
+            private ConcurrentDictionary<int, string> _dict;
 
-            [Params(1, 30, 60, 90)]
-            public int LookupKey; 
+            public int LookupKey;
+
+            [Params(5, 40, 200)]
+            public int Count = 100;
+
+            [GlobalSetup]
+            public void Populate()
+            {
+                LookupKey = Count - 1;
+                _map = AddOrUpdate();
+                _mapV1 = AddOrUpdate_v1();
+                _mapV2 = AddOrUpdate_v2();
+                //_dict = ConcurrentDict();
+            }
 
             [Benchmark(Baseline = true)]
             public string TryFind()
@@ -187,7 +215,14 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
                 return result;
             }
 
-            //[Benchmark]
+            [Benchmark]
+            public string TryFind_v1()
+            {
+                _mapV1.TryFind(LookupKey, out var result);
+                return result;
+            }
+
+            [Benchmark]
             public string TryFind_v2()
             {
                 V2.ImMap.TryFind(_mapV2, LookupKey, out var result);
