@@ -340,6 +340,12 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
  BmarkMicrosoftDependencyInjection | 4.677 us | 0.0275 us | 0.0257 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 4.863 us | 0.0370 us | 0.0328 us |  1.04 |      1.0834 |           - |           - |                5 KB |
 
+## 28.01.2019: After improvements in ImMap
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc | 4.703 us | 0.0225 us | 0.0188 us |  0.99 |      1.0681 |           - |           - |             4.95 KB |
+ BmarkMicrosoftDependencyInjection | 4.750 us | 0.0082 us | 0.0076 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+
 */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
@@ -407,6 +413,15 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                   BmarkLightInject |  5.812 us | 0.0208 us | 0.0195 us |  5.44 |    0.02 |      3.8376 |      0.0076 |           - |             17.7 KB |
                       BmarkAutofac | 23.668 us | 0.1853 us | 0.1642 us | 22.16 |    0.15 |      4.5471 |      0.0305 |           - |            20.96 KB |
 
+        ## After improvements in ImMap
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  1.038 us | 0.0048 us | 0.0043 us |  1.00 |    0.00 |      0.5436 |           - |           - |             2.51 KB |
+                       BmarkDryIoc |  1.113 us | 0.0062 us | 0.0055 us |  1.07 |    0.00 |      0.4253 |           - |           - |             1.97 KB |
+                        BmarkGrace |  5.140 us | 0.0247 us | 0.0231 us |  4.95 |    0.03 |      1.4725 |           - |           - |             6.82 KB |
+                  BmarkLightInject |  5.821 us | 0.0285 us | 0.0253 us |  5.61 |    0.04 |      3.8376 |      0.0076 |           - |             17.7 KB |
+                      BmarkAutofac | 23.733 us | 0.5465 us | 0.6506 us | 22.85 |    0.60 |      4.5166 |      0.0610 |           - |            20.96 KB |
              */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister
