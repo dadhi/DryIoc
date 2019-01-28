@@ -1140,13 +1140,14 @@ namespace ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
         {
-            while (map.Height != 0 && map.Key != key)
-                map = key < map.Key ? map.Left : map.Right;
-
-            if (map.Height != 0)
+            while (map.Height != 0)
             {
-                value = map.Value;
-                return true;
+                if (map.Key == key)
+                {
+                    value = map.Value;
+                    return true;
+                }
+                map = key < map.Key ? map.Left : map.Right;
             }
 
             value = default(V);

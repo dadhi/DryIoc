@@ -176,6 +176,25 @@ namespace Playground
              TryFind_v1 |   200 | 7.391 ns | 0.1443 ns | 0.1350 ns |  1.33 |    0.02 |           - |           - |           - |                   - |
              TryFind_v2 |   200 | 8.764 ns | 0.0779 ns | 0.0651 ns |  1.58 |    0.02 |           - |           - |           - |                   - |
 
+            ##: New TryFind with somehow better perf (TryFind2 is the old one)
+
+                Method | Count |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------- |------ |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+               TryFind |     5 |  1.842 ns | 0.0370 ns | 0.0309 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind2 |     5 |  2.135 ns | 0.0169 ns | 0.0158 ns |  1.16 |    0.02 |           - |           - |           - |                   - |
+            TryFind_v1 |     5 |  4.341 ns | 0.0298 ns | 0.0278 ns |  2.36 |    0.05 |           - |           - |           - |                   - |
+ ConcurrentDict_TryGet |     5 | 10.206 ns | 0.0319 ns | 0.0298 ns |  5.54 |    0.09 |           - |           - |           - |                   - |
+                       |       |           |           |           |       |         |             |             |             |                     |
+               TryFind |    40 |  3.110 ns | 0.0395 ns | 0.0370 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind2 |    40 |  3.836 ns | 0.0449 ns | 0.0420 ns |  1.23 |    0.02 |           - |           - |           - |                   - |
+            TryFind_v1 |    40 |  5.818 ns | 0.0235 ns | 0.0197 ns |  1.87 |    0.02 |           - |           - |           - |                   - |
+ ConcurrentDict_TryGet |    40 | 10.136 ns | 0.0086 ns | 0.0076 ns |  3.26 |    0.04 |           - |           - |           - |                   - |
+                       |       |           |           |           |       |         |             |             |             |                     |
+               TryFind |   200 |  4.518 ns | 0.1164 ns | 0.1089 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+              TryFind2 |   200 |  5.173 ns | 0.0578 ns | 0.0540 ns |  1.15 |    0.03 |           - |           - |           - |                   - |
+            TryFind_v1 |   200 |  6.886 ns | 0.0354 ns | 0.0331 ns |  1.52 |    0.03 |           - |           - |           - |                   - |
+ ConcurrentDict_TryGet |   200 | 10.162 ns | 0.0355 ns | 0.0315 ns |  2.25 |    0.06 |           - |           - |           - |                   - |
+
                              */
 
 
@@ -238,8 +257,8 @@ namespace Playground
                 LookupKey = Count - 1;
                 _map = AddOrUpdate();
                 _mapV1 = AddOrUpdate_v1();
-                _mapV2 = AddOrUpdate_v2();
-                //_dict = ConcurrentDict();
+                //_mapV2 = AddOrUpdate_v2();
+                _dict = ConcurrentDict();
             }
 
             [Benchmark(Baseline = true)]
@@ -256,14 +275,14 @@ namespace Playground
                 return result;
             }
 
-            [Benchmark]
+            //[Benchmark]
             public string TryFind_v2()
             {
                 V2.ImMap.TryFind(_mapV2, LookupKey, out var result);
                 return result;
             }
 
-            //[Benchmark]
+            [Benchmark]
             public string ConcurrentDict_TryGet()
             {
                 _dict.TryGetValue(LookupKey, out var result);

@@ -21,8 +21,8 @@ namespace Playground
             //BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
             //BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
 
-            BenchmarkRunner.Run<ImMapBenchmarks.Populate>();
-            //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
+            //BenchmarkRunner.Run<ImMapBenchmarks.Populate>();
+            BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
 
             //BenchmarkRunner.Run<StructEnumerableTest>();
             //BenchmarkRunner.Run<PropertyAccess>();
