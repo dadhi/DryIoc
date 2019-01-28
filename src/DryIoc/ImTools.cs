@@ -833,16 +833,13 @@ namespace ImTools
         public bool IsEmpty => Height == 0;
 
         /// Returns a new tree with added or updated value for specified key.
-        public ImMap<V> AddOrUpdate(int key, V value)
-        {
-            if (Height == 0)
-                return new ImMap<V>(key, value);
-
-            if (key == Key)
-                return new ImMap<V>(key, value, Left, Right, Height);
-
-            return AddOrUpdateImpl(key, value);
-        }
+        [MethodImpl((MethodImplOptions)256)]
+        public ImMap<V> AddOrUpdate(int key, V value) =>
+            Height == 0
+                ? new ImMap<V>(key, value)
+                : key == Key
+                    ? new ImMap<V>(key, value, Left, Right, Height)
+                    : AddOrUpdateImpl(key, value);
 
         private ImMap<V> AddOrUpdateImpl(int key, V value)
         {
@@ -949,12 +946,14 @@ namespace ImTools
         /// <param name="key">Key</param> <param name="value">Value</param>
         /// <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
         /// <returns>New tree.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> AddOrUpdate(int key, V value, Update<V> updateValue) =>
             AddOrUpdateImpl(key, value, false, updateValue);
 
         /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <returns>New tree if key is found, or the same tree otherwise.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> Update(int key, V value) =>
             AddOrUpdateImpl(key, value, true, null);
 
@@ -990,6 +989,7 @@ namespace ImTools
         /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
         /// <param name="key">Key to look for.</param> 
         /// <returns>New tree with removed or updated value.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> Remove(int key) =>
             RemoveImpl(key);
 
@@ -998,9 +998,7 @@ namespace ImTools
 
         #region Implementation
 
-        internal ImMap()
-        {
-        }
+        internal ImMap() {}
 
         internal ImMap(int key, V value)
         {
