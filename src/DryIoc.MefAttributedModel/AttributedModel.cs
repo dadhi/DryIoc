@@ -501,7 +501,7 @@ namespace DryIoc.MefAttributedModel
         private static bool CanBeExported(Type type) =>
             type.IsClass() && !type.IsCompilerGenerated();
 
-        private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) =>
+        private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) => 
             new ReuseInfo { ReuseType = attribute.CreationPolicy == CreationPolicy.NonShared ? ReuseType.Transient : ReuseType.Singleton };
 
         /// <summary>Converts reuse info into pre-defined (<see cref="SupportedReuseTypes"/>) or custom reuse object.</summary>
