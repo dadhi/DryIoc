@@ -1773,7 +1773,7 @@ namespace DryIoc
                 return true;
             }
 
-            private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered) =>
+            private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered) => 
                 serviceKey == null ? 
                     WithDefaultService(factory, serviceType, ifAlreadyRegistered) : 
                     WithKeyedService(factory, serviceType, ifAlreadyRegistered, serviceKey);
@@ -1785,7 +1785,7 @@ namespace DryIoc
             private static object IfAlreadyRegisteredThrowDefaultService(Type serviceType, object oldEntry, object newEntry) => 
                 oldEntry == null ? newEntry
                 : oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
-                    ? (object)oldFactoriesEntry.With((Factory)newEntry)
+                    ? (object)oldFactoriesEntry.With((Factory) newEntry)
                     : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, newEntry, oldEntry);
 
             private static object IfAlreadyRegisteredReplaceDefaultService(Type _, object oldEntry, object newEntry)
@@ -7024,7 +7024,7 @@ namespace DryIoc
             int decoratedFactoryID)
             : this(container, parent, flags, serviceInfo, inputArgExprs)
         {
-            SetResolvedFactory(factory, factoryID, factoryType, factoryImplType, reuse, decoratedFactoryID);
+            SetResolvedFactory(factory , factoryID, factoryType, factoryImplType, reuse, decoratedFactoryID);
         }
 
         private void SetResolvedFactory(Factory factory, int factoryID, FactoryType factoryType,
@@ -7037,7 +7037,7 @@ namespace DryIoc
 
             _hashCode = Hasher.Combine(DirectParent?._hashCode ?? 0, FactoryID);
             _factoryImplType = factoryImplType;
-            
+             
             // runtime state
             Factory = factory;
 
