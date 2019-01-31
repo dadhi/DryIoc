@@ -10437,6 +10437,11 @@ namespace DryIoc
         public static IEnumerable<ConstructorInfo> PublicConstructors(this Type type) =>
             type.GetTypeInfo().DeclaredConstructors.Match(c => c.IsPublic && !c.IsStatic);
 
+        /// <summary>Returns all public instance constructors for the type</summary>
+        public static IEnumerable<ConstructorInfo> PublicAndInternalConstructors(this Type type) =>
+            type.GetTypeInfo().DeclaredConstructors.Match(c => !c.IsPrivate && !c.IsStatic);
+
+
         /// <summary>Enumerates all constructors from input type.</summary>
         public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)

@@ -165,37 +165,52 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [Export, AsResolutionRoot]
-    public class ServiceWithMultipleCostructors
+    public class ServiceWithMultipleConstructors
     {
         public ITransientService Transient { get; private set; }
         public ISingletonService Singleton { get; private set; }
 
-        public ServiceWithMultipleCostructors(ISingletonService singleton)
+        public ServiceWithMultipleConstructors(ISingletonService singleton)
         {
             Singleton = singleton;
         }
 
-        public ServiceWithMultipleCostructors(ITransientService transient)
+        public ServiceWithMultipleConstructors(ITransientService transient)
         {
             Transient = transient;
         }
     }
 
     [Export, AsResolutionRoot]
-    public class ServiceWithMultipleCostructorsAndOneImporting
+    public class ServiceWithMultipleConstructorsAndOneImporting
     {
         public ITransientService Transient { get; private set; }
         public ISingletonService Singleton { get; private set; }
 
-        public ServiceWithMultipleCostructorsAndOneImporting(ISingletonService singleton)
+        public ServiceWithMultipleConstructorsAndOneImporting(ISingletonService singleton)
         {
             Singleton = singleton;
         }
 
         [ImportingConstructor]
-        public ServiceWithMultipleCostructorsAndOneImporting(ITransientService transient)
+        public ServiceWithMultipleConstructorsAndOneImporting(ITransientService transient)
         {
             Transient = transient;
+        }
+    }
+
+    [Export, AsResolutionRoot]
+    public class ServiceWithInternalImportingConstructor
+    {
+        public ServiceWithInternalImportingConstructor(bool x)
+        {
+
+        }
+
+        [ImportingConstructor]
+        internal ServiceWithInternalImportingConstructor()
+        {
+
         }
     }
 

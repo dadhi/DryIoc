@@ -525,9 +525,14 @@ namespace DryIoc.MefAttributedModel
         private static FactoryMethod GetImportingConstructor(DryIoc.Request request, FactoryMethodSelector fallbackSelector = null)
         {
             var implType = request.ImplementationType;
-            var ctors = implType.PublicConstructors().ToArrayOrSelf();
-            var ctor = ctors.Length == 1 ? ctors[0]
-                : ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+            var ctors = implType.PublicAndInternalConstructors().ToArrayOrSelf();
+            var ctor = ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+
+            if (ctor == null)
+            {
+                ctors = ctors.Where(it => it.IsPublic).ToArrayOrSelf();
+                ctor = ctors.Length == 1 ? ctors[0] : null;
+            }
 
             if (ctor == null)
             {
