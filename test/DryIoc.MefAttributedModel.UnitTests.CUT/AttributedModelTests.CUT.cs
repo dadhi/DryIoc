@@ -466,7 +466,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [Export("a")]
         public class Fooh<A>
         {
-            public Fooh(A a) { }
+            public Fooh(A a) {}
         }
 
         [Export]
@@ -481,7 +481,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [Export]
-    public class A1 {}
+    public class A1 { }
 
     public interface IItem<T> {}
 
