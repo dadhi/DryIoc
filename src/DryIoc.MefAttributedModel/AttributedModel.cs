@@ -1769,7 +1769,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
-        public StringBuilder ToCode(StringBuilder code = null) =>
+        public StringBuilder ToCode(StringBuilder code = null) => 
             (code ?? new StringBuilder())
                 .Append("new WrapperInfo { WrappedServiceTypeArgIndex = ")
                 .AppendCode(WrappedServiceTypeArgIndex).Append(", AlwaysWrapsRequiredServiceType = ")
