@@ -265,7 +265,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     {
     }
 
-    [ExportMany(Except = new[] { typeof(IAnotherDb) })]
+    [ExportMany(Except = new []{ typeof(IAnotherDb) })]
     public class DbMan<T> : ISomeDb<T>, IAnotherDb
     {
     }
@@ -286,7 +286,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [Export, PartCreationPolicy(CreationPolicy.NonShared)]
-    public class Me { }
+    public class Me {}
 
     [Export, PartCreationPolicy(CreationPolicy.NonShared)]
     public class LazyDepClient
@@ -370,7 +370,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [Export, AsResolutionCall, TransientReuse]
-    public class A { }
+    public class A {}
 
     [Export, AsResolutionRoot, TransientReuse]
     public class B
@@ -466,7 +466,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [Export("a")]
         public class Fooh<A>
         {
-            public Fooh(A a) { }
+            public Fooh(A a) {}
         }
 
         [Export]
@@ -481,9 +481,9 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     [Export]
-    public class A1 { }
+    public class A1 {}
 
-    public interface IItem<T> { }
+    public interface IItem<T> {}
 
     [ExportMany]
     public class IntItem : IItem<int> { }
@@ -572,7 +572,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
 
     [ExportMany, AsResolutionRoot]
     public class OpGen<T> : IOpGen<T> { }
-
+    
     public class Aa { }
     public class Bb : Aa { }
 
