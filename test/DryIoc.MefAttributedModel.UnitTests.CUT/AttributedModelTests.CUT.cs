@@ -466,7 +466,7 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         [Export("a")]
         public class Fooh<A>
         {
-            public Fooh(A a) {}
+            public Fooh(A a) { }
         }
 
         [Export]
@@ -566,13 +566,13 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
     }
 
     public interface IOpGen<out T> { }
-
+    
     [ExportMany, AsResolutionRoot]
     public class ClGen : IOpGen<string> { }
 
     [ExportMany, AsResolutionRoot]
     public class OpGen<T> : IOpGen<T> { }
-    
+
     public class Aa { }
     public class Bb : Aa { }
 
