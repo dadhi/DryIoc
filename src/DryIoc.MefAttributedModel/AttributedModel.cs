@@ -965,22 +965,22 @@ namespace DryIoc.MefAttributedModel
         {
             _store.Swap(it => it
                 .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
-                 {
-                     var newType = newTypes[0].Key;
-                     var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
-                     if (typeAndCountIndex != -1)
-                     {
-                         var typeAndCount = types[typeAndCountIndex];
+                  {
+                      var newType = newTypes[0].Key;
+                      var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
+                      if (typeAndCountIndex != -1)
+                      {
+                          var typeAndCount = types[typeAndCountIndex];
 
-                         // Change the serviceKey only when multiple same types are registered with the same key
-                         serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                          // Change the serviceKey only when multiple same types are registered with the same key
+                          serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
-                         typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
-                         return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
-                     }
+                          typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
+                          return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
+                      }
 
-                     return types.Append(newTypes);
-                 }));
+                      return types.Append(newTypes);
+                  }));
 
             return serviceKey;
         }
@@ -1110,7 +1110,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys are strings.</summary>
-        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code,
+        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code, 
             IDictionary<string, TValue> dictionary, Func<StringBuilder, string, TValue, StringBuilder> appendValue = null)
         {
             if (appendValue == null)
