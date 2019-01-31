@@ -173,6 +173,90 @@ namespace PerformanceTests
             }
         }
 
+        public class R
+        {
+            public Single1    Single1 { get; }
+            public Single2    Single2 { get; }
+
+            public Scoped1    Scoped1 { get; }
+            public Scoped2    Scoped2 { get; }
+
+            public Trans1     Trans1 { get; }
+            public Trans2     Trans2 { get; }
+
+            public ScopedFac1 ScopedFac1 { get; }
+            public ScopedFac2 ScopedFac2 { get; }
+
+            public SingleObj1 SingleObj1 { get; }
+            public SingleObj2 SingleObj2 { get; }
+
+            public R(
+                Single1 single1,
+                Single2 single2,
+                Scoped1 scoped1,
+                Scoped2 scoped2,
+                Trans1  trans1,
+                Trans2  trans2,
+                ScopedFac1 scopedFac1,
+                ScopedFac2 scopedFac2,
+                SingleObj1 singleObj1,
+                SingleObj2 singleObj2
+            )
+            {
+                Single1 = single1;
+                Single2 = single2;
+                Scoped1 = scoped1;
+                Scoped2 = scoped2;
+                Trans1  = trans1;
+                Trans2  = trans2;
+                ScopedFac1 = scopedFac1;
+                ScopedFac2 = scopedFac2;
+                SingleObj1 = singleObj1;
+                SingleObj2 = singleObj2;
+            }
+        }
+
+        public class Single1
+        {
+        }
+
+        public class Single2
+        {
+        }
+
+        public class Scoped1
+        {
+        }
+
+        public class Scoped2
+        {
+        }
+
+        public class SingleObj1
+        {
+        }
+
+        public class SingleObj2
+        {
+        }
+
+        public class ScopedFac1
+        {
+        }
+
+        public class ScopedFac2
+        {
+        }
+
+        public class Trans1
+        {
+        }
+
+        public class Trans2
+        {
+        }
+
+
         /*
         ## 28.11.2018
         BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
