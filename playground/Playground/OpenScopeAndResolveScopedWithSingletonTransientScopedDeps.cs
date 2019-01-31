@@ -449,7 +449,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
-        public class OpenScopeResolveAfterWarmUp
+        public class SecondOpenScopeResolve
         {
             /*
 ## 25.01.2019
@@ -506,5 +506,63 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             public object BmarkSimpleInjector() => Measure(_simpleInjector);
         }
 
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        public class ThirdOpenScopeResolve
+        {
+            /*
+            ## 31.01.2019
+            */
+
+            private static readonly IContainer _autofac = PrepareAutofac();
+            private static readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
+            private static readonly IServiceProvider _msDi = PrepareMsDi();
+            private static readonly DependencyInjectionContainer _grace = PrepareGrace();
+            private static readonly ServiceContainer _lightInject = PrepareLightInject();
+            private static readonly Lamar.Container _lamar = PrepareLamar();
+            private static readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
+
+            [GlobalSetup]
+            public void WarmUp()
+            {
+                for (var i = 0; i < 5; i++)
+                {
+                    Measure(_autofac);
+                    Measure(_autofac);
+
+                    Measure(_dryioc);
+                    Measure(_dryioc);
+
+                    Measure(_msDi);
+                    Measure(_msDi);
+
+                    Measure(_grace);
+                    Measure(_grace);
+
+                    Measure(_lightInject);
+                    Measure(_lightInject);
+                }
+            }
+
+            [Benchmark]
+            public object BmarkAutofac() => Measure(_autofac);
+
+            [Benchmark]
+            public object BmarkDryIoc() => Measure(_dryioc);
+
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftSDependencyInjection() => Measure(_msDi);
+
+            [Benchmark]
+            public object BmarkGrace() => Measure(_grace);
+
+            [Benchmark]
+            public object BmarkLightInject() => Measure(_lightInject);
+
+            //[Benchmark]
+            public object BmarkLamar() => Measure(_lamar);
+
+            //[Benchmark]
+            public object BmarkSimpleInjector() => Measure(_simpleInjector);
+        }
     }
 }
