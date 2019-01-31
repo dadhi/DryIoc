@@ -17,7 +17,7 @@
         <PackageReleaseNotes>
 <![CDATA[
 v4.0.0
-- breaking: Strong-name signed
+- breaking: Strong-name signed!
 - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
 - fixed: #7 Context-based injection
 - fixed: #16 AutoConcreteTypeResolution should not consider a primitive type

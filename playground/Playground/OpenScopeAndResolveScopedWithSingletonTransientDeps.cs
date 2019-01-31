@@ -1,6 +1,7 @@
 using System;
 using Autofac;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Order;
 using DryIoc;
 using Grace.DependencyInjection;
 using LightInject;
@@ -166,8 +167,18 @@ namespace PerformanceTests
                         BmarkGrace |   146.3 ns | 0.8087 ns | 0.7565 ns |  0.61 |    0.01 |      0.0677 |           - |           - |               320 B |
                   BmarkLightInject |   593.7 ns | 1.5277 ns | 1.4290 ns |  2.48 |    0.02 |      0.1554 |           - |           - |               736 B |
 
+        ## 25.01.2019: After some work on perf and memory utilization
+
+                            Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |   114.9 ns | 0.3553 ns | 0.3324 ns |  0.47 |    0.00 |      0.0627 |           - |           - |               296 B |
+                        BmarkGrace |   153.3 ns | 0.4556 ns | 0.4262 ns |  0.63 |    0.00 |      0.0677 |           - |           - |               320 B |
+ BmarkMicrosoftDependencyInjection |   243.0 ns | 1.0791 ns | 1.0094 ns |  1.00 |    0.00 |      0.0691 |           - |           - |               328 B |
+                  BmarkLightInject |   609.3 ns | 3.6483 ns | 3.4126 ns |  2.51 |    0.02 |      0.1554 |           - |           - |               736 B |
+                      BmarkAutofac | 1,654.2 ns | 6.8377 ns | 5.7098 ns |  6.81 |    0.04 |      0.5322 |           - |           - |              2512 B |
+
         */
-        [MemoryDiagnoser]
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class FirstTimeOpenScopeResolve
         {
             private readonly IContainer _autofac = PrepareAutofac();
@@ -244,7 +255,7 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
        BmarkGrace |   148.5 ns |  0.6353 ns |   0.5943 ns |  1.11 |    0.00 |      0.0608 |           - |           - |               288 B |
  BmarkLightInject |   648.4 ns |  5.4780 ns |   5.1241 ns |  4.87 |    0.05 |      0.1488 |           - |           - |               704 B |
 
-            ## 25.11.2018: Adding MS.DI as reference
+## 25.11.2018: Adding MS.DI as reference
 
                             Method |       Mean |     Error |    StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |-----------:|----------:|----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -254,8 +265,17 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
                         BmarkGrace | 540.672 us | 4.1734 us | 3.9038 us | 142.19 |    1.34 |      5.8594 |      2.9297 |           - |            30.24 KB |
                   BmarkLightInject | 426.462 us | 4.2650 us | 3.9895 us | 112.15 |    1.27 |      6.8359 |      3.4180 |           - |            32.42 KB |
 
+## 25.01.2019: Results after some work on memory and performance
+
+                            Method |       Mean |     Error |    StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|----------:|----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |   3.193 us | 0.0117 us | 0.0110 us |   0.84 |    0.01 |      0.7782 |           - |           - |              3.6 KB |
+ BmarkMicrosoftDependencyInjection |   3.823 us | 0.0297 us | 0.0278 us |   1.00 |    0.00 |      0.9232 |           - |           - |             4.26 KB |
+                      BmarkAutofac |  30.870 us | 0.2843 us | 0.2660 us |   8.08 |    0.08 |      5.2185 |           - |           - |            24.15 KB |
+                  BmarkLightInject | 435.833 us | 3.6918 us | 3.4533 us | 114.01 |    1.03 |      6.8359 |      3.4180 |           - |            32.42 KB |
+                        BmarkGrace | 552.673 us | 3.3771 us | 3.1590 us | 144.57 |    1.06 |      5.8594 |      2.9297 |           - |            30.24 KB |
  */
-        [MemoryDiagnoser]
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerRegister_FirstTimeOpenScopeResolve
         {
             [Benchmark]

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -8,6 +8,16 @@ namespace ImTools.UnitTests
     [TestFixture]
     public class HashTreeTests
     {
+        [Test]
+        public void Empty_tree_is_fine_for_GetValueOrDefault()
+        {
+            var map = ImHashMap<Type, string>.Empty;
+
+            var result = map.GetValueOrDefault(typeof(HashTreeTests));
+
+            Assert.IsNull(result);
+        }
+
         [Test]
         public void Tree_should_support_arbitrary_keys_by_using_their_hash_code()
         {

@@ -1096,8 +1096,7 @@ namespace DryIoc
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return factories;
 
-            return CombineRegisteredWithDynamicFactories(
-                factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
+            return CombineRegisteredWithDynamicFactories(factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
         }
 
         private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry) =>
@@ -1710,7 +1709,7 @@ namespace DryIoc
                 return factory.FactoryType == FactoryType.Service
                         ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, factory.One(), ArrayTools.Append))
+                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, factory.One(), out _, out _, (_, old, x) => ArrayTools.Append(old, x)))
                         : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
             }
 

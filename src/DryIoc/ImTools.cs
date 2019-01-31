@@ -45,7 +45,7 @@ namespace ImTools
         public static R Do<T, R>(this T x, Func<T, R> @do) => @do(x);
 
         /// <summary>Piping</summary>
-        public static void Do<T>(this T x, Action<T> @do) =>  @do(x);
+        public static void Do<T>(this T x, Action<T> @do) => @do(x);
     }
 
     /// <summary>Helpers for lazy instantiations</summary>
@@ -166,6 +166,7 @@ namespace ImTools
                     if (Equals(item, value))
                         return i;
                 }
+
             return -1;
         }
 
@@ -209,6 +210,7 @@ namespace ImTools
                     if (predicate(item))
                         return item;
                 }
+
             return default(T);
         }
 
@@ -217,7 +219,7 @@ namespace ImTools
         /// <param name="source">items collection to search</param>
         /// <param name="predicate">condition to evaluate for each item.</param>
         /// <returns>First item matching condition or default value.</returns>
-        public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) => 
+        public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
             source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
 
         /// <summary>Returns element if collection consist on single element, otherwise returns default value.
@@ -328,8 +330,8 @@ namespace ImTools
                 var condition1 = condition(source[1]);
                 return condition0 && condition1 ? new[] { source[0], source[1] }
                     : condition0 ? new[] { source[0] }
-                        : condition1 ? new[] { source[1] }
-                            : Empty<T>();
+                    : condition1 ? new[] { source[1] }
+                    : Empty<T>();
             }
 
             var matchStart = 0;
@@ -347,6 +349,7 @@ namespace ImTools
                         matches = AppendTo(source, matchStart, i - matchStart, matches);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
+
                 ++i;
             }
 
@@ -388,9 +391,9 @@ namespace ImTools
                 var condition0 = condition(source[0]);
                 var condition1 = condition(source[1]);
                 return condition0 && condition1 ? new[] { map(source[0]), map(source[1]) }
-                : condition0 ? new[] { map(source[0]) }
-                : condition1 ? new[] { map(source[1]) }
-                : Empty<R>();
+                    : condition0 ? new[] { map(source[0]) }
+                    : condition1 ? new[] { map(source[1]) }
+                    : Empty<R>();
             }
 
             var matchStart = 0;
@@ -408,6 +411,7 @@ namespace ImTools
                         matches = AppendTo(source, matchStart, i - matchStart, map, matches);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
+
                 ++i;
             }
 
@@ -457,7 +461,7 @@ namespace ImTools
         /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
         /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
         /// <returns>Converted items</returns>
-        public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map) => 
+        public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map) =>
             source is T[] arr ? arr.Map(map) : source?.Select(map);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
@@ -465,7 +469,7 @@ namespace ImTools
         /// <param name="source">If null, the null will be returned.</param>
         /// <param name="condition">Condition to keep items.</param>
         /// <returns>Result items, may be an array.</returns>
-        public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) => 
+        public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
             source is T[] arr ? arr.Match(condition) : source?.Where(condition);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
@@ -474,7 +478,7 @@ namespace ImTools
         /// <param name="source">If null, the null will be returned.</param>
         /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
         /// <returns>Result items, may be an array.</returns>
-        public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) => 
+        public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
             source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
     }
 
@@ -554,8 +558,10 @@ namespace ImTools
         }
 
         private const int RETRY_COUNT_UNTIL_THROW = 50;
+
         private static readonly string _errorRetryCountExceeded =
-            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW + " times But there is always someone else intervened.";
+            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW +
+            " times But there is always someone else intervened.";
     }
 
     /// <summary>Printable thingy via provided printer </summary>
@@ -605,12 +611,12 @@ namespace ImTools
 
         /// <inheritdoc />
         public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-             s.Append("(").Do(b => Key == null ? b : printer(b, Key))
-              .Append(", ").Do(b => Value == null ? b : printer(b, Value))
-              .Append(')');
+            s.Append("(").Do(b => Key == null ? b : printer(b, Key))
+                .Append(", ").Do(b => Value == null ? b : printer(b, Value))
+                .Append(')');
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
-        public override string ToString() => 
+        public override string ToString() =>
             Print(new StringBuilder(), (s, x) => s.Append(x)).ToString();
 
         /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
@@ -709,7 +715,9 @@ namespace ImTools
 
         #region Implementation
 
-        private ImList() { }
+        private ImList()
+        {
+        }
 
         private ImList(T head, ImList<T> tail)
         {
@@ -788,9 +796,9 @@ namespace ImTools
         }
 
         /// <summary>Copies list to array.</summary> 
-        public static T[] ToArray<T>(this ImList<T> source) => 
+        public static T[] ToArray<T>(this ImList<T> source) =>
             source.IsEmpty ? ArrayTools.Empty<T>() :
-            source.Tail.IsEmpty ? new[] {source.Head} : 
+            source.Tail.IsEmpty ? new[] { source.Head } :
             source.Enumerate().ToArray();
     }
 
@@ -824,57 +832,132 @@ namespace ImTools
         /// <summary>Returns true is tree is empty.</summary>
         public bool IsEmpty => Height == 0;
 
-        /// <summary>Returns new tree with added or updated value for specified key.</summary>
-        /// <param name="key"></param> <param name="value"></param>
-        /// <returns>New tree.</returns>
+        /// Returns a new tree with added or updated value for specified key.
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> AddOrUpdate(int key, V value) =>
-            AddOrUpdateImpl(key, value);
+            Height == 0
+                ? new ImMap<V>(key, value)
+                : key == Key
+                    ? new ImMap<V>(key, value, Left, Right, Height)
+                    : AddOrUpdateImpl(key, value);
+
+        private ImMap<V> AddOrUpdateImpl(int key, V value)
+        {
+            if (key < Key)
+            {
+                if (Left.Height == 0)
+                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, 2);
+
+                if (Left.Key == key)
+                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, Height);
+
+                if (Right.Height == 0)
+                {
+                    // single rotation:
+                    //      5     =>     2
+                    //   2            1     5
+                    // 1              
+                    if (key < Left.Key)
+                        return new ImMap<V>(Left.Key, Left.Value,
+                            new ImMap<V>(key, value), new ImMap<V>(Key, Value), 2);
+
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2            4            2     5
+                    //     4        2               
+                    return new ImMap<V>(key, value,
+                        new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
+                }
+
+                var newLeft = Left.AddOrUpdateImpl(key, value);
+
+                if (newLeft.Height > Right.Height + 1) // left is longer by 2, rotate left
+                {
+                    var leftLeft = newLeft.Left;
+                    var leftRight = newLeft.Right;
+
+                    // single rotation:
+                    //      5     =>     2
+                    //   2     6      1     5
+                    // 1   4              4   6
+                    if (leftLeft.Height >= leftRight.Height)
+                        return new ImMap<V>(newLeft.Key, newLeft.Value,
+                            leftLeft, new ImMap<V>(Key, Value, leftRight, Right));
+                    
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2     6      4     6      2     5
+                    // 1   4        2   3        1   3     6
+                    //    3        1
+                    return new ImMap<V>(leftRight.Key, leftRight.Value,
+                        new ImMap<V>(newLeft.Key, newLeft.Value, leftLeft, leftRight.Left),
+                        new ImMap<V>(Key, Value, leftRight.Right, Right));
+                }
+
+                return new ImMap<V>(Key, Value, newLeft, Right);
+            }
+            else
+            {
+                if (Right.Height == 0)
+                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), 2);
+
+                if (Right.Key == key)
+                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), Height);
+
+                if (Left.Height == 0)
+                {
+                    // single rotation:
+                    //      5     =>     8     
+                    //         8      5     9
+                    //           9
+                    if (key >= Right.Key)
+                        return new ImMap<V>(Right.Key, Right.Value,
+                            new ImMap<V>(Key, Value), new ImMap<V>(key, value), 2);
+
+                    // double rotation:
+                    //      5     =>     5     =>     7
+                    //         8            7      5     8
+                    //        7              8
+                    return new ImMap<V>(key, value,
+                        new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
+                }
+
+                var newRight = Right.AddOrUpdateImpl(key, value);
+
+                if (newRight.Height > Left.Height + 1)
+                {
+                    var rightLeft = newRight.Left;
+                    var rightRight = newRight.Right;
+
+                    if (rightRight.Height >= rightLeft.Height)
+                        return new ImMap<V>(newRight.Key, newRight.Value,
+                            new ImMap<V>(Key, Value, Left, rightLeft), rightRight);
+
+                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
+                        new ImMap<V>(Key, Value, Left, rightLeft.Left),
+                        new ImMap<V>(newRight.Key, newRight.Value, rightLeft.Right, rightRight));
+                }
+
+                return new ImMap<V>(Key, Value, Left, newRight);
+            }
+        }
 
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key">Key</param> <param name="value">Value</param>
         /// <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
         /// <returns>New tree.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> AddOrUpdate(int key, V value, Update<V> updateValue) =>
             AddOrUpdateImpl(key, value, false, updateValue);
 
         /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
         /// <param name="key"></param> <param name="value"></param>
         /// <returns>New tree if key is found, or the same tree otherwise.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> Update(int key, V value) =>
             AddOrUpdateImpl(key, value, true, null);
 
-        /// <summary>Get value for found key or null otherwise.</summary>
-        /// <param name="key"></param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
-        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        public V GetValueOrDefault(int key, V defaultValue = default(V))
-        {
-            var node = this;
-            while (node.Height != 0 && node.Key != key)
-                node = key < node.Key ? node.Left : node.Right;
-            return node.Height != 0 ? node.Value : defaultValue;
-        }
-
-        /// <summary>Returns true if key is found and sets the value.</summary>
-        /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
-        /// <returns>True if key found, false otherwise.</returns>
-        public bool TryFind(int key, out V value)
-        {
-            var hash = key.GetHashCode();
-
-            var node = this;
-            while (node.Height != 0 && node.Key != key)
-                node = hash < node.Key ? node.Left : node.Right;
-
-            if (node.Height != 0)
-            {
-                value = node.Value;
-                return true;
-            }
-
-            value = default(V);
-            return false;
-        }
-
+        // todo: Leak, cause returned ImMap references left and right sub-trees - replace with `KeyValuePair`
         /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
         /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
         public IEnumerable<ImMap<V>> Enumerate()
@@ -906,6 +989,7 @@ namespace ImTools
         /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
         /// <param name="key">Key to look for.</param> 
         /// <returns>New tree with removed or updated value.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> Remove(int key) =>
             RemoveImpl(key);
 
@@ -914,9 +998,9 @@ namespace ImTools
 
         #region Implementation
 
-        private ImMap() { }
+        internal ImMap() {}
 
-        private ImMap(int key, V value)
+        internal ImMap(int key, V value)
         {
             Key = key;
             Value = value;
@@ -925,7 +1009,7 @@ namespace ImTools
             Height = 1;
         }
 
-        private ImMap(int key, V value, ImMap<V> left, ImMap<V> right, int height)
+        internal ImMap(int key, V value, ImMap<V> left, ImMap<V> right, int height)
         {
             Key = key;
             Value = value;
@@ -934,49 +1018,36 @@ namespace ImTools
             Height = height;
         }
 
-        private ImMap(int key, V value, ImMap<V> left, ImMap<V> right)
+        internal ImMap(int key, V value, ImMap<V> left, ImMap<V> right)
         {
             Key = key;
             Value = value;
             Left = left;
             Right = right;
-            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
-        }
-
-        private ImMap<V> AddOrUpdateImpl(int key, V value)
-        {
-            return Height == 0  // add new node
-                ? new ImMap<V>(key, value)
-                : (key == Key // update found node
-                    ? new ImMap<V>(key, value, Left, Right)
-                    : (key < Key  // search for node
-                        ? (Height == 1
-                            ? new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, height: 2)
-                            : CreateBalanced(Key, Value, Left.AddOrUpdateImpl(key, value), Right))
-                        : (Height == 1
-                            ? new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), height: 2)
-                            : CreateBalanced(Key, Value, Left, Right.AddOrUpdateImpl(key, value)))));
+            Height = left.Height > right.Height ? left.Height + 1 : right.Height + 1;
         }
 
         private ImMap<V> AddOrUpdateImpl(int key, V value, bool updateOnly, Update<V> update)
         {
-            return Height == 0 ? // tree is empty
+            return Height == 0
+                ? // tree is empty
                 (updateOnly ? this : new ImMap<V>(key, value))
-                : (key == Key ? // actual update
+                : (key == Key
+                    ? // actual update
                     new ImMap<V>(key, update == null ? value : update(Value, value), Left, Right)
-                    : (key < Key    // try update on left or right sub-tree
-                        ? CreateBalanced(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
-                        : CreateBalanced(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
+                    : (key < Key // try update on left or right sub-tree
+                        ? Balance(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
+                        : Balance(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
         }
 
-        private static ImMap<V> CreateBalanced(int key, V value, ImMap<V> left, ImMap<V> right)
+        internal static ImMap<V> Balance(int key, V value, ImMap<V> left, ImMap<V> right)
         {
             var delta = left.Height - right.Height;
-            if (delta >= 2) // left is longer by 2, rotate left
+            if (delta > 1) // left is longer by 2, rotate left
             {
                 var leftLeft = left.Left;
                 var leftRight = left.Right;
-                if (leftRight.Height - leftLeft.Height == 1)
+                if (leftRight.Height > leftLeft.Height)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
@@ -984,36 +1055,33 @@ namespace ImTools
                     // 1   4        2   3        1   3     6
                     //    3        1
                     return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        left: new ImMap<V>(left.Key, left.Value,
-                            left: leftLeft, right: leftRight.Left), right: new ImMap<V>(key, value,
-                            left: leftRight.Right, right: right));
+                        new ImMap<V>(left.Key, left.Value, leftLeft, leftRight.Left),
+                        new ImMap<V>(key, value, leftRight.Right, right));
                 }
 
-                // todo: do we need this?
-                // one rotation:
+                // single rotation:
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
                 return new ImMap<V>(left.Key, left.Value,
-                    left: leftLeft, right: new ImMap<V>(key, value,
-                        left: leftRight, right: right));
+                    leftLeft,
+                    new ImMap<V>(key, value, leftRight, right));
             }
 
-            if (delta <= -2)
+            if (delta < -1)
             {
                 var rightLeft = right.Left;
                 var rightRight = right.Right;
-                if (rightLeft.Height - rightRight.Height == 1)
+                if (rightLeft.Height > rightRight.Height)
                 {
                     return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        left: new ImMap<V>(key, value,
-                            left: left, right: rightLeft.Left), right: new ImMap<V>(right.Key, right.Value,
-                            left: rightLeft.Right, right: rightRight));
+                        new ImMap<V>(key, value, left, rightLeft.Left),
+                        new ImMap<V>(right.Key, right.Value, rightLeft.Right, rightRight));
                 }
 
                 return new ImMap<V>(right.Key, right.Value,
-                    left: new ImMap<V>(key, value,
-                        left: left, right: rightLeft), right: rightRight);
+                    new ImMap<V>(key, value, left, rightLeft),
+                    rightRight);
             }
 
             return new ImMap<V>(key, value, left, right);
@@ -1040,18 +1108,49 @@ namespace ImTools
                     var successor = Right;
                     while (!successor.Left.IsEmpty) successor = successor.Left;
                     result = new ImMap<V>(successor.Key, successor.Value,
-                        Left, Right.RemoveImpl(successor.Key, ignoreKey: true));
+                        Left, Right.RemoveImpl(successor.Key, true));
                 }
             }
             else if (key < Key)
-                result = CreateBalanced(Key, Value, Left.RemoveImpl(key), Right);
+                result = Balance(Key, Value, Left.RemoveImpl(key), Right);
             else
-                result = CreateBalanced(Key, Value, Left, Right.RemoveImpl(key));
+                result = Balance(Key, Value, Left, Right.RemoveImpl(key));
 
             return result;
         }
 
         #endregion
+    }
+
+    /// ImMap methods
+    public static class ImMap
+    {
+        /// Get value for found key or default value otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImMap<V> map, int key, V defaultValue = default(V))
+        {
+            while (map.Height != 0 && map.Key != key)
+                map = key < map.Key ? map.Left : map.Right;
+            return map.Height != 0 ? map.Value : defaultValue;
+        }
+
+        /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
+        {
+            while (map.Height != 0)
+            {
+                if (map.Key == key)
+                {
+                    value = map.Value;
+                    return true;
+                }
+                map = key < map.Key ? map.Left : map.Right;
+            }
+
+            value = default(V);
+            return false;
+        }
     }
 
     /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree 
@@ -1062,16 +1161,32 @@ namespace ImTools
         public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
 
         /// <summary>Calculated key hash.</summary>
-        public readonly int Hash;
+        public int Hash
+        {
+            [MethodImpl((MethodImplOptions) 256)]
+            get => _data.Hash;
+        }
 
         /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
-        public readonly K Key;
+        public K Key
+        {
+            [MethodImpl((MethodImplOptions)256)]
+            get => _data.Key;
+        }
 
         /// <summary>Value of any type V.</summary>
-        public readonly V Value;
+        public V Value
+        {
+            [MethodImpl((MethodImplOptions)256)]
+            get => _data.Value;
+        }
 
         /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
-        public readonly KV<K, V>[] Conflicts;
+        public KV<K, V>[] Conflicts
+        {
+            [MethodImpl((MethodImplOptions)256)]
+            get => _data.Conflicts;
+        } 
 
         /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImHashMap<K, V> Left;
@@ -1089,8 +1204,24 @@ namespace ImTools
         /// If value with the same key is exist then the value is replaced.</summary>
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <returns>New tree with added or updated key-value.</returns>
-        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
-            AddOrUpdate(key.GetHashCode(), key, value);
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(K key, V value)
+        {
+            var isUpdated = false;
+            var oldValue = default(V);
+
+            var hash = key.GetHashCode();
+
+            if (Height == 0)
+                return new ImHashMap<K, V>(new Data(hash, key, value));
+
+            if (hash == Hash)
+                return ReferenceEquals(Key, key) || Key.Equals(key)
+                    ? UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue)
+                    : UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue);
+
+            return AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue);
+        }
 
         /// <summary>Returns new tree with added key-value. If value with the same key is exist, then
         /// if <paramref name="update"/> is not specified: then existing value will be replaced by <paramref name="value"/>;
@@ -1098,12 +1229,46 @@ namespace ImTools
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <param name="update">Update handler.</param>
         /// <returns>New tree with added or updated key-value.</returns>
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
-            AddOrUpdate(key.GetHashCode(), key, value, update);
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update)
+        {
+            var isUpdated = false;
+            var oldValue = default(V);
 
-        /// Returns the previous value if updated
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V updatedOldValue, Update<K, V> update) =>
-            AddOrUpdate(key.GetHashCode(), key, value, update, out isUpdated, out updatedOldValue);
+            var hash = key.GetHashCode();
+
+            if (Height == 0)
+                return new ImHashMap<K, V>(new Data(hash, key, value));
+
+            V Upd(K k, V oldVal, V newVal) => update(oldVal, newVal);
+
+            if (hash == Hash)
+                return ReferenceEquals(Key, key) || Key.Equals(key)
+                    ? UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, Upd)
+                    : UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, Upd);
+
+            return AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, Upd);
+        }
+
+        /// Allocation free for `update` using the key
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V oldValue, Update<K, V> update = null)
+        {
+            isUpdated = false;
+            oldValue = default(V);
+
+            var hash = key.GetHashCode();
+
+            if (Height == 0)
+                return new ImHashMap<K, V>(new Data(hash, key, value));
+
+            if (hash == Hash)
+                return ReferenceEquals(Key, key) || Key.Equals(key)
+                    ? UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, update)
+                    : UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update);
+
+            return AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+        }
 
         /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
         /// runs custom update handler (<paramref name="update"/>) with old and new value to get the updated result.</summary>
@@ -1112,22 +1277,9 @@ namespace ImTools
         /// <param name="update">(optional) Delegate for custom update logic, it gets old and new <paramref name="value"/>
         /// as inputs and should return updated value as output.</param>
         /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
             Update(key.GetHashCode(), key, value, update);
-
-        /// <summary>Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.</summary>
-        /// <param name="key">Key to look for.</param> <param name="defaultValue">(optional) Value to return if key is not found.</param>
-        /// <returns>Found value or <paramref name="defaultValue"/>.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public V GetValueOrDefault(K key, V defaultValue = default(V))
-        {
-            var t = this;
-            var hash = key.GetHashCode();
-            while (t.Height != 0 && t.Hash != hash)
-                t = hash < t.Hash ? t.Left : t.Right;
-            return t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key))
-                ? t.Value : t.GetConflictedValueOrDefault(key, defaultValue);
-        }
 
         /// <summary>Returns true if key is found and sets the value.</summary>
         /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
@@ -1138,12 +1290,12 @@ namespace ImTools
             var hash = key.GetHashCode();
 
             var t = this;
-            while (t.Height != 0 && t.Hash != hash)
-                t = hash < t.Hash ? t.Left : t.Right;
+            while (t.Height != 0 && t._data.Hash != hash)
+                t = hash < t._data.Hash ? t.Left : t.Right;
 
-            if (t.Height != 0 && (ReferenceEquals(key, t.Key) || key.Equals(t.Key)))
+            if (t.Height != 0 && (ReferenceEquals(key, t._data.Key) || key.Equals(t._data.Key)))
             {
-                value = t.Value;
+                value = t._data.Value;
                 return true;
             }
 
@@ -1195,155 +1347,258 @@ namespace ImTools
 
         #region Implementation
 
-        private ImHashMap() { }
-
-        private ImHashMap(int hash, K key, V value, KV<K, V>[] conflicts)
+        private sealed class Data
         {
-            Hash = hash;
-            Key = key;
-            Value = value;
-            Conflicts = conflicts;
+            public readonly int Hash;
+            public readonly K Key;
+            public readonly V Value;
 
+            public readonly KV<K, V>[] Conflicts;
+
+            public Data() { }
+
+            public Data(int hash, K key, V value, KV<K, V>[] conflicts = null)
+            {
+                Hash = hash;
+                Key = key;
+                Value = value;
+                Conflicts = conflicts;
+            }
+        }
+
+        private readonly Data _data;
+
+        private ImHashMap()
+        {
+            _data = new Data();
+        }
+
+        private ImHashMap(Data data)
+        {
+            _data = data;
             Left = Empty;
             Right = Empty;
             Height = 1;
         }
 
-        private ImHashMap(
-            int hash, K key, V value, KV<K, V>[] conflicts,
-            ImHashMap<K, V> left, ImHashMap<K, V> right)
+        private ImHashMap(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
-            Hash = hash;
-            Key = key;
-            Value = value;
-            Conflicts = conflicts;
-
+            _data = data;
             Left = left;
             Right = right;
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private ImHashMap(
-            int hash, K key, V value, KV<K, V>[] conflicts,
-            ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
+        private ImHashMap(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
         {
-            Hash = hash;
-            Key = key;
-            Value = value;
-            Conflicts = conflicts;
-
+            _data = data;
             Left = left;
             Right = right;
             Height = height;
         }
 
-        // todo: made public for benchmarking
-        /// <summary>It is fine</summary>
-        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value)
-        {
-            return Height == 0  // add new node
-                ? new ImHashMap<K, V>(hash, key, value, null)
-                : (hash == Hash // update found node
-                    ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                        ? new ImHashMap<K, V>(hash, key, value, Conflicts, Left, Right)
-                        : UpdateValueAndResolveConflicts(key, value, null, false))
-                    : (hash < Hash  // search for node
-                        ? (Height == 1
-                            ? new ImHashMap<K, V>(Hash, Key, Value, Conflicts,
-                                new ImHashMap<K, V>(hash, key, value, null), Right, height: 2)
-                            : CreateBalanced(Hash, Key, Value, Conflicts, Left.AddOrUpdate(hash, key, value), Right))
-                        : (Height == 1
-                            ? new ImHashMap<K, V>(Hash, Key, Value, Conflicts, Left, new ImHashMap<K, V>(hash, key, value, null), height: 2)
-                            : CreateBalanced(Hash, Key, Value, Conflicts, Left, Right.AddOrUpdate(hash, key, value)))));
-        }
-
-        private ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<V> update)
-        {
-            return Height == 0
-                ? new ImHashMap<K, V>(hash, key, value, null)
-                : hash == Hash // update
-                ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? new ImHashMap<K, V>(hash, key, update(Value, value), Conflicts, Left, Right)
-                    : UpdateValueAndResolveConflicts(key, value, update, false))
-                : (hash < Hash
-                    ? With(Left.AddOrUpdate(hash, key, value, update), Right)
-                    : With(Left, Right.AddOrUpdate(hash, key, value, update)));
-        }
-
         private ImHashMap<K, V> AddOrUpdate(
-            int hash, K key, V value, Update<K, V> update, out bool updated, out V oldValue)
+            int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
         {
-            updated = false;
-            oldValue = default(V);
+            if (hash < Hash)
+            {
+                if (Height == 1)
+                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
 
+                var left = Left;
+                if (left.Height == 0) 
+                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right, Height);
+
+                if (left.Hash == hash)
+                {
+                    var updatedLeft = ReferenceEquals(left.Key, key) || left.Key.Equals(key)
+                        ? left.UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, update)
+                        : left.UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update);
+                    return updatedLeft == left ? this : new ImHashMap<K, V>(_data, updatedLeft, Right);
+                }
+
+                if (left.Height == 1)
+                {
+                    if (Right.Height == 0)
+                    {
+                        // single rotation:
+                        //      5     =>     2
+                        //   2            1     5
+                        // 1                     
+                        if (hash < left.Hash)
+                            return new ImHashMap<K, V>(left._data,
+                                new ImHashMap<K, V>(new Data(hash, key, value)), new ImHashMap<K, V>(_data), 2);
+
+                        // double rotation:
+                        //      5     =>     5     =>     4
+                        //   2            4            2     5
+                        //     4        2                     
+                        return new ImHashMap<K, V>(new Data(hash, key, value),
+                            new ImHashMap<K, V>(left._data), new ImHashMap<K, V>(_data), 2);
+                    }
+
+                    if (hash < left.Hash)
+                        left = new ImHashMap<K, V>(left._data,
+                            new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
+                    else
+                        left = new ImHashMap<K, V>(left._data,
+                            Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
+                }
+                else
+                {
+                    var oldLeft = left;
+                    left = left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+                    if (oldLeft == left)
+                        return this;
+                }
+
+                if (left.Height > Right.Height + 1) // left is longer by 2, rotate left
+                {
+                    var leftLeft = left.Left;
+                    var leftRight = left.Right;
+
+                    // double rotation:
+                    //      5     =>     5     =>     4
+                    //   2     6      4     6      2     5
+                    // 1   4        2   3        1   3     6
+                    //    3        1
+                    if (leftRight.Height > leftLeft.Height)
+                        return new ImHashMap<K, V>(leftRight._data,
+                            new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left),
+                            new ImHashMap<K, V>(_data, leftRight.Right, Right));
+
+                    // single rotation:
+                    //      5     =>     2
+                    //   2     6      1     5
+                    // 1   4              4   6
+                    return new ImHashMap<K, V>(left._data,
+                        leftLeft, new ImHashMap<K, V>(_data, leftRight, Right));
+                }
+
+                return new ImHashMap<K, V>(_data, left, Right);
+            }
+            else
+            {
+                if (Height == 1)
+                    return new ImHashMap<K, V>(_data, Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
+
+                var right = Right;
+                if (right.Height == 0)
+                    return new ImHashMap<K, V>(_data, Left, new ImHashMap<K, V>(new Data(hash, key, value)), Height);
+
+                if (right.Hash == hash)
+                {
+                    var updatedRight = ReferenceEquals(right.Key, key) || right.Key.Equals(key)
+                        ? right.UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, update)
+                        : right.UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update);
+                    return updatedRight == right ? this : new ImHashMap<K, V>(_data, Left, updatedRight);
+                }
+
+                if (right.Height == 1)
+                {
+                    if (Left.Height == 0)
+                    {
+                        // double rotation:
+                        //    5     =>   5     =>     6
+                        //       8          6      5     8
+                        //      6            8
+                        if (hash < right.Hash)
+                            return new ImHashMap<K, V>(new Data(hash, key, value),
+                                new ImHashMap<K, V>(_data), new ImHashMap<K, V>(right._data), 2);
+
+                        // single rotation:
+                        //    5     =>    6
+                        //      6      5     8
+                        //       8
+                        return new ImHashMap<K, V>(right._data,
+                            new ImHashMap<K, V>(_data), new ImHashMap<K, V>(new Data(hash, key, value)), 2);
+                    }
+
+                    if (hash < right.Hash)
+                        right = new ImHashMap<K, V>(right._data,
+                            new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
+                    else
+                        right = new ImHashMap<K, V>(right._data,
+                            Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
+                }
+                else
+                {
+                    var oldRight = right;
+                    right = right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
+                    if (oldRight == right)
+                        return this;
+                }
+
+                if (right.Height > Left.Height + 1)
+                {
+                    var rightLeft = right.Left;
+                    var rightRight = right.Right;
+                    if (rightLeft.Height > rightRight.Height)
+                        return new ImHashMap<K, V>(rightLeft._data,
+                            new ImHashMap<K, V>(_data, Left, rightLeft.Left),
+                            new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
+
+                    return new ImHashMap<K, V>(right._data,
+                        new ImHashMap<K, V>(_data, Left, rightLeft), rightRight);
+                }
+
+                return new ImHashMap<K, V>(_data, Left, right);
+            }
+        }
+
+        private ImHashMap<K, V> UpdatedOrOld(int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
+        {
+            if (update != null)
+                value = update(key, Value, value);
+            if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
+                return this;
+            isUpdated = true;
+            oldValue = Value;
+            return new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right);
+        }
+
+        /// It is fine, made public for testing.
+        public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update = null)
+        {
             if (Height == 0)
-                return new ImHashMap<K, V>(hash, key, value, null);
+                return this;
 
             if (hash == Hash)
             {
                 if (ReferenceEquals(Key, key) || Key.Equals(key))
                 {
-                    var newValue = update(Key, Value, value);
-                    if (ReferenceEquals(newValue, Value) || newValue?.Equals(Value) == true)
-                        return this;
-
-                    updated = true;
-                    oldValue = Value;
-                    return new ImHashMap<K, V>(hash, key, newValue, Conflicts, Left, Right);
+                    if (update != null)
+                        value = update(Value, value);
+                    return new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right);
                 }
 
-                return UpdateValueAndResolveConflicts(key, value, update, false, ref updated, ref oldValue);
+                var isUpdated = false;
+                var oldValue = default(V);
+                return UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, 
+                    update == null ? (Update<K, V>)null : (k, v, nv) => update(v, nv), 
+                    true);
             }
 
-            return hash < Hash
-                ? With(Left.AddOrUpdate(hash, key, value, update, out updated, out oldValue), Right)
-                : With(Left, Right.AddOrUpdate(hash, key, value, update, out updated, out oldValue));
-        }
-
-
-        // todo: made public for benchmarking
-        /// <summary>It is fine</summary>
-        public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update)
-        {
-            return Height == 0 ? this
-                : hash == Hash
-                    ? (ReferenceEquals(Key, key) || Key.Equals(key)
-                        ? new ImHashMap<K, V>(hash, key, update == null ? value : update(Value, value), Conflicts, Left, Right)
-                        : UpdateValueAndResolveConflicts(key, value, update, true))
-                    : (hash < Hash
-                        ? With(Left.Update(hash, key, value, update), Right)
-                        : With(Left, Right.Update(hash, key, value, update)));
-        }
-
-        private ImHashMap<K, V> UpdateValueAndResolveConflicts(K key, V value, Update<V> update, bool updateOnly)
-        {
-            if (Conflicts == null) // add only if updateOnly is false.
-                return updateOnly ? this
-                    : new ImHashMap<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
-
-            var found = Conflicts.Length - 1;
-            while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
-            if (found == -1)
+            // No need to balance cause we not adding or removing nodes
+            if (hash < Hash)
             {
-                if (updateOnly) return this;
-                var newConflicts = new KV<K, V>[Conflicts.Length + 1];
-                Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
-                newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-                return new ImHashMap<K, V>(Hash, Key, Value, newConflicts, Left, Right);
+                var left = Left.Update(hash, key, value, update);
+                return left == Left ? this : new ImHashMap<K, V>(_data, left, Right);
             }
-
-            var conflicts = new KV<K, V>[Conflicts.Length];
-            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
-            conflicts[found] = new KV<K, V>(key, update == null ? value : update(Conflicts[found].Value, value));
-            return new ImHashMap<K, V>(Hash, Key, Value, conflicts, Left, Right);
+            else
+            {
+                var right = Right.Update(hash, key, value, update);
+                return right == Right ? this : new ImHashMap<K, V>(_data, Left, right);
+            }
         }
 
         private ImHashMap<K, V> UpdateValueAndResolveConflicts(
-            K key, V value, Update<K, V> update, bool updateOnly, ref bool updated, ref V oldValue)
+            K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null, bool updateOnly = false)
         {
             if (Conflicts == null) // add only if updateOnly is false.
-                return updateOnly ? this
-                    : new ImHashMap<K, V>(Hash, Key, Value, new[] { new KV<K, V>(key, value) }, Left, Right);
+                return updateOnly
+                    ? this
+                    : new ImHashMap<K, V>(new Data(Hash, Key, Value, new[] { new KV<K, V>(key, value) }), Left, Right);
 
             var found = Conflicts.Length - 1;
             while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
@@ -1354,32 +1609,24 @@ namespace ImTools
                 var newConflicts = new KV<K, V>[Conflicts.Length + 1];
                 Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
                 newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-                return new ImHashMap<K, V>(Hash, Key, Value, newConflicts, Left, Right);
+                return new ImHashMap<K, V>(new Data(Hash, Key, Value, newConflicts), Left, Right);
             }
 
             var conflicts = new KV<K, V>[Conflicts.Length];
             Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
 
-            if (update == null)
-                conflicts[found] = new KV<K, V>(key, value);
-            else
-            {
-                var conflict = conflicts[found];
-                var newValue = update(conflict.Key, conflict.Value, value);
-                if (ReferenceEquals(newValue, conflict.Value) || newValue?.Equals(conflict.Value) == true)
-                    return this;
+            if (update != null)
+                value = update(key, Conflicts[found].Value, value);
+            if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
+                return this;
 
-                updated = true;
-                oldValue = conflict.Value;
-                conflicts[found] = new KV<K, V>(key, newValue);
-            }
-
-            return new ImHashMap<K, V>(Hash, Key, Value, conflicts, Left, Right);
+            isUpdated = true;
+            oldValue = conflicts[found].Value;
+            conflicts[found] = new KV<K, V>(key, value);
+            return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
         }
 
-
-        // todo: temporary made public for benchmarking
-        /// <summary>It is fine</summary>
+        /// It is fine to be public.
         public V GetConflictedValueOrDefault(K key, V defaultValue)
         {
             if (Conflicts != null)
@@ -1391,7 +1638,7 @@ namespace ImTools
 
         private bool TryFindConflictedValue(K key, out V value)
         {
-            if (Height != 0 && Conflicts != null)
+            if (Conflicts != null)
                 for (var i = Conflicts.Length - 1; i >= 0; --i)
                     if (Equals(Conflicts[i].Key, key))
                     {
@@ -1403,60 +1650,49 @@ namespace ImTools
             return false;
         }
 
-        private ImHashMap<K, V> With(ImHashMap<K, V> left, ImHashMap<K, V> right) => 
-            left == Left && right == Right ? this : CreateBalanced(Hash, Key, Value, Conflicts, left, right);
-
-        private static ImHashMap<K, V> CreateBalanced(
-            int hash, K key, V value, KV<K, V>[] conflicts, 
-            ImHashMap<K, V> left, ImHashMap<K, V> right)
+        private static ImHashMap<K, V> Balance(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
             var delta = left.Height - right.Height;
             if (delta > 1) // left is longer by 2, rotate left
             {
                 var leftLeft = left.Left;
                 var leftRight = left.Right;
-                if (leftRight.Height - leftLeft.Height == 1)
+                if (leftRight.Height > leftLeft.Height)
                 {
                     // double rotation:
                     //      5     =>     5     =>     4
                     //   2     6      4     6      2     5
                     // 1   4        2   3        1   3     6
                     //    3        1
-                    return new ImHashMap<K, V>(
-                        leftRight.Hash, leftRight.Key, leftRight.Value, leftRight.Conflicts,
-                        left: new ImHashMap<K, V>(left.Hash, left.Key, left.Value, left.Conflicts,
-                            left: leftLeft, right: leftRight.Left), right: new ImHashMap<K, V>(hash, key, value, conflicts,
-                            left: leftRight.Right, right: right));
+                    return new ImHashMap<K, V>(leftRight._data,
+                        new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left),
+                        new ImHashMap<K, V>(data, leftRight.Right, right));
                 }
 
-                // todo: do we need this?
                 // one rotation:
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImHashMap<K, V>(left.Hash, left.Key, left.Value, left.Conflicts,
-                    left: leftLeft, right: new ImHashMap<K, V>(hash, key, value, conflicts,
-                        left: leftRight, right: right));
+                return new ImHashMap<K, V>(left._data,
+                    leftLeft, new ImHashMap<K, V>(data, leftRight, right));
             }
 
             if (delta < -1)
             {
                 var rightLeft = right.Left;
                 var rightRight = right.Right;
-                if (rightLeft.Height - rightRight.Height == 1)
+                if (rightLeft.Height > rightRight.Height)
                 {
-                    return new ImHashMap<K, V>(rightLeft.Hash, rightLeft.Key, rightLeft.Value, rightLeft.Conflicts,
-                        left: new ImHashMap<K, V>(hash, key, value, conflicts,
-                            left: left, right: rightLeft.Left), right: new ImHashMap<K, V>(right.Hash, right.Key, right.Value, right.Conflicts,
-                            left: rightLeft.Right, right: rightRight));
+                    return new ImHashMap<K, V>(rightLeft._data,
+                        new ImHashMap<K, V>(data, left, rightLeft.Left),
+                        new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
                 }
 
-                return new ImHashMap<K, V>(right.Hash, right.Key, right.Value, right.Conflicts,
-                    left: new ImHashMap<K, V>(hash, key, value, conflicts,
-                        left: left, right: rightLeft), right: rightRight);
+                return new ImHashMap<K, V>(right._data,
+                    new ImHashMap<K, V>(data, left, rightLeft), rightRight);
             }
 
-            return new ImHashMap<K, V>(hash, key, value, conflicts, left, right);
+            return new ImHashMap<K, V>(data, left, right);
         }
 
         internal ImHashMap<K, V> Remove(int hash, K key, bool ignoreKey = false)
@@ -1484,8 +1720,7 @@ namespace ImTools
                         // we have two children, so remove the next highest node and replace this node with it.
                         var successor = Right;
                         while (!successor.Left.IsEmpty) successor = successor.Left;
-                        result = new ImHashMap<K, V>(
-                            successor.Hash, successor.Key, successor.Value, successor.Conflicts,
+                        result = new ImHashMap<K, V>(successor._data,
                             Left, Right.Remove(successor.Hash, default(K), ignoreKey: true));
                     }
                 }
@@ -1494,10 +1729,10 @@ namespace ImTools
                 else
                     return this; // if key is not matching and no conflicts to lookup - just return
             }
-            else if (hash < Hash)
-                result = CreateBalanced(Hash, Key, Value, Conflicts, Left.Remove(hash, key, ignoreKey), Right);
             else
-                result = CreateBalanced(Hash, Key, Value, Conflicts, Left, Right.Remove(hash, key, ignoreKey));
+                result = hash < Hash
+                    ? Balance(_data, Left.Remove(hash, key, ignoreKey), Right)
+                    : Balance(_data, Left, Right.Remove(hash, key, ignoreKey));
 
             return result;
         }
@@ -1510,23 +1745,49 @@ namespace ImTools
                 return this;
 
             if (Conflicts.Length == 1)
-                return new ImHashMap<K, V>(Hash, Key, Value, null, Left, Right);
+                return new ImHashMap<K, V>(new Data(Hash, Key, Value), Left, Right);
             var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
             var newIndex = 0;
             for (var i = 0; i < Conflicts.Length; ++i)
                 if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
-            return new ImHashMap<K, V>(Hash, Key, Value, shrinkedConflicts, Left, Right);
+            return new ImHashMap<K, V>(new Data(Hash, Key, Value, shrinkedConflicts), Left, Right);
         }
 
         private ImHashMap<K, V> ReplaceRemovedWithConflicted()
         {
             if (Conflicts.Length == 1)
-                return new ImHashMap<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, null, Left, Right);
+                return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value), Left, Right);
             var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
             Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
-            return new ImHashMap<K, V>(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts, Left, Right);
+            return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts), Left, Right);
         }
 
         #endregion
+    }
+
+    /// ImHashMap methods for faster performance
+    public static class ImHashMap
+    {
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
+        {
+            var hash = key.GetHashCode();
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+            return map.Height != 0 && (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
+                ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+        }
+
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
+        {
+            var hash = key.GetHashCode();
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+            // we don't need to check `Height != 0` again cause in that case `key` will be `null` and `ReferenceEquals` will fail
+            return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+        }
     }
 }
