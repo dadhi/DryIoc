@@ -3,6 +3,7 @@ using Autofac;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
 using DryIoc;
+using DryIoc.Microsoft.DependencyInjection;
 using Grace.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using IContainer = DryIoc.IContainer;
@@ -10,7 +11,7 @@ using IContainer = DryIoc.IContainer;
 
 namespace PerformanceTests
 {
-    public class RealLifeKindaSetup
+    public class CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark
     {
         public static IContainer PrepareDryIoc()
         {
@@ -70,6 +71,34 @@ namespace PerformanceTests
         {
             using (var scope = serviceProvider.CreateScope())
                 return scope.ServiceProvider.GetRequiredService<R>();
+        }
+
+        public static IServiceProvider PrepareDryIocMsDi(bool msDiVNext = false)
+        {
+            var services = new ServiceCollection();
+
+            services.AddScoped<R>();
+
+            services.AddScoped<Scoped1>();
+            services.AddScoped<Scoped2>();
+
+            services.AddTransient<Trans1>();
+            services.AddTransient<Trans2>();
+
+            services.AddSingleton<Single1>();
+            services.AddSingleton<Single2>();
+
+            services.AddScoped(_ => new ScopedFac1());
+            services.AddScoped(_ => new ScopedFac2());
+
+            services.AddSingleton(new SingleObj1());
+            services.AddSingleton(new SingleObj2());
+
+            if (!msDiVNext)
+                return new Container().WithDependencyInjectionAdapter(services).Resolve<IServiceProvider>();
+
+            new Container().WithDependencyInjectionAdapter(out var serviceProvider, services);
+            return serviceProvider;
         }
 
         public static DependencyInjectionContainer PrepareGrace()
@@ -142,19 +171,26 @@ namespace PerformanceTests
             /*
             ## 31.01.2019: At least first step to real world graph
 
-                                        Method |         Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
-            ---------------------------------- |-------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
-             BmarkMicrosoftDependencyInjection |     8.838 us |  0.0474 us |  0.0443 us |   1.00 |    0.00 |      1.7700 |           - |           - |             8.16 KB |
-                                   BmarkDryIoc |    14.735 us |  0.1339 us |  0.1252 us |   1.67 |    0.02 |      3.4027 |           - |           - |            15.68 KB |
-                                  BmarkAutofac |    74.973 us |  0.6942 us |  0.6493 us |   8.48 |    0.10 |     13.5498 |           - |           - |            62.63 KB |
-                                    BmarkGrace | 2,008.109 us | 16.6289 us | 15.5547 us | 227.22 |    2.30 |     19.5313 |      7.8125 |           - |            92.86 KB |
+                            Method |         Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |     8.731 us |  0.0638 us |  0.0566 us |   1.00 |    0.00 |      1.7700 |           - |           - |             8.16 KB |
+                       BmarkDryIoc |    14.657 us |  0.0516 us |  0.0482 us |   1.68 |    0.01 |      3.4027 |           - |           - |            15.68 KB |
+                      BmarkAutofac |    69.055 us |  0.3195 us |  0.2988 us |   7.91 |    0.07 |     13.5498 |      0.1221 |           - |            62.63 KB |
+                   BmarkDryIocMsDi |   744.086 us |  3.9580 us |  3.5087 us |  85.23 |    0.75 |      8.7891 |      3.9063 |           - |            41.26 KB |
+                        BmarkGrace | 1,981.725 us | 14.3364 us | 13.4103 us | 227.10 |    2.13 |     19.5313 |      7.8125 |           - |            92.88 KB |
              */
+
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
 
             [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
 
-            [Benchmark(Baseline = true)]
-            public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
+            [Benchmark]
+            public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
+
+            //[Benchmark]
+            public object BmarkDryIocMsDiVNext() => Measure(PrepareDryIocMsDi(true));
 
             [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());

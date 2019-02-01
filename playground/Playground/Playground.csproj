@@ -19,6 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
     </ItemGroup>
 

@@ -78,6 +78,32 @@ namespace DryIoc.Microsoft.DependencyInjection
             return adapter;
         }
 
+        /// Directly returns created <paramref name="serviceProvider"/>.
+        public static IContainer WithDependencyInjectionAdapter(this IContainer container, 
+            out IServiceProvider serviceProvider,
+            IEnumerable<ServiceDescriptor> descriptors = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
+            Func<Type, bool> throwIfUnresolved = null)
+        {
+            var adapter = container.With(rules => rules
+                .With(FactoryMethod.ConstructorWithResolvableArguments)
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                .WithTrackingDisposableTransients());
+
+            adapter.RegisterMany<DryIocServiceProvider>(
+                setup: Setup.With(useParentReuse: true),
+                made: Parameters.Of.Type(_ => throwIfUnresolved));
+
+            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.ScopedOrSingleton);
+
+            // Registers service collection
+            if (descriptors != null)
+                adapter.Populate(descriptors, registerDescriptor);
+
+            serviceProvider = new DryIocServiceProvider(adapter, throwIfUnresolved);
+            return adapter;
+        }
+
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
         {
