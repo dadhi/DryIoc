@@ -5,6 +5,7 @@ using BenchmarkDotNet.Order;
 using DryIoc;
 using DryIoc.Microsoft.DependencyInjection;
 using Grace.DependencyInjection;
+using Grace.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using IContainer = DryIoc.IContainer;
 
@@ -173,6 +174,16 @@ namespace PerformanceTests
             return container;
         }
 
+        public static IServiceProvider PrepareGraceMsDi()
+        {
+            var container = new DependencyInjectionContainer();
+
+            container.Populate(GetServices());
+
+            return container.Locate<IServiceProvider>();
+        }
+
+
         public static object Measure(DependencyInjectionContainer container)
         {
             using (var scope = container.BeginLifetimeScope())
@@ -248,11 +259,12 @@ namespace PerformanceTests
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    23.14 us |  0.1099 us |  0.0974 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
-                       BmarkDryIoc |    54.08 us |  0.3364 us |  0.3147 us |   2.34 |    0.02 |     11.9019 |           - |           - |            55.11 KB |
-                      BmarkAutofac |   146.67 us |  0.3466 us |  0.3242 us |   6.34 |    0.03 |     28.0762 |      0.2441 |           - |           129.45 KB |
-                   BmarkDryIocMsDi | 1,820.61 us | 15.8273 us | 14.0305 us |  78.68 |    0.74 |     25.3906 |     11.7188 |           - |           117.45 KB |
-                        BmarkGrace | 5,445.34 us | 35.4986 us | 33.2054 us | 235.32 |    2.02 |     46.8750 |     23.4375 |           - |           216.11 KB |
+ BmarkMicrosoftDependencyInjection |    23.18 us |  0.1323 us |  0.1173 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    53.76 us |  0.3287 us |  0.2745 us |   2.32 |    0.02 |     11.9019 |           - |           - |            55.11 KB |
+                      BmarkAutofac |   147.99 us |  0.8766 us |  0.8199 us |   6.39 |    0.05 |     28.0762 |      0.2441 |           - |           129.45 KB |
+                   BmarkDryIocMsDi | 1,823.35 us |  8.3675 us |  7.8269 us |  78.69 |    0.52 |     25.3906 |     11.7188 |           - |           117.45 KB |
+                        BmarkGrace | 5,448.31 us | 56.9761 us | 53.2955 us | 234.90 |    2.40 |     46.8750 |     23.4375 |           - |           216.17 KB |
+                    BmarkGraceMsDi | 7,261.23 us | 90.1823 us | 84.3566 us | 313.59 |    3.87 |     62.5000 |     31.2500 |           - |           308.78 KB |
 
              */
 
@@ -272,6 +284,9 @@ namespace PerformanceTests
             public object BmarkGrace() => Measure(PrepareGrace());
 
             [Benchmark]
+            public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
+
+            [Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
         }
 
@@ -289,20 +304,22 @@ namespace PerformanceTests
                       BmarkAutofac | 4,834.6 ns | 42.2654 ns | 39.5351 ns |  9.57 |    0.08 |      1.5411 |           - |           - |              7280 B |
 
             ## 2 level graph
+
                             Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |  1.375 us | 0.0134 us | 0.0126 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
-                       BmarkDryIoc |  1.921 us | 0.0142 us | 0.0133 us |  1.40 |    0.01 |      0.5074 |           - |           - |             2.34 KB |
-                        BmarkGrace |  2.254 us | 0.0126 us | 0.0105 us |  1.64 |    0.01 |      1.1406 |           - |           - |             5.26 KB |
-                   BmarkDryIocMsDi |  3.509 us | 0.0611 us | 0.0572 us |  2.55 |    0.05 |      0.9804 |           - |           - |             4.52 KB |
-                      BmarkAutofac | 13.403 us | 0.2648 us | 0.2477 us |  9.75 |    0.21 |      3.9368 |           - |           - |            18.18 KB |
-
+ BmarkMicrosoftDependencyInjection |  1.415 us | 0.0121 us | 0.0101 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                       BmarkDryIoc |  1.842 us | 0.0049 us | 0.0043 us |  1.30 |    0.01 |      0.5074 |           - |           - |             2.34 KB |
+                        BmarkGrace |  2.007 us | 0.0038 us | 0.0034 us |  1.42 |    0.01 |      1.0033 |           - |           - |             4.63 KB |
+                    BmarkGraceMsDi |  2.577 us | 0.0140 us | 0.0131 us |  1.82 |    0.02 |      1.2703 |           - |           - |             5.87 KB |
+                   BmarkDryIocMsDi |  3.508 us | 0.0158 us | 0.0148 us |  2.48 |    0.02 |      0.9804 |           - |           - |             4.52 KB |
+                      BmarkAutofac | 13.075 us | 0.0651 us | 0.0609 us |  9.24 |    0.09 |      3.9368 |           - |           - |            18.18 KB |
              */
 
             private IServiceProvider _msDi;
             private IContainer _dryioc;
             private IServiceProvider _dryIocMsDi;
             private DependencyInjectionContainer _grace;
+            private IServiceProvider _graceMsDi;
             private Autofac.IContainer _autofac;
 
             [GlobalSetup]
@@ -312,6 +329,7 @@ namespace PerformanceTests
                 _dryioc = PrepareDryIoc();
                 _dryIocMsDi = PrepareDryIocMsDi();
                 _grace = PrepareGrace();
+                _graceMsDi = PrepareGraceMsDi();
                 _autofac = PrepareAutofac();
             }
 
@@ -326,6 +344,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkGrace() => Measure(_grace);
+
+            [Benchmark]
+            public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
             [Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
