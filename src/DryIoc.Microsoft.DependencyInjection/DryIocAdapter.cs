@@ -90,6 +90,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .WithTrackingDisposableTransients());
 
+            // todo: do we need it then?
             adapter.RegisterMany<DryIocServiceProvider>(
                 setup: Setup.With(useParentReuse: true),
                 made: Parameters.Of.Type(_ => throwIfUnresolved));
