@@ -1205,23 +1205,8 @@ namespace ImTools
         /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
         /// <returns>New tree with added or updated key-value.</returns>
         [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value)
-        {
-            var isUpdated = false;
-            var oldValue = default(V);
-
-            var hash = key.GetHashCode();
-
-            if (Height == 0)
-                return new ImHashMap<K, V>(new Data(hash, key, value));
-
-            if (hash == Hash)
-                return ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue)
-                    : UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue);
-
-            return AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue);
-        }
+        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
+            AddOrUpdate(key, value, out _, out _);
 
         /// <summary>Returns new tree with added key-value. If value with the same key is exist, then
         /// if <paramref name="update"/> is not specified: then existing value will be replaced by <paramref name="value"/>;
@@ -1230,25 +1215,8 @@ namespace ImTools
         /// <param name="update">Update handler.</param>
         /// <returns>New tree with added or updated key-value.</returns>
         [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update)
-        {
-            var isUpdated = false;
-            var oldValue = default(V);
-
-            var hash = key.GetHashCode();
-
-            if (Height == 0)
-                return new ImHashMap<K, V>(new Data(hash, key, value));
-
-            V Upd(K k, V oldVal, V newVal) => update(oldVal, newVal);
-
-            if (hash == Hash)
-                return ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, Upd)
-                    : UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, Upd);
-
-            return AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, Upd);
-        }
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) => 
+            AddOrUpdate(key, value, out _, out _, (_, oldVal, newVal) => update(oldVal, newVal));
 
         /// Allocation free for `update` using the key
         [MethodImpl((MethodImplOptions)256)]
