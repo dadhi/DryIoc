@@ -204,33 +204,39 @@ namespace PerformanceTests
         {
             /*
             ## 31.01.2019: At least first step to real world graph
-                                        Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
-            ---------------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
-                                   BmarkDryIoc |   415.6 ns |  2.957 ns |  2.469 ns |  0.79 |    0.00 |      0.1421 |           - |           - |               672 B |
-             BmarkMicrosoftDependencyInjection |   525.1 ns |  1.174 ns |  1.041 ns |  1.00 |    0.00 |      0.1602 |           - |           - |               760 B |
-                                    BmarkGrace |   692.3 ns |  2.166 ns |  2.026 ns |  1.32 |    0.00 |      0.3366 |           - |           - |              1592 B |
-                                  BmarkAutofac | 4,867.2 ns | 95.883 ns | 84.997 ns |  9.27 |    0.16 |      1.5411 |           - |           - |              7280 B |
+                            Method |       Mean |      Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|-----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |   419.5 ns |  0.7336 ns |  0.6862 ns |  0.83 |    0.00 |      0.1421 |           - |           - |               672 B |
+ BmarkMicrosoftDependencyInjection |   505.1 ns |  1.8306 ns |  1.6228 ns |  1.00 |    0.00 |      0.1602 |           - |           - |               760 B |
+                        BmarkGrace |   787.8 ns |  1.9183 ns |  1.7005 ns |  1.56 |    0.01 |      0.3910 |           - |           - |              1848 B |
+                   BmarkDryIocMsDi | 1,013.9 ns |  5.2416 ns |  4.9030 ns |  2.01 |    0.01 |      0.3204 |           - |           - |              1520 B |
+                      BmarkAutofac | 4,834.6 ns | 42.2654 ns | 39.5351 ns |  9.57 |    0.08 |      1.5411 |           - |           - |              7280 B |
              */
 
-            private IContainer _dryioc;
             private IServiceProvider _msDi;
+            private IContainer _dryioc;
+            private IServiceProvider _dryIocMsDi;
             private DependencyInjectionContainer _grace;
             private Autofac.IContainer _autofac;
 
             [GlobalSetup]
             public void WarmUp()
             {
-                _dryioc = PrepareDryIoc();
                 _msDi = PrepareMsDi();
+                _dryioc = PrepareDryIoc();
+                _dryIocMsDi = PrepareDryIocMsDi();
                 _grace = PrepareGrace();
                 _autofac = PrepareAutofac();
             }
 
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
+
             [Benchmark]
             public object BmarkDryIoc() => Measure(_dryioc);
 
-            [Benchmark(Baseline = true)]
-            public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
+            [Benchmark]
+            public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
 
             [Benchmark]
             public object BmarkGrace() => Measure(_grace);
