@@ -39,70 +39,41 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="container">Source container to adapt.</param>
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
-        /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
-        /// for unresolved type instead of fallback to default Resolver.</param>
-        /// <returns>New container adapted to AspNetCore DI conventions.</returns>
         /// <example>
         /// <code><![CDATA[
+        /// 
         ///     var container = new Container();
-        ///     // you may start to register you services here
+        ///
+        ///     // you may register the services here:
+        ///     container.Register<IMyService, MyService>(Reuse.Scoped)
         /// 
         ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services);
-        ///     var serviceProvider = adaptedContainer.Resolve<IServiceProvider>();
-        ///     
-        ///     // to register service per Request use Reuse.InCurrentScope
-        ///     adaptedContainer.Register<IMyService, MyService>(Reuse.InCurrentScope)
+        ///     IServiceProvider serviceProvider = adaptedContainer; // the container implements IServiceProvider now
+        ///
         ///]]></code>
         /// </example>
         /// <remarks>You still need to Dispose adapted container at the end / application shutdown.</remarks>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
             IEnumerable<ServiceDescriptor> descriptors = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
-            Func<Type, bool> throwIfUnresolved = null)
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
-            var adapter = container.With(rules => rules
-                .With(FactoryMethod.ConstructorWithResolvableArguments)
-                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithTrackingDisposableTransients());
+            if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
+                container = container.With(rules => rules
+                    .With(FactoryMethod.ConstructorWithResolvableArguments)
+                    .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                    .WithTrackingDisposableTransients());
 
-            adapter.RegisterMany<DryIocServiceProvider>(
-                setup: Setup.With(useParentReuse: true),
-                made: Parameters.Of.Type(_ => throwIfUnresolved));
-
-            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.ScopedOrSingleton);
+            container.RegisterDelegate<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
             // Registers service collection
             if (descriptors != null)
-                adapter.Populate(descriptors, registerDescriptor);
+                container.Populate(descriptors, registerDescriptor);
 
-            return adapter;
-        }
+#if NETSTANDARD1_0
+            container.UseInstance<IServiceProvider>(new DryIocServiceProvider(container));
+#endif
 
-        /// Directly returns created <paramref name="serviceProvider"/>.
-        public static IContainer WithDependencyInjectionAdapter(this IContainer container, 
-            out IServiceProvider serviceProvider,
-            IEnumerable<ServiceDescriptor> descriptors = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
-            Func<Type, bool> throwIfUnresolved = null)
-        {
-            var adapter = container.With(rules => rules
-                .With(FactoryMethod.ConstructorWithResolvableArguments)
-                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                .WithTrackingDisposableTransients());
-
-            // todo: do we need it then?
-            adapter.RegisterMany<DryIocServiceProvider>(
-                setup: Setup.With(useParentReuse: true),
-                made: Parameters.Of.Type(_ => throwIfUnresolved));
-
-            adapter.Register<IServiceScopeFactory, DryIocServiceScopeFactory>(Reuse.ScopedOrSingleton);
-
-            // Registers service collection
-            if (descriptors != null)
-                adapter.Populate(descriptors, registerDescriptor);
-
-            serviceProvider = new DryIocServiceProvider(adapter, throwIfUnresolved);
-            return adapter;
+            return container;
         }
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
@@ -119,8 +90,12 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Resolves the <see cref="IServiceProvider"/> from the container.
         /// It is usually the last method in fluent DI setup.</summary>
-        public static IServiceProvider BuildServiceProvider(this IContainer container) => 
+        public static IServiceProvider BuildServiceProvider(this IContainer container) =>
+#if NETSTANDARD1_0
             container.Resolve<IServiceProvider>();
+#else
+            container;
+#endif
 
         /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
         /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
@@ -209,47 +184,29 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
     }
 
-    /// <summary>Wraps DryIoc scoped container.</summary>
-    public sealed class DryIocServiceProvider : IServiceProvider, ISupportRequiredService, IServiceScope
+#if NETSTANDARD1_0
+    /// Bare-bones IServiceScope implementations
+    public sealed class DryIocServiceProvider : IServiceProvider
     {
-        private readonly IResolverContext _scopedResolver;
-        private readonly Func<Type, bool> _throwIfUnresolved;
+        private readonly IResolverContext _resolverContext;
 
-        /// <summary>Uses passed container for scoped resolutions.</summary> 
-        /// <param name="scopedResolver">A scoped resolver context to wrap</param>
-        /// <param name="throwIfUnresolved">(optional) Instructs DryIoc to throw exception
-        /// for unresolved type instead of fallback to default Resolver.</param>
-        public DryIocServiceProvider(IResolverContext scopedResolver, Func<Type, bool> throwIfUnresolved)
+        /// Creating from resolver context
+        public DryIocServiceProvider(IResolverContext resolverContext)
         {
-            _scopedResolver = scopedResolver;
-            _throwIfUnresolved = throwIfUnresolved;
+            _resolverContext = resolverContext;
         }
 
-        /// <summary>Just for convenience and access from tests</summary>
-        public IServiceProvider ServiceProvider => this;
-
-        /// <summary>Delegates resolution to scoped container. In case the service is unresolved
-        /// depending on provided policy it will either fallback to default DI resolver, 
-        /// or will throw the original DryIoc exception (cause it good to know the reason).</summary>
-        /// <param name="serviceType">Service type to resolve.</param>
-        /// <returns>Resolved service object.</returns>
+        /// <inheritdoc />
         public object GetService(Type serviceType) => 
-            _scopedResolver.Resolve(serviceType, _throwIfUnresolved == null || !_throwIfUnresolved(serviceType));
-
-        /// <summary> Gets service of type <paramref name="serviceType" /> from the <see cref="T:System.IServiceProvider" /> implementing
-        /// this interface. </summary>
-        /// <param name="serviceType">An object that specifies the type of service object to get.</param>
-        /// <returns>A service object of type <paramref name="serviceType" />.
-        /// Throws an exception if the <see cref="T:System.IServiceProvider" /> cannot create the object.</returns>
-        public object GetRequiredService(Type serviceType) => _scopedResolver.Resolve(serviceType);
-
-        /// <summary>Disposes underlying container.</summary>
-        public void Dispose() => _scopedResolver.Dispose();
+            _resolverContext.Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
     }
+#endif
 
     /// <summary>Creates/opens new scope in passed scoped container.</summary>
-    public sealed class DryIocServiceScopeFactory: IServiceScopeFactory
+    public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
     {
+        private readonly IResolverContext _scopedResolver;
+
         /// <summary>Stores passed scoped container to open nested scope.</summary>
         /// <param name="scopedResolver">Scoped container to be used to create nested scope.</param>
         public DryIocServiceScopeFactory(IResolverContext scopedResolver)
@@ -259,8 +216,39 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
-        public IServiceScope CreateScope() => _scopedResolver.OpenScope().Resolve<IServiceScope>();
+        public IServiceScope CreateScope()
+        {
+            var r = _scopedResolver;
+            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope) : r.ScopeContext.SetCurrent(p => new Scope(p));
+            return new DryIocServiceScope(r.WithCurrentScope(scope));
+        }
+    }
 
-        private readonly IResolverContext _scopedResolver;
+    /// Bare-bones IServiceScope implementations
+    public sealed class DryIocServiceScope : IServiceScope
+    {
+        /// <inheritdoc />
+        public IServiceProvider ServiceProvider
+        {
+            get
+            {
+#if NETSTANDARD1_0
+                return new DryIocServiceProvider(_resolverContext);
+#else
+                return _resolverContext;
+#endif
+            }
+        }
+
+        private readonly IResolverContext _resolverContext;
+
+        /// Creating from resolver context
+        public DryIocServiceScope(IResolverContext resolverContext)
+        {
+            _resolverContext = resolverContext;
+        }
+
+        /// Disposes the underlying resolver context 
+        public void Dispose() => _resolverContext.Dispose();
     }
 }

@@ -197,6 +197,13 @@ namespace DryIoc
 
         #region IResolver
 
+#if NET45 || NETSTANDARD2_0
+        /// Resolves service with <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
+        /// enabling the fallback resolution for not registered services (default MS convention)
+        object IServiceProvider.GetService(Type serviceType) => 
+            ((IResolver)this).Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
+#endif
+
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             var cachedItem = _registry.Value.DefaultFactoryCache.Value.GetValueOrDefault(serviceType);
@@ -892,6 +899,9 @@ namespace DryIoc
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
             var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
+
+            // todo: optimize the code inside these brackets, remove unnecessary allocations
+            // the code mostly called from DI.MS.DI
             if (Rules.FactorySelector != null && serviceKey == null)
             {
                 var allFactories = ((IContainer)this)
@@ -3345,7 +3355,7 @@ namespace DryIoc
         public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
             // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
-            var scope = r.ScopeContext != null ? SetCurrentContextScope(r, name) : new Scope(r.CurrentScope, name);
+            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope, name) : SetCurrentContextScope(r, name);
 
             if (trackInParent)
                 (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
@@ -3447,18 +3457,23 @@ namespace DryIoc
 
         private static ImHashMap<Type, Factory> AddContainerInterfaces(this ImHashMap<Type, Factory> wrappers)
         {
-            var wrapperSetup = Setup.WrapperWith(preventDisposal: true);
+            var resolverContextExpr = new ExpressionFactory(
+                ResolverContext.GetRootOrSelfExpr, 
+                Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
-            wrappers = wrappers.AddOrUpdate(typeof(IResolver),
-                new ExpressionFactory(ResolverContext.GetRootOrSelfExpr, Reuse.Transient, wrapperSetup));
-
-            var containerFactory = new ExpressionFactory(r =>
-                Convert(ResolverContext.GetRootOrSelfExpr(r), r.ServiceType), Reuse.Transient, wrapperSetup);
+            var containerExpr = new ExpressionFactory(
+                r => Convert(ResolverContext.GetRootOrSelfExpr(r), r.ServiceType),
+                Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             wrappers = wrappers
-                .AddOrUpdate(typeof(IContainer), containerFactory)
-                .AddOrUpdate(typeof(IRegistrator), containerFactory)
-                .AddOrUpdate(typeof(IResolverContext), containerFactory);
+                .AddOrUpdate(typeof(IResolverContext), resolverContextExpr)
+                .AddOrUpdate(typeof(IResolver), resolverContextExpr)
+                .AddOrUpdate(typeof(IContainer), containerExpr)
+                .AddOrUpdate(typeof(IRegistrator), containerExpr)
+#if NET45 || NETSTANDARD2_0
+                .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr)
+#endif
+                ;
 
             return wrappers;
         }
@@ -3815,8 +3830,16 @@ namespace DryIoc
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
-        /// <summary>Default rules as staring point.</summary>
+        /// Default rules as staring point.
         public static readonly Rules Default = new Rules();
+
+        /// Default rules as staring point.
+        public static readonly Rules MicrosoftDependencyInjectionRules = new Rules(
+            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) & ~Settings.ThrowOnRegisteringDisposableTransient, 
+            Rules.SelectLastRegisteredFactory(), Reuse.Transient,
+            Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
+            IfAlreadyRegistered.AppendNotKeyed, 
+            DefaultDependencyDepthToSplitObjectGraph, null, null, null, null, null);
 
         /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
         public const int DefaultDependencyDepthToSplitObjectGraph = 5;
@@ -5895,25 +5918,39 @@ namespace DryIoc
     /// default value if service is unresolved, custom service value.</summary>
     public class ServiceDetails
     {
-        /// <summary>Default details if not specified, use default setting values, e.g. <see cref="DryIoc.IfUnresolved.Throw"/></summary>
-        public static readonly ServiceDetails Default = Of();
+        /// Default details if not specified, use default setting values, e.g. <see cref="DryIoc.IfUnresolved.Throw"/>
+        public static readonly ServiceDetails Default = 
+            new ServiceDetails(null, IfUnresolved.Throw, null, null, null, null, false);
 
-        /// <summary>Default details with <see cref="DryIoc.IfUnresolved.ReturnDefault"/> option.</summary>
+        /// Default details with <see cref="DryIoc.IfUnresolved.ReturnDefault"/> option.
         public static readonly ServiceDetails IfUnresolvedReturnDefault =
-            Of(ifUnresolved: IfUnresolved.ReturnDefault);
+            new ServiceDetails(null, IfUnresolved.ReturnDefault, null, null, null, null, false);
 
-        /// <summary>Default details with <see cref="DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered"/> option.</summary>
+        /// Default details with <see cref="DryIoc.IfUnresolved.ReturnDefaultIfNotRegistered"/> option.
         public static readonly ServiceDetails IfUnresolvedReturnDefaultIfNotRegistered =
-            Of(ifUnresolved: IfUnresolved.ReturnDefaultIfNotRegistered);
+            new ServiceDetails(null, IfUnresolved.ReturnDefaultIfNotRegistered, null, null, null, null, false);
 
         /// <summary>Creates new details out of provided settings, or returns default if all settings have default value.</summary>
         public static ServiceDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
             object defaultValue = null, string metadataKey = null, object metadata = null)
         {
-            // IfUnresolved.Throw does not make sense when default value is provided, so normalizing it to ReturnDefault
-            if (defaultValue != null && ifUnresolved == IfUnresolved.Throw)
-                ifUnresolved = IfUnresolved.ReturnDefault;
+            if (defaultValue != null)
+            {
+                // IfUnresolved.Throw does not make sense when default value is provided, so normalizing it to ReturnDefault
+                if (ifUnresolved == IfUnresolved.Throw)
+                    ifUnresolved = IfUnresolved.ReturnDefault;
+            }
+            else if (requiredServiceType == null && serviceKey == null &&
+                     metadataKey == null && metadata == null)
+            {
+                if (ifUnresolved == IfUnresolved.Throw)
+                    return Default;
+                if (ifUnresolved == IfUnresolved.ReturnDefault)
+                    return IfUnresolvedReturnDefault;
+                if (ifUnresolved == IfUnresolved.ReturnDefaultIfNotRegistered)
+                    return IfUnresolvedReturnDefaultIfNotRegistered;
+            }
 
             return new ServiceDetails(requiredServiceType, ifUnresolved,
                 serviceKey, metadataKey, metadata, defaultValue, hasCustomValue: false);
@@ -8082,7 +8119,19 @@ namespace DryIoc
                 var paramRequest = request.Push(paramInfo);
                 var paramServiceType = paramRequest.ServiceType;
 
-                if (paramInfo.Details.HasCustomValue)
+                if (paramInfo.Details == ServiceDetails.Default)
+                {
+                    if (paramServiceType == typeof(IResolverContext) || paramServiceType == typeof(IResolver)
+// todo: replace with feature toggles
+#if NET45 || NETSTANDARD2_0
+                        || paramServiceType == typeof(IServiceProvider)
+#endif
+                    )
+                        paramExprs[i] = ResolverContext.GetRootOrSelfExpr(paramRequest);
+                    else if (paramServiceType == typeof(IRegistrator) || paramServiceType == typeof(IContainer))
+                        paramExprs[i] = Convert(ResolverContext.GetRootOrSelfExpr(paramRequest), paramServiceType);
+                }
+                else if (paramInfo.Details.HasCustomValue)
                 {
                     var customValue = paramInfo.Details.CustomValue;
                     var hasConversionOperator = false;
@@ -9508,6 +9557,10 @@ namespace DryIoc
     /// <summary>Declares minimal API for service resolution. 
     /// Resolve default and keyed is separated because of optimization for faster resolution of the former.</summary>
     public interface IResolver
+#if NET45 || NETSTANDARD2_0
+    : IServiceProvider
+#endif
+
     {
         /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>

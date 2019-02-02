@@ -450,7 +450,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private V2.ImHashMap<Type, string> _mapV2;
+            //private V2.ImHashMap<Type, string> _mapV2;
 
             public V1.ImHashMap<Type, string> AddOrUpdate_v1()
             {
@@ -478,7 +478,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private V3.ImHashMap<Type, string> _mapV3;
+            //private V3.ImHashMap<Type, string> _mapV3;
 
             public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
@@ -492,7 +492,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            private ConcurrentDictionary<Type, string> _concurDict;
+            //private ConcurrentDictionary<Type, string> _concurDict;
 
             public ImmutableDictionary<Type, string> ImmutableDict()
             {
@@ -504,7 +504,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.Add(typeof(ImHashMapBenchmarks), "!");
             }
 
-            private ImmutableDictionary<Type, string> _immutableDict;
+            //private ImmutableDictionary<Type, string> _immutableDict;
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
@@ -523,11 +523,11 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             }
 
             //[Benchmark]
-            public string TryFind_v2()
-            {
-                V2.ImHashMap.TryFind(_mapV2, LookupKey, out var result);
-                return result;
-            }
+            //public string TryFind_v2()
+            //{
+            //    V2.ImHashMap.TryFind(_mapV2, LookupKey, out var result);
+            //    return result;
+            //}
 
             [Benchmark(Baseline = true)]
             public string GetValueOrDefault() => _map.GetValueOrDefault(LookupKey);
@@ -536,23 +536,23 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
 
             //[Benchmark]
-            public string GetValueOrDefault_v2() => V2.ImHashMap.GetValueOrDefault(_mapV2, LookupKey);
+            //public string GetValueOrDefault_v2() => V2.ImHashMap.GetValueOrDefault(_mapV2, LookupKey);
 
             //[Benchmark]
-            public string GetValueOrDefault_v3() => V3.ImHashMap.GetValueOrDefault(_mapV3, LookupKey);
+            //public string GetValueOrDefault_v3() => V3.ImHashMap.GetValueOrDefault(_mapV3, LookupKey);
 
             //[Benchmark]
-            public string ConcurrentDict_TryGet()
-            {
-                _concurDict.TryGetValue(LookupKey, out var result);
-                return result;
-            }
+            //public string ConcurrentDict_TryGet()
+            //{
+            //    _concurDict.TryGetValue(LookupKey, out var result);
+            //    return result;
+            //}
 
-            public string ImmutableDict_TryGet()
-            {
-                _immutableDict.TryGetValue(LookupKey, out var result);
-                return result;
-            }
+            //public string ImmutableDict_TryGet()
+            //{
+            //    _immutableDict.TryGetValue(LookupKey, out var result);
+            //    return result;
+            //}
         }
     }
 }

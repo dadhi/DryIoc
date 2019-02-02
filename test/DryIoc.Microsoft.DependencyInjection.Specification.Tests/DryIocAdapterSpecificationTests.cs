@@ -1,18 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Specification;
-using Microsoft.Extensions.DependencyInjection.Specification.Fakes;
-using Xunit;
+
+// uncomment when I want to copy some test here for testing.
+//using Microsoft.Extensions.DependencyInjection.Specification.Fakes;
+//using Xunit;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     public class DryIocAdapterSpecificationTests : DependencyInjectionSpecificationTests
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection serviceCollection)
-        {
-            return new Container().WithDependencyInjectionAdapter(serviceCollection).Resolve<IServiceProvider>();
-        }
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection serviceCollection) =>
+            new Container(Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(serviceCollection);
 
         internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {

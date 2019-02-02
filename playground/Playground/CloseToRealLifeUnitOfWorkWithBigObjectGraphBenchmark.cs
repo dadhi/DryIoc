@@ -115,17 +115,11 @@ namespace PerformanceTests
         public static object Measure(IServiceProvider serviceProvider)
         {
             using (var scope = serviceProvider.CreateScope())
-                return scope.ServiceProvider.GetRequiredService<R>();
+                return scope.ServiceProvider.GetService<R>();
         }
 
-        public static IServiceProvider PrepareDryIocMsDi(bool msDiVNext = false)
-        {
-            if (!msDiVNext)
-                return new Container().WithDependencyInjectionAdapter(GetServices()).Resolve<IServiceProvider>();
-
-            new Container().WithDependencyInjectionAdapter(out var serviceProvider, GetServices());
-            return serviceProvider;
-        }
+        public static IServiceProvider PrepareDryIocMsDi() => 
+            new Container().WithDependencyInjectionAdapter(GetServices());
 
         public static DependencyInjectionContainer PrepareGrace()
         {
@@ -277,9 +271,6 @@ namespace PerformanceTests
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            //[Benchmark]
-            public object BmarkDryIocMsDiVNext() => Measure(PrepareDryIocMsDi(true));
-
             [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
@@ -333,22 +324,23 @@ namespace PerformanceTests
                 _autofac = PrepareAutofac();
             }
 
-            [Benchmark(Baseline = true)]
+            //[Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkDryIoc() => Measure(_dryioc);
 
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(_grace);
 
-            [Benchmark]
+            //[Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
         }
 

@@ -34,6 +34,9 @@ namespace Playground
             BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealLifeKindaSetup.WarmedUpOpenScopeAndResolve>();
 
+            //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
+            //    CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
+
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister_FirstTimeOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.FirstTimeOpenScopeResolve>();

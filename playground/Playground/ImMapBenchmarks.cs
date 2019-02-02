@@ -220,7 +220,7 @@ namespace Playground
                 return map;
             }
 
-            private V2.ImMap<string> _mapV2;
+            //private V2.ImMap<string> _mapV2;
 
             public ImMap<string> AddOrUpdate()
             {
@@ -276,11 +276,11 @@ namespace Playground
             }
 
             //[Benchmark]
-            public string TryFind_v2()
-            {
-                V2.ImMap.TryFind(_mapV2, LookupKey, out var result);
-                return result;
-            }
+            //public string TryFind_v2()
+            //{
+            //    V2.ImMap.TryFind(_mapV2, LookupKey, out var result);
+            //    return result;
+            //}
 
             [Benchmark]
             public string ConcurrentDict_TryGet()
