@@ -1249,27 +1249,6 @@ namespace ImTools
         public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
             Update(key.GetHashCode(), key, value, update);
 
-        /// <summary>Returns true if key is found and sets the value.</summary>
-        /// <param name="key">Key to look for.</param> <param name="value">Result value</param>
-        /// <returns>True if key found, false otherwise.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public bool TryFind(K key, out V value)
-        {
-            var hash = key.GetHashCode();
-
-            var t = this;
-            while (t.Height != 0 && t._data.Hash != hash)
-                t = hash < t._data.Hash ? t.Left : t.Right;
-
-            if (t.Height != 0 && (ReferenceEquals(key, t._data.Key) || key.Equals(t._data.Key)))
-            {
-                value = t._data.Value;
-                return true;
-            }
-
-            return t.TryFindConflictedValue(key, out value);
-        }
-
         /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
         /// <returns>Sequence of enumerated key value pairs.</returns>
@@ -1604,7 +1583,8 @@ namespace ImTools
             return defaultValue;
         }
 
-        private bool TryFindConflictedValue(K key, out V value)
+        /// Does it
+        public bool TryFindConflictedValue(K key, out V value)
         {
             if (Conflicts != null)
                 for (var i = Conflicts.Length - 1; i >= 0; --i)
@@ -1740,10 +1720,19 @@ namespace ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
         {
+            if (map.Height == 0)
+                return defaultValue;
+
             var hash = key.GetHashCode();
-            while (map.Height != 0 && map.Hash != hash)
+
+            while (map.Hash != hash)
+            {
                 map = hash < map.Hash ? map.Left : map.Right;
-            return map.Height != 0 && (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
+                if (map.Height == 0)
+                    return defaultValue;
+            }
+
+            return ReferenceEquals(key, map.Key) || key.Equals(map.Key)
                 ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
         }
 
@@ -1751,11 +1740,69 @@ namespace ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
         {
+            if (map.Height == 0)
+                return defaultValue;
+
             var hash = key.GetHashCode();
-            while (map.Height != 0 && map.Hash != hash)
+            while (hash != map.Hash)
+            {
                 map = hash < map.Hash ? map.Left : map.Right;
+                if (map.Height == 0)
+                    return defaultValue;
+            }
+
             // we don't need to check `Height != 0` again cause in that case `key` will be `null` and `ReferenceEquals` will fail
             return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+        }
+
+        /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
+        {
+            value = default(V);
+            if (map.Height == 0)
+                return false;
+
+            var hash = key.GetHashCode();
+
+            while (hash != map.Hash)
+            {
+                map = hash < map.Hash ? map.Left : map.Right;
+                if (map.Height == 0)
+                    return false;
+            }
+
+            if (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
+            {
+                value = map.Value;
+                return true;
+            }
+
+            return map.TryFindConflictedValue(key, out value);
+        }
+
+        /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<V>(this ImHashMap<Type, V> map, Type key, out V value)
+        {
+            if (map.Height == 0)
+            {
+                value = default(V);
+                return false;
+            }
+
+            var hash = key.GetHashCode();
+
+            while (hash != map.Hash && map.Height != 0)
+                map = hash < map.Hash ? map.Left : map.Right;
+
+            if (ReferenceEquals(key, map.Key))
+            {
+                value = map.Value;
+                return true;
+            }
+
+            return map.TryFindConflictedValue(key, out value);
         }
     }
 }

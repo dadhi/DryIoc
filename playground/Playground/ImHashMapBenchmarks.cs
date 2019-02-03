@@ -243,7 +243,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
  */
 
-            [Params(5, 40, 200, 1000)]
+            [Params(10, 100, 1000)]
             public int Count;
 
             [Benchmark(Baseline = true)]
@@ -268,7 +268,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
             }
 
-            [Benchmark]
+            //[Benchmark]
             public V2.ImHashMap<Type, string> AddOrUpdate_v2()
             {
                 var map = V2.ImHashMap<Type, string>.Empty;
@@ -290,7 +290,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!", out _, out _);
             }
 
-            //[Benchmark]
+            [Benchmark]
             public ImmutableDictionary<Type, string> ImmutableDict()
             {
                 var map = ImmutableDictionary<Type, string>.Empty;
@@ -301,7 +301,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.Add(typeof(ImHashMapBenchmarks), "!");
             }
 
-            //[Benchmark]
+            [Benchmark]
             public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
                 var map = new ConcurrentDictionary<Type, string>();
@@ -309,7 +309,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 foreach (var key in _keys.Take(Count))
                     map.TryAdd(key, "a");
 
-                map.TryAdd(typeof(ImHashMapBenchmarks), "!!!");
+                map.TryAdd(typeof(ImHashMapBenchmarks), "!");
 
                 return map;
             }
@@ -409,6 +409,43 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
     GetValueOrDefault |   200 | 11.637 ns | 0.0721 ns | 0.0602 ns |  1.00 |           - |           - |           - |                   - |
  GetValueOrDefault_v1 |   200 | 12.042 ns | 0.0607 ns | 0.0568 ns |  1.03 |           - |           - |           - |                   - |
 
+## TryFind
+
+             Method | Count |      Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+        ----------- |------ |----------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+         TryFind_v1 |     5 |  5.229 ns | 0.0307 ns | 0.0257 ns |  1.00 |           - |           - |           - |                   - |
+            TryFind |     5 |  6.766 ns | 0.0695 ns | 0.0650 ns |  1.30 |           - |           - |           - |                   - |
+                    |       |           |           |           |       |             |             |             |                     |
+         TryFind_v1 |    40 |  9.268 ns | 0.0116 ns | 0.0108 ns |  1.00 |           - |           - |           - |                   - |
+            TryFind |    40 |  9.755 ns | 0.0219 ns | 0.0205 ns |  1.05 |           - |           - |           - |                   - |
+                    |       |           |           |           |       |             |             |             |                     |
+         TryFind_v1 |   200 | 11.773 ns | 0.0558 ns | 0.0494 ns |  1.00 |           - |           - |           - |                   - |
+            TryFind |   200 | 12.212 ns | 0.0456 ns | 0.0380 ns |  1.04 |           - |           - |           - |                   - |
+
+     Method | Count |      Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+----------- |------ |----------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+    TryFind |     5 |  5.906 ns | 0.0191 ns | 0.0178 ns |  0.97 |           - |           - |           - |                   - |
+ TryFind_v1 |     5 |  6.079 ns | 0.0947 ns | 0.0839 ns |  1.00 |           - |           - |           - |                   - |
+            |       |           |           |           |       |             |             |             |                     |
+    TryFind |    40 |  9.211 ns | 0.0214 ns | 0.0200 ns |  0.87 |           - |           - |           - |                   - |
+ TryFind_v1 |    40 | 10.566 ns | 0.0149 ns | 0.0132 ns |  1.00 |           - |           - |           - |                   - |
+            |       |           |           |           |       |             |             |             |                     |
+    TryFind |   200 | 11.400 ns | 0.1152 ns | 0.1078 ns |  0.88 |           - |           - |           - |                   - |
+ TryFind_v1 |   200 | 12.929 ns | 0.0712 ns | 0.0666 ns |  1.00 |           - |           - |           - |                   - |
+
+    ## GetOrDefault a bit optimized
+    
+               Method | Count |      Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------- |------ |----------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+    GetValueOrDefault |     5 |  6.782 ns | 0.0449 ns | 0.0398 ns |  0.96 |           - |           - |           - |                   - |
+ GetValueOrDefault_v1 |     5 |  7.042 ns | 0.0659 ns | 0.0616 ns |  1.00 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |             |             |             |                     |
+    GetValueOrDefault |    40 | 10.962 ns | 0.0866 ns | 0.0768 ns |  0.99 |           - |           - |           - |                   - |
+ GetValueOrDefault_v1 |    40 | 11.094 ns | 0.0973 ns | 0.0813 ns |  1.00 |           - |           - |           - |                   - |
+                      |       |           |           |           |       |             |             |             |                     |
+    GetValueOrDefault |   200 | 13.329 ns | 0.0338 ns | 0.0299 ns |  0.97 |           - |           - |           - |                   - |
+ GetValueOrDefault_v1 |   200 | 13.722 ns | 0.0537 ns | 0.0448 ns |  1.00 |           - |           - |           - |                   - |
+
 */
             [Params(5, 40, 200)]// the 1000 does not add anything as the LookupKey stored higher in the tree, 1000)]
             public int Count;
@@ -420,7 +457,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 _mapV1 = AddOrUpdate_v1();
                 //_mapV2 = AddOrUpdate_v2();
                 //_mapV3 = AddOrUpdate_v3();
-                //_concurDict = ConcurrentDict();
+                //_concurrentDict = ConcurrentDict();
                 //_immutableDict = ImmutableDict();
             }
 
@@ -438,18 +475,17 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             private ImHashMap<Type, string> _map;
 
-            public V2.ImHashMap<Type, string> AddOrUpdate_v2()
-            {
-                var map = V2.ImHashMap<Type, string>.Empty;
+            //public V2.ImHashMap<Type, string> AddOrUpdate_v2()
+            //{
+            //    var map = V2.ImHashMap<Type, string>.Empty;
 
-                foreach (var key in _keys.Take(Count))
-                    map = map.AddOrUpdate(key, "a");
+            //    foreach (var key in _keys.Take(Count))
+            //        map = map.AddOrUpdate(key, "a");
 
-                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
+            //    map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
 
-                return map;
-            }
-
+            //    return map;
+            //}
             //private V2.ImHashMap<Type, string> _mapV2;
 
             public V1.ImHashMap<Type, string> AddOrUpdate_v1()
@@ -466,18 +502,17 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             private V1.ImHashMap<Type, string> _mapV1;
 
-            public V3.ImHashMap<Type, string> AddOrUpdate_v3()
-            {
-                var map = V3.ImHashMap<Type, string>.Empty;
+            //public V3.ImHashMap<Type, string> AddOrUpdate_v3()
+            //{
+            //    var map = V3.ImHashMap<Type, string>.Empty;
 
-                foreach (var key in _keys.Take(Count))
-                    map = map.AddOrUpdate(key, "a");
+            //    foreach (var key in _keys.Take(Count))
+            //        map = map.AddOrUpdate(key, "a");
 
-                map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
+            //    map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
 
-                return map;
-            }
-
+            //    return map;
+            //}
             //private V3.ImHashMap<Type, string> _mapV3;
 
             public ConcurrentDictionary<Type, string> ConcurrentDict()
@@ -487,7 +522,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 foreach (var key in _keys.Take(Count))
                     map.TryAdd(key, "a");
 
-                map.TryAdd(typeof(ImHashMapBenchmarks), "!!!");
+                map.TryAdd(typeof(ImHashMapBenchmarks), "!");
 
                 return map;
             }
@@ -508,19 +543,20 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
-            //[Benchmark]
-            public string TryFindByRef()
-            {
-                _map.TryFind(LookupKey, out var result);
-                return result;
-            }
-
-            //[Benchmark]
+            //[Benchmark(Baseline = true)]
             public string TryFind_v1()
             {
                 _mapV1.TryFind(LookupKey, out var result);
                 return result;
             }
+
+            //[Benchmark]
+            public string TryFind()
+            {
+                _map.TryFind(LookupKey, out var result);
+                return result;
+            }
+
 
             //[Benchmark]
             //public string TryFind_v2()
@@ -529,10 +565,10 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             //    return result;
             //}
 
-            [Benchmark(Baseline = true)]
+            [Benchmark]
             public string GetValueOrDefault() => _map.GetValueOrDefault(LookupKey);
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
 
             //[Benchmark]
