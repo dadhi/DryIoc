@@ -63,7 +63,8 @@ namespace DryIoc.Microsoft.DependencyInjection
                     .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                     .WithTrackingDisposableTransients());
 
-            container.RegisterDelegate<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+            //container.RegisterDelegate<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+            container.Use(typeof(IServiceScopeFactory), r => new DryIocServiceScopeFactory(r));
 
             // Registers service collection
             if (descriptors != null)
@@ -163,6 +164,8 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
+                //container.Use(descriptor.ServiceType, _ => descriptor.ImplementationInstance);
+
                 container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance,
                     IfAlreadyRegistered.AppendNotKeyed);
             }

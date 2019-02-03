@@ -223,6 +223,9 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
+            if (ResolverContext.TryGetScopedInstance(this, serviceType, out var obj))
+                return obj;
+
             var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
@@ -790,6 +793,10 @@ namespace DryIoc
                         serviceInfo.SetValue(instance, value);
                 }
         }
+
+        /// Adding the factory directly to scope for resolution 
+        public void Use(Type serviceType, FactoryDelegate factory) => 
+            (CurrentScope ?? SingletonScope).SetInstance(serviceType, factory);
 
         #endregion
 
@@ -2246,6 +2253,10 @@ namespace DryIoc
                         var callArgs = callExpr.Arguments.ToListOrSelf();
 
                         object resolver;
+                        if (callMethod == Resolver.FastResolveMethod)
+                            return TryInterpret(r, callObject, useFec, out resolver) &&
+                                   TryInterpretFastResolve((IResolverContext)resolver, callArgs, out result);
+
                         if (callMethod == Resolver.ResolveMethod)
                             return TryInterpret(r, callObject, useFec, out resolver) &&
                                    TryInterpretResolve((IResolverContext)resolver, callArgs, useFec, out result);
@@ -2401,6 +2412,12 @@ namespace DryIoc
             }
 
             return false;
+        }
+
+        private static bool TryInterpretFastResolve(IResolverContext r, IList<Expression> args, out object result)
+        {
+            result = r.Resolve((Type)ConstValue(args[0]), (IfUnresolved)ConstValue(args[1]));
+            return true;
         }
 
         private static bool TryInterpretResolve(IResolverContext r, IList<Expression> args, bool useFec, out object result)
@@ -3257,9 +3274,12 @@ namespace DryIoc
         /// <summary>Creates resolver context with specified current scope (or container which implements the context).</summary>
         IResolverContext WithCurrentScope(IScope scope);
 
-        /// <summary>Put instance into the current scope or singletons.</summary>
+        /// Put instance into the current scope or singletons.
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
+
+        /// Put instance into the current scope or singletons.
+        void Use(Type serviceType, FactoryDelegate factory);
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
         void InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames);
@@ -3365,6 +3385,13 @@ namespace DryIoc
 
         private static IScope SetCurrentContextScope(IResolverContext r, object name) =>
             r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
+
+        internal static bool TryGetScopedInstance(this IResolverContext r, Type serviceType, out object instance)
+        {
+            instance = null;
+            return  r.CurrentScope?.TryGetInstance(r, serviceType, out instance) == true ||
+                   r.SingletonScope.TryGetInstance(r, serviceType, out instance);
+        }
     }
 
     /// <summary>The result generated delegate used for service creation.</summary>
@@ -5520,6 +5547,10 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
+        /// Adding the factory directly to scope for resolution 
+        public static void Use<TService>(this IResolverContext r, Type serviceType, FactoryDelegate factory) =>
+            r.Use(typeof(TService), factory);
+
         /// <summary>Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
         /// Or you can register initializer for <see cref="Object"/> type to be applied 
@@ -5683,6 +5714,9 @@ namespace DryIoc
     /// <summary>Extension methods for <see cref="IResolver"/>.</summary>
     public static class Resolver
     {
+        internal static readonly MethodInfo FastResolveMethod =
+            typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(IfUnresolved));
+
         internal static readonly MethodInfo ResolveMethod =
             typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
@@ -8124,12 +8158,26 @@ namespace DryIoc
                     if (paramServiceType == typeof(IResolverContext) || paramServiceType == typeof(IResolver)
 // todo: replace with feature toggles
 #if NET45 || NETSTANDARD2_0
-                        || paramServiceType == typeof(IServiceProvider)
+                                                                     || paramServiceType == typeof(IServiceProvider)
 #endif
                     )
+                    {
                         paramExprs[i] = ResolverContext.GetRootOrSelfExpr(paramRequest);
+                        continue;
+                    }
                     else if (paramServiceType == typeof(IRegistrator) || paramServiceType == typeof(IContainer))
+                    {
                         paramExprs[i] = Convert(ResolverContext.GetRootOrSelfExpr(paramRequest), paramServiceType);
+                        continue;
+                    }
+
+                    // todo: change to generating fast resolve call
+                    if (container.TryGetScopedInstance(paramServiceType, out var instance))
+                    {
+                        paramExprs[i] = Constant(instance, paramServiceType);
+                        continue;
+                    }
+
                 }
                 else if (paramInfo.Details.HasCustomValue)
                 {
@@ -8856,7 +8904,13 @@ namespace DryIoc
         /// <summary>Gets and existing value at specified id, or adds a new value if no-one was added in between.</summary>
         object GetOrTryAdd(int id, object item, int disposalOrder);
 
-        /// <summary>Clones the scope.</summary>
+        /// Sets (replaces) the factory for specified type.
+        void SetInstance(Type type, FactoryDelegate instance);
+
+        /// Looks up for stored item by type.
+        bool TryGetInstance(IResolverContext r, Type type, out object instance);
+
+        /// Clones the scope.
         IScope Clone();
     }
 
@@ -8875,17 +8929,18 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, ImMap<object>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(parent, name, ImMap<object>.Empty, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
         { }
 
         private Scope(IScope parent, object name, ImMap<object> items,
-            ImMap<IDisposable> disposables, int nextDisposalIndex)
+            ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
         {
             Parent = parent;
             Name = name;
             _items = items;
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
+            _factories = ImHashMap<Type, FactoryDelegate>.Empty;
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
@@ -9001,7 +9056,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IScope Clone() =>
-            new Scope(Parent, Name, _items, _disposables, _nextDisposalIndex);
+            new Scope(Parent, Name, _items, _factories, _disposables, _nextDisposalIndex);
 
         /// <inheritdoc />
         public bool TryGet(out object item, int id)
@@ -9024,6 +9079,34 @@ namespace DryIoc
         }
 
         private int NextDisposalIndex() => Interlocked.Decrement(ref _nextDisposalIndex);
+
+        /// Add instance to the list
+        public void SetInstance(Type type, FactoryDelegate instance)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            var factories = _factories;
+            if (Interlocked.CompareExchange(ref _factories, _factories.AddOrUpdate(type, instance), factories) != factories)
+                Ref.Swap(ref _factories, f => f.AddOrUpdate(type, instance));
+        }
+
+        /// Try get item by type
+        public bool TryGetInstance(IResolverContext r, Type type, out object instance)
+        {
+            instance = null;
+            if (_disposed == 1)
+                return false;
+
+            var factory = _factories.GetValueOrDefault(type);
+            if (factory != null)
+            {
+                instance = factory(r);
+                return true;
+            }
+
+            return Parent?.TryGetInstance(r, type, out instance) ?? false;
+        }
 
         private void TrackDisposable(IDisposable disposable, int disposalOrder)
         {
@@ -9079,6 +9162,7 @@ namespace DryIoc
         #region Implementation
 
         private ImMap<object> _items;
+        private ImHashMap<Type, FactoryDelegate> _factories;
         private ImMap<IDisposable> _disposables;
         private int _nextDisposalIndex;
         private int _disposed;
