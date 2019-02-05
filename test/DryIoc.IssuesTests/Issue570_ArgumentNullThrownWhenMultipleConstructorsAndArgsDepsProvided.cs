@@ -34,28 +34,6 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void AutoConcreteTypeResolution_should_be_able_to_create_with_default_ctor()
-        {
-            var container = new Container(rules => rules
-                .WithAutoConcreteTypeResolution());
-
-            var dict = container.Resolve<Dictionary<Type, object>>();
-
-            Assert.IsNotNull(dict);
-        }
-
-        [Test]
-        public void WithConcreteTypeDynamicRegistrations_should_be_able_to_create_with_default_ctor()
-        {
-            var container = new Container(rules => rules
-                .WithConcreteTypeDynamicRegistrations());
-
-            var dict = container.Resolve<Dictionary<Type, object>>();
-
-            Assert.IsNotNull(dict);
-        }
-
-        [Test]
         public void Should_work_with_the_Dictionary_is_right()
         {
             var container = new Container(rules => rules

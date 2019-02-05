@@ -926,13 +926,17 @@ namespace DryIoc
                 if (matchedFactories1.Length == 0)
                     return null;
 
-                var selectedFactory = Rules.FactorySelector(request, matchedFactories1.Map(f => f.Key.Pair(f.Value)));
+                var matchedFactoriesWithKeys = matchedFactories1.Map(f => f.Key.Pair(f.Value));
+                var selectedFactory = Rules.FactorySelector(request, matchedFactoriesWithKeys);
                 if (selectedFactory == null)
                     return null;
 
                 // Issue: #508
                 if (allFactories.Length > 1)
-                    request.ChangeServiceKey(matchedFactories1.FindFirst(f => f.Value.FactoryID == selectedFactory.FactoryID).Key);
+                {
+                    var singleMatchedFactory = matchedFactories1.FindFirst(f => f.Value.FactoryID == selectedFactory.FactoryID);
+                    request.ChangeServiceKey(singleMatchedFactory.Key);
+                }
 
                 return selectedFactory;
             }
