@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples
 {
@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests.Samples
             container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
             var client = container.Resolve<SomeClient>();
-            Assert.That(client.Dependency, Is.Not.Null);
+            Assert.IsNotNull(client.Dependency);
         }
 
         public interface IDependency { }

@@ -1469,8 +1469,6 @@ namespace DryIoc
             return resultFactories;
         }
 
-        // todo: Optimize memory and performance cause SelectLastRegisteredFactory is common use-case
-
         private static readonly LastFactoryIDWinsComparer _lastFactoryIDWinsComparer = new LastFactoryIDWinsComparer();
         private struct LastFactoryIDWinsComparer : IComparer<KV<object, Factory>>
         {
@@ -4107,7 +4105,7 @@ namespace DryIoc
             Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
-        /// <summary>Replaced with WithConcreteTypeDynamicRegistrations</summary>
+        /// Replaced with `WithConcreteTypeDynamicRegistrations`
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
@@ -4557,11 +4555,13 @@ namespace DryIoc
                 .ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
 
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
-            if (ctors.Length == 0)
+
+            var ctorCount = ctors.Length;
+            if (ctorCount == 0)
                 return null;
 
             // if there is only one constructor then use it
-            if (ctors.Length == 1)
+            if (ctorCount == 1)
                 return Of(ctors[0]);
 
             // stop here for non-auto selection
@@ -4574,13 +4574,52 @@ namespace DryIoc
                 : rules.Parameters.OverrideWith(request.Made.Parameters);
             var paramSelector = selector(request);
 
-            var ctorsWithMaxParamsFirst = ctors.OrderByDescending(x => x.GetParameters().Length).ToArray();
-
             // First the check for normal resolution without Func<a, b, c>
             if (!request.IsWrappedInFuncWithArgs())
-                return Of(ctorsWithMaxParamsFirst.FindFirst(x =>
-                        x.GetParameters().FindFirst(p => !IsResolvableParameter(p, paramSelector, request)) == null)
-                    .ThrowIfNull(Error.UnableToFindCtorWithAllResolvableArgs, request));
+            {
+                ConstructorInfo maxParamCtor = null;
+                for (var processedCtorCount = 0; processedCtorCount < ctorCount; ++processedCtorCount)
+                {
+                    // find first not null (null means already processed) ctor
+                    var ctorIndex = 0;
+                    while (ctorIndex < ctorCount && ctors[ctorIndex] == null)
+                        ++ctorIndex;
+
+                    maxParamCtor = ctors[ctorIndex];
+                    var maxParams = maxParamCtor.GetParameters();
+                    for (var i = 0; i < ctorCount; i++)
+                    {
+                        if (i != ctorIndex && ctors[i]?.GetParameters().Length > maxParams.Length)
+                        {
+                            maxParamCtor = ctors[i];
+                            maxParams = maxParamCtor.GetParameters();
+                            ctorIndex = i;
+                        }
+                    }
+
+                    for (int i = 0; i < maxParams.Length; i++)
+                    {
+                        // todo: skip constructors with parameters already found to be non-resolvable
+                        if (!IsResolvableParameter(maxParams[i], paramSelector, request))
+                        {
+                            ctors[ctorIndex] = null; // mark to skip
+                            maxParamCtor = null;
+                            break;
+                        }
+                    }
+
+                    if (maxParamCtor != null)
+                        break; // success
+                }
+
+                if (maxParamCtor == null)
+                    return Throw.For<FactoryMethod>(request.IfUnresolved != IfUnresolved.ReturnDefault,
+                        Error.UnableToFindCtorWithAllResolvableArgs, request);
+
+                return Of(maxParamCtor);
+            }
+
+            var ctorsWithMaxParamsFirst = ctors.OrderByDescending(x => x.GetParameters().Length).ToArray();
 
             // For Func<a, b, r> the constructor should contain all input arguments and
             // the rest should be resolvable.
@@ -8099,9 +8138,17 @@ namespace DryIoc
             var container = request.Container;
             var rules = container.Rules;
 
-            var factoryMethod = (Made.FactoryMethod ?? rules.FactoryMethod)?.Invoke(request)
-                 .ThrowIfNull(Error.UnableToSelectCtor, request.ImplementationType, request)
-                ?? FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+            FactoryMethod factoryMethod;
+            var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
+            if (factoryMethodSelector == null)
+                factoryMethod = FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+            else
+            {
+                factoryMethod = factoryMethodSelector(request);
+                if (factoryMethod == null)
+                    return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
+                        Error.UnableToSelectCtor, request.ImplementationType, request);
+            }
 
             // If factory method is the method of some registered service, then resolve factory service first.
             var factoryExpr = factoryMethod.FactoryExpression;
@@ -10299,6 +10346,14 @@ namespace DryIoc
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
+
+        /// Throws if contidion is true, otherwise returns the `default(T)` value
+        public static T For<T>(bool throwCondition, int error, 
+            object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        {
+            if (!throwCondition) return default(T);
+            throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
+        }
     }
 
     /// <summary>Called from generated code.</summary>
@@ -10582,11 +10637,38 @@ namespace DryIoc
         public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
         {
-            var ctors = type.GetTypeInfo().DeclaredConstructors;
-            if (!includeNonPublic) ctors = ctors.Match(c => c.IsPublic);
-            if (!includeStatic) ctors = ctors.Match(c => !c.IsStatic);
+            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+
+            if (ctors.Length == 0)
+                return ctors;
+
+            var skip0 = DoSkipCtor(ctors[0], includeNonPublic, includeStatic);
+            if (ctors.Length == 1)
+                return skip0 ? ArrayTools.Empty<ConstructorInfo>() : ctors;
+
+            if (ctors.Length == 2)
+            {
+                var skip1 = DoSkipCtor(ctors[1], includeNonPublic, includeStatic);
+                if (skip0 && skip1)
+                    return ArrayTools.Empty<ConstructorInfo>();
+                if (skip0)
+                    return new[] { ctors[1] };
+                if (skip1)
+                    return new[] { ctors[0] };
+                return ctors;
+            }
+
+            if (!includeNonPublic && !includeStatic)
+                return ctors.Match(x => !x.IsStatic && x.IsPublic);
+            if (!includeNonPublic)
+                return ctors.Match(x => x.IsPublic);
+            if (!includeStatic)
+                return ctors.Match(x => !x.IsStatic);
             return ctors;
         }
+
+        private static bool DoSkipCtor(ConstructorInfo ctor, bool includeNonPublic, bool includeStatic) =>
+            !includeNonPublic && !ctor.IsPublic || !includeStatic && ctor.IsStatic;
 
         /// <summary>Searches and returns constructor by its signature.</summary>
         public static ConstructorInfo GetConstructorOrNull(this Type type,
@@ -10595,7 +10677,7 @@ namespace DryIoc
             var pTypesCount = args.Length;
             var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
             if (!includeNonPublic)
-                ctors = ctors.Match(c => c.IsPublic);
+                ctors = ctors.Match(x => x.IsPublic);
 
             for (var i = 0; i < ctors.Length; i++)
             {

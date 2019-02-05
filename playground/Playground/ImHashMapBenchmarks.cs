@@ -446,8 +446,27 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
     GetValueOrDefault |   200 | 13.329 ns | 0.0338 ns | 0.0299 ns |  0.97 |           - |           - |           - |                   - |
  GetValueOrDefault_v1 |   200 | 13.722 ns | 0.0537 ns | 0.0448 ns |  1.00 |           - |           - |           - |                   - |
 
+    ## The whole result for the docs
+
+                Method | Count |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------- |------ |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+            TryFind_v1 |    10 |  7.274 ns | 0.0410 ns | 0.0384 ns |  0.98 |    0.01 |           - |           - |           - |                   - |
+               TryFind |    10 |  7.422 ns | 0.0237 ns | 0.0222 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+ ConcurrentDict_TryGet |    10 | 21.664 ns | 0.0213 ns | 0.0189 ns |  2.92 |    0.01 |           - |           - |           - |                   - |
+  ImmutableDict_TryGet |    10 | 71.199 ns | 0.1312 ns | 0.1228 ns |  9.59 |    0.03 |           - |           - |           - |                   - |
+                       |       |           |           |           |       |         |             |             |             |                     |
+            TryFind_v1 |   100 |  8.426 ns | 0.0236 ns | 0.0221 ns |  0.91 |    0.00 |           - |           - |           - |                   - |
+               TryFind |   100 |  9.304 ns | 0.0305 ns | 0.0270 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+ ConcurrentDict_TryGet |   100 | 21.791 ns | 0.1072 ns | 0.0951 ns |  2.34 |    0.01 |           - |           - |           - |                   - |
+  ImmutableDict_TryGet |   100 | 74.985 ns | 0.1053 ns | 0.0879 ns |  8.06 |    0.03 |           - |           - |           - |                   - |
+                       |       |           |           |           |       |         |             |             |             |                     |
+               TryFind |  1000 | 13.837 ns | 0.0291 ns | 0.0272 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+            TryFind_v1 |  1000 | 16.108 ns | 0.0415 ns | 0.0367 ns |  1.16 |    0.00 |           - |           - |           - |                   - |
+ ConcurrentDict_TryGet |  1000 | 21.876 ns | 0.0325 ns | 0.0288 ns |  1.58 |    0.00 |           - |           - |           - |                   - |
+  ImmutableDict_TryGet |  1000 | 83.563 ns | 0.1046 ns | 0.0873 ns |  6.04 |    0.01 |           - |           - |           - |                   - |
+
 */
-            [Params(5, 40, 200)]// the 1000 does not add anything as the LookupKey stored higher in the tree, 1000)]
+            [Params(10, 100, 1000)]// the 1000 does not add anything as the LookupKey stored higher in the tree, 1000)]
             public int Count;
 
             [GlobalSetup]
@@ -457,8 +476,8 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 _mapV1 = AddOrUpdate_v1();
                 //_mapV2 = AddOrUpdate_v2();
                 //_mapV3 = AddOrUpdate_v3();
-                //_concurrentDict = ConcurrentDict();
-                //_immutableDict = ImmutableDict();
+                _concurrentDict = ConcurrentDict();
+                _immutableDict = ImmutableDict();
             }
 
             public ImHashMap<Type, string> AddOrUpdate()
@@ -527,7 +546,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
-            //private ConcurrentDictionary<Type, string> _concurDict;
+            private ConcurrentDictionary<Type, string> _concurrentDict;
 
             public ImmutableDictionary<Type, string> ImmutableDict()
             {
@@ -539,24 +558,37 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map.Add(typeof(ImHashMapBenchmarks), "!");
             }
 
-            //private ImmutableDictionary<Type, string> _immutableDict;
+            private ImmutableDictionary<Type, string> _immutableDict;
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
-            //[Benchmark(Baseline = true)]
+            [Benchmark]
             public string TryFind_v1()
             {
                 _mapV1.TryFind(LookupKey, out var result);
                 return result;
             }
 
-            //[Benchmark]
+            [Benchmark(Baseline = true)]
             public string TryFind()
             {
                 _map.TryFind(LookupKey, out var result);
                 return result;
             }
 
+            [Benchmark]
+            public string ConcurrentDict_TryGet()
+            {
+                _concurrentDict.TryGetValue(LookupKey, out var result);
+                return result;
+            }
+
+            [Benchmark]
+            public string ImmutableDict_TryGet()
+            {
+                _immutableDict.TryGetValue(LookupKey, out var result);
+                return result;
+            }
 
             //[Benchmark]
             //public string TryFind_v2()
@@ -565,10 +597,10 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             //    return result;
             //}
 
-            [Benchmark]
+            //[Benchmark]
             public string GetValueOrDefault() => _map.GetValueOrDefault(LookupKey);
 
-            [Benchmark(Baseline = true)]
+            //[Benchmark(Baseline = true)]
             public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
 
             //[Benchmark]
