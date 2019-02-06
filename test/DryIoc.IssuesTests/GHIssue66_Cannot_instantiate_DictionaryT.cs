@@ -51,15 +51,34 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(a.B.I);
         }
 
-        [Test]
-        public void Should_call_resolve_for_parameter_no_more_than_once()
+        [Test, Ignore("fixme")]
+        public void Should_throw_when_no_constructors_are_match()
         {
             var container = new Container(rules => rules
-                .WithConcreteTypeDynamicRegistrations());
+                .WithAutoConcreteTypeResolution());
 
-            container.Register<I, X>();
+            Assert.Throws<ContainerException>(() => container.Resolve<D>());
+        }
 
-            var d = container.Resolve<D>();
+        [Test]
+        public void Should_throw_when_single_constructor_cant_be_used()
+        {
+            var container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution());
+
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<E>());
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToResolveUnknownService),
+                ex.ErrorName);
+        }
+
+        [Test, Ignore("fixme")]
+        public void Should_consider_arguments_passed_to_Resolve()
+        {
+            var container = new Container(rules => rules
+                .WithAutoConcreteTypeResolution());
+
+            var d = container.Resolve<D>(new object[] { (I)new X() });
             Assert.IsNotNull(d.I);
         }
 
@@ -89,6 +108,15 @@ namespace DryIoc.IssuesTests
             public I I { get; }
             public D() { }
             public D(I i)
+            {
+                I = i;
+            }
+        }
+
+        public class E
+        {
+            public I I { get; }
+            public E(I i)
             {
                 I = i;
             }

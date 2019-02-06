@@ -1012,6 +1012,7 @@ namespace DryIoc
                 return Rules.FactorySelector(request, factory0.Key.Pair(factory0.Value).One());
             }
 
+            // todo: add match by scope and open-generic
             //if (allFactories.Length == 2)
             //{
             //    var factory0 = allFactories[0];
