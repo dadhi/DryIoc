@@ -51,6 +51,18 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(a.B.I);
         }
 
+        [Test]
+        public void Should_call_resolve_for_parameter_no_more_than_once()
+        {
+            var container = new Container(rules => rules
+                .WithConcreteTypeDynamicRegistrations());
+
+            container.Register<I, X>();
+
+            var d = container.Resolve<D>();
+            Assert.IsNotNull(d.I);
+        }
+
         public class A
         {
             public B B { get; }
@@ -71,5 +83,15 @@ namespace DryIoc.IssuesTests
 
         public interface I { }
         public class X : I { }
+
+        public class D
+        {
+            public I I { get; }
+            public D() { }
+            public D(I i)
+            {
+                I = i;
+            }
+        }
     }
 }

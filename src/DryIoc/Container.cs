@@ -8207,9 +8207,9 @@ namespace DryIoc
                 if (paramInfo.Details == ServiceDetails.Default)
                 {
                     if (paramServiceType == typeof(IResolverContext) || paramServiceType == typeof(IResolver)
-// todo: replace with feature toggles
+// todo: replace framework targets with feature toggle
 #if NET45 || NETSTANDARD2_0
-                                                                     || paramServiceType == typeof(IServiceProvider)
+                     || paramServiceType == typeof(IServiceProvider)
 #endif
                     )
                     {
@@ -8553,39 +8553,6 @@ namespace DryIoc
                 : request.IfUnresolved != IfUnresolved.Throw ? null
                 : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
         }
-
-        //private static CreateScopedValue GetActivator(Type type, IList<object> argExprs)
-        //{
-        //    if (argExprs == null || argExprs.Count == 0)
-        //        return () => Activator.CreateInstance(type, Empty<object>());
-
-        //    var args = new object[argExprs.Count];
-        //    for (var i = 0; i < args.Length; ++i)
-        //    {
-        //        var argExpr = argExprs[i];
-        //        var convertExpr = argExpr as UnaryExpression;
-        //        if (convertExpr != null && convertExpr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
-        //            argExpr = convertExpr.Operand;
-
-        //        var constExpr = argExpr as ConstantExpression;
-        //        if (constExpr != null)
-        //            args[i] = constExpr.Value;
-        //        else
-        //        {
-        //            var argNewExpr = argExpr as NewExpression;
-        //            if (argNewExpr == null)
-        //                return null;
-
-        //            var activator = GetActivator(argNewExpr.Type, argNewExpr.Arguments.ToArrayOrSelf());
-        //            if (activator == null)
-        //                return null;
-
-        //            args[i] = activator();
-        //        }
-        //    }
-
-        //    return () => Activator.CreateInstance(type, args);
-        //}
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
             Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
