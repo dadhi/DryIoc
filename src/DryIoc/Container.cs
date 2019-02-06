@@ -8187,7 +8187,7 @@ namespace DryIoc
             {
                 var param = parameters[i];
 
-                // check not yet used func arguments
+                // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
                 if (argExprs != null)
                     for (var a = 0; a < argExprs.Length; ++a)
                         if ((argsUsedMask & 1 << a) == 0 && argExprs[a].Type.IsAssignableTo(param.ParameterType))
@@ -8198,7 +8198,7 @@ namespace DryIoc
                         }
 
                 if (paramExprs[i] != null)
-                    continue; // done, parameter is by provided via input argument
+                    continue; // done, parameter is provided via argument expression
 
                 var paramInfo = getParamInfo(param) ?? ParameterServiceInfo.Of(param);
                 var paramRequest = request.Push(paramInfo);
@@ -8222,13 +8222,12 @@ namespace DryIoc
                         continue;
                     }
 
-                    // todo: change to generating fast resolve call
+                    // todo: change to generate the fast resolve call
                     if (container.TryGetScopedInstance(paramServiceType, out var instance))
                     {
                         paramExprs[i] = Constant(instance, paramServiceType);
                         continue;
                     }
-
                 }
                 else if (paramInfo.Details.HasCustomValue)
                 {
@@ -8238,15 +8237,13 @@ namespace DryIoc
                     {
                         if (!customValue.GetType().IsAssignableTo(paramServiceType) &&
                             !(hasConversionOperator = customValue.GetType().HasConversionOperatorTo(paramServiceType)))
-                            Throw.It(Error.InjectedCustomValueIsOfDifferentType, customValue, paramServiceType, paramRequest);
+                            return Throw.For<Expression>(paramRequest.IfUnresolved != IfUnresolved.ReturnDefault,
+                                Error.InjectedCustomValueIsOfDifferentType, customValue, paramServiceType, paramRequest);
                     }
 
-                    if (hasConversionOperator)
-                        paramExprs[i] = Convert(container.GetConstantExpression(customValue), paramServiceType);
-                    else
-                        paramExprs[i] = container.GetConstantExpression(customValue, paramServiceType);
-
-                    // done, parameter is provided via custom value specified in registration
+                    paramExprs[i] = hasConversionOperator 
+                        ? Convert(container.GetConstantExpression(customValue), paramServiceType) 
+                        : container.GetConstantExpression(customValue, paramServiceType);
                     continue;
                 }
 
