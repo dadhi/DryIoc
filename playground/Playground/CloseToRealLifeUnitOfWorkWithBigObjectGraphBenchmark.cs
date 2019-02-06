@@ -271,7 +271,7 @@ namespace PerformanceTests
                         BmarkGrace | 5,439.60 us | 23.1980 us | 21.6994 us | 240.25 |    2.00 |     46.8750 |     23.4375 |           - |           216.23 KB |
                     BmarkGraceMsDi | 7,190.90 us | 55.1042 us | 48.8484 us | 317.53 |    3.35 |     62.5000 |     31.2500 |           - |           314.21 KB |
 
-            ## Use instance everywhere
+            ## Use instance everywhere (wip)
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -282,7 +282,17 @@ namespace PerformanceTests
                         BmarkGrace | 5,423.84 us | 41.2778 us | 38.6112 us | 239.02 |    1.75 |     46.8750 |     23.4375 |           - |           216.08 KB |
                     BmarkGraceMsDi | 7,194.49 us | 69.7629 us | 65.2563 us | 316.76 |    3.14 |     62.5000 |     31.2500 |           - |           314.24 KB |
 
-             * */
+            ## After shaving factory selection (wip)
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    22.92 us |  0.2458 us |  0.2052 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    54.52 us |  0.1413 us |  0.1322 us |   2.38 |    0.02 |     11.9629 |           - |           - |            55.21 KB |
+                      BmarkAutofac |   145.66 us |  0.9167 us |  0.8575 us |   6.36 |    0.04 |     28.0762 |      0.2441 |           - |           129.45 KB |
+                   BmarkDryIocMsDi | 1,644.43 us | 14.6430 us | 13.6971 us |  71.71 |    0.96 |     19.5313 |      9.7656 |           - |            93.37 KB |
+                        BmarkGrace | 5,440.88 us | 46.6670 us | 43.6524 us | 237.61 |    3.03 |     46.8750 |     23.4375 |           - |           216.14 KB |
+                    BmarkGraceMsDi | 7,226.64 us | 45.4676 us | 42.5304 us | 314.89 |    2.59 |     62.5000 |     31.2500 |           - |            314.2 KB |
+            */
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());

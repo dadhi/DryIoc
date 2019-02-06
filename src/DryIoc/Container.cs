@@ -471,13 +471,13 @@ namespace DryIoc
             var metadata = preResolveParent.Metadata;
             if (metadataKey != null || metadata != null)
             {
-                items = items.Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                items = items.Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems
-                        .Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                        .Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
                 if (variantGenericItems != null)
                     variantGenericItems = variantGenericItems
-                        .Where(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                        .Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
             }
 
             // Exclude composite parent service from items, skip decorators
@@ -907,39 +907,9 @@ namespace DryIoc
         {
             var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
 
-            // todo: optimize the code inside these brackets, remove unnecessary allocations
             // the code mostly called from DI.MS.DI
             if (Rules.FactorySelector != null && serviceKey == null)
-            {
-                var allFactories = ((IContainer)this)
-                    .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
-                    .ToArrayOrSelf();
-
-                if (allFactories.Length == 0)
-                    return null;
-
-                // Sort in registration order
-                if (allFactories.Length > 1)
-                    Array.Sort(allFactories, _lastFactoryIDWinsComparer);
-
-                var matchedFactories1 = MatchFactories(allFactories, request);
-                if (matchedFactories1.Length == 0)
-                    return null;
-
-                var matchedFactoriesWithKeys = matchedFactories1.Map(f => f.Key.Pair(f.Value));
-                var selectedFactory = Rules.FactorySelector(request, matchedFactoriesWithKeys);
-                if (selectedFactory == null)
-                    return null;
-
-                // Issue: #508
-                if (allFactories.Length > 1)
-                {
-                    var singleMatchedFactory = matchedFactories1.FindFirst(f => f.Value.FactoryID == selectedFactory.FactoryID);
-                    request.ChangeServiceKey(singleMatchedFactory.Key);
-                }
-
-                return selectedFactory;
-            }
+                return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
 
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -1024,6 +994,94 @@ namespace DryIoc
             return null;
         }
 
+        // todo: shave memory allocations
+        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, Type serviceType)
+        {
+            var allFactories = ((IContainer)this)
+                .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
+                .ToArrayOrSelf();
+
+            if (allFactories.Length == 0)
+                return null;
+
+            if (allFactories.Length == 1)
+            {
+                var factory0 = allFactories[0];
+                if (!MatchFactoryConditionAndMetadata(factory0.Value, request))
+                    return null;
+                return Rules.FactorySelector(request, factory0.Key.Pair(factory0.Value).One());
+            }
+
+            //if (allFactories.Length == 2)
+            //{
+            //    var factory0 = allFactories[0];
+            //    var factory1 = allFactories[1];
+
+            //    var matched0 = MatchFactoryConditionAndMetadata(factory0.Value, request);
+            //    var matched1 = MatchFactoryConditionAndMetadata(factory1.Value, request);
+
+            //    if (!matched0 && !matched1)
+            //        return null;
+
+            //    KeyValuePair<object, Factory>[] facs;
+            //    if (!matched0)
+            //        facs = factory1.Key.Pair(factory1.Value).One();
+            //    else if (!matched1)
+            //        facs = factory0.Key.Pair(factory0.Value).One();
+            //    else
+            //        facs = factory0.Value.FactoryID > factory1.Value.FactoryID 
+            //            ? new[] { factory1.Key.Pair(factory1.Value), factory0.Key.Pair(factory0.Value) }
+            //            : new[] { factory0.Key.Pair(factory0.Value), factory1.Key.Pair(factory1.Value) };
+
+            //    return Rules.FactorySelector(request, facs);
+            //}
+
+            // Sort in registration order
+            if (allFactories.Length > 1)
+                Array.Sort(allFactories, _lastFactoryIDWinsComparer);
+
+            var matchedFactories = MatchFactories(allFactories, request);
+            if (matchedFactories.Length == 0)
+                return null;
+
+            // todo: try to remove this step
+            var matchedFactoriesWithKeys = matchedFactories.Map(f => f.Key.Pair(f.Value));
+
+            var selectedFactory = Rules.FactorySelector(request, matchedFactoriesWithKeys);
+            if (selectedFactory == null)
+                return null;
+
+            // Issue: #508
+            if (allFactories.Length > 1)
+            {
+                for (var i = 0; i < matchedFactories.Length; i++)
+                {
+                    if (matchedFactories[i].Value.FactoryID == selectedFactory.FactoryID)
+                    {
+                        request.ChangeServiceKey(matchedFactories[i].Key);
+                        break;
+                    }
+                }
+            }
+
+            return selectedFactory;
+        }
+
+        private static bool MatchFactoryConditionAndMetadata(Factory factory, Request request)
+        {
+            if (!factory.CheckCondition(request))
+                return false;
+
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+
+            if ((metadataKey != null || metadata != null) &&
+                !factory.Setup.MatchesMetadata(metadataKey, metadata))
+                return false;
+
+            return true;
+        }
+
         private static Type GetServiceTypeAndKeyForFactoryLookup(Request request, out object serviceKey)
         {
             serviceKey = request.ServiceKey;
@@ -1057,7 +1115,7 @@ namespace DryIoc
 
         private static KV<object, Factory>[] MatchFactories(KV<object, Factory>[] matchedFactories, Request request)
         {
-            // Check factories condition, even for the single factory
+            // Check factories condition
             matchedFactories = matchedFactories.Match(f => f.Value.CheckCondition(request));
             if (matchedFactories.Length == 0)
                 return matchedFactories;
@@ -1067,8 +1125,7 @@ namespace DryIoc
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
             {
-                matchedFactories = matchedFactories
-                    .Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
+                matchedFactories = matchedFactories.Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
                 if (matchedFactories.Length == 0)
                     return matchedFactories;
             }
@@ -1483,7 +1540,7 @@ namespace DryIoc
         private static KV<object, Factory>[] MatchFactoriesByReuse(
             KV<object, Factory>[] matchedFactories, Request request)
         {
-            var reuseMatchedFactories = matchedFactories.Match(it => it.Value.Reuse?.CanApply(request) ?? true);
+            var reuseMatchedFactories = matchedFactories.Match(x => x.Value.Reuse?.CanApply(request) ?? true);
             if (reuseMatchedFactories.Length == 1)
             {
                 matchedFactories = reuseMatchedFactories;
@@ -3956,7 +4013,7 @@ namespace DryIoc
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
-        /// <summary>Select last registered factory from multiple default.</summary>
+        /// <summary>Select last registered factory from the multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
         private static Factory SelectLastRegisteredFactory(Request request, KeyValuePair<object, Factory>[] factories)
         {

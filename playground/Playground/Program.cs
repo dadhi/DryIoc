@@ -22,7 +22,7 @@ namespace Playground
             //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
 
             //BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
-            BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
+            //BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
 
             //BenchmarkRunner.Run<StructEnumerableTest>();
             //BenchmarkRunner.Run<PropertyAccess>();
@@ -30,7 +30,7 @@ namespace Playground
             //BenchmarkRunner.Run<FindMethodInClass>();
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
-            //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.WarmedUpOpenScopeAndResolve>();
 
