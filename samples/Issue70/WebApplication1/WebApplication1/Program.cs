@@ -1,13 +1,9 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
-using DryIoc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using DryIoc;
 using DryIoc.Microsoft.DependencyInjection;
-using Container = DryIoc.Container;
-using IContainer = DryIoc.IContainer;
 
 namespace WebApplication1
 {
@@ -40,7 +36,7 @@ namespace WebApplication1
                     services.AddHostedService<MyBootstrapService>();
                 })
                 .UseServiceProviderFactory(new DryIocServiceProviderFactory())
-                .ConfigureContainer<Container>((hostContext, container) =>
+                .ConfigureContainer<IContainer>((hostContext, container) =>
                 {
                     //container.Register<FooService>(Reuse.Transient);
                     // etc.
