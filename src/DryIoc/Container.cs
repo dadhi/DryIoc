@@ -3338,7 +3338,7 @@ namespace DryIoc
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
 
-        /// Put instance into the current scope or singletons.
+        /// Puts instance created via the passed factory on demand into the current or singleton scope
         void Use(Type serviceType, FactoryDelegate factory);
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
@@ -5649,8 +5649,16 @@ namespace DryIoc
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Adding the factory directly to scope for resolution 
-        public static void Use<TService>(this IResolverContext r, Type serviceType, FactoryDelegate factory) =>
+        public static void Use<TService>(this IResolverContext r, FactoryDelegate factory) =>
             r.Use(typeof(TService), factory);
+
+        /// Adding the factory directly to scope for resolution 
+        public static void Use<TService>(this IRegistrator r, FactoryDelegate factory) =>
+            r.Use(typeof(TService), factory);
+
+        /// Adding the factory directly to scope for resolution 
+        public static void Use<TService>(this IContainer c, FactoryDelegate factory) =>
+            ((IResolverContext)c).Use(typeof(TService), factory);
 
         /// <summary>Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
@@ -9853,9 +9861,12 @@ namespace DryIoc
         /// May return empty, 1 or multiple factories.</summary>
         Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
 
-        /// <summary>Put instance into the current scope or singletons.</summary>
+        /// Puts instance into the current scope or singletons.
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
+
+        /// Puts instance created via the passed factory on demand into the current or singleton scope
+        void Use(Type serviceType, FactoryDelegate factory);
     }
 
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
