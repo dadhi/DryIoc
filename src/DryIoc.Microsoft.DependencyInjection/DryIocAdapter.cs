@@ -253,4 +253,48 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// Disposes the underlying resolver context 
         public void Dispose() => _resolverContext.Dispose();
     }
+
+
+    /// This is a implementation supposed to be used with the `HostBuilder` like this:
+    /// <code><![CDATA[
+    /// static async Task Main()
+    /// {
+    ///     var host = new HostBuilder()
+    ///         .ConfigureServices(services =>
+    ///         {
+    ///             services.AddHostedService<MyBootstrapService>();
+    ///         })
+    ///         .UseServiceProviderFactory(  new DryIocServiceProviderFactory()  )
+    ///         .ConfigureContainer<Container>((hostContext, container) =>
+    ///         {
+    ///             container.Register<FooService>(Reuse.Scoped);
+    ///             // etc.
+    ///         })
+    ///         .Build();
+    ///
+    ///     await host.RunAsync(); 
+    /// }
+    /// ]]></code>
+    public class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
+    {
+        private readonly IContainer _container;
+        private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
+
+        /// Some options to push to `.WithDependencyInjectionAdapter(...)`
+        public DryIocServiceProviderFactory(
+            IContainer container = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+        {
+            _container = container;
+            _registerDescriptor = registerDescriptor;
+        }
+
+        /// <inheritdoc />
+        public IContainer CreateBuilder(IServiceCollection services) =>
+            (_container ?? new Container()).WithDependencyInjectionAdapter(services, _registerDescriptor);
+
+        /// <inheritdoc />
+        public IServiceProvider CreateServiceProvider(IContainer container) => 
+            container.BuildServiceProvider();
+    }
 }

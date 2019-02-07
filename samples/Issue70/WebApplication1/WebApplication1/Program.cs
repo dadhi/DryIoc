@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using DryIoc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,9 +15,9 @@ namespace WebApplication1
     {
     }
 
-    class BootstrapService : IHostedService
+    class MyBootstrapService : IHostedService
     {
-        public BootstrapService(FooService bar) { }
+        public MyBootstrapService(FooService bar) { }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
@@ -36,26 +37,17 @@ namespace WebApplication1
             var host = new HostBuilder()
                 .ConfigureServices(services =>
                 {
-                    services.AddHostedService<BootstrapService>();
+                    services.AddHostedService<MyBootstrapService>();
                 })
                 .UseServiceProviderFactory(new DryIocServiceProviderFactory())
                 .ConfigureContainer<Container>((hostContext, container) =>
                 {
-                    // no errors from DryIoc when the following line is uncommented
-                    //                container.Register<FooService>(Reuse.Transient);
+                    //container.Register<FooService>(Reuse.Transient);
+                    // etc.
                 })
-                .ConfigureHostConfiguration(builder => builder.AddEnvironmentVariables())
                 .Build();
 
             await host.RunAsync();
-        }
-
-        internal class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
-        {
-            public IContainer CreateBuilder(IServiceCollection services) => 
-                new Container().WithDependencyInjectionAdapter(services);
-
-            public IServiceProvider CreateServiceProvider(IContainer container) => container;
         }
     }
 }
