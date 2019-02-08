@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc", "..\..\..\src\DryI
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Microsoft.DependencyInjection", "..\..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj", "{621CC862-8784-4D7E-95BC-894923CC94B8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebApplication2", "WebApplication2\WebApplication2.csproj", "{A8EEEA98-2B9A-444D-9CCE-943758DD2E59}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{621CC862-8784-4D7E-95BC-894923CC94B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{621CC862-8784-4D7E-95BC-894923CC94B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{621CC862-8784-4D7E-95BC-894923CC94B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8EEEA98-2B9A-444D-9CCE-943758DD2E59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8EEEA98-2B9A-444D-9CCE-943758DD2E59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8EEEA98-2B9A-444D-9CCE-943758DD2E59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8EEEA98-2B9A-444D-9CCE-943758DD2E59}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
