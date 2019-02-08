@@ -251,7 +251,8 @@ namespace ImTools
                     action(source[i]);
         }
 
-        private static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
+        /// Appends source to results
+        public static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
         {
             if (results == null)
             {

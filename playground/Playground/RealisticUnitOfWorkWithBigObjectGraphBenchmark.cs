@@ -12,7 +12,7 @@ using IContainer = DryIoc.IContainer;
 
 namespace PerformanceTests
 {
-    public class CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark
+    public class RealisticUnitOfWorkWithBigObjectGraphBenchmark
     {
         public static IContainer PrepareDryIoc()
         {
@@ -177,7 +177,6 @@ namespace PerformanceTests
             return container.Locate<IServiceProvider>();
         }
 
-
         public static object Measure(DependencyInjectionContainer container)
         {
             using (var scope = container.BeginLifetimeScope())
@@ -234,6 +233,40 @@ namespace PerformanceTests
                 return scope.Resolve<R>();
         }
 
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        public class CreateContainerAndRegisterServices
+        {
+            /*
+            ## Baseline:
+
+                            Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |   3.328 us | 0.0210 us | 0.0186 us |  1.00 |    0.00 |      1.3657 |           - |           - |              6.3 KB |
+                       BmarkDryIoc |   7.465 us | 0.0990 us | 0.0926 us |  2.24 |    0.03 |      3.0670 |           - |           - |            14.14 KB |
+                   BmarkDryIocMsDi |   7.989 us | 0.0754 us | 0.0705 us |  2.40 |    0.02 |      3.7231 |           - |           - |            17.16 KB |
+                        BmarkGrace |  19.484 us | 0.3751 us | 0.3684 us |  5.86 |    0.12 |      5.1575 |      0.0305 |           - |            23.82 KB |
+                      BmarkAutofac |  89.109 us | 0.5113 us | 0.4783 us | 26.78 |    0.19 |     15.8691 |      0.1221 |           - |            73.67 KB |
+                    BmarkGraceMsDi | 144.011 us | 1.3689 us | 1.2805 us | 43.29 |    0.40 |      8.3008 |      0.2441 |           - |            38.55 KB |
+
+             */
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => PrepareMsDi();
+
+            [Benchmark]
+            public object BmarkDryIoc() => PrepareDryIoc();
+
+            [Benchmark]
+            public object BmarkDryIocMsDi() => PrepareDryIocMsDi();
+
+            [Benchmark]
+            public object BmarkGrace() => PrepareGrace();
+
+            [Benchmark]
+            public object BmarkGraceMsDi() => PrepareGraceMsDi();
+
+            [Benchmark]
+            public object BmarkAutofac() => PrepareAutofac();
+        }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve

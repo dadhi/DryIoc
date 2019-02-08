@@ -18,6 +18,8 @@ namespace Playground
     {
         public static void Main()
         {
+            //BenchmarkRunner.Run<MatchCaseOrder>();
+
             //BenchmarkRunner.Run<ImMapBenchmarks.Populate>();
             //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
 
@@ -30,7 +32,8 @@ namespace Playground
             //BenchmarkRunner.Run<FindMethodInClass>();
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
-            BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices>();
+            //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.WarmedUpOpenScopeAndResolve>();
 
