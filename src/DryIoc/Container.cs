@@ -207,15 +207,15 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             var cachedItem = _registry.Value.DefaultFactoryCache.Value.GetValueOrDefault(serviceType);
-            return cachedItem == null 
-                ? ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved) 
-                : (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem))(this);
+            return cachedItem != null 
+                ? (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem))(this)
+                : ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
         }
 
         private FactoryDelegate CompileAndCacheFactoryDelegate(Type serviceType, object expr)
         {
             var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-            _registry.Value.CacheDefaultFactory(serviceType, factoryDelegate);
+            _registry.Value.TryCacheDefaultFactory(serviceType, factoryDelegate);
             return factoryDelegate;
         }
 
@@ -223,7 +223,7 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            if (ResolverContext.TryGetScopedInstance(this, serviceType, out var obj))
+            if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
                 return obj;
 
             var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
@@ -246,7 +246,8 @@ namespace DryIoc
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
-                _registry.Value.CacheDefaultFactory(serviceType, expr);
+                if (factory.Caching != FactoryCaching.DoNotCache)
+                    _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -264,7 +265,8 @@ namespace DryIoc
             if (factoryDelegate == null)
                 return null;
 
-            _registry.Value.CacheDefaultFactory(serviceType, factoryDelegate);
+            if (factory.Caching != FactoryCaching.DoNotCache)
+                _registry.Value.TryCacheDefaultFactory(serviceType, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -300,7 +302,7 @@ namespace DryIoc
             var factory = ((IContainer)this).ResolveFactory(request);
 
             // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
-            if (serviceKey == null && request.ServiceKey != null)
+            if (serviceKey == null && request.ServiceKey != null && factory.Caching != FactoryCaching.DoNotCache)
             {
                 key = KV.Of(serviceType, request.ServiceKey);
                 cacheEntry = cacheRef.Value.GetValueOrDefault(key);
@@ -319,7 +321,8 @@ namespace DryIoc
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
-                CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, expr);
+                if (factory.Caching != FactoryCaching.DoNotCache)
+                    TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -341,7 +344,8 @@ namespace DryIoc
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
+            if (factory.Caching != FactoryCaching.DoNotCache)
+                TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -373,7 +377,7 @@ namespace DryIoc
             return entryKey;
         }
 
-        private void CacheKeyedFactoryDelegateOrExpression(
+        private void TryCacheKeyedFactoryDelegateOrExpression(
             Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key,
             KV<object, ImHashMap<object, object>> cacheEntry, object сontextKey, 
             object factory)
@@ -407,7 +411,7 @@ namespace DryIoc
                 if (factoryDelegate == null)
                 {
                     factoryDelegate = ((Expression)cachedFactory).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-                    CacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
+                    TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
                 }
 
                 return true;
@@ -871,7 +875,7 @@ namespace DryIoc
                 var unknownServiceResolvers = Rules.UnknownServiceResolvers;
                 if (!unknownServiceResolvers.IsNullOrEmpty())
                     for (var i = 0; factory == null && i < unknownServiceResolvers.Length; i++)
-                        factory = unknownServiceResolvers[i](request);
+                        factory = unknownServiceResolvers[i](request)?.DoNotCache();
             }
 
             if (factory?.FactoryGenerator != null)
@@ -2184,7 +2188,7 @@ namespace DryIoc
                     DefaultFactoryCache, KeyedFactoryDelegateCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
 
-            public void CacheDefaultFactory(Type serviceType, object factory)
+            public void TryCacheDefaultFactory(Type serviceType, object factory)
             {
                 // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
                 if (Services.IsEmpty)
@@ -3446,7 +3450,7 @@ namespace DryIoc
         private static IScope SetCurrentContextScope(IResolverContext r, object name) =>
             r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
 
-        internal static bool TryGetScopedInstance(this IResolverContext r, Type serviceType, out object instance)
+        internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
             instance = null;
             return  r.CurrentScope?.TryGetInstance(r, serviceType, out instance) == true ||
@@ -3908,7 +3912,7 @@ namespace DryIoc
         public DynamicRegistration(Factory factory,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
         {
-            Factory = factory.ThrowIfNull();
+            Factory = factory.ThrowIfNull().DoNotCache();
             ServiceKey = serviceKey;
             IfAlreadyRegistered = ifAlreadyRegistered;
         }
@@ -7623,6 +7627,16 @@ namespace DryIoc
         Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false);
     }
 
+    /// Instructs how to deal with factory result expression: 
+    public enum FactoryCaching
+    {   /// Is up to DryIoc to decide,
+        Default = 0,
+        /// Prevents DryIoc to sуе `DoNotCache`.
+        PleaseDontSetDoNotCache,
+        /// If set, the expression won't be cached 
+        DoNotCache
+    }
+
     /// <summary>Base class for different ways to instantiate service:
     /// <list type="bullet">
     /// <item>Through reflection - <see cref="ReflectionFactory"/></item>
@@ -7647,7 +7661,7 @@ namespace DryIoc
         /// <summary>Setup may contain different/non-default factory settings.</summary>
         public virtual Setup Setup
         {
-            get { return _setup; }
+            get => _setup;
             internal set { _setup = value ?? Setup.Default; }
         }
 
@@ -7675,6 +7689,17 @@ namespace DryIoc
 
         /// <summary>The factory inserts the runtime-state into result expression, e.g. delegate or pre-created instance.</summary>
         public virtual bool HasRuntimeState => false;
+
+        /// Indicates how to deal with the result expression
+        public FactoryCaching Caching { get; set; }
+
+        /// Instructs to skip caching the factory unleast it really wants to via `PleaseDontSetDoNotCache`
+        public Factory DoNotCache()
+        {
+            if (Caching != FactoryCaching.PleaseDontSetDoNotCache)
+                Caching = FactoryCaching.DoNotCache;
+            return this;
+        }
 
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
@@ -8289,7 +8314,7 @@ namespace DryIoc
                     }
 
                     // todo: change to generate the fast resolve call
-                    if (container.TryGetScopedInstance(paramServiceType, out var instance))
+                    if (container.TryGetUsedInstance(paramServiceType, out var instance))
                     {
                         paramExprs[i] = Constant(instance, paramServiceType);
                         continue;
