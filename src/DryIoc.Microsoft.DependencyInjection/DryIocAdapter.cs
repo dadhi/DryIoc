@@ -32,6 +32,20 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// to simplify work with adapted container.</summary>
     public static class DryIocAdapter
     {
+        /// Creates the container and the `IServiceProvider` because its implemented by `IContainer` -
+        /// you get simply the best of both worlds.
+        public static IContainer Create(
+            IEnumerable<ServiceDescriptor> services,
+            Func<IRegistrator, ServiceDescriptor, bool> registerService = null)
+        {
+            var container = new Container(Rules.MicrosoftDependencyInjectionRules);
+
+            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+            container.Populate(services, registerService);
+
+            return container;
+        }
+
         /// <summary>Adapts passed <paramref name="container"/> to Microsoft.DependencyInjection conventions,
         /// registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>,
         /// and returns NEW container.
@@ -88,14 +102,18 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static IContainer WithCompositionRoot<TCompositionRoot>(this IContainer container) =>
             container.WithCompositionRoot(typeof(TCompositionRoot));
 
-        /// <summary>Resolves the <see cref="IServiceProvider"/> from the container.
-        /// It is usually the last method in fluent DI setup.</summary>
+        /// It does not really build anything, it just gets the `IServiceProvider` from the container.
         public static IServiceProvider BuildServiceProvider(this IContainer container) =>
+            container.GetServiceProvider();
+
+        /// Just gets the `IServiceProvider` from the container.
+        public static IServiceProvider GetServiceProvider(this IResolver container) =>
 #if NETSTANDARD1_0
             container.Resolve<IServiceProvider>();
 #else
             container;
 #endif
+
 
         /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
         /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
@@ -116,7 +134,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// ]]></code>
         /// </example>
         public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
-            container.WithCompositionRoot<TCompositionRoot>().BuildServiceProvider();
+            container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
 
         /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
         /// <param name="container">The container.</param>
@@ -137,9 +155,13 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
-            foreach (var descriptor in descriptors)
-                if (registerDescriptor == null || !registerDescriptor(container, descriptor))
+            if (registerDescriptor == null)
+                foreach (var descriptor in descriptors)
                     container.RegisterDescriptor(descriptor);
+            else
+                foreach (var descriptor in descriptors)
+                    if (!registerDescriptor(container, descriptor))
+                        container.RegisterDescriptor(descriptor);
         }
 
         /// <summary>Uses passed descriptor to register service in container: 
@@ -149,7 +171,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="descriptor">Service descriptor.</param>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
         {
-            var reuse = ConvertLifetimeToReuse(descriptor.Lifetime);
+            var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton 
+                      : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton 
+                      : Reuse.Transient;
 
             if (descriptor.ImplementationType != null)
             {
@@ -158,15 +182,19 @@ namespace DryIoc.Microsoft.DependencyInjection
             else if (descriptor.ImplementationFactory != null)
             {
                 container.RegisterDelegate(descriptor.ServiceType,
-                    r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()), 
+#if NETSTANDARD1_0
+                    r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()),
+#else
+                    descriptor.ImplementationFactory,
+#endif
                     reuse);
             }
             else
             {
+                // todo: add support as soon as `Use` will be completed 
                 //container.Use(descriptor.ServiceType, _ => descriptor.ImplementationInstance);
 
-                container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance,
-                    IfAlreadyRegistered.AppendNotKeyed);
+                container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance, IfAlreadyRegistered.AppendNotKeyed);
             }
         }
 
@@ -179,9 +207,8 @@ namespace DryIoc.Microsoft.DependencyInjection
                 case ServiceLifetime.Scoped:
                     return Reuse.ScopedOrSingleton; // note: because the infrastructure services may be resolved w/out scope
                 case ServiceLifetime.Transient:
-                    return Reuse.Transient;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "Not supported lifetime");
+                    return Reuse.Transient;
             }
         }
     }

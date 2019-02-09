@@ -11,8 +11,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     public class DryIocAdapterSpecificationTests : DependencyInjectionSpecificationTests
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection serviceCollection) =>
-            new Container(Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(serviceCollection);
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => DryIocAdapter.Create(services);
 
         internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {

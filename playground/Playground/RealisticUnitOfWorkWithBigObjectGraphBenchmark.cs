@@ -1,5 +1,6 @@
 using System;
 using Autofac;
+using Autofac.Extensions.DependencyInjection;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
 using DryIoc;
@@ -109,8 +110,7 @@ namespace PerformanceTests
         }
 
 
-        public static IServiceProvider PrepareMsDi() =>
-            GetServices().BuildServiceProvider();
+        public static IServiceProvider PrepareMsDi() => GetServices().BuildServiceProvider();
 
         public static object Measure(IServiceProvider serviceProvider)
         {
@@ -118,8 +118,7 @@ namespace PerformanceTests
                 return scope.ServiceProvider.GetService<R>();
         }
 
-        public static IServiceProvider PrepareDryIocMsDi() => 
-            new Container().WithDependencyInjectionAdapter(GetServices());
+        public static IServiceProvider PrepareDryIocMsDi() => DryIocAdapter.Create(GetServices());
 
         public static DependencyInjectionContainer PrepareGrace()
         {
@@ -175,6 +174,17 @@ namespace PerformanceTests
             container.Populate(GetServices());
 
             return container.Locate<IServiceProvider>();
+        }
+
+        public static IServiceProvider PrepareAutofacMsDi()
+        {
+            var containerBuilder = new ContainerBuilder();
+
+            containerBuilder.Populate(GetServices());
+
+            var container = containerBuilder.Build();
+
+            return new AutofacServiceProvider(container);
         }
 
         public static object Measure(DependencyInjectionContainer container)
@@ -241,12 +251,13 @@ namespace PerformanceTests
 
                             Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |   3.328 us | 0.0210 us | 0.0186 us |  1.00 |    0.00 |      1.3657 |           - |           - |              6.3 KB |
-                       BmarkDryIoc |   7.465 us | 0.0990 us | 0.0926 us |  2.24 |    0.03 |      3.0670 |           - |           - |            14.14 KB |
-                   BmarkDryIocMsDi |   7.989 us | 0.0754 us | 0.0705 us |  2.40 |    0.02 |      3.7231 |           - |           - |            17.16 KB |
-                        BmarkGrace |  19.484 us | 0.3751 us | 0.3684 us |  5.86 |    0.12 |      5.1575 |      0.0305 |           - |            23.82 KB |
-                      BmarkAutofac |  89.109 us | 0.5113 us | 0.4783 us | 26.78 |    0.19 |     15.8691 |      0.1221 |           - |            73.67 KB |
-                    BmarkGraceMsDi | 144.011 us | 1.3689 us | 1.2805 us | 43.29 |    0.40 |      8.3008 |      0.2441 |           - |            38.55 KB |
+ BmarkMicrosoftDependencyInjection |   3.590 us | 0.0690 us | 0.0738 us |  1.00 |    0.00 |      1.3657 |           - |           - |              6.3 KB |
+                       BmarkDryIoc |   7.424 us | 0.0115 us | 0.0102 us |  2.08 |    0.04 |      3.0823 |           - |           - |            14.26 KB |
+                   BmarkDryIocMsDi |   7.646 us | 0.0365 us | 0.0341 us |  2.14 |    0.05 |      3.7384 |           - |           - |            17.28 KB |
+                        BmarkGrace |  19.034 us | 0.2705 us | 0.2530 us |  5.32 |    0.11 |      5.1270 |      0.0305 |           - |            23.73 KB |
+                  BmarkAutofacMsDi |  82.972 us | 1.3541 us | 1.2666 us | 23.20 |    0.54 |     16.2354 |      0.1221 |           - |            75.02 KB |
+                      BmarkAutofac |  86.698 us | 0.6252 us | 0.5848 us | 24.24 |    0.54 |     15.8691 |      0.1221 |           - |            73.67 KB |
+                    BmarkGraceMsDi | 146.023 us | 1.5914 us | 1.4886 us | 40.82 |    0.95 |      8.3008 |      0.2441 |           - |            38.55 KB |
 
              */
             [Benchmark(Baseline = true)]
@@ -266,6 +277,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkAutofac() => PrepareAutofac();
+
+            [Benchmark]
+            public object BmarkAutofacMsDi() => PrepareAutofacMsDi();
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
@@ -315,16 +329,17 @@ namespace PerformanceTests
                         BmarkGrace | 5,423.84 us | 41.2778 us | 38.6112 us | 239.02 |    1.75 |     46.8750 |     23.4375 |           - |           216.08 KB |
                     BmarkGraceMsDi | 7,194.49 us | 69.7629 us | 65.2563 us | 316.76 |    3.14 |     62.5000 |     31.2500 |           - |           314.24 KB |
 
-            ## After shaving factory selection (wip)
+            ## After shaving factory selection (wip) + Autofac.MS.DI
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    22.92 us |  0.2458 us |  0.2052 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
-                       BmarkDryIoc |    54.52 us |  0.1413 us |  0.1322 us |   2.38 |    0.02 |     11.9629 |           - |           - |            55.21 KB |
-                      BmarkAutofac |   145.66 us |  0.9167 us |  0.8575 us |   6.36 |    0.04 |     28.0762 |      0.2441 |           - |           129.45 KB |
-                   BmarkDryIocMsDi | 1,644.43 us | 14.6430 us | 13.6971 us |  71.71 |    0.96 |     19.5313 |      9.7656 |           - |            93.37 KB |
-                        BmarkGrace | 5,440.88 us | 46.6670 us | 43.6524 us | 237.61 |    3.03 |     46.8750 |     23.4375 |           - |           216.14 KB |
-                    BmarkGraceMsDi | 7,226.64 us | 45.4676 us | 42.5304 us | 314.89 |    2.59 |     62.5000 |     31.2500 |           - |            314.2 KB |
+ BmarkMicrosoftDependencyInjection |    23.03 us |  0.1025 us |  0.0908 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    55.36 us |  0.2364 us |  0.2096 us |   2.40 |    0.02 |     11.9629 |           - |           - |            55.33 KB |
+                      BmarkAutofac |   148.79 us |  1.0168 us |  0.9511 us |   6.46 |    0.04 |     28.0762 |           - |           - |           129.45 KB |
+                  BmarkAutofacMsDi |   152.68 us |  1.0374 us |  0.9704 us |   6.63 |    0.04 |     30.5176 |      0.2441 |           - |           141.25 KB |
+                   BmarkDryIocMsDi | 1,589.43 us |  9.5683 us |  8.9502 us |  68.97 |    0.52 |     19.5313 |      9.7656 |           - |            90.29 KB |
+                        BmarkGrace | 5,538.53 us | 28.7673 us | 26.9090 us | 240.47 |    1.31 |     46.8750 |     23.4375 |           - |           216.09 KB |
+                    BmarkGraceMsDi | 7,310.95 us | 28.3436 us | 23.6682 us | 317.48 |    1.50 |     62.5000 |     31.2500 |           - |           314.17 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -344,6 +359,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
+
+            [Benchmark]
+            public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
@@ -370,13 +388,36 @@ namespace PerformanceTests
                    BmarkDryIocMsDi |  3.508 us | 0.0158 us | 0.0148 us |  2.48 |    0.02 |      0.9804 |           - |           - |             4.52 KB |
                       BmarkAutofac | 13.075 us | 0.0651 us | 0.0609 us |  9.24 |    0.09 |      3.9368 |           - |           - |            18.18 KB |
 
-            ## After using еру Use method:
+            ## After using the Use method:
 
                             Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
  BmarkMicrosoftDependencyInjection | 1.354 us | 0.0063 us | 0.0059 us |  1.00 |      0.3433 |           - |           - |             1.59 KB |
                     BmarkGraceMsDi | 1.938 us | 0.0099 us | 0.0092 us |  1.43 |      0.8926 |           - |           - |             4.12 KB |
                    BmarkDryIocMsDi | 2.689 us | 0.0121 us | 0.0113 us |  1.99 |      0.6905 |           - |           - |              3.2 KB |
+
+            ## After optimization in delegate factory registration in DI.MS.DI:
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  1.378 us | 0.0058 us | 0.0052 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                       BmarkDryIoc |  1.859 us | 0.0027 us | 0.0024 us |  1.35 |    0.00 |      0.5093 |           - |           - |             2.35 KB |
+                        BmarkGrace |  2.172 us | 0.0343 us | 0.0320 us |  1.58 |    0.03 |      1.1406 |           - |           - |             5.26 KB |
+                    BmarkGraceMsDi |  2.338 us | 0.0454 us | 0.0540 us |  1.68 |    0.04 |      1.0529 |           - |           - |             4.87 KB |
+                   BmarkDryIocMsDi |  2.664 us | 0.0505 us | 0.0496 us |  1.93 |    0.04 |      0.6905 |           - |           - |              3.2 KB |
+                      BmarkAutofac | 13.193 us | 0.0625 us | 0.0554 us |  9.57 |    0.06 |      3.9368 |           - |           - |            18.18 KB |
+                  BmarkAutofacMsDi | 18.649 us | 0.1764 us | 0.1650 us | 13.53 |    0.13 |      5.2795 |           - |           - |            24.42 KB |
+
+            ## wip: Use method for instances 
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  1.388 us | 0.0094 us | 0.0083 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                       BmarkDryIoc |  1.887 us | 0.0118 us | 0.0105 us |  1.36 |    0.01 |      0.5093 |           - |           - |             2.35 KB |
+                   BmarkDryIocMsDi |  1.959 us | 0.0084 us | 0.0078 us |  1.41 |    0.01 |      0.6905 |           - |           - |              3.2 KB |
+                    BmarkGraceMsDi |  2.115 us | 0.0093 us | 0.0087 us |  1.52 |    0.01 |      0.9460 |           - |           - |             4.37 KB |
+                        BmarkGrace |  2.133 us | 0.0096 us | 0.0085 us |  1.54 |    0.01 |      1.0719 |           - |           - |             4.95 KB |
+                      BmarkAutofac | 13.472 us | 0.0888 us | 0.0742 us |  9.71 |    0.06 |      3.9368 |           - |           - |            18.18 KB |
+                  BmarkAutofacMsDi | 18.157 us | 0.0679 us | 0.0635 us | 13.08 |    0.09 |      5.2795 |           - |           - |            24.42 KB |
 
             */
 
@@ -386,6 +427,7 @@ namespace PerformanceTests
             private DependencyInjectionContainer _grace;
             private IServiceProvider _graceMsDi;
             private Autofac.IContainer _autofac;
+            private IServiceProvider _autofacMsDi;
 
             [GlobalSetup]
             public void WarmUp()
@@ -396,26 +438,29 @@ namespace PerformanceTests
                 _grace = PrepareGrace();
                 _graceMsDi = PrepareGraceMsDi();
                 _autofac = PrepareAutofac();
+                _autofacMsDi = PrepareAutofacMsDi();
             }
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkDryIoc() => Measure(_dryioc);
 
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGrace() => Measure(_grace);
 
             [Benchmark]
-            //[Benchmark(Baseline = true)]
             public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
+
+            [Benchmark]
+            public object BmarkAutofacMsDi() => Measure(_autofacMsDi);
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
@@ -423,12 +468,13 @@ namespace PerformanceTests
         {
             /*
             ## 31.01.2019: At least first step to real world graph
-                                        Method |       Mean |      Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
-            ---------------------------------- |-----------:|-----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
-                                   BmarkDryIoc |   417.8 ns |  1.7928 ns |  1.5892 ns |  0.81 |    0.00 |      0.1421 |           - |           - |               672 B |
-             BmarkMicrosoftDependencyInjection |   516.0 ns |  0.7929 ns |  0.7417 ns |  1.00 |    0.00 |      0.1602 |           - |           - |               760 B |
-                                    BmarkGrace |   686.8 ns |  0.9498 ns |  0.8885 ns |  1.33 |    0.00 |      0.3366 |           - |           - |              1592 B |
-                                  BmarkAutofac | 4,919.1 ns | 67.7257 ns | 63.3506 ns |  9.53 |    0.13 |      1.5411 |           - |           - |              7280 B |
+
+                            Method |       Mean |      Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-----------:|-----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |   417.8 ns |  1.7928 ns |  1.5892 ns |  0.81 |    0.00 |      0.1421 |           - |           - |               672 B |
+ BmarkMicrosoftDependencyInjection |   516.0 ns |  0.7929 ns |  0.7417 ns |  1.00 |    0.00 |      0.1602 |           - |           - |               760 B |
+                        BmarkGrace |   686.8 ns |  0.9498 ns |  0.8885 ns |  1.33 |    0.00 |      0.3366 |           - |           - |              1592 B |
+                      BmarkAutofac | 4,919.1 ns | 67.7257 ns | 63.3506 ns |  9.53 |    0.13 |      1.5411 |           - |           - |              7280 B |
 
              */
 

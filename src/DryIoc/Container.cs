@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2018 Maksim Volkau
+Copyright (c) 2013-2019 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -800,7 +800,7 @@ namespace DryIoc
 
         /// Adding the factory directly to scope for resolution 
         public void Use(Type serviceType, FactoryDelegate factory) => 
-            (CurrentScope ?? SingletonScope).SetInstance(serviceType, factory);
+            (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
 
         #endregion
 
@@ -3453,8 +3453,8 @@ namespace DryIoc
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
             instance = null;
-            return  r.CurrentScope?.TryGetInstance(r, serviceType, out instance) == true ||
-                   r.SingletonScope.TryGetInstance(r, serviceType, out instance);
+            return  r.CurrentScope?.TryGetUsedInstance(r, serviceType, out instance) == true ||
+                   r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
         }
     }
 
@@ -7746,11 +7746,11 @@ namespace DryIoc
                     return Constant(singleton, request.ServiceType);
             }
 
-            Request exprCacheReq = null;
-            if (FactoryType == FactoryType.Service)
+            Request reqParentWithExprCache = null;
+            if (Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service)
             {
-                exprCacheReq = request.GetParentWithExprCache();
-                var cachedExpr = exprCacheReq.ExprCache?.GetValueOrDefault(FactoryID);
+                reqParentWithExprCache = request.GetParentWithExprCache();
+                var cachedExpr = reqParentWithExprCache.ExprCache?.GetValueOrDefault(FactoryID);
                 if (cachedExpr != null)
                     return cachedExpr;
             }
@@ -7770,8 +7770,8 @@ namespace DryIoc
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
 
-                if (exprCacheReq?.ExprCache != null)
-                    exprCacheReq.ExprCache = exprCacheReq.ExprCache.AddOrUpdate(FactoryID, serviceExpr);
+                if (reqParentWithExprCache?.ExprCache != null)
+                    reqParentWithExprCache.ExprCache = reqParentWithExprCache.ExprCache.AddOrUpdate(FactoryID, serviceExpr);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -9011,10 +9011,10 @@ namespace DryIoc
         object GetOrTryAdd(int id, object item, int disposalOrder);
 
         /// Sets (replaces) the factory for specified type.
-        void SetInstance(Type type, FactoryDelegate instance);
+        void SetUsedInstance(Type type, FactoryDelegate factory);
 
         /// Looks up for stored item by type.
-        bool TryGetInstance(IResolverContext r, Type type, out object instance);
+        bool TryGetUsedInstance(IResolverContext r, Type type, out object instance);
 
         /// Clones the scope.
         IScope Clone();
@@ -9186,19 +9186,19 @@ namespace DryIoc
 
         private int NextDisposalIndex() => Interlocked.Decrement(ref _nextDisposalIndex);
 
-        /// Add instance to the list
-        public void SetInstance(Type type, FactoryDelegate instance)
+        /// Add instance to the small registry via factory
+        public void SetUsedInstance(Type type, FactoryDelegate factory)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             var factories = _factories;
-            if (Interlocked.CompareExchange(ref _factories, _factories.AddOrUpdate(type, instance), factories) != factories)
-                Ref.Swap(ref _factories, f => f.AddOrUpdate(type, instance));
+            if (Interlocked.CompareExchange(ref _factories, _factories.AddOrUpdate(type, factory), factories) != factories)
+                Ref.Swap(ref _factories, f => f.AddOrUpdate(type, factory));
         }
 
-        /// Try get item by type
-        public bool TryGetInstance(IResolverContext r, Type type, out object instance)
+        /// Try retrieve instance from the small registry.
+        public bool TryGetUsedInstance(IResolverContext r, Type type, out object instance)
         {
             instance = null;
             if (_disposed == 1)
@@ -9211,7 +9211,7 @@ namespace DryIoc
                 return true;
             }
 
-            return Parent?.TryGetInstance(r, type, out instance) ?? false;
+            return Parent?.TryGetUsedInstance(r, type, out instance) ?? false;
         }
 
         private void TrackDisposable(IDisposable disposable, int disposalOrder)
@@ -9993,6 +9993,9 @@ namespace DryIoc
         /// <summary>Puts and instance into the current scope or singletons.</summary>
         new void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
+
+        /// Puts instance created via the passed factory on demand into the current or singleton scope
+        new void Use(Type serviceType, FactoryDelegate factory);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
