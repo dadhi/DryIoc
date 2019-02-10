@@ -286,7 +286,7 @@ namespace PerformanceTests
         public class CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve
         {
             /*
-            ## 31.01.2019: At least first step to real world graph
+            ## 31.01.2019: At least first step to real world object graph
 
                             Method |         Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |-------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -340,7 +340,19 @@ namespace PerformanceTests
                    BmarkDryIocMsDi | 1,589.43 us |  9.5683 us |  8.9502 us |  68.97 |    0.52 |     19.5313 |      9.7656 |           - |            90.29 KB |
                         BmarkGrace | 5,538.53 us | 28.7673 us | 26.9090 us | 240.47 |    1.31 |     46.8750 |     23.4375 |           - |           216.09 KB |
                     BmarkGraceMsDi | 7,310.95 us | 28.3436 us | 23.6682 us | 317.48 |    1.50 |     62.5000 |     31.2500 |           - |           314.17 KB |
-            */
+
+            ## After enabling interpretation of FactoryDelegate registered by RegisterDelegate - found the culprit
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    23.03 us |  0.4313 us |  0.3824 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    57.49 us |  1.0566 us |  0.9884 us |   2.50 |    0.07 |     12.2070 |      0.0610 |           - |            56.28 KB |
+                   BmarkDryIocMsDi |    92.48 us |  1.7939 us |  1.5902 us |   4.02 |    0.08 |     16.2354 |      0.1221 |           - |            75.33 KB |
+                      BmarkAutofac |   207.44 us |  1.2361 us |  1.1563 us |   9.01 |    0.13 |     35.8887 |      0.2441 |           - |           165.75 KB |
+                  BmarkAutofacMsDi |   221.23 us |  1.0479 us |  0.9802 us |   9.61 |    0.17 |     39.3066 |      0.2441 |           - |           181.71 KB |
+                        BmarkGrace | 5,391.88 us | 42.6043 us | 39.8521 us | 234.04 |    4.16 |     46.8750 |     23.4375 |           - |           216.12 KB |
+                    BmarkGraceMsDi | 7,171.67 us | 29.6879 us | 26.3176 us | 311.45 |    5.72 |     62.5000 |     31.2500 |           - |           314.27 KB |
+           */
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
@@ -407,6 +419,18 @@ namespace PerformanceTests
                    BmarkDryIocMsDi |  2.664 us | 0.0505 us | 0.0496 us |  1.93 |    0.04 |      0.6905 |           - |           - |              3.2 KB |
                       BmarkAutofac | 13.193 us | 0.0625 us | 0.0554 us |  9.57 |    0.06 |      3.9368 |           - |           - |            18.18 KB |
                   BmarkAutofacMsDi | 18.649 us | 0.1764 us | 0.1650 us | 13.53 |    0.13 |      5.2795 |           - |           - |            24.42 KB |
+
+                ## Interpreting  factory delegate + register delegate for instance
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  1.367 us | 0.0102 us | 0.0080 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                       BmarkDryIoc |  1.851 us | 0.0078 us | 0.0073 us |  1.35 |    0.01 |      0.5093 |           - |           - |             2.35 KB |
+                        BmarkGrace |  2.145 us | 0.0073 us | 0.0068 us |  1.57 |    0.01 |      1.1253 |           - |           - |              5.2 KB |
+                    BmarkGraceMsDi |  2.275 us | 0.0227 us | 0.0212 us |  1.66 |    0.01 |      1.0681 |           - |           - |             4.93 KB |
+                   BmarkDryIocMsDi |  2.606 us | 0.0157 us | 0.0147 us |  1.90 |    0.01 |      0.6905 |           - |           - |              3.2 KB |
+                      BmarkAutofac | 13.152 us | 0.0745 us | 0.0660 us |  9.62 |    0.09 |      3.9368 |           - |           - |            18.18 KB |
+                  BmarkAutofacMsDi | 18.202 us | 0.0819 us | 0.0726 us | 13.31 |    0.07 |      5.2795 |           - |           - |            24.42 KB |
+
 
             ## wip: Use method for instances 
                             Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |

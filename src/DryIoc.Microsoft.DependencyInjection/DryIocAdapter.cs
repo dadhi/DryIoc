@@ -191,24 +191,8 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
-                // todo: add support as soon as `Use` will be completed 
-                //container.Use(descriptor.ServiceType, _ => descriptor.ImplementationInstance);
-
-                container.UseInstance(descriptor.ServiceType, descriptor.ImplementationInstance, IfAlreadyRegistered.AppendNotKeyed);
-            }
-        }
-
-        private static IReuse ConvertLifetimeToReuse(ServiceLifetime lifetime)
-        {
-            switch (lifetime)
-            {
-                case ServiceLifetime.Singleton:
-                    return Reuse.Singleton;
-                case ServiceLifetime.Scoped:
-                    return Reuse.ScopedOrSingleton; // note: because the infrastructure services may be resolved w/out scope
-                case ServiceLifetime.Transient:
-                default:
-                    return Reuse.Transient;
+                var instance = descriptor.ImplementationInstance;
+                container.RegisterDelegate(descriptor.ServiceType, _ => instance);
             }
         }
     }

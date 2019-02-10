@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -54,7 +54,7 @@ namespace DryIoc.Microsoft.Hosting
         /// <summary>Creates **new** container configured for Microsoft.Extensions.DependencyInjection
         /// with user provided configuration or by default.</summary>
         public IContainer CreateBuilder(IServiceCollection services) => 
-            _configureContainer?.Invoke(services) ?? new Container().WithDependencyInjectionAdapter(services);
+            _configureContainer?.Invoke(services) ?? DryIocAdapter.Create(services);
 
         /// <summary>Resolves service provider from configured DryIoc container.</summary>
         public IServiceProvider CreateServiceProvider(IContainer containerBuilder)
@@ -65,7 +65,7 @@ namespace DryIoc.Microsoft.Hosting
                 containerBuilder.Register(_compositionRootType);
                 containerBuilder.Resolve(_compositionRootType);
             }
-            return containerBuilder.Resolve<IServiceProvider>();
+            return containerBuilder.GetServiceProvider();
         }
     }
 }

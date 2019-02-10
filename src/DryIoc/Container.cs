@@ -1638,7 +1638,6 @@ namespace DryIoc
                 scopeToAdd?.SetOrAdd(FactoryID, instance);
             }
 
-            // todo: figure it out
             /// Switched off until I (or someone) will figure it out.
             public override bool UseInterpretation(Request request) => false;
 
@@ -2455,16 +2454,29 @@ namespace DryIoc
                 case ExprType.Invoke:
                     {
                         var invokeExpr = (InvocationExpression)expr;
-                        if (invokeExpr.Expression.NodeType == ExprType.Lambda)
+                        var delegateExpr = invokeExpr.Expression;
+
+                        // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
+                        if (delegateExpr.Type == typeof(FactoryDelegate) && 
+                            delegateExpr is ConstantExpression delegateConstExpr)
+                        {
+                            if (!TryInterpret(r, invokeExpr.Arguments[0], useFec, out var resolver))
+                                break;
+
+                            result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
+                            return true;
+                        }
+
+                        if (delegateExpr.NodeType == ExprType.Lambda)
                             break;
 
-                        if (!TryInterpret(r, invokeExpr.Expression, useFec, out var lambdaObj))
+                        if (!TryInterpret(r, delegateExpr, useFec, out var delegateObj))
                             break;
 
                         if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), useFec, out var args))
                             break;
 
-                        var lambda = (Delegate)lambdaObj;
+                        var lambda = (Delegate)delegateObj;
                         result = lambda.Method.Invoke(lambda.Target, args);
                         return true;
                     }
@@ -8934,10 +8946,6 @@ namespace DryIoc
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
         }
-
-        // todo: figure it out
-        /// Switched off until I (or someone) will figure it out.
-        public override bool UseInterpretation(Request request) => false;
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
         /// If decorator found for request then factory fall-backs to expression creation.</summary>
