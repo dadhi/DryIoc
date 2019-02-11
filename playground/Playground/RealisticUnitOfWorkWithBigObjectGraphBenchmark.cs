@@ -352,7 +352,19 @@ namespace PerformanceTests
                   BmarkAutofacMsDi |   221.23 us |  1.0479 us |  0.9802 us |   9.61 |    0.17 |     39.3066 |      0.2441 |           - |           181.71 KB |
                         BmarkGrace | 5,391.88 us | 42.6043 us | 39.8521 us | 234.04 |    4.16 |     46.8750 |     23.4375 |           - |           216.12 KB |
                     BmarkGraceMsDi | 7,171.67 us | 29.6879 us | 26.3176 us | 311.45 |    5.72 |     62.5000 |     31.2500 |           - |           314.27 KB |
-           */
+
+            ## Optimizing RegisterDelegate a bit (removing separate Resolve call)
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    22.85 us |  0.1008 us |  0.0943 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    57.43 us |  0.6581 us |  0.5834 us |   2.51 |    0.02 |     12.1460 |           - |           - |            56.12 KB |
+                   BmarkDryIocMsDi |    87.30 us |  0.4908 us |  0.4351 us |   3.82 |    0.02 |     16.2354 |      0.1221 |           - |            74.91 KB |
+                      BmarkAutofac |   211.94 us |  0.9523 us |  0.8908 us |   9.28 |    0.06 |     35.8887 |      0.2441 |           - |           165.83 KB |
+                  BmarkAutofacMsDi |   224.10 us |  1.3852 us |  1.2957 us |   9.81 |    0.06 |     39.3066 |           - |           - |           181.71 KB |
+                        BmarkGrace | 5,518.34 us | 44.9419 us | 39.8399 us | 241.41 |    1.87 |     46.8750 |     23.4375 |           - |           216.19 KB |
+                    BmarkGraceMsDi | 7,252.74 us | 51.6014 us | 45.7433 us | 317.28 |    2.42 |     62.5000 |     31.2500 |           - |           314.21 KB |
+            */
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
@@ -443,6 +455,17 @@ namespace PerformanceTests
                       BmarkAutofac | 13.472 us | 0.0888 us | 0.0742 us |  9.71 |    0.06 |      3.9368 |           - |           - |            18.18 KB |
                   BmarkAutofacMsDi | 18.157 us | 0.0679 us | 0.0635 us | 13.08 |    0.09 |      5.2795 |           - |           - |            24.42 KB |
 
+            ## Optimizing RegisterDelegate a bit (removing separate Resolve call)
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  1.411 us | 0.0078 us | 0.0073 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                       BmarkDryIoc |  1.899 us | 0.0078 us | 0.0073 us |  1.35 |    0.01 |      0.5074 |           - |           - |             2.35 KB |
+                        BmarkGrace |  1.936 us | 0.0108 us | 0.0101 us |  1.37 |    0.01 |      0.9079 |           - |           - |              4.2 KB |
+                    BmarkGraceMsDi |  2.332 us | 0.0164 us | 0.0153 us |  1.65 |    0.02 |      1.1101 |           - |           - |             5.12 KB |
+                   BmarkDryIocMsDi |  2.499 us | 0.0093 us | 0.0087 us |  1.77 |    0.01 |      0.6905 |           - |           - |              3.2 KB |
+                      BmarkAutofac | 13.103 us | 0.0392 us | 0.0366 us |  9.29 |    0.06 |      3.6163 |           - |           - |             16.7 KB |
+                  BmarkAutofacMsDi | 19.003 us | 0.1271 us | 0.1189 us | 13.47 |    0.14 |      5.4932 |           - |           - |            25.34 KB |
             */
 
             private IServiceProvider _msDi;

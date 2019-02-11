@@ -5532,11 +5532,12 @@ namespace DryIoc
         /// <remarks>The alternative to this method please consider using <see cref="Made"/> instead:
         /// <code lang="cs"><![CDATA[container.Register<ICar>(Made.Of(() => new Car(Arg.Of<IEngine>())))]]></code>.
         /// </remarks>
-        public static void RegisterDelegate<TService>(this IRegistrator registrator, Func<IResolverContext, TService> factoryDelegate,
+        public static void RegisterDelegate<TService>(this IRegistrator registrator,
+            Func<IResolverContext, TService> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
             registrator.Register(new DelegateFactory(r => factoryDelegate(r), reuse, setup),
-                typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+                typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
         /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
@@ -5554,11 +5555,23 @@ namespace DryIoc
         {
             if (serviceType.IsOpenGeneric())
                 Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
+
             FactoryDelegate checkedDelegate = r => factoryDelegate(r)
-                .ThrowIfNotInstanceOf(serviceType, Error.RegedFactoryDlgResultNotOfServiceType, r);
+                .ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType, r);
+
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
-            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
+
+            registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
+
+        /// A special performant version mostly for integration with other libraries,
+        /// that already check compatiblity between delegate result and the service type
+        public static void RegisterDelegate(this IRegistrator registrator,
+            bool isChecked, Type serviceType, Func<IResolverContext, object> factoryDelegate,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
+            object serviceKey = null) =>
+            registrator.Register(new DelegateFactory(factoryDelegate.Invoke, reuse, setup), 
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers decorator function that gets decorated value as input and returns decorator.
         /// Note: Delegate decorator will use <see cref="Reuse"/> of decoratee service.</summary>
@@ -7283,19 +7296,44 @@ namespace DryIoc
                 && Equals(metadata, metaValue);
         }
 
-        // todo: move to the level of factory
         /// <summary>Indicates that injected expression should be:
         /// <c><![CDATA[r.Resolver.Resolve<IDependency>(...)]]></c>
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public bool AsResolutionCall => (_settings & Settings.AsResolutionCall) != 0;
 
+        private static readonly Setup AsResolutionCallSetup = 
+            new ServiceSetup { _settings = Settings.AsResolutionCall };
+
         internal Setup WithAsResolutionCall()
         {
             if (AsResolutionCall)
                 return this;
-            var copy = (Setup)MemberwiseClone();
-            copy._settings |= Settings.AsResolutionCall;
-            return copy;
+
+            if (this == Default)
+                return AsResolutionCallSetup;
+
+            var setupClone = (Setup)MemberwiseClone();
+            setupClone._settings |= Settings.AsResolutionCall;
+            return setupClone;
+        }
+
+        /// Works `AsResolutionCall` only with `Rules.UsedForExpressionGeneration`
+        public bool AsResolutionCallForGeneratedExpression => (_settings & Settings.AsResolutionCallForExpressionGeneration) != 0;
+
+        private static readonly Setup AsResolutionCallForGeneratedExpressionSetup =
+            new ServiceSetup { _settings = Settings.AsResolutionCall };
+
+        internal Setup WithAsResolutionCallForGeneratedExpression()
+        {
+            if (AsResolutionCallForGeneratedExpression)
+                return this;
+
+            if (this == Default)
+                return AsResolutionCallForGeneratedExpressionSetup;
+
+            var setupClone = (Setup)MemberwiseClone();
+            setupClone._settings |= Settings.AsResolutionCallForExpressionGeneration;
+            return setupClone;
         }
 
         /// <summary>Marks service (not a wrapper or decorator) registration that is expected to be resolved via Resolve call.</summary>
@@ -7369,7 +7407,8 @@ namespace DryIoc
             TrackDisposableTransient = 1 << 6,
             AsResolutionRoot = 1 << 7,
             UseParentReuse = 1 << 8,
-            PreferInSingleServiceResolve = 1 << 9
+            PreferInSingleServiceResolve = 1 << 9,
+            AsResolutionCallForExpressionGeneration = 1 << 10
         }
 
         private Settings _settings; // note: mutable because of setting the AsResolutionCall
@@ -7488,14 +7527,14 @@ namespace DryIoc
             /// Otherwise just returns metadata object.</summary>
             /// <remarks>Invocation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
             public override object Metadata =>
-                _metadataOrFuncOfMetadata is Func<object>
-                    ? (_metadataOrFuncOfMetadata = ((Func<object>)_metadataOrFuncOfMetadata).Invoke())
+                _metadataOrFuncOfMetadata is Func<object> metaFactory
+                    ? (_metadataOrFuncOfMetadata = metaFactory())
                     : _metadataOrFuncOfMetadata;
 
-            /// <summary>All settings are set to defaults.</summary>
+            /// All settings are set to defaults.
             public ServiceSetup() { }
 
-            /// <summary>Specify an individual settings</summary>
+            /// Specify all the individual settings.
             public ServiceSetup(Func<Request, bool> condition, object metadataOrFuncOfMetadata,
                 bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
                 bool preventDisposal, bool weaklyReferenced,
@@ -7734,13 +7773,18 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
+            var rules = request.Rules;
+            var setup = Setup;
+
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && // preventing recursion
-                (Setup.OpenResolutionScope ||
+                (setup.OpenResolutionScope ||
                 !request.IsResolutionCall && // preventing recursion
-                (Setup.AsResolutionCall || Setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
+                (setup.AsResolutionCall || 
+                 (setup.AsResolutionCallForGeneratedExpression && rules.UsedForExpressionGeneration) ||
+                 setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
                 request.GetActualServiceType() != typeof(void)))
-                return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
+                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator
             if (FactoryType != FactoryType.Decorator)
@@ -7751,8 +7795,8 @@ namespace DryIoc
             }
 
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
-            if (request.Rules.EagerCachingSingletonForFasterAccess && request.Reuse is SingletonReuse &&
-                !Setup.PreventDisposal && !Setup.WeaklyReferenced)
+            if (rules.EagerCachingSingletonForFasterAccess && request.Reuse is SingletonReuse &&
+                !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
                 if (request.SingletonScope.TryGet(out var singleton, FactoryID))
                     return Constant(singleton, request.ServiceType);
@@ -7836,6 +7880,8 @@ namespace DryIoc
                     serviceExpr = New(typeof(WeakReference).Constructor(typeof(object)), serviceExpr);
                 else if (Setup.PreventDisposal)
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
+
+                // todo: optimize for FactoryDelegate
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
@@ -8933,7 +8979,8 @@ namespace DryIoc
         /// <summary>Creates factory.</summary>
         public DelegateFactory(FactoryDelegate factoryDelegate,
            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
-           : base(reuse, (setup ?? Setup.Default).WithAsResolutionCall())
+           : base(reuse, 
+               (setup ?? Setup.Default).WithAsResolutionCallForGeneratedExpression())
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
             _knownImplementationType = knownImplementationType;
@@ -10164,7 +10211,7 @@ namespace DryIoc
             UnableToFindMatchingCtorForFuncWithArgs = Of(
                 "Unable to find constructor with all parameters matching Func signature {0} " + NewLine
                                                                                               + "and the rest of parameters resolvable from Container when resolving: {1}."),
-            RegedFactoryDlgResultNotOfServiceType = Of(
+            RegisteredDelegateResultIsNotOfServiceType = Of(
                 "Registered factory delegate returns service {0} is not assignable to {2}."),
             NotFoundSpecifiedWritablePropertyOrField = Of(
                 "Unable to find writable property or field {0} when resolving: {1}."),

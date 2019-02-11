@@ -181,7 +181,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                container.RegisterDelegate(descriptor.ServiceType,
+                container.RegisterDelegate(true, descriptor.ServiceType,
 #if NETSTANDARD1_0
                     r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()),
 #else
@@ -192,7 +192,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             else
             {
                 var instance = descriptor.ImplementationInstance;
-                container.RegisterDelegate(descriptor.ServiceType, _ => instance);
+                container.RegisterDelegate(true, descriptor.ServiceType, _ => instance);
             }
         }
     }
