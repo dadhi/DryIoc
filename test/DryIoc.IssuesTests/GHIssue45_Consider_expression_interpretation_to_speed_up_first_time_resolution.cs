@@ -37,5 +37,51 @@ namespace DryIoc.IssuesTests
                 Parameter2 = parameter2;
             }
         }
+
+        [Test]
+        public void Interpreting_scoped_registered_delegates()
+        {
+            var container = new Container();
+
+            container.Register<R>(Reuse.Scoped);
+
+            container.RegisterDelegate(_ => new X(), Reuse.Scoped);
+            container.RegisterDelegate(_ => new Y(), Reuse.Scoped);
+            container.RegisterDelegate(_ => 42, Reuse.Scoped);
+            container.Register<S>(Reuse.Scoped);
+
+            using (var scope = container.OpenScope())
+            {
+                var r = scope.Resolve<R>();
+
+                Assert.IsNotNull(r.X);
+                Assert.IsNotNull(r.Y);
+                Assert.AreEqual(42, r.Unknown);
+            }
+        }
+
+        public class R
+        {
+            public readonly X X;
+            public readonly Y Y;
+            public readonly int Unknown;
+            public readonly S S;
+
+            public R(X x, Y y, int _42, S s)
+            {
+                S = s;
+                X = x;
+                Y = y;
+                Unknown = _42;
+            }
+        }
+
+        public class X { }
+        public class Y { }
+
+        public struct S
+        {
+            public S(int _42) { }
+        }
     }
 }

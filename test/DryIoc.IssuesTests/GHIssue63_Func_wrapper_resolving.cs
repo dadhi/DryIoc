@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container(Rules.Default
-                .WithUnknownServiceResolvers(request => new DelegateFactory(_ => null)));
+                .WithUnknownServiceResolvers(request => new DelegateFactory(_ => null, setup: Setup.With(asResolutionCall: true))));
 
             container.Register<A>(); //UNCOMMENT THIS LINE TO GET EXCEPTION
 

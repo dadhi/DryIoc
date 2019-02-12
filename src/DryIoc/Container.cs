@@ -2564,9 +2564,10 @@ namespace DryIoc
 
             var createExpr = ((LambdaExpression)args[3]).Body;
 
-            result = scope.TryGetOrAddWithoutClosure(id, resolverContext, createExpr, useFec, (rc, e, uf) => 
-                TryInterpretAndUnwrapContainerException(rc, e, uf, out var value) ? value
-                : e.CompileToFactoryDelegate(uf)(rc),
+            result = scope.TryGetOrAddWithoutClosure(id, resolverContext, createExpr, useFec, 
+                (rc, e, uf) => TryInterpretAndUnwrapContainerException(rc, e, uf, out var value) 
+                    ? value
+                    : e.CompileToFactoryDelegate(uf)(rc),
                 (int)ConstValue(args[4]));
 
             return true;
@@ -2608,7 +2609,8 @@ namespace DryIoc
             var disposalIndex = (int)ConstValue(args[5]);
 
             result = CurrentScopeReuse.GetNameScoped(resolverContext, scopeName, throwIfNoScope, id, 
-                () => TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) ? value
+                () => TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) 
+                    ? value
                     : createExpr.CompileToFactoryDelegate(useFec)(resolverContext), 
                 disposalIndex);
 
@@ -7301,7 +7303,8 @@ namespace DryIoc
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public bool AsResolutionCall => (_settings & Settings.AsResolutionCall) != 0;
 
-        private static readonly Setup AsResolutionCallSetup = 
+        /// Setup with the only setting: `AsResolutionCall` 
+        internal static readonly Setup AsResolutionCallSetup = 
             new ServiceSetup { _settings = Settings.AsResolutionCall };
 
         internal Setup WithAsResolutionCall()
@@ -7321,7 +7324,7 @@ namespace DryIoc
         public bool AsResolutionCallForGeneratedExpression => (_settings & Settings.AsResolutionCallForExpressionGeneration) != 0;
 
         private static readonly Setup AsResolutionCallForGeneratedExpressionSetup =
-            new ServiceSetup { _settings = Settings.AsResolutionCall };
+            new ServiceSetup { _settings = Settings.AsResolutionCallForExpressionGeneration };
 
         internal Setup WithAsResolutionCallForGeneratedExpression()
         {
@@ -7427,10 +7430,12 @@ namespace DryIoc
             bool useParentReuse = false, int disposalOrder = 0, bool preferInSingleServiceResolve = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
-                !openResolutionScope && !asResolutionCall && !asResolutionRoot &&
+                !openResolutionScope && !asResolutionRoot &&
                 !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
                 !useParentReuse && disposalOrder == 0 && !preferInSingleServiceResolve)
-                return Default;
+            {
+                return !asResolutionCall ? Default : AsResolutionCallSetup;
+            }
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
@@ -7881,7 +7886,6 @@ namespace DryIoc
                 else if (Setup.PreventDisposal)
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
 
-                // todo: optimize for FactoryDelegate
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
@@ -8989,6 +8993,7 @@ namespace DryIoc
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
+            // GetConstant here is needed to check the state
             var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate);
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
@@ -9463,6 +9468,10 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
+            // strip the conversion as we operate with object anyway
+            if (serviceFactoryExpr.NodeType == ExprType.Convert)
+                serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
+
             var resolverExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
             if (request.TracksTransientDisposable)
             {
