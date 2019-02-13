@@ -15,9 +15,13 @@ namespace PerformanceTests
 {
     public class RealisticUnitOfWorkWithBigObjectGraphBenchmark
     {
-        public static IContainer PrepareDryIoc()
+        public static IContainer PrepareDryIoc(bool turnOffInterpretation = false)
         {
-            var container = new Container();
+            var rules = !turnOffInterpretation
+                ? Rules.Default
+                : Rules.Default.WithoutInterpretationForTheFirstResolution();
+
+            var container = new Container(rules);
 
             container.Register<R>(Reuse.Scoped);
 
@@ -386,6 +390,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
+
+            //[Benchmark]
+            public object BmarkDryIocWithoutInterpreter() => Measure(PrepareDryIoc(true));
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
@@ -476,6 +483,7 @@ namespace PerformanceTests
             private IServiceProvider _graceMsDi;
             private Autofac.IContainer _autofac;
             private IServiceProvider _autofacMsDi;
+            private IContainer _dryIocWithoutInterpreter;
 
             [GlobalSetup]
             public void WarmUp()
@@ -487,6 +495,7 @@ namespace PerformanceTests
                 _graceMsDi = PrepareGraceMsDi();
                 _autofac = PrepareAutofac();
                 _autofacMsDi = PrepareAutofacMsDi();
+                _dryIocWithoutInterpreter = PrepareDryIoc(true);
             }
 
             [Benchmark(Baseline = true)]
@@ -509,6 +518,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkAutofacMsDi() => Measure(_autofacMsDi);
+
+            [Benchmark]
+            public object BmarkDryIocWithoutInterpreter() => Measure(_dryIocWithoutInterpreter);
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
