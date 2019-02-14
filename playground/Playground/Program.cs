@@ -33,9 +33,9 @@ namespace Playground
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices>();
-            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.FirstTimeOpenScopeAndResolve>();
-            //BenchmarkRunner.Run<CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.WarmedUpOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.FirstTimeOpenScopeAndResolve>();
+            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.WarmedUpOpenScopeAndResolve>();
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //    CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());

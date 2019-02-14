@@ -46,8 +46,8 @@ namespace DryIoc.IssuesTests
             container.Register<R>(Reuse.Scoped);
 
             container.RegisterDelegate(_ => new X(), Reuse.Scoped);
-            container.RegisterDelegate(_ => new Y(), Reuse.Scoped);
-            container.RegisterDelegate(_ => 42, Reuse.Scoped);
+            container.RegisterDelegate(_ => new Y(), Reuse.ScopedOrSingleton);
+            container.RegisterDelegate(_ => 42, Reuse.ScopedOrSingleton);
             container.Register<S>(Reuse.Scoped);
 
             using (var scope = container.OpenScope())
@@ -57,6 +57,7 @@ namespace DryIoc.IssuesTests
                 Assert.IsNotNull(r.X);
                 Assert.IsNotNull(r.Y);
                 Assert.AreEqual(42, r.Unknown);
+                Assert.AreEqual(42, r.S.Unknown);
             }
         }
 
@@ -81,7 +82,11 @@ namespace DryIoc.IssuesTests
 
         public struct S
         {
-            public S(int _42) { }
+            public int Unknown { get; }
+            public S(int _42)
+            {
+                Unknown = _42;
+            }
         }
     }
 }

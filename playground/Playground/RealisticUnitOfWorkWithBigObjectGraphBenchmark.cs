@@ -368,6 +368,18 @@ namespace PerformanceTests
                   BmarkAutofacMsDi |   226.47 us |  2.0552 us |  1.9225 us |   9.82 |    0.10 |     39.3066 |      0.2441 |           - |           181.77 KB |
                         BmarkGrace | 5,492.44 us | 27.8638 us | 26.0638 us | 238.34 |    1.82 |     46.8750 |     23.4375 |           - |           216.16 KB |
                     BmarkGraceMsDi | 7,250.63 us | 56.5489 us | 52.8958 us | 314.39 |    2.46 |     62.5000 |     31.2500 |           - |            314.2 KB |
+
+            ## Optimized interpreting of the ScopeOrSingleton and registered FactoryDelegate - now DI.MS.DI is faster than DI :)
+
+                            Method |        Mean |       Error |     StdDev |      Median |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|------------:|-----------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    26.94 us |   0.5351 us |  1.2923 us |    27.44 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    60.68 us |   0.9147 us |  0.8556 us |    60.93 us |   2.38 |    0.23 |     11.4746 |           - |           - |            52.93 KB |
+                   BmarkDryIocMsDi |    66.79 us |   0.9228 us |  0.8180 us |    66.93 us |   2.64 |    0.25 |     11.8408 |           - |           - |            54.79 KB |
+                      BmarkAutofac |   247.97 us |   1.5355 us |  1.4363 us |   247.71 us |   9.73 |    0.88 |     35.6445 |      0.4883 |           - |            165.9 KB |
+                  BmarkAutofacMsDi |   264.72 us |   1.9329 us |  1.8080 us |   264.03 us |  10.39 |    0.94 |     39.0625 |      0.4883 |           - |           181.76 KB |
+                        BmarkGrace | 6,099.80 us | 104.3044 us | 97.5664 us | 6,078.28 us | 239.58 |   24.44 |     46.8750 |     23.4375 |           - |           216.12 KB |
+                    BmarkGraceMsDi | 7,923.96 us |  60.4445 us | 56.5398 us | 7,938.68 us | 311.03 |   29.28 |     62.5000 |     31.2500 |           - |           314.19 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -474,6 +486,18 @@ namespace PerformanceTests
                     BmarkGraceMsDi |  2.241 us | 0.0069 us | 0.0061 us |  1.58 |    0.01 |      1.0529 |           - |           - |             4.87 KB |
                       BmarkAutofac | 12.845 us | 0.1024 us | 0.0957 us |  9.05 |    0.07 |      3.6163 |           - |           - |             16.7 KB |
                   BmarkAutofacMsDi | 18.235 us | 0.2559 us | 0.2393 us | 12.85 |    0.18 |      5.0964 |           - |           - |            23.55 KB |
+
+            ## Optimized interpreting of the ScopeOrSingleton and registered FactoryDelegate - now DI.MS.DI is faster than DI :)
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  1.640 us | 0.0301 us | 0.0281 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                   BmarkDryIocMsDi |  1.848 us | 0.0301 us | 0.0251 us |  1.13 |    0.02 |      0.6828 |           - |           - |             3.15 KB |
+                       BmarkDryIoc |  1.949 us | 0.0370 us | 0.0346 us |  1.19 |    0.03 |      0.5074 |           - |           - |             2.35 KB |
+                        BmarkGrace |  2.197 us | 0.0343 us | 0.0321 us |  1.34 |    0.03 |      0.9079 |           - |           - |              4.2 KB |
+                    BmarkGraceMsDi |  2.616 us | 0.0508 us | 0.0499 us |  1.59 |    0.04 |      1.0262 |           - |           - |             4.74 KB |
+                      BmarkAutofac | 15.111 us | 0.1772 us | 0.1658 us |  9.22 |    0.17 |      3.6011 |           - |           - |             16.7 KB |
+                  BmarkAutofacMsDi | 22.683 us | 0.2758 us | 0.2579 us | 13.84 |    0.26 |      5.4932 |           - |           - |             25.4 KB |
             */
 
             private IServiceProvider _msDi;
@@ -519,7 +543,7 @@ namespace PerformanceTests
             [Benchmark]
             public object BmarkAutofacMsDi() => Measure(_autofacMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkDryIocWithoutInterpreter() => Measure(_dryIocWithoutInterpreter);
         }
 
