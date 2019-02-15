@@ -191,8 +191,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else
             {
-                var instance = descriptor.ImplementationInstance;
-                container.RegisterDelegate(true, descriptor.ServiceType, _ => instance);
+                container.RegisterInstance(true, descriptor.ServiceType, descriptor.ImplementationInstance);
             }
         }
     }

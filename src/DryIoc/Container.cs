@@ -563,7 +563,8 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
-        /// <summary>Puts and instance into the current scope or singletons.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or <see cref="Use"/> method instead.
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
@@ -2316,7 +2317,7 @@ namespace DryIoc
                         var callArgs = callExpr.Arguments.ToListOrSelf();
 
                         object resolver;
-                        if (callMethod == Resolver.FastResolveMethod)
+                        if (callMethod == Resolver.ResolveFastMethod)
                             return TryInterpret(r, callObject, useFec, out resolver) &&
                                    TryInterpretFastResolve((IResolverContext)resolver, callArgs, out result);
 
@@ -5420,6 +5421,29 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
+        /// It is always back, bit now the roles are split, this just a normal registration to the root container,
+        /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
+        /// though without ability to use decorators and wrappers on it.
+        public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
+            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            registrator.Register(new RegisteredInstanceFactory(instance, preventDisposal, weaklyReferenced),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+
+        /// It is always back, bit now the roles are split, this just a normal registration to the root container,
+        /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
+        /// though without ability to use decorators and wrappers on it.
+        public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, 
+            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+
+        /// It is always back, bit now the roles are split, this just a normal registration to the root container,
+        /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
+        /// though without ability to use decorators and wrappers on it.
+        public static void RegisterInstance<T>(this IRegistrator registrator, T instance, 
+            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+
+        // todo: Exclude everything from the System namespace
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
         {
@@ -5664,79 +5688,62 @@ namespace DryIoc
             public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r).Invoke(decoratee);
         }
 
-        /// <summary>Obsolete: replaced with UseInstance</summary>
-        [Obsolete("Replace by UseInstance", false)]
-        public static void RegisterInstance(this IResolverContext r, Type serviceType, object instance,
-            IReuse ignored = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// <summary>Obsolete: replaced with UseInstance</summary>
-        [Obsolete("Replace by UseInstance", false)]
-        public static void RegisterInstance<TService>(this IResolverContext r, TService instance,
-            IReuse reuse = null, IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.RegisterInstance(typeof(TService), instance, reuse, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-
-        // todo: why is this even in `Registrator`?
-        /// <summary>Stores an externally created instance in the current scope or singletons,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IResolverContext r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores an externally created instance in the current scope or singletons,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IRegistrator r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        // todo: do something about multiplicity of methods on (IContainer, IRegistrator, IResolver) 
-        /// <summary>Stores an externally created instance in the current scope or singletons,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IContainer c, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        // todo: why is this even in `Registrator`?
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IRegistrator r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IContainer c, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IResolverContext r, TService instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IRegistrator r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// <summary>Stores the externally created instance into open scope or singleton,
-        /// replacing the existing registration and instance if any.</summary>
+        /// OBSOLETE!
+        /// Please just use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IContainer c, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
@@ -5745,13 +5752,37 @@ namespace DryIoc
         public static void Use<TService>(this IResolverContext r, FactoryDelegate factory) =>
             r.Use(typeof(TService), factory);
 
+        /// Adding the instance directly to scope for resolution 
+        public static void Use(this IResolverContext r, Type serviceType, object instance) =>
+            r.Use(serviceType, _ => instance);
+
+        /// Adding the instance directly to scope for resolution 
+        public static void Use<TService>(this IResolverContext r, TService instance) =>
+            r.Use(typeof(TService), _ => instance);
+
         /// Adding the factory directly to scope for resolution 
         public static void Use<TService>(this IRegistrator r, FactoryDelegate factory) =>
             r.Use(typeof(TService), factory);
 
+        /// Adding the instance directly to scope for resolution 
+        public static void Use(this IRegistrator r, Type serviceType, object instance) =>
+            r.Use(serviceType, _ => instance);
+
+        /// Adding the instance directly to scope for resolution 
+        public static void Use<TService>(this IRegistrator r, TService instance) =>
+            r.Use(typeof(TService), _ => instance);
+
         /// Adding the factory directly to scope for resolution 
         public static void Use<TService>(this IContainer c, FactoryDelegate factory) =>
             ((IResolverContext)c).Use(typeof(TService), factory);
+
+        /// Adding the instance directly to scope for resolution 
+        public static void Use(this IContainer c, Type serviceType, object instance) =>
+            ((IResolverContext)c).Use(serviceType, _ => instance);
+
+        /// Adding the instance directly to scope for resolution 
+        public static void Use<TService>(this IContainer c, TService instance) =>
+            ((IResolverContext)c).Use(typeof(TService), _ => instance);
 
         /// <summary>Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
@@ -5916,7 +5947,7 @@ namespace DryIoc
     /// <summary>Extension methods for <see cref="IResolver"/>.</summary>
     public static class Resolver
     {
-        internal static readonly MethodInfo FastResolveMethod =
+        internal static readonly MethodInfo ResolveFastMethod =
             typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(IfUnresolved));
 
         internal static readonly MethodInfo ResolveMethod =
@@ -7383,14 +7414,15 @@ namespace DryIoc
         }
 
         /// Works `AsResolutionCall` only with `Rules.UsedForExpressionGeneration`
-        public bool AsResolutionCallForGeneratedExpression => (_settings & Settings.AsResolutionCallForExpressionGeneration) != 0;
+        public bool AsResolutionCallForExpressionGeneration => (_settings & Settings.AsResolutionCallForExpressionGeneration) != 0;
 
-        private static readonly Setup AsResolutionCallForGeneratedExpressionSetup =
+        /// Specifies to use `asResolutionCall` but only in expression generation context, e.g. DryIocZero
+        internal static readonly Setup AsResolutionCallForGeneratedExpressionSetup =
             new ServiceSetup { _settings = Settings.AsResolutionCallForExpressionGeneration };
 
         internal Setup WithAsResolutionCallForGeneratedExpression()
         {
-            if (AsResolutionCallForGeneratedExpression)
+            if (AsResolutionCallForExpressionGeneration)
                 return this;
 
             if (this == Default)
@@ -7425,12 +7457,12 @@ namespace DryIoc
         /// <summary>When single service is resolved, but multiple candidates found, this options will be used to prefer this one.</summary>
         public bool PreferInSingleServiceResolve => (_settings & Settings.PreferInSingleServiceResolve) != 0;
 
-        /// <summary>Sets the base settings.</summary>
-        private Setup(Func<Request, bool> condition = null,
-            bool openResolutionScope = false, bool asResolutionCall = false,
-            bool asResolutionRoot = false, bool preventDisposal = false, bool weaklyReferenced = false,
-            bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, int disposalOrder = 0, bool preferOverMultipleResolved = false)
+        private Setup() { }
+
+        private Setup(Func<Request, bool> condition,
+            bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot, bool preventDisposal, bool weaklyReferenced,
+            bool allowDisposableTransient, bool trackDisposableTransient, bool useParentReuse, int disposalOrder, 
+            bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false)
         {
             Condition = condition;
             DisposalOrder = disposalOrder;
@@ -7459,6 +7491,8 @@ namespace DryIoc
                 _settings |= Settings.UseParentReuse;
             if (preferOverMultipleResolved)
                 _settings |= Settings.PreferInSingleServiceResolve;
+            if (asResolutionCallForExpressionGeneration)
+                _settings |= Settings.AsResolutionCallForExpressionGeneration;
         }
 
         [Flags]
@@ -7495,9 +7529,7 @@ namespace DryIoc
                 !openResolutionScope && !asResolutionRoot &&
                 !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
                 !useParentReuse && disposalOrder == 0 && !preferInSingleServiceResolve)
-            {
                 return !asResolutionCall ? Default : AsResolutionCallSetup;
-            }
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
@@ -7602,14 +7634,14 @@ namespace DryIoc
             public ServiceSetup() { }
 
             /// Specify all the individual settings.
-            public ServiceSetup(Func<Request, bool> condition, object metadataOrFuncOfMetadata,
-                bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot,
-                bool preventDisposal, bool weaklyReferenced,
-                bool allowDisposableTransient, bool trackDisposableTransient,
-                bool useParentReuse, int disposalOrder, bool preferOverMultipleResolved = false)
+            public ServiceSetup(Func<Request, bool> condition = null, object metadataOrFuncOfMetadata = null,
+                bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
+                bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false, 
+                bool trackDisposableTransient = false, bool useParentReuse = false, int disposalOrder = 0, 
+                bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false)
                 : base(condition, openResolutionScope, asResolutionCall, asResolutionRoot,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                    useParentReuse, disposalOrder, preferOverMultipleResolved)
+                    useParentReuse, disposalOrder, preferOverMultipleResolved, asResolutionCallForExpressionGeneration)
             {
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
             }
@@ -7848,7 +7880,7 @@ namespace DryIoc
                 (setup.OpenResolutionScope ||
                 !request.IsResolutionCall && // preventing recursion
                 (setup.AsResolutionCall || 
-                 (setup.AsResolutionCallForGeneratedExpression && rules.UsedForExpressionGeneration) ||
+                 (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration) ||
                  setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
                 request.GetActualServiceType() != typeof(void)))
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
@@ -8437,10 +8469,11 @@ namespace DryIoc
                         continue;
                     }
 
-                    // todo: change to generate the fast resolve call
                     if (container.TryGetUsedInstance(paramServiceType, out var instance))
                     {
-                        paramExprs[i] = Constant(instance, paramServiceType);
+                        // Generate the fast resolve call for used instances
+                        paramExprs[i] = Call(ResolverContext.GetRootOrSelfExpr(request), Resolver.ResolveFastMethod, 
+                            Constant(paramServiceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
                         continue;
                     }
                 }
@@ -9032,12 +9065,56 @@ namespace DryIoc
         private readonly Func<Request, Expression> _getServiceExpression;
     }
 
+    /// Wraps the instance in registry
+    public sealed class RegisteredInstanceFactory : Factory
+    {
+        /// The registered pre-created object instance
+        public readonly object Instance;
+
+        /// <summary>Non-abstract closed implementation type.</summary>
+        public override Type ImplementationType { get; }
+
+
+        /// <inheritdoc />
+        public override bool HasRuntimeState => true;
+
+        /// <summary>Creates factory.</summary>
+        public RegisteredInstanceFactory(object instance, bool preventDisposal, bool weeklyReferenced)
+           : base(DryIoc.Reuse.Singleton, 
+               preventDisposal || weeklyReferenced 
+                   ? new Setup.ServiceSetup(null, preventDisposal: preventDisposal, weaklyReferenced: weeklyReferenced, asResolutionCallForExpressionGeneration: true) 
+                   : DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup)
+        {
+            Instance = instance; // may be a `null` - it is fine
+            ImplementationType = instance?.GetType();
+        }
+
+        /// Wraps the instance in expression constant
+        public override Expression CreateExpressionOrDefault(Request request) => 
+            Convert(request.Container.GetConstantExpression(Instance), request.GetActualServiceType());
+
+        /// Used at resolution root too simplify getting the actual instance
+        public override FactoryDelegate GetDelegateOrDefault(Request request)
+        {
+            request = request.WithResolvedFactory(this);
+
+            // Fallback to the general flow
+            if (request.Reuse != DryIoc.Reuse.Transient ||
+                FactoryType == FactoryType.Service &&
+                request.Container.GetDecoratorExpressionOrDefault(request) != null)
+                return base.GetDelegateOrDefault(request);
+
+            // Otherwise, simply return instance wrapped in `FactoryDelegate`
+            return _ => Instance;
+        }
+    }
+
     /// <summary>This factory is the thin wrapper for user provided delegate
     /// and where possible it uses delegate directly: without converting it to expression.</summary>
     public sealed class DelegateFactory : Factory
     {
         /// <summary>Non-abstract closed implementation type.</summary>
-        public override Type ImplementationType => _knownImplementationType;
+        public override Type ImplementationType { get; }
 
         /// <inheritdoc />
         public override bool HasRuntimeState => true;
@@ -9045,11 +9122,10 @@ namespace DryIoc
         /// <summary>Creates factory.</summary>
         public DelegateFactory(FactoryDelegate factoryDelegate,
            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
-           : base(reuse, 
-               (setup ?? Setup.Default).WithAsResolutionCallForGeneratedExpression())
+           : base(reuse, (setup ?? Setup.Default).WithAsResolutionCallForGeneratedExpression())
         {
             _factoryDelegate = factoryDelegate.ThrowIfNull();
-            _knownImplementationType = knownImplementationType;
+            ImplementationType = knownImplementationType;
         }
 
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
@@ -9080,7 +9156,6 @@ namespace DryIoc
         }
 
         private readonly FactoryDelegate _factoryDelegate;
-        private readonly Type _knownImplementationType;
     }
 
     internal sealed class FactoryPlaceholder : Factory

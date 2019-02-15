@@ -37,8 +37,8 @@ namespace PerformanceTests
             container.RegisterDelegate(r => new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()));
             container.RegisterDelegate(r => new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()));
 
-            container.UseInstance(new SingleObj1());
-            container.UseInstance(new SingleObj2());
+            container.RegisterInstance(new SingleObj1());
+            container.RegisterInstance(new SingleObj2());
 
             // level 2
 
@@ -57,8 +57,8 @@ namespace PerformanceTests
             container.RegisterDelegate(r => new ScopedFac12());
             container.RegisterDelegate(r => new ScopedFac22());
 
-            container.UseInstance(new SingleObj12());
-            container.UseInstance(new SingleObj22());
+            container.RegisterInstance(new SingleObj12());
+            container.RegisterInstance(new SingleObj22());
 
             return container;
         }
@@ -380,6 +380,19 @@ namespace PerformanceTests
                   BmarkAutofacMsDi |   264.72 us |   1.9329 us |  1.8080 us |   264.03 us |  10.39 |    0.94 |     39.0625 |      0.4883 |           - |           181.76 KB |
                         BmarkGrace | 6,099.80 us | 104.3044 us | 97.5664 us | 6,078.28 us | 239.58 |   24.44 |     46.8750 |     23.4375 |           - |           216.12 KB |
                     BmarkGraceMsDi | 7,923.96 us |  60.4445 us | 56.5398 us | 7,938.68 us | 311.03 |   29.28 |     62.5000 |     31.2500 |           - |           314.19 KB |
+
+                ## Initial RegisterInstance performance - bit it!
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    23.12 us |  0.1317 us |  0.1232 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    42.05 us |  0.2900 us |  0.2713 us |   1.82 |    0.01 |      9.3994 |           - |           - |            43.34 KB |
+                   BmarkDryIocMsDi |    52.88 us |  0.2601 us |  0.2172 us |   2.29 |    0.02 |     11.4136 |      0.0610 |           - |            52.76 KB |
+                      BmarkAutofac |   207.70 us |  0.8652 us |  0.8093 us |   8.98 |    0.06 |     35.8887 |           - |           - |           165.95 KB |
+                  BmarkAutofacMsDi |   224.37 us |  3.5212 us |  3.2938 us |   9.71 |    0.17 |     39.3066 |      0.2441 |           - |           181.67 KB |
+                        BmarkGrace | 5,504.00 us | 26.0347 us | 24.3528 us | 238.09 |    1.78 |     46.8750 |     23.4375 |           - |           216.27 KB |
+                    BmarkGraceMsDi | 7,235.79 us | 37.6264 us | 35.1958 us | 313.00 |    2.25 |     62.5000 |     31.2500 |           - |           314.23 KB |
+
             */
 
             [Benchmark(Baseline = true)]
@@ -498,6 +511,19 @@ namespace PerformanceTests
                     BmarkGraceMsDi |  2.616 us | 0.0508 us | 0.0499 us |  1.59 |    0.04 |      1.0262 |           - |           - |             4.74 KB |
                       BmarkAutofac | 15.111 us | 0.1772 us | 0.1658 us |  9.22 |    0.17 |      3.6011 |           - |           - |             16.7 KB |
                   BmarkAutofacMsDi | 22.683 us | 0.2758 us | 0.2579 us | 13.84 |    0.26 |      5.4932 |           - |           - |             25.4 KB |
+
+                ## Initial RegisterInstance performance - bit it!
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |  1.023 us | 0.0042 us | 0.0039 us |  0.73 |    0.00 |      0.5093 |           - |           - |             2.35 KB |
+ BmarkMicrosoftDependencyInjection |  1.401 us | 0.0080 us | 0.0067 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                   BmarkDryIocMsDi |  1.545 us | 0.0143 us | 0.0134 us |  1.10 |    0.01 |      0.6828 |           - |           - |             3.15 KB |
+                    BmarkGraceMsDi |  2.276 us | 0.0382 us | 0.0357 us |  1.62 |    0.02 |      1.0529 |           - |           - |             4.87 KB |
+                        BmarkGrace |  2.313 us | 0.0306 us | 0.0286 us |  1.65 |    0.02 |      1.1787 |           - |           - |             5.45 KB |
+                      BmarkAutofac | 13.339 us | 0.2588 us | 0.2657 us |  9.50 |    0.19 |      3.6163 |           - |           - |             16.7 KB |
+                  BmarkAutofacMsDi | 21.783 us | 0.3098 us | 0.2898 us | 15.51 |    0.20 |      5.4932 |           - |           - |            25.45 KB |
+
             */
 
             private IServiceProvider _msDi;

@@ -753,16 +753,12 @@ container.Resolve<A>(); // Fails with StackOverflowException
 To catch the problem with recursive dependency, replace `RegisterDelegate` with `container.Register<B>()`.
 
 
-## UseInstance
+## RegisterInstance
 
-**Caution:** Please avoid using `UseInstance` if not absolutely necessary. 
-Instead, utilize DryIoc container to create an instance for you. 
-The only case I can imagine for `UseInstance`, when the value provided by some external context, e.g. `HttpContext` in ASP.NET.
-
-Basically, `UseInstance` method supplies an already created external instance to the container to use it for dependency injection.
+Basically `RegisterInstance` method will supply an already created external instance to the container to use it for dependency injection.
 
 ```cs 
-class Use_instance
+class Register_instance_example
 {
     [Test]
     public void Example()
@@ -770,7 +766,7 @@ class Use_instance
         var container = new Container();
 
         var a = new A();
-        container.UseInstance(a);
+        container.RegisterInstance(a);
         container.Register<B>();
 
         var b = container.Resolve<B>();
@@ -786,16 +782,14 @@ class Use_instance
 } 
 ```
 
-Why it is called `UseInstance` instead of `RegisterInstance`?
+Ok, now we have a pre-created instance in the registry, but what if I need a different instances when opening a new scope.
+Say I want to put `RequestMessage` object into ASP request scope. A request message has a different value in different requests.
 
-The main container goal is to _create_ the services using registered Type or Delegate.
-In case of _pre-created_ external instance there is nothing to create - 
-container should just _use instance_ for injection.
+In that case you we can use method `Use` to put instance directly into the current scope skipping the registration ceremony.
 
-When you call `UseInstance` the instance will be **directly put into current open scope or singleton scope** 
-based on whether the container is scoped (returned from `OpenScope` call) or not.
+__Caution:__ the instance put via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators), 
+but instead it provides nice performance gains and less memory allocations.
 
-In addition, the scoped and singleton instances may coexist with each other.
 ```cs 
 
 class Example_of_scoped_and_singleton_instance
@@ -809,14 +803,14 @@ class Example_of_scoped_and_singleton_instance
         using (var scope = container.OpenScope())
         {
             var a = new A();
-            scope.UseInstance(a); // injected into current open scope
+            scope.Use(a); // injected into current open scope
 
             var b = scope.Resolve<B>(); // will inject `a`
             Assert.AreSame(a, b.A);
         }
 
         var anotherA = new A();
-        container.UseInstance(anotherA); // injected into singleton scope
+        container.Use(anotherA); // injected into singleton scope
 
         var anotherB = container.Resolve<B>(); // will inject `anotherA`
         Assert.AreSame(anotherA, anotherB.A);
@@ -831,32 +825,31 @@ class Example_of_scoped_and_singleton_instance
 }
 ```
 
+__Note:__ The same way you may put an instance into the singletons scope if no current scope is open.
+
 In previous examples we did not specify the service type, but you can specify it for used instance 
 and moreover, you can provide run-time **service type** for the `object` instance:
 
-```cs
-// compile-time known type
-container.UseInstance<ISomeService>(a);
+```cs 
+class Typed_instance
+{
+    public void Example()
+    {
+        var container = new Container();
 
-// run-time known type
-object aa = a;
-container.UseInstance(typeof(ISomeService), aa);
+        // compile-time known type
+        var a = new A();
+        container.Use<ISomeService>(a);
+
+        // run-time known type
+        object aa = a;
+        container.Use(typeof(ISomeService), aa);
+    }
+
+    interface ISomeService {}
+    class A : ISomeService {}
+} 
 ```
-
-You may also provide **service key** to distinguish used instances:
-```cs
-container.UseInstance(new A()); 
-container.UseInstance(new A(special), serviceKey: "specialOne");
-```
-
-`UseInstance` method will replace (override) the previous registrations done on the same level: container or scope.
-```cs
-container.UseInstance(new A(1)); 
-container.UseInstance(new A(2)); // will replace the A(1) instance.
-```
-
-**Note:** The DryIoc version prior 3.0 contains `RegisterInstance` method. 
-The method is obsolete and its usages should be replaced with `UseInstance`.
 
 
 ## RegisterInitializer
