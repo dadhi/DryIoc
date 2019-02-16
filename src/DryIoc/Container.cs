@@ -912,7 +912,6 @@ namespace DryIoc
         {
             var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
 
-            // the code mostly called from DI.MS.DI
             if (Rules.FactorySelector != null && serviceKey == null)
                 return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
 
@@ -944,7 +943,7 @@ namespace DryIoc
                 : ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
 
             if (!Rules.DynamicRegistrationProviders.IsNullOrEmpty() &&
-                (factories.IsNullOrEmpty() || !Rules.UseDynamicRegistrationsAsFallback))
+                (factories.IsNullOrEmpty() || !Rules.UseDynamicRegistrationsAsFallbackOnly))
                 factories = CombineRegisteredWithDynamicFactories(factories,
                     true, FactoryType.Service, serviceType, serviceKey);
 
@@ -988,7 +987,6 @@ namespace DryIoc
                 // Changes service key for resolution call to identify single factory in cache and prevent wrong hit
                 if (defaultFactories.Length > 1 && request.IsResolutionCall)
                     request.ChangeServiceKey(matchedFactories[0].Key);
-
                 return matchedFactories[0].Value;
             }
 
@@ -999,76 +997,71 @@ namespace DryIoc
             return null;
         }
 
-        // todo: shave memory allocations
         private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, Type serviceType)
         {
-            var allFactories = ((IContainer)this)
-                .GetAllServiceFactories(serviceType, bothClosedAndOpenGenerics: true)
-                .ToArrayOrSelf();
+            var serviceFactories = _registry.Value.Services;
+            var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            if (allFactories.Length == 0)
-                return null;
-
-            if (allFactories.Length == 1)
+            KV<object, Factory>[] factories;
+            if (entry is Factory singleDefaultFactory)
             {
-                var factory0 = allFactories[0];
-                if (!MatchFactoryConditionAndMetadata(factory0.Value, request))
-                    return null;
-                return Rules.FactorySelector(request, factory0.Key.Pair(factory0.Value).One());
+                // optimize for the most usual case - a single factory and no dynamic rules
+                if (Rules.UseDynamicRegistrationsAsFallbackOnly || 
+                    Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                    return MatchFactoryConditionAndMetadata(singleDefaultFactory, request)
+                        ? Rules.FactorySelector(request, DefaultKey.Value.Pair<object, Factory>(singleDefaultFactory).One())
+                        : null;
+
+                factories = new[] {new KV<object, Factory>(DefaultKey.Value, singleDefaultFactory)};
+            }
+            else if (entry is FactoriesEntry e)
+                factories = e.Factories.Enumerate().ToArrayOrSelf();
+            else
+            {
+                object openGenericEntry;
+                if (serviceType.IsClosedGeneric() &&
+                    null != (openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition())))
+                    factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
+                else
+                    factories = Empty<KV<object, Factory>>();
             }
 
-            // todo: add match by scope and open-generic
-            //if (allFactories.Length == 2)
-            //{
-            //    var factory0 = allFactories[0];
-            //    var factory1 = allFactories[1];
+            if ((factories.Length == 0 || !Rules.UseDynamicRegistrationsAsFallbackOnly) &&
+                !Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                factories = CombineRegisteredWithDynamicFactories(factories, true, FactoryType.Service, serviceType);
 
-            //    var matched0 = MatchFactoryConditionAndMetadata(factory0.Value, request);
-            //    var matched1 = MatchFactoryConditionAndMetadata(factory1.Value, request);
+            if (factories.Length == 0)
+                return null;
 
-            //    if (!matched0 && !matched1)
-            //        return null;
-
-            //    KeyValuePair<object, Factory>[] facs;
-            //    if (!matched0)
-            //        facs = factory1.Key.Pair(factory1.Value).One();
-            //    else if (!matched1)
-            //        facs = factory0.Key.Pair(factory0.Value).One();
-            //    else
-            //        facs = factory0.Value.FactoryID > factory1.Value.FactoryID 
-            //            ? new[] { factory1.Key.Pair(factory1.Value), factory0.Key.Pair(factory0.Value) }
-            //            : new[] { factory0.Key.Pair(factory0.Value), factory1.Key.Pair(factory1.Value) };
-
-            //    return Rules.FactorySelector(request, facs);
-            //}
+            // optimize for the case with the single factory
+            if (factories.Length == 1)
+            {
+                var factory0 = factories[0];
+                return MatchFactoryConditionAndMetadata(factory0.Value, request) 
+                    ? Rules.FactorySelector(request, factory0.Key.Pair(factory0.Value).One()) 
+                    : null;
+            }
 
             // Sort in registration order
-            if (allFactories.Length > 1)
-                Array.Sort(allFactories, _lastFactoryIDWinsComparer);
+            if (factories.Length > 1)
+                Array.Sort(factories, _lastFactoryIDWinsComparer);
 
-            var matchedFactories = MatchFactories(allFactories, request);
+            var matchedFactories = MatchFactories(factories, request);
             if (matchedFactories.Length == 0)
                 return null;
 
-            // todo: try to remove this step
-            var matchedFactoriesWithKeys = matchedFactories.Map(f => f.Key.Pair(f.Value));
-
-            var selectedFactory = Rules.FactorySelector(request, matchedFactoriesWithKeys);
+            var selectedFactory = Rules.FactorySelector(request, matchedFactories.Map(x => x.Key.Pair(x.Value)));
             if (selectedFactory == null)
                 return null;
 
             // Issue: #508
-            if (allFactories.Length > 1)
-            {
+            if (factories.Length > 1)
                 for (var i = 0; i < matchedFactories.Length; i++)
-                {
                     if (matchedFactories[i].Value.FactoryID == selectedFactory.FactoryID)
                     {
                         request.ChangeServiceKey(matchedFactories[i].Key);
                         break;
                     }
-                }
-            }
 
             return selectedFactory;
         }
@@ -1138,25 +1131,16 @@ namespace DryIoc
 
             // Check the for matching scopes. Only for more than 1 factory, 
             // for the single factory the check will be down the road
-            // Issue: #175
-            if (matchedFactories.Length > 1 &&
-                request.Rules.ImplicitCheckForReuseMatchingScope)
-            {
+            // BitBucket issue: #175
+            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
                 matchedFactories = MatchFactoriesByReuse(matchedFactories, request);
-                if (matchedFactories.Length == 0)
-                    return matchedFactories;
-            }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (matchedFactories.Length > 1)
-            {
                 matchedFactories = matchedFactories.Match(f =>
                     f.Value.FactoryGenerator == null ||
                     f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null);
-                if (matchedFactories.Length == 0)
-                    return matchedFactories;
-            }
 
             return matchedFactories;
         }
@@ -1164,7 +1148,6 @@ namespace DryIoc
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
         {
             var serviceFactories = _registry.Value.Services;
-
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
@@ -1176,7 +1159,7 @@ namespace DryIoc
                     factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
 
-            if (!factories.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallback ||
+            if (!factories.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return factories;
 
@@ -1330,7 +1313,7 @@ namespace DryIoc
             if (!allDecorators.IsEmpty)
                 decorators = allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
 
-            if (!decorators.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallback ||
+            if (!decorators.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return decorators;
 
@@ -4139,14 +4122,14 @@ namespace DryIoc
         /// And additionally specifies to use dynamic registrations only when no normal registrations found!</summary>
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
-            new Rules(_settings | Settings.UseDynamicRegistrationsAsFallback, FactorySelector, DefaultReuse,
+            new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
-        /// <summary>Specifies to use dynamic registrations only when no normal registrations found</summary>
-        public bool UseDynamicRegistrationsAsFallback =>
-            (_settings & Settings.UseDynamicRegistrationsAsFallback) != 0;
+        /// Specifies to use dynamic registrations only when no normal registrations found
+        public bool UseDynamicRegistrationsAsFallbackOnly =>
+            (_settings & Settings.UseDynamicRegistrationsAsFallbackOnly) != 0;
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
         /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
@@ -4608,7 +4591,7 @@ namespace DryIoc
             EagerCachingSingletonForFasterAccess = 1 << 7,
             ThrowIfRuntimeStateRequired = 1 << 8,
             CaptureContainerDisposeStackTrace = 1 << 9,
-            UseDynamicRegistrationsAsFallback = 1 << 10,
+            UseDynamicRegistrationsAsFallbackOnly = 1 << 10,
             IgnoringReuseForFuncWithArgs = 1 << 11,
             OverrideRegistrationMade = 1 << 12,
             FuncAndLazyWithoutRegistration = 1 << 13,

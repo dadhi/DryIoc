@@ -47,7 +47,7 @@ namespace DryIoc.IssuesTests
 
             container.RegisterDelegate(_ => new X(), Reuse.Scoped);
             container.RegisterDelegate(_ => new Y(), Reuse.ScopedOrSingleton);
-            container.RegisterDelegate(_ => 42, Reuse.ScopedOrSingleton);
+            container.RegisterInstance(42);
             container.Register<S>(Reuse.Scoped);
 
             using (var scope = container.OpenScope())

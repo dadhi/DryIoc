@@ -393,6 +393,17 @@ namespace PerformanceTests
                         BmarkGrace | 5,504.00 us | 26.0347 us | 24.3528 us | 238.09 |    1.78 |     46.8750 |     23.4375 |           - |           216.27 KB |
                     BmarkGraceMsDi | 7,235.79 us | 37.6264 us | 35.1958 us | 313.00 |    2.25 |     62.5000 |     31.2500 |           - |           314.23 KB |
 
+                ## Fixing #61 and optimizing rule selection - check memory for BmarkDryIocMsDi
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    23.83 us |  0.0954 us |  0.0846 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    43.34 us |  0.1748 us |  0.1635 us |   1.82 |    0.01 |      9.3994 |           - |           - |            43.34 KB |
+                   BmarkDryIocMsDi |    50.31 us |  0.3109 us |  0.2908 us |   2.11 |    0.01 |     10.6812 |      0.0610 |           - |            49.33 KB |
+                      BmarkAutofac |   212.30 us |  0.9974 us |  0.9329 us |   8.91 |    0.05 |     35.8887 |      0.2441 |           - |           165.88 KB |
+                  BmarkAutofacMsDi |   226.75 us |  0.8951 us |  0.8373 us |   9.52 |    0.05 |     39.3066 |           - |           - |           181.67 KB |
+                        BmarkGrace | 5,491.76 us | 38.8408 us | 36.3317 us | 230.42 |    1.85 |     46.8750 |     23.4375 |           - |           216.13 KB |
+                    BmarkGraceMsDi | 7,349.26 us | 33.0618 us | 30.9261 us | 308.29 |    1.88 |     62.5000 |     31.2500 |           - |            314.2 KB |
             */
 
             [Benchmark(Baseline = true)]
