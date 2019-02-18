@@ -403,6 +403,19 @@ namespace PerformanceTests
                   BmarkAutofacMsDi |   226.75 us |  0.8951 us |  0.8373 us |   9.52 |    0.05 |     39.3066 |           - |           - |           181.67 KB |
                         BmarkGrace | 5,491.76 us | 38.8408 us | 36.3317 us | 230.42 |    1.85 |     46.8750 |     23.4375 |           - |           216.13 KB |
                     BmarkGraceMsDi | 7,349.26 us | 33.0618 us | 30.9261 us | 308.29 |    1.88 |     62.5000 |     31.2500 |           - |            314.2 KB |
+
+                ## Optimized register instance
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    22.52 us |  0.1295 us |  0.1081 us |   1.00 |    0.00 |      4.2419 |           - |           - |            19.62 KB |
+                       BmarkDryIoc |    39.58 us |  0.2562 us |  0.2271 us |   1.76 |    0.01 |      9.0332 |           - |           - |            41.69 KB |
+                   BmarkDryIocMsDi |    48.00 us |  0.6945 us |  0.6496 us |   2.13 |    0.03 |     10.3149 |           - |           - |            47.68 KB |
+                      BmarkAutofac |   211.89 us |  0.4042 us |  0.3584 us |   9.41 |    0.05 |     35.8887 |      0.2441 |           - |           165.88 KB |
+                  BmarkAutofacMsDi |   219.85 us |  1.3451 us |  1.2582 us |   9.76 |    0.06 |     39.3066 |      0.2441 |           - |           181.67 KB |
+                        BmarkGrace | 5,370.39 us | 25.0568 us | 22.2122 us | 238.50 |    1.55 |     46.8750 |     23.4375 |           - |           216.17 KB |
+                    BmarkGraceMsDi | 7,145.42 us | 38.5442 us | 36.0542 us | 317.47 |    2.15 |     62.5000 |     31.2500 |           - |           314.21 KB |
+
             */
 
             [Benchmark(Baseline = true)]
@@ -533,6 +546,18 @@ namespace PerformanceTests
                         BmarkGrace |  2.313 us | 0.0306 us | 0.0286 us |  1.65 |    0.02 |      1.1787 |           - |           - |             5.45 KB |
                       BmarkAutofac | 13.339 us | 0.2588 us | 0.2657 us |  9.50 |    0.19 |      3.6163 |           - |           - |             16.7 KB |
                   BmarkAutofacMsDi | 21.783 us | 0.3098 us | 0.2898 us | 15.51 |    0.20 |      5.4932 |           - |           - |            25.45 KB |
+
+                ## Optimized register instance
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |  1.035 us | 0.0121 us | 0.0113 us |  0.73 |    0.01 |      0.5093 |           - |           - |             2.35 KB |
+ BmarkMicrosoftDependencyInjection |  1.411 us | 0.0059 us | 0.0055 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                   BmarkDryIocMsDi |  1.570 us | 0.0198 us | 0.0185 us |  1.11 |    0.01 |      0.6828 |           - |           - |             3.15 KB |
+                        BmarkGrace |  1.989 us | 0.0193 us | 0.0181 us |  1.41 |    0.01 |      0.9232 |           - |           - |             4.26 KB |
+                    BmarkGraceMsDi |  2.404 us | 0.0392 us | 0.0348 us |  1.70 |    0.02 |      1.0796 |           - |           - |             4.99 KB |
+                      BmarkAutofac | 13.317 us | 0.1708 us | 0.1598 us |  9.44 |    0.12 |      3.6163 |           - |           - |             16.7 KB |
+                  BmarkAutofacMsDi | 19.549 us | 0.3447 us | 0.3225 us | 13.85 |    0.24 |      5.0964 |           - |           - |            23.55 KB |
 
             */
 

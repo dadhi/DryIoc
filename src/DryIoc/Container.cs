@@ -5331,9 +5331,14 @@ namespace DryIoc
         /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
-            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
+            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
+        {
+            if (instance is IDisposable && !preventDisposal)
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
+
             registrator.Register(new RegisteredInstanceFactory(instance, preventDisposal, weaklyReferenced),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+        }
 
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
         /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
@@ -9006,7 +9011,6 @@ namespace DryIoc
         /// <summary>Non-abstract closed implementation type.</summary>
         public override Type ImplementationType { get; }
 
-
         /// <inheritdoc />
         public override bool HasRuntimeState => true;
 
@@ -9017,28 +9021,73 @@ namespace DryIoc
                    ? new Setup.ServiceSetup(null, preventDisposal: preventDisposal, weaklyReferenced: weeklyReferenced, asResolutionCallForExpressionGeneration: true) 
                    : DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup)
         {
-            Instance = instance; // may be a `null` - it is fine
-            ImplementationType = instance?.GetType();
+            if (instance != null) // it may be `null` as well
+            {
+                ImplementationType = instance.GetType();
+                if (weeklyReferenced)
+                    Instance = new WeakReference(instance);
+                else
+                    Instance = instance;
+            }
         }
 
         /// Wraps the instance in expression constant
-        public override Expression CreateExpressionOrDefault(Request request) => 
-            Convert(request.Container.GetConstantExpression(Instance), request.GetActualServiceType());
+        public override Expression CreateExpressionOrDefault(Request request)
+        {
+            // unpacks the weak-reference
+            if (Setup.WeaklyReferenced)
+                return Call(
+                    typeof(ThrowInGeneratedCode).GetTypeInfo()
+                        .GetDeclaredMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
+                    Property(
+                        Constant(Instance, typeof(WeakReference)),
+                        typeof(WeakReference).Property(nameof(WeakReference.Target))));
+
+            // otherwise just return a constant
+            var instanceExpr = request.Container.GetConstantExpression(Instance);
+            var serviceType = request.GetActualServiceType();
+            if (ImplementationType.IsAssignableTo(serviceType))
+                return instanceExpr;
+            return Convert(instanceExpr, serviceType);
+        }
+
+        /// Simplified path for the registered instance
+        public override Expression GetExpressionOrDefault(Request request)
+        {
+            request = request.WithResolvedFactory(this);
+
+            if (!request.IsResolutionCall && // preventing recursion
+                 (Setup.AsResolutionCall ||
+                  Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
+                return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
+
+            // First look for decorators if it is not already a decorator
+            if (FactoryType != FactoryType.Decorator)
+            {
+                var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request);
+                if (decoratorExpr != null)
+                    return decoratorExpr;
+            }
+
+            return CreateExpressionOrDefault(request);
+        }
 
         /// Used at resolution root too simplify getting the actual instance
         public override FactoryDelegate GetDelegateOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
 
-            // Fallback to the general flow
-            if (request.Reuse != DryIoc.Reuse.Transient ||
-                FactoryType == FactoryType.Service &&
+            if (FactoryType == FactoryType.Service &&
                 request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
-            // Otherwise, simply return instance wrapped in `FactoryDelegate`
-            return _ => Instance;
+            return Setup.WeaklyReferenced 
+                ? (FactoryDelegate)UnpackWeakRefFactory 
+                : InstanceFactory;
         }
+
+        private object InstanceFactory(IResolverContext _) => Instance;
+        private object UnpackWeakRefFactory(IResolverContext _) => (Instance as WeakReference)?.Target.WeakRefReuseWrapperGCed();
     }
 
     /// <summary>This factory is the thin wrapper for user provided delegate
@@ -9338,8 +9387,7 @@ namespace DryIoc
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
-            var disposable = item as IDisposable;
-            if (disposable != null && disposable != this)
+            if (item is IDisposable disposable && disposable != this)
                 TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
             return item;
         }
