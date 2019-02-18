@@ -5354,7 +5354,6 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        // todo: Exclude everything from the System namespace
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
         {
