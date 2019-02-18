@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -39,7 +39,9 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<YetAnotherClient>());
 
-            StringAssert.StartsWith("Unable to find constructor with all resolvable parameters", ex.Message);
+            Assert.AreEqual(
+                Error.NameOf(Error.UnableToFindCtorWithAllResolvableArgs),
+                ex.ErrorName);
         }
 
         [Test]
@@ -79,14 +81,13 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void For_func_with_arguments_When_no_matching_constructor_found_Then_it_should_throw()
+        public void For_func_with_arguments_When_it_should_the_first_matching_constructor()
         {
             var container = new Container();
             container.Register<SomeClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
 
-            var ex = Assert.Throws<ContainerException>(() => container.Resolve<Func<string, SomeClient>>());
-
-            StringAssert.StartsWith("Unable to find constructor with all parameters matching Func signature", ex.Message);
+            var x = container.Resolve<Func<string, SomeClient>>();
+            Assert.AreEqual(1, x("").Seed);
         }
 
         [Test]

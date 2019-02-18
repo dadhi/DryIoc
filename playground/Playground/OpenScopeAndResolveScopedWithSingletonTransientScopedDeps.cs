@@ -430,6 +430,11 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                        BmarkDryIoc | 4.703 us | 0.0225 us | 0.0188 us |  0.99 |      1.0681 |           - |           - |             4.95 KB |
  BmarkMicrosoftDependencyInjection | 4.750 us | 0.0082 us | 0.0076 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
 
+## Final cut
+                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.671 us | 0.0223 us | 0.0208 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
+                       BmarkDryIoc | 5.147 us | 0.0237 us | 0.0198 us |  1.10 |      1.0986 |           - |           - |             5.08 KB |
 */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve

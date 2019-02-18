@@ -51,13 +51,15 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(a.B.I);
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void Should_throw_when_no_constructors_are_match()
         {
             var container = new Container(rules => rules
                 .WithAutoConcreteTypeResolution());
 
-            Assert.Throws<ContainerException>(() => container.Resolve<D>());
+            var d = container.Resolve<D>();
+
+            Assert.IsNull(d.I);
         }
 
         [Test]
@@ -72,7 +74,7 @@ namespace DryIoc.IssuesTests
                 ex.ErrorName);
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void Should_consider_arguments_passed_to_Resolve()
         {
             var container = new Container(rules => rules

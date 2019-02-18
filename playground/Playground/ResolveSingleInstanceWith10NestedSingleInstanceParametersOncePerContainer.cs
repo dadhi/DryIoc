@@ -1,5 +1,6 @@
 using Autofac;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Order;
 using DryIoc;
 using IContainer = Autofac.IContainer;
 
@@ -130,6 +131,7 @@ namespace PerformanceTests
 
         #endregion
 
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class BenchmarkResolution
         {
             private IContainer _autofac = PrepareAutofac();
@@ -142,22 +144,30 @@ namespace PerformanceTests
                 return Measure(_autofac);
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(_dryioc);
             }
         }
 
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class BenchmarkRegistrationAndResolution
         {
+            /*
+                   Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+            ------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+              BmarkDryIoc |  19.12 us | 0.0740 us | 0.0692 us |  1.00 |    0.00 |      4.3945 |           - |           - |            20.27 KB |
+             BmarkAutofac | 102.08 us | 0.8342 us | 0.7395 us |  5.34 |    0.04 |     18.0664 |      0.1221 |           - |            83.68 KB |
+
+             */
             [Benchmark]
             public object BmarkAutofac()
             {
                 return Measure(PrepareAutofac());
             }
 
-            [Benchmark]
+            [Benchmark(Baseline = true)]
             public object BmarkDryIoc()
             {
                 return Measure(PrepareDryIoc());

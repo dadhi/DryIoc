@@ -43,7 +43,7 @@ namespace Autofac
         /// Throws an exception
         public static Factory ThrowDependencyResolutionException(Request request)
         {
-            if (!request.IsResolutionRoot)
+            if (!request.IsResolutionRoot && request.IfUnresolved == IfUnresolved.Throw)
                 throw new DependencyResolutionException($"Unable to resolve: {request}");
             return null;
         }

@@ -1,5 +1,6 @@
 using Autofac;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Order;
 using DryIoc;
 using IContainer = Autofac.IContainer;
 
@@ -85,9 +86,15 @@ namespace PerformanceTests
 
         #endregion
 
-        [MemoryDiagnoser]
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class BenchmarkResolution
         {
+            /*
+                   Method |       Mean |      Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+            ------------- |-----------:|-----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+              BmarkDryIoc |   366.7 ns |  0.3240 ns |  0.2872 ns |  1.00 |    0.00 |      0.1183 |           - |           - |               560 B |
+             BmarkAutofac | 2,392.4 ns | 15.0952 ns | 11.7853 ns |  6.52 |    0.03 |      0.8125 |           - |           - |              3840 B |
+             */
             private IContainer _autofac = PrepareAutofac();
 
             private global::DryIoc.IContainer _dryioc = PrepareDryIoc();
@@ -105,9 +112,15 @@ namespace PerformanceTests
             }
         }
 
-        [MemoryDiagnoser]
+        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class BenchmarkRegistrationAndResolution
         {
+            /*
+       Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+  BmarkDryIoc |  4.394 us | 0.0220 us | 0.0206 us |  1.00 |    0.00 |      0.9842 |           - |           - |             4.56 KB |
+ BmarkAutofac | 37.145 us | 0.2879 us | 0.2404 us |  8.45 |    0.06 |      6.5918 |           - |           - |             30.4 KB |
+             */
             [Benchmark]
             public object BmarkAutofac()
             {
