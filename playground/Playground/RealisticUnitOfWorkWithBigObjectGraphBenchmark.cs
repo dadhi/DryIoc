@@ -113,7 +113,6 @@ namespace PerformanceTests
             return services;
         }
 
-
         public static IServiceProvider PrepareMsDi() => GetServices().BuildServiceProvider();
 
         public static object Measure(IServiceProvider serviceProvider)
@@ -622,6 +621,7 @@ namespace PerformanceTests
             }
 
             [Benchmark]
+
             public object BmarkDryIoc() => Measure(_dryioc);
 
             [Benchmark(Baseline = true)]
