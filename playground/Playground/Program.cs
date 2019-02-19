@@ -38,8 +38,7 @@ namespace Playground
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices>();
             BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.FirstTimeOpenScopeAndResolve>();
-            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.WarmedUpOpenScopeAndResolve>();
+            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.OpenScopeAndResolve>();
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //    CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
