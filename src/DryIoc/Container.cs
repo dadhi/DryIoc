@@ -244,6 +244,14 @@ namespace DryIoc
                 if (expr == null)
                     return null;
 
+                if (expr is ConstantExpression ce)
+                {
+                    var value = ce.Value;
+                    if (factory.Caching != FactoryCaching.DoNotCache)
+                        _registry.Value.TryCacheDefaultFactory(serviceType, new FactoryDelegate(_ => value));
+                    return value;
+                }
+
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
                 if (factory.Caching != FactoryCaching.DoNotCache)
@@ -281,54 +289,68 @@ namespace DryIoc
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
             }
 
-            var key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
-            var entryKey = GetResolvedCacheEntryKeyOrDefault(requiredServiceType, preResolveParent, args);
+            object key = null;
+            object inEntryKey = null;
+            KV<object, ImHashMap<object, object>> cacheEntry = null;
+            var noArgs = args.IsNullOrEmpty();
+            if (noArgs)
+            {
+                key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
+                inEntryKey = GetResolvedCacheEntryKeyOrDefault(requiredServiceType, preResolveParent, args);
 
-            FactoryDelegate factoryDelegate;
-
-            // Try get from cache first
-            var cacheRef = _registry.Value.KeyedFactoryDelegateCache;
-            var cacheEntry = cacheRef.Value.GetValueOrDefault(key);
-            if (cacheEntry != null && 
-                GetCachedOrCompileAndCacheFactoryDelegate(cacheRef, key, cacheEntry, entryKey, out factoryDelegate))
-                return factoryDelegate(this);
+                // Try get from cache first
+                var cache = _registry.Value.KeyedFactoryDelegateCache;
+                cacheEntry = cache.Value.GetValueOrDefault(key);
+                if (cacheEntry != null &&
+                    GetCachedOrCompileAndCacheFactoryDelegate(cache, key, cacheEntry, inEntryKey, out var cachedFactory))
+                    return cachedFactory(this);
+            }
 
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
 
-            var request = Request.Create(this,
-                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, inputArgs: args);
-
+            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, inputArgs: args);
             var factory = ((IContainer)this).ResolveFactory(request);
 
             // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
-            if (serviceKey == null && request.ServiceKey != null && factory.Caching != FactoryCaching.DoNotCache)
+            if (serviceKey == null && request.ServiceKey != null && 
+                factory.Caching != FactoryCaching.DoNotCache && args.IsNullOrEmpty())
             {
                 key = KV.Of(serviceType, request.ServiceKey);
-                cacheEntry = cacheRef.Value.GetValueOrDefault(key);
-                if (GetCachedOrCompileAndCacheFactoryDelegate(cacheRef, key, cacheEntry, entryKey, out factoryDelegate))
-                    return factoryDelegate(this);
+                var cache = _registry.Value.KeyedFactoryDelegateCache;
+                cacheEntry = cache.Value.GetValueOrDefault(key);
+                if (cacheEntry != null &&
+                    GetCachedOrCompileAndCacheFactoryDelegate(cache, key, cacheEntry, inEntryKey, out var cachedFactory))
+                    return cachedFactory(this);
             }
 
             if (factory == null)
                 return null;
 
+            FactoryDelegate factoryDelegate;
             if (factory.UseInterpretation(request))
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
                     return null;
 
+                if (expr is ConstantExpression ce)
+                {
+                    var value = ce.Value;
+                    if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
+                        TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, 
+                            new FactoryDelegate(_ => value));
+                    return value;
+                }
+
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
-                if (factory.Caching != FactoryCaching.DoNotCache)
-                    TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, expr);
+                if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
+                    TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
-
-                object instance;
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out var instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
@@ -344,8 +366,8 @@ namespace DryIoc
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            if (factory.Caching != FactoryCaching.DoNotCache)
-                TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
+            if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
+                TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -379,16 +401,16 @@ namespace DryIoc
 
         private void TryCacheKeyedFactoryDelegateOrExpression(
             Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key,
-            KV<object, ImHashMap<object, object>> cacheEntry, object сontextKey, 
+            KV<object, ImHashMap<object, object>> cacheEntry, object inEntryKey, 
             object factory)
         {
             if (_registry.Value.Services.IsEmpty)
                 return;
 
             var cachedFactories = cacheEntry?.Value ?? ImHashMap<object, object>.Empty;
-            cacheEntry = сontextKey == null
+            cacheEntry = inEntryKey == null
                 ? KV.Of(factory, cachedFactories)
-                : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(сontextKey, factory));
+                : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(inEntryKey, factory));
 
             var cache = cacheRef.Value;
             if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(key, cacheEntry)))
@@ -785,8 +807,7 @@ namespace DryIoc
 
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
-            var request = Request.Create(this, instanceType)
-                .WithResolvedFactory(new InstanceFactory(instance, instanceType, Reuse.Transient));
+            var request = Request.Create(this, instanceType).WithResolvedFactory(new RegisteredInstanceFactory(instance));
 
             foreach (var serviceInfo in propertiesAndFields(request))
                 if (serviceInfo != null)
@@ -1175,8 +1196,7 @@ namespace DryIoc
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
             // return early if no decorators registered
-            if (_registry.Value.Decorators.IsEmpty &&
-                request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+            if (_registry.Value.Decorators.IsEmpty && request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
@@ -2259,8 +2279,10 @@ namespace DryIoc
         public HiddenDisposable(object value) { Value = value; }
     }
 
-    internal static class Interpreter
+    /// Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection
+    public static class Interpreter
     {
+        /// Calls `TryInterpret` inside try-catch and unwraps/rethrows `ContainerException` from the reflection `TargetInvocationException`
         public static bool TryInterpretAndUnwrapContainerException(
             IResolverContext r, Expression expr, bool useFec, out object result)
         {
@@ -2277,6 +2299,7 @@ namespace DryIoc
             }
         }
 
+        /// Interprets passed expression
         public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
         {
             result = null;
@@ -2814,7 +2837,7 @@ namespace DryIoc
         private static readonly Type[] _factoryDelegateParamTypes = { typeof(IResolverContext) };
         private static readonly ParameterExpression[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
 
-        /// <summary>Strips the unnecessary or adds the necessary cast to expression return result.</summary>
+        /// Strips the unnecessary or adds the necessary cast to expression return result
         public static Expression NormalizeExpression(this Expression expr)
         {
             if (expr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
@@ -2838,10 +2861,10 @@ namespace DryIoc
         {
             expression = expression.NormalizeExpression();
 
-            // Optimization: just extract singleton from expression without compiling
-            if (expression.NodeType == System.Linq.Expressions.ExpressionType.Constant)
+            // Optimization for constants
+            if (expression is ConstantExpression ce)
             {
-                var value = ((ConstantExpression)expression).Value;
+                var value = ce.Value;
                 return _ => value;
             }
 
@@ -5333,11 +5356,12 @@ namespace DryIoc
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
         {
-            if (instance is IDisposable && !preventDisposal)
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
-
             registrator.Register(new RegisteredInstanceFactory(instance, preventDisposal, weaklyReferenced),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+
+            // done after registration to pass all the registration validation checks
+            if (instance is IDisposable && !preventDisposal)
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
         }
 
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
@@ -6050,7 +6074,7 @@ namespace DryIoc
             if (factory == null || factory is FactoryPlaceholder)
                 return;
 
-            // Prevents infiinte recursion when genererating the resolution depenedency #579
+            // Prevents infinite recursion when genererating the resolution depenedency #579
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
                 return;
             request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
@@ -9013,8 +9037,16 @@ namespace DryIoc
         /// <inheritdoc />
         public override bool HasRuntimeState => true;
 
+        /// Simplified specially for register instance 
+        internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
+        {
+            if (!isStaticallyChecked && ImplementationType?.IsAssignableTo(serviceType.ThrowIfNull()) != true)
+                Throw.It(Error.RegisteringInstanceNotAssignableToServiceType, ImplementationType, serviceType);
+            return true;
+        }
+
         /// <summary>Creates factory.</summary>
-        public RegisteredInstanceFactory(object instance, bool preventDisposal, bool weeklyReferenced)
+        public RegisteredInstanceFactory(object instance, bool preventDisposal = false, bool weeklyReferenced = false)
            : base(DryIoc.Reuse.Singleton, 
                preventDisposal || weeklyReferenced 
                    ? new Setup.ServiceSetup(null, preventDisposal: preventDisposal, weaklyReferenced: weeklyReferenced, asResolutionCallForExpressionGeneration: true) 
@@ -9053,17 +9085,19 @@ namespace DryIoc
         /// Simplified path for the registered instance
         public override Expression GetExpressionOrDefault(Request request)
         {
-            request = request.WithResolvedFactory(this);
-
-            if (!request.IsResolutionCall && // preventing recursion
-                 (Setup.AsResolutionCall ||
-                  Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
-                return Resolver.CreateResolutionExpression(request, Setup.OpenResolutionScope);
+            if (// preventing recursion
+                (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
+                 (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
+                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator
-            if (FactoryType != FactoryType.Decorator)
+            var serviceType = request.ServiceType;
+            var elementType = serviceType.GetArrayElementTypeOrNull();
+            if (elementType != null)
+                serviceType = typeof(IEnumerable<>).MakeGenericType(elementType);
+            if (!request.Container.GetDecoratorFactoriesOrDefault(serviceType).IsNullOrEmpty())
             {
-                var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request);
+                var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                 if (decoratorExpr != null)
                     return decoratorExpr;
             }
@@ -9076,8 +9110,7 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            if (FactoryType == FactoryType.Service &&
-                request.Container.GetDecoratorExpressionOrDefault(request) != null)
+            if (request.Container.GetDecoratorExpressionOrDefault(request) != null)
                 return base.GetDelegateOrDefault(request);
 
             return Setup.WeaklyReferenced 
@@ -10477,7 +10510,7 @@ namespace DryIoc
             RegisterMappingUnableToSelectFromMultipleFactories = Of(
                 "RegisterMapping selected more than 1 factory with provided type {0} and key {1}: {2}"),
             RegisteringInstanceNotAssignableToServiceType = Of(
-                "Registered instance {0} is not assignable to serviceType {1}."),
+                "Registered instance of type {0} is not assignable to serviceType {1}."),
             NoMoreRegistrationsAllowed = Of(
                 "Container does not allow further registrations." + NewLine +
                 "Attempting to register {0}{1} with implementation factory {2}."),

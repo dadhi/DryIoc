@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -39,7 +39,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance(typeof(string), "ring", serviceKey: "MyPrecious");
+            container.RegisterInstance(typeof(string), "ring", serviceKey: "MyPrecious");
 
             var ring = container.Resolve<string>("MyPrecious");
             Assert.That(ring, Is.EqualTo("ring"));
@@ -51,7 +51,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.UseInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
+                container.RegisterInstance(typeof(int), "ring", serviceKey: "MyPrecious"));
 
             Assert.AreEqual(ex.Error, Error.RegisteringInstanceNotAssignableToServiceType);
         }
@@ -205,12 +205,12 @@ namespace DryIoc.UnitTests
             container.Register<DependencyA>();
 
             var aa = new DependencyA();
-            container.UseInstance(aa, ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
-            container.UseInstance<DependencyA>(new AAA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance(aa, IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance<DependencyA>(new AAA(), IfAlreadyRegistered.AppendNotKeyed);
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(3, aas.Count());
 
-            container.UseInstance<DependencyA>(new AAAA());
+            container.RegisterInstance<DependencyA>(new AAAA(), IfAlreadyRegistered.Replace);
             var aaaa = container.Resolve<DependencyA>();
             Assert.IsInstanceOf<AAAA>(aaaa);
         }
@@ -220,11 +220,11 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance<DependencyA>(new AAA(), serviceKey: "aaa");
-            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
-            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance<DependencyA>(new AAA(), serviceKey: "aaa");
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.AppendNotKeyed);
 
-            container.UseInstance<DependencyA>(new AAAA());
+            container.RegisterInstance<DependencyA>(new AAAA(), IfAlreadyRegistered.Replace);
             Assert.IsInstanceOf<AAAA>(container.Resolve<DependencyA>());
             Assert.IsInstanceOf<AAA>(container.Resolve<DependencyA>("aaa"));
         }
@@ -234,21 +234,21 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance(new DependencyA());
-            container.UseInstance(new DependencyA(), serviceKey: "keyed", ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+            container.RegisterInstance(new DependencyA());
+            container.RegisterInstance(new DependencyA(), serviceKey: "keyed", ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(2, aas.Count());
         }
 
         [Test]
-        public void Can_append_new_default_with_presence_of_keyyed()
+        public void Can_append_new_default_with_presence_of_keyed()
         {
             var container = new Container();
 
-            container.UseInstance(new DependencyA(), serviceKey: "aa");
-            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
-            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance(new DependencyA(), serviceKey: "aa");
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.AppendNotKeyed);
 
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(3, aas.Count());
@@ -260,8 +260,8 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var aa = new DependencyA();
-            container.UseInstance(aa);
-            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.RegisterInstance(aa);
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.Keep);
 
             var x = container.Resolve<DependencyA>();
             Assert.AreSame(aa, x);
@@ -273,9 +273,9 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var aa = new DependencyA();
-            container.UseInstance(aa);
-            container.UseInstance(aa, serviceKey: "aa");
-            container.UseInstance(new DependencyA(), ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.RegisterInstance(aa);
+            container.RegisterInstance(aa, serviceKey: "aa");
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.Keep);
 
             var x = container.Resolve<DependencyA>();
             Assert.AreSame(aa, x);
@@ -287,14 +287,14 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var aa = new DependencyA();
-            container.UseInstance(aa);
+            container.RegisterInstance(aa);
 
             var ex = Assert.Throws<ContainerException>(() => 
-            container.UseInstance(new DependencyA(), IfAlreadyRegistered.Throw));
+            container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.Throw));
 
             Assert.AreEqual(
                 Error.NameOf(Error.UnableToRegisterDuplicateDefault),
-                Error.NameOf(ex.Error));
+                ex.ErrorName);
         }
 
         [Test]
@@ -303,17 +303,16 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var aa = new DependencyA();
-            container.UseInstance(aa);
-            container.UseInstance(aa, serviceKey: "aa");
+            container.RegisterInstance(aa);
+            container.RegisterInstance(aa, serviceKey: "aa");
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.UseInstance(new DependencyA(), IfAlreadyRegistered.Throw));
 
             Assert.AreEqual(
                 Error.NameOf(Error.UnableToRegisterDuplicateDefault),
-                Error.NameOf(ex.Error));
+                ex.ErrorName);
         }
-
 
         [Test]
         public void Can_append_new_default_implementation_And_ignore_the_duplicate_implementation()
@@ -321,15 +320,15 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             var aa = new DependencyA();
-            container.UseInstance(aa);
-            container.UseInstance<DependencyA>(new AAA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.RegisterInstance(aa);
+            container.RegisterInstance<DependencyA>(new AAA(), IfAlreadyRegistered.AppendNewImplementation);
 
             Assert.AreEqual(2, container.ResolveMany<DependencyA>().Count());
 
             var newaaa = new AAA();
-            container.UseInstance<DependencyA>(newaaa, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.RegisterInstance<DependencyA>(newaaa, IfAlreadyRegistered.AppendNewImplementation);
 
-            container.UseInstance<DependencyA>(new AAAA(), ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.RegisterInstance<DependencyA>(new AAAA(), IfAlreadyRegistered.AppendNewImplementation);
             Assert.AreEqual(3, container.ResolveMany<DependencyA>().Count());
         }
 
@@ -337,10 +336,10 @@ namespace DryIoc.UnitTests
         public void Can_reuse_the_default_factory()
         {
             var container = new Container();
-            container.UseInstance<int>(42, serviceKey: "nice number");
-            container.UseInstance<int>(43);
-            container.UseInstance<int>(44, serviceKey: "another nice number");
-            container.UseInstance<int>(45); // will replace the 43
+            container.RegisterInstance<int>(42, serviceKey: "nice number");
+            container.RegisterInstance<int>(43, IfAlreadyRegistered.Replace);
+            container.RegisterInstance<int>(44, serviceKey: "another nice number");
+            container.RegisterInstance<int>(45, IfAlreadyRegistered.Replace); // will replace the 43
 
             var forties = container.Resolve<int[]>();
 

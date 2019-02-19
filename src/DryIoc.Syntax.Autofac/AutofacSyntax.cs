@@ -80,7 +80,7 @@ namespace Autofac
                 if (r.Factory != null)
                     Container.RegisterDelegate(r.ServiceType, r.Factory, r.Reuse);
                 else if (r.Instance != null)
-                    Container.UseInstance(r.ServiceType, r.Instance);
+                    Container.RegisterInstance(r.ServiceType, r.Instance);
                 else
                     Container.Register(r.ServiceType, r.ImplementationType, r.Reuse);
             }
