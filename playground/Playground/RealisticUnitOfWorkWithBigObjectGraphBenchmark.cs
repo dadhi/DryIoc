@@ -15,13 +15,9 @@ namespace PerformanceTests
 {
     public class RealisticUnitOfWorkWithBigObjectGraphBenchmark
     {
-        public static IContainer PrepareDryIoc(bool turnOffInterpretation = false)
+        public static IContainer PrepareDryIoc()
         {
-            var rules = !turnOffInterpretation
-                ? Rules.Default
-                : Rules.Default.WithoutInterpretationForTheFirstResolution();
-
-            var container = new Container(rules);
+            var container = new Container();
 
             container.Register<R>(Reuse.Scoped);
 
@@ -285,7 +281,7 @@ namespace PerformanceTests
             public object BmarkAutofacMsDi() => PrepareAutofacMsDi();
         }
 
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]//, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve
         {
             /*
@@ -437,12 +433,9 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
-
-            //[Benchmark]
-            public object BmarkDryIocWithoutInterpreter() => Measure(PrepareDryIoc(true));
         }
 
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]//, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class OpenScopeAndResolve
         {
             /*
@@ -567,7 +560,6 @@ namespace PerformanceTests
             private IServiceProvider _graceMsDi;
             private Autofac.IContainer _autofac;
             private IServiceProvider _autofacMsDi;
-            private IContainer _dryIocWithoutInterpreter;
 
             [GlobalSetup]
             public void WarmUp()
@@ -579,7 +571,6 @@ namespace PerformanceTests
                 _graceMsDi = PrepareGraceMsDi();
                 _autofac = PrepareAutofac();
                 _autofacMsDi = PrepareAutofacMsDi();
-                _dryIocWithoutInterpreter = PrepareDryIoc(true);
             }
 
             [Benchmark(Baseline = true)]
@@ -602,9 +593,6 @@ namespace PerformanceTests
 
             [Benchmark]
             public object BmarkAutofacMsDi() => Measure(_autofacMsDi);
-
-            //[Benchmark]
-            public object BmarkDryIocWithoutInterpreter() => Measure(_dryIocWithoutInterpreter);
         }
 
         public class R
