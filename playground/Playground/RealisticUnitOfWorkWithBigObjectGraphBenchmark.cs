@@ -19,6 +19,10 @@ namespace PerformanceTests
         {
             var container = new Container();
 
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R(oot) / Controller
             container.Register<R>(Reuse.Scoped);
 
             container.Register<Scoped1>(Reuse.Scoped);
@@ -56,8 +60,10 @@ namespace PerformanceTests
             container.RegisterInstance(new SingleObj12());
             container.RegisterInstance(new SingleObj22());
 
+            ResolveDummyPopulation(container);
             return container;
         }
+
 
         public static object Measure(IContainer container)
         {
@@ -65,9 +71,64 @@ namespace PerformanceTests
                 return scope.Resolve<R>();
         }
 
+        private static void RegisterDummyPopulation(Container container)
+        {
+            container.Register<D1>(Reuse.Scoped);
+            container.Register<D2>(Reuse.Scoped);
+            container.Register<D3>(Reuse.Scoped);
+            container.Register<D4>(Reuse.Scoped);
+            container.Register<D5>(Reuse.Scoped);
+            container.Register<D6>(Reuse.Scoped);
+            container.Register<D7>(Reuse.Scoped);
+            container.Register<D8>(Reuse.Scoped);
+            container.Register<D9>(Reuse.Scoped);
+            container.Register<D10>(Reuse.Scoped);
+            container.Register<D11>(Reuse.Scoped);
+            container.Register<D12>(Reuse.Scoped);
+
+            container.Register<D13>(Reuse.Singleton);
+            container.Register<D14>(Reuse.Singleton);
+            container.Register<D15>(Reuse.Singleton);
+            container.Register<D16>(Reuse.Singleton);
+            container.Register<D17>(Reuse.Singleton);
+            container.Register<D18>(Reuse.Singleton);
+            container.Register<D19>(Reuse.Singleton);
+            container.Register<D20>(Reuse.Singleton);
+        }
+
+        public static object ResolveDummyPopulation(IContainer container)
+        {
+            using (var scope = container.OpenScope())
+            {
+                scope.Resolve<D1>();
+                scope.Resolve<D2>();
+                scope.Resolve<D3>();
+                scope.Resolve<D4>();
+                scope.Resolve<D5>();
+                scope.Resolve<D6>();
+                scope.Resolve<D7>();
+                scope.Resolve<D8>();
+                scope.Resolve<D9>();
+                scope.Resolve<D10>();
+                scope.Resolve<D11>();
+                scope.Resolve<D12>();
+
+                scope.Resolve<D13>();
+                scope.Resolve<D14>();
+                scope.Resolve<D15>();
+                scope.Resolve<D16>();
+                scope.Resolve<D17>();
+                scope.Resolve<D18>();
+                scope.Resolve<D19>();
+                return scope.Resolve<D20>();
+            }
+        }
+
         public static ServiceCollection GetServices()
         {
             var services = new ServiceCollection();
+
+            RegisterDummyPopulation(services);
 
             services.AddScoped<R>();
 
@@ -109,7 +170,12 @@ namespace PerformanceTests
             return services;
         }
 
-        public static IServiceProvider PrepareMsDi() => GetServices().BuildServiceProvider();
+        public static IServiceProvider PrepareMsDi()
+        {
+            var serviceProvider = GetServices().BuildServiceProvider();
+            ResolveDummyPopulation(serviceProvider);
+            return serviceProvider;
+        }
 
         public static object Measure(IServiceProvider serviceProvider)
         {
@@ -117,7 +183,66 @@ namespace PerformanceTests
                 return scope.ServiceProvider.GetService<R>();
         }
 
-        public static IServiceProvider PrepareDryIocMsDi() => DryIocAdapter.Create(GetServices());
+        private static void RegisterDummyPopulation(ServiceCollection services)
+        {
+            services.AddScoped<D1>();
+            services.AddScoped<D2>();
+            services.AddScoped<D3>();
+            services.AddScoped<D4>();
+            services.AddScoped<D5>();
+            services.AddScoped<D6>();
+            services.AddScoped<D7>();
+            services.AddScoped<D8>();
+            services.AddScoped<D9>();
+            services.AddScoped<D10>();
+            services.AddScoped<D11>();
+            services.AddScoped<D12>();
+
+            services.AddSingleton<D13>();
+            services.AddSingleton<D14>();
+            services.AddSingleton<D15>();
+            services.AddSingleton<D16>();
+            services.AddSingleton<D17>();
+            services.AddSingleton<D18>();
+            services.AddSingleton<D19>();
+            services.AddSingleton<D20>();
+        }
+
+        public static object ResolveDummyPopulation(IServiceProvider serviceProvider)
+        {
+            using (var scope = serviceProvider.CreateScope())
+            {
+                var s = scope.ServiceProvider;
+                s.GetService<D1>();
+                s.GetService<D2>();
+                s.GetService<D3>();
+                s.GetService<D4>();
+                s.GetService<D5>();
+                s.GetService<D6>();
+                s.GetService<D7>();
+                s.GetService<D8>();
+                s.GetService<D9>();
+                s.GetService<D10>();
+                s.GetService<D11>();
+                s.GetService<D12>();
+
+                s.GetService<D13>();
+                s.GetService<D14>();
+                s.GetService<D15>();
+                s.GetService<D16>();
+                s.GetService<D17>();
+                s.GetService<D18>();
+                s.GetService<D19>();
+                return s.GetService<D20>();
+            }
+        }
+
+        public static IServiceProvider PrepareDryIocMsDi()
+        {
+            var serviceProvider = DryIocAdapter.Create(GetServices());
+            ResolveDummyPopulation(serviceProvider);
+            return serviceProvider;
+        }
 
         public static DependencyInjectionContainer PrepareGrace()
         {
@@ -125,6 +250,8 @@ namespace PerformanceTests
 
             container.Configure(c =>
             {
+                RegisterDummyPopulation(c);
+
                 c.Export<R>().Lifestyle.SingletonPerScope();
 
                 c.Export<Scoped1>().Lifestyle.SingletonPerScope();
@@ -142,7 +269,7 @@ namespace PerformanceTests
                 c.ExportInstance(new SingleObj1());
                 c.ExportInstance(new SingleObj2());
 
-                // Level 3
+                // Level 2
 
                 c.Export<Scoped3>().Lifestyle.SingletonPerScope();
                 c.Export<Scoped4>().Lifestyle.SingletonPerScope();
@@ -163,7 +290,61 @@ namespace PerformanceTests
                 c.ExportInstance(new SingleObj22());
             });
 
+            ResolveDummyPopulation(container);
             return container;
+        }
+
+        private static void RegisterDummyPopulation(IExportRegistrationBlock block)
+        {
+            block.Export<D1> ().Lifestyle.SingletonPerScope();
+            block.Export<D2> ().Lifestyle.SingletonPerScope();
+            block.Export<D3> ().Lifestyle.SingletonPerScope();
+            block.Export<D4> ().Lifestyle.SingletonPerScope();
+            block.Export<D5> ().Lifestyle.SingletonPerScope();
+            block.Export<D6> ().Lifestyle.SingletonPerScope();
+            block.Export<D7> ().Lifestyle.SingletonPerScope();
+            block.Export<D8> ().Lifestyle.SingletonPerScope();
+            block.Export<D9> ().Lifestyle.SingletonPerScope();
+            block.Export<D10>().Lifestyle.SingletonPerScope();
+            block.Export<D11>().Lifestyle.SingletonPerScope();
+            block.Export<D12>().Lifestyle.SingletonPerScope();
+
+            block.Export<D13>().Lifestyle.Singleton();
+            block.Export<D14>().Lifestyle.Singleton();
+            block.Export<D15>().Lifestyle.Singleton();
+            block.Export<D16>().Lifestyle.Singleton();
+            block.Export<D17>().Lifestyle.Singleton();
+            block.Export<D18>().Lifestyle.Singleton();
+            block.Export<D19>().Lifestyle.Singleton();
+            block.Export<D20>().Lifestyle.Singleton();
+        }
+
+        public static object ResolveDummyPopulation(DependencyInjectionContainer container)
+        {
+            using (var scope = container.BeginLifetimeScope())
+            {
+                scope.Locate<D1>();
+                scope.Locate<D2>();
+                scope.Locate<D3>();
+                scope.Locate<D4>();
+                scope.Locate<D5>();
+                scope.Locate<D6>();
+                scope.Locate<D7>();
+                scope.Locate<D8>();
+                scope.Locate<D9>();
+                scope.Locate<D10>();
+                scope.Locate<D11>();
+                scope.Locate<D12>();
+
+                scope.Locate<D13>();
+                scope.Locate<D14>();
+                scope.Locate<D15>();
+                scope.Locate<D16>();
+                scope.Locate<D17>();
+                scope.Locate<D18>();
+                scope.Locate<D19>();
+                return scope.Locate<D20>();
+            }
         }
 
         public static IServiceProvider PrepareGraceMsDi()
@@ -172,7 +353,10 @@ namespace PerformanceTests
 
             container.Populate(GetServices());
 
-            return container.Locate<IServiceProvider>();
+            var serviceProvider = container.Locate<IServiceProvider>();
+
+            ResolveDummyPopulation(serviceProvider);
+            return serviceProvider;
         }
 
         public static IServiceProvider PrepareAutofacMsDi()
@@ -183,7 +367,10 @@ namespace PerformanceTests
 
             var container = containerBuilder.Build();
 
-            return new AutofacServiceProvider(container);
+            var serviceProvider = new AutofacServiceProvider(container);
+
+            ResolveDummyPopulation(serviceProvider);
+            return serviceProvider;
         }
 
         public static object Measure(DependencyInjectionContainer container)
@@ -195,6 +382,8 @@ namespace PerformanceTests
         public static Autofac.IContainer PrepareAutofac()
         {
             var builder = new ContainerBuilder();
+
+            RegisterDummyPopulation(builder);
 
             builder.RegisterType<R>().AsSelf().InstancePerLifetimeScope();
 
@@ -233,7 +422,62 @@ namespace PerformanceTests
             builder.RegisterInstance(new SingleObj12()).AsSelf();
             builder.RegisterInstance(new SingleObj22()).AsSelf();
 
-            return builder.Build();
+            var container = builder.Build();
+            ResolveDummyPopulation(container);
+            return container;
+        }
+
+        private static void RegisterDummyPopulation(ContainerBuilder builder)
+        {
+            builder.RegisterType<D1> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D2> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D3> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D4> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D5> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D6> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D7> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D8> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D9> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D10>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D11>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D12>().AsSelf().InstancePerLifetimeScope();
+
+            builder.RegisterType<D13>().AsSelf().SingleInstance();
+            builder.RegisterType<D14>().AsSelf().SingleInstance();
+            builder.RegisterType<D15>().AsSelf().SingleInstance();
+            builder.RegisterType<D16>().AsSelf().SingleInstance();
+            builder.RegisterType<D17>().AsSelf().SingleInstance();
+            builder.RegisterType<D18>().AsSelf().SingleInstance();
+            builder.RegisterType<D19>().AsSelf().SingleInstance();
+            builder.RegisterType<D20>().AsSelf().SingleInstance();
+        }
+
+        public static object ResolveDummyPopulation(Autofac.IContainer container)
+        {
+            using (var scope = container.BeginLifetimeScope())
+            {
+                scope.Resolve<D1>();
+                scope.Resolve<D2>();
+                scope.Resolve<D3>();
+                scope.Resolve<D4>();
+                scope.Resolve<D5>();
+                scope.Resolve<D6>();
+                scope.Resolve<D7>();
+                scope.Resolve<D8>();
+                scope.Resolve<D9>();
+                scope.Resolve<D10>();
+                scope.Resolve<D11>();
+                scope.Resolve<D12>();
+
+                scope.Resolve<D13>();
+                scope.Resolve<D14>();
+                scope.Resolve<D15>();
+                scope.Resolve<D16>();
+                scope.Resolve<D17>();
+                scope.Resolve<D18>();
+                scope.Resolve<D19>();
+                return scope.Resolve<D20>();
+            }
         }
 
         public static object Measure(Autofac.IContainer container)
@@ -400,7 +644,7 @@ namespace PerformanceTests
                         BmarkGrace | 5,491.76 us | 38.8408 us | 36.3317 us | 230.42 |    1.85 |     46.8750 |     23.4375 |           - |           216.13 KB |
                     BmarkGraceMsDi | 7,349.26 us | 33.0618 us | 30.9261 us | 308.29 |    1.88 |     62.5000 |     31.2500 |           - |            314.2 KB |
 
-                ## Optimized register instance
+            ## Optimized register instance
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -411,6 +655,26 @@ namespace PerformanceTests
                   BmarkAutofacMsDi |   219.85 us |  1.3451 us |  1.2582 us |   9.76 |    0.06 |     39.3066 |      0.2441 |           - |           181.67 KB |
                         BmarkGrace | 5,370.39 us | 25.0568 us | 22.2122 us | 238.50 |    1.55 |     46.8750 |     23.4375 |           - |           216.17 KB |
                     BmarkGraceMsDi | 7,145.42 us | 38.5442 us | 36.0542 us | 317.47 |    2.15 |     62.5000 |     31.2500 |           - |           314.21 KB |
+
+            ## Test with the Dummy Population (and moved to .Net Core v2.2)
+
+            BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.590 (1803/April2018Update/Redstone4)
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
+.NET Core SDK=2.2.100
+  [Host]     : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
+  DefaultJob : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
+
+                            Method |         Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |-------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |     68.51 us |   0.2992 us |   0.2652 us |   0.68 |    0.02 |     16.6016 |      0.1221 |           - |            76.57 KB |
+                   BmarkDryIocMsDi |     83.14 us |   0.5770 us |   0.5397 us |   0.83 |    0.02 |     18.1885 |      0.1221 |           - |             84.2 KB |
+ BmarkMicrosoftDependencyInjection |     99.98 us |   2.0301 us |   2.4166 us |   1.00 |    0.00 |     10.9863 |      0.1221 |           - |            46.02 KB |
+                      BmarkAutofac |    409.29 us |   1.4180 us |   1.3264 us |   4.08 |    0.11 |     67.3828 |      0.4883 |           - |           310.66 KB |
+                  BmarkAutofacMsDi |    415.40 us |   1.9196 us |   1.6029 us |   4.13 |    0.12 |     69.8242 |      0.9766 |           - |           322.92 KB |
+                        BmarkGrace | 11,377.40 us |  76.6630 us |  71.7107 us | 113.29 |    2.92 |    109.3750 |     46.8750 |           - |           517.05 KB |
+                    BmarkGraceMsDi | 13,103.36 us | 111.6352 us | 104.4236 us | 130.48 |    3.43 |    125.0000 |     62.5000 |     15.6250 |            615.5 KB |
+
             */
 
             [Benchmark(Baseline = true)]
@@ -551,6 +815,24 @@ namespace PerformanceTests
                       BmarkAutofac | 13.317 us | 0.1708 us | 0.1598 us |  9.44 |    0.12 |      3.6163 |           - |           - |             16.7 KB |
                   BmarkAutofacMsDi | 19.549 us | 0.3447 us | 0.3225 us | 13.85 |    0.24 |      5.0964 |           - |           - |            23.55 KB |
 
+                ## Test with the Dummy Population (and moved to .Net Core v2.2)
+
+            BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.590 (1803/April2018Update/Redstone4)
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
+.NET Core SDK=2.2.100
+  [Host]     : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
+  DefaultJob : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |  1.036 us | 0.0044 us | 0.0041 us |  0.76 |    0.00 |      0.5093 |           - |           - |             2.35 KB |
+ BmarkMicrosoftDependencyInjection |  1.355 us | 0.0046 us | 0.0043 us |  1.00 |    0.00 |      0.3433 |           - |           - |             1.59 KB |
+                   BmarkDryIocMsDi |  1.496 us | 0.0059 us | 0.0052 us |  1.10 |    0.00 |      0.6828 |           - |           - |             3.15 KB |
+                        BmarkGrace |  2.028 us | 0.0084 us | 0.0079 us |  1.50 |    0.01 |      1.0452 |           - |           - |             4.82 KB |
+                    BmarkGraceMsDi |  2.077 us | 0.0099 us | 0.0092 us |  1.53 |    0.01 |      0.9460 |           - |           - |             4.37 KB |
+                      BmarkAutofac | 13.465 us | 0.0484 us | 0.0429 us |  9.94 |    0.06 |      3.9825 |           - |           - |            18.38 KB |
+                  BmarkAutofacMsDi | 19.185 us | 0.2073 us | 0.1939 us | 14.16 |    0.12 |      5.4932 |           - |           - |             25.4 KB |
             */
 
             private IServiceProvider _msDi;
@@ -823,5 +1105,27 @@ namespace PerformanceTests
         public class ScopedFac22
         {
         }
+
+        public class D1 { }
+        public class D2 { }
+        public class D3 { }
+        public class D4 { }
+        public class D5 { }
+        public class D6 { }
+        public class D7 { }
+        public class D8 { }
+        public class D9 { }
+        public class D10 { }
+        public class D11 { }
+        public class D12 { }
+
+        public class D13 { }
+        public class D14 { }
+        public class D15 { }
+        public class D16 { }
+        public class D17 { }
+        public class D18 { }
+        public class D19 { }
+        public class D20 { }
     }
 }
