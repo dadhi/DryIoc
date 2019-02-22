@@ -42,7 +42,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         };
 
         [Test, TestCaseSource(nameof(LifetimeCombinations))]
-        public void Resolve_single_service_with_multiple_registrations_should_resolve_the_same_way_as_microsoft_di(bool usingScope, ServiceLifetime firstLifetime, ServiceLifetime secondLifetime, Type expectedResolveType)
+        public void Resolve_single_service_with_multiple_registrations_should_resolve_the_same_way_as_microsoft_di(
+            bool usingScope, ServiceLifetime firstLifetime, ServiceLifetime secondLifetime, Type expectedResolveType)
         {
             // arrange
             var collection = new ServiceCollection();
@@ -50,7 +51,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             collection.Add(ServiceDescriptor.Describe(typeof(IService), typeof(ServiceB), secondLifetime));
 
             IServiceProvider msProvider = collection.BuildServiceProvider();
-            IServiceProvider dryiocProvider = new Container().WithDependencyInjectionAdapter(collection).BuildServiceProvider();
+            IServiceProvider dryiocProvider = DryIocAdapter.Create(collection);
 
             if (usingScope)
             {

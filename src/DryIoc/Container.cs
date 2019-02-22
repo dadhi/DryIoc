@@ -4014,7 +4014,8 @@ namespace DryIoc
 
         /// Default rules as staring point.
         public static readonly Rules MicrosoftDependencyInjectionRules = new Rules(
-            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) & ~Settings.ThrowOnRegisteringDisposableTransient, 
+            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) & 
+            ~Settings.ThrowOnRegisteringDisposableTransient & ~Settings.ImplicitCheckForReuseMatchingScope, 
             Rules.SelectLastRegisteredFactory(), Reuse.Transient,
             Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
             IfAlreadyRegistered.AppendNotKeyed, 
@@ -9645,16 +9646,15 @@ namespace DryIoc
         public const int DefaultLifespan = 100;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan { get; }
+        public int Lifespan => ScopedOrSingleton ? SingletonReuse.DefaultLifespan : DefaultLifespan;
 
         /// <inheritdoc />
         public object Name { get; }
 
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
         public bool CanApply(Request request) =>
-            ScopedOrSingleton || Name == null
-                ? request.Container.CurrentScope != null
-                : request.Container.GetNamedScope(Name, false) != null;
+            ScopedOrSingleton || 
+            (Name == null ? request.Container.CurrentScope != null : request.Container.GetNamedScope(Name, false) != null);
 
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
@@ -9765,11 +9765,11 @@ namespace DryIoc
         }
 
         /// <summary>Creates reuse optionally specifying its name.</summary>
-        public CurrentScopeReuse(object name = null, int lifespan = DefaultLifespan,
+        public CurrentScopeReuse(object name = null,
             bool scopedOrSingleton = false)
         {
             Name = name;
-            Lifespan = lifespan;
+            //Lifespan = lifespan;
             ScopedOrSingleton = scopedOrSingleton;
         }
 
