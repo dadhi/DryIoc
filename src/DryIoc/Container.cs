@@ -4247,7 +4247,7 @@ namespace DryIoc
                 factory = new ReflectionFactory(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
                     Setup.With(condition: r1 => r1.WithIfUnresolved(IfUnresolved.ReturnDefault)
-                                                  .Map(r2 => factory?.GetExpressionOrDefault(r2)) != null));
+                                                  .To(r2 => factory?.GetExpressionOrDefault(r2)) != null));
 
                 return factory;
             });
@@ -4780,7 +4780,7 @@ namespace DryIoc
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
                 .GetConstructorOrNull(includeNonPublic, Empty<Type>())
-                ?.Map(ctor => Of(ctor));
+                ?.To(ctor => Of(ctor));
 
         /// <summary>Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
@@ -8063,7 +8063,7 @@ namespace DryIoc
         public static ParameterSelector Details(this ParameterSelector source, Func<Request, ParameterInfo, ServiceDetails> getDetailsOrNull)
         {
             getDetailsOrNull.ThrowIfNull();
-            return source.OverrideWith(request => p => getDetailsOrNull(request, p)?.Map(ParameterServiceInfo.Of(p).WithDetails));
+            return source.OverrideWith(request => p => getDetailsOrNull(request, p)?.To(ParameterServiceInfo.Of(p).WithDetails));
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
@@ -8226,13 +8226,13 @@ namespace DryIoc
                     .GetMembers(x => x.DeclaredProperties, includeBase: true)
                     .FindFirst(x => x.Name == name);
                 if (property != null && property.IsInjectable(true, true))
-                    return getDetails(req)?.Map(PropertyOrFieldServiceInfo.Of(property).WithDetails).One();
+                    return getDetails(req)?.To(PropertyOrFieldServiceInfo.Of(property).WithDetails).One();
 
                 var field = implType
                     .GetMembers(x => x.DeclaredFields, includeBase: true)
                     .FindFirst(x => x.Name == name);
                 if (field != null && field.IsInjectable(true, true))
-                    return getDetails(req)?.Map(PropertyOrFieldServiceInfo.Of(field).WithDetails).One();
+                    return getDetails(req)?.To(PropertyOrFieldServiceInfo.Of(field).WithDetails).One();
 
                 return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(
                     Error.NotFoundSpecifiedWritablePropertyOrField, name, req);

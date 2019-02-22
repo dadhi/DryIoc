@@ -42,7 +42,7 @@ namespace ImTools
         public static T Id<T>(T x) => x;
 
         /// <summary>Piping</summary>
-        public static R Map<T, R>(this T x, Func<T, R> map) => map(x);
+        public static R To<T, R>(this T x, Func<T, R> map) => map(x);
 
         /// <summary>Piping</summary>
         public static void Do<T>(this T x, Action<T> effect) => effect(x);
@@ -653,8 +653,8 @@ namespace ImTools
 
         /// <inheritdoc />
         public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-            s.Append("(").Map(b => Key == null ? b : printer(b, Key))
-                .Append(", ").Map(b => Value == null ? b : printer(b, Value))
+            s.Append("(").To(b => Key == null ? b : printer(b, Key))
+                .Append(", ").To(b => Value == null ? b : printer(b, Value))
                 .Append(')');
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
