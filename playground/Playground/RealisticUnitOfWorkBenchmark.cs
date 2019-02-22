@@ -8,12 +8,13 @@ using DryIoc.Microsoft.DependencyInjection;
 using Grace.DependencyInjection;
 using Grace.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using RealisticUnitOfWork;
 using IContainer = DryIoc.IContainer;
 
 
 namespace PerformanceTests
 {
-    public class RealisticUnitOfWorkWithBigObjectGraphBenchmark
+    public class RealisticUnitOfWorkBenchmark
     {
         public static IContainer PrepareDryIoc()
         {
@@ -34,14 +35,17 @@ namespace PerformanceTests
             container.Register<Single1>(Reuse.Singleton);
             container.Register<Single2>(Reuse.Singleton);
 
-            container.RegisterDelegate(r => new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()));
-            container.RegisterDelegate(r => new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()));
+            container.RegisterDelegate(
+                r => new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()),
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()),
+                Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj1());
             container.RegisterInstance(new SingleObj2());
 
             // level 2
-
             container.Register<Scoped3>(Reuse.Scoped);
             container.Register<Scoped4>(Reuse.Scoped);
 
@@ -54,16 +58,55 @@ namespace PerformanceTests
             container.Register<Trans12>(Reuse.Transient);
             container.Register<Trans22>(Reuse.Transient);
 
-            container.RegisterDelegate(r => new ScopedFac12());
-            container.RegisterDelegate(r => new ScopedFac22());
+            container.RegisterDelegate(
+                r => new ScopedFac12(r.Resolve<Scoped13>(), r.Resolve<Single1>(), r.Resolve<SingleObj13>()), 
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac22(r.Resolve<Scoped23>(), r.Resolve<Single2>(), r.Resolve<SingleObj23>()), 
+                Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj12());
             container.RegisterInstance(new SingleObj22());
 
+            // level 3
+            container.Register<Scoped13>(Reuse.Scoped);
+            container.Register<Scoped23>(Reuse.Scoped);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate(
+                r => new ScopedFac13(r.Resolve<Single1>(), r.Resolve<Scoped14>(), r.Resolve<ScopedFac14>()), 
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()), 
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.Scoped);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
             ResolveDummyPopulation(container);
             return container;
         }
-
 
         public static object Measure(IContainer container)
         {
@@ -161,11 +204,43 @@ namespace PerformanceTests
             services.AddTransient<Trans12>();
             services.AddTransient<Trans22>();
 
-            services.AddScoped(_ => new ScopedFac12());
-            services.AddScoped(_ => new ScopedFac22());
+            services.AddScoped(r => new ScopedFac12(r.GetService<Scoped13>(), r.GetService<Single1>(), r.GetService<SingleObj13>()));
+            services.AddScoped(r => new ScopedFac22(r.GetService<Scoped23>(), r.GetService<Single2>(), r.GetService<SingleObj23>()));
 
             services.AddSingleton(new SingleObj12());
             services.AddSingleton(new SingleObj22());
+
+            // level 3
+            services.AddScoped<Scoped13>();
+            services.AddScoped<Scoped23>();
+
+            services.AddSingleton<Single13>();
+            services.AddSingleton<Single23>();
+
+            services.AddTransient<Trans13>();
+            services.AddTransient<Trans23>();
+
+            services.AddScoped(r => new ScopedFac13(r.GetService<Single1>(), r.GetService<Scoped14>(), r.GetService<ScopedFac14>()));
+            services.AddScoped(r => new ScopedFac23(r.GetService<Single2>(), r.GetService<Scoped24>(), r.GetService<ScopedFac24>()));
+
+            services.AddSingleton(new SingleObj13());
+            services.AddSingleton(new SingleObj23());
+
+            // level 4
+            services.AddScoped<Scoped14>();
+            services.AddScoped<Scoped24>();
+
+            services.AddSingleton<Single14>();
+            services.AddSingleton<Single24>();
+
+            services.AddTransient<Trans14>();
+            services.AddTransient<Trans24>();
+
+            services.AddScoped(r => new ScopedFac14());
+            services.AddScoped(r => new ScopedFac24());
+
+            services.AddSingleton(new SingleObj14());
+            services.AddSingleton(new SingleObj24());
 
             return services;
         }
@@ -263,14 +338,15 @@ namespace PerformanceTests
                 c.Export<Single1>().Lifestyle.Singleton();
                 c.Export<Single2>().Lifestyle.Singleton();
 
-                c.ExportFactory<Scoped1, Scoped3, Single1, SingleObj1, ScopedFac1>((scoped1, scoped3, single1, singleObj1) => new ScopedFac1(scoped1, scoped3, single1, singleObj1)).Lifestyle.SingletonPerScope();
-                c.ExportFactory<Scoped2, Scoped4, Single2, SingleObj2, ScopedFac2>((scoped2, scoped4, single2, singleObj2) => new ScopedFac2(scoped2, scoped4, single2, singleObj2)).Lifestyle.SingletonPerScope();
+                c.ExportFactory<Scoped1, Scoped3, Single1, SingleObj1, ScopedFac1>(
+                    (scoped1, scoped3, single1, singleObj1) => new ScopedFac1(scoped1, scoped3, single1, singleObj1)).Lifestyle.SingletonPerScope();
+                c.ExportFactory<Scoped2, Scoped4, Single2, SingleObj2, ScopedFac2>(
+                    (scoped2, scoped4, single2, singleObj2) => new ScopedFac2(scoped2, scoped4, single2, singleObj2)).Lifestyle.SingletonPerScope();
 
                 c.ExportInstance(new SingleObj1());
                 c.ExportInstance(new SingleObj2());
 
                 // Level 2
-
                 c.Export<Scoped3>().Lifestyle.SingletonPerScope();
                 c.Export<Scoped4>().Lifestyle.SingletonPerScope();
 
@@ -283,11 +359,50 @@ namespace PerformanceTests
                 c.Export<Trans12>();
                 c.Export<Trans22>();
 
-                c.ExportFactory(() => new ScopedFac12()).Lifestyle.SingletonPerScope();
-                c.ExportFactory(() => new ScopedFac22()).Lifestyle.SingletonPerScope();
+                c.ExportFactory<Scoped13, Single1, SingleObj13, ScopedFac12>((scoped13, single1, singleObj13) => 
+                    new ScopedFac12(scoped13, single1, singleObj13)).Lifestyle.SingletonPerScope();
+
+                c.ExportFactory<Scoped23, Single2, SingleObj23, ScopedFac22>((scoped23, single2, singleObj23) =>
+                    new ScopedFac22(scoped23, single2, singleObj23)).Lifestyle.SingletonPerScope();
 
                 c.ExportInstance(new SingleObj12());
                 c.ExportInstance(new SingleObj22());
+
+                // level 3
+                c.Export<Scoped13>().Lifestyle.SingletonPerScope();
+                c.Export<Scoped23>().Lifestyle.SingletonPerScope();
+
+                c.Export<Single13>().Lifestyle.Singleton();
+                c.Export<Single23>().Lifestyle.Singleton();
+
+                c.Export<Trans13>();
+                c.Export<Trans23>();
+
+                c.ExportFactory<Single1, Scoped14, ScopedFac14, ScopedFac13>(
+                    (single1, scoped14, scopedFac14) => new ScopedFac13(single1, scoped14, scopedFac14))
+                    .Lifestyle.SingletonPerScope();
+                c.ExportFactory<Single2, Scoped24, ScopedFac24, ScopedFac23>(
+                    (single2, scoped24, scopedFac24) => new ScopedFac23(single2, scoped24, scopedFac24))
+                    .Lifestyle.SingletonPerScope();
+
+                c.ExportInstance(new SingleObj13());
+                c.ExportInstance(new SingleObj23());
+
+                // level 4
+                c.Export<Scoped14>().Lifestyle.SingletonPerScope();
+                c.Export<Scoped24>().Lifestyle.SingletonPerScope();
+
+                c.Export<Single14>().Lifestyle.Singleton();
+                c.Export<Single24>().Lifestyle.Singleton();
+
+                c.Export<Trans14>();
+                c.Export<Trans24>();
+
+                c.ExportFactory(() => new ScopedFac14()).Lifestyle.SingletonPerScope();
+                c.ExportFactory(() => new ScopedFac24()).Lifestyle.SingletonPerScope();
+
+                c.ExportInstance(new SingleObj14());
+                c.ExportInstance(new SingleObj24());
             });
 
             ResolveDummyPopulation(container);
@@ -396,8 +511,12 @@ namespace PerformanceTests
             builder.RegisterType<Single1>().AsSelf().SingleInstance();
             builder.RegisterType<Single2>().AsSelf().SingleInstance();
 
-            builder.Register(c => new ScopedFac1(c.Resolve<Scoped1>(), c.Resolve<Scoped3>(), c.Resolve<Single1>(), c.Resolve<SingleObj1>())).AsSelf().InstancePerLifetimeScope();
-            builder.Register(c => new ScopedFac2(c.Resolve<Scoped2>(), c.Resolve<Scoped4>(), c.Resolve<Single2>(), c.Resolve<SingleObj2>())).AsSelf().InstancePerLifetimeScope();
+            builder.Register(c => 
+                new ScopedFac1(c.Resolve<Scoped1>(), c.Resolve<Scoped3>(), c.Resolve<Single1>(), c.Resolve<SingleObj1>()))
+                .AsSelf().InstancePerLifetimeScope();
+            builder.Register(c => 
+                new ScopedFac2(c.Resolve<Scoped2>(), c.Resolve<Scoped4>(), c.Resolve<Single2>(), c.Resolve<SingleObj2>()))
+                .AsSelf().InstancePerLifetimeScope();
 
             builder.RegisterInstance(new SingleObj1()).AsSelf();
             builder.RegisterInstance(new SingleObj2()).AsSelf();
@@ -416,11 +535,51 @@ namespace PerformanceTests
             builder.RegisterType<Trans12>().AsSelf().InstancePerDependency();
             builder.RegisterType<Trans22>().AsSelf().InstancePerDependency();
 
-            builder.Register(r => new ScopedFac12());
-            builder.Register(r => new ScopedFac22());
+            builder.Register(r => 
+                new ScopedFac12(r.Resolve<Scoped13>(), r.Resolve<Single1>(), r.Resolve<SingleObj13>()))
+                .AsSelf().InstancePerLifetimeScope();
+            builder.Register(r => 
+                new ScopedFac22(r.Resolve<Scoped23>(), r.Resolve<Single2>(), r.Resolve<SingleObj23>()))
+                .AsSelf().InstancePerLifetimeScope();
 
             builder.RegisterInstance(new SingleObj12()).AsSelf();
             builder.RegisterInstance(new SingleObj22()).AsSelf();
+
+            // level 3
+            builder.RegisterType<Scoped13>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<Scoped23>().AsSelf().InstancePerLifetimeScope();
+
+            builder.RegisterType<Single13>().AsSelf().SingleInstance();
+            builder.RegisterType<Single23>().AsSelf().SingleInstance();
+
+            builder.RegisterType<Trans13>().AsSelf().InstancePerDependency();
+            builder.RegisterType<Trans23>().AsSelf().InstancePerDependency();
+
+            builder.Register(
+                r => new ScopedFac13(r.Resolve<Single1>(), r.Resolve<Scoped14>(), r.Resolve<ScopedFac14>()))
+                .AsSelf().InstancePerLifetimeScope();
+            builder.Register(
+                r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()))
+                .AsSelf().InstancePerLifetimeScope();
+
+            builder.RegisterInstance(new SingleObj13()).AsSelf();
+            builder.RegisterInstance(new SingleObj23()).AsSelf();
+
+            // level 4
+            builder.RegisterType<Scoped14>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<Scoped24>().AsSelf().InstancePerLifetimeScope();
+
+            builder.RegisterType<Single14>().AsSelf().SingleInstance();
+            builder.RegisterType<Single24>().AsSelf().SingleInstance();
+
+            builder.RegisterType<Trans14>().AsSelf().InstancePerDependency();
+            builder.RegisterType<Trans24>().AsSelf().InstancePerDependency();
+
+            builder.Register(r => new ScopedFac14()).AsSelf().InstancePerLifetimeScope();
+            builder.Register(r => new ScopedFac24()).AsSelf().InstancePerLifetimeScope();
+
+            builder.RegisterInstance(new SingleObj14()).AsSelf();
+            builder.RegisterInstance(new SingleObj24()).AsSelf();
 
             var container = builder.Build();
             ResolveDummyPopulation(container);
@@ -675,6 +834,17 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                         BmarkGrace | 11,377.40 us |  76.6630 us |  71.7107 us | 113.29 |    2.92 |    109.3750 |     46.8750 |           - |           517.05 KB |
                     BmarkGraceMsDi | 13,103.36 us | 111.6352 us | 104.4236 us | 130.48 |    3.43 |    125.0000 |     62.5000 |     15.6250 |            615.5 KB |
 
+            ## Test with 4 level graph + disposables + fixed scoped things for DryIoc:
+
+                            Method |        Mean |       Error |      StdDev |      Median |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    127.9 us |   1.6149 us |   1.5106 us |    127.7 us |   1.00 |    0.00 |     13.7939 |      0.1221 |           - |            58.66 KB |
+                       BmarkDryIoc |    141.2 us |   0.6137 us |   0.5741 us |    141.2 us |   1.10 |    0.01 |     30.2734 |      0.2441 |           - |           140.54 KB |
+                   BmarkDryIocMsDi |    160.3 us |   0.9125 us |   0.8089 us |    160.3 us |   1.25 |    0.02 |     32.2266 |           - |           - |           149.19 KB |
+                  BmarkAutofacMsDi |    639.3 us |   5.3215 us |   4.4437 us |    639.7 us |   4.99 |    0.06 |    105.4688 |      7.8125 |           - |           487.97 KB |
+                      BmarkAutofac |    674.9 us |  15.0460 us |  26.7442 us |    663.1 us |   5.25 |    0.22 |    101.5625 |     14.6484 |           - |           470.58 KB |
+                        BmarkGrace | 18,243.0 us | 175.4339 us | 164.1009 us | 18,187.9 us | 142.69 |    2.44 |    156.2500 |     62.5000 |           - |           755.44 KB |
+                    BmarkGraceMsDi | 21,553.9 us | 168.8899 us | 157.9798 us | 21,599.1 us | 168.58 |    2.57 |    187.5000 |     93.7500 |     31.2500 |           927.05 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -833,6 +1003,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                     BmarkGraceMsDi |  2.077 us | 0.0099 us | 0.0092 us |  1.53 |    0.01 |      0.9460 |           - |           - |             4.37 KB |
                       BmarkAutofac | 13.465 us | 0.0484 us | 0.0429 us |  9.94 |    0.06 |      3.9825 |           - |           - |            18.38 KB |
                   BmarkAutofacMsDi | 19.185 us | 0.2073 us | 0.1939 us | 14.16 |    0.12 |      5.4932 |           - |           - |             25.4 KB |
+
+            ## Test with 4 level graph + disposables + fixed scoped things for DryIoc:
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  3.278 us | 0.0176 us | 0.0164 us |  1.00 |    0.00 |      0.8354 |           - |           - |             3.87 KB |
+                       BmarkDryIoc |  4.381 us | 0.0294 us | 0.0275 us |  1.34 |    0.01 |      1.9531 |           - |           - |             9.02 KB |
+                        BmarkGrace |  4.452 us | 0.0335 us | 0.0280 us |  1.36 |    0.01 |      2.2049 |           - |           - |            10.16 KB |
+                   BmarkDryIocMsDi |  4.590 us | 0.0760 us | 0.0711 us |  1.40 |    0.02 |      1.9608 |           - |           - |             9.06 KB |
+                    BmarkGraceMsDi |  4.971 us | 0.0356 us | 0.0333 us |  1.52 |    0.01 |      2.0828 |           - |           - |             9.62 KB |
+                      BmarkAutofac | 38.913 us | 0.2321 us | 0.2171 us | 11.87 |    0.09 |      9.7656 |           - |           - |            45.15 KB |
+                  BmarkAutofacMsDi | 51.898 us | 0.2000 us | 0.1871 us | 15.83 |    0.11 |     13.4277 |      0.1221 |           - |            62.02 KB |
             */
 
             private IServiceProvider _msDi;
@@ -876,256 +1058,5 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkAutofacMsDi() => Measure(_autofacMsDi);
         }
-
-        public class R
-        {
-            public Single1 Single1 { get; }
-            public Single2 Single2 { get; }
-
-            public Scoped1 Scoped1 { get; }
-            public Scoped2 Scoped2 { get; }
-
-            public Trans1 Trans1 { get; }
-            public Trans2 Trans2 { get; }
-
-            public ScopedFac1 ScopedFac1 { get; }
-            public ScopedFac2 ScopedFac2 { get; }
-
-            public SingleObj1 SingleObj1 { get; }
-            public SingleObj2 SingleObj2 { get; }
-
-            public R(
-                Single1 single1,
-                Single2 single2,
-                Scoped1 scoped1,
-                Scoped2 scoped2,
-                Trans1 trans1,
-                Trans2 trans2,
-                ScopedFac1 scopedFac1,
-                ScopedFac2 scopedFac2,
-                SingleObj1 singleObj1,
-                SingleObj2 singleObj2
-            )
-            {
-                Single1 = single1;
-                Single2 = single2;
-                Scoped1 = scoped1;
-                Scoped2 = scoped2;
-                Trans1 = trans1;
-                Trans2 = trans2;
-                ScopedFac1 = scopedFac1;
-                ScopedFac2 = scopedFac2;
-                SingleObj1 = singleObj1;
-                SingleObj2 = singleObj2;
-            }
-        }
-
-        public class Single1
-        {
-            public Single12 Single12 { get; }
-            public Single22 Single22 { get; }
-            public SingleObj12 SingleObj12 { get; }
-            public SingleObj22 SingleObj22 { get; }
-
-            public Single1(
-                Single12 single12,
-                Single22 single22,
-                SingleObj12 singleObj12,
-                SingleObj22 singleObj22
-                )
-            {
-                Single12 = single12;
-                Single22 = single22;
-                SingleObj12 = singleObj12;
-                SingleObj22 = singleObj22;
-            }
-        }
-
-        public class Single2
-        {
-            public Single12 Single12 { get; }
-            public Single22 Single22 { get; }
-            public SingleObj12 SingleObj12 { get; }
-            public SingleObj22 SingleObj22 { get; }
-            public Single2(
-                Single12 single12,
-                Single22 single22,
-                SingleObj12 singleObj12,
-                SingleObj22 singleObj22
-            )
-            {
-                Single12 = single12;
-                Single22 = single22;
-                SingleObj12 = singleObj12;
-                SingleObj22 = singleObj22;
-            }
-        }
-
-        public class Scoped1
-        {
-            public Single12 Single12 { get; }
-            public SingleObj12 SingleObj12 { get; }
-            public Scoped12 Scoped12 { get; }
-            public ScopedFac12 ScopedFac12 { get; }
-            public Trans12  Trans12 { get; }
-
-            public Single1  Single1 { get; }
-            public SingleObj1 SingleObj1 { get; }
-
-            public Scoped1(Single12 single12, SingleObj12 singleObj12, ScopedFac12 scopedFac12, Trans12 trans12, Single1 single1, SingleObj1 singleObj1, Scoped12 scoped12)
-            {
-                Single12 = single12;
-                SingleObj12 = singleObj12;
-                ScopedFac12 = scopedFac12;
-                Trans12 = trans12;
-                Single1 = single1;
-                SingleObj1 = singleObj1;
-                Scoped12 = scoped12;
-            }
-        }
-
-        public class Scoped2
-        {
-            public Single22    Single22 { get; }
-            public SingleObj22 SingleObj22 { get; }
-            public Scoped22    Scoped22 { get; }
-            public ScopedFac22 ScopedFac22 { get; }
-            public Trans22     Trans22 { get; }
-
-            public Single2 Single2 { get; }
-            public SingleObj2 SingleObj2 { get; }
-
-            public Scoped2(Single22 single22, SingleObj22 singleObj22, ScopedFac22 scopedFac22, Trans22 trans22, Single2 single2, SingleObj2 singleObj2, Scoped22 scoped22)
-            {
-                Single22 = single22;
-                SingleObj22 = singleObj22;
-                ScopedFac22 = scopedFac22;
-                Trans22 = trans22;
-                Single2 = single2;
-                SingleObj2 = singleObj2;
-                Scoped22 = scoped22;
-            }
-        }
-
-        public class Scoped3 
-        {
-        }
-
-        public class Scoped4 
-        {
-        }
-
-        public class SingleObj1
-        {
-        }
-
-        public class SingleObj2
-        {
-        }
-
-        public class ScopedFac1
-        {
-            public Scoped1 Scoped1 { get; }
-            public Scoped3 Scoped3 { get; }
-            public Single1 Single1 { get; }
-            public SingleObj1 SingleObj1 { get; }
-
-            public ScopedFac1(Scoped1 scoped1, Scoped3 scoped3, Single1 single1, SingleObj1 singleObj1)
-            {
-                Scoped1 = scoped1;
-                Scoped3 = scoped3;
-                Single1 = single1;
-                SingleObj1 = singleObj1;
-            }
-        }
-
-        public class ScopedFac2
-        {
-            public Scoped2 Scoped2 { get; }
-            public Scoped4 Scoped4 { get; }
-            public Single2 Single2 { get; }
-            public SingleObj2 SingleObj2 { get; }
-
-            public ScopedFac2(Scoped2 scoped2, Scoped4 scoped4, Single2 single2, SingleObj2 singleObj2)
-            {
-                Scoped2 = scoped2;
-                Scoped4 = scoped4;
-                Single2 = single2;
-                SingleObj2 = singleObj2;
-            }
-        }
-
-        public class Trans1
-        {
-        }
-
-        public class Trans2
-        {
-        }
-
-        // ## Level 2
-
-        public class Single22
-        {
-        }
-
-        public class Single12
-        {
-        }
-
-        public class SingleObj12
-        {
-        }
-
-        public class SingleObj22
-        {
-        }
-
-        public class Scoped12
-        {
-        }
-
-        public class Scoped22
-        {
-        }
-
-
-        public class ScopedFac12
-        {
-        }
-
-        public class Trans12
-        {
-        }
-
-        public class Trans22
-        {
-        }
-
-        public class ScopedFac22
-        {
-        }
-
-        public class D1 { }
-        public class D2 { }
-        public class D3 { }
-        public class D4 { }
-        public class D5 { }
-        public class D6 { }
-        public class D7 { }
-        public class D8 { }
-        public class D9 { }
-        public class D10 { }
-        public class D11 { }
-        public class D12 { }
-
-        public class D13 { }
-        public class D14 { }
-        public class D15 { }
-        public class D16 { }
-        public class D17 { }
-        public class D18 { }
-        public class D19 { }
-        public class D20 { }
     }
 }

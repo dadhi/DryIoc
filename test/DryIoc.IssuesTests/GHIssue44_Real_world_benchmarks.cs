@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using static DryIoc.IssuesTests.Realistic_unit_of_work_slash_web_controller_example;
+using RealisticUnitOfWork;
 
 namespace DryIoc.IssuesTests
 {
@@ -21,6 +21,10 @@ namespace DryIoc.IssuesTests
     {
         public static IContainer PrepareDryIoc(this IContainer container)
         {
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R(oot) / Controller
             container.Register<R>(Reuse.Scoped);
 
             container.Register<Scoped1>(Reuse.Scoped);
@@ -32,14 +36,17 @@ namespace DryIoc.IssuesTests
             container.Register<Single1>(Reuse.Singleton);
             container.Register<Single2>(Reuse.Singleton);
 
-            container.RegisterDelegate(r => new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()));
-            container.RegisterDelegate(r => new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()));
+            container.RegisterDelegate(r => 
+                new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()),
+                Reuse.Scoped);
+            container.RegisterDelegate(r => 
+                new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()),
+                Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj1());
             container.RegisterInstance(new SingleObj2());
 
             // level 2
-
             container.Register<Scoped3>(Reuse.Scoped);
             container.Register<Scoped4>(Reuse.Scoped);
 
@@ -52,12 +59,53 @@ namespace DryIoc.IssuesTests
             container.Register<Trans12>(Reuse.Transient);
             container.Register<Trans22>(Reuse.Transient);
 
-            container.RegisterDelegate(r => new ScopedFac12());
-            container.RegisterDelegate(r => new ScopedFac22());
+            container.RegisterDelegate(
+                r => new ScopedFac12(r.Resolve<Scoped13>(), r.Resolve<Single1>(), r.Resolve<SingleObj13>()),
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac22(r.Resolve<Scoped23>(), r.Resolve<Single2>(), r.Resolve<SingleObj23>()),
+                Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj12());
             container.RegisterInstance(new SingleObj22());
 
+            // level 3
+            container.Register<Scoped13>(Reuse.Scoped);
+            container.Register<Scoped23>(Reuse.Scoped);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate(
+                r => new ScopedFac13(r.Resolve<Single1>(), r.Resolve<Scoped14>(), r.Resolve<ScopedFac14>()),
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.Scoped);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
+            ResolveDummyPopulation(container);
             return container;
         }
 
@@ -67,234 +115,59 @@ namespace DryIoc.IssuesTests
                 return scope.Resolve<R>();
         }
 
-
-        public class R
+        private static void RegisterDummyPopulation(IContainer container)
         {
-            public Single1 Single1 { get; }
-            public Single2 Single2 { get; }
+            container.Register<D1>(Reuse.Scoped);
+            container.Register<D2>(Reuse.Scoped);
+            container.Register<D3>(Reuse.Scoped);
+            container.Register<D4>(Reuse.Scoped);
+            container.Register<D5>(Reuse.Scoped);
+            container.Register<D6>(Reuse.Scoped);
+            container.Register<D7>(Reuse.Scoped);
+            container.Register<D8>(Reuse.Scoped);
+            container.Register<D9>(Reuse.Scoped);
+            container.Register<D10>(Reuse.Scoped);
+            container.Register<D11>(Reuse.Scoped);
+            container.Register<D12>(Reuse.Scoped);
 
-            public Scoped1 Scoped1 { get; }
-            public Scoped2 Scoped2 { get; }
+            container.Register<D13>(Reuse.Singleton);
+            container.Register<D14>(Reuse.Singleton);
+            container.Register<D15>(Reuse.Singleton);
+            container.Register<D16>(Reuse.Singleton);
+            container.Register<D17>(Reuse.Singleton);
+            container.Register<D18>(Reuse.Singleton);
+            container.Register<D19>(Reuse.Singleton);
+            container.Register<D20>(Reuse.Singleton);
+        }
 
-            public Trans1 Trans1 { get; }
-            public Trans2 Trans2 { get; }
-
-            public ScopedFac1 ScopedFac1 { get; }
-            public ScopedFac2 ScopedFac2 { get; }
-
-            public SingleObj1 SingleObj1 { get; }
-            public SingleObj2 SingleObj2 { get; }
-
-            public R(
-                Single1 single1,
-                Single2 single2,
-                Scoped1 scoped1,
-                Scoped2 scoped2,
-                Trans1 trans1,
-                Trans2 trans2,
-                ScopedFac1 scopedFac1,
-                ScopedFac2 scopedFac2,
-                SingleObj1 singleObj1,
-                SingleObj2 singleObj2
-            )
+        public static object ResolveDummyPopulation(IContainer container)
+        {
+            using (var scope = container.OpenScope())
             {
-                Single1 = single1;
-                Single2 = single2;
-                Scoped1 = scoped1;
-                Scoped2 = scoped2;
-                Trans1 = trans1;
-                Trans2 = trans2;
-                ScopedFac1 = scopedFac1;
-                ScopedFac2 = scopedFac2;
-                SingleObj1 = singleObj1;
-                SingleObj2 = singleObj2;
+                scope.Resolve<D1>();
+                scope.Resolve<D2>();
+                scope.Resolve<D3>();
+                scope.Resolve<D4>();
+                scope.Resolve<D5>();
+                scope.Resolve<D6>();
+                scope.Resolve<D7>();
+                scope.Resolve<D8>();
+                scope.Resolve<D9>();
+                scope.Resolve<D10>();
+                scope.Resolve<D11>();
+                scope.Resolve<D12>();
+
+                scope.Resolve<D13>();
+                scope.Resolve<D14>();
+                scope.Resolve<D15>();
+                scope.Resolve<D16>();
+                scope.Resolve<D17>();
+                scope.Resolve<D18>();
+                scope.Resolve<D19>();
+                return scope.Resolve<D20>();
             }
-        }
-
-        public class Single1
-        {
-            public Single12 Single12 { get; }
-            public Single22 Single22 { get; }
-            public SingleObj12 SingleObj12 { get; }
-            public SingleObj22 SingleObj22 { get; }
-
-            public Single1(
-                Single12 single12,
-                Single22 single22,
-                SingleObj12 singleObj12,
-                SingleObj22 singleObj22
-                )
-            {
-                Single12 = single12;
-                Single22 = single22;
-                SingleObj12 = singleObj12;
-                SingleObj22 = singleObj22;
-            }
-        }
-
-        public class Single2
-        {
-            public Single12 Single12 { get; }
-            public Single22 Single22 { get; }
-            public SingleObj12 SingleObj12 { get; }
-            public SingleObj22 SingleObj22 { get; }
-            public Single2(
-                Single12 single12,
-                Single22 single22,
-                SingleObj12 singleObj12,
-                SingleObj22 singleObj22
-            )
-            {
-                Single12 = single12;
-                Single22 = single22;
-                SingleObj12 = singleObj12;
-                SingleObj22 = singleObj22;
-            }
-        }
-
-        public class Scoped1
-        {
-            public Single12 Single12 { get; }
-            public SingleObj12 SingleObj12 { get; }
-            public Scoped12 Scoped12 { get; }
-            public ScopedFac12 ScopedFac12 { get; }
-            public Trans12 Trans12 { get; }
-
-            public Single1 Single1 { get; }
-            public SingleObj1 SingleObj1 { get; }
-
-            public Scoped1(Single12 single12, SingleObj12 singleObj12, ScopedFac12 scopedFac12, Trans12 trans12, Single1 single1, SingleObj1 singleObj1, Scoped12 scoped12)
-            {
-                Single12 = single12;
-                SingleObj12 = singleObj12;
-                ScopedFac12 = scopedFac12;
-                Trans12 = trans12;
-                Single1 = single1;
-                SingleObj1 = singleObj1;
-                Scoped12 = scoped12;
-            }
-        }
-
-        public class Scoped2
-        {
-            public Single22 Single22 { get; }
-            public SingleObj22 SingleObj22 { get; }
-            public Scoped22 Scoped22 { get; }
-            public ScopedFac22 ScopedFac22 { get; }
-            public Trans22 Trans22 { get; }
-
-            public Single2 Single2 { get; }
-            public SingleObj2 SingleObj2 { get; }
-
-            public Scoped2(Single22 single22, SingleObj22 singleObj22, ScopedFac22 scopedFac22, Trans22 trans22, Single2 single2, SingleObj2 singleObj2, Scoped22 scoped22)
-            {
-                Single22 = single22;
-                SingleObj22 = singleObj22;
-                ScopedFac22 = scopedFac22;
-                Trans22 = trans22;
-                Single2 = single2;
-                SingleObj2 = singleObj2;
-                Scoped22 = scoped22;
-            }
-        }
-
-        public class Scoped3
-        {
-        }
-
-        public class Scoped4
-        {
-        }
-
-        public class SingleObj1
-        {
-        }
-
-        public class SingleObj2
-        {
-        }
-
-        public class ScopedFac1
-        {
-            public Scoped1 Scoped1 { get; }
-            public Scoped3 Scoped3 { get; }
-            public Single1 Single1 { get; }
-            public SingleObj1 SingleObj1 { get; }
-
-            public ScopedFac1(Scoped1 scoped1, Scoped3 scoped3, Single1 single1, SingleObj1 singleObj1)
-            {
-                Scoped1 = scoped1;
-                Scoped3 = scoped3;
-                Single1 = single1;
-                SingleObj1 = singleObj1;
-            }
-        }
-
-        public class ScopedFac2
-        {
-            public Scoped2 Scoped2 { get; }
-            public Scoped4 Scoped4 { get; }
-            public Single2 Single2 { get; }
-            public SingleObj2 SingleObj2 { get; }
-
-            public ScopedFac2(Scoped2 scoped2, Scoped4 scoped4, Single2 single2, SingleObj2 singleObj2)
-            {
-                Scoped2 = scoped2;
-                Scoped4 = scoped4;
-                Single2 = single2;
-                SingleObj2 = singleObj2;
-            }
-        }
-
-        public class Trans1
-        {
-        }
-
-        public class Trans2
-        {
-        }
-
-        // ## Level 2
-
-        public class Single22
-        {
-        }
-
-        public class Single12
-        {
-        }
-
-        public class SingleObj12
-        {
-        }
-
-        public class SingleObj22
-        {
-        }
-
-        public class Scoped12
-        {
-        }
-
-        public class Scoped22
-        {
-        }
-
-
-        public class ScopedFac12
-        {
-        }
-
-        public class Trans12
-        {
-        }
-
-        public class Trans22
-        {
-        }
-
-        public class ScopedFac22
-        {
         }
     }
+
+
 }
