@@ -1,4 +1,5 @@
 using BenchmarkDotNet.Running;
+using PerformanceTests;
 
 namespace BenchmarkDryIocV3ForComparison
 {
@@ -6,9 +7,9 @@ namespace BenchmarkDryIocV3ForComparison
     {
         public static void Main()
         {
-            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices>();
-            BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            //BenchmarkRunner.Run<RealisticUnitOfWorkWithBigObjectGraphBenchmark.OpenScopeAndResolve>();
+            //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
+            //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
         }
     }
 }
