@@ -42,10 +42,15 @@ namespace ImTools
         public static T Id<T>(T x) => x;
 
         /// <summary>Piping</summary>
-        public static R Do<T, R>(this T x, Func<T, R> @do) => @do(x);
+        public static R To<T, R>(this T x, Func<T, R> map) => map(x);
 
         /// <summary>Piping</summary>
-        public static void Do<T>(this T x, Action<T> @do) =>  @do(x);
+        public static void Do<T>(this T x, Action<T> effect) => effect(x);
+
+        /// Lift argument to Func without allocations ignoring the first argument.
+        /// For example if you have `Func{T, R} = _ => instance`,
+        /// you may rewrite it without allocations as `instance.ToFunc{A, R}` 
+        public static R ToFunc<T, R>(this R result, T ignoredArg) => result;
     }
 
     /// <summary>Helpers for lazy instantiations</summary>
@@ -628,8 +633,8 @@ namespace ImTools
 
         /// <inheritdoc />
         public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-             s.Append("(").Do(b => Key == null ? b : printer(b, Key))
-              .Append(", ").Do(b => Value == null ? b : printer(b, Value))
+             s.Append("(").To(b => Key == null ? b : printer(b, Key))
+              .Append(", ").To(b => Value == null ? b : printer(b, Value))
               .Append(')');
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
