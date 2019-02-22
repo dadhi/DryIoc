@@ -42,10 +42,15 @@ namespace ImTools
         public static T Id<T>(T x) => x;
 
         /// <summary>Piping</summary>
-        public static R Do<T, R>(this T x, Func<T, R> @do) => @do(x);
+        public static R Map<T, R>(this T x, Func<T, R> map) => map(x);
 
         /// <summary>Piping</summary>
-        public static void Do<T>(this T x, Action<T> @do) => @do(x);
+        public static void Do<T>(this T x, Action<T> effect) => effect(x);
+
+        /// Lift argument to Func without allocations ignoring the first argument.
+        /// For example if you have `Func{T, R} = _ => instance`,
+        /// you may rewrite it without allocations as `instance.ToFunc{A, R}` 
+        public static R ToFunc<T, R>(this R result, T ignoredArg) => result;
     }
 
     /// <summary>Helpers for lazy instantiations</summary>
@@ -504,6 +509,12 @@ namespace ImTools
         public T Swap(Func<T, T> getNewValue) =>
             Ref.Swap(ref _value, getNewValue);
 
+        /// Option without allocation for capturing `a` in closure of `getNewValue`
+        public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
+
+        /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
+        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
+
         /// <summary>Just sets new value ignoring any intermingled changes.</summary>
         /// <param name="newValue"></param> <returns>old value</returns>
         public T Swap(T newValue) =>
@@ -551,6 +562,36 @@ namespace ImTools
             {
                 var oldValue = value;
                 var newValue = getNewValue(oldValue);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
+                    throw new InvalidOperationException(_errorRetryCountExceeded);
+            }
+        }
+
+        /// Option without allocation for capturing `a` in closure of `getNewValue`
+        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue) where T : class
+        {
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = getNewValue(oldValue, a);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
+                    throw new InvalidOperationException(_errorRetryCountExceeded);
+            }
+        }
+
+        /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
+        public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue) where T : class
+        {
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = getNewValue(oldValue, a, b);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -612,8 +653,8 @@ namespace ImTools
 
         /// <inheritdoc />
         public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-            s.Append("(").Do(b => Key == null ? b : printer(b, Key))
-                .Append(", ").Do(b => Value == null ? b : printer(b, Value))
+            s.Append("(").Map(b => Key == null ? b : printer(b, Key))
+                .Append(", ").Map(b => Value == null ? b : printer(b, Value))
                 .Append(')');
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>

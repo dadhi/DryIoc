@@ -62,7 +62,7 @@ namespace DryIoc.IssuesTests
             // Works 3: Same as above but with a bit of sugar with `Do` - most succinct variant
             container.Register<IObjectValidator>(made: Made.Of(req =>
                 typeof(IObjectValidatorBuilder<>).MakeGenericType(req.Parent.ImplementationType)
-                    .Do(t => FactoryMethod.Of(t.SingleMethod("Build"), ServiceInfo.Of(t)))));
+                    .Map(t => FactoryMethod.Of(t.SingleMethod("Build"), ServiceInfo.Of(t)))));
 
             var sin = container.Resolve<SignInViewModel>();
             Assert.NotNull(sin);

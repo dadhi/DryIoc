@@ -836,15 +836,15 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## Test with 4 level graph + disposables + fixed scoped things for DryIoc:
 
-                            Method |        Mean |       Error |      StdDev |      Median |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |------------:|------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    127.9 us |   1.6149 us |   1.5106 us |    127.7 us |   1.00 |    0.00 |     13.7939 |      0.1221 |           - |            58.66 KB |
-                       BmarkDryIoc |    141.2 us |   0.6137 us |   0.5741 us |    141.2 us |   1.10 |    0.01 |     30.2734 |      0.2441 |           - |           140.54 KB |
-                   BmarkDryIocMsDi |    160.3 us |   0.9125 us |   0.8089 us |    160.3 us |   1.25 |    0.02 |     32.2266 |           - |           - |           149.19 KB |
-                  BmarkAutofacMsDi |    639.3 us |   5.3215 us |   4.4437 us |    639.7 us |   4.99 |    0.06 |    105.4688 |      7.8125 |           - |           487.97 KB |
-                      BmarkAutofac |    674.9 us |  15.0460 us |  26.7442 us |    663.1 us |   5.25 |    0.22 |    101.5625 |     14.6484 |           - |           470.58 KB |
-                        BmarkGrace | 18,243.0 us | 175.4339 us | 164.1009 us | 18,187.9 us | 142.69 |    2.44 |    156.2500 |     62.5000 |           - |           755.44 KB |
-                    BmarkGraceMsDi | 21,553.9 us | 168.8899 us | 157.9798 us | 21,599.1 us | 168.58 |    2.57 |    187.5000 |     93.7500 |     31.2500 |           927.05 KB |
+                            Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    134.0 us |   2.1675 us |   2.0275 us |   1.00 |    0.00 |     13.7939 |      0.1221 |           - |            58.65 KB |
+                       BmarkDryIoc |    145.3 us |   0.8318 us |   0.7374 us |   1.08 |    0.02 |     30.2734 |           - |           - |           140.35 KB |
+                   BmarkDryIocMsDi |    161.6 us |   0.9626 us |   0.9004 us |   1.21 |    0.02 |     32.2266 |           - |           - |           149.19 KB |
+                  BmarkAutofacMsDi |    665.2 us |   5.4804 us |   5.1264 us |   4.96 |    0.08 |    105.4688 |      3.9063 |           - |           487.64 KB |
+                      BmarkAutofac |    673.2 us |   5.5615 us |   5.2022 us |   5.02 |    0.08 |    101.5625 |     18.5547 |           - |           470.39 KB |
+                        BmarkGrace | 18,480.8 us | 100.5977 us |  89.1773 us | 137.83 |    2.35 |    156.2500 |     62.5000 |           - |           755.18 KB |
+                    BmarkGraceMsDi | 21,640.4 us | 119.7309 us | 106.1383 us | 161.39 |    2.81 |    187.5000 |     93.7500 |     31.2500 |           926.88 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -1006,15 +1006,15 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## Test with 4 level graph + disposables + fixed scoped things for DryIoc:
 
-                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |  3.278 us | 0.0176 us | 0.0164 us |  1.00 |    0.00 |      0.8354 |           - |           - |             3.87 KB |
-                       BmarkDryIoc |  4.381 us | 0.0294 us | 0.0275 us |  1.34 |    0.01 |      1.9531 |           - |           - |             9.02 KB |
-                        BmarkGrace |  4.452 us | 0.0335 us | 0.0280 us |  1.36 |    0.01 |      2.2049 |           - |           - |            10.16 KB |
-                   BmarkDryIocMsDi |  4.590 us | 0.0760 us | 0.0711 us |  1.40 |    0.02 |      1.9608 |           - |           - |             9.06 KB |
-                    BmarkGraceMsDi |  4.971 us | 0.0356 us | 0.0333 us |  1.52 |    0.01 |      2.0828 |           - |           - |             9.62 KB |
-                      BmarkAutofac | 38.913 us | 0.2321 us | 0.2171 us | 11.87 |    0.09 |      9.7656 |           - |           - |            45.15 KB |
-                  BmarkAutofacMsDi | 51.898 us | 0.2000 us | 0.1871 us | 15.83 |    0.11 |     13.4277 |      0.1221 |           - |            62.02 KB |
+                            Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    127.6 us |   2.2582 us |   1.8857 us |   1.00 |    0.00 |     13.7939 |      0.1221 |           - |            58.66 KB |
+                       BmarkDryIoc |    140.4 us |   0.9150 us |   0.8559 us |   1.10 |    0.02 |     30.2734 |      0.4883 |           - |           140.03 KB |
+                   BmarkDryIocMsDi |    156.1 us |   0.8473 us |   0.7926 us |   1.22 |    0.02 |     32.2266 |      0.4883 |           - |           148.89 KB |
+                        BmarkGrace | 18,281.0 us | 138.8669 us | 129.8962 us | 143.33 |    2.27 |    156.2500 |     62.5000 |           - |           755.21 KB |
+                    BmarkGraceMsDi | 21,385.1 us | 207.0743 us | 193.6974 us | 167.74 |    3.39 |    187.5000 |     93.7500 |     31.2500 |            926.6 KB |
+                      BmarkAutofac |    669.0 us |   4.3029 us |   4.0249 us |   5.24 |    0.07 |    101.5625 |      5.8594 |           - |           470.49 KB |
+                  BmarkAutofacMsDi |    634.3 us |   4.5897 us |   4.2932 us |   4.97 |    0.09 |    105.4688 |      0.9766 |           - |           487.79 KB |
             */
 
             private IServiceProvider _msDi;

@@ -1454,7 +1454,7 @@ namespace DryIoc.MefAttributedModel
                     Key = item.Constructor.DeclaringType.FullName,
                     Value = string.Format("new {0}({1})",
                             item.Constructor.DeclaringType.FullName,
-                            string.Join(", ", item.ConstructorArguments.Map(a => a.ToString()).ToArrayOrSelf())) +
+                            string.Join(", ", ArrayTools.Map(item.ConstructorArguments, a => a.ToString()).ToArrayOrSelf())) +
                             (item.NamedArguments.Any() ?
                                 " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
                                 string.Empty)

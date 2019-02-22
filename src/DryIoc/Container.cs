@@ -215,7 +215,7 @@ namespace DryIoc
         private FactoryDelegate CompileAndCacheFactoryDelegate(Type serviceType, object expr)
         {
             var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-            _registry.Value.TryCacheDefaultFactory(serviceType, factoryDelegate);
+            _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, factoryDelegate);
             return factoryDelegate;
         }
 
@@ -248,14 +248,14 @@ namespace DryIoc
                 {
                     var value = ce.Value;
                     if (factory.Caching != FactoryCaching.DoNotCache)
-                        _registry.Value.TryCacheDefaultFactory(serviceType, new FactoryDelegate(_ => value));
+                        _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
                 if (factory.Caching != FactoryCaching.DoNotCache)
-                    _registry.Value.TryCacheDefaultFactory(serviceType, expr);
+                    _registry.Value.TryCacheDefaultFactoryExpression(serviceType, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -274,7 +274,7 @@ namespace DryIoc
                 return null;
 
             if (factory.Caching != FactoryCaching.DoNotCache)
-                _registry.Value.TryCacheDefaultFactory(serviceType, factoryDelegate);
+                _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -339,7 +339,7 @@ namespace DryIoc
                     var value = ce.Value;
                     if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
                         TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, 
-                            new FactoryDelegate(_ => value));
+                            (FactoryDelegate)value.ToFactoryDelegate);
                     return value;
                 }
 
@@ -802,7 +802,7 @@ namespace DryIoc
                     m => (m is PropertyInfo || m is FieldInfo) && propertyAndFieldNames.IndexOf(m.Name) != -1,
                     PropertyOrFieldServiceInfo.Of);
                 // todo: Should we throw when no props are found?
-                propertiesAndFields = _ => matchedMembers;
+                propertiesAndFields = matchedMembers.ToFunc<Request, IEnumerable<PropertyOrFieldServiceInfo>>;
             }
 
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
@@ -2191,7 +2191,7 @@ namespace DryIoc
                     DefaultFactoryCache, KeyedFactoryDelegateCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
 
-            public void TryCacheDefaultFactory(Type serviceType, object factory)
+            public void TryCacheDefaultFactoryDelegate(Type serviceType, FactoryDelegate factory)
             {
                 // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
                 if (Services.IsEmpty)
@@ -2200,6 +2200,17 @@ namespace DryIoc
                 var cache = DefaultFactoryCache.Value;
                 if (!DefaultFactoryCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
                     DefaultFactoryCache.AddOrUpdate(serviceType, factory);
+            }
+
+            public void TryCacheDefaultFactoryExpression(Type serviceType, Expression expr)
+            {
+                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
+                if (Services.IsEmpty)
+                    return;
+
+                var cache = DefaultFactoryCache.Value;
+                if (!DefaultFactoryCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, expr)))
+                    DefaultFactoryCache.AddOrUpdate(serviceType, expr);
             }
         }
 
@@ -2589,12 +2600,12 @@ namespace DryIoc
         private static bool InterpretGetScopedViaFactoryDelegate(
             IResolverContext r, IList<Expression> args, bool useFec, out object result)
         {
-            // todo: specialize for resolver if possible
-            TryInterpret(r, args[0], useFec, out var resolverObj);
-            var resolver = (IResolverContext)resolverObj;
+            if (args[0] != FactoryDelegateCompiler.ResolverContextParamExpr &&
+                TryInterpret(r, args[0], useFec, out var rObj))
+                r = (IResolverContext)rObj;
 
             result = null;
-            var scope = resolver.GetCurrentScope(throwIfNotFound: (bool)ConstValue(args[1]));
+            var scope = r.GetCurrentScope(throwIfNotFound: (bool)ConstValue(args[1]));
             if (scope == null)
                 return true;
 
@@ -2603,10 +2614,8 @@ namespace DryIoc
             if (scope.TryGet(out result, id))
                 return true; // this is fine, cause `throwIfNoScope == false` and result is null in this case
 
-            if (!TryInterpret(r, args[3], useFec, out var factoryDelegate))
-                return false;
-
-            result = scope.GetOrAddViaFactoryDelegate(id, (FactoryDelegate)factoryDelegate, resolver, (int)ConstValue(args[4]));
+            var factoryDelegate = (FactoryDelegate)((ConstantExpression)args[3]).Value;
+            result = scope.GetOrAddViaFactoryDelegate(id, factoryDelegate, r, (int)ConstValue(args[4]));
             return true;
         }
 
@@ -2713,10 +2722,9 @@ namespace DryIoc
             if (scope.TryGet(out result, id))
                 return true;
 
-            if (!TryInterpret(r, args[2], useFec, out var factoryDelegate))
-                return false;
-
-            result = scope.GetOrAddViaFactoryDelegate(id, (FactoryDelegate)factoryDelegate, resolver, (int)ConstValue(args[3]));
+            // we know for sure that it will be a constant
+            var factoryDelegate = (FactoryDelegate)((ConstantExpression)args[2]).Value;
+            result = scope.GetOrAddViaFactoryDelegate(id, factoryDelegate, resolver, (int)ConstValue(args[3]));
             return true;
         }
 
@@ -2863,10 +2871,7 @@ namespace DryIoc
 
             // Optimization for constants
             if (expression is ConstantExpression ce)
-            {
-                var value = ce.Value;
-                return _ => value;
-            }
+                return ce.Value.ToFactoryDelegate;
 
             if (useFastExpressionCompiler)
             {
@@ -3623,7 +3628,7 @@ namespace DryIoc
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
-                    setup: Setup.WrapperWith(unwrap: _ => typeof(void))));
+                    setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddContainerInterfaces();
             return wrappers;
@@ -4241,7 +4246,7 @@ namespace DryIoc
                 factory = new ReflectionFactory(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
                     Setup.With(condition: r1 => r1.WithIfUnresolved(IfUnresolved.ReturnDefault)
-                                                  .Do(r2 => factory?.GetExpressionOrDefault(r2)) != null));
+                                                  .Map(r2 => factory?.GetExpressionOrDefault(r2)) != null));
 
                 return factory;
             });
@@ -4774,7 +4779,7 @@ namespace DryIoc
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
                 .GetConstructorOrNull(includeNonPublic, Empty<Type>())
-                ?.Do(ctor => Of(ctor));
+                ?.Map(ctor => Of(ctor));
 
         /// <summary>Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
@@ -4899,7 +4904,7 @@ namespace DryIoc
             if (methodReturnType != null && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
-            return new Made(_ => factoryMethod, parameters, propertiesAndFields, methodReturnType);
+            return new Made(factoryMethod.ToFunc<Request, FactoryMethod>, parameters, propertiesAndFields, methodReturnType);
         }
 
         /// <summary>Creates factory method specification</summary>
@@ -5500,7 +5505,7 @@ namespace DryIoc
             Type[] serviceTypes, Type implType,
             IReuse reuse = null, Made made = null, Setup setup = null,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            registrator.RegisterMany(new[] { implType }, _ => serviceTypes,
+            registrator.RegisterMany(new[] { implType }, serviceTypes.ToFunc<Type, Type[]>,
                 t => t.ToFactory(reuse, made, setup), (_, __) => serviceKey, ifAlreadyRegistered);
 
         /// <summary>Batch registers assemblies of implementation types with possibly many service types.
@@ -5558,8 +5563,14 @@ namespace DryIoc
             Func<IResolverContext, TService> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new DelegateFactory(r => factoryDelegate(r), reuse, setup),
+            registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
+        /// Minimizes the number of allocations when converting from Func to named delegate
+        public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
+
+        /// Lifts value to the factory delegate without allocations on capturing value in lambda closure
+        public static object ToFactoryDelegate(this object result, IResolverContext _) => result;
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
         /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
@@ -5592,7 +5603,7 @@ namespace DryIoc
             bool isChecked, Type serviceType, Func<IResolverContext, object> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new DelegateFactory(factoryDelegate.Invoke, reuse, setup), 
+            registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup), 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers decorator function that gets decorated value as input and returns decorator.
@@ -5605,8 +5616,8 @@ namespace DryIoc
             // unique key to bind decorator factory and decorator registrations
             var factoryKey = new object();
 
-            registrator.RegisterDelegate(_ =>
-                new DecoratorDelegateFactory<TService>(getDecorator),
+            registrator.RegisterDelegate(
+                _ => new DecoratorDelegateFactory<TService>(getDecorator),
                 serviceKey: factoryKey);
 
             registrator.Register(Made.Of(
@@ -5688,11 +5699,11 @@ namespace DryIoc
 
         /// Adding the instance directly to scope for resolution 
         public static void Use(this IResolverContext r, Type serviceType, object instance) =>
-            r.Use(serviceType, _ => instance);
+            r.Use(serviceType, instance.ToFactoryDelegate);
 
         /// Adding the instance directly to scope for resolution 
         public static void Use<TService>(this IResolverContext r, TService instance) =>
-            r.Use(typeof(TService), _ => instance);
+            r.Use(typeof(TService), instance.ToFactoryDelegate);
 
         /// Adding the factory directly to scope for resolution 
         public static void Use<TService>(this IRegistrator r, FactoryDelegate factory) =>
@@ -5700,11 +5711,11 @@ namespace DryIoc
 
         /// Adding the instance directly to scope for resolution 
         public static void Use(this IRegistrator r, Type serviceType, object instance) =>
-            r.Use(serviceType, _ => instance);
+            r.Use(serviceType, instance.ToFactoryDelegate);
 
         /// Adding the instance directly to scope for resolution 
         public static void Use<TService>(this IRegistrator r, TService instance) =>
-            r.Use(typeof(TService), _ => instance);
+            r.Use(typeof(TService), instance.ToFactoryDelegate);
 
         /// Adding the factory directly to scope for resolution 
         public static void Use<TService>(this IContainer c, FactoryDelegate factory) =>
@@ -5712,11 +5723,11 @@ namespace DryIoc
 
         /// Adding the instance directly to scope for resolution 
         public static void Use(this IContainer c, Type serviceType, object instance) =>
-            ((IResolverContext)c).Use(serviceType, _ => instance);
+            ((IResolverContext)c).Use(serviceType, instance.ToFactoryDelegate);
 
         /// Adding the instance directly to scope for resolution 
         public static void Use<TService>(this IContainer c, TService instance) =>
-            ((IResolverContext)c).Use(typeof(TService), _ => instance);
+            ((IResolverContext)c).Use(typeof(TService), instance.ToFactoryDelegate);
 
         /// <summary>Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
@@ -5732,7 +5743,7 @@ namespace DryIoc
                     parameters: Parameters.Of
                         .Type(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope
                             ? r.Container.RootOrSelf() : r.Container)
-                        .Type(_ => initialize)),
+                        .Type(initialize.ToFunc<Request, Action<TTarget, IResolverContext>>)),
                 setup: Setup.DecoratorWith(
                     r => r.ServiceType.IsAssignableTo<TTarget>() && (condition == null || condition(r)),
                     useDecorateeReuse: true));
@@ -8051,7 +8062,7 @@ namespace DryIoc
         public static ParameterSelector Details(this ParameterSelector source, Func<Request, ParameterInfo, ServiceDetails> getDetailsOrNull)
         {
             getDetailsOrNull.ThrowIfNull();
-            return source.OverrideWith(request => p => getDetailsOrNull(request, p)?.Do(ParameterServiceInfo.Of(p).WithDetails));
+            return source.OverrideWith(request => p => getDetailsOrNull(request, p)?.Map(ParameterServiceInfo.Of(p).WithDetails));
         }
 
         /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
@@ -8158,14 +8169,14 @@ namespace DryIoc
 
             return req =>
             {
-                var properties = req.ImplementationType.GetMembers(_ => _.DeclaredProperties, includeBase: withBase)
+                var properties = req.ImplementationType.GetMembers(x => x.DeclaredProperties, includeBase: withBase)
                     .Match(p => p.IsInjectable(withNonPublic, withPrimitive), p => info(p, req));
 
                 if (!withFields)
                     return properties;
 
                 var fields = req.ImplementationType
-                    .GetMembers(_ => _.DeclaredFields, includeBase: withBase)
+                    .GetMembers(x => x.DeclaredFields, includeBase: withBase)
                     .Match(f => f.IsInjectable(withNonPublic, withPrimitive), f => info(f, req));
 
                 return properties.Append(fields);
@@ -8214,13 +8225,13 @@ namespace DryIoc
                     .GetMembers(x => x.DeclaredProperties, includeBase: true)
                     .FindFirst(x => x.Name == name);
                 if (property != null && property.IsInjectable(true, true))
-                    return getDetails(req)?.Do(PropertyOrFieldServiceInfo.Of(property).WithDetails).One();
+                    return getDetails(req)?.Map(PropertyOrFieldServiceInfo.Of(property).WithDetails).One();
 
                 var field = implType
                     .GetMembers(x => x.DeclaredFields, includeBase: true)
                     .FindFirst(x => x.Name == name);
                 if (field != null && field.IsInjectable(true, true))
-                    return getDetails(req)?.Do(PropertyOrFieldServiceInfo.Of(field).WithDetails).One();
+                    return getDetails(req)?.Map(PropertyOrFieldServiceInfo.Of(field).WithDetails).One();
 
                 return Throw.For<IEnumerable<PropertyOrFieldServiceInfo>>(
                     Error.NotFoundSpecifiedWritablePropertyOrField, name, req);
@@ -10724,13 +10735,13 @@ namespace DryIoc
     internal static class RefMap
     {
         public static void AddOrUpdate<V>(this Ref<ImMap<V>> map, int key, V value) =>
-            map.Swap(_ => _.AddOrUpdate(key, value));
+            map.Swap(x => x.AddOrUpdate(key, value));
 
         public static void AddOrUpdate<V>(ref ImMap<V> map, int key, V value) =>
             Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
 
         public static void AddOrUpdate<K, V>(this Ref<ImHashMap<K, V>> map, K key, V value) =>
-            map.Swap(_ => _.AddOrUpdate(key, value));
+            map.Swap(key, value, (m, k, v) => m.AddOrUpdate(k, v));
 
         public static void AddOrUpdate<K, V>(ref ImHashMap<K, V> map, K key, V value) =>
             Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
@@ -11132,7 +11143,7 @@ namespace DryIoc
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false) =>
-            type.GetMembers(_ => _.DeclaredProperties, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
+            type.GetMembers(x => x.DeclaredProperties, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo Field(this Type type, string name, bool includeBase = false) =>
@@ -11141,7 +11152,7 @@ namespace DryIoc
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false) =>
-            type.GetMembers(_ => _.DeclaredFields, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
+            type.GetMembers(x => x.DeclaredFields, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
 
         /// <summary>Returns type assembly.</summary>
         public static Assembly GetAssembly(this Type type) => type.GetTypeInfo().Assembly;
