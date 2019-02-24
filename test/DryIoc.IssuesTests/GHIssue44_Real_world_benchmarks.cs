@@ -39,6 +39,7 @@ namespace DryIoc.IssuesTests
             container.RegisterDelegate(r => 
                 new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()),
                 Reuse.Scoped);
+
             container.RegisterDelegate(r => 
                 new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()),
                 Reuse.Scoped);
@@ -82,6 +83,7 @@ namespace DryIoc.IssuesTests
             container.RegisterDelegate(
                 r => new ScopedFac13(r.Resolve<Single1>(), r.Resolve<Scoped14>(), r.Resolve<ScopedFac14>()),
                 Reuse.Scoped);
+
             container.RegisterDelegate(
                 r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()),
                 Reuse.Scoped);

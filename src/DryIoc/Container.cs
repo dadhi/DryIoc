@@ -585,7 +585,7 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
-        /// OBSOLETE!
+        /// Will become OBSOLETE! in the next major version:
         /// Please just use `RegisterInstance` or <see cref="Use"/> method instead.
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
@@ -3043,7 +3043,7 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             container.RegisterPlaceholder(typeof(TService), ifAlreadyRegistered, serviceKey);
 
-        /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
+        /// Obsolete: please use WithAutoFallbackDynamicRegistration
         [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Type> implTypes,
@@ -3053,7 +3053,7 @@ namespace DryIoc
                 rules.WithUnknownServiceResolvers(
                     Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
 
-        /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
+        /// Obsolete: please use WithAutoFallbackDynamicRegistration
         [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Assembly> implTypeAssemblies,
@@ -5634,62 +5634,62 @@ namespace DryIoc
             public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r).Invoke(decoratee);
         }
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IResolverContext r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IRegistrator r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IContainer c, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IRegistrator r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IContainer c, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance<TService>(this IResolverContext r, TService instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IRegistrator r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// OBSOLETE!
-        /// Please just use `RegisterInstance` or `Use` method instead.
+        /// Will become OBSOLETE! in the next major version:
+        /// Please use `RegisterInstance` or `Use` method instead.
         public static void UseInstance(this IContainer c, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
@@ -7888,17 +7888,9 @@ namespace DryIoc
         /// and producing the result expression.</summary>
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
-            var reuse = request.Reuse;
-            var rules = request.Rules;
-
-            // optimization for already activated singleton
-            if (serviceExpr.NodeType == ExprType.Constant &&
-                reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
-                !Setup.PreventDisposal && !Setup.WeaklyReferenced)
-                return serviceExpr;
-
             // Optimization: eagerly creates a singleton during the construction of object graph
-            if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
+            if (request.Reuse is SingletonReuse && 
+                request.Rules.EagerCachingSingletonForFasterAccess &&
                 // except: For decorators and wrappers, when tracking transient disposable and
                 // for lazy creation in Func
                 FactoryType == FactoryType.Service &&
@@ -7920,7 +7912,7 @@ namespace DryIoc
 
                 var container = request.Container;
                 var singleton = container.SingletonScope.TryGetOrAddWithoutClosure(FactoryID, 
-                    container, serviceExpr, rules.UseFastExpressionCompiler, createSingleton, Setup.DisposalOrder);
+                    container, serviceExpr, container.Rules.UseFastExpressionCompiler, createSingleton, Setup.DisposalOrder);
 
                 serviceExpr = Constant(singleton);
             }
@@ -7932,7 +7924,7 @@ namespace DryIoc
                 else if (Setup.PreventDisposal)
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
 
-                serviceExpr = reuse.Apply(request, serviceExpr);
+                serviceExpr = request.Reuse.Apply(request, serviceExpr);
             }
 
             // Unwrap WeakReference or HiddenDisposable
@@ -9669,28 +9661,17 @@ namespace DryIoc
                 ie.Expression is ConstantExpression factoryDelegateExpr &&
                 factoryDelegateExpr.Type == typeof(FactoryDelegate))
             {
-                if (request.TracksTransientDisposable)
+                if (!request.TracksTransientDisposable && !request.IsResolutionCall)
                 {
-                    ;
-                }
-                else
-                {
-                    if (request.IsResolutionCall)
-                    {
-                        ;
-                    }
-                    else
-                    {
-                        if (ScopedOrSingleton)
-                            return Call(GetScopedOrSingletonViaFactoryDelegateMethod, 
-                                resolverExpr, Constant(request.FactoryID), factoryDelegateExpr,
-                                Constant(request.Factory.Setup.DisposalOrder));
-                        else if (Name == null)
-                            return Call(GetScopedViaFactoryDelegateMethod,
-                                resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
-                                Constant(request.FactoryID), factoryDelegateExpr,
-                                Constant(request.Factory.Setup.DisposalOrder));
-                    }
+                    if (ScopedOrSingleton)
+                        return Call(GetScopedOrSingletonViaFactoryDelegateMethod, 
+                            resolverExpr, Constant(request.FactoryID), factoryDelegateExpr,
+                            Constant(request.Factory.Setup.DisposalOrder));
+                    else if (Name == null)
+                        return Call(GetScopedViaFactoryDelegateMethod,
+                            resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
+                            Constant(request.FactoryID), factoryDelegateExpr,
+                            Constant(request.Factory.Setup.DisposalOrder));
                 }
             }
 

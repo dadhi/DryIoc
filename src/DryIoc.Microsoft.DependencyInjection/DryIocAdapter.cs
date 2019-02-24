@@ -172,16 +172,20 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="descriptor">Service descriptor.</param>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
         {
-            var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton 
-                      : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton 
-                      : Reuse.Transient;
-
             if (descriptor.ImplementationType != null)
             {
+                var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton
+                    : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton
+                    : Reuse.Transient;
+
                 container.Register(descriptor.ServiceType, descriptor.ImplementationType, reuse);
             }
             else if (descriptor.ImplementationFactory != null)
             {
+                var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton
+                    : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton
+                    : Reuse.Transient;
+
                 container.RegisterDelegate(true, descriptor.ServiceType,
 #if NETSTANDARD1_0
                     r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()),
