@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -46,7 +46,7 @@ namespace DryIoc.IssuesTests
         {
             string Name { get; }
 
-            void AddHandler<EventInfoType>(IEvntHandler<EventInfoType> evntHandler)
+            void AddHandler<EventInfoType>(IEvntHandler<EventInfoType> eventHandler)
                 where EventInfoType : IEventInfo;
 
             void FireEvent<EventInfoType>(EventInfoType eventInfo)
@@ -57,12 +57,12 @@ namespace DryIoc.IssuesTests
         {
             IContainer _dryContainer = new Container();
 
-            public string Name { get { return "DryIoc"; } }
+            public string Name => "DryIoc";
 
-            public void AddHandler<EventInfoType>(IEvntHandler<EventInfoType> evntHandler)
+            public void AddHandler<EventInfoType>(IEvntHandler<EventInfoType> eventHandler)
                 where EventInfoType : IEventInfo
             {
-                _dryContainer.UseInstance(evntHandler);
+                _dryContainer.RegisterInstance(eventHandler);
             }
 
             public void FireEvent<EventInfoType>(EventInfoType eventInfo)

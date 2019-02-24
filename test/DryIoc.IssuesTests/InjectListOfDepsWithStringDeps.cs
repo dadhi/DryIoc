@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -13,8 +13,8 @@ namespace DryIoc.IssuesTests
         {
             var di = new Container(Rules.Default.WithConcreteTypeDynamicRegistrations());
 
-            di.UseInstance("a", serviceKey: "x");
-            di.UseInstance("b", serviceKey: "y");
+            di.RegisterInstance("a", serviceKey: "x");
+            di.RegisterInstance("b", serviceKey: "y");
 
             di.Register(Made.Of(() => 
                 GetBs(Arg.Of<Func<string, B>>(), Arg.Of<KeyValuePair<string, string>[]>())));

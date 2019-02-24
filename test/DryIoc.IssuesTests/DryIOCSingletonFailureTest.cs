@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
         public DryIOCSingletonFailureTest()
         {
             _container = new Container();
-            _container.UseInstance(new Producer());
+            _container.RegisterInstance(new Producer());
             _container.Register<Consumer>(Reuse.Singleton);
         }
 

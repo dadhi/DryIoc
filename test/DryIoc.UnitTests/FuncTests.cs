@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -140,7 +140,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register(typeof(ClientWithFuncAndInstanceDependency));
-            container.UseInstance("I am a string");
+            container.RegisterInstance("I am a string");
             container.Register(typeof(IService), typeof(ServiceWithOnePrimitiveParameter), Reuse.Singleton);
 
             var client = container.Resolve<ClientWithFuncAndInstanceDependency>();
@@ -265,7 +265,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             Func<int, string> toString = i => i.ToString();
-            container.UseInstance(toString);
+            container.RegisterInstance(toString);
 
             var func = container.Resolve<Func<int, string>>();
 
@@ -278,7 +278,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             Func<string, TwoCtors> getTwo = s => new TwoCtors(s);
-            container.UseInstance(getTwo);
+            container.RegisterInstance(getTwo);
 
             var getTwoResolved = container.Resolve<Func<string, TwoCtors>>();
 

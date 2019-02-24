@@ -71,22 +71,22 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance("hey");
-            var regBefore = container.GetServiceRegistrations().Single();
+            container.RegisterInstance("hey");
+            var regBefore = container.GetServiceRegistrations();
+            Assert.AreEqual(1, regBefore.Count());
 
-            container.UseInstance("nah");
-            var regAfter = container.GetServiceRegistrations().Single();
-
-            Assert.AreEqual(regBefore.Factory.FactoryID, regAfter.Factory.FactoryID);
+            container.RegisterInstance("nah", IfAlreadyRegistered.Replace);
+            var regAfter = container.GetServiceRegistrations();
+            Assert.AreEqual(1, regAfter.Count());
         }
 
         [Test]
         public void Can_register_instance_with_keep_option()
         {
             var container = new Container();
-            container.UseInstance("a");
 
-            container.UseInstance("x", ifAlreadyRegistered: IfAlreadyRegistered.Keep);
+            container.RegisterInstance("a");
+            container.RegisterInstance("x", IfAlreadyRegistered.Keep);
 
             var s = container.Resolve<string>();
             Assert.AreEqual("a", s);
@@ -97,9 +97,9 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance("a");
-            container.UseInstance("b");
-            container.UseInstance("x");
+            container.RegisterInstance("a");
+            container.RegisterInstance("b");
+            container.RegisterInstance("x", IfAlreadyRegistered.Replace);
 
             var x = container.Resolve<string>();
             Assert.AreEqual("x", x);
@@ -110,10 +110,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance("a", serviceKey: "x");
+            container.RegisterInstance("a", serviceKey: "x");
             Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
 
-            container.UseInstance("b", serviceKey: "x");
+            container.RegisterInstance("b", serviceKey: "x", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
         }
 
@@ -125,7 +125,7 @@ namespace DryIoc.UnitTests
             container.RegisterDelegate(_ => "a", serviceKey: "x");
             Assert.AreEqual("a", container.Resolve<string>(serviceKey: "x"));
 
-            container.UseInstance("b", serviceKey: "x");
+            container.RegisterInstance("b", serviceKey: "x", ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             Assert.AreEqual("b", container.Resolve<string>(serviceKey: "x"));
         }
 
@@ -134,10 +134,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance("a", preventDisposal: true);
+            container.RegisterInstance("a", preventDisposal: true);
             container.Resolve<string>();
 
-            container.UseInstance("a");
+            container.RegisterInstance("a", IfAlreadyRegistered.Replace);
             container.Resolve<string>();
         }
 
@@ -149,10 +149,10 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_use_intstance_of_Int_type()
+        public void Can_use_instance_of_Int_type()
         {
             var container = new Container();
-            container.UseInstance<int>(42);
+            container.RegisterInstance<int>(42);
 
             var int42 = container.Resolve<int>();
 
@@ -163,9 +163,9 @@ namespace DryIoc.UnitTests
         public void Can_work_with_multiple_keyed_and_default_instances()
         {
             var container = new Container();
-            container.UseInstance<int>(42, serviceKey: "nice number");
-            container.UseInstance<int>(43);
-            container.UseInstance<int>(44, serviceKey: "another nice number");
+            container.RegisterInstance<int>(42, serviceKey: "nice number");
+            container.RegisterInstance<int>(43);
+            container.RegisterInstance<int>(44, serviceKey: "another nice number");
 
             var forties = container.Resolve<int[]>();
 
@@ -173,16 +173,16 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void UseInstance_by_default_should_replace_previous_typed_registration()
+        public void The_Use_by_default_should_replace_previous_typed_registration()
         {
             var container = new Container();
-            container.Register<DependencyA>();
 
             var aa = new DependencyA();
-            container.UseInstance(aa);
+            container.Use(aa);
+            Assert.AreSame(aa, container.Resolve<DependencyA>());
 
-            var x = container.Resolve<DependencyA>();
-            Assert.AreSame(aa, x);
+            container.Use(new DependencyA());
+            Assert.AreNotSame(aa, container.Resolve<DependencyA>());
         }
 
         [Test]
@@ -192,7 +192,7 @@ namespace DryIoc.UnitTests
             container.Register<DependencyA>();
 
             var aa = new DependencyA();
-            container.UseInstance(aa, ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+            container.RegisterInstance(aa);
 
             var aas = container.ResolveMany<DependencyA>();
             Assert.AreEqual(2, aas.Count());
@@ -307,7 +307,7 @@ namespace DryIoc.UnitTests
             container.RegisterInstance(aa, serviceKey: "aa");
 
             var ex = Assert.Throws<ContainerException>(() =>
-                container.UseInstance(new DependencyA(), IfAlreadyRegistered.Throw));
+                container.RegisterInstance(new DependencyA(), IfAlreadyRegistered.Throw));
 
             Assert.AreEqual(
                 Error.NameOf(Error.UnableToRegisterDuplicateDefault),

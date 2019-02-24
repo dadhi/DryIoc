@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -9,10 +9,11 @@ namespace DryIoc.IssuesTests
         public void Test()
         {
             var container = new Container();
-            container.UseInstance<A>(new A());
-            container.UseInstance<B>(new B());
+            container.RegisterInstance<A>(new A());
+            container.RegisterInstance<B>(new B());
             container.Register<C>(Reuse.Transient);
-            container.Resolve<C>(IfUnresolved.Throw);
+
+            container.Resolve<C>();
         }
 
         public class A

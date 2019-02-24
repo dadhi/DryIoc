@@ -8720,16 +8720,41 @@ namespace DryIoc
                 if (member == null)
                     continue;
 
-                Expression memberExpr;
+                Expression memberExpr = null;
                 var memberRequest = request.Push(member);
-                if (member.Details.HasCustomValue)
+                var memberServiceType = memberRequest.ServiceType;
+
+                if (member.Details == DryIoc.ServiceDetails.Default)
+                {
+                    if (memberServiceType == typeof(IResolverContext) || memberServiceType == typeof(IResolver)
+// todo: replace framework targets with feature toggle
+#if NET45 || NETSTANDARD2_0
+                    || memberServiceType == typeof(IServiceProvider)
+#endif
+                    )
+                    {
+                        memberExpr = ResolverContext.GetRootOrSelfExpr(memberRequest);
+                    }
+                    else if (memberServiceType == typeof(IRegistrator) || memberServiceType == typeof(IContainer))
+                    {
+                        memberExpr = Convert(ResolverContext.GetRootOrSelfExpr(memberRequest), memberServiceType);
+                    }
+
+                    if (request.Container.TryGetUsedInstance(memberServiceType, out var instance))
+                    {
+                        // Generate the fast resolve call for used instances
+                        memberExpr = Call(ResolverContext.GetRootOrSelfExpr(request), Resolver.ResolveFastMethod,
+                            Constant(memberServiceType, typeof(Type)), Constant(memberRequest.IfUnresolved));
+                    }
+                }
+                else if (member.Details.HasCustomValue)
                 {
                     var customValue = member.Details.CustomValue;
-                    customValue?.ThrowIfNotInstanceOf(
-                        memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                    customValue?.ThrowIfNotInstanceOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
                     memberExpr = container.GetConstantExpression(customValue, memberRequest.ServiceType);
                 }
-                else
+                
+                if (memberExpr == null)
                 {
                     var memberFactory = container.ResolveFactory(memberRequest);
                     memberExpr = memberFactory?.GetExpressionOrDefault(memberRequest);

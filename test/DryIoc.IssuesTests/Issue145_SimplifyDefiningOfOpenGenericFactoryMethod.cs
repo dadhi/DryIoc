@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
@@ -82,7 +82,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterExports(typeof(X<>));
 
-            container.UseInstance<int>(1);
+            container.RegisterInstance<int>(1);
             var y = container.Resolve<Y<int, double>>();
 
             Assert.AreEqual(1, y.Blah);
@@ -94,7 +94,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterExports(typeof(Z<>));
 
-            container.UseInstance<string>("1");
+            container.RegisterInstance<string>("1");
             var y = container.Resolve<Y<string, string>>();
 
             Assert.AreEqual("1", y.Blah);
