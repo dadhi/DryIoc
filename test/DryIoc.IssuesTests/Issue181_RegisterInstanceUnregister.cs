@@ -5,7 +5,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue181_RegisterInstanceUnregister
     {
-        [Test, Ignore("fixme")]
+        [Test]
         public void Test_without_Unregister()
         {
             var container = new Container();
@@ -13,12 +13,12 @@ namespace DryIoc.IssuesTests
             container.Register(typeof(Printer));
 
             var test = new Test { N = 1 };
-            container.RegisterInstance<ITest>(test);
+            container.RegisterInstance<ITest>(test, setup: Setup.With(asResolutionCall: true));
             var printer = container.Resolve<IPrinter, Printer>();
             Assert.AreEqual("1", printer.Print()); // prints '1' as expected
 
             test = new Test { N = 2 };
-            container.UseInstance<ITest>(test);
+            container.RegisterInstance<ITest>(test, IfAlreadyRegistered.Replace);
 
             Assert.AreEqual(2, container.Resolve<ITest>().N); // does not throws, replaced dependency
 

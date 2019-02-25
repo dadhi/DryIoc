@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -13,8 +13,8 @@ namespace DryIoc.IssuesTests
 
             c.Register<Blah>();
 
-            c.UseInstance("a", serviceKey: "a");
-            c.UseInstance(1);
+            c.RegisterInstance("a", serviceKey: "a");
+            c.RegisterInstance(1);
 
             var blah = c.Resolve<Blah>();
         }

@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
                 reuse: Reuse.Singleton);
 
             container.Register<TestThing>();
-            container.UseInstance("in scope", serviceKey: "someSetting");
+            container.RegisterInstance("in scope", serviceKey: "someSetting");
 
             var z = new TestThing();
             var t = container.WithDependencies(Parameters.Of.Type(_ => z))
@@ -48,7 +48,7 @@ namespace DryIoc.IssuesTests
                 made: Parameters.Of.Type<string>(serviceKey: "someSetting"),
                 reuse: Reuse.Singleton);
 
-            container.UseInstance("in scope", serviceKey: "someSetting");
+            container.RegisterInstance("in scope", serviceKey: "someSetting");
 
             var t = container.WithDependencies(Parameters.Of.Type(_ => "42"))
                 .Resolve<TestParameter2>();
@@ -75,7 +75,7 @@ namespace DryIoc.IssuesTests
                 made: PropertiesAndFields.Of.Name(nameof(TestParameter3.Test), serviceKey: "someSetting"),
                 reuse: Reuse.Singleton);
 
-            container.UseInstance("instance", serviceKey: "someSetting");
+            container.RegisterInstance("instance", serviceKey: "someSetting");
 
             var thing = new TestThing();
 

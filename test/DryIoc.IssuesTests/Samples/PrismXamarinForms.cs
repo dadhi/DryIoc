@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples
@@ -90,11 +90,11 @@ namespace DryIoc.IssuesTests.Samples
             c.Register<Foo>();
             //c.Register<Foo>(Reuse.Singleton); // !!! If the consumer of replaced dependency is singleton, it won't work
                                                 // cause the consumer singleton should be replaced too
-            c.UseInstance<IBar>(new Bar());
+            c.RegisterInstance<IBar>(new Bar(), setup: Setup.With(asResolutionCall: true));
             var foo = c.Resolve<Foo>();
             Assert.IsInstanceOf<Bar>(foo.Bar);
 
-            c.UseInstance<IBar>(new Bar2());
+            c.RegisterInstance<IBar>(new Bar2(), IfAlreadyRegistered.Replace);
             var foo2 = c.Resolve<Foo>();
             Assert.IsInstanceOf<Bar2>(foo2.Bar);
         }

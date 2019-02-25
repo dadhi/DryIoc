@@ -31,7 +31,7 @@ namespace DryIoc.Owin.UnitTests
             var container = new Container();
 
             container.Register<TestGreetingMiddleware>();
-            container.UseInstance(new Greeting { Message = "Hey, DryIoc!" });
+            container.Use(new Greeting { Message = "Hey, DryIoc!" });
 
             using (var server = TestServer.Create(app => app.UseDryIocOwinMiddleware(container)))
             {

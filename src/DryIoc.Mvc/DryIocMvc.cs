@@ -130,7 +130,7 @@ namespace DryIoc.Mvc
             var filterProvider = new DryIocFilterAttributeFilterProvider(container);
             filterProviders.Add(filterProvider);
 
-            container.UseInstance<IFilterProvider>(filterProvider);
+            container.RegisterInstance<IFilterProvider>(filterProvider, IfAlreadyRegistered.Replace);
         }
 
         /// <summary>Registers both <see cref="DryIocDataAnnotationsModelValidator"/> and

@@ -5360,13 +5360,13 @@ namespace DryIoc
         /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
-            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null)
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
-            registrator.Register(new RegisteredInstanceFactory(instance, preventDisposal, weaklyReferenced),
+            registrator.Register(new RegisteredInstanceFactory(instance, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
             // done after registration to pass all the registration validation checks
-            if (instance is IDisposable && !preventDisposal)
+            if (instance is IDisposable && (setup == null || !setup.PreventDisposal))
                 (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
         }
 
@@ -5374,15 +5374,15 @@ namespace DryIoc
         /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, 
-            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
+            registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, setup, serviceKey);
 
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
         /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance<T>(this IRegistrator registrator, T instance, 
-            IfAlreadyRegistered? ifAlreadyRegistered = null, bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
+            registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, setup, serviceKey);
 
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
@@ -9075,16 +9075,14 @@ namespace DryIoc
         }
 
         /// <summary>Creates factory.</summary>
-        public RegisteredInstanceFactory(object instance, bool preventDisposal = false, bool weeklyReferenced = false)
-           : base(DryIoc.Reuse.Singleton, 
-               preventDisposal || weeklyReferenced 
-                   ? new Setup.ServiceSetup(null, preventDisposal: preventDisposal, weaklyReferenced: weeklyReferenced, asResolutionCallForExpressionGeneration: true) 
-                   : DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup)
+        public RegisteredInstanceFactory(object instance, Setup setup = null)
+           : base(DryIoc.Reuse.Singleton,
+               (setup ?? DryIoc.Setup.Default).WithAsResolutionCallForGeneratedExpression())
         {
             if (instance != null) // it may be `null` as well
             {
                 ImplementationType = instance.GetType();
-                if (weeklyReferenced)
+                if (Setup.WeaklyReferenced)
                     Instance = new WeakReference(instance);
                 else
                     Instance = instance;
@@ -9116,7 +9114,8 @@ namespace DryIoc
         {
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
-                 (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
+                 (Setup.AsResolutionCall || 
+                  Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
                 return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator

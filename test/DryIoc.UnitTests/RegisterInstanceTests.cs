@@ -134,7 +134,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterInstance("a", preventDisposal: true);
+            container.RegisterInstance("a", setup: Setup.With(preventDisposal: true));
             container.Resolve<string>();
 
             container.RegisterInstance("a", IfAlreadyRegistered.Replace);

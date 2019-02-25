@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.RegisterInstance<IA>(a, preventDisposal: true);
+            container.RegisterInstance<IA>(a, setup: Setup.With(preventDisposal: true));
 
             using (var c2 = container.CreateFacade())
             {
@@ -32,7 +32,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.RegisterInstance<IA>(a, preventDisposal: true);
+            container.RegisterInstance<IA>(a, setup: Setup.With(preventDisposal: true));
 
             using (var c2 = container.CreateFacade())
             {
@@ -51,7 +51,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.RegisterInstance<IA>(a, preventDisposal: true, weaklyReferenced: true);
+            container.RegisterInstance<IA>(a, setup: Setup.With(preventDisposal: true, weaklyReferenced: true));
 
             using (var c2 = container.CreateFacade())
             {
@@ -67,19 +67,13 @@ namespace DryIoc.IssuesTests
         public interface IA { }
         public class A : IA, IDisposable
         {
-            public Boolean IsDisposed = false;
+            public Boolean IsDisposed;
             public void Dispose()
             {
                 IsDisposed = true;
             }
 
-            public override string ToString()
-            {
-                if (IsDisposed)
-                    return "Object is disposed";
-                else
-                    return "Ok";
-            }
+            public override string ToString() => IsDisposed ? "Object is disposed" : "Ok";
         }
 
         public class B

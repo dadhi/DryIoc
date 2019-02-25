@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
             var aa = container.Resolve<A>(serviceKey: "42");
             Assert.IsInstanceOf<AA>(aa);
 
-            container.UseInstance<A>(new AB(), serviceKey: "42");
+            container.RegisterInstance<A>(new AB(), IfAlreadyRegistered.Replace, serviceKey: "42");
             var ab = container.Resolve<A>(serviceKey: "42");
             Assert.IsInstanceOf<AB>(ab);
         }
@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
             var aa = container.Resolve<A>(serviceKey: "42");
             Assert.IsInstanceOf<AA>(aa);
 
-            container.UseInstance<A>(new AB(), serviceKey: "42");
+            container.RegisterInstance<A>(new AB(), IfAlreadyRegistered.Replace, serviceKey: "42");
             var ab = container.Resolve<A>(serviceKey: "42");
             Assert.IsInstanceOf<AB>(ab);
         }

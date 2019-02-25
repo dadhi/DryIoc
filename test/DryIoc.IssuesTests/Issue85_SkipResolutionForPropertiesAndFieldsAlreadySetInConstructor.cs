@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq.Expressions;
 using NUnit.Framework;
 
@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register<IHey, Hey>();
             container.Register(Made.Of(() => Decor(Arg.Of<IHey>(), Arg.Of<string>())), setup: Setup.Decorator);
-            container.UseInstance("no");
+            container.RegisterInstance("no");
 
             var hey = container.Resolve<IHey>();
 

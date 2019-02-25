@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.UseInstance("hello world", serviceKey: "x");
+            container.RegisterInstance("hello world", serviceKey: "x");
 
             container.Register(typeof(ConnSet),
                 made: Made.Of(propertiesAndFields: PropertiesAndFields.Of.Name("Name", serviceKey: "x")),

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using ImTools;
@@ -12,10 +12,10 @@ namespace DryIoc.IssuesTests
         public void When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a");
+            container.RegisterInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: ContainerTools.FacadeKey);
+            f.RegisterInstance("b", serviceKey: ContainerTools.FacadeKey);
             var strs = f.Resolve<string[]>();
 
             CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);
@@ -25,7 +25,7 @@ namespace DryIoc.IssuesTests
         public void When_only_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a");
+            container.RegisterInstance("a");
 
             var f = container.CreateFacade();
             var strs = f.Resolve<string[]>();
@@ -37,10 +37,10 @@ namespace DryIoc.IssuesTests
         public void For_KeyValuePair_When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a", serviceKey: 1);
+            container.RegisterInstance("a", serviceKey: 1);
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: 2);
+            f.RegisterInstance("b", serviceKey: 2);
             var strs = f.Resolve<KeyValuePair<int, string>[]>();
 
             CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs.Select(it => it.Value));
@@ -50,10 +50,10 @@ namespace DryIoc.IssuesTests
         public void For_lazy_collection_When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a");
+            container.RegisterInstance("a");
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: ContainerTools.FacadeKey);
+            f.RegisterInstance("b", serviceKey: ContainerTools.FacadeKey);
             var strs = f.Resolve<LazyEnumerable<string>>().ToArrayOrSelf();
 
             CollectionAssert.AreEquivalent(new[] { "b", "a" }, strs);
@@ -63,7 +63,7 @@ namespace DryIoc.IssuesTests
         public void For_lazy_collection_When_only_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a");
+            container.RegisterInstance("a");
 
             var f = container.CreateFacade();
             var strs = f.Resolve<LazyEnumerable<string>>().ToArrayOrSelf();
@@ -75,10 +75,10 @@ namespace DryIoc.IssuesTests
         public void For_lazy_collection_of_KeyValuePair_When_both_current_and_fallback_services_are_available()
         {
             var container = new Container();
-            container.UseInstance("a", serviceKey: 1);
+            container.RegisterInstance("a", serviceKey: 1);
 
             var f = container.CreateFacade();
-            f.UseInstance("b", serviceKey: 2);
+            f.RegisterInstance("b", serviceKey: 2);
             var strs = f.Resolve<LazyEnumerable<KeyValuePair<int, string>>>().ToArrayOrSelf();
 
             Assert.AreEqual(2, strs.Length);

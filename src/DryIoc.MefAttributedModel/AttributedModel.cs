@@ -239,7 +239,7 @@ namespace DryIoc.MefAttributedModel
         public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
         {
             // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
-            container.UseInstance(new ServiceKeyStore());
+            container.Use(new ServiceKeyStore());
 
             // decorator to filter in a presence of multiple same keys
             // note: it explicitly set to Transient to produce new results for new filtered collection,
