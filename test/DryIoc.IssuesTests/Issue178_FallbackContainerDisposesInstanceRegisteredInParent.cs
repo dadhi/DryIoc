@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.UseInstance<IA>(a, preventDisposal: true);
+            container.RegisterInstance<IA>(a, preventDisposal: true);
 
             using (var c2 = container.CreateFacade())
             {
@@ -32,7 +32,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.UseInstance<IA>(a, preventDisposal: true);
+            container.RegisterInstance<IA>(a, preventDisposal: true);
 
             using (var c2 = container.CreateFacade())
             {
@@ -51,7 +51,7 @@ namespace DryIoc.IssuesTests
 
             var a = new A();
 
-            container.UseInstance<IA>(a, preventDisposal: true, weaklyReferenced: true);
+            container.RegisterInstance<IA>(a, preventDisposal: true, weaklyReferenced: true);
 
             using (var c2 = container.CreateFacade())
             {
