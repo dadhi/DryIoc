@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -231,7 +231,82 @@ namespace DryIoc.UnitTests
 
             Assert.AreEqual(Error.NoMoreUnregistrationsAllowed, ex.Error);
         }
-        
+
+        [Test]
+        [Ignore("fixme")]
+        public void Resolve_scoped_lazy_service_in_parent_container_with_WithoutThrowIfDependencyHasShorterReuseLifespan_via_InjectPropertiesAndFields_should_not_return_null()
+        {
+            var container1 = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
+
+            container1.Register<ServiceA>(Reuse.Scoped);
+
+            var container2 = container1.With(container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), null, RegistrySharing.CloneAndDropCache, null);
+
+            var container2Scope = container2.OpenScope();
+
+            var serviceB = new ServiceB();
+            container2Scope.InjectPropertiesAndFields(serviceB);
+
+            Assert.That(serviceB.ServiceA, Is.InstanceOf<Lazy<ServiceA>>());
+            Assert.That(serviceB.ServiceA.Value, Is.Not.Null);
+        }
+
+        [Test]
+        public void Resolve_scoped_service_in_parent_container_with_WithoutThrowIfDependencyHasShorterReuseLifespan_via_InjectPropertiesAndFields_should_not_return_null()
+        {
+            var container1 = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
+
+            container1.Register<ServiceA>(Reuse.Scoped);
+
+            var container2 = container1.With(container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), null, RegistrySharing.CloneAndDropCache, null);
+
+            var container2Scope = container2.OpenScope();
+
+            var serviceC = new ServiceC();
+            container2Scope.InjectPropertiesAndFields(serviceC);
+
+            Assert.That(serviceC.ServiceA, Is.InstanceOf<ServiceA>());
+            Assert.That(serviceC.ServiceA, Is.Not.Null);
+        }
+
+        [Test]
+        [Ignore("fixme")]
+        public void Resolve_lazy_service_in_parent_container_should_work()
+        {
+            var container1 = new Container();
+
+            container1.Register<ServiceA>(Reuse.Scoped);
+
+            var container2 = container1.With(container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), null, RegistrySharing.CloneAndDropCache, null);
+
+            var container2Scope = container2.OpenScope();
+
+            var serviceB = new ServiceB();
+            container2Scope.InjectPropertiesAndFields(serviceB);
+
+            Assert.That(serviceB.ServiceA, Is.InstanceOf<Lazy<ServiceA>>());
+            Assert.That(serviceB.ServiceA.Value, Is.Not.Null);
+        }
+
+        [Test]
+        [Ignore("fixme")]
+        public void Resolve_service_in_parent_container_should_work()
+        {
+            var container1 = new Container();
+
+            container1.Register<ServiceA>(Reuse.Scoped);
+
+            var container2 = container1.With(container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), null, RegistrySharing.CloneAndDropCache, null);
+
+            var container2Scope = container2.OpenScope();
+
+            var serviceC = new ServiceC();
+            container2Scope.InjectPropertiesAndFields(serviceC);
+
+            Assert.That(serviceC.ServiceA, Is.InstanceOf<Lazy<ServiceA>>());
+            Assert.That(serviceC.ServiceA, Is.Not.Null);
+        }
+
         #region CUT
 
         internal class Foo : IDisposable
@@ -271,6 +346,20 @@ namespace DryIoc.UnitTests
             {
                 Fruit = fruit;
             }
+        }
+
+        public class ServiceA
+        {
+        }
+
+        public class ServiceB
+        {
+            public Lazy<ServiceA> ServiceA { get; set; }
+        }
+
+        public class ServiceC
+        {
+            public ServiceA ServiceA { get; set; }
         }
 
         #endregion
