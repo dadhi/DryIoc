@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -76,7 +76,7 @@ namespace DryIoc.UnitTests.Memory
             var container = new Container();
 
             var service = new Service();
-            container.UseInstance(service);
+            container.RegisterInstance(service);
 
             var serviceRef = new WeakReference(service);
             container.Dispose();
@@ -93,7 +93,7 @@ namespace DryIoc.UnitTests.Memory
             var container = new Container();
 
             var service = new Service();
-            container.UseInstance(service);
+            container.RegisterInstance(service);
             container.Resolve<Service>();
 
             var serviceRef = new WeakReference(service);

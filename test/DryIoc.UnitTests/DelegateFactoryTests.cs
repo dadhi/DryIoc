@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DryIoc.UnitTests.CUT;
@@ -72,7 +72,7 @@ namespace DryIoc.UnitTests
         public void Can_use_factory_method_instead_register_delegate()
         {
             var container = new Container();
-            container.UseInstance<Func<IService>>(() => new Service());
+            container.RegisterInstance<Func<IService>>(() => new Service());
             container.Register(Made.Of(r => ServiceInfo.Of<Func<IService>>(), func => func()));
 
             var service = container.Resolve<IService>();
@@ -149,7 +149,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IDependency, Dependency>();
-            container.UseInstance<Func<IResolver, ServiceWithDependency>>(r => new ServiceWithDependency(r.Resolve<IDependency>()));
+            container.RegisterInstance<Func<IResolver, ServiceWithDependency>>(r => new ServiceWithDependency(r.Resolve<IDependency>()));
             container.Register(Made.Of(r => ServiceInfo.Of<Func<IResolver, ServiceWithDependency>>(), f => f(Arg.Of<IResolver>())));
 
             var service = container.Resolve<ServiceWithDependency>();

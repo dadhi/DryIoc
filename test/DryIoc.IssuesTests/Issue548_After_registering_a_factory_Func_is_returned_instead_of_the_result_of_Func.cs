@@ -20,7 +20,7 @@ namespace DryIoc.IssuesTests
                     return new ExpressionFactory(_ => Property(Constant(opts), optsType.Property("Value")));
                 }));
 
-            c.UseInstance<IOptions<Foo>>(new Options<Foo> { Value = new Foo() });
+            c.RegisterInstance<IOptions<Foo>>(new Options<Foo> { Value = new Foo() });
             c.Register<FooUser>();
 
             var fooUser = c.Resolve<FooUser>();

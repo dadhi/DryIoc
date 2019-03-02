@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             using (var c = container.OpenScope())
             {
                 var impl = new int1impl();
-                c.UseInstance<int1>(impl);
+                c.Use<int1>(impl);
 
                 Assert.AreSame(impl, c.Resolve<int1>());
             }
@@ -20,7 +20,7 @@ namespace DryIoc.IssuesTests
             using (var c = container.OpenScope())
             {
                 var impl = new int1impl();
-                c.UseInstance<int1>(impl);
+                c.Use<int1>(impl);
 
                 c.Resolve<int1>();
                 Assert.AreSame(impl, c.Resolve<int1>());

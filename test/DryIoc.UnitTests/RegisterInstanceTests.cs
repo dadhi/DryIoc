@@ -9,25 +9,16 @@ namespace DryIoc.UnitTests
     public class RegisterInstanceTests
     {
         [Test]
-        public void Can_replace_instance_without_replacing_factory_and_without_exceptions()
-        {
-            var container = new Container();
-
-            container.UseInstance("a");
-            container.UseInstance("z");
-        }
-
-        [Test]
         public void Can_re_register_instance_with_different_reuse()
         {
             var container = new Container();
 
-            container.UseInstance("a");
+            container.Use("a");
             Assert.AreEqual("a", container.Resolve<string>());
 
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance("b");
+                scope.Use("b");
                 Assert.AreEqual("b", scope.Resolve<string>());
             }
 
@@ -60,7 +51,7 @@ namespace DryIoc.UnitTests
         public void Wiping_cache_should_not_delete_current_instance_value()
         {
             var container = new Container();
-            container.UseInstance("mine");
+            container.Use("mine");
 
             var mine = container.WithoutCache().Resolve<string>();
             Assert.AreEqual("mine", mine);
@@ -350,16 +341,18 @@ namespace DryIoc.UnitTests
         public void Should_use_correct_instance_in_collection_in_and_out_of_scope()
         {
             var container = new Container();
-            container.UseInstance<int>(42, serviceKey: "nice number");
-            container.UseInstance<int>(43);
-            container.UseInstance<int>(44, serviceKey: "another nice number");
+            container.RegisterInstance<int>(42, serviceKey: "nice number", setup: Setup.With(asResolutionCall: true));
+            container.RegisterInstance<int>(43, setup: Setup.With(asResolutionCall: true));
+            container.RegisterInstance<int>(44, serviceKey: "another nice number", setup: Setup.With(asResolutionCall: true));
+
 
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance<int>(45);
+                container.RegisterInstance<int>(45, IfAlreadyRegistered.Replace, Setup.With(asResolutionCall: true));
                 CollectionAssert.AreEquivalent(new[] { 42, 44, 45 }, scope.Resolve<int[]>());
             }
 
+            container.RegisterInstance<int>(43, IfAlreadyRegistered.Replace, Setup.With(asResolutionCall: true));
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<int[]>());
         }
 
@@ -367,9 +360,9 @@ namespace DryIoc.UnitTests
         public void Should_fallback_to_singleton_in_collection_if_no_scoped_instance()
         {
             var container = new Container();
-            container.UseInstance<int>(42, serviceKey: "nice number");
-            container.UseInstance<int>(43);
-            container.UseInstance<int>(44, serviceKey: "another nice number");
+            container.RegisterInstance<int>(42, serviceKey: "nice number");
+            container.RegisterInstance<int>(43);
+            container.RegisterInstance<int>(44, serviceKey: "another nice number");
 
             using (var scope = container.OpenScope())
             {
@@ -383,16 +376,17 @@ namespace DryIoc.UnitTests
         public void Should_use_correct_instance_in_lazy_collection_in_and_out_of_scope()
         {
             var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
-            container.UseInstance<int>(42, serviceKey: "nice number");
-            container.UseInstance<int>(43);
-            container.UseInstance<int>(44, serviceKey: "another nice number");
+            container.RegisterInstance<int>(42, serviceKey: "nice number", setup: Setup.With(asResolutionCall: true));
+            container.RegisterInstance<int>(43, setup: Setup.With(asResolutionCall: true));
+            container.RegisterInstance<int>(44, serviceKey: "another nice number", setup: Setup.With(asResolutionCall: true));
 
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance<int>(45);
+                container.RegisterInstance<int>(45, IfAlreadyRegistered.Replace, setup: Setup.With(asResolutionCall: true));
                 CollectionAssert.AreEquivalent(new[] { 42, 44, 45 }, scope.Resolve<IEnumerable<int>>().ToArray());
             }
 
+            container.RegisterInstance<int>(43, IfAlreadyRegistered.Replace, setup: Setup.With(asResolutionCall: true));
             CollectionAssert.AreEquivalent(new[] { 42, 43, 44 }, container.Resolve<IEnumerable<int>>().ToArray());
         }
 
@@ -403,12 +397,12 @@ namespace DryIoc.UnitTests
             container.Register<ServiceB>();
 
             var singletonDep = new DependencyA();
-            container.UseInstance(singletonDep);
+            container.Use(singletonDep);
 
             using (var scope = container.OpenScope())
             {
                 var scopedDep = new DependencyA();
-                scope.UseInstance(scopedDep);
+                scope.Use(scopedDep);
         
                 var service = scope.Resolve<ServiceB>();
                 Assert.AreSame(scopedDep, service.Dep);
@@ -425,12 +419,12 @@ namespace DryIoc.UnitTests
             container.Register<ServiceB>(Reuse.Singleton);
 
             var singletonDep = new DependencyA();
-            container.UseInstance(singletonDep);
+            container.Use(singletonDep);
 
             using (var scope = container.OpenScope())
             {
                 var scopedDep = new DependencyA();
-                scope.UseInstance(scopedDep);
+                scope.Use(scopedDep);
 
                 var service = scope.Resolve<ServiceB>();
                 Assert.AreSame(singletonDep, service.Dep);
@@ -452,7 +446,7 @@ namespace DryIoc.UnitTests
             ServiceB service;
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance(dependencyA); // what does it mean for the typed DependencyA
+                scope.Use(dependencyA); // what does it mean for the typed DependencyA
 
                 service = scope.Resolve<ServiceB>();
                 Assert.AreSame(dependencyA, service.Dep);
@@ -477,7 +471,7 @@ namespace DryIoc.UnitTests
 
             using (var scope = container.OpenScope())
             {
-                scope.UseInstance(dependencyA);
+                scope.Use(dependencyA);
                 service = scope.Resolve<ServiceB>();
                 Assert.AreSame(dependencyA, service.Dep);
             }
@@ -503,7 +497,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.UseInstance("x");
+            container.RegisterInstance("x");
             container.Register<string>(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
 
             var xy = container.Resolve<string>();
@@ -517,7 +511,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<XUser>();
-            container.UseInstance("x");
+            container.RegisterInstance("x");
             container.Register(Made.Of(() => AdjustString(Arg.Of<string>())), setup: Setup.Decorator);
 
             var user = container.Resolve<XUser>();
@@ -548,7 +542,7 @@ namespace DryIoc.UnitTests
 
             using (var scope1 = container.OpenScope("1"))
             {
-                scope1.UseInstance(a);
+                scope1.Use(a);
 
                 using (var scope2 = scope1.OpenScope("2"))
                 {

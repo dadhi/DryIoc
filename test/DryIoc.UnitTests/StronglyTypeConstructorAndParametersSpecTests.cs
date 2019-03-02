@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -57,7 +57,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<BlueCheese>(serviceKey: "a");
-            container.UseInstance("King");
+            container.RegisterInstance("King");
 
             container.Register(Made.Of(() => new Burger("King", Arg.Of<BlueCheese>("a"))));
 
@@ -81,7 +81,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<BlueCheese>(serviceKey: "a");
-            container.UseInstance("King");
+            container.RegisterInstance("King");
 
             container.Register(Made.Of(() => Burger.Create("King", Arg.Of<BlueCheese>("a"))));
 
@@ -122,9 +122,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>())));
-            container.UseInstance("King", serviceKey: "key");
+            container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
+            Assert.IsNotNull(burger);
         }
 
         [Test]
@@ -132,7 +133,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IBurger, Burger>(Made.Of(() => new Burger(Arg.Of<string>("key"), Arg.Of<int>(IfUnresolved.ReturnDefault))));
-            container.UseInstance("King", serviceKey: "key");
+            container.RegisterInstance("King", serviceKey: "key");
 
             var burger = container.Resolve<IBurger>();
 

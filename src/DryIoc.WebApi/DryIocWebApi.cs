@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2018 Maksim Volkau
+Copyright (c) 2013-2019 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -112,8 +112,7 @@ namespace DryIoc.WebApi
         {
             var providers = services.GetFilterProviders();
             services.RemoveAll(typeof(IFilterProvider), _ => true);
-            var filterProvider = new DryIocFilterProvider(container, providers);
-            container.UseInstance<IFilterProvider>(filterProvider);
+            container.RegisterInstance<IFilterProvider>(new DryIocFilterProvider(container, providers), IfAlreadyRegistered.Replace);
         }
 
         /// <summary>Inserts DryIoc delegating request handler into message handlers.</summary>
@@ -243,6 +242,6 @@ namespace DryIoc.WebApi
 
         /// <summary>Registers request into current dependency scope.</summary>
         public void RegisterInDependencyScope(HttpRequestMessage request) =>
-            ((DryIocDependencyScope)request.ThrowIfNull().GetDependencyScope()).ScopedContainer.UseInstance(request);
+            ((DryIocDependencyScope)request.ThrowIfNull().GetDependencyScope()).ScopedContainer.Use(request);
     }
 }

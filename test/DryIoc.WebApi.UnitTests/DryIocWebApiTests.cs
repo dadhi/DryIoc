@@ -94,7 +94,7 @@ namespace DryIoc.WebApi.UnitTests
         }
 
         [Test]
-        public void Can_verify_if_no_controlles_were_registered()
+        public void Can_verify_if_no_controllers_were_registered()
         {
             var config = new HttpConfiguration();
             var container = new Container().WithWebApi(config, new[] { Assembly.GetExecutingAssembly() });

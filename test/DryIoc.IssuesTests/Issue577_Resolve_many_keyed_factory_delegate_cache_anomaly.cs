@@ -161,7 +161,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<IBEntityRepository, BEntityRepository>();
             container.Register<IAEntityRepository, AEntityRepository>();
-            container.UseInstance<ICurrentUser>(new SystemCurrentUser());
+            container.RegisterInstance<ICurrentUser>(new SystemCurrentUser());
             container.Register<IAService, AService>();
 
             container.Register<IExPostValidator, ExPostValidator>();

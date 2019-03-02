@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -10,10 +10,10 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
             
-            c.UseInstance(false, serviceKey: "skipAuthz");
+            c.RegisterInstance(false, serviceKey: "skipAuthz");
 
             var accessAll = new object();
-            c.UseInstance(true, serviceKey: accessAll);
+            c.RegisterInstance(true, serviceKey: accessAll);
             c.Register(Made.Of(() => new A(Arg.Of<bool>(accessAll))));
 
             Assert.DoesNotThrow(() => c.Resolve<A>());

@@ -388,7 +388,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             var arr = new[] { "str" };
-            container.UseInstance(arr, serviceKey: "key");
+            container.RegisterInstance(arr, serviceKey: "key");
             var inst = container.Resolve<string[]>("key");
         }
 

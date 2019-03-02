@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.Composition;
+using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
             var c = new Container().WithMef();
 
             c.RegisterExports(typeof(Explicit));
-            c.UseInstance("prop");
+            c.RegisterInstance("prop");
 
             var e = c.Resolve<IExplicit>();
             Assert.AreEqual("prop", e.X);

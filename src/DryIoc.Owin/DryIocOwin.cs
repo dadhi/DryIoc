@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2018 Maksim Volkau
+Copyright (c) 2013-2019 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -79,7 +79,7 @@ namespace DryIoc.Owin
             {
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                 {
-                    scope.UseInstance(context);
+                    scope.Use(context);
                     registerInScope?.Invoke(scope);
                     context.Set(ScopedContainerKeyInContext, scope);
                     await next();
@@ -89,7 +89,7 @@ namespace DryIoc.Owin
             return container;
         }
 
-        /// <summary>Adds to application builder the registered OWIN middlewares 
+        /// <summary>Adds to application builder the registered OWIN middle-wares 
         /// wrapped in <see cref="DryIocWrapperMiddleware{TServiceMiddleware}"/>.</summary>
         /// <param name="app">App builder to use.</param>
         /// <param name="registry">Container registry to find registered <see cref="OwinMiddleware"/>.</param>

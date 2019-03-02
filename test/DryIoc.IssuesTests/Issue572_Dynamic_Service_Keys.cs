@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using Castle.Core.Internal;
 using NUnit.Framework;
@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
-            c.UseInstance(new DataStore { Accounts = new[] { new Account { IsDefault = true, Token = "aaa" } }});
+            c.RegisterInstance(new DataStore { Accounts = new[] { new Account { IsDefault = true, Token = "aaa" } }});
 
             c.Register(Made.Of(() => CreateClient(Arg.Of<DataStore>(), null)));
 

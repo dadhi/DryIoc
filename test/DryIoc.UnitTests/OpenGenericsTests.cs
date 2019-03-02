@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
@@ -427,7 +427,7 @@ namespace DryIoc.UnitTests
             container.Register(typeof(Zzz<>), 
                 made: Made.Of(typeof(Zzz<>).Constructor(typeof(string))));
 
-            container.UseInstance<string>("x");
+            container.RegisterInstance<string>("x");
 
             container.Resolve<Zzz<string>>();
         }

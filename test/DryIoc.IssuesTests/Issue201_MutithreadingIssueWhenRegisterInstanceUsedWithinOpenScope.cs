@@ -1,4 +1,4 @@
-﻿
+
 using System.Threading.Tasks;
 using NUnit.Framework;
 
@@ -24,7 +24,7 @@ namespace DryIoc.IssuesTests
                     {
                         using (var scope = container.OpenScope(ThreadScopeContext.ScopeContextName))
                         {
-                            scope.UseInstance(new S());
+                            scope.Use(new S());
                             var u = scope.Resolve<U>();
 
                             await Task.Delay(5).ConfigureAwait(true);

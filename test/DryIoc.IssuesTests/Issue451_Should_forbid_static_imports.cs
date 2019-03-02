@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.Composition;
+using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container().WithMef();
 
-            container.UseInstance(42);
+            container.RegisterInstance(42);
 
             container.RegisterExports(typeof(A));
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using ImTools;
 using NUnit.Framework;
 
@@ -82,7 +82,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceFactory>();
-            container.UseInstance("parameter");
+            container.RegisterInstance("parameter");
             container.Register<IService>(made: Made.Of(
                 typeof(ServiceFactory).Method("Create", typeof(string)),
                 ServiceInfo.Of<ServiceFactory>()));
@@ -97,7 +97,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<ServiceFactory>();
-            container.UseInstance("parameter");
+            container.RegisterInstance("parameter");
             container.Register(Made.Of(r => ServiceInfo.Of<ServiceFactory>(), f => f.Create(Arg.Of<string>())));
 
             var service = container.Resolve<IService>();
@@ -111,7 +111,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<ServiceFactory>(serviceKey: "factory");
-            container.UseInstance("parameter");
+            container.RegisterInstance("parameter");
 
             container.Register(Made.Of(
                 r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),
@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register<ServiceFactory>(serviceKey: "factory");
-            container.UseInstance("XXX", serviceKey: "myKey");
+            container.RegisterInstance("XXX", serviceKey: "myKey");
 
             container.Register(Made.Of(
                 r => ServiceInfo.Of<ServiceFactory>(serviceKey: "factory"),

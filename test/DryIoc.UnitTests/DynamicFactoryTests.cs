@@ -12,7 +12,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<ServiceWithNotRegisteredLazyParameter>();
             container.Register(typeof(DynamicFactory<>));
-            container.UseInstance(container);
+            container.RegisterInstance(container);
 
             var service = container.Resolve<ServiceWithNotRegisteredLazyParameter>();
 

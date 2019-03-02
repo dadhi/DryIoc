@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -63,7 +63,7 @@ namespace DryIoc.IssuesTests
             var sut = new Container();
             sut.Register<DbContext, MyDbContext>(setup: Setup.With(allowDisposableTransient: true));
             sut.Register<ServiceBase, ServiceWithResolve>();
-            sut.UseInstance(sut);
+            sut.RegisterInstance(sut);
 
             // Act
             var controller = sut.Resolve<ServiceBase>();
@@ -80,7 +80,7 @@ namespace DryIoc.IssuesTests
             var sut = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
             sut.Register<DbContext, MyDbContext>(setup: Setup.With(allowDisposableTransient: true));
             sut.Register<ServiceBase, ServiceWithResolve>();
-            sut.UseInstance(sut);
+            sut.RegisterInstance(sut);
 
             // Act
             var controller = sut.Resolve<ServiceBase>(); // Throws: Registered Disposable Transient service blah blah

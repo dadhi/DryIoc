@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -13,15 +13,14 @@ namespace DryIoc.IssuesTests
 
             var childContainer = c.WithRegistrationsCopy().OpenScope();
 
-            childContainer.UseInstance<IServiceDependency>(new ServiceDependency());
+            childContainer.Use<IServiceDependency>(new ServiceDependency());
 
             var ex = Assert.Throws<ContainerException>(() =>
                 childContainer.Resolve<IService>());
 
-            // because the instance is registered into scope, but resolve from singleton
             Assert.AreEqual(
-                Error.NameOf(Error.DependencyHasShorterReuseLifespan),
-                Error.NameOf(ex.Error));
+                Error.NameOf(Error.UnableToResolveUnknownService),
+                ex.ErrorName);
         }
 
         public interface IService

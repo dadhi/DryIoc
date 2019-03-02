@@ -214,6 +214,9 @@ namespace DryIoc
 
         private FactoryDelegate CompileAndCacheFactoryDelegate(Type serviceType, object expr)
         {
+            if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
+                return obj.ToFactoryDelegate;
+
             var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
             _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, factoryDelegate);
             return factoryDelegate;
@@ -292,7 +295,7 @@ namespace DryIoc
             object key = null;
             object inEntryKey = null;
             KV<object, ImHashMap<object, object>> cacheEntry = null;
-            var noArgs = args.IsNullOrEmpty();
+            var noArgs = args.IsNullOrEmpty() && (preResolveParent == null || preResolveParent.IsEmpty);
             if (noArgs)
             {
                 key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
@@ -456,9 +459,10 @@ namespace DryIoc
                     WrappersSupport.CollectionWrapperID, FactoryType.Wrapper, null, null, 0, 0);
 
             var container = (IContainer)this;
+
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
                 .Where(f => f.Value != null)
-                .Select(f => new ServiceRegistrationInfo(f.Value, requiredItemType, f.Key));
+                .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
@@ -2921,8 +2925,8 @@ namespace DryIoc
                 RegistrySharing.CloneAndDropCache, container.SingletonScope);
 
         /// <summary>Prepares container for expression generation.</summary>
-        public static IContainer WithExpressionGeneration(this IContainer container) =>
-            container.With(rules => rules.WithDependencyResolutionCallExpressions());
+        public static IContainer WithExpressionGeneration(this IContainer container, bool allowRuntimeState = false) =>
+            container.With(rules => rules.WithExpressionGeneration(allowRuntimeState));
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
@@ -3164,9 +3168,9 @@ namespace DryIoc
         /// Wraps exceptions into errors. The method does not create any actual services.
         /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(this IContainer container,
-            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null)
+            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false)
         {
-            var generatingContainer = container.WithExpressionGeneration();
+            var generatingContainer = container.WithExpressionGeneration(allowRuntimeState);
             var regs = generatingContainer.GetServiceRegistrations();
             var roots = getRoots != null ? getRoots(regs) : regs.Select(r => r.ToServiceInfo());
 
@@ -3200,13 +3204,12 @@ namespace DryIoc
         /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
             this IContainer container, Func<ServiceRegistrationInfo, bool> condition) =>
-            container.GenerateResolutionExpressions(regs =>
-                regs.Where(condition.ThrowIfNull()).Select(r => r.ToServiceInfo()));
+            container.GenerateResolutionExpressions(regs => regs.Where(condition.ThrowIfNull()).Select(r => r.ToServiceInfo()));
 
         /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
             this IContainer container, params ServiceInfo[] roots) =>
-            container.GenerateResolutionExpressions(_ => roots);
+            container.GenerateResolutionExpressions(roots.ToFunc<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>>);
 
         /// <summary>Helps to find potential problems in service registration setup.
         /// Method tries to resolve the specified registrations, collects exceptions, and
@@ -3216,7 +3219,10 @@ namespace DryIoc
         /// which usually is not realistic case to validate. </summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> condition = null) =>
-            container.GenerateResolutionExpressions(condition ?? DefaultValidateCondition).Errors.ToArray();
+            container.GenerateResolutionExpressions(
+                regs => regs.Where(condition ?? DefaultValidateCondition).Select(r => r.ToServiceInfo()),
+                allowRuntimeState: true)
+                .Errors.ToArray();
 
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
@@ -3544,6 +3550,10 @@ namespace DryIoc
             return  r.CurrentScope?.TryGetUsedInstance(r, serviceType, out instance) == true ||
                    r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
         }
+
+        /// A bit if sugar to track disposable in singlteon or current scope
+        public static T TrackDisposable<T>(this IResolverContext r, T instance) where T : IDisposable =>
+            (T)(r.SingletonScope ?? r.CurrentScope).TrackDisposable(instance);
     }
 
     /// <summary>The result generated delegate used for service creation.</summary>
@@ -3687,7 +3697,7 @@ namespace DryIoc
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
                     .Map(f => new ServiceRegistrationInfo(f.Value, requiredItemType,
-                         new OpenGenericTypeKey(requiredItemOpenGenericType, f.Key)))
+                         new OpenGenericTypeKey(requiredItemType.GetGenericDefinitionOrNull(), f.Key)))
                     .ToArrayOrSelf();
                 items = items.Append(openGenericItems);
             }
@@ -4022,7 +4032,7 @@ namespace DryIoc
             DefaultDependencyDepthToSplitObjectGraph, null, null, null, null, null);
 
         /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
-        public const int DefaultDependencyDepthToSplitObjectGraph = 5;
+        public const int DefaultDependencyDepthToSplitObjectGraph = 20;
 
         /// <summary>Nested dependency depth to split an object graph</summary>
         public int DependencyDepthToSplitObjectGraph { get; private set; }
@@ -4418,7 +4428,7 @@ namespace DryIoc
         public Rules WithoutEagerCachingSingletonForFasterAccess() =>
             WithSettings(_settings & ~Settings.EagerCachingSingletonForFasterAccess);
 
-        /// <summary><see cref="WithDependencyResolutionCallExpressions"/>.</summary>
+        /// <summary><see cref="WithExpressionGeneration"/>.</summary>
         public Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> DependencyResolutionCallExprs { get; private set; }
 
         /// Indicates that container is used for generation purposes, so it should use less runtime state
@@ -4426,8 +4436,8 @@ namespace DryIoc
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
-        public Rules WithDependencyResolutionCallExpressions() =>
-            new Rules(GetSettingsForExpressionGeneration(), FactorySelector, DefaultReuse,
+        public Rules WithExpressionGeneration(bool allowRuntimeState = false) =>
+            new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -4442,14 +4452,14 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.ImplicitCheckForReuseMatchingScope);
 
         /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
-        public Rules ForExpressionGeneration() => WithSettings(GetSettingsForExpressionGeneration());
+        public Rules ForExpressionGeneration(bool allowRuntimeState = false) => WithSettings(GetSettingsForExpressionGeneration());
 
-        private Settings GetSettingsForExpressionGeneration() =>
+        private Settings GetSettingsForExpressionGeneration(bool allowRuntimeState = false) =>
             _settings & ~Settings.EagerCachingSingletonForFasterAccess
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       & ~Settings.UseInterpretationForTheFirstResolution
-                      | Settings.ThrowIfRuntimeStateRequired
-                      | Settings.UsedForExpressionGeneration;
+                      | Settings.UsedForExpressionGeneration
+                      | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
         public bool ResolveIEnumerableAsLazyEnumerable =>
@@ -5366,7 +5376,7 @@ namespace DryIoc
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
             // done after registration to pass all the registration validation checks
-            if (instance is IDisposable && (setup == null || !setup.PreventDisposal))
+            if (instance is IDisposable && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
                 (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
         }
 
@@ -5695,8 +5705,8 @@ namespace DryIoc
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Adding the factory directly to scope for resolution 
-        public static void Use<TService>(this IResolverContext r, FactoryDelegate factory) =>
-            r.Use(typeof(TService), factory);
+        public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
+            r.Use(typeof(TService), factory.ToFactoryDelegate);
 
         /// Adding the instance directly to scope for resolution 
         public static void Use(this IResolverContext r, Type serviceType, object instance) =>
@@ -5707,8 +5717,8 @@ namespace DryIoc
             r.Use(typeof(TService), instance.ToFactoryDelegate);
 
         /// Adding the factory directly to scope for resolution 
-        public static void Use<TService>(this IRegistrator r, FactoryDelegate factory) =>
-            r.Use(typeof(TService), factory);
+        public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) =>
+            r.Use(typeof(TService), factory.ToFactoryDelegate);
 
         /// Adding the instance directly to scope for resolution 
         public static void Use(this IRegistrator r, Type serviceType, object instance) =>
@@ -5719,8 +5729,8 @@ namespace DryIoc
             r.Use(typeof(TService), instance.ToFactoryDelegate);
 
         /// Adding the factory directly to scope for resolution 
-        public static void Use<TService>(this IContainer c, FactoryDelegate factory) =>
-            ((IResolverContext)c).Use(typeof(TService), factory);
+        public static void Use<TService>(this IContainer c, Func<IResolverContext, TService> factory) =>
+            ((IResolverContext)c).Use(typeof(TService), factory.ToFactoryDelegate);
 
         /// Adding the instance directly to scope for resolution 
         public static void Use(this IContainer c, Type serviceType, object instance) =>
@@ -8434,7 +8444,7 @@ namespace DryIoc
                     if (request.Container.TryGetUsedInstance(paramServiceType, out var instance))
                     {
                         // Generate the fast resolve call for used instances
-                        paramExprs[i] = Call(ResolverContext.GetRootOrSelfExpr(request), Resolver.ResolveFastMethod,
+                        paramExprs[i] = Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
                             Constant(paramServiceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
                         ++usedInputArgAndCustomValueCount;
                         continue;
@@ -8743,7 +8753,7 @@ namespace DryIoc
                     if (request.Container.TryGetUsedInstance(memberServiceType, out var instance))
                     {
                         // Generate the fast resolve call for used instances
-                        memberExpr = Call(ResolverContext.GetRootOrSelfExpr(request), Resolver.ResolveFastMethod,
+                        memberExpr = Call(ResolverContext.GetRootOrSelfExpr(memberRequest), Resolver.ResolveFastMethod,
                             Constant(memberServiceType, typeof(Type)), Constant(memberRequest.IfUnresolved));
                     }
                 }
@@ -9069,7 +9079,7 @@ namespace DryIoc
         /// Simplified specially for register instance 
         internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
-            if (!isStaticallyChecked && ImplementationType?.IsAssignableTo(serviceType.ThrowIfNull()) != true)
+            if (!isStaticallyChecked && (ImplementationType != null && !ImplementationType.IsAssignableTo(serviceType.ThrowIfNull())))
                 Throw.It(Error.RegisteringInstanceNotAssignableToServiceType, ImplementationType, serviceType);
             return true;
         }
@@ -10511,7 +10521,7 @@ namespace DryIoc
                 "There is no explicit or implicit conversion operator found when interpreting the expression: {0}"),
             StateIsRequiredToUseItem = Of(
                 "Runtime state is required to inject (or use) the: {0}. " + NewLine +
-                "The reason is using RegisterDelegate, UseInstance, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
+                "The reason is using RegisterDelegate, Use (or UseInstance), RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgValueIndexIsProvidedButNoArgValues = Of(
                 "`Arg.Index` is provided but no values are passed in Made.Of expression: " + NewLine +
