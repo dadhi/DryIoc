@@ -90,7 +90,7 @@ namespace DryIoc.IssuesTests
         public class AA : A { }
         public class AB : A { }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void ScopedFactory_ShouldResolveItselfWithinSelfScope_EvenIfThereAreParallelScopes()
         {
             var container = new Container();
@@ -114,7 +114,7 @@ namespace DryIoc.IssuesTests
             Assert.AreNotSame(scopedFactory2, scopedFactory4);
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void ScopedFactory_ShouldResolveItselfWithinSelfScope_EvenIfThereAreParallelScopesAndNullArgsProvided()
         {
             var container = new Container();

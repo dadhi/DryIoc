@@ -215,7 +215,10 @@ namespace DryIoc
         private FactoryDelegate CompileAndCacheFactoryDelegate(Type serviceType, object expr)
         {
             if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
+            {
+                _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, null);
                 return obj.ToFactoryDelegate;
+            }
 
             var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
             _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, factoryDelegate);
@@ -295,8 +298,8 @@ namespace DryIoc
             object key = null;
             object inEntryKey = null;
             KV<object, ImHashMap<object, object>> cacheEntry = null;
-            var noArgs = args.IsNullOrEmpty() && (preResolveParent == null || preResolveParent.IsEmpty);
-            if (noArgs)
+            var noCache = args.IsNullOrEmpty() && (preResolveParent == null || preResolveParent.IsEmpty);
+            if (noCache)
             {
                 key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
                 inEntryKey = GetResolvedCacheEntryKeyOrDefault(requiredServiceType, preResolveParent, args);
@@ -340,7 +343,7 @@ namespace DryIoc
                 if (expr is ConstantExpression ce)
                 {
                     var value = ce.Value;
-                    if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
+                    if (factory.Caching != FactoryCaching.DoNotCache && noCache)
                         TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, 
                             (FactoryDelegate)value.ToFactoryDelegate);
                     return value;
@@ -348,7 +351,7 @@ namespace DryIoc
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
-                if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
+                if (factory.Caching != FactoryCaching.DoNotCache && noCache)
                     TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, expr);
 
                 // 1) First try to interpret
@@ -369,7 +372,7 @@ namespace DryIoc
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            if (factory.Caching != FactoryCaching.DoNotCache && noArgs)
+            if (factory.Caching != FactoryCaching.DoNotCache && noCache)
                 TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, factoryDelegate);
 
             return factoryDelegate(this);
@@ -9672,7 +9675,7 @@ namespace DryIoc
         public const int DefaultLifespan = 100;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan => ScopedOrSingleton ? SingletonReuse.DefaultLifespan : DefaultLifespan;
+        public int Lifespan => DefaultLifespan;
 
         /// <inheritdoc />
         public object Name { get; }
@@ -9780,11 +9783,9 @@ namespace DryIoc
         }
 
         /// <summary>Creates reuse optionally specifying its name.</summary>
-        public CurrentScopeReuse(object name = null,
-            bool scopedOrSingleton = false)
+        public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false)
         {
             Name = name;
-            //Lifespan = lifespan;
             ScopedOrSingleton = scopedOrSingleton;
         }
 

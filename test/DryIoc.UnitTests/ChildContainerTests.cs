@@ -219,7 +219,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_produce_container_which_throws_on_further_unregistrations()
+        public void Can_produce_container_which_throws_on_further_un_registrations()
         {
             var c = new Container();
             c.Register<Foo>(Reuse.Singleton);
@@ -240,7 +240,11 @@ namespace DryIoc.UnitTests
 
             container1.Register<ServiceA>(Reuse.Scoped);
 
-            var container2 = container1.With(container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), null, RegistrySharing.CloneAndDropCache, null);
+            var container2 = container1.With(
+                container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), 
+                null, 
+                RegistrySharing.CloneAndDropCache, 
+                null);
 
             var container2Scope = container2.OpenScope();
 
