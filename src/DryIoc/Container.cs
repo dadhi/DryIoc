@@ -790,7 +790,9 @@ namespace DryIoc
 
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
-            var request = Request.Create(this, instanceType).WithResolvedFactory(new RegisteredInstanceFactory(instance));
+            var request = Request.Create(this, instanceType)
+                .WithResolvedFactory(new RegisteredInstanceFactory(instance, Reuse.Transient), 
+                    skipRecursiveDependencyCheck: true, skipCaptiveDependencyCheck: true);
 
             foreach (var serviceInfo in propertiesAndFields(request))
                 if (serviceInfo != null)
@@ -5351,7 +5353,7 @@ namespace DryIoc
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
-            registrator.Register(new RegisteredInstanceFactory(instance, setup),
+            registrator.Register(new RegisteredInstanceFactory(instance, DryIoc.Reuse.Singleton, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
             // done after registration to pass all the registration validation checks
@@ -9064,8 +9066,8 @@ namespace DryIoc
         }
 
         /// <summary>Creates factory.</summary>
-        public RegisteredInstanceFactory(object instance, Setup setup = null)
-           : base(DryIoc.Reuse.Singleton,
+        public RegisteredInstanceFactory(object instance, IReuse reuse = null, Setup setup = null)
+           : base(reuse ?? DryIoc.Reuse.Singleton,
                (setup ?? DryIoc.Setup.Default).WithAsResolutionCallForGeneratedExpression())
         {
             if (instance != null) // it may be `null` as well

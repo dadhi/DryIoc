@@ -233,7 +233,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Ignore("fixme")]
         public void Resolve_scoped_lazy_service_in_parent_container_with_WithoutThrowIfDependencyHasShorterReuseLifespan_via_InjectPropertiesAndFields_should_not_return_null()
         {
             var container1 = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
@@ -274,7 +273,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Ignore("fixme")]
         public void Resolve_lazy_service_in_parent_container_should_work()
         {
             var container1 = new Container();
@@ -293,21 +291,24 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        [Ignore("fixme")]
         public void Resolve_service_in_parent_container_should_work()
         {
             var container1 = new Container();
 
             container1.Register<ServiceA>(Reuse.Scoped);
 
-            var container2 = container1.With(container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), null, RegistrySharing.CloneAndDropCache, null);
+            var container2 = container1.With(
+                container1.Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()), 
+                null, 
+                RegistrySharing.CloneAndDropCache, 
+                null);
 
             var container2Scope = container2.OpenScope();
 
             var serviceC = new ServiceC();
             container2Scope.InjectPropertiesAndFields(serviceC);
 
-            Assert.That(serviceC.ServiceA, Is.InstanceOf<Lazy<ServiceA>>());
+            Assert.That(serviceC.ServiceA, Is.InstanceOf<ServiceA>());
             Assert.That(serviceC.ServiceA, Is.Not.Null);
         }
 
