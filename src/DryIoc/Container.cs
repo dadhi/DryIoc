@@ -288,9 +288,9 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            if (serviceKey == null && requiredServiceType == null &&
-                (preResolveParent == null || preResolveParent.IsEmpty) &&
-                CurrentScope?.Name == null && args.IsNullOrEmpty())
+            preResolveParent = preResolveParent ?? Request.Empty;
+            if (serviceKey == null && requiredServiceType == null && CurrentScope?.Name == null &&
+                preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
             }
@@ -298,11 +298,14 @@ namespace DryIoc
             object key = null;
             object inEntryKey = null;
             KV<object, ImHashMap<object, object>> cacheEntry = null;
-            var noCache = args.IsNullOrEmpty() && (preResolveParent == null || preResolveParent.IsEmpty);
+            var noCache = args.IsNullOrEmpty() && preResolveParent.IsEmpty;
             if (noCache)
             {
                 key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
-                inEntryKey = GetResolvedCacheEntryKeyOrDefault(requiredServiceType, preResolveParent, args);
+
+                inEntryKey = CurrentScope?.Name == null ? requiredServiceType
+                    : requiredServiceType == null ? CurrentScope?.Name
+                    : (object)KV.Of(requiredServiceType, CurrentScope?.Name);
 
                 // Try get from cache first
                 var cache = _registry.Value.KeyedFactoryDelegateCache;
@@ -378,33 +381,6 @@ namespace DryIoc
             return factoryDelegate(this);
         }
 
-        private object GetResolvedCacheEntryKeyOrDefault(Type requiredServiceType, Request preResolveParent, object[] args)
-        {
-            object entryKey = requiredServiceType;
-
-            if (preResolveParent == null)
-                preResolveParent = Request.Empty;
-
-            if (!preResolveParent.IsEmpty)
-                entryKey = entryKey == null ? (object)preResolveParent : KV.Of(entryKey, preResolveParent);
-            else if (preResolveParent.OpensResolutionScope)
-                entryKey = entryKey == null ? (object)true : KV.Of(entryKey, true);
-
-            var currentScopeName = CurrentScope?.Name;
-            if (currentScopeName != null)
-                entryKey = entryKey == null ? currentScopeName : KV.Of(entryKey, currentScopeName);
-
-            if (!args.IsNullOrEmpty())
-            {
-                if (args.Length == 1)
-                    entryKey = entryKey == null ? (object)args[0] : KV.Of(entryKey, args[0]);
-                else
-                    entryKey = entryKey == null ? (object)args : KV.Of(entryKey, args);
-            }
-
-            return entryKey;
-        }
-
         private void TryCacheKeyedFactoryDelegateOrExpression(
             Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key,
             KV<object, ImHashMap<object, object>> cacheEntry, object inEntryKey, 
@@ -425,12 +401,12 @@ namespace DryIoc
 
         private bool GetCachedOrCompileAndCacheFactoryDelegate(
             Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key, 
-            KV<object, ImHashMap<object, object>> cacheEntry, object entryKey, 
+            KV<object, ImHashMap<object, object>> cacheEntry, object inEntryKey, 
             out FactoryDelegate factoryDelegate)
         {
             var cachedFactory = cacheEntry == null ? null :
-                entryKey == null ? cacheEntry.Key :
-                cacheEntry.Value != null ? cacheEntry.Value.GetValueOrDefault(entryKey) :
+                inEntryKey == null ? cacheEntry.Key :
+                cacheEntry.Value != null ? cacheEntry.Value.GetValueOrDefault(inEntryKey) :
                 null;
 
             if (cachedFactory != null)
@@ -439,7 +415,7 @@ namespace DryIoc
                 if (factoryDelegate == null)
                 {
                     factoryDelegate = ((Expression)cachedFactory).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-                    TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, entryKey, factoryDelegate);
+                    TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, inEntryKey, factoryDelegate);
                 }
 
                 return true;
