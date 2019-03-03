@@ -6,7 +6,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" Version="5.6.0" />
         <PackageReference Include="Autofac" Version="4.8.1" />
         <PackageReference Include="Castle.Core" Version="4.3.1" />
         <PackageReference Include="JetBrains.dotMemoryUnit" Version="3.0.20171219.105559" />

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using FluentAssertions;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -21,7 +20,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
             var id = 1000;
-            container.RegisterDelegate((c) => ++id);
+            container.RegisterDelegate(_ => ++id);
 
             container.Register<TrackingDisposable>(Reuse.ScopedOrSingleton);
 
@@ -36,61 +35,65 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
             var id = 1000;
-            container.RegisterDelegate((c) => ++id);
+            container.RegisterDelegate(c => ++id);
             container.Register<TrackingDisposable>(Reuse.ScopedOrSingleton);
-            var childContainer = container.OpenScope();
 
+            var scope = container.OpenScope();
 
             Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(3, TrackingDisposable.ConstructorCallsCount);
+            Assert.AreEqual(1, TrackingDisposable.ConstructorCallsCount);
 
-            Assert.AreEqual(4, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(4, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(4, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(6, TrackingDisposable.ConstructorCallsCount);
+            Assert.AreEqual(2, scope.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(2, scope.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(2, scope.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(2, TrackingDisposable.ConstructorCallsCount);
 
             Assert.AreEqual(0, TrackingDisposable.DestructorCallsCount);
 
-            DebugLogger.Log("extra calls #80 for scope; ignore IDisposable");
-            Assert.Fail(DebugLogger.String());
+            scope.Dispose();
+            Assert.AreEqual(1, TrackingDisposable.DestructorCallsCount);
+
+            container.Dispose();
+            Assert.AreEqual(2, TrackingDisposable.DestructorCallsCount);
         }
 
         [Test]
         public void Issue80_Scoped()
         {
-
             var container = new Container();
             var id = 1000;
-            container.RegisterDelegate((c) => ++id);
+            container.RegisterDelegate(c => ++id);
             container.Register<TrackingDisposable>(Reuse.Scoped);
-            var childContainer = container.OpenScope();
+            var scope1 = container.OpenScope();
 
 
-            Assert.AreEqual(1, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(1, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(1, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(3, TrackingDisposable.ConstructorCallsCount);
+            Assert.AreEqual(1, scope1.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(1, scope1.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(1, scope1.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(1, TrackingDisposable.ConstructorCallsCount);
 
-            var childContainer2 = container.OpenScope();
+            var scope2 = container.OpenScope();
 
-            Assert.AreEqual(4, childContainer2.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(4, childContainer2.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(4, childContainer2.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(6, TrackingDisposable.ConstructorCallsCount);
+            Assert.AreEqual(2, scope2.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(2, scope2.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(2, scope2.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(2, TrackingDisposable.ConstructorCallsCount);
 
-            DebugLogger.Log("extra calls #81 for scope; ignore IDisposable");
             Assert.AreEqual(0, TrackingDisposable.DestructorCallsCount);
 
-            Assert.Fail(DebugLogger.String());
-        }
+            scope1.Dispose();
+            Assert.AreEqual(1, TrackingDisposable.DestructorCallsCount);
 
+            scope2.Dispose();
+            Assert.AreEqual(2, TrackingDisposable.DestructorCallsCount);
+        }
     }
 
     public class TrackingDisposable : IDisposable
     {
-        public TrackingDisposable(Int32 i)
+        public TrackingDisposable(int i)
         {
             DebugLogger.Log($"~ctor {i}");
         }

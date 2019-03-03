@@ -845,6 +845,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac |    673.2 us |   5.5615 us |   5.2022 us |   5.02 |    0.08 |    101.5625 |     18.5547 |           - |           470.39 KB |
                         BmarkGrace | 18,480.8 us | 100.5977 us |  89.1773 us | 137.83 |    2.35 |    156.2500 |     62.5000 |           - |           755.18 KB |
                     BmarkGraceMsDi | 21,640.4 us | 119.7309 us | 106.1383 us | 161.39 |    2.81 |    187.5000 |     93.7500 |     31.2500 |           926.88 KB |
+
+            ## After returning ScopedOrSingleton to use lambda 
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+                       BmarkDryIoc |    160.1 us |   2.670 us |   2.498 us |   0.96 |    0.02 |     30.2734 |      0.4883 |           - |           140.03 KB |
+ BmarkMicrosoftDependencyInjection |    166.9 us |   2.035 us |   1.804 us |   1.00 |    0.00 |     13.6719 |      0.2441 |           - |            58.66 KB |
+                   BmarkDryIocMsDi |    180.2 us |   2.420 us |   2.263 us |   1.08 |    0.02 |     32.4707 |      0.2441 |           - |           150.03 KB |
+                  BmarkAutofacMsDi |    747.8 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
+                      BmarkAutofac |    790.0 us |   5.206 us |   4.615 us |   4.74 |    0.06 |    101.5625 |      6.8359 |           - |           470.32 KB |
+                        BmarkGrace | 20,058.3 us | 290.376 us | 257.411 us | 120.22 |    1.59 |    156.2500 |     62.5000 |           - |           755.11 KB |
+                    BmarkGraceMsDi | 23,546.7 us | 294.414 us | 275.395 us | 141.02 |    2.04 |    187.5000 |     93.7500 |     31.2500 |           926.86 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -1015,6 +1027,19 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                     BmarkGraceMsDi |  5.280 us | 0.0267 us | 0.0236 us |  1.64 |    0.01 |      2.2202 |           - |           - |            10.24 KB |
                       BmarkAutofac | 37.600 us | 0.5655 us | 0.5289 us | 11.67 |    0.16 |      9.3994 |      0.0610 |           - |            43.47 KB |
                   BmarkAutofacMsDi | 49.487 us | 0.4901 us | 0.4585 us | 15.36 |    0.13 |     13.3667 |      0.1221 |           - |            61.75 KB |
+
+            ## After returning ScopedOrSingleton to use lambda 
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  3.308 us | 0.0178 us | 0.0166 us |  1.00 |    0.00 |      0.8354 |           - |           - |             3.87 KB |
+                       BmarkDryIoc |  4.331 us | 0.0239 us | 0.0223 us |  1.31 |    0.01 |      1.9531 |           - |           - |             9.02 KB |
+                        BmarkGrace |  4.374 us | 0.0806 us | 0.0754 us |  1.32 |    0.03 |      1.9684 |           - |           - |              9.1 KB |
+                   BmarkDryIocMsDi |  5.144 us | 0.0819 us | 0.0766 us |  1.56 |    0.03 |      2.1439 |           - |           - |             9.91 KB |
+                    BmarkGraceMsDi |  5.172 us | 0.0858 us | 0.0803 us |  1.56 |    0.03 |      2.1133 |           - |           - |             9.74 KB |
+                      BmarkAutofac | 40.098 us | 0.6651 us | 0.6221 us | 12.12 |    0.17 |      9.8267 |           - |           - |            45.37 KB |
+                  BmarkAutofacMsDi | 51.747 us | 1.0334 us | 1.4821 us | 15.47 |    0.52 |     12.6953 |           - |           - |            58.53 KB |
+
             */
 
             private IServiceProvider _msDi;
