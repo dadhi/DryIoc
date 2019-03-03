@@ -1,22 +1,26 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.WebApi.Owin</id>
-        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>4.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2019 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET WebAPI and OWIN</description>
         <tags>Web ASP WebApi OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
-          v3.0.0:
-          - Support for DryIoc v3
-          v2.2:
-          - changed: Reference latest DryIoc 2.10, DI.Owin 2.1 and DI.WebApi 2.2
-          v2.0.1:
-          - added: Reference to latest DryIoc 2.8 and DI.Owin 2.0.3 and DI.WebApi 2.1.1
+<![CDATA[
+v4.0.0:
+- Support for DryIoc v4
+v3.0.0:
+- Support for DryIoc v3
+v2.2:
+- changed: Reference latest DryIoc 2.10, DI.Owin 2.1 and DI.WebApi 2.2
+v2.0.1:
+- changed: Reference to latest DryIoc 2.8 and DI.Owin 2.0.3 and DI.WebApi 2.1.1
+]]>
         </releaseNotes>
         <dependencies>
           <group>

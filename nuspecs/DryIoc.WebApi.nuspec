@@ -2,18 +2,18 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.WebApi</id>
-        <version>3.1.0-preview-01</version>
+        <version>4.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2018 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET WebAPI</description>
         <tags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
-            <![CDATA[
-v3.1.0:
-- Support for DryIoc v3.1
+<![CDATA[
+v4.0.0:
+- Support for DryIoc v4
 v3.0.0:
 - Support for DryIoc v3
 v2.2:

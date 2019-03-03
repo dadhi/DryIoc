@@ -15,7 +15,8 @@ namespace DryIoc.Microsoft.Hosting
         ///     builder.UseDryIoc(services => container.WithDependencyInjectionAdapter(services, throwIfUnresolved:...));
         /// ]]></code>
         /// </summary>
-        public static IHostBuilder UseDryIoc(this IHostBuilder builder, Func<IServiceCollection, IContainer> configureContainer = null) => 
+        public static IHostBuilder UseDryIoc(this IHostBuilder builder, 
+            Func<IServiceCollection, IContainer> configureContainer = null) => 
             builder.UseServiceProviderFactory(new DryIocServiceProviderFactory(configureContainer));
 
         /// <summary>The same as <see cref="UseDryIoc"/> but composition root to be used as additional service registration.
@@ -35,7 +36,9 @@ namespace DryIoc.Microsoft.Hosting
         /// ]]></code>
         /// </summary>
         public static IHostBuilder UseDryIoc<TCompositionRoot>(this IHostBuilder builder, Func<IServiceCollection, IContainer> configureContainer = null) =>
-            builder.UseServiceProviderFactory(new DryIocServiceProviderFactory(configureContainer, typeof(TCompositionRoot)));
+            builder.UseServiceProviderFactory(
+                new DryIocServiceProviderFactory(configureContainer, 
+                typeof(TCompositionRoot)));
     }
 
     /// <summary>Service provider via DryIoc container.</summary>
@@ -45,7 +48,9 @@ namespace DryIoc.Microsoft.Hosting
         private readonly Type _compositionRootType;
 
         /// <summary>Constructs the factory with optional pre-configured container via <paramref name="configureContainer"/>.</summary>
-        public DryIocServiceProviderFactory(Func<IServiceCollection, IContainer> configureContainer = null, Type compositionRootType = null)
+        public DryIocServiceProviderFactory(
+            Func<IServiceCollection, IContainer> configureContainer = null, 
+            Type compositionRootType = null)
         {
             _configureContainer = configureContainer;
             _compositionRootType = compositionRootType;
@@ -59,12 +64,12 @@ namespace DryIoc.Microsoft.Hosting
         /// <summary>Resolves service provider from configured DryIoc container.</summary>
         public IServiceProvider CreateServiceProvider(IContainer containerBuilder)
         {
-            // todo: Replace with `WithCompositionRoot` and `BuildServiceProvider` when it available
             if (_compositionRootType != null)
             {
                 containerBuilder.Register(_compositionRootType);
                 containerBuilder.Resolve(_compositionRootType);
             }
+
             return containerBuilder.GetServiceProvider();
         }
     }

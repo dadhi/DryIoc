@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net45</TargetFramework>
 
         <Product>DryIoc.WebApi</Product>
-        <VersionPrefix>3.1.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionPrefix>4.0.0</VersionPrefix>
+        <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
@@ -15,8 +15,8 @@
         <PackageTags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-v3.1.0:
-- Support for DryIoc v3.1
+v4.0.0:
+- Support for DryIoc v4
 v3.0.0:
 - Support for DryIoc v3
 v2.2:

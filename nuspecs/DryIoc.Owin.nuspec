@@ -1,30 +1,34 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.Owin</id>
-        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>4.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2019 Maksim Volkau</copyright>
         <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
         <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for OWIN</description>
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
-          v3.0.0:
-          - Support for DryIoc v3
-          v2.2.0
-          - changed: (for #460) `UseDryIocOwinMiddleware` to simply call `InsertOpenScope` then `UseRegisteredMiddlewares`
-          - changed: Methods return `IAppBuilder` to enable fluent method chaining
-          - fixed: #460 Sequence of Owin Middleware with external libraries
-          v2.1.0
-          - changed: Reference to latest DryIoc 2.10
-          v2.0.3
-          - changed: Reference to latest DryIoc 2.8.3
-          v2.0.2
-          - fixed: #306: DryIoc.Owin: Use registered middlewares in service key then registration order
-          v2.0.1
-          - fixed: #209: Possible leak in UseDryIocOwinMiddleware
+        <![CDATA[
+v4.0.0:
+- Support for DryIoc v4
+v3.0.0:
+- Support for DryIoc v3
+v2.2.0
+- changed: (for #460) `UseDryIocOwinMiddleware` to simply call `InsertOpenScope` then `UseRegisteredMiddlewares`
+- changed: Methods return `IAppBuilder` to enable fluent method chaining
+- fixed: #460 Sequence of Owin Middleware with external libraries
+v2.1.0
+- chnaged: Reference to latest DryIoc 2.10
+v2.0.3
+- chnaged: Reference to latest DryIoc 2.8.3
+v2.0.2
+- fixed: #306: DryIoc.Owin: Use registered middlewares in service key then registration order
+v2.0.1
+- fixed: #209: Possible leak in UseDryIocOwinMiddleware
+    ]]>
         </releaseNotes>
         <dependencies>
           <group>

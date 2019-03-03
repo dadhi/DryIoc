@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.0.0-preview-02</version>
+        <version>4.0.0</version>
         <!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
@@ -32,6 +32,7 @@ v4.0.0
 - fixed: #61 Rules.SelectLastRegisteredFactory() does not account for OpenGenerics
 - fixed: #63 Func wrapper resolving #63
 - fixed: #75 Scoped call to Resolve() with args seems to leak memory
+- fixed: #80 ScopedOrSingleton -> Extra constructor calls
 - fixed: BB-593 Add auto-generated tag to PCL FEC
 - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
 - fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
