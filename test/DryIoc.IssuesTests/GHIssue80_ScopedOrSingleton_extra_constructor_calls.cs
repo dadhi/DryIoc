@@ -12,12 +12,27 @@ namespace DryIoc.IssuesTests
         [SetUp]
         public void SetUp()
         {
-            TrackingDisposable.ConstructorIndex = 0;
-            TrackingDisposable.DestructorIndex = 0;
+            TrackingDisposable.ConstructorCallsCount = 0;
+            TrackingDisposable.DestructorCallsCount = 0;
         }
 
         [Test]
-        public void DryIocTest_Issue80()
+        public void Issue80_ScopedOrSingleton_SingletonCheck()
+        {
+            var container = new Container();
+            var id = 1000;
+            container.RegisterDelegate((c) => ++id);
+
+            container.Register<TrackingDisposable>(Reuse.ScopedOrSingleton);
+
+            Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
+            Assert.AreEqual(1, TrackingDisposable.ConstructorCallsCount, "expected 1 CONSTRUCTOR CALL, BECAUSE SINGLETON");// value = 3
+        }
+
+        [Test]
+        public void Issue80_ScopedOrSingleton()
         {
             var container = new Container();
             var id = 1000;
@@ -29,21 +44,21 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(1, container.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(3, TrackingDisposable.ConstructorIndex);
+            Assert.AreEqual(3, TrackingDisposable.ConstructorCallsCount);
 
             Assert.AreEqual(4, childContainer.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(4, childContainer.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(4, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(6, TrackingDisposable.ConstructorIndex);
+            Assert.AreEqual(6, TrackingDisposable.ConstructorCallsCount);
 
-            Assert.AreEqual(0, TrackingDisposable.DestructorIndex);
+            Assert.AreEqual(0, TrackingDisposable.DestructorCallsCount);
 
             DebugLogger.Log("extra calls #80 for scope; ignore IDisposable");
-            Assert.Pass(DebugLogger.String());
+            Assert.Fail(DebugLogger.String());
         }
 
         [Test]
-        public void DryIocTest_Issue81()
+        public void Issue80_Scoped()
         {
 
             var container = new Container();
@@ -56,73 +71,21 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(1, childContainer.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(1, childContainer.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(1, childContainer.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(3, TrackingDisposable.ConstructorIndex);
+            Assert.AreEqual(3, TrackingDisposable.ConstructorCallsCount);
 
             var childContainer2 = container.OpenScope();
 
             Assert.AreEqual(4, childContainer2.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(4, childContainer2.Resolve<TrackingDisposable>().Value);
             Assert.AreEqual(4, childContainer2.Resolve<TrackingDisposable>().Value);
-            Assert.AreEqual(6, TrackingDisposable.ConstructorIndex);
+            Assert.AreEqual(6, TrackingDisposable.ConstructorCallsCount);
 
             DebugLogger.Log("extra calls #81 for scope; ignore IDisposable");
-            Assert.AreEqual(0, TrackingDisposable.DestructorIndex);
+            Assert.AreEqual(0, TrackingDisposable.DestructorCallsCount);
 
-            Assert.Pass(DebugLogger.String());
+            Assert.Fail(DebugLogger.String());
         }
 
-        [Test]
-        public void Test_Scope_1()
-        {
-            var id = 1000;
-            string s = "12345";
-
-            var container = new Container();
-            container.RegisterInstance(s);
-            container.RegisterDelegate((c) => ++id);
-            container.Register<TrackingDisposable>(Reuse.Scoped);
-            container.Resolve<string>().Should().Be(s);
-
-            var child = container.OpenScope();
-            child.Resolve<TrackingDisposable>().Value.Should().Be(1);
-            child.Resolve<TrackingDisposable>().Value.Should().Be(1);
-            child.Resolve<TrackingDisposable>().Value.Should().Be(1);
-            child.Resolve<string>().Should().Be(s);
-
-            var child2 = child.OpenScope();
-
-            child2.Resolve<TrackingDisposable>().Value.Should().Be(4);
-            child2.Resolve<TrackingDisposable>().Value.Should().Be(4);
-            child2.Resolve<TrackingDisposable>().Value.Should().Be(4);
-            child2.Resolve<string>().Should().Be(s);
-
-            var child3 = child2.OpenScope();
-
-            child3.Resolve<TrackingDisposable>().Value.Should().Be(7);
-            child3.Resolve<TrackingDisposable>().Value.Should().Be(7);
-            child3.Resolve<TrackingDisposable>().Value.Should().Be(7);
-            child3.Resolve<string>().Should().Be(s);
-
-            child3.Dispose();
-
-            child2.Resolve<string>().Should().Be(s);
-            child2.Resolve<TrackingDisposable>().Value.Should().Be(4);
-            child2.Resolve<TrackingDisposable>().Value.Should().Be(4);
-            child2.Resolve<TrackingDisposable>().Value.Should().Be(4);
-
-            child.Resolve<string>().Should().Be(s);
-            child.Resolve<TrackingDisposable>().Value.Should().Be(1);
-            child.Resolve<TrackingDisposable>().Value.Should().Be(1);
-            child.Resolve<TrackingDisposable>().Value.Should().Be(1);
-
-            container.Resolve<string>().Should().Be(s);
-
-            var ms = container.With(rules => Rules.MicrosoftDependencyInjectionRules);
-            var value = 6666;
-
-            ms.Use(value);
-            ms.Resolve<Int32>().Should().Be(value);
-        }
     }
 
     public class TrackingDisposable : IDisposable
@@ -132,14 +95,14 @@ namespace DryIoc.IssuesTests
             DebugLogger.Log($"~ctor {i}");
         }
 
-        public static Int32 ConstructorIndex;
-        public static Int32 DestructorIndex;
-        public Int32 Value { get; set; } = ++ConstructorIndex;
+        public static Int32 ConstructorCallsCount;
+        public static Int32 DestructorCallsCount;
+        public Int32 Value { get; set; } = ++ConstructorCallsCount;
 
         public void Dispose()
         {
             DebugLogger.Log($"~dispose {Value}");
-            ++DestructorIndex;
+            ++DestructorCallsCount;
         }
     }
     public class DebugLogger
