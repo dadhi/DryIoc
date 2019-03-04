@@ -14,7 +14,7 @@
         <Description>DryIoc extension for OWIN</Description>
         <PackageTags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
+<![CDATA[
 v4.0.0:
 - Support for DryIoc v4
 v3.0.0:
@@ -31,7 +31,7 @@ v2.0.2
 - fixed: #306: DryIoc.Owin: Use registered middlewares in service key then registration order
 v2.0.1
 - fixed: #209: Possible leak in UseDryIocOwinMiddleware
-    ]]>
+]]>
         </PackageReleaseNotes>
 
     </PropertyGroup>

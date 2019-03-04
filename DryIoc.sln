@@ -89,9 +89,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "playground\Pl
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "nuspecs", "nuspecs", "{78204655-2AD6-4729-B436-44B370317EC1}"
 	ProjectSection(SolutionItems) = preProject
+		nuspecs\DryIoc.CommonServiceLocator.nuspec = nuspecs\DryIoc.CommonServiceLocator.nuspec
+		nuspecs\DryIoc.Internal.nuspec = nuspecs\DryIoc.Internal.nuspec
+		nuspecs\DryIoc.MefAttributedModel.nuspec = nuspecs\DryIoc.MefAttributedModel.nuspec
 		nuspecs\DryIoc.Mvc.nuspec = nuspecs\DryIoc.Mvc.nuspec
 		nuspecs\DryIoc.nuspec = nuspecs\DryIoc.nuspec
 		nuspecs\DryIoc.Owin.nuspec = nuspecs\DryIoc.Owin.nuspec
+		nuspecs\DryIoc.SignalR.nuspec = nuspecs\DryIoc.SignalR.nuspec
 		nuspecs\DryIoc.snk = nuspecs\DryIoc.snk
 		nuspecs\DryIoc.Web.nuspec = nuspecs\DryIoc.Web.nuspec
 		nuspecs\DryIoc.WebApi.nuspec = nuspecs\DryIoc.WebApi.nuspec

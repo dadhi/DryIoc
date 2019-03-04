@@ -15,7 +15,7 @@
         <Description>Superset of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features</Description>
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
-        <![CDATA[
+            <![CDATA[
 v5.0.0
 - updated to DryIoc v4
 v4.1.0
@@ -26,7 +26,8 @@ v4.0.1
 - added: NetStandard 1.3 and 2.0 package targets
 v4.0.0
 - Support for DryIoc v3
-        ]]></PackageReleaseNotes>
+        ]]>
+        </PackageReleaseNotes>
     </PropertyGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net40'">

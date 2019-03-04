@@ -14,8 +14,8 @@ echo:
 echo:DryIoc source and internal packages
 echo:===================================
 %NUGET% pack %NUSPECS%\DryIoc.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
-REM PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\BuildScripts\MakeInternal.ps1'";
-REM %NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\BuildScripts\MakeInternal.ps1'";
+%NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIocZero
@@ -25,17 +25,17 @@ echo:============================
 echo:
 echo:DryIocAttributes
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIocAttributes.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIocAttributes.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:MefAttributedModel
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.MefAttributedModel.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.MefAttributedModel.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.CommonServiceLocator
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.CommonServiceLocator.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.CommonServiceLocator.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.Web
@@ -55,17 +55,17 @@ echo:============================
 echo:
 echo:DryIoc.Owin
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.Owin.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.Owin.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.WebApi.Owin
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.WebApi.Owin.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.WebApi.Owin.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIoc.SignalR
 echo:============================
-REM %NUGET% pack %NUSPECS%\DryIoc.SignalR.nuspec -Version %VER% -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.SignalR.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 REM if not "%1"=="-nopause" pause 
 REM goto:eof

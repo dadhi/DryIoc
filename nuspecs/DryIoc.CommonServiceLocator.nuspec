@@ -1,33 +1,39 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.CommonServiceLocator</id>
-        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>4.0.0</version><!-- overridden by "nuget pack -Version" flag -->
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014 Maksim Volkau</copyright>
-        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <copyright>Copyright © 2014-2019 Maksim Volkau</copyright>
+        <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://commonservicelocator.codeplex.com/</description>
         <tags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-          v3.0.0:
-          - Support for DryIoc v3
-          - Support for CommonServiceLocator v2
+<![CDATA[
+v4.0.0:
+- Support for DryIoc v4.0
+v3.1.0:
+- Support for DryIoc v3.1
+v3.0.0:
+- Support for DryIoc v3
+- Support for CommonServiceLocator v2
+]]>
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="3.0.2" />
+            <dependency id="DryIoc" version="4.0.0" />
             <dependency id="CommonServiceLocator" version="2.0.3" />
           </group>
         </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\NuGetSpecs\README.md" />
+        <file src="..\nuspecs\DryIoc.snk" />
 
-        <!-- .NET 4.5 -->
-        <file src="..\Extensions\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\net40-Client\DryIoc\CommonServiceLocator" />
+        <file src="..\src\DryIoc.CommonServiceLocator\DryIocServiceLocator.cs" target="content\net40-Client\DryIoc\CommonServiceLocator" />
 
     </files>
 </package>

@@ -5,8 +5,9 @@
         <version>4.0.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
-        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for ASP.NET providing Web Request Reuse</description>
         <tags>Web ASP Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
@@ -31,7 +32,7 @@ v2.0.1:
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="3.1.0-preview-07" />
+            <dependency id="DryIoc" version="4.0.0" />
             <dependency id="Microsoft.Web.Infrastructure" version="1.0.0" />
           </group>
         </dependencies>

@@ -16,9 +16,38 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-v4.0.0
-- Strongly-named!
-- Greatly improved performance and decreased memory allocations for bootstapping and first-time resolution, as well as for the rest of operations
+## v4.0.0 Release notes
+
+### Highlights
+
+- DryIoc.dll and all extensions are strongly-signed.
+- Greatly improved performance and decreased memory allocations for bootstrapping and first-time resolution, as well as for the rest of operations. [The results](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255) were measured on realistic mid-sized object graph with ~40 dependencies and mixed registration types.
+- `IResolver` is directly implementing (`IServiceProvider`)[https://docs.microsoft.com/en-us/dotnet/api/system.iserviceprovider?view=netframework-4.7.2] for supported platforms
+- `UseInstance` is split into `RegisterInstance` and `Use` methods #78
+- The docs now are generated from `.cs` files in _DryIoc.Docs_ project with up-to-date runnable examples using [CsToMd](https://github.com/dadhi/Cstomd) project.
+
+### Features
+
+- added: #4 Rule for Func and Lazy to be resolved even without requested service registered
+- added: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
+- added: #9 RegisterMany should indicate if no registration was made
+- added: #11 Resolution root bound dependency expression de-duplication
+- added: #17 Rules.DefaultRegistrationServiceKey enhancement
+- added: #20 Enhance error message with current container Rules info
+- added: #32 Integrate MediatR like middleware directly to DryIoc #32
+- added: #39 For troubleshooting purposes add ability to opt-out FastExpressionCompiler 
+- Added: #45 Consider expression interpretation to speed-up first time resolution
+- added: #78 Split UseInstance two roles into separate RegisterInstance and Use
+- added: DryIoc IResolver now directly implements IServiceProvider - no need for BuildServiceProvider anymore
+- added: DryIoc.Rules.Rules.MicrosoftDependencyInjectionRules - the set of rules for MS.DI available directly in DryIoc
+- added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
+- added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
+- added: IRegistrator.GetRegisteredFactories
+- added: FactoryType to Registrator.RegisterMapping
+- added: AsyncExecutionFlowScopeContext.Default member
+- added: Support for FEC v2.0
+
+### Fixes
 
 - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
 - fixed: #7 Context-based injection
@@ -34,38 +63,10 @@ v4.0.0
 - fixed: #61 Rules.SelectLastRegisteredFactory() does not account for OpenGenerics
 - fixed: #63 Func wrapper resolving #63
 - fixed: #75 Scoped call to Resolve() with args seems to leak memory
-- fixed: #80 ScopedOrSingleton -> Extra constructor calls
 - fixed: BB-593 Add auto-generated tag to PCL FEC
 - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
 - fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
 - fixed: Using facadeKey in CreateFacade
-- added: #4 Rule for Func and Lazy to be resolved even without requested service registered
-- added: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
-- added: #9 RegisterMany should indicate if no registration was made
-- added: #11 Resolution root bound dependency expression de-duplication
-- added: #17 Rules.DefaultRegistrationServiceKey enhancement
-- added: #20 Enhance error message with current container Rules info
-- added: #32 Integrate MediatR like middleware directly to DryIoc #32
-- added: #39 For troubleshooting purposes add ability to opt-out FastExpressionCompiler 
-- ADDED: #45 Consider expression interpretation to speed-up first time resolution
-- added: DryIoc IResolver now directly implements IServiceProvider - no need for BuildServiceProvider anymore
-- added: DryIoc.Rules.Rules.MicrosoftDependencyInjectionRules - the set of rules for MS.DI available directly in DryIoc
-- added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
-- added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
-- added: IRegistrator.GetRegisteredFactories
-- added: FactoryType to Registrator.RegisterMapping
-- added: AsyncExecutionFlowScopeContext.Default member
-- added: Support for FEC v2.0-preview-03
-- changed: [generation] Using run-time request object 
-
-v3.0.2
-- fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
-
-v3.0.1
-- added: NetStandard 2.0 package target with no dependencies
-
-v3.0.0
-- Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
 ]]>
     </PackageReleaseNotes>
     </PropertyGroup>

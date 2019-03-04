@@ -3,11 +3,11 @@
   <metadata>
     <id>DryIocAttributes</id>
     <version>5.0.0</version>
-    <!-- overridden by "nuget pack -Version" flag -->
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
-    <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-    <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+    <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+    <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+    <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Super-set of MEF attributes. In addition to Export/Import contains attributes to support modern IOC (DryIoc) features.</description>
     <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
@@ -33,54 +33,31 @@ v4.0.0
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
-    <file src="..\NuGetSpecs\DryIoc.snk" />
+    <file src="..\nuspecs\DryIoc.snk" />
 
     <!-- net35 -->
-    <file src="..\DryIocAttributes\Attributes.cs" target="content\net35\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\net35\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net40.cs" target="content\net35\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="content\net35\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net35\DryIocAttributes" />
 
     <!-- net40 -->
-    <file src="..\DryIocAttributes\Attributes.cs" target="content\net40\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="content\net40\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net40\DryIocAttributes" />
 
     <!-- net45 -->
-    <file src="..\DryIocAttributes\Attributes.cs" target="content\net45\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net45\DryIocAttributes" />
 
     <!-- PCL Profile328 .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-    <file src="..\DryIocAttributes\Attributes.cs"   target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net40.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs"   target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
 
     <!-- PCL Profile259:.NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-    <file src="..\DryIocAttributes\Attributes.cs"   target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
-
-    <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
-    <file src="..\DryIocAttributes\Attributes.cs"   target="content\xamarinmac20\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="content\xamarinmac20\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="content\xamarinmac20\DryIocAttributes" />
-
-    <!--uap10.0: Universal Windows Platform-->
-    <file src="..\DryIocAttributes\Attributes.cs" target="contentFiles\cs\any" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\any" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="contentFiles\cs\any" />
+    <file src="..\src\DryIocAttributes\Attributes.cs"   target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIocAttributes" />
 
     <!-- NetStandard1.0 (based on PCL Profile259) -->
-    <file src="..\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-net45.cs" target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard1.0\DryIocAttributes" />
 
     <!-- NetStandard1.3 (based on Net45) -->
-    <file src="..\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard1.3\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\netstandard1.3\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard1.3\DryIocAttributes" />
 
     <!-- NetStandard2.0 (based on Net45) -->
-    <file src="..\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard2.0\DryIocAttributes" />
-    <file src="..\DryIocAttributes\Ported-MefAttributes.cs" target="contentFiles\cs\netstandard2.0\DryIocAttributes" />
+    <file src="..\src\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard2.0\DryIocAttributes" />
 
   </files>
 </package>

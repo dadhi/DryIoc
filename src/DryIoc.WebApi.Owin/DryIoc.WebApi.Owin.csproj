@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-      <TargetFramework>net45</TargetFramework>
+    <PropertyGroup>
+        <TargetFramework>net45</TargetFramework>
 
         <Product>DryIoc.WebApi.Owin</Product>
         <VersionPrefix>4.0.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
-     
+
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
 
@@ -14,7 +14,7 @@
         <Description>DryIoc extension for ASP.NET WebAPI with OWIN</Description>
         <PackageTags>Web ASP WebApi OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
-<![CDATA[
+            <![CDATA[
 v4.0.0:
 - Support for DryIoc v4
 v3.0.0:
@@ -25,23 +25,23 @@ v2.0.1:
 - changed: Reference to latest DryIoc 2.8 and DI.Owin 2.0.3 and DI.WebApi 2.1.1
 ]]>
         </PackageReleaseNotes>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.2.6" />
-    <PackageReference Include="Microsoft.Owin" Version="3.0.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="Owin" Version="1.0" />
-  </ItemGroup>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
+        <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.6" />
+        <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.2.6" />
+        <PackageReference Include="Microsoft.Owin" Version="3.0.1" />
+        <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+        <PackageReference Include="Owin" Version="1.0" />
+    </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="System.Net.Http" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
-    <ProjectReference Include="..\DryIoc.Owin\DryIoc.Owin.csproj" />
-    <ProjectReference Include="..\DryIoc.WebApi\DryIoc.WebApi.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <Reference Include="System.Net.Http" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+        <ProjectReference Include="..\DryIoc.Owin\DryIoc.Owin.csproj" />
+        <ProjectReference Include="..\DryIoc.WebApi\DryIoc.WebApi.csproj" />
+    </ItemGroup>
 </Project>

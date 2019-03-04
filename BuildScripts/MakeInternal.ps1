@@ -1,10 +1,10 @@
 $inputFiles = @(
-    ".\DryIoc\Container.cs",
-    ".\DryIoc\ImTools.cs",
-    ".\DryIoc\FastExpressionCompiler.cs",
-    ".\DryIoc\Expression.cs"
+    ".\src\DryIoc\Container.cs",
+    ".\src\DryIoc\ImTools.cs",
+    ".\src\DryIoc\FastExpressionCompiler.cs",
+    ".\src\DryIoc\Expression.cs"
 )
-$outputFolder = ".\DryIoc.Internal"
+$outputFolder = ".\src\DryIoc.Internal"
 
 New-Item -ItemType Directory -Force -Path $outputFolder | Out-Null
 ForEach ($file in $inputFiles)

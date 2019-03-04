@@ -2,11 +2,12 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.Owin</id>
-        <version>4.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>4.0.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2014-2019 Maksim Volkau</copyright>
-        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for OWIN</description>
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
@@ -32,17 +33,17 @@ v2.0.1
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="3.0.2" />
+            <dependency id="DryIoc" version="4.0.0" />
             <dependency id="Microsoft.Owin" version="3.0.1" />
           </group>
         </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\NuGetSpecs\DryIoc.snk" />
+        <file src="..\nuspecs\DryIoc.snk" />
 
         <!-- net45 -->
-        <file src="..\Extensions\DryIoc.Owin\DryIocOwin.cs" target="content\net45\DryIoc\Owin" />
+        <file src="..\src\DryIoc.Owin\DryIocOwin.cs" target="content\net45\DryIoc\Owin" />
 
     </files>
 </package>

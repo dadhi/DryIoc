@@ -1,39 +1,45 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.SignalR</id>
-        <version>0.0.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>4.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016 Maksim Volkau</copyright>
-        <projectUrl>https://bitbucket.org/dadhi/dryioc</projectUrl>
-        <licenseUrl>http://opensource.org/licenses/MIT</licenseUrl>
+        <copyright>Copyright © 2016-2019 Maksim Volkau</copyright>
+        <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Source code for DryIoc integration with ASP.NET SignalR</description>
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
-      <releaseNotes>
-        v3.0.0:
-        - Support for DryIoc v3
-        v2.1:
-        - changed: Reference to latest DryIoc 2.10
-        v2.0.1:
-        - changed: Reference to latest DryIoc 2.8.3
-        v2.0.0:
-        - changed: WithSignalR to not modify container and just register HubActivator, Hubs, and set GlobalHost.Resolver
-        - changed: HubActivator to just resolving the Hub without opening the scope
-        - add: Helper methods to RegisterHubs
-      </releaseNotes>
-      <dependencies>
-        <group>
-          <dependency id="DryIoc" version="3.0.2" />
-          <dependency id="Microsoft.AspNet.SignalR.Core" version="2.3.0" />
-        </group>
-      </dependencies>
+        <releaseNotes>
+            <![CDATA[
+v4.0.0:
+- added: Support for DryIoc v4
+v3.0.0:
+- added: Support for DryIoc v3
+v2.1:
+- changed: Reference to latest DryIoc 2.10
+v2.0.1:
+- changed: Reference to latest DryIoc 2.8.3
+v2.0.0:
+- changed: WithSignalR to not modify container and just register HubActivator, Hubs, and set GlobalHost.Resolver
+- changed: HubActivator to just resolving the Hub without opening the scope
+- add: Helper methods to RegisterHubs
+]]>
+        </releaseNotes>
+        <dependencies>
+            <group>
+                <dependency id="DryIoc" version="4.0.0" />
+                <dependency id="Microsoft.AspNet.SignalR.Core" version="2.3.0" />
+            </group>
+        </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
+        <file src="..\nuspecs\DryIoc.snk" />
 
         <!-- net45 -->
-        <file src="..\Extensions\DryIoc.SignalR\DryIocSignalR.cs" target="content\net45\DryIoc\SignalR" />
+        <file src="..\src\DryIoc.SignalR\DryIocSignalR.cs" target="content\net45\DryIoc\SignalR" />
 
     </files>
 </package>

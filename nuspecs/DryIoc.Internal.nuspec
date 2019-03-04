@@ -2,42 +2,69 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>0.0.0</version>
-        <!-- overridden by "nuget pack -Version" flag -->
+        <version>4.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
-        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo64.png</iconUrl>
         <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
-            v3.1.0-preview-01
-            - fixed: BB-593 Add auto-generated tag to PCL FEC
-            - fixed: BB-594 Conflicting type is not working in .NET Core 2.1
-            - fixed: BB-596 The problem was in non-public service type
-            - fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
-            - fixed: #7 Context-based injection
-            - fixed: #16 AutoConcreteTypeResolution should not consider a primitive type
-            - fixed: #25 Decorator with serviceKey throws exception which gives invalid advice on how to fix the issue for the most common reason to use the servicekey
-            - fixed: RegisterMapping for open-generic service type
-            - fixed: Using facadeKey in CreateFacade
-            - added: #4 Rule for Func and Lazy to be resolved even without requested service registered
-            - added: #9 RegisterMany should indicate if no registration was made
-            - added: #17 Rules.DefaultRegistrationServiceKey enhancement
-            - added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
-            - added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
-            - added: IRegistrator.GetRegisteredFactories
-            - added: FactoryType to Registrator.RegisterMapping
-            - changed: #11 Resolution root bound dependency expression de-duplication
-            - changed: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
-            v3.0.2
-            - fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
-            v3.0.1
-            - added: NetStandard 1.0, 1.3 and 2.0 package targets
-            v3.0.0
-            - Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
+            <![CDATA[
+v4.0.0
+- Strongly-named!
+- Greatly improved performance and decreased memory allocations for bootstapping and first-time resolution, as well as for the rest of operations
+
+- fixed: #6 Open generic singleton service registration that satisfies multiple interfaces
+- fixed: #7 Context-based injection
+- fixed: #16 AutoConcreteTypeResolution should not consider a primitive type
+- fixed: #25 Decorator with serviceKey throws exception which gives invalid advice on how to fix the issue for the most common reason to use the servicekey
+- fixed: #26 Speed Optimization for short living applications
+- fixed: #27 DryIoc cold start performance
+- fixed: #28 FastExpressionCompiler is not used in Net Standard 1.3, 2.0 packages and not used in .Net Core
+- fixed: #29 Resolve caches object[] args values
+- fixed: #33 Memory leak with ResolveManyBehavior.AzLazyEnumerable?
+- fixed: #41 ErrorCode: RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType
+- fixed: #46 Operation is not supported on this platform exception on Xamarin iOS
+- fixed: #61 Rules.SelectLastRegisteredFactory() does not account for OpenGenerics
+- fixed: #63 Func wrapper resolving #63
+- fixed: #75 Scoped call to Resolve() with args seems to leak memory
+- fixed: #80 ScopedOrSingleton -> Extra constructor calls
+- fixed: BB-593 Add auto-generated tag to PCL FEC
+- fixed: BB-594 Conflicting type is not working in .NET Core 2.1
+- fixed: BB-596 The problem was in non-public service type- fixed: RegisterMapping for open-generic service type
+- fixed: Using facadeKey in CreateFacade
+- added: #4 Rule for Func and Lazy to be resolved even without requested service registered
+- added: #8 Parity of registration methods between IContainer and IRegistrator (RegisterMapping and RegisterPlaceholder are available in IRegistrator)
+- added: #9 RegisterMany should indicate if no registration was made
+- added: #11 Resolution root bound dependency expression de-duplication
+- added: #17 Rules.DefaultRegistrationServiceKey enhancement
+- added: #20 Enhance error message with current container Rules info
+- added: #32 Integrate MediatR like middleware directly to DryIoc #32
+- added: #39 For troubleshooting purposes add ability to opt-out FastExpressionCompiler 
+- ADDED: #45 Consider expression interpretation to speed-up first time resolution
+- added: DryIoc IResolver now directly implements IServiceProvider - no need for BuildServiceProvider anymore
+- added: DryIoc.Rules.Rules.MicrosoftDependencyInjectionRules - the set of rules for MS.DI available directly in DryIoc
+- added: FactoryInfo.Of(MemberInfo factoryMember, object factoryInstance)
+- added: Explicit Factory.RegistrationOrder and adapted its usage for open-generics
+- added: IRegistrator.GetRegisteredFactories
+- added: FactoryType to Registrator.RegisterMapping
+- added: AsyncExecutionFlowScopeContext.Default member
+- added: Support for FEC v2.0-preview-03
+- changed: [generation] Using run-time request object 
+
+v3.0.2
+- fixed: NetStandard 1.3 and 2.0 package targets to be based on NetStandard 1.0 to be better aligned with extensions
+
+v3.0.1
+- added: NetStandard 2.0 package target with no dependencies
+
+v3.0.0
+- Release Notes https://bitbucket.org/dadhi/dryioc/wiki/Version3ReleaseNotes
+
+        ]]>
         </releaseNotes>
         <contentFiles>
             <files include="cs/**/*.*" buildAction="Compile" />
@@ -45,70 +72,50 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\NuGetSpecs\README.md" />
-        <file src="..\NuGetSpecs\DryIoc.snk" />
+        <file src="..\nuspecs\DryIoc.snk" />
 
         <!--net35-->
-        <file src="..\DryIoc.Internal\Container.cs" target="content\net35\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="content\net35\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\net35\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net40.cs" target="content\net35\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs" target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="content\net35\DryIoc" />
 
         <!--net40-->
-        <file src="..\DryIoc.Internal\Container.cs" target="content\net40\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="content\net40\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs" target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
 
         <!--net45-->
-        <file src="..\DryIoc.Internal\Container.cs" target="content\net45\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="content\net45\DryIoc" />
-        <file src="..\DryIoc.Internal\FastExpressionCompiler.cs" target="content\net45\DryIoc" />
-        <file src="..\DryIoc.Internal\AsyncExecutionFlowScopeContext.cs" target="content\net45\DryIoc" />
-
-        <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\DryIoc.Internal\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net45.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-
-        <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\DryIoc.Internal\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-
-        <!-- xamarinmac20: Xamarin.Forms for MacOS support, based on PCL Profile259/netstandard1.0 -->
-        <file src="..\DryIoc\Container.cs" target="content\xamarinmac20\DryIoc" />
-        <file src="..\DryIoc\ImTools.cs" target="content\xamarinmac20\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="content\xamarinmac20\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="content\xamarinmac20\DryIoc" />
-
-        <!--uap10.0: Universal Windows Platform-->
-        <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\any" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\any" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\any" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\any" />
+        <file src="..\src\DryIoc.Internal\Container.cs" target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs" target="content\net45\DryIoc" />
 
         <!-- .netstandard 1.0 (based on PCL Profile259) -->
-        <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
 
-        <!-- .netstandard 1.3 (based on PCL Profile259) -->
-        <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <!-- .netstandard 1.3 (based on PCL Profile259 except for FEC) -->
+        <file src="..\src\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs" target="contentFiles\cs\netstandard1.3\DryIoc" />
 
-        <!-- .netstandard 2.0 (based on PCL Profile259) -->
-        <file src="..\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\DryIoc.Internal\Ported-net.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\PCL\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <!-- .netstandard 2.0 (based on PCL Profile259 except for FEC) -->
+        <file src="..\src\DryIoc.Internal\Container.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs" target="contentFiles\cs\netstandard2.0\DryIoc" />
+
+        <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\src\DryIoc.Internal\Container.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+
+        <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
+        <file src="..\src\DryIoc.Internal\Container.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
 
     </files>
 </package>
