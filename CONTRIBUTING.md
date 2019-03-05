@@ -24,7 +24,7 @@ If you found the problem with DryIoc:
  - To get faster feedback, faster fixes, and generally to make me happy :-) 
      - [Fork DryIoc](https://github.com/dadhi/DryIoc/fork)
      - Add failing tests reproducing your case to `test\DryIoc.IssuesTests` project. Check other files in the project for general guideline, but nothing is strict here.
-     - **Ignore** the failing tests with `[Ignore("todo: fix me")]` attribute, so that CI build pass.
+     - **Ignore** the failing tests with `[Ignore("fixme")]` attribute, so that CI build pass.
      - Commit your tests and create a Pull Request for me to review.
     
 Thank you!
@@ -36,20 +36,17 @@ Thank you!
 
 Before sending a Pull Request, please build solution with `build.bat` located in the root folder.
 
-It will build all projects, run unit tests, and create NuGet packages.
+It will build all projects for __all platforms__ in Release configuration, run unit tests, and create NuGet packages.
 Make sure that there are no project build errors or failing tests.
 
-### Develop in Visual Studio 2017
+### Develop in Visual Studio 2017+
 
-- Open `DryIoc.sln` solution and re-build it. If something is failing, you may try to close VS, open command line and run `dotnet clean`, then `build.bat` in solution folder, open VS and try to build again.
-- Projects in solution multi-target multiple platforms, e.g. `DryIoc` targets 6+ platforms which makes it slower to build. To speedup development you may:
-    -  Set `<DevMode>true</DevMode>` to `true` in `Directory.Build.props` file in solution root folder. This setting will set projects to target a single platform: `.Net Standard` for libraries and `.Net Core` for tests. 
-    -  Re-build solution as described in step 1. 
-    -  **Don't forget** to set `<DevMode>false</DevMode>` back to `false` when publishing your changes.
+Open `DryIoc.sln` solution and re-build it. If something is failing, you may try to close VS, open command line and run `dotnet clean`, then `build.bat` in solution folder, open VS and try to build again.
 
+__Note:__ Projects in the solution multi-target multiple platforms, e.g. `DryIoc` targets 6+ platforms which makes it slower to build. To speedup the development DryIoc has `<DevMode>true</DevMode>` MSBuild proprerty set to `true` in `Directory.Build.props` file in the solution root folder. This setting minimizes the number of platforms to target. That's why you need to run `build.bat` to test your work on all platforms.
 
 __Productivity hint:__ Usually I am using [NCrunch](http://www.ncrunch.net/) to build and run tests continuously, to get an immediate feedback, quickly find regressions, and generally experiment with code.
 
 ### Develop in Visual Studio Code
 
-It is possible to develop and even run tests (via plugin) in VS Code, but only with `<DevMode>true</DevMode>` set to `true` in `Directory.Build.props` file in solution root folder. 
+It is possible to develop and even run tests (via plugin) in VS Code. 
