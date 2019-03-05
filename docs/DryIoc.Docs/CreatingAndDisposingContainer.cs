@@ -9,10 +9,9 @@
 
 In most cases all you need is: 
 ```cs md*/
+using System;
 using DryIoc;
 using NUnit.Framework;
-
-using System;
 
 // ReSharper disable UnusedVariable
 class Creating_container

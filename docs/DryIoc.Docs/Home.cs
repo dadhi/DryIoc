@@ -87,31 +87,31 @@ and to support __extensibility__ and __testability__ of our code.
 
 ## User's Guide
 
-- [Installing DryIoc](InstallationOptions)
-- [Creating and Disposing Container](CreatingAndDisposingContainer)
-- [Register and Resolve](RegisterResolve)
-- [Open-generics](OpenGenerics)
-- [Specify Constructor or Factory Method](SelectConstructorOrFactoryMethod)
-- [Specify Dependency or Primitive Value](SpecifyDependencyAndPrimitiveValues)
-- [Reuse and Scopes](ReuseAndScopes)
-- [Wrappers](Wrappers)
-- [Decorators](Decorators)
-- [Error Detection and Resolution](ErrorDetectionAndResolution)
-- [Rules and Default Conventions](RulesAndDefaultConventions)
+- [Installing DryIoc](InstallationOptions.md)
+- [Creating and Disposing Container](CreatingAndDisposingContainer.md)
+- [Register and Resolve](RegisterResolve.md)
+- [Open-generics](OpenGenerics.md)
+- [Specify Constructor or Factory Method](SelectConstructorOrFactoryMethod.md)
+- [Specify Dependency or Primitive Value](SpecifyDependencyAndPrimitiveValues.md)
+- [Reuse and Scopes](ReuseAndScopes.md)
+- [Wrappers](Wrappers.md)
+- [Decorators](Decorators.md)
+- [Error Detection and Resolution](ErrorDetectionAndResolution.md)
+- [Rules and Default Conventions](RulesAndDefaultConventions.md)
 
 - Advanced topics:
 
-    - ["Child" Containers](KindsOfChildContainer)
-    - [Required Service Type](RequiredServiceType)
-    - [Examples of context based resolution](ExamplesContextBasedResolution)
-    - [Un-registering service and Resolution Cache](UnregisterAndResolutionCache)
-    - [Auto-mocking in tests](UsingInTestsWithMockingLibrary)
-    - [Interception](Interception)
-    - [Thread-Safety](ThreadSafety)
+    - ["Child" Containers](KindsOfChildContainer.md)
+    - [Required Service Type](RequiredServiceType.md)
+    - [Examples of context based resolution](ExamplesContextBasedResolution.md)
+    - [Un-registering service and Resolution Cache](UnregisterAndResolutionCache.md)
+    - [Auto-mocking in tests](UsingInTestsWithMockingLibrary.md)
+    - [Interception](Interception.md)
+    - [Thread-Safety](ThreadSafety.md)
 
 - FAQs
 
-    - [FAQ - Migration from Autofac](FaqAutofacMigration)
+    - [FAQ - Migration from Autofac](FaqAutofacMigration.md)
 
 
 ## Companions
@@ -164,14 +164,14 @@ Get from NuGet:
   - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
   - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-### v3.1.0 / soon
+### v4.0.0 / 2019-03-04
 
-Stay tuned!
+[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.0.0)
 
 ### v3.0.0 / 2018-06-24
 
-[Release Notes](Version3ReleaseNotes)
+[Release Notes](Version3ReleaseNotes.md)
 
-### [Previous Versions](VersionHistory)
+### [Previous Versions](VersionHistory.md)
 
 md*/
