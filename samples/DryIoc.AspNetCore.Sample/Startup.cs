@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
@@ -15,45 +15,40 @@ namespace DryIoc.AspNetCore.Sample
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services
+                .AddLogging(logging => logging.AddConsole())
                 .AddMvc()
-
                 // Enables controllers to be resolved by DryIoc, OTHERWISE resolved by infrastructure
                 .AddControllersAsServices();
 
-            return new Container(rules => rules.With(
-
-                // optional: Enables property injection for Controllers
-                // NOTE: it will be overriden by MEF convention (ImportAttribute) with the `WithMef()` line below .
-                propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
-                    ? PropertiesAndFields.Properties()(request) 
-                    : null))
-
-                .WithMef() // optional: support for MEF service discovery
-
+            // Container in V4 is directly implementing `IServiceProvider`, so it is fine to return it.
+            return new Container(rules =>
+                    // optional: Enables property injection for Controllers
+                    // In current setup `WithMef` it will be overriden by properties marked with `ImportAttribute`
+                    rules.With(propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
+                        ? PropertiesAndFields.Properties()(request)
+                        : null)
+                )
+                // optional: support for MEF Exported services
+                .WithMef()
                 .WithDependencyInjectionAdapter(services,
-                    // optional: get original DryIoc.ContainerException if specified type is not resolved, 
-                    // and prevent fallback to default resolution by infrastructure
-                    throwIfUnresolved: type => type.Name.EndsWith("Controller"),
-
                     // optional: You may Log or Customize the infrastructure components registrations
-                    registerDescriptor: (registrator, descriptor) =>
-                    {
-#if DEBUG
-                        if (descriptor.ServiceType == typeof(ILoggerFactory))
-                            Console.WriteLine($"Logger factory is registered as instance: {descriptor.ImplementationInstance != null}");
-#endif
-                        return false; // fallback to default registration logic
-                    })
-
+                    MyCustomRegisterDescriptor)
                 // Your registrations are defined in CompositionRoot class
-                .ConfigureServiceProvider<CompositionRoot>();
+                .WithCompositionRoot<MyCompositionRoot>();
+        }
+
+        bool MyCustomRegisterDescriptor(IRegistrator registrator, ServiceDescriptor descriptor)
+        {
+#if DEBUG
+            if (descriptor.ServiceType == typeof(ILoggerFactory))
+                Console.WriteLine($"{descriptor.ServiceType.Name} is registered as instance: {descriptor}");
+#endif
+            return false; // fallback to the default registration logic
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
-            loggerFactory.AddConsole();
-
             if (env.IsDevelopment())
                 app.UseDeveloperExceptionPage();
 

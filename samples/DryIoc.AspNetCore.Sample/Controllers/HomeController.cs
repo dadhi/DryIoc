@@ -1,4 +1,4 @@
-﻿// For more information on enabling MVC for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
+// For more information on enabling MVC for empty projects, visit http://go.microsoft.com/fwlink/?LinkID=397860
 
 using Microsoft.AspNetCore.Mvc;
 using DryIoc.AspNetCore.Sample.Models.Home;
@@ -25,9 +25,9 @@ namespace DryIoc.AspNetCore.Sample.Controllers
         {
             var model = new HomeModel
             {
-                Message = $"Transient services are different: {Transient != Scoped.Transient}; "
-                        + $"Singletons are the same: {Transient.Singleton == Scoped.Singleton}; "
-                        + $"Exported service is successfully imported {Imported != null}"
+                Message = $"Transient services are different: {Transient != Scoped.Transient}, "
+                        + $"Singletons are the same: {Transient.Singleton == Scoped.Singleton}, "
+                        + $"Exported service is successfully importedЖ {Imported != null}"
             };
 
             return View(model);
