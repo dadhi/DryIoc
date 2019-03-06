@@ -4,9 +4,9 @@
 
 ## Source and Binary NuGet packages
 
-DryIoc and its extensions distributed via [NuGet](https://www.nuget.org/packages?q=dryioc) either as a __Source__ or a Binary package.
+DryIoc and its extensions distributed via [NuGet](https://www.nuget.org/packages?q=dryioc) either as a __source__ or a __binary__ package.
 
-__Note:__ Source code is the default way of distribution (e.g. __DryIoc__ package) for a historical reasons. If you want a "normal" assembly reference, please use the packages with `.dll` suffix (e.g. __DryIoc.dll__ package).
+__Note:__ Source code is the default way of distribution (e.g. __DryIoc__ package) for a historical reasons. If you want a normal assembly reference, please use the packages with `.dll` suffix (e.g. __DryIoc.dll__ package).
 
 ### Source package 
 
@@ -23,9 +23,6 @@ __DryIoc.dll package__ has a `.dll` suffix and contains assembly that normally r
 
 ## Assembly Signing
 
-By default DryIoc binaries provided without strong-signing. For those who requires strong-signing DryIoc package includes two files:
+The `.dll` packages are signed starting from the DryIoc V4 version and the extension version's released at the same time.
 
-- _tools\SignPackageAssemblies.ps1_
-- _tools\DryIoc.snk_
-
-Run _SignPackageAssemblies.ps1_ from __NuGet Package Manager -> Package Manager Console__ to sign the installed DryIoc assemblies with _DryIoc.snk_ key.
+The `DryIoc.snk` file itself is included into package and published to [GitHub repo](https://github.com/dadhi/DryIoc/blob/master/DryIoc.snk).
