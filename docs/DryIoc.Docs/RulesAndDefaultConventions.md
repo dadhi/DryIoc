@@ -441,10 +441,10 @@ The rule will work if multiple constructors available, and will select the const
         // Enabling the rule per registration
         container = new Container();
         container.Register<A>(made: Made.Of(FactoryMethod.ConstructorWithResolvableArguments));
-        container.RegisterInstance("Jeff");
+        container.Register<B>();
 
-        var b = container.Resolve<A>();
-        Assert.AreEqual("Jeff", b.S);
+        a = container.Resolve<A>();
+        Assert.IsNotNull(a.B);
     }
 
     public class A
@@ -455,12 +455,13 @@ The rule will work if multiple constructors available, and will select the const
             N = n;
         }
 
-        public string S { get; }
-        public A(string s)
+        public B B { get; }
+        public A(B b)
         {
-            S = s;
+            B = b;
         }
     }
+    public class B { }
 }
 ```
 
