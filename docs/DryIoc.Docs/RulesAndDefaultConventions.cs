@@ -501,27 +501,41 @@ md*/
 
 ## Unresolved parameters and properties
 
-By default DryIoc will throw exception if constructor or method parameter is not resolved, __but will not throw in case of property or field, or in case of optional parameter__ (yes, DryIoc supports optional parameters with default values just fine).
+By default DryIoc will throw exception if constructor or method parameter is not resolved, 
+__but will not throw in case of property or field, or in case of optional parameter__ (yes, DryIoc supports optional parameters with the default values just fine).
 
-This is because "normally" constructor parameters specify required dependencies. On the other hand writable properties usually specify dependencies that may be not set when object is created, set by third-party, or not set at all.
+This is because "normally" the constructor parameters specify required dependencies. 
+On the other hand, writable properties usually specify dependencies that may be not set when object is created, set by third-party, or not set at all.
 
 As usual, you may override default behavior to throw an exception for unresolved property, or set the default value for unresolved parameter:
-```
-#!c#
+```cs md*/
+[TestFixture]
+class Specify_how_to_treat_unresolved_parameter_or_property
+{
+    [Test]public void Example()
+    {
+        var container = new Container();
+        
+        container.Register<A>(Made.Of(() =>
+            new A(Arg.Of<B>(IfUnresolved.ReturnDefault),  // return default even if parameter is not optional with the default value
+                  Arg.Of<C>(IfUnresolved.Throw))          // throw for the optional parameter
+                  {
+                      P = Arg.Of<P>(IfUnresolved.Throw)   // throw for the unresolved property instead of the default silence
+                  }));
+
+        Assert.Throws<ContainerException>(() => container.Resolve<A>());
+    }
+
     public class A
     {
         public P P { get; set; }
-        public A(B b, C c = null) {}
+        public A(B b, C c = null) { }
     }
 
-    // Override unresolved behavior:
-    container.Register<A>(Made.Of(() => 
-        new A(
-            Arg.Of<B>(IfUnresolved.ReturnDefault),  // return default even for parameter
-            Arg.Of<C>(IfUnresolved.Throw))          // throw for optional parameter
-            { 
-                P = Arg.Of<P>(IfUnresolved.Throw)   // throw for property
-            }));
+    public class B { }
+    public class C { }
+    public class P { }
+} /*md
 ```
 
 
@@ -529,7 +543,7 @@ As usual, you may override default behavior to throw an exception for unresolved
 
 ### FactorySelector
 
-__Note:__ In DryIoc _Factory_ is the unit of registration. Speaking of factory selection we are speaking of registration selection.
+__Note:__ In DryIoc _Factory_ is the unit of registration. Speaking of factory selection we are speaking of the registration selection.
 
 Allows to override default factory selection, especially when we have multiple registered default factories.
 
