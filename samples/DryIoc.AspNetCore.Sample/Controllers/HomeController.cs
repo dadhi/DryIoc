@@ -27,7 +27,7 @@ namespace DryIoc.AspNetCore.Sample.Controllers
             {
                 Message = $"Transient services are different: {Transient != Scoped.Transient}, "
                         + $"Singletons are the same: {Transient.Singleton == Scoped.Singleton}, "
-                        + $"Exported service is successfully importedЖ {Imported != null}"
+                        + $"Exported service is successfully imported: {Imported != null}"
             };
 
             return View(model);
