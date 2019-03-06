@@ -43,6 +43,7 @@ Additionally after the service is found, DryIoc will look for any matching [Deco
 Actually, multiple services mean multiple implementations of the single service type:
 ```cs md*/
 
+using System;
 using System.Linq.Expressions;
 using DryIoc;
 using NUnit.Framework;
@@ -341,7 +342,6 @@ Given the example you can see that registering a `Container` object will not get
 
 The right way to register container interfaces manually with the correct scoping behavior maybe this:
 ```cs md*/
-
 class Registering_container_interfaces_by_hand
 {
     [Test]
@@ -357,45 +357,147 @@ class Registering_container_interfaces_by_hand
 
         container.RegisterDelegate<IContainer>(resolver => (IContainer)resolver, 
             setup: Setup.With(allowDisposableTransient: true));
+
+        // etc.
+    }
+
+    [Test]
+    public void Example_injecting_all_container_interfaces_without_registering_then()
+    {
+        var container = new Container();
+
+        container.Register<User>();
+
+        var x = container.Resolve<User>();
+
+        Assert.AreSame(container, x.Container);
+        Assert.AreSame(container, x.Registrator);
+        Assert.AreSame(container, x.ResolverContext);
+        Assert.AreSame(container, x.Resolver);
+        Assert.AreSame(container, x.ServiceProvider);
+
+        using (var scope = container.OpenScope())
+        {
+            var y = scope.Resolve<User>();
+            Assert.AreSame(scope, y.Container);
+            Assert.AreSame(scope, y.Registrator);
+            Assert.AreSame(scope, y.ResolverContext);
+            Assert.AreSame(scope, y.Resolver);
+            Assert.AreSame(scope, y.ServiceProvider);
+        }
+    }
+
+    public class User
+    {
+        public IServiceProvider ServiceProvider { get; }
+        public IResolver Resolver { get; }
+        public IResolverContext ResolverContext { get; }
+        public IRegistrator Registrator { get; }
+        public IContainer Container { get; }
+
+        public User(IServiceProvider serviceProvider, IResolver resolver, IResolverContext resolverContext,
+            IRegistrator registrator, IContainer container)
+        {
+            ServiceProvider = serviceProvider;
+            Resolver = resolver;
+            ResolverContext = resolverContext;
+            Registrator = registrator;
+            Container = container;
+        }
     }
 } /*md
 ```
 
 The above registrations look rather complex and leaky with all this casting in place.
 
-There is much easy and error-prone for User to make these registrations always available. 
-
-__Note:__ In case you have your own implementation of aforementioned interfaces, you may register them normally,
-and they override the implicit behavior. It is possible because internally these interface registered as [Wrappers](Wrappers).
-Wrapper resolution has a lower priority comparing to normal Service resolution and will be resolved as fallback.
+There is much easy and error-prone to make these registrations always available, which DryIoc jus does for you. 
 
 
 ## Default constructor selection
 
-By default DryIoc expects from registered type to have a __single public constructor__. 
+By default DryIoc expects from the registered type to have a __single public constructor__. 
 
-If no or multiple constructors available it will throw corresponding exception. 
-The reason for this is to be as deterministic as possible and to prevent hard-to-find errors.
+If no or multiple constructors available it will throw the corresponding exception. 
+The reason for this is to be as deterministic as possible and to prevent the hard-to-find errors.
 
-But the default behavior may be changed in different ways:
+But the default behavior may be opt-out in the following ways:
 
-- You may specify predefined `FactoryMethod.ConstructorWithResolvableArguments` rule to be used for registration or per Container. The rule will work if multiple constructors available, and will select the constructor with maximum number of parameters where each parameter is successfully resolved from container.
+1. You may specify predefined `FactoryMethod.ConstructorWithResolvableArguments` rule to be used for the registration or per Container. 
+The rule will work if multiple constructors available, and will select the constructor with maximum number of parameters where each parameter is successfully resolved from container.
+
+```cs
+md*/
+
+[TestFixture] public class Constructor_with_resolvable_arguments
+{
+    [Test] public void Example()
+    {
+        // Enabling the rule for container
+        var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+        container.Register<A>();
+        container.RegisterInstance(42);
+
+        var a = container.Resolve<A>();
+        Assert.AreEqual(42, a.N);
+
+        // Enabling the rule per registration
+        container = new Container();
+        container.Register<A>(made: Made.Of(FactoryMethod.ConstructorWithResolvableArguments));
+        container.RegisterInstance("Jeff");
+
+        var b = container.Resolve<A>();
+        Assert.AreEqual("Jeff", b.S);
+    }
+
+    public class A
+    {
+        public int N { get; }
+        public A(int n)
+        {
+            N = n;
+        }
+
+        public string S { get; }
+        public A(string s)
+        {
+            S = s;
+        }
+    }
+}
+/*md
 ```
-#!c#
-        // Enabling the rule per container:
-        var container = new Container(rules => rules.With(
-            FactoryMethod.ConstructorWithResolvableArguments));
 
-        // Enabling the rule per registration:
-        container.Register<A>(made: Made.Of(
-            FactoryMethod.ConstructorWithResolvableArguments));
+2. You may specify to use a specific constructor, or even the static or the instance method, the field or the property for producing the service. 
+The preferred way to do it is using the `Made.Of` expression specification:
+```cs
+md*/
+[TestFixture] class Using_specific_ctor_or_factory_method
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+        container.Register<A>(Made.Of(() => new A(Arg.Of<B>(), Arg.Of<C>("someKey"))));
+        container.Register<B>();
+        container.Register<C>(serviceKey: "someKey");
+
+        var a = container.Resolve<A>();
+    }
+
+    public class A
+    {
+        public A(B b) { }
+        public A(C c) { }
+        public A(B b, C c) { }
+    }
+
+    public class B { }
+    public class C { }
+}
+/*md
 ```
 
-- You may specify to use specific constructor, or even static or instance method, field or property for producing the service. The preferred way to do it is using `Made.Of` expression specification:
+[More examples are here](SelectConstructorOrFactoryMethod).
 
-        container.Register<A>(Made.Of(() => new A(Arg.Of<B>(), Arh.Of<C>("someKey"))));
-
-    [More examples are here](SelectConstructorOrFactoryMethod).
 
 ## Unresolved parameters and properties
 

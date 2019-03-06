@@ -25,4 +25,4 @@ __DryIoc.dll package__ has a `.dll` suffix and contains assembly that normally r
 
 The `.dll` packages are signed starting from the DryIoc V4 version and the extension version's released at the same time.
 
-The `DryIoc.snk` file itself is included into package and published to [GitHub repo](https://github.com/dadhi/DryIoc/blob/master/DryIoc.snk).
+The `DryIoc.snk` file itself is included into the package and published to [GitHub repo](https://github.com/dadhi/DryIoc/blob/master/DryIoc.snk).

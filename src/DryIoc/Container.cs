@@ -8341,7 +8341,7 @@ namespace DryIoc
                 if (paramInfo.Details == DryIoc.ServiceDetails.Default)
                 {
                     if (paramServiceType == typeof(IResolverContext) || paramServiceType == typeof(IResolver)
-// todo: replace framework targets with feature toggle
+                        // todo: replace framework targets with feature toggle
 #if NET45 || NETSTANDARD2_0
                         || paramServiceType == typeof(IServiceProvider)
 #endif
@@ -8652,7 +8652,7 @@ namespace DryIoc
                 if (member.Details == DryIoc.ServiceDetails.Default)
                 {
                     if (memberServiceType == typeof(IResolverContext) || memberServiceType == typeof(IResolver)
-// todo: replace framework targets with feature toggle
+                    // todo: replace framework targets with feature toggle
 #if NET45 || NETSTANDARD2_0
                     || memberServiceType == typeof(IServiceProvider)
 #endif
