@@ -9,7 +9,7 @@
         <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
         <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
-        <description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://commonservicelocator.codeplex.com/</description>
+        <description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://github.com/unitycontainer/commonservicelocator </description>
         <tags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
