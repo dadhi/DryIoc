@@ -781,27 +781,57 @@ DryIoc does not track disposable transients by default as described [here](Reuse
 
 That means you may register Transient `IDisposable` and forgot to dispose it, thinking that Container will do this for you.
 
-To prevent possible memory leaks due ignored `Dispose`, DryIoc by default will throw exception on registering transient implementing `IDisposable` interface:
+To prevent the possible memory leaks due the ignored `Dispose`, DryIoc by default will throw the exception on registering 
+transient implementing `IDisposable` interface:
+```cs md*/
+[TestFixture] public class Register_disposable_transient
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
 
-    container.Register<MyDisposableService>(); // Throws exception!
-    container.Register<MyDisposableService>(Reuse.InResolutionScope); // OK
+        var ex = Assert.Throws<ContainerException>(() => container.Register<MyDisposableService>()); // Throws exception!
+        Assert.AreSame(Error.NameOf(Error.RegisteredDisposableTransientWontBeDisposedByContainer), ex.ErrorName);
 
-If you disagree, you may silence this exception per registration or (more care-free) per Container:
+        container.Register<MyDisposableService>(Reuse.Scoped); // OK
+    }
+
+    public class MyDisposableService : IDisposable
+    {
+        public void Dispose() { }
+    }
+}
+/*md
 ```
-#!c#
-    // per registration:
-    container.Register<MyDisposableService>(
-        setup: Setup.With(allowDisposableTransient: true));
 
-    // per container:
-    var container = new Container(rules =>
-        rules.WithoutThrowOnRegisteringDisposableTransient);
-    container.Register<MyDisposableService>();
+If you disagree, you may silence this exception per registration or per Container:
+```cs
+md*/
+[TestFixture]public class Silence_registering_disposable_transient_exception
+{
+    [Test]public void Example()
+    {
+        var container = new Container();
+
+        // silence per registration:
+        container.Register<MyDisposableService>(setup: Setup.With(allowDisposableTransient: true)); // OK
+
+        // silence per container:
+        container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+        container.Register<MyDisposableService>(); // OK
+    }
+
+    public class MyDisposableService : IDisposable
+    {
+        public void Dispose() { }
+    }
+}
+/*md
 ```
 
 ### WithTrackingDisposableTransient
 
-In detail described [here](ReuseAndScopes#markdown-header-disposabletransient).
+In detail is described [here](ReuseAndScopes#markdown-header-disposabletransient).
 
 
 ### WithDefaultReuseInsteadOfTransient
