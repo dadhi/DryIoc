@@ -536,9 +536,6 @@ public class RegisterMany_examples
         // Plus registers the rest of the types from assembly of A.
         container.RegisterMany(new[] { typeof(A).Assembly }, type => type == typeof(X));
 
-        // Everything in assembly of A including internal types
-        container.RegisterMany(new[] { typeof(A).Assembly }, type => true, nonPublicServiceTypes: true);
-
         // Made.Of expression is supported too
         container.RegisterMany(Made.Of(() => CreateA()));
 
@@ -549,7 +546,8 @@ public class RegisterMany_examples
         container.RegisterMany(new[] { typeof(A).Assembly },
             getServiceTypes: implType => implType.GetImplementedServiceTypes(),
             getImplFactory: implType => new ReflectionFactory(implType,
-                reuse: implType.IsAssignableTo<IDisposable>() ? Reuse.Scoped : Reuse.Transient));
+                reuse: implType.IsAssignableTo<IDisposable>() ? Reuse.Scoped : Reuse.Transient,
+                made: FactoryMethod.ConstructorWithResolvableArguments));
     }
 } 
 ```

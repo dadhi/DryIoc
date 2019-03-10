@@ -425,9 +425,7 @@ But the default behavior may be opt-out in the following ways:
 1. You may specify predefined `FactoryMethod.ConstructorWithResolvableArguments` rule to be used for the registration or per Container. 
 The rule will work if multiple constructors available, and will select the constructor with maximum number of parameters where each parameter is successfully resolved from container.
 
-```cs
-md*/
-
+```cs md*/
 [TestFixture] public class Constructor_with_resolvable_arguments
 {
     [Test] public void Example()
@@ -435,10 +433,10 @@ md*/
         // Enabling the rule for container
         var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
         container.Register<A>();
-        container.RegisterInstance(42);
+        container.RegisterInstance(new C());
 
         var a = container.Resolve<A>();
-        Assert.AreEqual(42, a.N);
+        Assert.IsNotNull(a.C);
 
         // Enabling the rule per registration
         container = new Container();
@@ -451,27 +449,28 @@ md*/
 
     public class A
     {
-        public int N { get; }
-        public A(int n)
-        {
-            N = n;
-        }
-
         public B B { get; }
         public A(B b)
         {
             B = b;
         }
+
+        public C C { get; }
+        public A(C c)
+        {
+            C = c;
+        }
     }
+
     public class B { }
+    public class C { }
 }
 /*md
 ```
 
 2. You may specify to use a specific constructor, or even the static or the instance method, the field or the property for producing the service. 
 The preferred way to do it is using the `Made.Of` expression specification:
-```cs
-md*/
+```cs md*/
 [TestFixture] class Using_specific_ctor_or_factory_method
 {
     [Test] public void Example()
@@ -503,7 +502,8 @@ md*/
 ## Unresolved parameters and properties
 
 By default DryIoc will throw exception if constructor or method parameter is not resolved, 
-__but will not throw in case of property or field, or in case of optional parameter__ (yes, DryIoc supports optional parameters with the default values just fine).
+__but will not throw in case of property or field, or in case of optional parameter__ 
+(yes, DryIoc supports optional parameters with the default values just fine).
 
 This is because "normally" the constructor parameters specify required dependencies. 
 On the other hand, writable properties usually specify dependencies that may be not set when object is created, set by third-party, or not set at all.
@@ -551,29 +551,41 @@ Allows to override default factory selection, especially when we have multiple r
 DryIoc has two predefined rules that you can use instead of [default policy](RulesAndDefaultConventions#markdown-header-resolving-from-multiple-default-services):
 
 - `Rules.SelectLastRegisteredFactory` - explained [here](RulesAndDefaultConventions#markdown-header-resolving-from-multiple-default-services).
-- `Rules.SelectKeyedOverDefaultFactory(serviceKey)` - allows to prefer registration with specific key over the default. 
+- `Rules.SelectKeyedOverDefaultFactory(serviceKey)` - to prefer registration with the specific key over the default. 
     
-    For example you may register some dependencies to be available only inside opened scope:
-
+For example you may register some dependencies to be available only inside opened scope like this:
+```cs md*/
+[TestFixture] public class Using_factory_selector_to_change_the_default_preferred_service
+{
+    [Test]
+    public void Example()
+    {
         var container = new Container();
         container.Register<I, A>();
         container.Register<I, B>(serviceKey: "scoped");
 
-        using (var scope = container.OpenScope(configure: rules => rules
-            .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory("scoped")))) 
+        using (var scope = container
+            .With(r => r.WithFactorySelector(Rules.SelectKeyedOverDefaultFactory("scoped")))
+            .OpenScope())
         {
-            // will return B instead of A despite the absence of "scoped" key in resolve
-            container.Resolve<I>(); 
+            // Resolve will return B instead of A despite the absence of "scoped" key in Resolve
+            var x = scope.Resolve<I>();
+            Assert.IsInstanceOf<B>(x);
         }
+    }
+}
+/*md
+```
 
 
 ### FactoryMethod, Parameters and Properties selector
 
 This way you may specify how to select constructor, parameters and properties. 
 
-For instance [MefAttributedModel](Extensions/MefAttributedModel) uses these rules to instruct DryIoc to select constructor and properties marked with `ImportingConstructor` and `Import` attributes.
+For instance [MefAttributedModel](Extensions/MefAttributedModel) uses these rules to instruct DryIoc to select constructor and properties 
+marked with `ImportingConstructor` and `Import` attributes.
 
-Also you can use the rule to [select constructor with all resolvable parameters](RulesAndDefaultConventions#markdown-header-default-constructor-selection).
+In addition you can use the rule to [select constructor with all resolvable parameters](RulesAndDefaultConventions#markdown-header-default-constructor-selection).
 
 
 ### UnknownServiceResolvers
@@ -582,47 +594,75 @@ The rules is used as a last resort / fallback resolution strategy when no regist
 
 You may use this rule to implement on-demand registrations, or automatic concrete types registrations, etc.
 
-#### WithAutoFallbackResolution
 
-DryIoc provides predefined rule `AutoRegisterUnknownServiceRule` to register missing service from provided list of types or assemblies:
+#### AutoFallbackDynamicRegistrations
 
-    var container = new Container(rules =>
-        rules.WithUnknownServiceResolvers(Rules.AutoRegisterUnknownServiceRule(implTypes));
+DryIoc provides predefined rule `WithDynamicRegistrations` and `WithDynamicRegistrationsAsFallback` to register additional services 
+from the provided list of types or assemblies:
+```cs md*/
+[TestFixture] public class Auto_register_unknown_service
+{
+    [Test] public void Example()
+    {
+        var implTypes = new []{ typeof(A), typeof(B) };
 
-To simplify this scenario DryIoc defines extension method:
+        var container = new Container(rules =>
+            rules.WithDynamicRegistrationsAsFallback(
+                Rules.AutoFallbackDynamicRegistrations((_, __) => implTypes)));
 
-    container = container.WithAutoFallbackResolution(implTypes);
-    // or
-    container = container.WithAutoFallbackResolution(assemblies);
+        var b = container.Resolve<B>();
+        Assert.IsNotNull(b.A);
+    }
 
-- In addition you can specify to `changeDefaultReuse` that by default is Singleton or InCurrentScope (if missing service requested in a scope).
-- You may also pass `condition` to select only some of services based on context.
+    public class A { }
+    public class B
+    {
+        public A A { get; }
+        public B(A a) { A = a; }
+    }
+}
+/*md
+```
 
 
-#### WithAutoConcreteTypeResolution
+#### WithConcreteTypeDynamicRegistrations
 
-The rule (and corresponding sugar extension method) to automatically resolve concrete (non-interface, non-abstract) types without registering them in container.
+The rule to "automatically" resolve concrete (non-interface, non-abstract) types without registering them in container.
 
 Using the rule:
-
-    var container = new Container(rules =>
-        rules.WithUnknownServiceResolvers(Rules.AutoResolveConcreteTypeRule(optionalCondition));
-
-Using the extension method:
-
-    class Driver {}
-    class FastCar : ICar 
+```cs md*/
+[TestFixture]
+public class Auto_concrete_dynamic_type_registrations
+{
+    [Test]
+    public void Example()
     {
-        public FastCar(Driver driver) {}
-    } 
+        var container = new Container(rules => rules
+            .WithConcreteTypeDynamicRegistrations((serviceType, serviceKey) => true, Reuse.Singleton));
 
-    var container = new Container().WithAutoConcreteTypeResolution();
+        container.Register<ICar, FastCar>();
+        // but no Driver registration!
 
-    container.Register<ICar, FastCar>();
-    // no Driver registration!
+        // Driver is created by container
+        var car = container.Resolve<ICar>();
+        Assert.IsNotNull(car.Driver);
+    }
 
-    // Driver is created by container
-    var car = container.Resolve<ICar>();
+    class Driver { }
+
+    interface ICar
+    {
+        Driver Driver { get; }
+    }
+
+    class FastCar : ICar
+    {
+        public Driver Driver { get; }
+        public FastCar(Driver driver) { Driver = driver; }
+    }
+}
+/*md
+ ```
 
 
 ### Fallback Containers
@@ -632,36 +672,47 @@ Using the extension method:
 
 ### ThrowIfDependencyHasShorterReuseLifespan
 
-__This rule is enabled by default__ and instructs container to throw exception when injecting dependency with shorter lifespan than dependency holder. 
+__This rule is enabled by default__ and instructs container to throw exception when injecting dependency with shorter lifespan 
+than dependency holder. 
 
 What does it mean?
 
-- In DryIoc services with Singleton reuse have a longest lifespan equal to lifespan of container itself.
-- Then go services with Reuse.InCurrentScope which live no longer than singletons.
+- In DryIoc services with `Reuse.Singleton` have a longest lifespan equal to lifespan of container itself.
+- Then services with `Reuse.Scoped` and siblings which live no longer than singletons.
 - Transient services do not have a lifespan, so the rule is not applied for them.
-- Services reused in ResolutionScope are similar to transients in a way that container does not hold on them, 
-so their lifespan is not comparable with singletons and current scope. The rule is not applied for them too.
 
-From implementation point of view `Lifespan` is the property defined in `IReuse` interface, and the respective implementations define relative lifespan values for the property:
+From implementation point of view `Lifespan` is the property defined in `IReuse` interface, 
+and the respective implementations define relative lifespan values for the property:
 
-- `SingletonReuse.Lifespan` is `1000`
+- `SingletonReuse.Lifespan`    is `1000`
 - `CurrentScopeReuse.Lifespan` is `100`
-- `ResolutionScope.Lifespan` is `0`
+- `TransientReuse.Lifespan`    is `0`
 
 When defining your own Reuse you may take advantage of the rule by defining specific Lifespan number.
 
 Example:
-```
-#!c#
-    class A { public A(B b) {} }
+```cs md*/
+[TestFixture] public class Throw_if_dependency_has_a_shorter_lifetime
+{
+    [Test] public void Example()
+    {
+        var container = new Container(); // enabled by default
 
-    var container = new Container(); // enabled by default
+        container.Register<A>(Reuse.Singleton);
+        container.Register<B>(Reuse.InCurrentScope);
 
-    container.Register<A>(Reuse.Singleton);
-    container.Register<B>(Reuse.InCurrentScope);
+        using (var scope = container.OpenScope())
+        {
+            var ex = Assert.Throws<ContainerException>(() => scope.Resolve<A>());
 
-    using (var scope = container.OpenScope())
-        scope.Resolve<A>(); // Throws container exception with explanation and guidance
+            Assert.AreEqual(Error.NameOf(Error.DependencyHasShorterReuseLifespan), ex.ErrorName);
+        }
+    }
+
+    class A { public A(B b) { } }
+    class B { }
+}
+/*md
 ```
 
 You may disable the rule for Container, so lifespan mismatch will not throw exception.

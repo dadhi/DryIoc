@@ -2976,14 +2976,11 @@ namespace DryIoc
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Assembly> implTypeAssemblies,
             Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null)
-        {
-            var types = implTypeAssemblies.ThrowIfNull()
-                .SelectMany(assembly => assembly.GetLoadedTypes())
-                .Where(Registrator.IsImplementationType)
-                .ToArray();
-            return container.WithAutoFallbackResolution(types, changeDefaultReuse, condition);
-        }
+            Func<Request, bool> condition = null) =>
+            container.WithAutoFallbackResolution(implTypeAssemblies.ThrowIfNull()
+                     .SelectMany(assembly => assembly.GetLoadedTypes())
+                     .Where(Registrator.IsImplementationType).ToArray(), 
+                     changeDefaultReuse, condition);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
