@@ -74,6 +74,10 @@
         <Generator>CsToMd</Generator>
         <LastGenOutput>RulesAndDefaultConventions.md</LastGenOutput>
       </Compile>
+      <Compile Update="SelectConstructorOrFactoryMethod.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>SelectConstructorOrFactoryMethod.md</LastGenOutput>
+      </Compile>
       <Compile Update="UsingInTestsWithMockingLibrary.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
@@ -144,6 +148,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>RulesAndDefaultConventions.cs</DependentUpon>
+      </None>
+      <None Update="SelectConstructorOrFactoryMethod.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>SelectConstructorOrFactoryMethod.cs</DependentUpon>
       </None>
       <None Update="UsingInTestsWithMockingLibrary.md">
         <DesignTime>True</DesignTime>

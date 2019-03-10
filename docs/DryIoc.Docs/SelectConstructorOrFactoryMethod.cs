@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Select Constructor or Factory Method
@@ -246,3 +247,4 @@ I wanted to show how easy to specify Factory Method and Initializers without not
     container.RegisterExports(new[] { appAssembly });
 ```
 
+md*/
