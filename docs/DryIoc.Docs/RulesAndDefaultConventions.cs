@@ -903,32 +903,4 @@ This rule turns Off the default [Implicit registration selection based on scope]
 
 [Explained in Wrappers](Wrappers#markdown-header-contravariant-generics).
 
-
-### WithThrowIfRuntimeStateRequired
-
-Specifies to throw an exception in attempt to resolve service which require runtime state for resolution.
-Runtime state may be introduced by `RegisterDelegate`, `RegisterInstance`, or registering with non-primitive service key, or metadata.
-
-This rule is helpful for compile-time generation of resolution delegates, e.g. by __DryIocZero__.
-The problem with the stateful registrations (delegates, services instances, key or metadata objects) 
-that there is no way to make them available at compile-time.
-
-`WithThrowIfRuntimeStateRequired` rule Container will report presence of run-time state via exception, 
-so that compile-time generation process may notify user about problematic registrations.
-```
-#!c#
-    var container = new Container(rules => rules.WithThrowIfRuntimeStateRequired());
-
-    container.RegisterDelegate<string>(_ => "a");
-
-    container.Resolve<string>(); // throws exception
-```
-
-__Note:__ __Runtime state should be avoided generally__, because it is like a black box for container, 
-which disables number of diagnostics available for normal Type based registrations. 
-Especially two potential error checks: 
-
-- Reuse Lifespan mismatch
-- Recursive dependency detection
-
 md*/
