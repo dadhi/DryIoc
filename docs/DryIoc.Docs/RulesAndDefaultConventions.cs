@@ -716,32 +716,62 @@ Example:
 ```
 
 You may disable the rule for Container, so lifespan mismatch will not throw exception.
+```cs md*/
+[TestFixture] public class Disable_captive_dependency_exception
+{
+    [Test] public void Example()
+    {
+        var container = new Container(rules => rules
+            .WithoutThrowIfDependencyHasShorterReuseLifespan());
+
+        container.Register<A>(Reuse.Singleton);
+        container.Register<B>(Reuse.InCurrentScope);
+
+        A a; 
+        using (var scope1 = container.OpenScope())
+            a = scope1.Resolve<A>(); // OK
+
+        using (var scope2 = container.OpenScope())
+        {
+            a = scope2.Resolve<A>(); // OK, 
+
+            // But `a` still holds `B` from the `scope1` that's why it is called a Captive Dependency
+            Assert.AreNotSame(a.B, scope2.Resolve<B>());
+        }
+    }
+
+    class A
+    {
+        public B B { get; }
+        public A(B b) { B = b; }
+    }
+    class B { }
+}
+
+/*md
 ```
-#!c#
-    var container = new Container(rules => rules
-        .WithoutThrowIfDependencyHasShorterReuseLifespan());
-    
-    // ... the same setup
-    using (var scope1 = container.OpenScope())
-        _a = scope1.Resolve<A>(); // OK
 
-    using (var scope2 = container.OpenScope())
-        _a = scope2.Resolve<A>(); // OK, but _a still holds B from scope1
-```
+__Note:__ Another way to skip the captive dependency check is to wrap dependency in `Func`. 
+Using `Func` means that client is in charge of creating the dependency whenever its needed, 
+so the check does not make sense.
 
-__Note:__ Another way to skip the lifespan diagnostics is to wrap dependency in `Func`. 
-Using `Func` means that client is in charge of creating dependency whenever its needed, so the check does not make sense.
+```cs md*/
+[TestFixture] public class Wrap_captive_dependency_in_Func
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
 
-```
-#!c#
-    class A { public A(Func<B> getB) {} }
+        container.Register<A>(Reuse.Singleton);
+        container.Register<B>(Reuse.InCurrentScope);
 
-    var container = new Container();
+        container.Resolve<A>(); // works, an `A` will decide when to create `B`.
+    }
 
-    container.Register<A>(Reuse.Singleton);
-    container.Register<B>(Reuse.InCurrentScope);
-
-    container.Resolve<A>(); // works, A will decide when to create B.
+    public class B { }
+    public class A { public A(Func<B> getB) { } }
+}
+/*md
 ```
 
 
