@@ -43,6 +43,8 @@ Actually, multiple services mean multiple implementations of the single service 
 ```cs 
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using DryIoc;
 using NUnit.Framework;
@@ -831,31 +833,45 @@ Allows to specify different default Reuse per Container as described [here in Re
 
 Allows to specify registration option per Container which is different from default `IfAlreadyRegistered.AppendNonKeyed`. 
 
-For instance I want my container to follow _Register Once_ registration semantics:
-```
-#!c#
-    var container = new Container(rules => rules
-        .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
-    
-    container.Register<I, A>();
-    container.Register<I, B>();
-    
-    var i = container.Resolve<I>();
-    
-    Assert.IsInstanceOf<A>(i); // the first registration will be kept, and the second ignored
+For instance I want my container to follow the "Register Once" registration semantics:
+```cs 
+[TestFixture] public class Default_IfAlreadyRegistered
+{
+    [Test] public void Example()
+    {
+        var container = new Container(rules => rules
+            .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
+
+        container.Register<I, A>();
+        container.Register<I, B>();
+
+        var i = container.Resolve<I>();
+
+        Assert.IsInstanceOf<A>(i); // the first registration will be kept, and the second one is ignored
+    }
+}
 ```
 
-Another interesting use is to make __Collection Registration Explicit__. Given previous example I need to explicitly specify `IfAlreadyRegistered.AppendNonKeyed` for individual registration to be added to collection:
-```
-#!c#
-    var container = new Container(rules => rules
-        .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
-    
-    container.Register<I, A>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNonKeyed);
-    container.Register<I, B>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNonKeyed);
-    
-    var ii = container.Resolve<IEnumerable<I>>();
-    Assert.AreEqual(2, ii.Count());
+Another interesting use is to make a "Collection registration explicit". 
+Following the previous example I can explicitly specify `IfAlreadyRegistered.AppendNonKeyed` for individual registrations 
+to be added to collection:
+```cs 
+[TestFixture]
+public class Default_IfAlreadyRegistered_AppendNotKeyed
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container(rules => rules
+            .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Keep));
+
+        container.Register<I, A>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+        container.Register<I, B>(ifAlreadyRegistered: IfAlreadyRegistered.AppendNotKeyed);
+
+        var ii = container.Resolve<IEnumerable<I>>();
+        Assert.AreEqual(2, ii.Count());
+    }
+}
 ```
 
 
