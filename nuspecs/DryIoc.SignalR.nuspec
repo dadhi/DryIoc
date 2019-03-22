@@ -6,7 +6,7 @@
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2016-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
-        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <license type="expression">MIT</license>
         <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Source code for DryIoc integration with ASP.NET SignalR</description>

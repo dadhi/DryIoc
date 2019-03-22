@@ -6,7 +6,7 @@
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
-        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <license type="expression">MIT</license>
         <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
@@ -80,10 +80,6 @@
                 <dependency id="NETStandard.Library" version="1.6.1" />
                 <dependency id="System.Reflection.Emit.Lightweight" version="4.3.0" />
             </group>
-            <!-- matched to netstandard1.4 -->
-            <group targetFramework="xamarin.ios10">
-                <dependency id="System.Reflection.Emit.Lightweight" version="4.3.0" />
-            </group>
             <group targetFramework="netstandard2.0">
                 <dependency id="System.Reflection.Emit.Lightweight" version="4.3.0" />
             </group>
@@ -93,7 +89,7 @@
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
-        <file src="..\nuspecs\DryIoc.snk" />
+        <file src="..\DryIoc.snk" />
 
         <!--net35-->
         <file src="..\src\DryIoc\Container.cs" target="content\net35\DryIoc" />

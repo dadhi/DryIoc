@@ -6,7 +6,7 @@
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2014-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
-        <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+        <license type="expression">MIT</license>
         <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://github.com/unitycontainer/commonservicelocator </description>

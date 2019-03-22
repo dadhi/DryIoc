@@ -7,7 +7,7 @@
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2016-2018 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
-    <licenseUrl>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</licenseUrl>
+    <license type="expression">MIT</license>
     <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Lightweight IoC Container based on service factory delegates generated at compile-time by DryIoc. Compile-time delegate generation minimizes run-time IoC setup time to Zero.</description>

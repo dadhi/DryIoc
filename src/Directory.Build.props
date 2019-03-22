@@ -5,6 +5,7 @@
     <PropertyGroup>
         <NeutralLanguage>en-US</NeutralLanguage>
         <PackageLicense>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicense>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
