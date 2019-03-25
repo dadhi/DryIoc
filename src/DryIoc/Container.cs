@@ -10219,10 +10219,12 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
-    /// filtering or catching container relevant exceptions from client code.</summary>
-    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable",
-        Justification = "Not available in PCL.")]
+    /// Exception that container throws in case of error. Dedicated exception type simplifies
+    /// filtering or catching container relevant exceptions from client code.
+#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !PCL
+    [Serializable]
+#endif
+    [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException
     {
         /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>
@@ -10258,6 +10260,11 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         public ContainerException(int error, string message)
             : this(error, message, null) { }
+
+#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !PCL
+        protected ContainerException(SerializationInfo info, StreamingContext context)
+            : base(info, context) {}
+#endif
     }
 
     /// <summary>Defines error codes and error messages for all DryIoc exceptions (DryIoc extensions may define their own.)</summary>
