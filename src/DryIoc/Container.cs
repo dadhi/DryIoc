@@ -3920,8 +3920,7 @@ namespace DryIoc
 
         /// Default rules as staring point.
         public static readonly Rules MicrosoftDependencyInjectionRules = new Rules(
-            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) & 
-            ~Settings.ThrowOnRegisteringDisposableTransient & ~Settings.ImplicitCheckForReuseMatchingScope, 
+            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) & ~Settings.ThrowOnRegisteringDisposableTransient, 
             Rules.SelectLastRegisteredFactory(), Reuse.Transient,
             Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
             IfAlreadyRegistered.AppendNotKeyed, 

@@ -75,8 +75,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 container = container.With(rules => rules
                     .With(FactoryMethod.ConstructorWithResolvableArguments)
                     .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                    .WithTrackingDisposableTransients()
-                    .WithoutImplicitCheckForReuseMatchingScope());
+                    .WithTrackingDisposableTransients());
 
             container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
