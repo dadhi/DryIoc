@@ -95,17 +95,29 @@
         <file src="..\src\DryIoc\Container.cs" target="content\net35\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="content\net35\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\net35\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs" target="contentFiles\cs\net35\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\net35\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs" target="contentFiles\cs\net35\DryIoc" />
 
         <!--net40-->
         <file src="..\src\DryIoc\Container.cs" target="content\net40\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="content\net40\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs" target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs" target="contentFiles\cs\net40\DryIoc" />
 
         <!--net45-->
         <file src="..\src\DryIoc\Container.cs" target="content\net45\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="content\net45\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="content\net45\DryIoc" />
         <file src="..\src\DryIoc\Expression.cs" target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs" target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs" target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs" target="contentFiles\cs\net45\DryIoc" />
 
         <!-- .netstandard 1.0 (based on PCL Profile259) -->
         <file src="..\src\DryIoc\Container.cs" target="contentFiles\cs\netstandard1.0\DryIoc" />
