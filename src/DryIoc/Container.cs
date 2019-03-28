@@ -972,7 +972,34 @@ namespace DryIoc
                 return null;
 
             // For multiple matched factories, if the single one has a condition, then use it
-            var matchedFactories = MatchFactories(defaultFactories, request);
+            var matchedFactories = defaultFactories.Match(request.MatchFactoryConditionAndMetadata);
+
+            // Check the for matching scopes. Only for more than 1 factory, 
+            // for the single factory the check will be down the road
+            // BitBucket issue: #175
+            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+            {
+                var reuseMatchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
+                if (reuseMatchedFactories.Length == 1)
+                    matchedFactories = reuseMatchedFactories;
+                else if (reuseMatchedFactories.Length > 1)
+                    matchedFactories = FindFactoryWithTheMinReuseLifespan(matchedFactories)?.One() ?? matchedFactories;
+
+                if (matchedFactories.Length == 1)
+                {
+                    // Issue: #382
+                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                    if (request.IsResolutionCall)
+                        request.ChangeServiceKey(matchedFactories[0].Key);
+                    else // for injected dependency
+                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
+                }
+            }
+
+            // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
+            // so there should not be repeating of the check, and not match of Performance decrease.
+            if (matchedFactories.Length > 1)
+                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
 
             if (matchedFactories.Length > 1)
             {
@@ -1122,42 +1149,6 @@ namespace DryIoc
             }
 
             return serviceType;
-        }
-
-        private static KV<object, Factory>[] MatchFactories(KV<object, Factory>[] matchedFactories, Request request)
-        {
-            matchedFactories = matchedFactories.Match(request.MatchFactoryConditionAndMetadata);
-            if (matchedFactories.Length == 0)
-                return matchedFactories;
-
-            // Check the for matching scopes. Only for more than 1 factory, 
-            // for the single factory the check will be down the road
-            // BitBucket issue: #175
-            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
-            {
-                var reuseMatchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
-                if (reuseMatchedFactories.Length == 1)
-                    matchedFactories = reuseMatchedFactories;
-                else if (reuseMatchedFactories.Length > 1)
-                    matchedFactories = FindFactoryWithTheMinReuseLifespan(matchedFactories)?.One() ?? matchedFactories;
-
-                if (matchedFactories.Length == 1)
-                {
-                    // Issue: #382
-                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                    if (request.IsResolutionCall)
-                        request.ChangeServiceKey(matchedFactories[0].Key);
-                    else // for injected dependency
-                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
-                }
-            }
-
-            // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
-            // so there should not be repeating of the check, and not match of Performance decrease.
-            if (matchedFactories.Length > 1)
-                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
-
-            return matchedFactories;
         }
 
         private static KV<object, Factory> FindFactoryWithTheMinReuseLifespan(KV<object, Factory>[] factories)
