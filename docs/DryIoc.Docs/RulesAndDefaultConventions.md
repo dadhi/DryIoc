@@ -323,8 +323,6 @@ class Select_last_registered_factory_with_implicit_scope_selection
     class A : I { }
     class B : I { }
 } 
-
-
 ```
 
 

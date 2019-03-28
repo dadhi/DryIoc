@@ -465,6 +465,26 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
  ConcurrentDict_TryGet |  1000 | 21.876 ns | 0.0325 ns | 0.0288 ns |  1.58 |    0.00 |           - |           - |           - |                   - |
   ImmutableDict_TryGet |  1000 | 83.563 ns | 0.1046 ns | 0.0873 ns |  6.04 |    0.01 |           - |           - |           - |                   - |
 
+
+    ## 2019-03-28: Comparing vs `Dictionary<K, V>`:
+
+                           Method | Count |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------------------- |------ |----------:|----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                          TryFind |    10 |  7.722 ns | 0.0451 ns | 0.0422 ns |  7.718 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+           Dictionary_TryGetValue |    10 | 18.475 ns | 0.0502 ns | 0.0470 ns | 18.470 ns |  2.39 |    0.01 |           - |           - |           - |                   - |
+ ConcurrentDictionary_TryGetValue |    10 | 22.661 ns | 0.0463 ns | 0.0433 ns | 22.653 ns |  2.93 |    0.02 |           - |           - |           - |                   - |
+             ImmutableDict_TryGet |    10 | 72.911 ns | 1.5234 ns | 2.1355 ns | 74.134 ns |  9.25 |    0.23 |           - |           - |           - |                   - |
+                                  |       |           |           |           |           |       |         |             |             |             |                     |
+                          TryFind |   100 |  9.987 ns | 0.0543 ns | 0.0508 ns |  9.978 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+           Dictionary_TryGetValue |   100 | 18.110 ns | 0.0644 ns | 0.0602 ns | 18.088 ns |  1.81 |    0.01 |           - |           - |           - |                   - |
+ ConcurrentDictionary_TryGetValue |   100 | 24.402 ns | 0.0978 ns | 0.0915 ns | 24.435 ns |  2.44 |    0.02 |           - |           - |           - |                   - |
+             ImmutableDict_TryGet |   100 | 76.689 ns | 0.3632 ns | 0.3397 ns | 76.704 ns |  7.68 |    0.04 |           - |           - |           - |                   - |
+                                  |       |           |           |           |           |       |         |             |             |             |                     |
+                          TryFind |  1000 | 12.600 ns | 0.1506 ns | 0.1335 ns | 12.551 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+           Dictionary_TryGetValue |  1000 | 19.023 ns | 0.0575 ns | 0.0538 ns | 19.036 ns |  1.51 |    0.02 |           - |           - |           - |                   - |
+ ConcurrentDictionary_TryGetValue |  1000 | 22.651 ns | 0.1238 ns | 0.1097 ns | 22.613 ns |  1.80 |    0.02 |           - |           - |           - |                   - |
+             ImmutableDict_TryGet |  1000 | 83.608 ns | 0.3105 ns | 0.2904 ns | 83.612 ns |  6.64 |    0.07 |           - |           - |           - |                   - |
+
 */
             [Params(10, 100, 1000)]// the 1000 does not add anything as the LookupKey stored higher in the tree, 1000)]
             public int Count;
@@ -476,6 +496,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 _mapV1 = AddOrUpdate_v1();
                 //_mapV2 = AddOrUpdate_v2();
                 //_mapV3 = AddOrUpdate_v3();
+                _dict = Dict();
                 _concurrentDict = ConcurrentDict();
                 _immutableDict = ImmutableDict();
             }
@@ -494,19 +515,6 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             private ImHashMap<Type, string> _map;
 
-            //public V2.ImHashMap<Type, string> AddOrUpdate_v2()
-            //{
-            //    var map = V2.ImHashMap<Type, string>.Empty;
-
-            //    foreach (var key in _keys.Take(Count))
-            //        map = map.AddOrUpdate(key, "a");
-
-            //    map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
-
-            //    return map;
-            //}
-            //private V2.ImHashMap<Type, string> _mapV2;
-
             public V1.ImHashMap<Type, string> AddOrUpdate_v1()
             {
                 var map = V1.ImHashMap<Type, string>.Empty;
@@ -521,18 +529,19 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             private V1.ImHashMap<Type, string> _mapV1;
 
-            //public V3.ImHashMap<Type, string> AddOrUpdate_v3()
-            //{
-            //    var map = V3.ImHashMap<Type, string>.Empty;
+            public Dictionary<Type, string> Dict()
+            {
+                var map = new Dictionary<Type, string>();
 
-            //    foreach (var key in _keys.Take(Count))
-            //        map = map.AddOrUpdate(key, "a");
+                foreach (var key in _keys.Take(Count))
+                    map.TryAdd(key, "a");
 
-            //    map = map.AddOrUpdate(typeof(ImHashMapBenchmarks), "!");
+                map.TryAdd(typeof(ImHashMapBenchmarks), "!");
 
-            //    return map;
-            //}
-            //private V3.ImHashMap<Type, string> _mapV3;
+                return map;
+            }
+
+            private Dictionary<Type, string> _dict;
 
             public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
@@ -562,7 +571,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
 
             public static Type LookupKey = typeof(ImHashMapBenchmarks);
 
-            [Benchmark]
+            //[Benchmark]
             public string TryFind_v1()
             {
                 _mapV1.TryFind(LookupKey, out var result);
@@ -577,7 +586,14 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             }
 
             [Benchmark]
-            public string ConcurrentDict_TryGet()
+            public string Dictionary_TryGetValue()
+            {
+                _dict.TryGetValue(LookupKey, out var result);
+                return result;
+            }
+
+            [Benchmark]
+            public string ConcurrentDictionary_TryGetValue()
             {
                 _concurrentDict.TryGetValue(LookupKey, out var result);
                 return result;
@@ -598,10 +614,10 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             //}
 
             //[Benchmark]
-            public string GetValueOrDefault() => _map.GetValueOrDefault(LookupKey);
+            //public string GetValueOrDefault() => _map.GetValueOrDefault(LookupKey);
 
             //[Benchmark(Baseline = true)]
-            public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
+            //public string GetValueOrDefault_v1() => _mapV1.GetValueOrDefault(LookupKey);
 
             //[Benchmark]
             //public string GetValueOrDefault_v2() => V2.ImHashMap.GetValueOrDefault(_mapV2, LookupKey);

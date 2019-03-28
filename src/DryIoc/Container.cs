@@ -973,6 +973,7 @@ namespace DryIoc
 
             // For multiple matched factories, if the single one has a condition, then use it
             var matchedFactories = MatchFactories(defaultFactories, request);
+
             if (matchedFactories.Length > 1)
             {
                 var conditionedFactories = matchedFactories.Match(f => f.Value.Setup.Condition != null);

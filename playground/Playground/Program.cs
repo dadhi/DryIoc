@@ -24,7 +24,7 @@ namespace Playground
             //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
 
             //BenchmarkRunner.Run<ImHashMapBenchmarks.Populate>();
-            //BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
+            BenchmarkRunner.Run<ImHashMapBenchmarks.Lookup>();
 
             //BenchmarkRunner.Run<StructEnumerableTest>();
             //BenchmarkRunner.Run<PropertyAccess>();
@@ -38,10 +38,10 @@ namespace Playground
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
+            //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
-            //    CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
+            //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
 
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.CreateContainerAndRegister_FirstTimeOpenScopeResolve>();
