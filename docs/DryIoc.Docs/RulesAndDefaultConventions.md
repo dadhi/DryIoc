@@ -248,13 +248,14 @@ class Filter_out_service_that_do_not_have_a_matching_scope
     public void Example()
     {
         var container = new Container();
+
         container.Register<I, A>(Reuse.ScopedTo("a"));
         container.Register<I, B>(Reuse.ScopedTo("b"));
 
-        using (var scopeB = container.OpenScope("b"))
+        using (var scope = container.OpenScope("b"))
         {
             // will skip a registration of `A` because the open scope has different name
-            var b = scopeB.Resolve<I>();
+            var b = scope.Resolve<I>();
             Assert.IsInstanceOf<B>(b);
         }
     }
@@ -265,25 +266,25 @@ class Filter_out_service_that_do_not_have_a_matching_scope
 } 
 ```
 
-__Note:__ This way, you may identify a service based on its reuse rather than having a specific service key.
+__Note:__ This way you may identify a service based on its reuse rather than having a specific service key.
 
 A usual, the rule could be turned off:
 ```cs 
 class Turning_matching_scope_filtering_Off
 {
     [Test]
-    public void Example()
+    public void Example() 
     {
-        var container = new Container(rules =>
-            rules.WithoutImplicitCheckForReuseMatchingScope());
+        var container = new Container(rules => rules
+            .WithoutImplicitCheckForReuseMatchingScope());
 
         container.Register<I, A>(Reuse.ScopedTo("a"));
         container.Register<I, B>(Reuse.ScopedTo("b"));
 
-        using (var scopeB = container.OpenScope("b"))
-        {
+        using (var scope = container.OpenScope("b"))
+        { 
             // Throws an exception because of the multiple `I` registrations found
-            Assert.Throws<ContainerException>(() => scopeB.Resolve<I>());
+            Assert.Throws<ContainerException>(() => scope.Resolve<I>());
         }
     }
 
@@ -291,6 +292,39 @@ class Turning_matching_scope_filtering_Off
     class A : I { }
     class B : I { }
 } 
+```
+
+__Note:__ When both `Singleton` and `Transient` services are registered, DryIoc will prefer the `Singleton` service. 
+
+In case you are using `Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory())` and wandering how it relates to implicit reuse-based service selection,
+here is the example:
+```cs 
+class Select_last_registered_factory_with_implicit_scope_selection
+{
+    [Test]
+    public void Example()
+    {
+        IContainer container = new Container();
+
+        container.Register<I, A>(Reuse.Singleton);
+        container.Register<I, B>(Reuse.Transient);
+
+        var i = container.Resolve<I>();
+        Assert.IsInstanceOf<A>(i); // Singleton is implicitly preferred over Transient
+
+        container = container.With(rules => rules
+            .WithFactorySelector(Rules.SelectLastRegisteredFactory()));
+
+        i = container.Resolve<I>();
+        Assert.IsInstanceOf<B>(i); // Transient is used because the explicit rule is in work
+    }
+
+    interface I { }
+    class A : I { }
+    class B : I { }
+} 
+
+
 ```
 
 

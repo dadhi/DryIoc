@@ -1014,7 +1014,7 @@ namespace DryIoc
                 // optimize for the most usual case - a single factory and no dynamic rules
                 if (Rules.UseDynamicRegistrationsAsFallbackOnly || 
                     Rules.DynamicRegistrationProviders.IsNullOrEmpty())
-                    return MatchFactoryConditionAndMetadata(singleDefaultFactory, request)
+                    return request.MatchFactoryConditionAndMetadata(singleDefaultFactory)
                         ? Rules.FactorySelector(request, DefaultKey.Value.Pair<object, Factory>(singleDefaultFactory).One())
                         : null;
 
@@ -1041,18 +1041,37 @@ namespace DryIoc
 
             // optimize for the case with the single factory
             if (factories.Length == 1)
-            {
-                var factory0 = factories[0];
-                return MatchFactoryConditionAndMetadata(factory0.Value, request) 
-                    ? Rules.FactorySelector(request, factory0.Key.Pair(factory0.Value).One()) 
+                return request.MatchFactoryConditionAndMetadata(factories[0])
+                    ? Rules.FactorySelector(request, factories[0].Key.Pair(factories[0].Value).One())
                     : null;
-            }
 
             // Sort in registration order
             if (factories.Length > 1)
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
-            var matchedFactories = MatchFactories(factories, request);
+            var matchedFactories = factories.Match(request.MatchFactoryConditionAndMetadata);
+            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+            {
+                // Check the for matching scopes. Only for more than 1 factory, 
+                // for the single factory the check will be down the road
+                // BitBucket issue: #175
+                matchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
+                if (matchedFactories.Length == 1)
+                {
+                    // Issue: #382
+                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                    if (request.IsResolutionCall)
+                        request.ChangeServiceKey(matchedFactories[0].Key);
+                    else // for injected dependency
+                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
+                }
+            }
+
+            // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
+            // so there should not be repeating of the check, and not match of Performance decrease.
+            if (matchedFactories.Length > 1)
+                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
+
             if (matchedFactories.Length == 0)
                 return null;
 
@@ -1062,29 +1081,15 @@ namespace DryIoc
 
             // Issue: #508
             if (factories.Length > 1)
-                for (var i = 0; i < matchedFactories.Length; i++)
-                    if (matchedFactories[i].Value.FactoryID == selectedFactory.FactoryID)
-                    {
-                        request.ChangeServiceKey(matchedFactories[i].Key);
-                        break;
-                    }
+            {
+                var i = 0;
+                while (i < matchedFactories.Length && matchedFactories[i].Value.FactoryID != selectedFactory.FactoryID)
+                    ++i;
+                if (i < matchedFactories.Length)
+                    request.ChangeServiceKey(matchedFactories[i].Key);
+            }
 
             return selectedFactory;
-        }
-
-        private static bool MatchFactoryConditionAndMetadata(Factory factory, Request request)
-        {
-            if (!factory.CheckCondition(request))
-                return false;
-
-            var metadataKey = request.MetadataKey;
-            var metadata = request.Metadata;
-
-            if ((metadataKey != null || metadata != null) &&
-                !factory.Setup.MatchesMetadata(metadataKey, metadata))
-                return false;
-
-            return true;
         }
 
         private static Type GetServiceTypeAndKeyForFactoryLookup(Request request, out object serviceKey)
@@ -1120,35 +1125,63 @@ namespace DryIoc
 
         private static KV<object, Factory>[] MatchFactories(KV<object, Factory>[] matchedFactories, Request request)
         {
-            // Check factories condition
-            matchedFactories = matchedFactories.Match(f => f.Value.CheckCondition(request));
+            matchedFactories = matchedFactories.Match(request.MatchFactoryConditionAndMetadata);
             if (matchedFactories.Length == 0)
                 return matchedFactories;
-
-            // Check metadata, even for the single factory
-            var metadataKey = request.MetadataKey;
-            var metadata = request.Metadata;
-            if (metadataKey != null || metadata != null)
-            {
-                matchedFactories = matchedFactories.Match(f => f.Value.Setup.MatchesMetadata(metadataKey, metadata));
-                if (matchedFactories.Length == 0)
-                    return matchedFactories;
-            }
 
             // Check the for matching scopes. Only for more than 1 factory, 
             // for the single factory the check will be down the road
             // BitBucket issue: #175
             if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
-                matchedFactories = MatchFactoriesByReuse(matchedFactories, request);
+            {
+                var reuseMatchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
+                if (reuseMatchedFactories.Length == 1)
+                    matchedFactories = reuseMatchedFactories;
+                else if (reuseMatchedFactories.Length > 1)
+                    matchedFactories = FindFactoryWithTheMinReuseLifespan(matchedFactories)?.One() ?? matchedFactories;
+
+                if (matchedFactories.Length == 1)
+                {
+                    // Issue: #382
+                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
+                    if (request.IsResolutionCall)
+                        request.ChangeServiceKey(matchedFactories[0].Key);
+                    else // for injected dependency
+                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
+                }
+            }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (matchedFactories.Length > 1)
-                matchedFactories = matchedFactories.Match(f =>
-                    f.Value.FactoryGenerator == null ||
-                    f.Value.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true) != null);
+                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
 
             return matchedFactories;
+        }
+
+        private static KV<object, Factory> FindFactoryWithTheMinReuseLifespan(KV<object, Factory>[] factories)
+        {
+            var minLifespan = int.MaxValue;
+            var multipleFactories = false;
+            KV<object, Factory> minLifespanFactory = null;
+            for (var i = 0; i < factories.Length; i++)
+            {
+                var factory = factories[i];
+                var reuse = factory.Value.Reuse;
+                var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
+                if (lifespan < minLifespan)
+                {
+                    minLifespan = lifespan;
+                    minLifespanFactory = factory;
+                    multipleFactories = false;
+                }
+                else if (lifespan == minLifespan)
+                {
+                    multipleFactories = true;
+                }
+            }
+
+            return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
         }
 
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
@@ -1529,54 +1562,6 @@ namespace DryIoc
         {
             public int Compare(KV<object, Factory> first, KV<object, Factory> next) =>
                 (first?.Value.FactoryID ?? 0) - (next?.Value.FactoryID ?? 0);
-        }
-
-        private static KV<object, Factory>[] MatchFactoriesByReuse(
-            KV<object, Factory>[] matchedFactories, Request request)
-        {
-            var reuseMatchedFactories = matchedFactories.Match(x => x.Value.Reuse?.CanApply(request) ?? true);
-            if (reuseMatchedFactories.Length == 1)
-            {
-                matchedFactories = reuseMatchedFactories;
-            }
-            else if (reuseMatchedFactories.Length > 1)
-            {
-                var minLifespan = int.MaxValue;
-                var multipleFactories = false;
-                KV<object, Factory> minLifespanFactory = null;
-                for (var i = 0; i < reuseMatchedFactories.Length; i++)
-                {
-                    var factory = reuseMatchedFactories[i];
-                    var reuse = factory.Value.Reuse;
-                    var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
-                    if (lifespan < minLifespan)
-                    {
-                        minLifespan = lifespan;
-                        minLifespanFactory = factory;
-                        multipleFactories = false;
-                    }
-                    else if (lifespan == minLifespan)
-                    {
-                        multipleFactories = true;
-                    }
-                }
-
-                if (!multipleFactories && minLifespanFactory != null)
-                    matchedFactories = minLifespanFactory.One();
-            }
-
-            if (matchedFactories.Length == 1)
-            {
-                // Issue: #382
-                // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                var matchedFactory = matchedFactories[0];
-                if (request.IsResolutionCall)
-                    request.ChangeServiceKey(matchedFactory.Key);
-                else // for injected dependency
-                    matchedFactory.Value.Setup = matchedFactory.Value.Setup.WithAsResolutionCall();
-            }
-
-            return matchedFactories;
         }
 
         private Factory GetWrapperFactoryOrDefault(Request request)
@@ -6575,6 +6560,29 @@ namespace DryIoc
         IsDirectlyWrappedInFunc = 1 << 9
     }
 
+    /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
+    internal static class RequestTools
+    {
+        public static bool MatchFactoryConditionAndMetadata(this Request request, Factory factory)
+        {
+            if (!factory.CheckCondition(request))
+                return false;
+
+            var metadataKey = request.MetadataKey;
+            var metadata = request.Metadata;
+            return (metadataKey == null && metadata == null) || factory.Setup.MatchesMetadata(metadataKey, metadata);
+        }
+
+        public static bool MatchFactoryConditionAndMetadata(this Request r, KV<object, Factory> f) => 
+            r.MatchFactoryConditionAndMetadata(f.Value);
+
+        public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => 
+            f.Value.Reuse?.CanApply(r) ?? true;
+
+        public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f) =>
+            f.Value.FactoryGenerator == null || f.Value.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true) != null;
+    }
+
     /// <summary>Tracks the requested service and resolved factory details in a chain of nested dependencies.</summary>
     public sealed class Request : IEnumerable<Request>
     {
@@ -10262,7 +10270,8 @@ namespace DryIoc
             : this(error, message, null) { }
 
 #if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !PCL
-        protected ContainerException(SerializationInfo info, StreamingContext context)
+        /// <inheritdoc />
+        protected ContainerException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
             : base(info, context) {}
 #endif
     }
