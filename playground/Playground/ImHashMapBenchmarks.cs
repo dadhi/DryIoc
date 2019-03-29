@@ -6,6 +6,7 @@ using System.Linq;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
 using ImTools;
+using Microsoft.Collections.Extensions;
 
 namespace Playground
 {
@@ -485,6 +486,28 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
  ConcurrentDictionary_TryGetValue |  1000 | 22.651 ns | 0.1238 ns | 0.1097 ns | 22.613 ns |  1.80 |    0.02 |           - |           - |           - |                   - |
              ImmutableDict_TryGet |  1000 | 83.608 ns | 0.3105 ns | 0.2904 ns | 83.612 ns |  6.64 |    0.07 |           - |           - |           - |                   - |
 
+    ## 2019-03-29: Comparing vs `DictionarySlim<K, V>`:
+
+                           Method | Count |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------------------- |------ |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+       DictionarySlim_TryGetValue |    10 |  8.228 ns | 0.0682 ns | 0.0604 ns |  1.00 |    0.01 |           - |           - |           - |                   - |
+                          TryFind |    10 |  8.257 ns | 0.0796 ns | 0.0706 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+           Dictionary_TryGetValue |    10 | 19.615 ns | 0.0251 ns | 0.0209 ns |  2.38 |    0.02 |           - |           - |           - |                   - |
+ ConcurrentDictionary_TryGetValue |    10 | 22.339 ns | 0.0922 ns | 0.0863 ns |  2.71 |    0.03 |           - |           - |           - |                   - |
+             ImmutableDict_TryGet |    10 | 69.872 ns | 0.2699 ns | 0.2524 ns |  8.46 |    0.07 |           - |           - |           - |                   - |
+                                  |       |           |           |           |       |         |             |             |             |                     |
+       DictionarySlim_TryGetValue |   100 |  8.351 ns | 0.1613 ns | 0.1508 ns |  0.69 |    0.01 |           - |           - |           - |                   - |
+                          TryFind |   100 | 12.144 ns | 0.0570 ns | 0.0533 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+           Dictionary_TryGetValue |   100 | 17.985 ns | 0.0880 ns | 0.0823 ns |  1.48 |    0.01 |           - |           - |           - |                   - |
+ ConcurrentDictionary_TryGetValue |   100 | 22.312 ns | 0.0564 ns | 0.0471 ns |  1.84 |    0.01 |           - |           - |           - |                   - |
+             ImmutableDict_TryGet |   100 | 75.374 ns | 0.3042 ns | 0.2846 ns |  6.21 |    0.04 |           - |           - |           - |                   - |
+                                  |       |           |           |           |       |         |             |             |             |                     |
+       DictionarySlim_TryGetValue |  1000 |  8.202 ns | 0.0713 ns | 0.0667 ns |  0.55 |    0.01 |           - |           - |           - |                   - |
+                          TryFind |  1000 | 14.919 ns | 0.1101 ns | 0.0919 ns |  1.00 |    0.00 |           - |           - |           - |                   - |
+           Dictionary_TryGetValue |  1000 | 18.073 ns | 0.2415 ns | 0.2141 ns |  1.21 |    0.02 |           - |           - |           - |                   - |
+ ConcurrentDictionary_TryGetValue |  1000 | 22.406 ns | 0.1039 ns | 0.0921 ns |  1.50 |    0.01 |           - |           - |           - |                   - |
+             ImmutableDict_TryGet |  1000 | 84.215 ns | 0.2835 ns | 0.2513 ns |  5.65 |    0.04 |           - |           - |           - |                   - |
+
 */
             [Params(10, 100, 1000)]// the 1000 does not add anything as the LookupKey stored higher in the tree, 1000)]
             public int Count;
@@ -497,6 +520,7 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 //_mapV2 = AddOrUpdate_v2();
                 //_mapV3 = AddOrUpdate_v3();
                 _dict = Dict();
+                _dictSlim = DictSlim();
                 _concurrentDict = ConcurrentDict();
                 _immutableDict = ImmutableDict();
             }
@@ -541,7 +565,32 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
                 return map;
             }
 
+            public struct TypeVal : IEquatable<TypeVal>
+            {
+                public static implicit operator TypeVal(Type t) => new TypeVal(t);
+
+                public readonly Type Type;
+                public TypeVal(Type type) => Type = type;
+                public bool Equals(TypeVal other) => Type == other.Type;
+                public override bool Equals(object obj) => !ReferenceEquals(null, obj) && obj is TypeVal other && Equals(other);
+                public override int GetHashCode() => Type.GetHashCode();
+            }
+
             private Dictionary<Type, string> _dict;
+
+            public DictionarySlim<TypeVal, string> DictSlim()
+            {
+                var dict = new DictionarySlim<TypeVal, string>();
+
+                foreach (var key in _keys.Take(Count))
+                    dict.GetOrAddValueRef(key) = "a";
+
+                dict.GetOrAddValueRef(typeof(ImHashMapBenchmarks)) = "!";
+
+                return dict;
+            }
+
+            private DictionarySlim<TypeVal, string> _dictSlim;
 
             public ConcurrentDictionary<Type, string> ConcurrentDict()
             {
@@ -589,6 +638,13 @@ Frequency=2156249 Hz, Resolution=463.7683 ns, Timer=TSC
             public string Dictionary_TryGetValue()
             {
                 _dict.TryGetValue(LookupKey, out var result);
+                return result;
+            }
+
+            [Benchmark]
+            public string DictionarySlim_TryGetValue()
+            {
+                _dictSlim.TryGetValue(LookupKey, out var result);
                 return result;
             }
 

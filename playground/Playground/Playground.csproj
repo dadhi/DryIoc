@@ -16,6 +16,7 @@
         <PackageReference Include="Grace" Version="6.4.2" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="6.4.0" />
         <PackageReference Include="LightInject" Version="5.4.0" />
+        <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
         <PackageReference Include="SimpleInjector" Version="4.4.3" />
 
