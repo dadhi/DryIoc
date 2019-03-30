@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>DryIoc.Microsoft.DependencyInjection.src</id>
+    <version>3.0.1</version>
+    <authors>Maksim Volkau</authors>
+    <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
+    <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
+    <license type="expression">MIT</license>
+    <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</description>
+    <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
+    <releaseNotes>
+<![CDATA[
+## v3.0.1
+
+- fixed: #97: Resolving last registration from multiple default services bug
+
+## v3.0.0
+
+- Strongly-named!
+- Greatly improved performance and decreased memory allocations for bootstapping and first-time resolution
+
+- fixed: #56 Project Upgrade to core2.2 and then get an error
+- added: DryIocAdapter.Create
+- added: DryIoc IResolver now directly implements IServiceProvider - no need for BuildServiceProvider anymore
+- added: DryIoc.Rules.Rules.MicrosoftDependencyInjectionRules - the set of rules for MS.DI available directly in DryIoc
+
+v2.2.0:
+- updated: To DryIoc v3.1.0-preview-06
+v2.1.0:
+- added: Split WithCompositionRoot and BuildServiceProvider extension methods
+- removed: Preventing to use Container with ambient ScopeContext
+v2.0.1:
+- updated: to DryIoc v3.0.2
+v2.0.0:
+- updated: to DryIoc v3
+- updated: Targets changed to match MS.Ext.DI (netstandard 1.0 for DI 1.1.1 and netstandard 2.0 for DI 2.0)
+- updated: To Microsoft.Extensions.DependencyInjection.Abstractions 2.1.1
+- breaking: No longer uses Reuse.WebRequestScopeName when opening scope, so your registrations should use Reuse.Scope instead of Reuse.InWebRequest
+        ]]>
+    </releaseNotes>
+    <dependencies>
+      <group>
+        <dependency id="DryIoc" version="4.0.2" />
+        <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="2.2.0" />
+      </group>
+    </dependencies>
+    <contentFiles>
+      <files include="cs/**/*.*" buildAction="Compile" />
+    </contentFiles>
+  </metadata>
+  <files>
+    <file src="..\LICENSE.txt" />
+    <file src="..\nuspecs\DryIoc.snk" />
+
+    <!-- NetStandard2.0 -->
+    <file src="..\src\DryIoc.Microsoft.DependencyInjection\DryIocAdapter.cs" target="contentFiles\cs\netstandard2.0\DryIoc.Microsoft.DependencyInjection" />
+
+  </files>
+</package>

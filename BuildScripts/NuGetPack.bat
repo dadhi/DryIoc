@@ -38,6 +38,11 @@ echo:============================
 %NUGET% pack %NUSPECS%\DryIoc.CommonServiceLocator.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
+echo:DryIoc.Microsoft.DependencyInjection
+echo:============================
+%NUGET% pack %NUSPECS%\DryIoc.Microsoft.DependencyInjection.src.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
+
+echo:
 echo:DryIoc.Web
 echo:============================
 %NUGET% pack %NUSPECS%\DryIoc.Web.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive

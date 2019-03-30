@@ -15,7 +15,7 @@
         <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
+<![CDATA[
 ## v3.0.1
 
 - fixed: #97: Resolving last registration from multiple default services bug  

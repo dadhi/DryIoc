@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.0.1</version>
+        <version>4.0.2</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,10 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
     <![CDATA[
+## v4.0.2 Release notes
+
+- fixed: #100: ResolveMany with Meta does NOT work but collection with Meta does work
+
 ## v4.0.1 Release notes
 
 - added: #95: Serializable ContainerException for supported targets
