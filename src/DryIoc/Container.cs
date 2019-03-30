@@ -439,8 +439,10 @@ namespace DryIoc
 
             var container = (IContainer)this;
 
+            requiredItemType = container.GetWrappedType(requiredItemType, null) ?? requiredItemType;
+
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
-                .Where(f => f.Value != null)
+                .Where(x => x.Value != null)
                 .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
@@ -448,9 +450,9 @@ namespace DryIoc
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Where(f => f.Value != null)
-                    .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType,
-                        new OpenGenericTypeKey(requiredItemOpenGenericType, f.Key)));
+                    .Where(x => x.Value != null)
+                    .Select(x => new ServiceRegistrationInfo(x.Value, requiredServiceType,
+                        new OpenGenericTypeKey(requiredItemOpenGenericType, x.Key)));
             }
 
             // Append registered generic types with compatible variance,
@@ -459,10 +461,10 @@ namespace DryIoc
             if (requiredItemType.IsGeneric() && container.Rules.VariantGenericTypesInResolvedCollection)
             {
                 variantGenericItems = container.GetServiceRegistrations()
-                    .Where(it => it.ServiceType.IsGeneric()
-                        && it.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition()
-                        && it.ServiceType != requiredItemType
-                        && it.ServiceType.IsAssignableTo(requiredItemType));
+                    .Where(x => x.ServiceType.IsGeneric()
+                        && x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition()
+                        && x.ServiceType != requiredItemType
+                        && x.ServiceType.IsAssignableTo(requiredItemType));
             }
 
             if (serviceKey != null) // include only single item matching key.
@@ -1366,8 +1368,7 @@ namespace DryIoc
                 var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
                 if (factory != null)
                 {
-                    wrappedType = ((Setup.WrapperSetup)factory.Setup)
-                        .GetWrappedTypeOrNullIfWrapsRequired(serviceType);
+                    wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
                     if (wrappedType == null)
                         return null;
                 }
