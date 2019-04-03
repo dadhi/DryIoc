@@ -31,36 +31,39 @@ echo:
 echo:## Finished: BUILD and PACKAGING ##
 
 echo:
-echo:## Starting: TESTS... ##
+echo:## Running: TESTS... ##
+
 echo:
-dotnet test /p:DevMode=false -c:Release --no-build .\docs\DryIoc.Docs
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.IssuesTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.MefAttributedModel.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Owin.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.Owin.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.SignalR.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.CommonServiceLocator.UnitTests
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Syntax.Autofac.UnitTests
-if %ERRORLEVEL% neq 0 goto :error
+dotnet test /p:DevMode=false -c:Release --no-build .\docs\DryIoc.Docs    > TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.UnitTests   >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.IssuesTests     >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.MefAttributedModel.UnitTests    >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests   >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests   >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests   >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Owin.UnitTests  >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests   >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.Owin.UnitTests  >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.SignalR.UnitTests  >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.CommonServiceLocator.UnitTests >> TestResults.log
+dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Syntax.Autofac.UnitTests   >> TestResults.log
+
+echo:
+type TestResults.log
+for /f %%i in ('type TestResults.log ^| find /i "Failed "') do if not "%%i"=="" goto :error
 echo:
 echo:## Finished: TESTS ##
 
 call BuildScripts\NugetPack.bat
-if %ERRORLEVEL% neq 0 call :error "PACKAGING SOURCE PACKAGES"
+if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: PACKAGING ##
+
 echo:
-echo:## Finished: ALL ##
-echo:
+echo:## Finished: ALL Successful ##
 exit /b 0
 
 :error
 echo:
-echo:## :-( Failed with ERROR: %ERRORLEVEL%
-echo:
-exit /b %ERRORLEVEL%
+echo:## Build Failed :-(
+exit /b 1
