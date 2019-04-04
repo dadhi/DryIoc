@@ -61,7 +61,7 @@ namespace DryIoc.UnitTests
             Assert.IsFalse(((DisposableService)service).IsDisposed);
         }
 
-        [Test]
+        [Test, Explicit]
         public void Registering_instance_as_weak_reference_will_prevent_the_disposal()
         {
             var container = new Container();
