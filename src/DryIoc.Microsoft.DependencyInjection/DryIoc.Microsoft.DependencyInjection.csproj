@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard1.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard1.0;netstandard2.0;netcoreapp2.1</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>3.0.1</VersionPrefix>
+        <VersionPrefix>3.0.2</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -16,6 +16,10 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v3.0.2
+
+- added back the direct support for ASP .NET Core 2.1
+
 ## v3.0.1
 
 - fixed: #97: Resolving last registration from multiple default services bug  
@@ -54,7 +58,11 @@ v2.0.0:
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="1.1.1" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' != 'netstandard1.0'">
+    <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp2.1'">
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="[2.1.1, 2.2.0)" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="2.2.0" />
     </ItemGroup>
 </Project>
