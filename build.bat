@@ -34,7 +34,8 @@ echo:
 echo:## Running: TESTS... ##
 
 echo:
-dotnet test
+dotnet test -c Release
+
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TESTS ##
 
