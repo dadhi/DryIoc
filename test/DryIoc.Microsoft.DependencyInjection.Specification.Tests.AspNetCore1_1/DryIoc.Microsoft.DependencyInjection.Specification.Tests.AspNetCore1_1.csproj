@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp1.1</TargetFramework>
+    <TargetFrameworks>netcoreapp1.1</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
+    <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection.AspNetCore1_1\DryIoc.Microsoft.DependencyInjection.AspNetCore1_1.csproj" />
   </ItemGroup>
 
   <ItemGroup>

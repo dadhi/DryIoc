@@ -34,24 +34,8 @@ echo:
 echo:## Running: TESTS... ##
 
 echo:
-dotnet test /p:DevMode=false -c:Release --no-build .\docs\DryIoc.Docs    > TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.UnitTests   >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.IssuesTests     >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.MefAttributedModel.UnitTests    >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Microsoft.DependencyInjection.Specification.Tests   >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Web.UnitTests   >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Mvc.UnitTests   >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Owin.UnitTests  >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.UnitTests   >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.WebApi.Owin.UnitTests  >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.SignalR.UnitTests  >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.CommonServiceLocator.UnitTests >> TestResults.log
-dotnet test /p:DevMode=false -c:Release --no-build .\test\DryIoc.Syntax.Autofac.UnitTests   >> TestResults.log
-
-echo:
-type TestResults.log
-for /f %%i in ('type TestResults.log ^| find /i "Failed "') do if not "%%i"=="" goto :error
-echo:
+dotnet test
+if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TESTS ##
 
 call BuildScripts\NugetPack.bat

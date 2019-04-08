@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>netcoreapp2.0</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection.AspNetCore2_1\DryIoc.Microsoft.DependencyInjection.AspNetCore2_1.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+        <PackageReference Include="xunit" Version="2.3.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.1.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Specification.Tests" Version="2.1.1" />
+    </ItemGroup>
+
+</Project>

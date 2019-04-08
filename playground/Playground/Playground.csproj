@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFrameworks>netcoreapp2.2</TargetFrameworks>
@@ -18,7 +18,6 @@
         <PackageReference Include="LightInject" Version="5.4.0" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="2.2.0" />
         <PackageReference Include="SimpleInjector" Version="4.4.3" />
 
         <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="2.10.0" /><!--Required for Lamar-->

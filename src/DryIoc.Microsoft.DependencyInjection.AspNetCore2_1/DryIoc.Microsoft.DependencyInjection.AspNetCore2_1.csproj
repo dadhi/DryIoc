@@ -1,9 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard1.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0</TargetFrameworks>
 
-        <Product>DryIoc.Microsoft.DependencyInjection</Product>
+        <Product>DryIoc.Microsoft.DependencyInjection.AspNetCore2_1</Product>
         <VersionPrefix>3.0.3</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
@@ -43,13 +42,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="[2.1.1, 2.2.0)" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.0'">
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="1.1.1" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="2.2.0" />
-    </ItemGroup>
 </Project>
