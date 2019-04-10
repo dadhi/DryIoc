@@ -9559,13 +9559,19 @@ namespace DryIoc
         public bool CanApply(Request request) => true;
 
         /// <summary>Returns expression call to GetOrAddItem.</summary>
-        public Expression Apply(Request request, Expression serviceFactoryExpr) =>
-            request.TracksTransientDisposable
-            ? Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
-                serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder))
-            : Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddMethod,
-                Constant(request.FactoryID), Lambda<CreateScopedValue>(serviceFactoryExpr),
+        public Expression Apply(Request request, Expression serviceFactoryExpr)
+        {
+            // this is required because we cannot use ValueType for the object
+            if (serviceFactoryExpr.Type.IsValueType())
+                serviceFactoryExpr = Convert(serviceFactoryExpr, typeof(object));
+
+            return request.TracksTransientDisposable
+                ? Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
+                    serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder))
+                : Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddMethod,
+                    Constant(request.FactoryID), Lambda<CreateScopedValue>(serviceFactoryExpr),
                     Constant(request.Factory.Setup.DisposalOrder));
+        }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
             Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
@@ -9600,6 +9606,10 @@ namespace DryIoc
             // strip the conversion as we are operating with object anyway
             if (serviceFactoryExpr.NodeType == ExprType.Convert)
                 serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
+            
+            // this is required because we cannot use ValueType for the object
+            if (serviceFactoryExpr.Type.IsValueType())
+                serviceFactoryExpr = Convert(serviceFactoryExpr, typeof(object));
 
             var resolverExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
 

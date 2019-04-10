@@ -7,40 +7,34 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue109_Using_Func_wrapper_and_FastExpressionCompiler
     {
-        [Test][Ignore("fixme")]
+        [Test]
         public void Should_be_able_to_resolve_Func()
         {
             using (var c = new Container(Rules.Default.WithoutFastExpressionCompiler()))
             {
-                c.Register<CancellationTokenSource>(reuse: Reuse.Singleton, made: Made.Of(() => new CancellationTokenSource()));
-                c.Register<CancellationToken>(reuse: Reuse.Singleton, made: Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(), cts => cts.Token));
+                c.Register<CancellationTokenSource>(Made.Of(() => new CancellationTokenSource()), Reuse.Singleton);
+                c.Register<CancellationToken>(Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(), cts => cts.Token), Reuse.Singleton);
 
                 c.Register<IAlpha, Alpha>();
 
-                Assert.DoesNotThrow(() => c.Resolve<Func<IAlpha>>());
+                var f = c.Resolve<Func<IAlpha>>();
+                var a = f();
+                Assert.IsNotNull(a);
             }
         }
 
-        [Test][Ignore("fixme")]
-        public void Resolved_Func_should_not_throw()
+        private interface IAlpha
         {
-            using (var c = new Container(Rules.Default))
-            {
-                c.Register<CancellationTokenSource>(reuse: Reuse.Singleton, made: Made.Of(() => new CancellationTokenSource()));
-                c.Register<CancellationToken>(reuse: Reuse.Singleton, made: Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(), cts => cts.Token));
-
-                c.Register<IAlpha, Alpha>();
-
-                var func = c.Resolve<Func<IAlpha>>();
-                Assert.DoesNotThrow(() => func());
-            }
+            CancellationToken Ct { get; }
         }
-
-        private interface IAlpha { }
 
         private class Alpha : IAlpha
         {
-            public Alpha(CancellationToken ct) { }
+            public CancellationToken Ct { get; }
+            public Alpha(CancellationToken ct)
+            {
+                Ct = ct;
+            }
         }
     }
 }

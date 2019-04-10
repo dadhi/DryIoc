@@ -4,7 +4,7 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.0.2</VersionPrefix>
+        <VersionPrefix>4.0.3</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -16,6 +16,10 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.0.3 Release notes
+
+- fixed: #109: Cannot inject a struct using a Func wrapper
+
 ## v4.0.2 Release notes
 
 - fixed: #100: ResolveMany with Meta does NOT work but collection with Meta does work
