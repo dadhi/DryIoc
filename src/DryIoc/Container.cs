@@ -439,7 +439,9 @@ namespace DryIoc
 
             var container = (IContainer)this;
 
-            requiredItemType = container.GetWrappedType(requiredItemType, null) ?? requiredItemType;
+            var unwrappedType = container.GetWrappedType(requiredItemType, null);
+            if (unwrappedType != null && unwrappedType != typeof(void)) // accounting for the resolved action GH#114
+                requiredItemType = unwrappedType;
 
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
                 .Where(x => x.Value != null)
@@ -5255,7 +5257,7 @@ namespace DryIoc
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
-        /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
+        /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
@@ -5269,14 +5271,14 @@ namespace DryIoc
         }
 
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
-        /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
+        /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, setup, serviceKey);
 
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
-        /// Look at `Use` method to put instance directly into Currnt Scope or Singletons Scope,
+        /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
         public static void RegisterInstance<T>(this IRegistrator registrator, T instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>

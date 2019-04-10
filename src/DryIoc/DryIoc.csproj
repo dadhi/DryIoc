@@ -19,6 +19,7 @@
 ## v4.0.3 Release notes
 
 - fixed: #109: Cannot inject a struct using a Func wrapper
+- fixed: #114: Resolve Action<T>
 
 ## v4.0.2 Release notes
 
