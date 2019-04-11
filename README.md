@@ -30,10 +30,10 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
 - [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.0.0) :: [Previous Versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
-
+- [Extensions and Companions](Extensions.md)
 - [Documentation][WikiHome]
-- [How to contribute](CONTRIBUTING.md)
-- Check two original parts of DryIoc and now a standalone projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
+- [Contribution guide](CONTRIBUTING.md)
+- Check the two original parts of DryIoc and now standalone projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
 
 ## Benchmarks
 
@@ -118,55 +118,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
     * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
 * [Composite pattern](https://bitbucket.org/dadhi/dryioc/wiki/Wrappers#markdown-header-composite-pattern-support): Composite itself is excluded from result collection.
-* [Decorator pattern](https://bitbucket.org/dadhi/dryioc/wiki/Decorators). 
+* [Decorator pattern](https://bitbucket.org/dadhi/dryioc/wiki/Decorators).
 
-
-## Companions
-
-### __DryIocAttributes__
-
-__DryIocAttributes.dll__ [![NuGet Badge](https://buildstats.info/nuget/DryIocAttributes.dll)](https://www.nuget.org/packages/DryIocAttributes.dll)  
-__DryIocAttributes__ (sources) [![NuGet Badge](https://buildstats.info/nuget/DryIocAttributes)](https://www.nuget.org/packages/DryIocAttributes)
-
-- Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc.
-- Does not depend on DryIoc and may be used by other IoC libraries. 
-
-
-### DryIocZero
-
-__DryIocZero__ [![NuGet Badge](https://buildstats.info/nuget/DryIocZero)](https://www.nuget.org/packages/DryIocZero)
-
-Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc.
-
-- __Does not depend on DryIoc at run-time.__
-- Ensures _zero_ application bootstrapping time associated with IoC registrations.
-- Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically you can see how DryIoc is creating things.
-- Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
-- Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
-- Allows run-time registrations too. You may register instances and delegates at run-time.
-
-## Extensions
-
-- [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) 
-for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) 
-[![NuGet Badge](https://buildstats.info/nuget/DryIoc.MefAttributedModel.dll?includePreReleases=true)](https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll)
-
-
-- ASP.NET: 
-
-    - [DryIoc.Web](https://www.nuget.org/packages/DryIoc.Web/) 
-    - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.Mvc.dll/)
-    - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
-    - [DryIoc.SignalR](Extensions\SignalR)
-    - [DryIoc.Microsoft.DependencyInjection](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection)
-
-- OWIN:
-
-    - [DryIoc.Owin](https://www.nuget.org/packages/DryIoc.Owin.dll/)
-    - [DryIoc.WebApi.Owin](https://www.nuget.org/packages/DryIoc.WebApi.Owin.dll/)
-
-- [Nancy.Bootstrappers.DryIoc](https://www.nuget.org/packages/Nancy.Bootstrappers.DryIoc/) for [NanxyFX](http://nancyfx.org/)
-- [Common Service Locator](https://www.nuget.org/packages/DryIoc.CommonServiceLocator.dll/)
 
 ---
 <small>Icon made by <a href="http://www.freepik.com" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></small>
