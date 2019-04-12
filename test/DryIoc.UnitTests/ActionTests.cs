@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -84,10 +84,7 @@ namespace DryIoc.UnitTests
         {
         }
 
-        public static void Act1(IntValue i)
-        {
-            i.Value = 3;
-        }
+        public static void Act1(IntValue i) => i.Value = 3;
 
         public class IntValue
         {

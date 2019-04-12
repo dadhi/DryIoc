@@ -4,13 +4,8 @@ using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using DryIocAttributes;
 
-#if NET45 || NETCOREAPP2_0
 using FastExpressionCompiler.LightExpression;
 using static FastExpressionCompiler.LightExpression.Expression;
-#else
-using System.Linq.Expressions;
-using static System.Linq.Expressions.Expression;
-#endif
 
 namespace DryIoc.IssuesTests
 {

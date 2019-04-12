@@ -3,13 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
-#if NET45 || NETCOREAPP2_0
 using FastExpressionCompiler.LightExpression;
 using static FastExpressionCompiler.LightExpression.Expression;
-#else
-using System.Linq.Expressions;
-using static System.Linq.Expressions.Expression;
-#endif
 
 namespace DryIoc.IssuesTests
 {
