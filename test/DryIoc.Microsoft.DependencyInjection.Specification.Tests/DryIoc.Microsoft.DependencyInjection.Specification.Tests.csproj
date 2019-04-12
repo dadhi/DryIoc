@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netcoreapp2.1</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp2.0;netcoreapp2.1</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp2.1;netcoreapp2.1</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
