@@ -18,4 +18,4 @@ dotnet: 2.1.502
 install:
   - dotnet restore -p:NoSupportForNetCore22=true;Sign=false;DevMode=false
 script:
-  - dotnet test -c:Release -f:netcoreapp2.1 -p:NoSupportForNetCore22=true;Sign=false;DevMode=false
+  - dotnet test -c:Release -f:netcoreapp2.1 -p:NoSupportForNetCore22=true;Sign=false
