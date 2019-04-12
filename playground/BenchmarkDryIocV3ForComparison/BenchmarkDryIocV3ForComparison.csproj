@@ -2,8 +2,9 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
-  </PropertyGroup>
+    <TargetFrameworks Condition="'$(NoSupportForNetCore22)' != 'true'">netcoreapp2.2</TargetFrameworks>
+    <TargetFrameworks Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFrameworks>
+   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\..\test\DryIoc.IssuesTests\GHIssue44_Real_world_benchmarks.Setup.cs" Link="GHIssue44_Real_world_benchmarks.Setup.cs" />

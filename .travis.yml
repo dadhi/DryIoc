@@ -16,6 +16,6 @@ env:
 mono: latest
 dotnet: 2.1.502
 install:
-  - dotnet restore -p:TravisCI=true;Sign=false
+  - dotnet restore -p:NoSupportForNetCore22=true;Sign=false
 script:
-  - dotnet test -c:Release -f:netcoreapp2.1 -p:TravisCI=true;Sign=false
+  - dotnet test -c:Release -f:netcoreapp2.1 -p:NoSupportForNetCore22=true;Sign=false
