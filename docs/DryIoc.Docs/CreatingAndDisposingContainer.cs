@@ -1,5 +1,5 @@
 /*md
-<!--Auto-generated from .cs file, the edits here will be lost! -->
+<!--Auto-generated from .cs file, the edits made to .md file will be lost! -->
 
 # Creating and Disposing Container
 
