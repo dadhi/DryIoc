@@ -56,7 +56,7 @@ It is possible to develop and run tests (via extensions) in VS Code.
 
 ### Documentation in DryIoc explained
 
-DryIoc uses **compilable runnable documentation** written in `.cs` C# files in the markdown format.
+DryIoc uses **compilable runnable documentation** written in `.cs` C# files in the markdown format - [example](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/CreatingAndDisposingContainer.cs).
 That's a lot to say :-) so let's explain it step by step.
 
 Markdown text is placed inside `/*md ... md*/` block comment sections and 
