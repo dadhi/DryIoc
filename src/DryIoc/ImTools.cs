@@ -355,7 +355,6 @@ namespace ImTools
                         matches = AppendTo(source, matchStart, i - matchStart, matches);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
-
                 ++i;
             }
 
@@ -453,12 +452,31 @@ namespace ImTools
             if (sourceCount == 2)
                 return new[] { map(source[0]), map(source[1]) };
 
-            if (sourceCount == 3)
-                return new[] { map(source[0]), map(source[1]), map(source[2]) };
-
             var results = new R[sourceCount];
             for (var i = 0; i < source.Length; i++)
                 results[i] = map(source[i]);
+            return results;
+        }
+
+        /// Map with additional state to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+        public static R[] Map<T, S, R>(this T[] source, S state, Func<S, T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            var sourceCount = source.Length;
+            if (sourceCount == 0)
+                return Empty<R>();
+
+            if (sourceCount == 1)
+                return new[] { map(state, source[0]) };
+
+            if (sourceCount == 2)
+                return new[] { map(state, source[0]), map(state, source[1]) };
+
+            var results = new R[sourceCount];
+            for (var i = 0; i < source.Length; i++)
+                results[i] = map(state, source[i]);
             return results;
         }
 

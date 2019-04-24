@@ -1275,8 +1275,7 @@ namespace DryIoc
                 if (!genericDecorators.IsNullOrEmpty())
                 {
                     genericDecorators = genericDecorators
-                        .Map(d => d.FactoryGenerator == null ? d :
-                            d.FactoryGenerator.GetGeneratedFactory(request, ifErrorReturnDefault: true))
+                        .Map(request, (r, d) => d.FactoryGenerator == null ? d : d.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true))
                         .Match(d => d != null);
                     decorators = decorators.Append(genericDecorators);
                 }
@@ -1385,7 +1384,7 @@ namespace DryIoc
         {
             // Check for UsedForExpressionGeneration, and if not set just short-circuit to Expression.Constant
             if (!throwIfStateRequired && !Rules.ThrowIfRuntimeStateRequired && !Rules.UsedForExpressionGeneration)
-                return Constant(item, itemType);
+                return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (item == null)
                 return itemType == null || itemType == typeof(object) ? Constant(null) : Constant(null, itemType);
@@ -1408,7 +1407,7 @@ namespace DryIoc
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             // don't try to recover the non primitive type of element,
-            // cause it is a too much work to find the base commont element type in array
+            // cause it is a too much work to find the base common element type in array
             var arrayElemType = actualItemType.GetArrayElementTypeOrNull();
             if (arrayElemType != null && arrayElemType != typeof(object) &&
                (arrayElemType.IsPrimitive() || actualItemType.IsAssignableTo<Type>()))
