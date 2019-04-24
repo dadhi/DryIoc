@@ -219,6 +219,20 @@ namespace ImTools
             return default(T);
         }
 
+        /// Version of FindFirst with the fixed state used by predicate to prevent allocations by predicate lambda closure
+        public static T FindFirst<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+        {
+            if (source != null && source.Length != 0)
+                for (var i = 0; i < source.Length; ++i)
+                {
+                    var item = source[i];
+                    if (predicate(state, item))
+                        return item;
+                }
+
+            return default(T);
+        }
+
         /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
         /// <typeparam name="T">item type</typeparam>
         /// <param name="source">items collection to search</param>
@@ -311,6 +325,37 @@ namespace ImTools
             {
                 for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
                     appendedResults[i] = map(source[j]);
+            }
+
+            return appendedResults;
+        }
+
+        private static R[] AppendTo<T, S, R>(T[] source, S state, int sourcePos, int count, Func<S, T, R> map, R[] results = null)
+        {
+            if (results == null || results.Length == 0)
+            {
+                var newResults = new R[count];
+                if (count == 1)
+                    newResults[0] = map(state, source[sourcePos]);
+                else
+                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                        newResults[i] = map(state, source[j]);
+                return newResults;
+            }
+
+            var oldResultsCount = results.Length;
+            var appendedResults = new R[oldResultsCount + count];
+            if (oldResultsCount == 1)
+                appendedResults[0] = results[0];
+            else
+                Array.Copy(results, 0, appendedResults, 0, oldResultsCount);
+
+            if (count == 1)
+                appendedResults[oldResultsCount] = map(state, source[sourcePos]);
+            else
+            {
+                for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
+                    appendedResults[i] = map(state, source[j]);
             }
 
             return appendedResults;
@@ -448,6 +493,52 @@ namespace ImTools
                 return AppendTo(source, matchStart, i - matchStart, map, matches);
 
             return matches ?? (matchStart == 0 ? AppendTo(source, 0, source.Length, map) : Empty<R>());
+        }
+
+        /// Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> to minimize the allocations in <paramref name="condition"/> lambda closure 
+        public static R[] Match<T, S, R>(this T[] source, S state, Func<S, T, bool> condition, Func<S, T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            if (source.Length == 0)
+                return Empty<R>();
+
+            if (source.Length == 1)
+            {
+                var item = source[0];
+                return condition(state, item) ? new[] { map(state, item) } : Empty<R>();
+            }
+
+            if (source.Length == 2)
+            {
+                var condition0 = condition(state, source[0]);
+                var condition1 = condition(state, source[1]);
+                return condition0 && condition1 ? new[] { map(state, source[0]), map(state, source[1]) }
+                    : condition0 ? new[] { map(state, source[0]) }
+                    : condition1 ? new[] { map(state, source[1]) }
+                    : Empty<R>();
+            }
+
+            var matchStart = 0;
+            R[] matches = null;
+            var matchFound = false;
+
+            var i = 0;
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(state, source[i])))
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendTo(source, state, matchStart, i - matchStart, map, matches);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendTo(source, state, matchStart, i - matchStart, map, matches);
+
+            return matches ?? (matchStart == 0 ? AppendTo(source, state, 0, source.Length, map) : Empty<R>());
         }
 
         /// <summary>Maps all items from source to result array.</summary>

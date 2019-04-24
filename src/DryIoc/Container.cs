@@ -1492,15 +1492,15 @@ namespace DryIoc
                 }
 
                 var remainingDynamicFactories = dynamicRegistrations
-                    .Match(it =>
+                    .Match(x =>
                     {
-                        if (it.Factory.FactoryType != factoryType ||
-                            !it.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules))
+                        if (x.Factory.FactoryType != factoryType ||
+                            !x.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules))
                             return false;
 
-                        if (it.ServiceKey == null) // for the default dynamic factory
+                        if (x.ServiceKey == null) // for the default dynamic factory
                         {
-                            switch (it.IfAlreadyRegistered)
+                            switch (x.IfAlreadyRegistered)
                             {
                                 // accept the default if result factories don't contain it already
                                 case IfAlreadyRegistered.Keep:
@@ -1517,33 +1517,33 @@ namespace DryIoc
 
                                 case IfAlreadyRegistered.AppendNewImplementation:
                                     // if we cannot access to dynamic implementation type, assume that the type is new implementation
-                                    if (!it.Factory.CanAccessImplementationType)
+                                    if (!x.Factory.CanAccessImplementationType)
                                         return true;
 
                                     // keep dynamic factory if there is no result factory with the same implementation type
                                     return resultFactories.IndexOf(f =>
                                         f.Value.CanAccessImplementationType &&
-                                        f.Value.ImplementationType == it.Factory.ImplementationType) == -1;
+                                        f.Value.ImplementationType == x.Factory.ImplementationType) == -1;
                             }
                         }
                         else // for the keyed dynamic factory
                         {
-                            switch (it.IfAlreadyRegistered)
+                            switch (x.IfAlreadyRegistered)
                             {
                                 // remove the result factory with the same key
                                 case IfAlreadyRegistered.Replace:
-                                    resultFactories = resultFactories.Match(it.ServiceKey, (key, f) => !f.Key.Equals(key));
+                                    resultFactories = resultFactories.Match(x.ServiceKey, (key, f) => !f.Key.Equals(key));
                                     return true;
 
                                 // keep the dynamic factory with the new service key, otherwise skip it
                                 default:
-                                    return resultFactories.IndexOf(f => f.Key.Equals(it.ServiceKey)) == -1;
+                                    return resultFactories.IndexOf(f => f.Key.Equals(x.ServiceKey)) == -1;
                             }
                         }
 
                         return true;
                     },
-                     it => KV.Of(it.ServiceKey ?? (dynamicKey = dynamicKey.Next()), it.Factory));
+                     x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
 
                 resultFactories = resultFactories.Append(remainingDynamicFactories);
             }
@@ -4031,7 +4031,7 @@ namespace DryIoc
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
-            (r, fs) => fs.FindFirst(f => f.Key.Equals(serviceKey)).Value ??
+            (r, fs) => fs.FindFirst(serviceKey, (key, f) => f.Key.Equals(key)).Value ??
                        fs.FindFirst(f => f.Key.Equals(null)).Value;
 
         /// <summary>Specify the method signature for returning multiple keyed factories.
@@ -5328,9 +5328,9 @@ namespace DryIoc
                 .Match(nonPublicServiceTypes, (nonPublic, t) => (nonPublic || t.IsPublicOrNestedPublic()) && t.IsServiceType());
 
             if (type.IsGenericDefinition())
-                serviceTypes = serviceTypes.Match(
-                    t => t.ContainsAllGenericTypeParameters(type.GetGenericParamsAndArgs()),
-                    t => t.GetGenericDefinitionOrNull());
+                serviceTypes = serviceTypes.Match(type,
+                    (t, x) => x.ContainsAllGenericTypeParameters(t.GetGenericParamsAndArgs()),
+                    (_, x) => x.GetGenericDefinitionOrNull());
 
             return serviceTypes;
         }
@@ -8855,7 +8855,7 @@ namespace DryIoc
                     var factoryServiceType = factoryInfo.ServiceType;
                     if (factoryServiceType != factoryImplType)
                         factoryServiceType = factoryImplType.GetImplementedTypes()
-                            .FindFirst(t => t.IsGeneric() && t.GetGenericTypeDefinition() == factoryServiceType)
+                            .FindFirst(factoryServiceType, (fServiceType, t) => t.IsGeneric() && t.GetGenericTypeDefinition() == fServiceType)
                             .ThrowIfNull();
 
                     var factoryServiceTypeParams = factoryServiceType.GetGenericParamsAndArgs();
