@@ -1234,7 +1234,7 @@ namespace DryIoc
             {
                 appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
-                    decorators = decorators.Match(d => appliedDecoratorIDs.IndexOf(d.FactoryID) == -1);
+                    decorators = decorators.Match(appliedDecoratorIDs, (ids, d) => ids.IndexOf(d.FactoryID) == -1);
             }
 
             // Append open-generic decorators
@@ -1257,7 +1257,7 @@ namespace DryIoc
             var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!typeArgDecorators.IsNullOrEmpty())
                 genericDecorators = genericDecorators.Append(
-                    typeArgDecorators.Match(d => d.CheckCondition(request)));
+                    typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
 
             // Filter out already applied generic decorators
             // And combine with rest of decorators
@@ -1266,10 +1266,10 @@ namespace DryIoc
                 appliedDecoratorIDs = appliedDecoratorIDs ?? GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
                     genericDecorators = genericDecorators
-                        .Match(d => d.FactoryGenerator == null
-                            ? appliedDecoratorIDs.IndexOf(d.FactoryID) == -1
-                            : d.FactoryGenerator.GeneratedFactories.Enumerate()
-                                .All(f => appliedDecoratorIDs.IndexOf(f.Value.FactoryID) == -1));
+                        .Match(appliedDecoratorIDs, 
+                            (ids, d) => d.FactoryGenerator == null
+                            ? ids.IndexOf(d.FactoryID) == -1
+                            : d.FactoryGenerator.GeneratedFactories.Enumerate().All(f => ids.IndexOf(f.Value.FactoryID) == -1));
 
                 // Generate closed-generic versions
                 if (!genericDecorators.IsNullOrEmpty())
@@ -1284,7 +1284,7 @@ namespace DryIoc
             // Filter out the recursive decorators by doing the same recursive check
             // that Request.WithResolvedFactory does. Fixes: #267
             if (!decorators.IsNullOrEmpty())
-                decorators = decorators.Match(d => !request.HasRecursiveParent(d.FactoryID));
+                decorators = decorators.Match(request, (r, d) => !r.HasRecursiveParent(d.FactoryID));
 
             // Return earlier if no decorators found, or we have filtered out everything
             if (decorators.IsNullOrEmpty())
@@ -1532,7 +1532,7 @@ namespace DryIoc
                             {
                                 // remove the result factory with the same key
                                 case IfAlreadyRegistered.Replace:
-                                    resultFactories = resultFactories.Match(f => !f.Key.Equals(it.ServiceKey));
+                                    resultFactories = resultFactories.Match(it.ServiceKey, (key, f) => !f.Key.Equals(key));
                                     return true;
 
                                 // keep the dynamic factory with the new service key, otherwise skip it
@@ -2025,11 +2025,19 @@ namespace DryIoc
 
                     case FactoryType.Decorator:
                         Factory[] removedDecorators = null;
-                        registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _) =>
-                        {
-                            removedDecorators = condition == null ? factories : factories.Match(condition);
-                            return removedDecorators == factories ? null : factories.Except(removedDecorators).ToArray();
-                        }));
+                        // todo: minimize allocations in the lambdas below
+                        if (condition == null)
+                            registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _) =>
+                            {
+                                removedDecorators = factories;
+                                return null;
+                            }));
+                        else
+                            registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _) =>
+                            {
+                                removedDecorators = factories.Match(condition);
+                                return removedDecorators == factories ? null : factories.Except(removedDecorators).ToArray();
+                            }));
 
                         if (removedDecorators.IsNullOrEmpty())
                             return this;
@@ -3614,22 +3622,21 @@ namespace DryIoc
             // check fast for the parent of the same type
             if (!parent.IsEmpty && parent.GetActualServiceType() == requiredItemType)
             {
-                items = items.Match(x => x.Factory.FactoryID != parent.FactoryID);
+                items = items.Match(parent.FactoryID, (pID, x) => x.Factory.FactoryID != pID);
                 if (requiredItemType.IsGeneric())
-                    items = items.Match(x => x
-                        .Factory.FactoryGenerator?.GeneratedFactories.Enumerate()
-                        .FindFirst(f => f.Value.FactoryID == parent.FactoryID) == null);
+                    items = items.Match(parent.FactoryID, 
+                        (pID, x) => x.Factory.FactoryGenerator?.GeneratedFactories.Enumerate().FindFirst(f => f.Value.FactoryID == pID) == null);
             }
 
             // Return collection of single matched item if key is specified.
             var serviceKey = request.ServiceKey;
             if (serviceKey != null)
-                items = items.Match(it => serviceKey.Equals(it.OptionalServiceKey));
+                items = items.Match(serviceKey, (key, x) => key.Equals(x.OptionalServiceKey));
 
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
-                items = items.Match(it => it.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                items = items.Match(metadataKey.Pair(metadata), (m, x) => x.Factory.Setup.MatchesMetadata(m.Key, m.Value));
 
             var itemExprs = Empty<Expression>();
             if (!items.IsNullOrEmpty())
@@ -3822,28 +3829,27 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
             if (serviceKey != null)
             {
-                factories = factories.Match(f => serviceKey.Equals(f.Key));
+                factories = factories.Match(serviceKey, (key, f) => key.Equals(f.Key));
                 if (factories.Length == 0)
                     return null;
             }
 
             // if the service keys for some reason are not unique
             factories = factories
-                .Match(f =>
+                .Match(metadataType, (mType, f) =>
                 {
                     var metadata = f.Value.Setup.Metadata;
                     if (metadata == null)
                         return false;
 
-                    if (metadataType == typeof(object))
+                    if (mType == typeof(object))
                         return true;
 
                     var metadataDict = metadata as IDictionary<string, object>;
                     if (metadataDict != null)
-                        return metadataType == typeof(IDictionary<string, object>)
-                            || metadataDict.Values.Any(m => metadataType.IsTypeOf(m));
+                        return mType == typeof(IDictionary<string, object>) || metadataDict.Values.Any(m => mType.IsTypeOf(m));
 
-                    return metadataType.IsTypeOf(metadata);
+                    return mType.IsTypeOf(metadata);
                 });
 
             if (factories.Length == 0)
@@ -5319,7 +5325,7 @@ namespace DryIoc
             var implementedTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
 
             var serviceTypes = implementedTypes
-                .Match(t => (nonPublicServiceTypes || t.IsPublicOrNestedPublic()) && t.IsServiceType());
+                .Match(nonPublicServiceTypes, (nonPublic, t) => (nonPublic || t.IsPublicOrNestedPublic()) && t.IsServiceType());
 
             if (type.IsGenericDefinition())
                 serviceTypes = serviceTypes.Match(
@@ -8114,8 +8120,7 @@ namespace DryIoc
                     return sourceMembers == null || sourceMembers.Length == 0 ? otherMembers
                         : otherMembers == null || otherMembers.Length == 0 ? sourceMembers
                         : otherMembers.Append(
-                            sourceMembers.Match(s => s != null &&
-                                otherMembers.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
+                            sourceMembers.Match(otherMembers, (om, s) => s != null && om.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
                 };
         }
 

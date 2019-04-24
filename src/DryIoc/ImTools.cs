@@ -343,32 +343,60 @@ namespace ImTools
             var matchStart = 0;
             T[] matches = null;
             var matchFound = false;
-
             var i = 0;
-            while (i < source.Length)
-            {
-                matchFound = condition(source[i]);
-                if (!matchFound)
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(source[i])))
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
                         matches = AppendTo(source, matchStart, i - matchStart, matches);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
-                ++i;
-            }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
                 return AppendTo(source, matchStart, i - matchStart, matches);
 
-            if (matches != null)
-                return matches;
+            return matches ?? (matchStart != 0 ? Empty<T>() : source);
+        }
 
-            if (matchStart != 0) // no matches
-                return Empty<T>();
+        /// Match with the additional state to use in <paramref name="condition"/> to minimize the allocations in <paramref name="condition"/> lambda closure 
+        public static T[] Match<T, S>(this T[] source, S state, Func<S, T, bool> condition)
+        {
+            if (source == null || source.Length == 0)
+                return source;
 
-            return source;
+            if (source.Length == 1)
+                return condition(state, source[0]) ? source : Empty<T>();
+
+            if (source.Length == 2)
+            {
+                var condition0 = condition(state, source[0]);
+                var condition1 = condition(state, source[1]);
+                return condition0 && condition1 ? new[] { source[0], source[1] }
+                    : condition0 ? new[] { source[0] }
+                    : condition1 ? new[] { source[1] }
+                    : Empty<T>();
+            }
+
+            var matchStart = 0;
+            T[] matches = null;
+            var matchFound = false;
+            var i = 0;
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(state, source[i])))
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendTo(source, matchStart, i - matchStart, matches);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendTo(source, matchStart, i - matchStart, matches);
+
+            return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
 
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
@@ -406,10 +434,8 @@ namespace ImTools
             var matchFound = false;
 
             var i = 0;
-            while (i < source.Length)
-            {
-                matchFound = condition(source[i]);
-                if (!matchFound)
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(source[i])))
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
@@ -417,20 +443,11 @@ namespace ImTools
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
-                ++i;
-            }
-
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
                 return AppendTo(source, matchStart, i - matchStart, map, matches);
 
-            if (matches != null)
-                return matches;
-
-            if (matchStart != 0) // no matches
-                return Empty<R>();
-
-            return AppendTo(source, 0, source.Length, map);
+            return matches ?? (matchStart == 0 ? AppendTo(source, 0, source.Length, map) : Empty<R>());
         }
 
         /// <summary>Maps all items from source to result array.</summary>
