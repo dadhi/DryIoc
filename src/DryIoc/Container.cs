@@ -163,13 +163,14 @@ namespace DryIoc
             if (serviceKey == null)
                 serviceKey = Rules.DefaultRegistrationServiceKey;
 
-            factory.ThrowIfNull().ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, Rules);
+            factory.ThrowIfNull().ValidateAndNormalizeRegistration(serviceType, serviceKey, isStaticallyChecked, Rules);
 
             if (!ifAlreadyRegistered.HasValue)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
-            // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
             var registry = _registry.Value;
+
+            // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
             if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
@@ -208,7 +209,7 @@ namespace DryIoc
         {
             var cachedItem = _registry.Value.DefaultFactoryCache.Value.GetValueOrDefault(serviceType);
             return cachedItem != null 
-                ? (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem))(this)
+                ? (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem)).Invoke(this)
                 : ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
         }
 
@@ -250,9 +251,9 @@ namespace DryIoc
                 if (expr == null)
                     return null;
 
-                if (expr is ConstantExpression ce)
+                if (expr is ConstantExpression constExpr)
                 {
-                    var value = ce.Value;
+                    var value = constExpr.Value;
                     if (factory.Caching != FactoryCaching.DoNotCache)
                         _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, value.ToFactoryDelegate);
                     return value;
@@ -1485,7 +1486,7 @@ namespace DryIoc
                 {
                     resultFactories = dynamicRegistrations.Match(x =>
                         x.Factory.FactoryType == factoryType &&
-                        x.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules),
+                        x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules),
                         x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory))
                         .ToArrayOrSelf();
                     continue;
@@ -1495,7 +1496,7 @@ namespace DryIoc
                     .Match(x =>
                     {
                         if (x.Factory.FactoryType != factoryType ||
-                            !x.Factory.ThrowIfInvalidRegistration(serviceType, serviceKey, false, Rules))
+                            !x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules))
                             return false;
 
                         if (x.ServiceKey == null) // for the default dynamic factory
@@ -5991,7 +5992,7 @@ namespace DryIoc
             if (factory == null || factory is FactoryPlaceholder)
                 return;
 
-            // Prevents infinite recursion when genererating the resolution depenedency #579
+            // Prevents infinite recursion when generating the resolution dependency #579
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
                 return;
             request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
@@ -7723,7 +7724,7 @@ namespace DryIoc
         /// Indicates how to deal with the result expression
         public FactoryCaching Caching { get; set; }
 
-        /// Instructs to skip caching the factory unleast it really wants to via `PleaseDontSetDoNotCache`
+        /// Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`
         public Factory DoNotCache()
         {
             if (Caching != FactoryCaching.PleaseDontSetDoNotCache)
@@ -7875,7 +7876,7 @@ namespace DryIoc
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
             GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
 
-        internal virtual bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
+        internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
             if (!isStaticallyChecked)
                 serviceType.ThrowIfNull();
@@ -7907,6 +7908,7 @@ namespace DryIoc
             }
             else if (setup.FactoryType == FactoryType.Decorator)
             {
+                DoNotCache();
                 if (serviceKey != null)
                     Throw.It(Error.DecoratorShouldNotBeRegisteredWithServiceKey, serviceKey);
             }
@@ -8412,9 +8414,9 @@ namespace DryIoc
             return paramExprs;
         }
 
-        internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
+        internal override bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
-            base.ThrowIfInvalidRegistration(serviceType, serviceKey, isStaticallyChecked, rules);
+            base.ValidateAndNormalizeRegistration(serviceType, serviceKey, isStaticallyChecked, rules);
 
             if (!CanAccessImplementationType)
                 return true;
@@ -8521,7 +8523,7 @@ namespace DryIoc
                 var made = openFactory.Made;
                 if (made.FactoryMethod != null)
                 {
-                    // resolve request with factory to specify the implementation tyoe may be required by FactoryMethod or GetClosed...
+                    // resolve request with factory to specify the implementation type may be required by FactoryMethod or GetClosed...
                     request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
                     var factoryMethod = made.FactoryMethod(request);
                     if (factoryMethod == null)
@@ -8562,8 +8564,11 @@ namespace DryIoc
                         return generatedFactory;
                 }
 
-                var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup);
-                closedGenericFactory.GeneratorFactoryID = openFactory.FactoryID;
+                var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
+                {
+                    Caching = openFactory.Caching,
+                    GeneratorFactoryID = openFactory.FactoryID
+                };
                 _generatedFactories.AddOrUpdate(generatedFactoryKey, closedGenericFactory);
                 return closedGenericFactory;
             }
@@ -8804,14 +8809,14 @@ namespace DryIoc
                                 return true;
                         }
                         else if (resultImplArgs[paramIndex] != serviceArg)
-                            return false; // more than one service type arg is matching with single impl type param
+                            return false; // more than one service type arg is matching with single implementation type parameter
                     }
                 }
                 else if (implementedParam != serviceArg)
                 {
                     if (!implementedParam.IsOpenGeneric() ||
                         implementedParam.GetGenericDefinitionOrNull() != serviceArg.GetGenericDefinitionOrNull())
-                        return false; // type param and arg are of different types
+                        return false; // type parameter and argument are of different types
 
                     if (!MatchServiceWithImplementedTypeParams(resultImplArgs, implParams,
                         implementedParam.GetGenericParamsAndArgs(), serviceArg.GetGenericParamsAndArgs()))
@@ -8995,7 +9000,7 @@ namespace DryIoc
         public override bool HasRuntimeState => true;
 
         /// Simplified specially for register instance 
-        internal override bool ThrowIfInvalidRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
+        internal override bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
             if (!isStaticallyChecked && (ImplementationType != null && !ImplementationType.IsAssignableTo(serviceType.ThrowIfNull())))
                 Throw.It(Error.RegisteringInstanceNotAssignableToServiceType, ImplementationType, serviceType);
