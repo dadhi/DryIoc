@@ -34,7 +34,7 @@ echo:
 echo:## Running: TESTS... ##
 
 echo:
-dotnet test -c Release
+dotnet test -c Release -p:GeneratePackageOnBuild=false
 
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TESTS ##

@@ -6882,7 +6882,7 @@ namespace DryIoc
                 ServiceDetails.Of(details.RequiredServiceType, serviceKey, details.IfUnresolved, details.DefaultValue));
         }
 
-        /// <summary>Prepends input arguments to existing arguments in request. Prepending is done because
+        /// <summary>Prepends input arguments to existing arguments in request. It is done because the
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
@@ -7163,7 +7163,7 @@ namespace DryIoc
 
         // todo: Should we include InputArgs and DecoratedFactoryID and what about flags? 
         // todo: Should we add and rely on Equals of ServiceInfo and Reuse?
-        // todo: The equals calculated differently comparing to HashCode, may be we can use FactoryID for for Equals as well?
+        // todo: The equals calculated differently comparing to HashCode, may be we can use FactoryID for Equals as well?
         /// <summary>Compares self properties but not the parents.</summary>
         public bool EqualsWithoutParent(Request other) =>
             other.ServiceType == ServiceType
@@ -7662,7 +7662,7 @@ namespace DryIoc
     public enum FactoryCaching
     {   /// Is up to DryIoc to decide,
         Default = 0,
-        /// Prevents DryIoc to sуе `DoNotCache`.
+        /// Prevents DryIoc to set `DoNotCache`.
         PleaseDontSetDoNotCache,
         /// If set, the expression won't be cached 
         DoNotCache
@@ -8517,6 +8517,7 @@ namespace DryIoc
                   ? serviceType.GetGenericParamsAndArgs()
                   : implType.IsGenericParameter ? serviceType.One()
                   : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
+
                 if (closedTypeArgs == null)
                     return null;
 
@@ -8532,7 +8533,7 @@ namespace DryIoc
                     var checkMatchingType = implType != null && implType.IsGenericParameter;
                     var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
 
-                    // may be null only for IfUnresolved.ReturnDefault or check for matching type is failed
+                    // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
                     if (closedFactoryMethod == null)
                         return null;
 
@@ -8543,8 +8544,7 @@ namespace DryIoc
                 {
                     implType = implType.IsGenericParameter
                         ? closedTypeArgs[0]
-                        : Throw.IfThrows<ArgumentException, Type>(
-                            () => implType.MakeGenericType(closedTypeArgs),
+                        : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
                             !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                             Error.NoMatchedGenericParamConstraints, implType, request);
                     if (implType == null)

@@ -632,8 +632,7 @@ namespace ImTools
         /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
         /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
         /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public T Swap(Func<T, T> getNewValue) =>
-            Ref.Swap(ref _value, getNewValue);
+        public T Swap(Func<T, T> getNewValue) => Ref.Swap(ref _value, getNewValue);
 
         /// Option without allocation for capturing `a` in closure of `getNewValue`
         public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
