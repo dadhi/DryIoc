@@ -1434,7 +1434,7 @@ namespace DryIoc
                 Error.StateIsRequiredToUseItem, item);
 
             return itemType == null ? Constant(item) : Constant(item, itemType);
-        }l
+        }
 
         private static readonly MethodInfo _kvOfMethod =
             typeof(KV).GetTypeInfo().GetDeclaredMethod(nameof(KV.Of));
