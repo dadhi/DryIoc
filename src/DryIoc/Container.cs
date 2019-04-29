@@ -764,7 +764,7 @@ namespace DryIoc
                         registry.DropFactoryCache(oldFactory, serviceType);
                     else
                         ((FactoriesEntry)oldEntry).Factories.Enumerate().ToArray()
-                            .DoPer(x => registry.DropFactoryCache(x.Value, serviceType, serviceKey));
+                            .ForEach(x => registry.DropFactoryCache(x.Value, serviceType, serviceKey));
                 }
 
                 return registry;
@@ -1266,11 +1266,22 @@ namespace DryIoc
             {
                 appliedDecoratorIDs = appliedDecoratorIDs ?? GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
+                {
                     genericDecorators = genericDecorators
                         .Match(appliedDecoratorIDs, 
-                            (ids, d) => d.FactoryGenerator == null
-                            ? ids.IndexOf(d.FactoryID) == -1
-                            : d.FactoryGenerator.GeneratedFactories.Enumerate().All(f => ids.IndexOf(f.Value.FactoryID) == -1));
+                            (appliedDecIds, d) =>
+                            {
+                                var factoryGenerator = d.FactoryGenerator;
+                                if (factoryGenerator == null)
+                                    return appliedDecIds.IndexOf(d.FactoryID) == -1;
+
+                                foreach (var entry in factoryGenerator.GeneratedFactories.Enumerate())
+                                    if (appliedDecIds.IndexOf(entry.Value.FactoryID) != -1)
+                                        return false;
+
+                                return true;
+                            });
+                }
 
                 // Generate closed-generic versions
                 if (!genericDecorators.IsNullOrEmpty())
@@ -1423,7 +1434,7 @@ namespace DryIoc
                 Error.StateIsRequiredToUseItem, item);
 
             return itemType == null ? Constant(item) : Constant(item, itemType);
-        }
+        }l
 
         private static readonly MethodInfo _kvOfMethod =
             typeof(KV).GetTypeInfo().GetDeclaredMethod(nameof(KV.Of));
@@ -2130,7 +2141,7 @@ namespace DryIoc
                 else
                     (removed as Factory[] ??
                      ((FactoriesEntry)removed).Factories.Enumerate().Select(f => f.Value).ToArray())
-                        .DoPer(x => registry.DropFactoryCache(x, serviceType, serviceKey));
+                        .ForEach(x => registry.DropFactoryCache(x, serviceType, serviceKey));
 
                 return registry;
             }
@@ -8566,10 +8577,14 @@ namespace DryIoc
 
                 var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
                 {
-                    Caching = openFactory.Caching,
-                    GeneratorFactoryID = openFactory.FactoryID
+                    GeneratorFactoryID = openFactory.FactoryID,
+                    Caching = openFactory.Caching
                 };
-                _generatedFactories.AddOrUpdate(generatedFactoryKey, closedGenericFactory);
+
+                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
+                _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
+                    (genFacKey, fac, facs) => facs.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
+
                 return closedGenericFactory;
             }
 
@@ -10651,7 +10666,7 @@ namespace DryIoc
             Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
 
         public static void AddOrUpdate<K, V>(this Ref<ImHashMap<K, V>> map, K key, V value) =>
-            map.Swap(key, value, (m, k, v) => m.AddOrUpdate(k, v));
+            map.Swap(key, value, (k, v, m) => m.AddOrUpdate(k, v));
 
         public static void AddOrUpdate<K, V>(ref ImHashMap<K, V> map, K key, V value) =>
             Ref.Swap(ref map, x => x.AddOrUpdate(key, value));

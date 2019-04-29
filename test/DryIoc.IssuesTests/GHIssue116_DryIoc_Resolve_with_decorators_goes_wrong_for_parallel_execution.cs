@@ -8,7 +8,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution
     {
-        [Test][Ignore("fixme")]
+        [Test]
         public async Task DryIoc_Resolve_parallel_execution()
         {
             var container = new Container();

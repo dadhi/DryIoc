@@ -117,9 +117,6 @@ namespace DryIoc.IssuesTests
             Debug.WriteLine(s);
         }
 
-        public static string String()
-        {
-            return string.Join("\r\n", Lines);
-        }
+        public static string String() => string.Join("\r\n", Lines);
     }
 }

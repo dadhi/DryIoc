@@ -256,14 +256,12 @@ namespace ImTools
                 if (!e.MoveNext())
                     return default(T);
                 var it = e.Current;
-                if (!e.MoveNext())
-                    return it;
-                return default(T);
+                return !e.MoveNext() ? it : default(T);
             }
         }
 
         /// <summary>Does <paramref name="action"/> for each item</summary>
-        public static void DoPer<T>(this T[] source, Action<T> action)
+        public static void ForEach<T>(this T[] source, Action<T> action)
         {
             if (!source.IsNullOrEmpty())
                 for (var i = 0; i < source.Length; i++)
@@ -635,10 +633,10 @@ namespace ImTools
         public T Swap(Func<T, T> getNewValue) => Ref.Swap(ref _value, getNewValue);
 
         /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
+        public T Swap<A>(A a, Func<A, T, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
 
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
+        public T Swap<A, B>(A a, B b, Func<A, B, T, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
 
         /// <summary>Just sets new value ignoring any intermingled changes.</summary>
         /// <param name="newValue"></param> <returns>old value</returns>
@@ -695,13 +693,13 @@ namespace ImTools
         }
 
         /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue) where T : class
+        public static T Swap<A, T>(ref T value, A a, Func<A, T, T> getNewValue) where T : class
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(oldValue, a);
+                var newValue = getNewValue(a, oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -710,13 +708,13 @@ namespace ImTools
         }
 
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue) where T : class
+        public static T Swap<A, B, T>(ref T value, A a, B b, Func<A, B, T, T> getNewValue) where T : class
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b);
+                var newValue = getNewValue(a, b, oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -731,7 +729,7 @@ namespace ImTools
             " times But there is always someone else intervened.";
     }
 
-    /// <summary>Printable thingy via provided printer </summary>
+    /// <summary>Printable string via provided printer </summary>
     public interface IPrintable
     {
         /// <summary>Print to the provided string builder via the provided printer.</summary>
