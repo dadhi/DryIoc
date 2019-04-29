@@ -23,6 +23,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
+#define SUPPORTS_FAST_EXPRESSION_COMPILER
+#endif
+#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6 && !NETCOREAPP1_0 && !NETCOREAPP1_1
+#define SUPPORTS_ISERVICE_PROVIDER
+#endif
+#if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6
+#define SUPPORTS_SERIALIZABLE
+#define SUPPORTS_STACK_TRACE
+#define SUPPORTS_MANAGED_THREAD_ID
+#endif
+#if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_5 && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452
+#define SUPPORTS_ASYNC_LOCAL
+#endif
+
 namespace DryIoc
 {
     using System;
@@ -41,7 +56,7 @@ namespace DryIoc
 
     using ExprType = System.Linq.Expressions.ExpressionType;
 
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
     using FastExpressionCompiler.LightExpression;
     using static FastExpressionCompiler.LightExpression.Expression;
 #else
@@ -198,7 +213,7 @@ namespace DryIoc
 
         #region IResolver
 
-#if NET45 || NETSTANDARD2_0
+#if SUPPORTS_ISERVICE_PROVIDER
         /// Resolves service with <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
         /// enabling the fallback resolution for not registered services (default MS convention)
         object IServiceProvider.GetService(Type serviceType) => 
@@ -2448,7 +2463,7 @@ namespace DryIoc
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                         return true;
                     }
-#if NETSTANDARD2_0 || NET35 || NET40 || NET45
+#if SUPPORTS_FAST_EXPRESSION_COMPILER && !NETSTANDARD1_3 || NET35 || NET40 || NET403
                 // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Need help!
                 case ExprType.Invoke:
                     {
@@ -2802,7 +2817,7 @@ namespace DryIoc
             // or just in case when some expression is not supported (did not found one yet)
             var lambdaExpr = Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs);
 
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
             return lambdaExpr.ToLambdaExpression().Compile();
 #else
             return lambdaExpr.Compile();
@@ -2811,7 +2826,7 @@ namespace DryIoc
 
         /// <summary>Restores the expression from LightExpression, or returns itself if already an Expression.</summary>
         public static System.Linq.Expressions.Expression ToExpression(this Expression expr) =>
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
             expr.ToExpression();
 #else
             expr;
@@ -3095,7 +3110,7 @@ namespace DryIoc
                         continue;
 
                     result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
                         .ToLambdaExpression()
 #endif
                     ));
@@ -3569,7 +3584,7 @@ namespace DryIoc
                 .AddOrUpdate(typeof(IResolver), resolverContextExpr)
                 .AddOrUpdate(typeof(IContainer), containerExpr)
                 .AddOrUpdate(typeof(IRegistrator), containerExpr)
-#if NET45 || NETSTANDARD2_0
+#if SUPPORTS_ISERVICE_PROVIDER
                 .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr)
 #endif
                 ;
@@ -3783,7 +3798,7 @@ namespace DryIoc
             if (expr == null)
                 return null;
             return Constant(expr.WrapInFactoryExpression()
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
                 .ToLambdaExpression()
 #endif
                 , typeof(LambdaExpression));
@@ -6014,7 +6029,7 @@ namespace DryIoc
 
             request.Container.Rules.DependencyResolutionCallExprs.Swap(x =>
                 x.AddOrUpdate(request, factoryExpr
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
                         .ToExpression()
 #endif
                 ));
@@ -8675,8 +8690,7 @@ namespace DryIoc
                 if (member.Details == DryIoc.ServiceDetails.Default)
                 {
                     if (memberServiceType == typeof(IResolverContext) || memberServiceType == typeof(IResolver)
-                    // todo: replace framework targets with feature toggle
-#if NET45 || NETSTANDARD2_0
+#if SUPPORTS_ISERVICE_PROVIDER
                     || memberServiceType == typeof(IServiceProvider)
 #endif
                     )
@@ -9965,7 +9979,7 @@ namespace DryIoc
     /// <summary>Declares minimal API for service resolution. 
     /// Resolve default and keyed is separated because of optimization for faster resolution of the former.</summary>
     public interface IResolver
-#if NET45 || NETSTANDARD2_0
+#if SUPPORTS_ISERVICE_PROVIDER
     : IServiceProvider
 #endif
 
@@ -10257,7 +10271,7 @@ namespace DryIoc
 
     /// Exception that container throws in case of error. Dedicated exception type simplifies
     /// filtering or catching container relevant exceptions from client code.
-#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !PCL
+#if SUPPORTS_SERIALIZABLE
     [Serializable]
 #endif
     [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", Justification = "Not available in PCL.")]
@@ -10266,7 +10280,7 @@ namespace DryIoc
         /// <summary>Error code of exception, possible values are listed in <see cref="Error"/> class.</summary>
         public readonly int Error;
 
-        /// <summary>Simplifies the access to erro name.</summary>
+        /// <summary>Simplifies the access to the error name.</summary>
         public string ErrorName => DryIoc.Error.NameOf(Error);
 
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
@@ -10297,7 +10311,7 @@ namespace DryIoc
         public ContainerException(int error, string message)
             : this(error, message, null) { }
 
-#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !PCL
+#if SUPPORTS_SERIALIZABLE
         /// <inheritdoc />
         protected ContainerException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
             : base(info, context) {}
@@ -10921,7 +10935,6 @@ namespace DryIoc
         public static IEnumerable<ConstructorInfo> PublicAndInternalConstructors(this Type type) =>
             type.GetTypeInfo().DeclaredConstructors.Match(c => !c.IsPrivate && !c.IsStatic);
 
-
         /// <summary>Enumerates all constructors from input type.</summary>
         public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
@@ -11345,7 +11358,7 @@ namespace DryIoc
                 return null;
 
             return Lambda<Func<int>>(Call(method, Empty<Expression>()), Empty<ParameterExpression>())
-#if NET45 || NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
                 .ToLambdaExpression()
 #endif
                 .Compile();
@@ -11365,7 +11378,7 @@ namespace DryIoc
     }
 } // end of DryIoc namespace
 
-#if NETSTANDARD1_3 || NETSTANDARD2_0
+#if SUPPORTS_ASYNC_LOCAL
 namespace DryIoc
 {
     using System.Threading;
@@ -11398,7 +11411,7 @@ namespace DryIoc
     }
 }
 #endif
-#if NET45
+#if !SUPPORTS_ASYNC_LOCAL && SUPPORTS_SERIALIZABLE && !NETSTANDARD2_0
 namespace DryIoc
 {
     using System;
@@ -11447,7 +11460,7 @@ namespace DryIoc
 }
 #endif
 
-#if !NETSTANDARD2_0 && !NET35 && !NET40 && !NET45
+#if !SUPPORTS_STACK_TRACE
 namespace DryIoc
 {
     internal class StackTrace
@@ -11456,12 +11469,12 @@ namespace DryIoc
     }
 }
 #endif
-#if NET35 || NET40 || PCL328
+#if PCL328 || NET35 || NET40 || NET403
 namespace DryIoc
 {
     using System.Threading;
 
-    /// <summary>Poly-fill</summary>
+    /// Something for portability
     public static partial class Portable
     {
         // ReSharper disable once RedundantAssignment

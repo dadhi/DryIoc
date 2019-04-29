@@ -14,7 +14,10 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
+
             c.Register(typeof(IRequestHandler<,>), typeof(RetryOnConcurrencyRequestHandlerDecorator<,>), setup: Setup.Decorator);
+
+
         }
     }
 
@@ -30,10 +33,8 @@ namespace DryIoc.IssuesTests
             this.retryPolicy = retryPolicy;
         }
 
-        public Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken)
-        {
-            return retryPolicy.Execute(() => innerHandler.Handle(request, cancellationToken));
-        }
+        public Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken) => 
+            retryPolicy.Execute(() => innerHandler.Handle(request, cancellationToken));
     }
 
     public interface IRetryOnConflict
@@ -49,5 +50,10 @@ namespace DryIoc.IssuesTests
     public interface IConcurrencyRetryPolicy
     {
         Task<TResponse> Execute<TResponse>(Func<Task<TResponse>> func);
+    }
+
+    class ConcurrencyRetryPolicy : IConcurrencyRetryPolicy
+    {
+        public Task<TResponse> Execute<TResponse>(Func<Task<TResponse>> func) => Task.FromResult(default(TResponse));
     }
 }

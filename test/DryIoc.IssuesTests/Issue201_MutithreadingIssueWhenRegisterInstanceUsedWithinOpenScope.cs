@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    class Issue201_MutithreadingIssueWhenRegisterInstanceUsedWithinOpenScope
+    class Issue201_MultiThreadingIssueWhenRegisterInstanceUsedWithinOpenScope
     {
         [Test]
         public void UseInstance_InThread_Replace_should_return_the_same_in_thread()

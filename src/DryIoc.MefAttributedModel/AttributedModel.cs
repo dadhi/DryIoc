@@ -1822,7 +1822,7 @@ namespace DryIoc.MefAttributedModel
     using System.Linq;
     using System.Reflection;
 
-    /// <summary>Fake poly-fill for the reflection API missing in the PCL profiles.</summary>
+    /// <summary>Fake polyfill for the reflection API missing in the PCL profiles.</summary>
     /// <remarks>Actually, PCL-Net45 has CustomAttributeData class, but it's almost empty.</remarks>
     public class CustomAttributeData
     {
