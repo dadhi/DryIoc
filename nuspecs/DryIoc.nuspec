@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.0.3</version>
+        <version>4.0.4</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,14 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.0.4 Release notes
+
+- fixed: #116: DryIoc Resolve with decorators goes wrong for parallel execution
+- fixed: #119: v4.0.3 packages were targeting only .NET 4.5 and .NET Standard 2.0
+- fixed: #120: V4.0.3 double dryioc break the build
+- fixed: #121: FastExpressionCompiler.cs and Expression.cs code comment out in .NetFramework 4.7
+- fixed: #124: Stackoverflow exception 4.0.3
+
 ## v4.0.3 Release notes
 
 - fixed: #109: Cannot inject a struct using a Func wrapper

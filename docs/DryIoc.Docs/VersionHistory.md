@@ -1,6 +1,19 @@
 Version History
 ---------------
 
+## v4.0.4 Release notes
+
+- fixed: #116: DryIoc Resolve with decorators goes wrong for parallel execution
+- fixed: #119: v4.0.3 packages were targeting only .NET 4.5 and .NET Standard 2.0
+- fixed: #120: V4.0.3 double dryioc break the build
+- fixed: #121: FastExpressionCompiler.cs and Expression.cs code comment out in .NetFramework 4.7
+- fixed: #124: Stackoverflow exception 4.0.3
+
+## v4.0.3 Release notes
+
+- fixed: #109: Cannot inject a struct using a Func wrapper
+- fixed: #114: Resolve Action{T}
+
 ## v4.0.2 Release notes / 2019-03-30
 
 - fixed: #100: ResolveMany with Meta does NOT work but collection with Meta does work
