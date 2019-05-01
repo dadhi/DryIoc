@@ -6956,7 +6956,9 @@ namespace DryIoc
                 !factory.Setup.OpenResolutionScope &&
                 reuse.Lifespan != 0 &&
                 Rules.ThrowIfDependencyHasShorterReuseLifespan)
+            {
                 ThrowIfReuseHasShorterLifespanThanParent(reuse);
+            }
 
             if (reuse == DryIoc.Reuse.Singleton)
             {
@@ -9893,7 +9895,8 @@ namespace DryIoc
         /// <summary>Scoped to multiple names.</summary>
         public static IReuse ScopedTo(params object[] names) =>
             names.IsNullOrEmpty() ? Scoped
-            : names.Length == 1 ? ScopedTo(names[0]) : new CurrentScopeReuse(CompositeScopeName.Of(names));
+            : names.Length == 1 ? ScopedTo(names[0]) 
+            : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
