@@ -11,18 +11,18 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="4.9.0" />
-        <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="4.3.1" />
+        <PackageReference Include="Autofac" Version="4.9.2" />
+        <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="4.4.0" />
         <PackageReference Include="BenchmarkDotNet" Version="0.11.3" />
-        <PackageReference Include="Grace" Version="6.4.2" />
-        <PackageReference Include="Grace.DependencyInjection.Extensions" Version="6.4.0" />
+        <PackageReference Include="Grace" Version="7.0.0" />
+        <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.0.0" />
         <PackageReference Include="LightInject" Version="5.4.0" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
-        <PackageReference Include="SimpleInjector" Version="4.4.3" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.0-preview4.19216.2" />
+        <PackageReference Include="SimpleInjector" Version="4.6.0-beta1" />
 
-        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="2.10.0" /><!--Required for Lamar-->
-        <PackageReference Include="Lamar" Version="2.1.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="3.1.0-beta2-final" /><!--Required for Lamar-->
+        <PackageReference Include="Lamar" Version="3.0.2" />
     </ItemGroup>
 
     <ItemGroup>
