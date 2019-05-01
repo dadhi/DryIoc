@@ -37,6 +37,9 @@ THE SOFTWARE.
 #if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_5 && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452
 #define SUPPORTS_ASYNC_LOCAL
 #endif
+#if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NET35 && !NET40 && !NET403
+#define SUPPORTS_VARIANCE
+#endif
 
 namespace DryIoc
 {
@@ -8375,7 +8378,7 @@ namespace DryIoc
                 {
                     if (paramServiceType == typeof(IResolverContext) || paramServiceType == typeof(IResolver)
                         // todo: replace framework targets with feature toggle
-#if NET45 || NETSTANDARD2_0
+#if SUPPORTS_ISERVICE_PROVIDER
                         || paramServiceType == typeof(IServiceProvider)
 #endif
                     )
@@ -11733,7 +11736,7 @@ namespace System
     }
 }
 #endif
-#if NETSTANDARD1_3 || NETSTANDARD2_0 || NET45
+#if SUPPORTS_VARIANCE
 namespace DryIoc.Messages
 {
     using System;
