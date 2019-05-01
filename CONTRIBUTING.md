@@ -24,7 +24,7 @@ If you found the problem with DryIoc:
  - To get faster feedback, faster fixes, and generally to make me happy :-) 
      - [Fork DryIoc](https://github.com/dadhi/DryIoc/fork)
      - Add failing tests reproducing your case to `test\DryIoc.IssuesTests` project. Check other files in the project for general guideline, but nothing is strict here.
-     - **Ignore** the failing tests with `[Ignore("fixme")]` attribute, so that CI build pass.
+     - **Ignore** the failing tests with `[Ignore("fixme")]` attribute, so that CI build should pass.
      - Commit your tests and create a Pull Request for me to review.
     
 Thank you.
