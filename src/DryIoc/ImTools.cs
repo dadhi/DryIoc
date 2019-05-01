@@ -157,6 +157,16 @@ namespace ImTools
             return -1;
         }
 
+        /// Minimizes the allocations for closure in predicate lambda with the provided <paramref name="state"/>
+        public static int IndexOf<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+        {
+            if (source != null && source.Length != 0)
+                for (var i = 0; i < source.Length; ++i)
+                    if (predicate(state, source[i]))
+                        return i;
+            return -1;
+        }
+
         /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
         /// <typeparam name="T">Type of array items.</typeparam>
         /// <param name="source">Source array: if null or empty, then method will return -1.</param>

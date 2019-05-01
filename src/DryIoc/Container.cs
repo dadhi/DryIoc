@@ -1551,9 +1551,8 @@ namespace DryIoc
                                         return true;
 
                                     // keep dynamic factory if there is no result factory with the same implementation type
-                                    return resultFactories.IndexOf(f =>
-                                        f.Value.CanAccessImplementationType &&
-                                        f.Value.ImplementationType == x.Factory.ImplementationType) == -1;
+                                    return resultFactories.IndexOf(x, (s, f) =>
+                                        f.Value.CanAccessImplementationType && f.Value.ImplementationType == s.Factory.ImplementationType) == -1;
                             }
                         }
                         else // for the keyed dynamic factory
@@ -1567,7 +1566,7 @@ namespace DryIoc
 
                                 // keep the dynamic factory with the new service key, otherwise skip it
                                 default:
-                                    return resultFactories.IndexOf(f => f.Key.Equals(x.ServiceKey)) == -1;
+                                    return resultFactories.IndexOf(x.ServiceKey, (key, f) => f.Key.Equals(key)) == -1;
                             }
                         }
 
@@ -8474,8 +8473,8 @@ namespace DryIoc
                         implType, implType.GetGenericDefinitionOrNull());
 
                 else if (implType != serviceType && serviceType != typeof(object)
-                      && implType.GetImplementedTypes().IndexOf(t =>
-                        t == serviceType || t.GetGenericDefinitionOrNull() == serviceType) == -1)
+                      && implType.GetImplementedTypes()
+                          .IndexOf(serviceType, (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
                     Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
             else if (implType != serviceType)
