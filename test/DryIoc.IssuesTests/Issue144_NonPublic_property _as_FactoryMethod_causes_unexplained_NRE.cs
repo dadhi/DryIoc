@@ -1,10 +1,10 @@
-﻿using System.Reflection;
+using System.Reflection;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue144_NonPublic_property__as_FactoryMethod_causes_unexplained_NRE
+    public class Issue144_NonPublic_property_as_FactoryMethod_causes_unexplained_NRE
     {
         [Test]
         public void There_should_not_be_NRE()

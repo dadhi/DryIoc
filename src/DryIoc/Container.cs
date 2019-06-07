@@ -52,6 +52,7 @@ namespace DryIoc
     using System.Threading;
     using System.Diagnostics.CodeAnalysis;  // for SuppressMessage
     using System.Diagnostics;               // for StackTrace
+    using System.Runtime.CompilerServices;  // for MethodImplAttribute
 
     using ImTools;
     using static ImTools.ArrayTools;
@@ -8216,13 +8217,18 @@ namespace DryIoc
         /// <param name="withPrimitive">Says to include properties of primitive type.</param>
         /// <returns>True if property is matched and false otherwise.</returns>
         public static bool IsInjectable(this PropertyInfo property,
-            bool withNonPublic = false, bool withPrimitive = false) =>
-            property.CanWrite
-            && !property.IsExplicitlyImplemented()
-            && !property.IsStatic()
-            && !property.IsIndexer() // first checks that property is assignable in general and not an indexer
-            && (withNonPublic || property.GetSetMethodOrNull() != null)
-            && (withPrimitive || !property.PropertyType.IsPrimitive(orArrayOfPrimitives: true));
+            bool withNonPublic = false, bool withPrimitive = false)
+        {
+            if (!property.CanWrite || property.IsExplicitlyImplemented())
+                return false;
+
+            if (property.IsStatic())
+                return false;
+
+            return !property.IsIndexer() && 
+                   (withNonPublic || property.GetSetMethodOrNull() != null) && 
+                   (withPrimitive || !property.PropertyType.IsPrimitive(orArrayOfPrimitives: true));
+        }
 
         /// <summary>Returns true if field matches flags provided.</summary>
         /// <param name="field">Field to match.</param>
@@ -9387,10 +9393,11 @@ namespace DryIoc
                     return item;
 
                 _items = _items.AddOrUpdate(id, newItem);
-                var disposable = newItem as IDisposable;
-                if (disposable != null && disposable != this)
-                    TrackDisposable(disposable, NextDisposalIndex());
             }
+
+            var disposable = newItem as IDisposable;
+            if (disposable != null && disposable != this)
+                TrackDisposable(disposable, NextDisposalIndex());
 
             return newItem;
         }
@@ -9400,6 +9407,7 @@ namespace DryIoc
             new Scope(Parent, Name, _items, _factories, _disposables, _nextDisposalIndex);
 
         /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
         public bool TryGet(out object item, int id)
         {
             if (_disposed == 1)
@@ -9479,7 +9487,6 @@ namespace DryIoc
                 foreach (var disposable in disposables.Enumerate())
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal of other items
-                    // todo: May be it is better to aggregate?
                     try
                     {
                         disposable.Value.Dispose();
@@ -9507,7 +9514,7 @@ namespace DryIoc
         private int _nextDisposalIndex;
         private int _disposed;
 
-        // todo: Improve perf by scaling lockers count with the items amount
+        // todo: Improve performance by scaling lockers count with the items amount
         // Sync root is required to create object only once. The same reason as for Lazy<T>.
         private readonly object _locker = new object();
 
@@ -10933,19 +10940,26 @@ namespace DryIoc
         }
 
         /// <summary>Returns all public instance constructors for the type</summary>
-        public static IEnumerable<ConstructorInfo> PublicConstructors(this Type type) =>
-            type.GetTypeInfo().DeclaredConstructors.Match(c => c.IsPublic && !c.IsStatic);
+        public static IEnumerable<ConstructorInfo> PublicConstructors(this Type type)
+        {
+            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+                if (x.IsPublic && !x.IsStatic)
+                    yield return x;
+        }
 
         /// <summary>Returns all public instance constructors for the type</summary>
-        public static IEnumerable<ConstructorInfo> PublicAndInternalConstructors(this Type type) =>
-            type.GetTypeInfo().DeclaredConstructors.Match(c => !c.IsPrivate && !c.IsStatic);
+        public static IEnumerable<ConstructorInfo> PublicAndInternalConstructors(this Type type)
+        {
+            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+                if (!x.IsPrivate && !x.IsStatic)
+                    yield return x;
+        }
 
         /// <summary>Enumerates all constructors from input type.</summary>
         public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
         {
             var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
-
             if (ctors.Length == 0)
                 return ctors;
 
@@ -10978,34 +10992,31 @@ namespace DryIoc
             !includeNonPublic && !ctor.IsPublic || !includeStatic && ctor.IsStatic;
 
         /// <summary>Searches and returns constructor by its signature.</summary>
-        public static ConstructorInfo GetConstructorOrNull(this Type type,
-            bool includeNonPublic = false, params Type[] args)
+        public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
         {
-            var pTypesCount = args.Length;
-            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
-            if (!includeNonPublic)
-                ctors = ctors.Match(x => x.IsPublic);
-
-            for (var i = 0; i < ctors.Length; i++)
+            var argsLength = args.Length;
+            foreach (var ctor in type.GetTypeInfo().DeclaredConstructors)
             {
-                var ctor = ctors[i];
-                var ps = ctor.GetParameters();
-                if (ps.Length != pTypesCount)
-                    continue;
-
-                if (pTypesCount == 0)
-                    return ctor;
-
-                var p = 0;
-                for (; p < pTypesCount; ++p)
+                if (includeNonPublic || ctor.IsPublic)
                 {
-                    var paramType = ps[p].ParameterType;
-                    if (paramType != args[p] && paramType.GetGenericDefinitionOrNull() != args[p])
-                        break;
-                }
+                    var ctorParams = ctor.GetParameters();
+                    if (ctorParams.Length != argsLength)
+                        continue;
 
-                if (p == pTypesCount)
-                    return ctor;
+                    if (argsLength == 0)
+                        return ctor;
+
+                    var i = 0;
+                    for (; i < argsLength; ++i)
+                    {
+                        var paramType = ctorParams[i].ParameterType;
+                        if (paramType != args[i] && paramType.GetGenericDefinitionOrNull() != args[i])
+                            break;
+                    }
+
+                    if (i == argsLength)
+                        return ctor;
+                }
             }
 
             return null;
@@ -11017,23 +11028,35 @@ namespace DryIoc
 
         /// <summary>Searches and returns constructor by its signature, or throws if not found</summary>
         public static ConstructorInfo Constructor(this Type type, params Type[] args) =>
-            type.GetConstructorOrNull(includeNonPublic: true, args: args).ThrowIfNull(
-                Error.UnableToFindConstructorWithArgs, type, args);
+            type.GetConstructorOrNull(includeNonPublic: true, args: args).ThrowIfNull(Error.UnableToFindConstructorWithArgs, type, args);
 
         /// <summary>Returns single constructor otherwise (if no constructor or more than one) returns null.</summary>
-        public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false) =>
-            type.Constructors(includeNonPublic).SingleOrDefaultIfMany();
+        public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
+        {
+            ConstructorInfo ctor = null;
+            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+            {
+                if (ctor != null) // if multiple constructors
+                    return null; 
+                if (includeNonPublic || x.IsPublic)
+                    ctor = x;
+            }
+
+            return ctor;
+        }
 
         /// <summary>Returns single constructor otherwise (if no or more than one) throws an exception</summary>
         public static ConstructorInfo SingleConstructor(this Type type, bool includeNonPublic = false) =>
-            type.GetSingleConstructorOrNull(includeNonPublic).ThrowIfNull(
-                Error.UnableToFindSingleConstructor, type, includeNonPublic);
+            type.GetSingleConstructorOrNull(includeNonPublic).ThrowIfNull(Error.UnableToFindSingleConstructor, type, includeNonPublic);
 
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
-        public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false) =>
-            type.GetTypeInfo().DeclaredMethods
-                .Match(m => (includeNonPublic || m.IsPublic) && m.Name == name)
-                .SingleOrDefaultIfMany();
+        public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
+        {
+            foreach (var m in type.GetTypeInfo().DeclaredMethods)
+                if ((includeNonPublic || m.IsPublic) && m.Name == name)
+                    return m;
+            return null;
+        }
 
         // note: Prefer `GetDeclaredMethod(name)` for supported platforms
         /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
@@ -11050,30 +11073,28 @@ namespace DryIoc
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
             var pTypesCount = paramTypes.Length;
-            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
-            for (var i = 0; i < methods.Length; i++)
+            foreach (var method in type.GetTypeInfo().DeclaredMethods)
             {
-                var method = methods[i];
                 if (method.Name != name)
                     continue;
 
                 var ps = method.GetParameters();
-                if (ps.Length != pTypesCount)
-                    continue;
-
-                if (pTypesCount == 0)
-                    return method;
-
-                var p = 0;
-                for (; p < pTypesCount; ++p)
+                if (ps.Length == pTypesCount)
                 {
-                    var paramType = ps[p].ParameterType;
-                    if (paramType != paramTypes[p] && paramType.GetGenericDefinitionOrNull() != paramTypes[p])
-                        break;
-                }
+                    if (pTypesCount == 0)
+                        return method;
 
-                if (p == pTypesCount)
-                    return method;
+                    var p = 0;
+                    for (; p < pTypesCount; ++p)
+                    {
+                        var paramType = ps[p].ParameterType;
+                        if (paramType != paramTypes[p] && paramType.GetGenericDefinitionOrNull() != paramTypes[p])
+                            break;
+                    }
+
+                    if (p == pTypesCount)
+                        return method;
+                }
             }
 
             return null;
@@ -11081,21 +11102,29 @@ namespace DryIoc
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         public static PropertyInfo Property(this Type type, string name, bool includeBase = false) =>
-            type.GetPropertyOrNull(name, includeBase).ThrowIfNull(
-                Error.UndefinedPropertyWhenGettingProperty, name, type);
+            type.GetPropertyOrNull(name, includeBase).ThrowIfNull(Error.UndefinedPropertyWhenGettingProperty, name, type);
 
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
-        public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false) =>
-            type.GetMembers(x => x.DeclaredProperties, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
+        public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false)
+        {
+            foreach (var p in type.GetTypeInfo().DeclaredProperties)
+                if (p.Name == name)
+                    return p;
+            return !includeBase ? null : type.GetTypeInfo().BaseType?.GetPropertyOrNull(name, includeBase);
+        }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo Field(this Type type, string name, bool includeBase = false) =>
-            type.GetFieldOrNull(name, includeBase).ThrowIfNull(
-                Error.UndefinedFieldWhenGettingField, name, type);
+            type.GetFieldOrNull(name, includeBase).ThrowIfNull(Error.UndefinedFieldWhenGettingField, name, type);
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
-        public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false) =>
-            type.GetMembers(x => x.DeclaredFields, includeBase: includeBase).FirstOrDefault(p => p.Name == name);
+        public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false)
+        {
+            foreach (var f in type.GetTypeInfo().DeclaredFields)
+                if (f.Name == name)
+                    return f;
+            return !includeBase ? null : type.GetTypeInfo().BaseType?.GetFieldOrNull(name, includeBase);
+        }
 
         /// <summary>Returns type assembly.</summary>
         public static Assembly GetAssembly(this Type type) => type.GetTypeInfo().Assembly;
@@ -11104,35 +11133,42 @@ namespace DryIoc
         public static bool IsExplicitlyImplemented(this PropertyInfo property) => property.Name.Contains(".");
 
         /// <summary>Returns true if member is static, otherwise returns false.</summary>
-        public static bool IsStatic(this MemberInfo member)
+        public static bool IsStatic(this MemberInfo member) =>
+              member is MethodInfo method ? method.IsStatic
+            : member is FieldInfo field ? field.IsStatic
+            : member is PropertyInfo prop && !prop.IsExplicitlyImplemented() && prop.IsStatic(true);
+
+        /// Find if property is static
+        public static bool IsStatic(this PropertyInfo property, bool includeNonPublic = false)
         {
-            var method = member as MethodInfo;
-            if (method != null)
-                return method.IsStatic;
+            // e.g.: set_Blah or get_Blah
+            var propName = property.Name;
+            foreach (var m in property.DeclaringType.GetTypeInfo().DeclaredMethods)
+                if (m.IsSpecialName && (includeNonPublic || m.IsPublic))
+                {
+                    var name = m.Name;
+                    var nameLength = name.Length;
+                    if (nameLength > 4 && name[3] == '_' && nameLength - 4 == propName.Length)
+                    {
+                        var i = 4; ;
+                        for (var j = 0; i < nameLength; i++, j++)
+                            if (name[i] != propName[j])
+                                break;
+                        if (i == nameLength)
+                            return m.IsStatic;
+                    }
+                }
 
-            var field = member as FieldInfo;
-            if (field != null)
-                return field.IsStatic;
-
-            var prop = member as PropertyInfo;
-            if (prop == null || prop.IsExplicitlyImplemented())
-                return false;
-
-            var propAccessor =
-                prop.GetGetMethodOrNull(includeNonPublic: true) ??
-                prop.GetSetMethodOrNull(includeNonPublic: true);
-
-            return propAccessor.IsStatic;
+            return false;
         }
 
         /// <summary>Return either <see cref="PropertyInfo.PropertyType"/>, or <see cref="FieldInfo.FieldType"/>, 
         /// <see cref="MethodInfo.ReturnType"/>.</summary>
         public static Type GetReturnTypeOrDefault(this MemberInfo member) =>
             member is ConstructorInfo ? member.DeclaringType
-                : member is MethodInfo ? ((MethodInfo)member).ReturnType
-                : member is PropertyInfo ? ((PropertyInfo)member).PropertyType
-                : member is FieldInfo ? ((FieldInfo)member).FieldType
-                : null;
+            :  (member as MethodInfo)  ?.ReturnType 
+            ?? (member as PropertyInfo)?.PropertyType 
+            ?? (member as FieldInfo)   ?.FieldType;
 
         /// <summary>Returns true if field is backing field for property.</summary>
         public static bool IsBackingField(this FieldInfo field) =>
@@ -11349,12 +11385,24 @@ namespace DryIoc
         internal static IEnumerable<Type> ToTypes(IEnumerable<TypeInfo> x) => x.Select(t => t.AsType());
 
         /// <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
-        public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false) =>
-            p.DeclaringType.GetSingleMethodOrNull("get_" + p.Name, includeNonPublic);
+        public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
+        {
+            var name = "get_" + p.Name;
+            foreach (var m in p.DeclaringType.GetTypeInfo().DeclaredMethods)
+                if (m.IsSpecialName && (includeNonPublic || m.IsPublic) && m.Name == name)
+                    return m;
+            return null;
+        }
 
         /// <summary>Portable version of PropertyInfo.GetSetMethod.</summary>
-        public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false) =>
-            p.DeclaringType.GetSingleMethodOrNull("set_" + p.Name, includeNonPublic);
+        public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
+        {
+            var name = "set_" + p.Name;
+            foreach (var m in p.DeclaringType.GetTypeInfo().DeclaredMethods)
+                if (m.IsSpecialName && (includeNonPublic || m.IsPublic) && m.Name == name)
+                    return m;
+            return null;
+        }
 
         private static readonly Lazy<Func<int>> _getEnvCurrentManagedThreadId = Lazy.Of(() =>
         {
