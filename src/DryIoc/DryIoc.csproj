@@ -4,8 +4,8 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.0.4</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>4.0.5</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -16,6 +16,12 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.0.5 Release notes
+
+- fixed: #133 Validate method call hangs
+- fixed: #134 with finding is th property is static in VB
+
+
 ## v4.0.4 Release notes
 
 - fixed: #116: DryIoc Resolve with decorators goes wrong for parallel execution
