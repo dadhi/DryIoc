@@ -3139,6 +3139,9 @@ namespace DryIoc
             this IContainer container, params ServiceInfo[] roots) =>
             container.GenerateResolutionExpressions(roots.ToFunc<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>>);
 
+        /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
+        public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
+
         /// <summary>Helps to find potential problems in service registration setup.
         /// Method tries to resolve the specified registrations, collects exceptions, and
         /// returns them to user. Does not create any actual service objects.
@@ -3146,14 +3149,18 @@ namespace DryIoc
         /// otherwise container will try to resolve all registrations, 
         /// which usually is not realistic case to validate. </summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> condition = null) =>
-            container.GenerateResolutionExpressions(
-                regs => regs.Where(condition ?? DefaultValidateCondition).Select(r => r.ToServiceInfo()),
-                allowRuntimeState: true)
-                .Errors.ToArray();
+            Func<ServiceRegistrationInfo, bool> condition = null)
+        {
+            var noOpenGenericsWithCondition = condition == null 
+                ? (Func<ServiceRegistrationInfo, bool>)DefaultValidateCondition 
+                : (r => condition(r) && DefaultValidateCondition(r));
 
-        /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
-        public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
+            var roots = container.GetServiceRegistrations().Where(noOpenGenericsWithCondition).Select(r => r.ToServiceInfo()).ToArray();
+            if (roots.Length == 0)
+                Throw.It(Error.FoundNoRootsToValidate, container);
+
+            return container.Validate(roots);
+        }
 
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
         /// Method will collect the exceptions when resolving or injecting the specific root.
@@ -3162,8 +3169,30 @@ namespace DryIoc
         /// otherwise container will try to resolve all registrations, 
         /// which usually is not realistic case to validate. </summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(
-            this IContainer container, params ServiceInfo[] roots) =>
-            container.GenerateResolutionExpressions(roots).Errors.ToArray();
+            this IContainer container, params ServiceInfo[] roots)
+        {
+            var generatingContainer = container.With(rules => rules.ForValidate());
+
+            List<KeyValuePair<ServiceInfo, ContainerException>> errors = null;
+            foreach (var root in roots)
+            {
+                try
+                {
+                    var request = Request.Create(generatingContainer, root);
+                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    if (expr == null)
+                        continue;
+                }
+                catch (ContainerException ex)
+                {
+                    if (errors == null)
+                        errors = new List<KeyValuePair<ServiceInfo, ContainerException>>();
+                    errors.Add(root.Pair(ex));
+                }
+            }
+
+            return errors?.ToArray() ?? ArrayTools.Empty<KeyValuePair<ServiceInfo, ContainerException>>();
+        }
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
         public static Expression GetRequestExpression(this IContainer container, Request request,
@@ -4367,6 +4396,14 @@ namespace DryIoc
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
+        /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
+        /// in the-per rules collection.</summary>
+        public Rules ForValidate() =>
+            new Rules(GetSettingsForExpressionGeneration(allowRuntimeState: true), FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                null, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         public bool ImplicitCheckForReuseMatchingScope =>
             (_settings & Settings.ImplicitCheckForReuseMatchingScope) != 0;
@@ -4514,7 +4551,7 @@ namespace DryIoc
             Made made,
             IfAlreadyRegistered defaultIfAlreadyRegistered,
             int dependencyDepthToSplitObjectGraph,
-            Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExpressions,
+            Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExprs,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders,
             UnknownServiceResolver[] unknownServiceResolvers,
@@ -4526,7 +4563,7 @@ namespace DryIoc
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
             DependencyDepthToSplitObjectGraph = dependencyDepthToSplitObjectGraph;
-            DependencyResolutionCallExprs = dependencyResolutionCallExpressions;
+            DependencyResolutionCallExprs = dependencyResolutionCallExprs;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
             UnknownServiceResolvers = unknownServiceResolvers;
@@ -10528,7 +10565,10 @@ namespace DryIoc
                 "May be you missed the implementation or service types, " +
                 "e.g. provided only abstract or compiler-generated implementation types, " +
                 "or specified a wrong @serviceTypeCondition," +
-                "or did not specify to use non-public service types, etc.");
+                "or did not specify to use non-public service types, etc."),
+            FoundNoRootsToValidate = Of(
+                "No roots to Validate found. Check the `condition` passed to Validate method for container: {0}" + NewLine +
+                "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
