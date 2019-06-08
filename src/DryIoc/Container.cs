@@ -6061,6 +6061,7 @@ namespace DryIoc
             // Prevents infinite recursion when generating the resolution dependency #579
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
                 return;
+
             request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
 
             var factoryExpr = factory.GetExpressionOrDefault(request)?.NormalizeExpression();

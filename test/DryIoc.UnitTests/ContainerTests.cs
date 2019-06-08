@@ -566,7 +566,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_Validate_the_used_instance_dependency()
+        public void Can_Validate_the_instance_dependency()
         {
             var container = new Container();
 

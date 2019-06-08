@@ -1,7 +1,12 @@
 Version History
 ---------------
 
-## v4.0.4 Release notes
+## v4.0.5 Release notes / 2019-06-08
+
+- fixed: #133 Validate method call hangs
+- fixed: #134 with finding is th property is static in VB
+
+## v4.0.4 Release notes / 2019-05-01
 
 - fixed: #116: DryIoc Resolve with decorators goes wrong for parallel execution
 - fixed: #119: v4.0.3 packages were targeting only .NET 4.5 and .NET Standard 2.0

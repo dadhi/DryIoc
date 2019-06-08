@@ -5,7 +5,7 @@
 
         <Product>DryIoc</Product>
         <VersionPrefix>4.0.5</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -20,7 +20,6 @@
 
 - fixed: #133 Validate method call hangs
 - fixed: #134 with finding is th property is static in VB
-
 
 ## v4.0.4 Release notes
 

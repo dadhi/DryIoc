@@ -164,9 +164,9 @@ Get from NuGet:
   - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
   - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-### v4.0.4 / 2019-05-01
+### v4.0.5 / 2019-06-08
 
-[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.0.4)
+[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.0.5)
 
 ### [Previous Versions](VersionHistory.md)
 
