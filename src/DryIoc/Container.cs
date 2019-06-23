@@ -9284,10 +9284,6 @@ namespace DryIoc
         /// <summary>True if scope is disposed.</summary>
         public bool IsDisposed => _disposed == 1;
 
-        private const int LOCK_COUNT = 16;
-        private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
-        private readonly object[] _locks = new object[LOCK_COUNT];
-
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
             : this(parent, name, ImMap<object>.Empty, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
@@ -9302,6 +9298,7 @@ namespace DryIoc
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
+            _locks = new object[LOCK_COUNT]; // todo: opt-out for the Scope vs Singletons
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
@@ -9336,7 +9333,13 @@ namespace DryIoc
 
             var disposable = item as IDisposable;
             if (disposable != null && disposable != this)
-                TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
 
             return item;
         }
@@ -9352,7 +9355,10 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             object item;
-            lock (_locker)
+
+            var lockIndex = id & LOCK_COUNT_MASK;
+            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
+            lock (_locks[lockIndex])
             {
                 // re-check if items where changed in between (double check locking)
                 if (_items != items && _items.TryFind(id, out item))
@@ -9367,7 +9373,11 @@ namespace DryIoc
             }
 
             if (item is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                TrackDisposable(disposable, disposalOrder);
+            }
 
             return item;
         }
@@ -9382,7 +9392,10 @@ namespace DryIoc
 
             object item;
             var items = _items;
-            lock (_locker)
+
+            var lockIndex = id & LOCK_COUNT_MASK;
+            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
+            lock (_locks[lockIndex])
             {
                 // re-check if items where changed in between (double check locking)
                 if (_items != items && _items.TryFind(id, out item))
@@ -9397,7 +9410,11 @@ namespace DryIoc
             }
 
             if (item is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                TrackDisposable(disposable, disposalOrder);
+            }
 
             return item;
         }
@@ -9412,11 +9429,14 @@ namespace DryIoc
 
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
             if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                lock (_locker)
+            {
+                var lockIndex = id & LOCK_COUNT_MASK;
+                Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
+                lock (_locks[lockIndex])
                     _items = _items.AddOrUpdate(id, item);
+            }
 
-            var disposable = item as IDisposable;
-            if (disposable != null && disposable != this)
+            if (item is IDisposable disposable && disposable != this)
                 TrackDisposable(disposable, NextDisposalIndex());
         }
 
@@ -9431,7 +9451,9 @@ namespace DryIoc
                 return item;
 
             var items = _items;
-            lock (_locker)
+            var lockIndex = id & LOCK_COUNT_MASK;
+            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
+            lock (_locks[lockIndex])
             {
                 // if items did not change or we did found the item (now), let's return it
                 if (!_items.IsEmpty && _items.TryFind(id, out item))
@@ -9440,8 +9462,7 @@ namespace DryIoc
                 _items = _items.AddOrUpdate(id, newItem);
             }
 
-            var disposable = newItem as IDisposable;
-            if (disposable != null && disposable != this)
+            if (newItem is IDisposable disposable && disposable != this)
                 TrackDisposable(disposable, NextDisposalIndex());
 
             return newItem;
@@ -9467,7 +9488,11 @@ namespace DryIoc
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
             if (item is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, disposalOrder != 0 ? disposalOrder : NextDisposalIndex());
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                TrackDisposable(disposable, disposalOrder);
+            }
             return item;
         }
 
@@ -9559,9 +9584,9 @@ namespace DryIoc
         private int _nextDisposalIndex;
         private int _disposed;
 
-        // todo: Improve performance by scaling lockers count with the items amount
-        // Sync root is required to create object only once. The same reason as for Lazy<T>.
-        private readonly object _locker = new object();
+        private const int LOCK_COUNT = 16;
+        private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
+        private readonly object[] _locks;
 
         #endregion
     }
