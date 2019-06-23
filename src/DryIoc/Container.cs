@@ -8498,12 +8498,21 @@ namespace DryIoc
             var implType = ImplementationType;
             if (Made.FactoryMethod == null && rules.FactoryMethod == null)
             {
-                var ctors = implType.PublicConstructors().ToArrayOrSelf();
-                if (ctors.Length == 1)
-                    _knownSingleCtor = ctors[0];
-                else if (ctors.Length == 0)
+                var ctors = implType.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+                var ctorCount = 0;
+                for (var i = 0; ctorCount != 2 && i < ctors.Length; i++)
+                {
+                    var ctor = ctors[i];
+                    if (ctor.IsPublic && !ctor.IsStatic)
+                    {
+                        ++ctorCount;
+                        _knownSingleCtor = ctor;
+                    }
+                }
+
+                if (ctorCount == 0)
                     Throw.It(Error.UnableToSelectSinglePublicConstructorFromNone, implType);
-                else
+                else if (ctorCount > 1)
                     Throw.It(Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
             }
 
@@ -11068,27 +11077,26 @@ namespace DryIoc
         public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
         {
             var argsLength = args.Length;
-            foreach (var ctor in type.GetTypeInfo().DeclaredConstructors)
+            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            for (var c = 0; c < ctors.Length; c++)
             {
+                var ctor = ctors[c];
                 if (includeNonPublic || ctor.IsPublic)
                 {
                     var ctorParams = ctor.GetParameters();
-                    if (ctorParams.Length != argsLength)
-                        continue;
-
-                    if (argsLength == 0)
-                        return ctor;
-
-                    var i = 0;
-                    for (; i < argsLength; ++i)
+                    if (ctorParams.Length == argsLength)
                     {
-                        var paramType = ctorParams[i].ParameterType;
-                        if (paramType != args[i] && paramType.GetGenericDefinitionOrNull() != args[i])
-                            break;
-                    }
+                        var i = 0;
+                        for (; i < argsLength; ++i)
+                        {
+                            var paramType = ctorParams[i].ParameterType;
+                            if (paramType != args[i] && paramType.GetGenericDefinitionOrNull() != args[i])
+                                break;
+                        }
 
-                    if (i == argsLength)
-                        return ctor;
+                        if (i == argsLength)
+                            return ctor;
+                    }
                 }
             }
 
@@ -11107,10 +11115,12 @@ namespace DryIoc
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
             ConstructorInfo ctor = null;
-            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            for (var i = 0; i < ctors.Length; i++)
             {
+                var x = ctors[i];
                 if (ctor != null) // if multiple constructors
-                    return null; 
+                    return null;
                 if (includeNonPublic || x.IsPublic)
                     ctor = x;
             }
@@ -11125,9 +11135,14 @@ namespace DryIoc
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
-            foreach (var m in type.GetTypeInfo().DeclaredMethods)
+            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            for (var i = 0; i < methods.Length; i++)
+            {
+                var m = methods[i];
                 if ((includeNonPublic || m.IsPublic) && m.Name == name)
                     return m;
+            }
+
             return null;
         }
 
@@ -11146,27 +11161,25 @@ namespace DryIoc
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
             var pTypesCount = paramTypes.Length;
-            foreach (var method in type.GetTypeInfo().DeclaredMethods)
+            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            foreach (var method in methods)
             {
-                if (method.Name != name)
-                    continue;
-
-                var ps = method.GetParameters();
-                if (ps.Length == pTypesCount)
+                if (method.Name == name)
                 {
-                    if (pTypesCount == 0)
-                        return method;
-
-                    var p = 0;
-                    for (; p < pTypesCount; ++p)
+                    var ps = method.GetParameters();
+                    if (ps.Length == pTypesCount)
                     {
-                        var paramType = ps[p].ParameterType;
-                        if (paramType != paramTypes[p] && paramType.GetGenericDefinitionOrNull() != paramTypes[p])
-                            break;
-                    }
+                        var p = 0;
+                        for (; p < pTypesCount; ++p)
+                        {
+                            var paramType = ps[p].ParameterType;
+                            if (paramType != paramTypes[p] && paramType.GetGenericDefinitionOrNull() != paramTypes[p])
+                                break;
+                        }
 
-                    if (p == pTypesCount)
-                        return method;
+                        if (p == pTypesCount)
+                            return method;
+                    }
                 }
             }
 
@@ -11180,9 +11193,14 @@ namespace DryIoc
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false)
         {
-            foreach (var p in type.GetTypeInfo().DeclaredProperties)
+            var props = type.GetTypeInfo().DeclaredProperties.ToArrayOrSelf();
+            for (var i = 0; i < props.Length; i++)
+            {
+                var p = props[i];
                 if (p.Name == name)
                     return p;
+            }
+
             return !includeBase ? null : type.GetTypeInfo().BaseType?.GetPropertyOrNull(name, includeBase);
         }
 
@@ -11193,9 +11211,14 @@ namespace DryIoc
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false)
         {
-            foreach (var f in type.GetTypeInfo().DeclaredFields)
+            var fields = type.GetTypeInfo().DeclaredFields.ToArrayOrSelf();
+            for (var i = 0; i < fields.Length; i++)
+            {
+                var f = fields[i];
                 if (f.Name == name)
                     return f;
+            }
+
             return !includeBase ? null : type.GetTypeInfo().BaseType?.GetFieldOrNull(name, includeBase);
         }
 
@@ -11216,14 +11239,17 @@ namespace DryIoc
         {
             // e.g.: set_Blah or get_Blah
             var propName = property.Name;
-            foreach (var m in property.DeclaringType.GetTypeInfo().DeclaredMethods)
+            var methods = property.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            for (var index = 0; index < methods.Length; index++)
+            {
+                var m = methods[index];
                 if (m.IsSpecialName && (includeNonPublic || m.IsPublic))
                 {
                     var name = m.Name;
                     var nameLength = name.Length;
                     if (nameLength > 4 && name[3] == '_' && nameLength - 4 == propName.Length)
                     {
-                        var i = 4; ;
+                        var i = 4;
                         for (var j = 0; i < nameLength; i++, j++)
                             if (name[i] != propName[j])
                                 break;
@@ -11231,6 +11257,7 @@ namespace DryIoc
                             return m.IsStatic;
                     }
                 }
+            }
 
             return false;
         }
@@ -11461,9 +11488,14 @@ namespace DryIoc
         public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
             var name = "get_" + p.Name;
-            foreach (var m in p.DeclaringType.GetTypeInfo().DeclaredMethods)
+            var methods = p.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            for (var i = 0; i < methods.Length; i++)
+            {
+                var m = methods[i];
                 if (m.IsSpecialName && (includeNonPublic || m.IsPublic) && m.Name == name)
                     return m;
+            }
+
             return null;
         }
 
@@ -11471,9 +11503,14 @@ namespace DryIoc
         public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
             var name = "set_" + p.Name;
-            foreach (var m in p.DeclaringType.GetTypeInfo().DeclaredMethods)
+            var methods = p.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            for (var i = 0; i < methods.Length; i++)
+            {
+                var m = methods[i];
                 if (m.IsSpecialName && (includeNonPublic || m.IsPublic) && m.Name == name)
                     return m;
+            }
+
             return null;
         }
 

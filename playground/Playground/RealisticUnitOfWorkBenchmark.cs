@@ -1113,10 +1113,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(_autofac);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofacMsDi() => Measure(_autofacMsDi);
         }
     }
