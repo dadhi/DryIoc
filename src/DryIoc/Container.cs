@@ -9284,6 +9284,10 @@ namespace DryIoc
         /// <summary>True if scope is disposed.</summary>
         public bool IsDisposed => _disposed == 1;
 
+        private const int LOCK_COUNT = 8;
+        private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
+        private readonly object[] _locks = new object[LOCK_COUNT];
+
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
             : this(parent, name, ImMap<object>.Empty, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
@@ -9312,8 +9316,11 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            var lockIndex = id & LOCK_COUNT_MASK;
+            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
+
             object item;
-            lock (_locker)
+            lock (_locks[lockIndex])
             {
                 // re-check if items where changed in between (double check locking)
                 if (_items != items && _items.TryFind(id, out item))
