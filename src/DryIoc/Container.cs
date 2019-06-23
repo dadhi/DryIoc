@@ -9284,7 +9284,7 @@ namespace DryIoc
         /// <summary>True if scope is disposed.</summary>
         public bool IsDisposed => _disposed == 1;
 
-        private const int LOCK_COUNT = 8;
+        private const int LOCK_COUNT = 16;
         private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
         private readonly object[] _locks = new object[LOCK_COUNT];
 

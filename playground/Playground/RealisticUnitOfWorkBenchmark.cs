@@ -1064,6 +1064,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                     BmarkGraceMsDi |  3.232 us | 0.0137 us | 0.0128 us |  0.83 |    0.01 |      0.6332 |           - |           - |             2.93 KB |
                       BmarkAutofac | 38.488 us | 0.2379 us | 0.2225 us |  9.94 |    0.12 |      9.7656 |           - |           - |             45.2 KB |
                   BmarkAutofacMsDi | 47.389 us | 0.1995 us | 0.1866 us | 12.24 |    0.11 |     12.5732 |      0.1221 |           - |            58.09 KB |
+
+            ## After scaling the locks
+
+                            Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |  3.634 us | 0.0173 us | 0.0162 us |  1.00 |    0.00 |      0.9460 |           - |           - |             4.37 KB |
+                       BmarkDryIoc |  4.610 us | 0.0392 us | 0.0366 us |  1.27 |    0.01 |      2.1744 |           - |           - |            10.03 KB |
+                   BmarkDryIocMsDi |  4.657 us | 0.0140 us | 0.0131 us |  1.28 |    0.01 |      2.1820 |           - |           - |            10.08 KB |
+                        BmarkGrace |  2.573 us | 0.0219 us | 0.0205 us |  0.71 |    0.01 |      0.5798 |           - |           - |             2.69 KB |
+                    BmarkGraceMsDi |  3.263 us | 0.0159 us | 0.0149 us |  0.90 |    0.00 |      0.6332 |           - |           - |             2.93 KB |
+                      BmarkAutofac | 38.586 us | 0.7638 us | 0.7145 us | 10.62 |    0.21 |      9.8267 |      0.0610 |           - |            45.53 KB |
+                  BmarkAutofacMsDi | 50.002 us | 0.9774 us | 1.1635 us | 13.74 |    0.37 |     13.3667 |           - |           - |             61.7 KB |
             */
 
             private IServiceProvider _msDi;
