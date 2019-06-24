@@ -592,7 +592,7 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
-        /// Will become OBSOLETE! in the next major version:
+        /// Will become OBSOLETE in the next major version:
         /// Please just use `RegisterInstance` or <see cref="Use"/> method instead.
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
@@ -3508,7 +3508,7 @@ namespace DryIoc
                    r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
         }
 
-        /// A bit if sugar to track disposable in singlteon or current scope
+        /// A bit if sugar to track disposable in singleton or current scope
         public static T TrackDisposable<T>(this IResolverContext r, T instance) where T : IDisposable =>
             (T)(r.SingletonScope ?? r.CurrentScope).TrackDisposable(instance);
     }
