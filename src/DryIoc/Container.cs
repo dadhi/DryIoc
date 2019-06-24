@@ -91,7 +91,7 @@ namespace DryIoc
         { }
 
         /// <summary>Helper to create singleton scope</summary>
-        public static IScope NewSingletonScope() => new Scope(name: "<singletons>");
+        public static IScope NewSingletonScope() => new SingletonScope();
 
         /// <summary>Outputs info about container disposal state and current scopes.</summary>
         public override string ToString()
@@ -9278,6 +9278,312 @@ namespace DryIoc
 
         /// Clones the scope.
         IScope Clone();
+    }
+
+    /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
+    /// <c>lock</c> is used internally to ensure that object factory called only once.</summary>
+    public sealed class SingletonScope : IScope
+    {
+        /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
+        public IScope Parent => null;
+
+        /// The name associated with scope just be log friendly
+        public object Name => "<singletons>";
+
+        /// <summary>True if scope is disposed.</summary>
+        public bool IsDisposed => _disposed == 1;
+
+        /// <summary>Creates scope with optional parent and name.</summary>
+        public SingletonScope()
+            : this(ImMap<object>.Empty, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+        { }
+
+        private SingletonScope(ImMap<object> items, ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
+        {
+            _items = items;
+            _disposables = disposables;
+            _nextDisposalIndex = nextDisposalIndex;
+            _factories = ImHashMap<Type, FactoryDelegate>.Empty;
+            var locks = new object[LOCK_COUNT];
+            for (int i = 0; i < LOCK_COUNT; i++)
+                locks[i] = new object();
+            _locks = locks;
+        }
+
+        internal static readonly MethodInfo GetOrAddMethod =
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAdd));
+
+        /// <inheritdoc />
+        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0) =>
+            _items.TryFind(id, out var value) ? value : TryGetOrAdd(_items, id, createValue, disposalOrder);
+
+        private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            lock (_locks[id & LOCK_COUNT_MASK])
+            {
+                // re-check if items where changed in between (double check locking)
+                if (_items != items && _items.TryFind(id, out item))
+                    return item;
+
+                item = createValue();
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                items = _items;
+                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref _items, id, item);
+            }
+
+            var disposable = item as IDisposable;
+            if (disposable != null && disposable != this)
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
+
+            return item;
+        }
+
+        /// <inheritdoc />
+        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0) =>
+            _items.TryFind(id, out var value) ? value : TryGetOrAddViaFactoryDelegate(_items, id, createValue, r, disposalOrder);
+
+        private object TryGetOrAddViaFactoryDelegate(
+            ImMap<object> items, int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+
+            lock (_locks[id & LOCK_COUNT_MASK])
+            {
+                // re-check if items where changed in between (double check locking)
+                if (_items != items && _items.TryFind(id, out item))
+                    return item;
+
+                item = createValue(r);
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                items = _items;
+                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref _items, id, item);
+            }
+
+            if (item is IDisposable disposable && disposable != this)
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                TrackDisposable(disposable, disposalOrder);
+            }
+
+            return item;
+        }
+
+        /// <inheritdoc />
+        public object TryGetOrAddWithoutClosure(int id,
+            IResolverContext resolveContext, Expression expr, bool useFec,
+            Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            var items = _items;
+
+            lock (_locks[id & LOCK_COUNT_MASK])
+            {
+                // re-check if items where changed in between (double check locking)
+                if (_items != items && _items.TryFind(id, out item))
+                    return item;
+
+                item = createValue(resolveContext, expr, useFec);
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                items = _items;
+                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref _items, id, item);
+            }
+
+            if (item is IDisposable disposable && disposable != this)
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                TrackDisposable(disposable, disposalOrder);
+            }
+
+            return item;
+        }
+
+        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
+        /// <param name="id">To set value at. Should be >= 0.</param> <param name="item">Value to set.</param>
+        public void SetOrAdd(int id, object item)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+            var items = _items;
+
+            // try to atomically replaced items with the one set item, if attempt failed then lock and replace
+            if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+            {
+                lock (_locks[id & LOCK_COUNT_MASK])
+                    _items = _items.AddOrUpdate(id, item);
+            }
+
+            if (item is IDisposable disposable && disposable != this)
+                TrackDisposable(disposable, NextDisposalIndex());
+        }
+
+        /// Try to set the value if it is not already set
+        public object GetOrTryAdd(int id, object newItem, int disposalOrder)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            if (!_items.IsEmpty && _items.TryFind(id, out item))
+                return item;
+
+            var items = _items;
+            lock (_locks[id & LOCK_COUNT_MASK])
+            {
+                // if items did not change or we did found the item (now), let's return it
+                if (!_items.IsEmpty && _items.TryFind(id, out item))
+                    return item;
+
+                _items = _items.AddOrUpdate(id, newItem);
+            }
+
+            if (newItem is IDisposable disposable && disposable != this)
+                TrackDisposable(disposable, NextDisposalIndex());
+
+            return newItem;
+        }
+
+        /// <inheritdoc />
+        public IScope Clone() =>
+            new SingletonScope(_items, _factories, _disposables, _nextDisposalIndex);
+
+        /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
+        public bool TryGet(out object item, int id)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+            return _items.TryFind(id, out item);
+        }
+
+        internal static readonly MethodInfo TrackDisposableMethod =
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
+
+        /// <summary>Can be used to manually add service for disposal</summary>
+        public object TrackDisposable(object item, int disposalOrder = 0)
+        {
+            if (item is IDisposable disposable && disposable != this)
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                TrackDisposable(disposable, disposalOrder);
+            }
+            return item;
+        }
+
+        private int NextDisposalIndex() => Interlocked.Decrement(ref _nextDisposalIndex);
+
+        /// Add instance to the small registry via factory
+        public void SetUsedInstance(Type type, FactoryDelegate factory)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            var factories = _factories;
+            if (Interlocked.CompareExchange(ref _factories, _factories.AddOrUpdate(type, factory), factories) != factories)
+                Ref.Swap(ref _factories, f => f.AddOrUpdate(type, factory));
+        }
+
+        /// Try retrieve instance from the small registry.
+        public bool TryGetUsedInstance(IResolverContext r, Type type, out object instance)
+        {
+            instance = null;
+            if (_disposed == 1)
+                return false;
+
+            var factory = _factories.GetValueOrDefault(type);
+            if (factory != null)
+            {
+                instance = factory(r);
+                return true;
+            }
+
+            return Parent?.TryGetUsedInstance(r, type, out instance) ?? false;
+        }
+
+        private void TrackDisposable(IDisposable disposable, int disposalOrder)
+        {
+            var ds = _disposables;
+            if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+        }
+
+        /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
+        public IEnumerator<IScope> GetEnumerator()
+        {
+            for (IScope scope = this; scope != null; scope = scope.Parent)
+                yield return scope;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        /// <summary>Disposes all stored <see cref="IDisposable"/> objects and empties item storage.
+        /// The disposal happens in REVERSE resolution / injection order, consumer first, dependency next.
+        /// It will allow consumer to do something with its dependency before it is disposed.</summary>
+        /// <remarks>All disposal exceptions are swallowed except the ContainerException,
+        /// which may indicate container misconfiguration.</remarks>
+        public void Dispose()
+        {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+                return;
+
+            var disposables = _disposables;
+            if (!disposables.IsEmpty)
+                foreach (var disposable in disposables.Enumerate())
+                {
+                    // Ignoring disposing exception, as it is not important to proceed the disposal of other items
+                    try
+                    {
+                        disposable.Value.Dispose();
+                    }
+                    catch (ContainerException) { throw; }
+                    catch (Exception) { }
+                }
+
+            _disposables = ImMap<IDisposable>.Empty;
+            _items = ImMap<object>.Empty;
+        }
+
+        /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
+        public override string ToString() =>
+            (IsDisposed ? "Disposed <singleton scope>" : "<singleton scope>");
+
+        #region Implementation
+
+        private ImMap<object> _items;
+        private ImHashMap<Type, FactoryDelegate> _factories;
+        private ImMap<IDisposable> _disposables;
+        private int _nextDisposalIndex;
+        private int _disposed;
+
+        private const int LOCK_COUNT = 16;
+        private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
+        private readonly object[] _locks;
+
+        #endregion
     }
 
     /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.

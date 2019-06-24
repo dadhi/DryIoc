@@ -764,6 +764,32 @@ namespace ImTools
         }
     }
 
+    /// Simple object pool
+    public sealed class StackPool<T> where T : class
+    {
+        /// Give me an object
+        public T Rent() =>
+            Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
+
+        /// Give it back
+        public void Return(T x) =>
+            Interlocked.Exchange(ref _s, new Stack(x, _s));
+
+        private Stack _s;
+
+        private sealed class Stack
+        {
+            public readonly T Head;
+            public readonly Stack Tail;
+
+            public Stack(T h, Stack t)
+            {
+                Head = h;
+                Tail = t;
+            }
+        }
+    }
+
     /// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
     /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
     /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
