@@ -840,7 +840,7 @@ namespace DryIoc
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
-        /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
+        /// <summary>Represents scope bound to container itself, and not an ambient (context) thing.</summary>
         public IScope OwnCurrentScope => _ownCurrentScope;
 
         /// <summary>Indicates that container is disposed.</summary>
@@ -9613,7 +9613,7 @@ namespace DryIoc
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
-            _locks = new object[LOCK_COUNT]; // todo: opt-out for the Scope vs Singletons
+            _lock = new object();
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
@@ -9628,11 +9628,8 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            var lockIndex = id & LOCK_COUNT_MASK;
-            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
-
             object item;
-            lock (_locks[lockIndex])
+            lock (_lock)
             {
                 // re-check if items where changed in between (double check locking)
                 if (_items != items && _items.TryFind(id, out item))
@@ -9670,10 +9667,7 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             object item;
-
-            var lockIndex = id & LOCK_COUNT_MASK;
-            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
-            lock (_locks[lockIndex])
+            lock (_lock)
             {
                 // re-check if items where changed in between (double check locking)
                 if (_items != items && _items.TryFind(id, out item))
@@ -9708,9 +9702,7 @@ namespace DryIoc
             object item;
             var items = _items;
 
-            var lockIndex = id & LOCK_COUNT_MASK;
-            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
-            lock (_locks[lockIndex])
+            lock (_lock)
             {
                 // re-check if items where changed in between (double check locking)
                 if (_items != items && _items.TryFind(id, out item))
@@ -9745,9 +9737,7 @@ namespace DryIoc
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
             if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
             {
-                var lockIndex = id & LOCK_COUNT_MASK;
-                Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
-                lock (_locks[lockIndex])
+                lock (_lock)
                     _items = _items.AddOrUpdate(id, item);
             }
 
@@ -9766,9 +9756,7 @@ namespace DryIoc
                 return item;
 
             var items = _items;
-            var lockIndex = id & LOCK_COUNT_MASK;
-            Interlocked.CompareExchange(ref _locks[lockIndex], new object(), null);
-            lock (_locks[lockIndex])
+            lock (_lock)
             {
                 // if items did not change or we did found the item (now), let's return it
                 if (!_items.IsEmpty && _items.TryFind(id, out item))
@@ -9899,9 +9887,7 @@ namespace DryIoc
         private int _nextDisposalIndex;
         private int _disposed;
 
-        private const int LOCK_COUNT = 16;
-        private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
-        private readonly object[] _locks;
+        private readonly object _lock;
 
         #endregion
     }
