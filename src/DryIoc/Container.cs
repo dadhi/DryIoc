@@ -9284,6 +9284,17 @@ namespace DryIoc
     /// <c>lock</c> is used internally to ensure that object factory called only once.</summary>
     public sealed class SingletonScope : IScope
     {
+        struct Slot
+        {
+            public object Lock;
+            public ImMap<object> Items;
+            public Slot(object l, ImMap<object> items)
+            {
+                Lock = l;
+                Items = items;
+            }
+        }
+
         /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
         public IScope Parent => null;
 
@@ -9295,48 +9306,63 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public SingletonScope()
-            : this(ImMap<object>.Empty, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(null, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
         { }
 
-        private SingletonScope(ImMap<object> items, ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
+        private SingletonScope(Slot[] slots, ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
         {
-            _items = items;
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
-            var locks = new object[LOCK_COUNT];
-            for (int i = 0; i < LOCK_COUNT; i++)
-                locks[i] = new object();
-            _locks = locks;
+
+            if (slots == null)
+            {
+                slots = new Slot[SLOT_COUNT];
+                for (int i = 0; i < SLOT_COUNT; i++)
+                    slots[i] = new Slot(new object(), ImMap<object>.Empty);
+                _slots = slots;
+            }
+        }
+
+        private static Slot[] _emptySlots = CreateEmptySlots();
+
+        private static Slot[] CreateEmptySlots()
+        {
+            var locker = new object();
+            var slots = new Slot[SLOT_COUNT];
+            for (int i = 0; i < SLOT_COUNT; i++)
+                slots[i] = new Slot(locker, ImMap<object>.Empty);
+            return slots;
         }
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
-            var currentItems = _items;
-            return currentItems.TryFind(id, out var value) ? value 
-                : TryGetOrAdd(currentItems, id, createValue, disposalOrder);
+            var slots = _slots;
+            var index =  id & SLOT_COUNT_MASK;
+            return slots[index].Items.TryFind(id, out var value) ? value
+                : TryGetOrAdd(ref slots[index], id, createValue, disposalOrder);
         }
 
-        private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
+        private object TryGetOrAdd(ref Slot slot, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             object item;
-            lock (_locks[id & LOCK_COUNT_MASK])
+            lock (slot.Lock)
             {
                 // re-check if items where changed in between (double check locking)
-                if (_items != items && _items.TryFind(id, out item))
+                if (slot.Items.TryFind(id, out item))
                     return item;
 
                 item = createValue();
 
                 // Swap is required because if _items changed inside createValue, then we need to retry
-                items = _items;
-                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                    RefMap.AddOrUpdate(ref _items, id, item);
+                var items = slot.Items;
+                if (Interlocked.CompareExchange(ref slot.Items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref slot.Items, id, item);
             }
 
             if (item is IDisposable disposable && disposable != this)
@@ -9355,31 +9381,32 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            var currentItems = _items;
-            return currentItems.TryFind(id, out var value) ? value
-                : TryGetOrAddViaFactoryDelegate(currentItems, id, createValue, r, disposalOrder);
+            var slots = _slots;
+            var index = id & SLOT_COUNT_MASK;
+            return slots[index].Items.TryFind(id, out var value) ? value
+                : TryGetOrAddViaFactoryDelegate(ref slots[index], id, createValue, r, disposalOrder);
         }
 
         private object TryGetOrAddViaFactoryDelegate(
-            ImMap<object> items, int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+            ref Slot slot, int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             object item;
 
-            lock (_locks[id & LOCK_COUNT_MASK])
+            lock (slot.Lock)
             {
                 // re-check if items where changed in between (double check locking)
-                if (_items != items && _items.TryFind(id, out item))
+                if (slot.Items.TryFind(id, out item))
                     return item;
 
                 item = createValue(r);
 
                 // Swap is required because if _items changed inside createValue, then we need to retry
-                items = _items;
-                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                    RefMap.AddOrUpdate(ref _items, id, item);
+                var items = slot.Items;
+                if (Interlocked.CompareExchange(ref slot.Items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref slot.Items, id, item);
             }
 
             if (item is IDisposable disposable && disposable != this)
@@ -9402,21 +9429,21 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            object item;
-            var items = _items;
+            ref var slot = ref _slots[id & SLOT_COUNT_MASK];
 
-            lock (_locks[id & LOCK_COUNT_MASK])
+            object item;
+            lock (slot.Lock)
             {
                 // re-check if items where changed in between (double check locking)
-                if (_items != items && _items.TryFind(id, out item))
+                if (slot.Items.TryFind(id, out item))
                     return item;
 
                 item = createValue(resolveContext, expr, useFec);
 
                 // Swap is required because if _items changed inside createValue, then we need to retry
-                items = _items;
-                if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
-                    RefMap.AddOrUpdate(ref _items, id, item);
+                var items = slot.Items;
+                if (Interlocked.CompareExchange(ref slot.Items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref slot.Items, id, item);
             }
 
             if (item is IDisposable disposable && disposable != this)
@@ -9437,13 +9464,16 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            var items = _items;
+
+            ref var slot = ref _slots[id & SLOT_COUNT_MASK];
+
+            var items = slot.Items;
 
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
-            if (Interlocked.CompareExchange(ref _items, items.AddOrUpdate(id, item), items) != items)
+            if (Interlocked.CompareExchange(ref slot.Items, items.AddOrUpdate(id, item), items) != items)
             {
-                lock (_locks[id & LOCK_COUNT_MASK])
-                    _items = _items.AddOrUpdate(id, item);
+                lock (slot.Lock)
+                    slot.Items = slot.Items.AddOrUpdate(id, item);
             }
 
             if (item is IDisposable disposable && disposable != this)
@@ -9461,18 +9491,20 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            ref var slot = ref _slots[id & SLOT_COUNT_MASK];
+
             object item;
-            if (!_items.IsEmpty && _items.TryFind(id, out item))
+            if (!slot.Items.TryFind(id, out item))
                 return item;
 
-            var items = _items;
-            lock (_locks[id & LOCK_COUNT_MASK])
+            var items = slot.Items;
+            lock (slot.Lock)
             {
                 // if items did not change or we did found the item (now), let's return it
-                if (!_items.IsEmpty && _items.TryFind(id, out item))
+                if (!items.TryFind(id, out item))
                     return item;
 
-                _items = _items.AddOrUpdate(id, newItem);
+                slot.Items = slot.Items.AddOrUpdate(id, newItem);
             }
 
             if (newItem is IDisposable disposable && disposable != this)
@@ -9489,7 +9521,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IScope Clone() =>
-            new SingletonScope(_items, _factories, _disposables, _nextDisposalIndex);
+            new SingletonScope(_slots, _factories, _disposables, _nextDisposalIndex);
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
@@ -9497,7 +9529,7 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            return _items.TryFind(id, out item);
+            return _slots[id & SLOT_COUNT_MASK].Items.TryFind(id, out item);
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
@@ -9578,7 +9610,7 @@ namespace DryIoc
                 }
 
             _disposables = ImMap<IDisposable>.Empty;
-            _items = ImMap<object>.Empty;
+            _slots = _emptySlots;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
         }
 
@@ -9588,15 +9620,14 @@ namespace DryIoc
 
         #region Implementation
 
-        private ImMap<object> _items;
         private ImHashMap<Type, FactoryDelegate> _factories;
         private ImMap<IDisposable> _disposables;
         private int _nextDisposalIndex;
         private int _disposed;
 
-        private const int LOCK_COUNT = 16;
-        private const int LOCK_COUNT_MASK = LOCK_COUNT - 1;
-        private readonly object[] _locks;
+        private const int SLOT_COUNT = 16;
+        private const int SLOT_COUNT_MASK = SLOT_COUNT - 1;
+        private Slot[] _slots;
 
         #endregion
     }
