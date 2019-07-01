@@ -9310,12 +9310,14 @@ namespace DryIoc
             _locks = locks;
         }
 
-        internal static readonly MethodInfo GetOrAddMethod =
-            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAdd));
-
         /// <inheritdoc />
-        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0) =>
-            _items.TryFind(id, out var value) ? value : TryGetOrAdd(_items, id, createValue, disposalOrder);
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
+        {
+            var currentItems = _items;
+            return currentItems.TryFind(id, out var value) ? value 
+                : TryGetOrAdd(currentItems, id, createValue, disposalOrder);
+        }
 
         private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
@@ -9337,11 +9339,10 @@ namespace DryIoc
                     RefMap.AddOrUpdate(ref _items, id, item);
             }
 
-            var disposable = item as IDisposable;
-            if (disposable != null && disposable != this)
+            if (item is IDisposable disposable && disposable != this)
             {
                 if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
                 var ds = _disposables;
                 if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
                     RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
@@ -9351,8 +9352,13 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0) =>
-            _items.TryFind(id, out var value) ? value : TryGetOrAddViaFactoryDelegate(_items, id, createValue, r, disposalOrder);
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        {
+            var currentItems = _items;
+            return currentItems.TryFind(id, out var value) ? value
+                : TryGetOrAddViaFactoryDelegate(currentItems, id, createValue, r, disposalOrder);
+        }
 
         private object TryGetOrAddViaFactoryDelegate(
             ImMap<object> items, int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
@@ -9379,8 +9385,10 @@ namespace DryIoc
             if (item is IDisposable disposable && disposable != this)
             {
                 if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                TrackDisposable(disposable, disposalOrder);
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
 
             return item;
@@ -9414,8 +9422,10 @@ namespace DryIoc
             if (item is IDisposable disposable && disposable != this)
             {
                 if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                TrackDisposable(disposable, disposalOrder);
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
 
             return item;
@@ -9437,7 +9447,12 @@ namespace DryIoc
             }
 
             if (item is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, NextDisposalIndex());
+            {
+                int disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
         }
 
         /// Try to set the value if it is not already set
@@ -9461,7 +9476,13 @@ namespace DryIoc
             }
 
             if (newItem is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, NextDisposalIndex());
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
 
             return newItem;
         }
@@ -9489,12 +9510,12 @@ namespace DryIoc
             {
                 if (disposalOrder == 0)
                     disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
-                TrackDisposable(disposable, disposalOrder);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
             return item;
         }
-
-        private int NextDisposalIndex() => Interlocked.Decrement(ref _nextDisposalIndex);
 
         /// Add instance to the small registry via factory
         public void SetUsedInstance(Type type, FactoryDelegate factory)
@@ -9522,13 +9543,6 @@ namespace DryIoc
             }
 
             return Parent?.TryGetUsedInstance(r, type, out instance) ?? false;
-        }
-
-        private void TrackDisposable(IDisposable disposable, int disposalOrder)
-        {
-            var ds = _disposables;
-            if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
@@ -9565,6 +9579,7 @@ namespace DryIoc
 
             _disposables = ImMap<IDisposable>.Empty;
             _items = ImMap<object>.Empty;
+            _factories = ImHashMap<Type, FactoryDelegate>.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
@@ -9620,8 +9635,13 @@ namespace DryIoc
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAdd));
 
         /// <inheritdoc />
-        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0) => 
-            _items.TryFind(id, out var value) ? value : TryGetOrAdd(_items, id, createValue, disposalOrder);
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
+        {
+            var currentIntems = _items;
+            return currentIntems.TryFind(id, out var value) ? value 
+                : TryGetOrAdd(currentIntems, id, createValue, disposalOrder);
+        }
 
         private object TryGetOrAdd(ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
@@ -9657,8 +9677,13 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0) =>
-            _items.TryFind(id, out var value) ? value : TryGetOrAddViaFactoryDelegate(_items, id, createValue, r, disposalOrder);
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        {
+            var currentItems = _items;
+            return currentItems.TryFind(id, out var value) ? value
+                : TryGetOrAddViaFactoryDelegate(currentItems, id, createValue, r, disposalOrder);
+        }
 
         private object TryGetOrAddViaFactoryDelegate(
             ImMap<object> items, int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
@@ -9685,7 +9710,9 @@ namespace DryIoc
             {
                 if (disposalOrder == 0)
                     disposalOrder = NextDisposalIndex();
-                TrackDisposable(disposable, disposalOrder);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
 
             return item;
@@ -9720,7 +9747,9 @@ namespace DryIoc
             {
                 if (disposalOrder == 0)
                     disposalOrder = NextDisposalIndex();
-                TrackDisposable(disposable, disposalOrder);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
 
             return item;
@@ -9742,7 +9771,12 @@ namespace DryIoc
             }
 
             if (item is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, NextDisposalIndex());
+            {
+                int disposalOrder = NextDisposalIndex();
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
         }
 
         /// Try to set the value if it is not already set
@@ -9766,7 +9800,13 @@ namespace DryIoc
             }
 
             if (newItem is IDisposable disposable && disposable != this)
-                TrackDisposable(disposable, NextDisposalIndex());
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
 
             return newItem;
         }
@@ -9794,7 +9834,9 @@ namespace DryIoc
             {
                 if (disposalOrder == 0)
                     disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
-                TrackDisposable(disposable, disposalOrder);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
             return item;
         }
@@ -9870,6 +9912,7 @@ namespace DryIoc
 
             _disposables = ImMap<IDisposable>.Empty;
             _items = ImMap<object>.Empty;
+            _factories = ImHashMap<Type, FactoryDelegate>.Empty;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
