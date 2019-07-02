@@ -9394,7 +9394,6 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             object item;
-
             lock (slot.Lock)
             {
                 // re-check if items where changed in between (double check locking)
@@ -9467,9 +9466,8 @@ namespace DryIoc
 
             ref var slot = ref _slots[id & SLOT_COUNT_MASK];
 
-            var items = slot.Items;
-
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
+            var items = slot.Items;
             if (Interlocked.CompareExchange(ref slot.Items, items.AddOrUpdate(id, item), items) != items)
             {
                 lock (slot.Lock)
@@ -9651,7 +9649,7 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, null, ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(parent, name, CreateEmptySlots(), ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
         { }
 
         private Scope(IScope parent, object name, ImMap<object>[] slots,
@@ -9663,13 +9661,6 @@ namespace DryIoc
             _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
             _lock = new object();
-
-            if (slots == null)
-            {
-                slots = new ImMap<object>[SLOT_COUNT];
-                for (int i = 0; i < SLOT_COUNT; i++)
-                    slots[i] = ImMap<object>.Empty;
-            }
             _slots = slots;
         }
 
@@ -9677,7 +9668,6 @@ namespace DryIoc
 
         private static ImMap<object>[] CreateEmptySlots()
         {
-            var locker = new object();
             var slots = new ImMap<object>[SLOT_COUNT];
             for (int i = 0; i < SLOT_COUNT; i++)
                 slots[i] = ImMap<object>.Empty;
@@ -9781,9 +9771,9 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            object item;
             ref var items = ref _slots[id & SLOT_COUNT_MASK];
 
+            object item;
             lock (_lock)
             {
                 // re-check if items where changed in between (double check locking)
@@ -9818,9 +9808,9 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             ref var items = ref _slots[id & SLOT_COUNT_MASK];
-            var it = items;
 
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
+            var it = items;
             if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
             {
                 lock (_lock)
