@@ -2,6 +2,7 @@
     <PropertyGroup>
         <!--Set to true to minimize number of target frameworks, to fasten the build :-) -->
         <DevMode>true</DevMode>
+        <LangVersion>Latest</LangVersion>
 
         <Authors>Maksim Volkau</Authors>
         <Copyright>Copyright © 2013-2019 Maksim Volkau</Copyright>

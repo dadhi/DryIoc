@@ -984,9 +984,13 @@ namespace DryIoc
             // just lookup for the key and return whatever the result
             if (serviceKey != null)
             {
-                foreach (var f in factories)
+                for (var i = 0; i < factories.Length; i++)
+                {
+                    var f = factories[i];
                     if (serviceKey.Equals(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
+                }
+
                 return null;
             }
 
@@ -2072,8 +2076,9 @@ namespace DryIoc
                         if (removedDecorators.IsNullOrEmpty())
                             return this;
 
-                        foreach (var removedDecorator in removedDecorators)
-                            registry.DropFactoryCache(removedDecorator, serviceType);
+                        for (var i = 0; i < removedDecorators.Length; i++)
+                            registry.DropFactoryCache(removedDecorators[i], serviceType);
+
                         return registry;
 
                     default:
@@ -2810,8 +2815,8 @@ namespace DryIoc
 
             if (useFastExpressionCompiler)
             {
-                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
-                    expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                var factoryDelegate = (FactoryDelegate)FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile(
+                    typeof(FactoryDelegate), expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -3174,8 +3179,9 @@ namespace DryIoc
             var generatingContainer = container.With(rules => rules.ForValidate());
 
             List<KeyValuePair<ServiceInfo, ContainerException>> errors = null;
-            foreach (var root in roots)
+            for (var i = 0; i < roots.Length; i++)
             {
+                var root = roots[i];
                 try
                 {
                     var request = Request.Create(generatingContainer, root);
