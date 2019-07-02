@@ -1074,6 +1074,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                    BmarkDryIocMsDi | 4.598 us | 0.0586 us | 0.0548 us |  1.25 |      2.0905 |           - |           - |             9.66 KB |
                         BmarkGrace | 2.606 us | 0.0276 us | 0.0258 us |  0.71 |      0.5798 |           - |           - |             2.69 KB |
                     BmarkGraceMsDi | 3.311 us | 0.0423 us | 0.0396 us |  0.90 |      0.6332 |           - |           - |             2.93 KB |
+
+            ## Hybrid array[tree] collection for scoped items
+
+                            Method |     Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |---------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection | 4.385 us | 0.0855 us | 0.0714 us |  1.00 |    0.00 |      0.9460 |           - |           - |             4.37 KB |
+                       BmarkDryIoc | 4.680 us | 0.0624 us | 0.0584 us |  1.07 |    0.02 |      1.6174 |           - |           - |             7.47 KB |
+                   BmarkDryIocMsDi | 4.663 us | 0.0860 us | 0.0804 us |  1.06 |    0.03 |      1.6251 |           - |           - |             7.52 KB |
+                        BmarkGrace | 2.891 us | 0.0550 us | 0.0612 us |  0.66 |    0.02 |      0.5798 |           - |           - |             2.69 KB |
+                    BmarkGraceMsDi | 3.673 us | 0.0532 us | 0.0497 us |  0.84 |    0.02 |      0.6332 |           - |           - |             2.93 KB |
             */
 
             private IServiceProvider _msDi;
