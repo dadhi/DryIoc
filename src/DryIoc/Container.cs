@@ -226,7 +226,7 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var cachedItem = _registry.Value.DefaultFactoryCache.Value.GetValueOrDefault(serviceType);
+            var cachedItem = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceType);
             return cachedItem != null 
                 ? (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem)).Invoke(this)
                 : ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
@@ -236,12 +236,12 @@ namespace DryIoc
         {
             if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
             {
-                _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, null);
+                _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceType, null);
                 return obj.ToFactoryDelegate;
             }
 
             var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-            _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, factoryDelegate);
+            _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceType, factoryDelegate);
             return factoryDelegate;
         }
 
@@ -274,14 +274,14 @@ namespace DryIoc
                 {
                     var value = constExpr.Value;
                     if (factory.Caching != FactoryCaching.DoNotCache)
-                        _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, value.ToFactoryDelegate);
+                        _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceType, value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
                 if (factory.Caching != FactoryCaching.DoNotCache)
-                    _registry.Value.TryCacheDefaultFactoryExpression(serviceType, expr);
+                    _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -300,7 +300,7 @@ namespace DryIoc
                 return null;
 
             if (factory.Caching != FactoryCaching.DoNotCache)
-                _registry.Value.TryCacheDefaultFactoryDelegate(serviceType, factoryDelegate);
+                _registry.Value.TryCacheDefaultFactory(serviceType, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -1706,7 +1706,37 @@ namespace DryIoc
             public readonly ImHashMap<Type, Factory> Wrappers;
 
             // FactoryDelegate or factory Expression cache for default (non-keyed services)
-            public readonly Ref<ImHashMap<Type, object>> DefaultFactoryCache;
+            internal const int DEFAULT_CACHE_SLOT_COUNT = 16;
+            internal const int DEFAULT_CACHE_SLOT_COUNT_MASK = DEFAULT_CACHE_SLOT_COUNT - 1;
+            public ImHashMap<Type, object>[] DefaultFactoryCache;
+
+            [MethodImpl((MethodImplOptions)256)]
+            public object GetCachedDefaultFactoryOrDefault(Type serviceType)
+            {
+                if (DefaultFactoryCache == null)
+                    return null;
+
+                var hash = serviceType.GetHashCode();
+                var map = DefaultFactoryCache[hash & DEFAULT_CACHE_SLOT_COUNT_MASK];
+                if (map == null)
+                    return null;
+
+                while (hash != map.Hash && map.Height != 0)
+                    map = hash < map.Hash ? map.Left : map.Right;
+
+                return ReferenceEquals(serviceType, map.Key) ? map.Value : map.GetConflictedValueOrDefault(serviceType, null);
+            }
+
+            private ImHashMap<Type, object>[] CloneDefaultFactoryCache()
+            {
+                if (DefaultFactoryCache == null)
+                    return null;
+
+                var clone = new ImHashMap<Type, object>[DEFAULT_CACHE_SLOT_COUNT];
+                for (int i = 0; i < DEFAULT_CACHE_SLOT_COUNT; i++)
+                    clone[i] = DefaultFactoryCache[i];
+                return clone;
+            }
 
             // key: KV where Key is ServiceType and object is ServiceKey
             // value: FactoryDelegate or/and ImHashMap<{requiredServiceType+preResolvedParent}, FactoryDelegate>
@@ -1719,7 +1749,7 @@ namespace DryIoc
                 : this(ImHashMap<Type, object>.Empty,
                     ImHashMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
-                    Ref.Of(ImHashMap<Type, object>.Empty),
+                    null,
                     Ref.Of(ImHashMap<object, KV<object, ImHashMap<object, object>>>.Empty),
                     IsChangePermitted.Permitted)
             { }
@@ -1728,7 +1758,7 @@ namespace DryIoc
                 ImHashMap<Type, object> services,
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
-                Ref<ImHashMap<Type, object>> defaultFactoryCache,
+                ImHashMap<Type, object>[] defaultFactoryCache,
                 Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> keyedFactoryDelegateCache,
                 IsChangePermitted isChangePermitted)
             {
@@ -1742,26 +1772,26 @@ namespace DryIoc
 
             public Registry WithoutCache() =>
                 new Registry(Services, Decorators, Wrappers,
-                    Ref.Of(ImHashMap<Type, object>.Empty),
+                    null,
                     Ref.Of(ImHashMap<object, KV<object, ImHashMap<object, object>>>.Empty),
                     _isChangePermitted);
 
             internal Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
-                    DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                    CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(),
                     _isChangePermitted);
 
             private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) =>
                 decorators == Decorators ? this :
                 new Registry(Services, decorators, Wrappers,
-                    DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                    CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(),
                     _isChangePermitted);
 
             private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) =>
                 wrappers == Wrappers ? this :
                 new Registry(Services, Decorators, wrappers,
-                    DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(),
+                    CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(),
                     _isChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
@@ -1945,7 +1975,7 @@ namespace DryIoc
                 if (registry.Services != newServices)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
-                        DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
+                        CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
 
                     if (isUpdated)
                     {
@@ -2021,7 +2051,7 @@ namespace DryIoc
                 if (newServices != registry.Services)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
-                        DefaultFactoryCache.NewRef(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
+                        CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
 
                     if (isUpdated && ifAlreadyRegistered == IfAlreadyRegistered.Replace && 
                         updatedOldEntry is FactoriesEntry updatedOldFactories &&
@@ -2171,7 +2201,7 @@ namespace DryIoc
 
             internal void DropFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
             {
-                if (!DefaultFactoryCache.Value.IsEmpty ||
+                if (DefaultFactoryCache != null ||
                     !KeyedFactoryDelegateCache.Value.IsEmpty)
                 {
                     if (factory.FactoryGenerator == null)
@@ -2180,7 +2210,7 @@ namespace DryIoc
                     {
                         // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
                         // a safe alternative is dropping the whole cache
-                        DefaultFactoryCache.Swap(x => ImHashMap<Type, object>.Empty);
+                        DefaultFactoryCache = null;
                         KeyedFactoryDelegateCache.Swap(x => ImHashMap<object, KV<object, ImHashMap<object, object>>>.Empty);
                     }
                 }
@@ -2188,7 +2218,10 @@ namespace DryIoc
 
             private void SetCachedFactoryValueToNull(Type serviceType, object serviceKey)
             {
-                DefaultFactoryCache.Swap(x => x.Update(serviceType, null));
+                if (DefaultFactoryCache != null)
+                    Ref.Swap(ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK],
+                        serviceType, (t, x) => (x ?? ImHashMap<Type, object>.Empty).Update(t, null));
+
                 KeyedFactoryDelegateCache.Swap(x => x
                     .Update(serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey), null));
             }
@@ -2198,26 +2231,20 @@ namespace DryIoc
                     DefaultFactoryCache, KeyedFactoryDelegateCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
 
-            public void TryCacheDefaultFactoryDelegate(Type serviceType, FactoryDelegate factory)
+            public void TryCacheDefaultFactory<T>(Type serviceType, T factory)
             {
                 // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
                 if (Services.IsEmpty)
                     return;
 
-                var cache = DefaultFactoryCache.Value;
-                if (!DefaultFactoryCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, factory)))
-                    DefaultFactoryCache.AddOrUpdate(serviceType, factory);
-            }
-
-            public void TryCacheDefaultFactoryExpression(Type serviceType, Expression expr)
-            {
-                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-                if (Services.IsEmpty)
-                    return;
-
-                var cache = DefaultFactoryCache.Value;
-                if (!DefaultFactoryCache.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(serviceType, expr)))
-                    DefaultFactoryCache.AddOrUpdate(serviceType, expr);
+                if (DefaultFactoryCache == null)
+                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[DEFAULT_CACHE_SLOT_COUNT], null);
+                ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK];
+                if (map == null)
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
+                var current = map;
+                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(serviceType, factory), current) != current)
+                    Ref.Swap(ref map, serviceType, factory, (t, f, x) => x.AddOrUpdate(t, f));
             }
         }
 
@@ -2815,8 +2842,8 @@ namespace DryIoc
 
             if (useFastExpressionCompiler)
             {
-                var factoryDelegate = (FactoryDelegate)FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile(
-                    typeof(FactoryDelegate), expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
+                    expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }

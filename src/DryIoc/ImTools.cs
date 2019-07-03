@@ -1424,7 +1424,7 @@ namespace ImTools
         public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V oldValue, Update<K, V> update = null)
         {
             isUpdated = false;
-            oldValue = default(V);
+            oldValue = default;
 
             var hash = key.GetHashCode();
 

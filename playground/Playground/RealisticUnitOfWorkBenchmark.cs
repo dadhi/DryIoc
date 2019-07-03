@@ -881,6 +881,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                     BmarkGraceMsDi | 22,385.2 us | 254.643 us | 238.194 us | 155.02 |    1.68 |    187.5000 |     93.7500 |           - |           909.11 KB |
                       BmarkAutofac |    699.3 us |   7.371 us |   6.894 us |   4.85 |    0.06 |    102.5391 |      6.8359 |           - |           473.04 KB |
                   BmarkAutofacMsDi |    682.8 us |   6.497 us |   5.760 us |   4.73 |    0.04 |    105.4688 |           - |           - |           489.77 KB |
+
+                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    130.6 us |   5.148 us |   8.015 us |   1.00 |    0.00 |     17.5781 |      0.9766 |           - |            79.72 KB |
+                       BmarkDryIoc |    153.2 us |   1.196 us |   1.119 us |   1.17 |    0.03 |     26.8555 |           - |           - |            125.2 KB |
+                   BmarkDryIocMsDi |    161.1 us |   1.456 us |   1.290 us |   1.23 |    0.04 |     28.8086 |      0.4883 |           - |           133.72 KB |
+                        BmarkGrace | 18,794.2 us | 114.387 us | 106.998 us | 144.02 |    4.02 |    156.2500 |     62.5000 |           - |           739.76 KB |
+                    BmarkGraceMsDi | 22,490.8 us | 124.663 us | 110.510 us | 172.21 |    5.08 |    187.5000 |     93.7500 |           - |           909.11 KB |
+                      BmarkAutofac |    670.9 us |   3.976 us |   3.719 us |   5.14 |    0.15 |    102.5391 |      9.7656 |           - |           472.92 KB |
+                  BmarkAutofacMsDi |    664.5 us |   7.498 us |   6.646 us |   5.09 |    0.17 |    105.4688 |      5.8594 |           - |           490.05 KB |
             */
 
             [Benchmark(Baseline = true)]
