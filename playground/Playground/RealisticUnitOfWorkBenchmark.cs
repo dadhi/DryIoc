@@ -870,16 +870,6 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## DryIoc v4.0.5
 
-                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    130.6 us |   5.148 us |   8.015 us |   1.00 |    0.00 |     17.5781 |      0.9766 |           - |            79.72 KB |
-                       BmarkDryIoc |    153.2 us |   1.196 us |   1.119 us |   1.17 |    0.03 |     26.8555 |           - |           - |            125.2 KB |
-                   BmarkDryIocMsDi |    161.1 us |   1.456 us |   1.290 us |   1.23 |    0.04 |     28.8086 |      0.4883 |           - |           133.72 KB |
-                        BmarkGrace | 18,794.2 us | 114.387 us | 106.998 us | 144.02 |    4.02 |    156.2500 |     62.5000 |           - |           739.76 KB |
-                    BmarkGraceMsDi | 22,490.8 us | 124.663 us | 110.510 us | 172.21 |    5.08 |    187.5000 |     93.7500 |           - |           909.11 KB |
-                      BmarkAutofac |    670.9 us |   3.976 us |   3.719 us |   5.14 |    0.15 |    102.5391 |      9.7656 |           - |           472.92 KB |
-                  BmarkAutofacMsDi |    664.5 us |   7.498 us |   6.646 us |   5.09 |    0.17 |    105.4688 |      5.8594 |           - |           490.05 KB |
-
                             Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
  BmarkMicrosoftDependencyInjection |    148.0 us |   1.5359 us |   1.4366 us |   1.00 |    0.00 |     18.4326 |      0.1221 |           - |            79.69 KB |
@@ -889,6 +879,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                     BmarkGraceMsDi | 22,149.9 us | 122.6704 us | 114.7460 us | 149.69 |    1.48 |    187.5000 |     93.7500 |           - |           909.15 KB |
                       BmarkAutofac |    696.3 us |   4.9448 us |   4.3834 us |   4.71 |    0.07 |    102.5391 |      2.9297 |           - |            472.8 KB |
                   BmarkAutofacMsDi |    688.8 us |   7.1206 us |   6.6606 us |   4.66 |    0.07 |    105.4688 |      0.9766 |           - |           489.97 KB |
+
+            ## FEC v2.1 - degradation
+
+                            Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+---------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+ BmarkMicrosoftDependencyInjection |    142.2 us |   2.7192 us |   2.5435 us |   1.00 |    0.00 |     18.3105 |      0.2441 |           - |             79.7 KB |
+                       BmarkDryIoc |    160.9 us |   1.1228 us |   1.0502 us |   1.13 |    0.02 |     32.4707 |      0.2441 |           - |           149.87 KB |
+                   BmarkDryIocMsDi |    174.8 us |   0.8662 us |   0.8102 us |   1.23 |    0.02 |     34.6680 |           - |           - |           160.05 KB |
+                        BmarkGrace | 18,482.4 us | 174.6449 us | 154.8182 us | 130.17 |    2.58 |    156.2500 |     62.5000 |           - |           739.75 KB |
+                    BmarkGraceMsDi | 22,160.8 us | 147.9753 us | 138.4162 us | 155.84 |    2.49 |    187.5000 |     93.7500 |           - |           909.12 KB |
+                      BmarkAutofac |    652.3 us |   3.2561 us |   3.0457 us |   4.59 |    0.08 |    102.5391 |      2.9297 |           - |           473.06 KB |
+                  BmarkAutofacMsDi |    638.9 us |   3.3328 us |   2.9545 us |   4.50 |    0.08 |    105.4688 |      8.7891 |           - |           489.89 KB |
             */
 
             [Benchmark(Baseline = true)]
