@@ -224,25 +224,30 @@ namespace DryIoc
             ((IResolver)this).Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
 #endif
 
+        [MethodImpl((MethodImplOptions)256)]
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var cachedItem = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceType);
-            return cachedItem != null 
-                ? (cachedItem as FactoryDelegate ?? CompileAndCacheFactoryDelegate(serviceType, cachedItem)).Invoke(this)
-                : ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
-        }
-
-        private FactoryDelegate CompileAndCacheFactoryDelegate(Type serviceType, object expr)
-        {
-            if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
+            var cacheSlot = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceType);
+            if (cacheSlot != null)
             {
-                _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceType, null);
-                return obj.ToFactoryDelegate;
+                if (cacheSlot.Value is FactoryDelegate cachedDelegate)
+                    return cachedDelegate(this);
+
+                if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
+                {
+                    cacheSlot.Value = null; // reset the cache
+                    return obj;
+                }
+
+                if (cacheSlot.Value is Expression expr)
+                {
+                    var compiledFactory = expr.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                    cacheSlot.Value = compiledFactory;
+                    return compiledFactory(this);
+                }
             }
 
-            var factoryDelegate = ((Expression)expr).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-            _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceType, factoryDelegate);
-            return factoryDelegate;
+            return ResolveAndCacheFactoryDelegate(serviceType, ifUnresolved);
         }
 
         private object ResolveAndCacheFactoryDelegate(Type serviceType, IfUnresolved ifUnresolved)
@@ -1706,12 +1711,18 @@ namespace DryIoc
             public readonly ImHashMap<Type, Factory> Wrappers;
 
             // FactoryDelegate or factory Expression cache for default (non-keyed services)
+            public sealed class CacheSlot
+            {
+                public object Value;
+                public CacheSlot(object value) => Value = value;
+            }
+
             internal const int DEFAULT_CACHE_SLOT_COUNT = 16;
             internal const int DEFAULT_CACHE_SLOT_COUNT_MASK = DEFAULT_CACHE_SLOT_COUNT - 1;
-            public ImHashMap<Type, object>[] DefaultFactoryCache;
+            public ImHashMap<Type, CacheSlot>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public object GetCachedDefaultFactoryOrDefault(Type serviceType)
+            public CacheSlot GetCachedDefaultFactoryOrDefault(Type serviceType)
             {
                 if (DefaultFactoryCache == null)
                     return null;
@@ -1727,12 +1738,28 @@ namespace DryIoc
                 return ReferenceEquals(serviceType, map.Key) ? map.Value : map.GetConflictedValueOrDefault(serviceType, null);
             }
 
-            private ImHashMap<Type, object>[] CloneDefaultFactoryCache()
+            public void TryCacheDefaultFactory<T>(Type serviceType, T factory)
+            {
+                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
+                if (Services.IsEmpty)
+                    return;
+
+                if (DefaultFactoryCache == null)
+                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, CacheSlot>[DEFAULT_CACHE_SLOT_COUNT], null);
+                ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK];
+                if (map == null)
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, CacheSlot>.Empty, null);
+                var current = map;
+                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(serviceType, new CacheSlot(factory)), current) != current)
+                    Ref.Swap(ref map, serviceType, factory, (t, f, x) => x.AddOrUpdate(t, new CacheSlot(f)));
+            }
+
+            private ImHashMap<Type, CacheSlot>[] CloneDefaultFactoryCache()
             {
                 if (DefaultFactoryCache == null)
                     return null;
 
-                var clone = new ImHashMap<Type, object>[DEFAULT_CACHE_SLOT_COUNT];
+                var clone = new ImHashMap<Type, CacheSlot>[DEFAULT_CACHE_SLOT_COUNT];
                 for (int i = 0; i < DEFAULT_CACHE_SLOT_COUNT; i++)
                     clone[i] = DefaultFactoryCache[i];
                 return clone;
@@ -1758,7 +1785,7 @@ namespace DryIoc
                 ImHashMap<Type, object> services,
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
-                ImHashMap<Type, object>[] defaultFactoryCache,
+                ImHashMap<Type, CacheSlot>[] defaultFactoryCache,
                 Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> keyedFactoryDelegateCache,
                 IsChangePermitted isChangePermitted)
             {
@@ -2220,7 +2247,7 @@ namespace DryIoc
             {
                 if (DefaultFactoryCache != null)
                     Ref.Swap(ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK],
-                        serviceType, (t, x) => (x ?? ImHashMap<Type, object>.Empty).Update(t, null));
+                        serviceType, (t, x) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
 
                 KeyedFactoryDelegateCache.Swap(x => x
                     .Update(serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey), null));
@@ -2230,22 +2257,6 @@ namespace DryIoc
                 new Registry(Services, Decorators, Wrappers,
                     DefaultFactoryCache, KeyedFactoryDelegateCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
-
-            public void TryCacheDefaultFactory<T>(Type serviceType, T factory)
-            {
-                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-                if (Services.IsEmpty)
-                    return;
-
-                if (DefaultFactoryCache == null)
-                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[DEFAULT_CACHE_SLOT_COUNT], null);
-                ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK];
-                if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
-                var current = map;
-                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(serviceType, factory), current) != current)
-                    Ref.Swap(ref map, serviceType, factory, (t, f, x) => x.AddOrUpdate(t, f));
-            }
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
