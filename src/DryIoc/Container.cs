@@ -2290,7 +2290,7 @@ namespace DryIoc
         /// <summary>Optional key</summary>
         public readonly object ServiceKey;
 
-        /// <summary>Constructs the thingy</summary>
+        /// <summary>Constructs the thing</summary>
         public OpenGenericTypeKey(Type requiredServiceType, object serviceKey)
         {
             RequiredServiceType = requiredServiceType.ThrowIfNull();
@@ -2338,7 +2338,7 @@ namespace DryIoc
     /// Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection
     public static class Interpreter
     {
-        /// Calls `TryInterpret` inside try-catch and unwraps/rethrows `ContainerException` from the reflection `TargetInvocationException`
+        /// Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`
         public static bool TryInterpretAndUnwrapContainerException(
             IResolverContext r, Expression expr, bool useFec, out object result)
         {
@@ -2590,9 +2590,13 @@ namespace DryIoc
             var resolverContext = (IResolverContext)resolverObj;
 
             result = null;
-            var scope = resolverContext.GetCurrentScope((bool)ConstValue(args[1]));
+            var scope = resolverContext.CurrentScope;
             if (scope == null)
-                return true; // this is fine, cause `throwIfNoScope == false` and result is null in this case
+            {
+                if ((bool)ConstValue(args[1]))
+                    Throw.For<IScope>(Error.NoCurrentScope, resolverContext);
+                return true;
+            }
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[2]);
@@ -2602,9 +2606,12 @@ namespace DryIoc
             var createExpr = ((LambdaExpression)args[3]).Body;
 
             result = scope.TryGetOrAddWithoutClosure(id, resolverContext, createExpr, useFec, 
-                (rc, e, uf) => TryInterpretAndUnwrapContainerException(rc, e, uf, out var value) 
-                    ? value
-                    : e.CompileToFactoryDelegate(uf)(rc),
+                (rc, e, uf) =>
+                {
+                    if (TryInterpretAndUnwrapContainerException(rc, e, uf, out var value))
+                        return value;
+                    return e.CompileToFactoryDelegate(uf)(rc);
+                },
                 (int)ConstValue(args[4]));
 
             return true;
@@ -2838,11 +2845,11 @@ namespace DryIoc
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression) =>
+            Lambda<FactoryDelegate>(expression.NormalizeExpression(), _factoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-            Lambda<FactoryDelegate>(expression.NormalizeExpression(), _factoryDelegateParamExprs, typeof(object));
-#else
-            Lambda<FactoryDelegate>(expression.NormalizeExpression(), _factoryDelegateParamExprs);
+                , typeof(object)
 #endif
+                );
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
@@ -2872,6 +2879,7 @@ namespace DryIoc
 #endif
         }
 
+        // todo: remove unused
         /// <summary>Restores the expression from LightExpression, or returns itself if already an Expression.</summary>
         public static System.Linq.Expressions.Expression ToExpression(this Expression expr) =>
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -9847,8 +9855,8 @@ namespace DryIoc
             {
                 if (disposalOrder == 0)
                     disposalOrder = NextDisposalIndex();
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                var d = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
                     RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
 
