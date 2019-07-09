@@ -822,16 +822,6 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
   [Host]     : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
   DefaultJob : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
 
-                            Method |         Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |-------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
-                       BmarkDryIoc |     68.51 us |   0.2992 us |   0.2652 us |   0.68 |    0.02 |     16.6016 |      0.1221 |           - |            76.57 KB |
-                   BmarkDryIocMsDi |     83.14 us |   0.5770 us |   0.5397 us |   0.83 |    0.02 |     18.1885 |      0.1221 |           - |             84.2 KB |
- BmarkMicrosoftDependencyInjection |     99.98 us |   2.0301 us |   2.4166 us |   1.00 |    0.00 |     10.9863 |      0.1221 |           - |            46.02 KB |
-                      BmarkAutofac |    409.29 us |   1.4180 us |   1.3264 us |   4.08 |    0.11 |     67.3828 |      0.4883 |           - |           310.66 KB |
-                  BmarkAutofacMsDi |    415.40 us |   1.9196 us |   1.6029 us |   4.13 |    0.12 |     69.8242 |      0.9766 |           - |           322.92 KB |
-                        BmarkGrace | 11,377.40 us |  76.6630 us |  71.7107 us | 113.29 |    2.92 |    109.3750 |     46.8750 |           - |           517.05 KB |
-                    BmarkGraceMsDi | 13,103.36 us | 111.6352 us | 104.4236 us | 130.48 |    3.43 |    125.0000 |     62.5000 |     15.6250 |            615.5 KB |
-
             ## Test with 4 level graph + disposables + fixed scoped things for DryIoc:
 
                             Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -839,22 +829,22 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
  BmarkMicrosoftDependencyInjection |    134.0 us |   2.1675 us |   2.0275 us |   1.00 |    0.00 |     13.7939 |      0.1221 |           - |            58.65 KB |
                        BmarkDryIoc |    145.3 us |   0.8318 us |   0.7374 us |   1.08 |    0.02 |     30.2734 |           - |           - |           140.35 KB |
                    BmarkDryIocMsDi |    161.6 us |   0.9626 us |   0.9004 us |   1.21 |    0.02 |     32.2266 |           - |           - |           149.19 KB |
-                  BmarkAutofacMsDi |    665.2 us |   5.4804 us |   5.1264 us |   4.96 |    0.08 |    105.4688 |      3.9063 |           - |           487.64 KB |
-                      BmarkAutofac |    673.2 us |   5.5615 us |   5.2022 us |   5.02 |    0.08 |    101.5625 |     18.5547 |           - |           470.39 KB |
                         BmarkGrace | 18,480.8 us | 100.5977 us |  89.1773 us | 137.83 |    2.35 |    156.2500 |     62.5000 |           - |           755.18 KB |
                     BmarkGraceMsDi | 21,640.4 us | 119.7309 us | 106.1383 us | 161.39 |    2.81 |    187.5000 |     93.7500 |     31.2500 |           926.88 KB |
+                      BmarkAutofac |    673.2 us |   5.5615 us |   5.2022 us |   5.02 |    0.08 |    101.5625 |     18.5547 |           - |           470.39 KB |
+                  BmarkAutofacMsDi |    665.2 us |   5.4804 us |   5.1264 us |   4.96 |    0.08 |    105.4688 |      3.9063 |           - |           487.64 KB |
 
             ## After returning ScopedOrSingleton to use lambda 
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
-                       BmarkDryIoc |    160.1 us |   2.670 us |   2.498 us |   0.96 |    0.02 |     30.2734 |      0.4883 |           - |           140.03 KB |
  BmarkMicrosoftDependencyInjection |    166.9 us |   2.035 us |   1.804 us |   1.00 |    0.00 |     13.6719 |      0.2441 |           - |            58.66 KB |
+                       BmarkDryIoc |    160.1 us |   2.670 us |   2.498 us |   0.96 |    0.02 |     30.2734 |      0.4883 |           - |           140.03 KB |
                    BmarkDryIocMsDi |    180.2 us |   2.420 us |   2.263 us |   1.08 |    0.02 |     32.4707 |      0.2441 |           - |           150.03 KB |
-                  BmarkAutofacMsDi |    747.8 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
-                      BmarkAutofac |    790.0 us |   5.206 us |   4.615 us |   4.74 |    0.06 |    101.5625 |      6.8359 |           - |           470.32 KB |
                         BmarkGrace | 20,058.3 us | 290.376 us | 257.411 us | 120.22 |    1.59 |    156.2500 |     62.5000 |           - |           755.11 KB |
                     BmarkGraceMsDi | 23,546.7 us | 294.414 us | 275.395 us | 141.02 |    2.04 |    187.5000 |     93.7500 |     31.2500 |           926.86 KB |
+                      BmarkAutofac |    790.0 us |   5.206 us |   4.615 us |   4.74 |    0.06 |    101.5625 |      6.8359 |           - |           470.32 KB |
+                  BmarkAutofacMsDi |    747.8 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
 
             ## DryIoc v4.0.4 and Grace v7
 
@@ -880,17 +870,13 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac |    696.3 us |   4.9448 us |   4.3834 us |   4.71 |    0.07 |    102.5391 |      2.9297 |           - |            472.8 KB |
                   BmarkAutofacMsDi |    688.8 us |   7.1206 us |   6.6606 us |   4.66 |    0.07 |    105.4688 |      0.9766 |           - |           489.97 KB |
 
-            ## FEC v2.1 - degradation
+            ### FEC v2.1 and BDN 0.11.5
 
-                            Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    142.2 us |   2.7192 us |   2.5435 us |   1.00 |    0.00 |     18.3105 |      0.2441 |           - |             79.7 KB |
-                       BmarkDryIoc |    160.9 us |   1.1228 us |   1.0502 us |   1.13 |    0.02 |     32.4707 |      0.2441 |           - |           149.87 KB |
-                   BmarkDryIocMsDi |    174.8 us |   0.8662 us |   0.8102 us |   1.23 |    0.02 |     34.6680 |           - |           - |           160.05 KB |
-                        BmarkGrace | 18,482.4 us | 174.6449 us | 154.8182 us | 130.17 |    2.58 |    156.2500 |     62.5000 |           - |           739.75 KB |
-                    BmarkGraceMsDi | 22,160.8 us | 147.9753 us | 138.4162 us | 155.84 |    2.49 |    187.5000 |     93.7500 |           - |           909.12 KB |
-                      BmarkAutofac |    652.3 us |   3.2561 us |   3.0457 us |   4.59 |    0.08 |    102.5391 |      2.9297 |           - |           473.06 KB |
-                  BmarkAutofacMsDi |    638.9 us |   3.3328 us |   2.9545 us |   4.50 |    0.08 |    105.4688 |      8.7891 |           - |           489.89 KB |
+|                            Method |     Mean |    Error |    StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|---------------------------------- |---------:|---------:|----------:|------:|--------:|-------:|------:|----------:|
+| BmarkMicrosoftDependencyInjection | 120.6 us | 1.223 us | 0.9550 us |  1.00 | 18.6768 | 0.1221 |     - |  80.63 KB |
+|                       BmarkDryIoc | 147.2 us | 1.034 us | 0.9673 us |  1.22 | 28.3203 | 0.2441 |     - | 131.55 KB |
+|                   BmarkDryIocMsDi | 166.6 us | 1.509 us | 1.4116 us |  1.38 | 30.7617 | 0.7324 |     - | 142.35 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -902,16 +888,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
         }
 
@@ -1118,13 +1104,13 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [GlobalSetup]
             public void WarmUp()
             {
-                _msDi = PrepareMsDi();
-                _dryioc = PrepareDryIoc();
-                _dryIocMsDi = PrepareDryIocMsDi();
-                _grace = PrepareGrace();
-                _graceMsDi = PrepareGraceMsDi();
-                _autofac = PrepareAutofac();
-                _autofacMsDi = PrepareAutofacMsDi();
+                Measure(_msDi = PrepareMsDi());
+                Measure(_dryioc = PrepareDryIoc());
+                Measure(_dryIocMsDi = PrepareDryIocMsDi());
+                Measure(_grace = PrepareGrace());
+                Measure(_graceMsDi = PrepareGraceMsDi());
+                Measure(_autofac = PrepareAutofac());
+                Measure(_autofacMsDi = PrepareAutofacMsDi());
             }
 
             [Benchmark(Baseline = true)]
@@ -1136,10 +1122,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(_grace);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
             //[Benchmark]

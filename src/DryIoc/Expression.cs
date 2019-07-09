@@ -84,18 +84,14 @@ namespace FastExpressionCompiler.LightExpression
             return result;
         }
 
-        internal static string ToParamsCode(IReadOnlyList<Expression> arguments)
+        internal static string ToParamsCode<T>(IReadOnlyList<T> arguments) where T : Expression 
         {
             if (arguments.Count == 0)
-                return "new Expression[0]";
+                return $"new {typeof(T).Name}[0]";
 
             var s = "";
             for (var i = 0; i < arguments.Count; i++)
-            {
-                if (i > 0)
-                    s += "," + NewLine;
-                s += arguments[i].CodeString;
-            }
+                s += (i > 0 ? "," + NewLine : "") + arguments[i].CodeString;
 
             return s;
         }
@@ -215,15 +211,6 @@ namespace FastExpressionCompiler.LightExpression
 
         public static MemberExpression Field(Expression instance, string fieldName) =>
             new FieldExpression(instance, instance.Type.FindField(fieldName));
-
-        public static LambdaExpression Lambda(Expression body) =>
-            new LambdaExpression(null, body, Tools.Empty<ParameterExpression>());
-
-        public static LambdaExpression Lambda(Expression body, params ParameterExpression[] parameters) =>
-            new LambdaExpression(null, body, parameters);
-
-        public static LambdaExpression Lambda(Type delegateType, Expression body, params ParameterExpression[] parameters) =>
-            new LambdaExpression(delegateType, body, parameters);
 
         /// <summary>Creates a UnaryExpression that represents a bitwise complement operation.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
@@ -373,14 +360,33 @@ namespace FastExpressionCompiler.LightExpression
         public static UnaryExpression Unbox(Expression expression, Type type) =>
             new UnaryExpression(ExpressionType.Unbox, expression, type);
 
+        public static LambdaExpression Lambda(Expression body) =>
+            new LambdaExpression(Tools.GetFuncOrActionType(Tools.Empty<Type>(), body.Type), body, Tools.Empty<ParameterExpression>(), body.Type);
+
+        public static LambdaExpression Lambda(Expression body, params ParameterExpression[] parameters) =>
+            new LambdaExpression(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), body, parameters, body.Type);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body, params ParameterExpression[] parameters) =>
+            new LambdaExpression(delegateType, body, parameters, delegateType.FindDelegateInvokeMethod().ReturnType);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression[] parameters, Type returnType) =>
+            new LambdaExpression(delegateType, body, parameters, returnType);
+
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body) =>
-            new Expression<TDelegate>(body, Tools.Empty<ParameterExpression>());
+            new Expression<TDelegate>(body, Tools.Empty<ParameterExpression>(), typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
+
+        public static Expression<TDelegate> Lambda<TDelegate>(Expression body, Type returnType) =>
+            new Expression<TDelegate>(body, Tools.Empty<ParameterExpression>(), returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, params ParameterExpression[] parameters) =>
-            new Expression<TDelegate>(body, parameters);
+            new Expression<TDelegate>(body, parameters, typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
 
+        public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression[] parameters, Type returnType) =>
+            new Expression<TDelegate>(body, parameters, returnType);
+
+        /// todo: <paramref name="name"/> is ignored for now, the method is just for compatibility with SysExpression
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, string name, params ParameterExpression[] parameters) =>
-            new Expression<TDelegate>(body, parameters);
+            new Expression<TDelegate>(body, parameters, typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
 
         /// <summary>Creates a BinaryExpression that represents applying an array index operator to an array of rank one.</summary>
         /// <param name="array">A Expression to set the Left property equal to.</param>
@@ -1549,7 +1555,9 @@ namespace FastExpressionCompiler.LightExpression
             _paramExpr = null;
         }
 
-        private System.Linq.Expressions.ParameterExpression _paramExpr;
+        // todo: should be moved out, as it is used only for conversion back to Expression,
+        // we should probably pass the parameters collection to `ToParameterExpression` to check parameter presence.
+        private System.Linq.Expressions.ParameterExpression _paramExpr; 
     }
 
     public sealed class ConstantExpression : Expression
@@ -1662,10 +1670,9 @@ namespace FastExpressionCompiler.LightExpression
                 var methodIndex = Method.DeclaringType.GetTypeInfo().DeclaredMethods.AsArray().GetFirstIndex(Method);
                 return $"Call({Object?.CodeString ?? "null"}," + NewLine + 
                        $"{Method.DeclaringType.ToCode()}.GetTypeInfo().DeclaredMethods.ToArray()[{methodIndex}]," + NewLine + 
-                       $"{ToParamsCode(Arguments)}";
+                       $"{ToParamsCode(Arguments)})";
             }
         }
-
 
         internal MethodCallExpression(Expression @object, MethodInfo method, IReadOnlyList<Expression> arguments)
             : base(arguments)
@@ -1773,7 +1780,8 @@ namespace FastExpressionCompiler.LightExpression
             get
             {
                 var memberIndex = Member.DeclaringType.GetTypeInfo().DeclaredMembers.AsArray().GetFirstIndex(Member);
-                return $"Bind({Member.DeclaringType.ToCode()}.GetTypeInfo().DeclaredMembers.ToArray()[{memberIndex}], {Expression.CodeString})";
+                return $"Bind({Member.DeclaringType.ToCode()}.GetTypeInfo().DeclaredMembers.ToArray()[{memberIndex}]," + NewLine + 
+                       $"{Expression.CodeString})";
             }
         }
 
@@ -2172,21 +2180,16 @@ namespace FastExpressionCompiler.LightExpression
             $"{Body.CodeString}," + NewLine + 
             $"{ToParamsCode(Parameters)})";
 
-        internal LambdaExpression(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters)
+        internal LambdaExpression(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
         {
             Body = body;
             Parameters = parameters;
+            ReturnType = returnType;
 
-            if (delegateType == null || delegateType == typeof(Delegate))
-            {
-                ReturnType = body.Type;
-                Type = Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), ReturnType);
-            }
-            else
-            {
-                ReturnType = delegateType.FindDelegateInvokeMethod().ReturnType; // todo: improve by passing the known return type
+            if (delegateType != null && delegateType != typeof(Delegate))
                 Type = delegateType;
-            }
+            else
+                Type = Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), ReturnType);
         }
     }
 
@@ -2195,8 +2198,8 @@ namespace FastExpressionCompiler.LightExpression
         public new System.Linq.Expressions.Expression<TDelegate> ToLambdaExpression() =>
             SysExpr.Lambda<TDelegate>(Body.ToExpression(), ParameterExpression.ToParameterExpressions(Parameters));
 
-        internal Expression(Expression body, IReadOnlyList<ParameterExpression> parameters)
-            : base(typeof(TDelegate), body, parameters) { }
+        internal Expression(Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
+            : base(typeof(TDelegate), body, parameters, returnType) { }
     }
 }
 #endif

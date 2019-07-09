@@ -34,7 +34,8 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 - [Extensions and Companions](Extensions.md)
 - [Documentation][WikiHome]
 - [Contribution guide](CONTRIBUTING.md)
-- Check the two original parts of DryIoc and now standalone projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
+- Check the old issues on [BitBucket](https://bitbucket.org/dadhi/dryioc)
+- Two original parts of DryIoc are now separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
 
 ## Benchmarks
 
