@@ -7235,6 +7235,9 @@ namespace DryIoc
 
             s.Append(_serviceInfo);
 
+            if (Factory != null && !(Factory is ReflectionFactory))
+                s.Append(' ').Append(Factory.GetType().Name).Append(' ');
+
             if (FactoryID != 0)
                 s.Append(" FactoryId=").Append(FactoryID);
 
