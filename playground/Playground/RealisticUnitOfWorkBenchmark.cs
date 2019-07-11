@@ -12,6 +12,21 @@ using IContainer = DryIoc.IContainer;
 
 namespace PerformanceTests
 {
+    public static class Ext
+    {
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> f,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> f,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+    }
+
     public class RealisticUnitOfWorkBenchmark
     {
         public static IContainer PrepareDryIoc()
@@ -81,6 +96,101 @@ namespace PerformanceTests
                 Reuse.Scoped);
             container.RegisterDelegate(
                 r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()), 
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.Scoped);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
+            ResolveDummyPopulation(container);
+            return container;
+        }
+
+        public static IContainer PrepareDryIoc_RegisterDelegateWithInjectedDependencies()
+        {
+            var container = new Container();
+
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R (root) / Controller
+            container.Register<R>(Reuse.Scoped);
+
+            container.Register<Scoped1>(Reuse.Scoped);
+            container.Register<Scoped2>(Reuse.Scoped);
+
+            container.Register<Trans1>(Reuse.Transient);
+            container.Register<Trans2>(Reuse.Transient);
+
+            container.Register<Single1>(Reuse.Singleton);
+            container.Register<Single2>(Reuse.Singleton);
+
+            container.RegisterDelegate<Scoped1, Scoped3, Single1, SingleObj1, ScopedFac1>(
+                (scoped1, scoped3, single1, singleObj1) => new ScopedFac1(scoped1, scoped3, single1, singleObj1),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Scoped2, Scoped4, Single2, SingleObj2, ScopedFac2>(
+                (scoped2, scoped4, single2, singleObj2) => new ScopedFac2(scoped2, scoped4, single2, singleObj2),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj1());
+            container.RegisterInstance(new SingleObj2());
+
+            // level 2
+            container.Register<Scoped3>(Reuse.Scoped);
+            container.Register<Scoped4>(Reuse.Scoped);
+
+            container.Register<Scoped12>(Reuse.Scoped);
+            container.Register<Scoped22>(Reuse.Scoped);
+
+            container.Register<Single12>(Reuse.Singleton);
+            container.Register<Single22>(Reuse.Singleton);
+
+            container.Register<Trans12>(Reuse.Transient);
+            container.Register<Trans22>(Reuse.Transient);
+
+            container.RegisterDelegate<Scoped13, Single1, SingleObj13, ScopedFac12>(
+                (scoped13, single1, singleObj13) => new ScopedFac12(scoped13, single1, singleObj13),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Scoped23, Single2, SingleObj23, ScopedFac22>(
+                (scoped23, single2, singleObj23) => new ScopedFac22(scoped23, single2, singleObj23),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj12());
+            container.RegisterInstance(new SingleObj22());
+
+            // level 3
+            container.Register<Scoped13>(Reuse.Scoped);
+            container.Register<Scoped23>(Reuse.Scoped);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate<Single1, Scoped14, ScopedFac14, ScopedFac13>(
+                (single1, scoped14, scopedFac14) => new ScopedFac13(single1, scoped14, scopedFac14),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Single2, Scoped24, ScopedFac24, ScopedFac23>(
+                (single2, scoped24, scopedFac24) => new ScopedFac23(single2, scoped24, scopedFac24),
                 Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj13());
@@ -877,6 +987,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 | BmarkMicrosoftDependencyInjection | 120.6 us | 1.223 us | 0.9550 us |  1.00 | 18.6768 | 0.1221 |     - |  80.63 KB |
 |                       BmarkDryIoc | 147.2 us | 1.034 us | 0.9673 us |  1.22 | 28.3203 | 0.2441 |     - | 131.55 KB |
 |                   BmarkDryIocMsDi | 166.6 us | 1.509 us | 1.4116 us |  1.38 | 30.7617 | 0.7324 |     - | 142.35 KB |
+
+            ### RegisterDelegate with injected dependencies
+
+|                                               Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
+|                    BmarkMicrosoftDependencyInjection |    121.0 us |   0.9459 us |   0.8848 us |   1.00 |    0.00 |  18.6768 |  0.1221 |     - |  80.63 KB |
+|                                          BmarkDryIoc |    145.0 us |   0.7806 us |   0.6518 us |   1.20 |    0.01 |  28.3203 |  0.2441 |     - | 131.55 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    114.1 us |   0.7860 us |   0.6968 us |   0.94 |    0.01 |  22.7051 |  0.1221 |     - | 104.65 KB |
+|                                      BmarkDryIocMsDi |    161.4 us |   2.0801 us |   1.9457 us |   1.33 |    0.02 |  30.7617 |  0.7324 |     - | 142.35 KB |
+|                                           BmarkGrace | 17,375.4 us | 329.5635 us | 308.2739 us | 143.57 |    2.96 | 156.2500 | 62.5000 |     - | 739.99 KB |
+|                                       BmarkGraceMsDi | 19,487.7 us | 112.4615 us | 105.1965 us | 161.02 |    1.56 | 187.5000 | 93.7500 |     - | 909.83 KB |
+
             */
 
             [Benchmark(Baseline = true)]
@@ -886,12 +1008,15 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
 
             [Benchmark]
+            public object BmarkDryIoc_RegisterDelegateWithInjectedDependencies() => Measure(PrepareDryIoc_RegisterDelegateWithInjectedDependencies());
+
+            [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
             //[Benchmark]
@@ -1094,7 +1219,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             */
 
             private IServiceProvider _msDi;
-            private IContainer _dryioc;
+            private IContainer _dryIoc, _dryIoc2;
             private IServiceProvider _dryIocMsDi;
             private DependencyInjectionContainer _grace;
             private IServiceProvider _graceMsDi;
@@ -1105,7 +1230,8 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             public void WarmUp()
             {
                 Measure(_msDi = PrepareMsDi());
-                Measure(_dryioc = PrepareDryIoc());
+                Measure(_dryIoc = PrepareDryIoc());
+                Measure(_dryIoc2 = PrepareDryIoc_RegisterDelegateWithInjectedDependencies());
                 Measure(_dryIocMsDi = PrepareDryIocMsDi());
                 Measure(_grace = PrepareGrace());
                 Measure(_graceMsDi = PrepareGraceMsDi());
@@ -1117,15 +1243,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
 
             [Benchmark]
-            public object BmarkDryIoc() => Measure(_dryioc);
+            public object BmarkDryIoc() => Measure(_dryIoc);
+
+            [Benchmark]
+            public object BmarkDryIoc_RegisterDelegateWithInjectedDependencies() => Measure(_dryIoc2);
 
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGrace() => Measure(_grace);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
             //[Benchmark]

@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using RealisticUnitOfWork;
 
@@ -12,6 +13,16 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             var x = container.PrepareDryIoc().Measure();
+
+            Assert.IsInstanceOf<R>(x);
+        }
+
+        [Test]
+        public void CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve_RegisterDelegateWithInjectedDependencies()
+        {
+            var container = new Container();
+
+            var x = container.PrepareDryIoc_RegisterDelegateWithInjectedDependencies().Measure();
 
             Assert.IsInstanceOf<R>(x);
         }
@@ -98,6 +109,111 @@ namespace DryIoc.IssuesTests
 
             container.RegisterDelegate(
                 r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.Scoped);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
+            ResolveDummyPopulation(container);
+            return container;
+        }
+
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> f,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
+                reuse: reuse, setup:setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> f,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        public static IContainer PrepareDryIoc_RegisterDelegateWithInjectedDependencies(this IContainer container)
+        {
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R (root) / Controller
+            container.Register<R>(Reuse.Scoped);
+
+            container.Register<Scoped1>(Reuse.Scoped);
+            container.Register<Scoped2>(Reuse.Scoped);
+
+            container.Register<Trans1>(Reuse.Transient);
+            container.Register<Trans2>(Reuse.Transient);
+
+            container.Register<Single1>(Reuse.Singleton);
+            container.Register<Single2>(Reuse.Singleton);
+
+            container.RegisterDelegate<Scoped1, Scoped3, Single1, SingleObj1, ScopedFac1>(
+                (scoped1, scoped3, single1, singleObj1) => new ScopedFac1(scoped1, scoped3, single1, singleObj1),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Scoped2, Scoped4, Single2, SingleObj2, ScopedFac2>(
+                (scoped2, scoped4, single2, singleObj2) => new ScopedFac2(scoped2, scoped4, single2, singleObj2),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj1());
+            container.RegisterInstance(new SingleObj2());
+
+            // level 2
+            container.Register<Scoped3>(Reuse.Scoped);
+            container.Register<Scoped4>(Reuse.Scoped);
+
+            container.Register<Scoped12>(Reuse.Scoped);
+            container.Register<Scoped22>(Reuse.Scoped);
+
+            container.Register<Single12>(Reuse.Singleton);
+            container.Register<Single22>(Reuse.Singleton);
+
+            container.Register<Trans12>(Reuse.Transient);
+            container.Register<Trans22>(Reuse.Transient);
+
+            container.RegisterDelegate<Scoped13, Single1, SingleObj13, ScopedFac12>(
+                (scoped13, single1, singleObj13) => new ScopedFac12(scoped13, single1, singleObj13),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Scoped23, Single2, SingleObj23, ScopedFac22>(
+                (scoped23, single2, singleObj23) => new ScopedFac22(scoped23, single2, singleObj23),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj12());
+            container.RegisterInstance(new SingleObj22());
+
+            // level 3
+            container.Register<Scoped13>(Reuse.Scoped);
+            container.Register<Scoped23>(Reuse.Scoped);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate<Single1, Scoped14, ScopedFac14, ScopedFac13>(
+                (single1, scoped14, scopedFac14) => new ScopedFac13(single1, scoped14, scopedFac14),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Single2, Scoped24, ScopedFac24, ScopedFac23>(
+                (single2, scoped24, scopedFac24) => new ScopedFac23(single2, scoped24, scopedFac24),
                 Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj13());
