@@ -21,7 +21,7 @@ using Web.Rest.API;
 using CustomerDatabase = Databases.CustomerDatabase;
 using IUserService = Conn.IUserService;
 
-namespace PokemonBenchmark
+namespace LoadTest
 {
     class Registrations
     {

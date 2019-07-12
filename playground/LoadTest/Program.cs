@@ -8,7 +8,7 @@ using System.Web.Http.Controllers;
 using DryIoc;
 using DryIoc.WebApi;
 
-namespace PokemonBenchmark
+namespace LoadTest
 {
     class Program
     {
@@ -39,7 +39,6 @@ namespace PokemonBenchmark
              */
             // var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
             // Registrations.RegisterTypes(container, false);
-
 
 
             // This setup config works, but uses a lot of memory
