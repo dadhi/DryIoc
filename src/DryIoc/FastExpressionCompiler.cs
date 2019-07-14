@@ -23,6 +23,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+// ReSharper disable CoVariantArrayConversion
+
+/*
+// Lists the target platforms that are Not supported by FEC - simplifies the direct referencing of Expression.cs file
+*/
 #if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
 #define SUPPORTS_FAST_EXPRESSION_COMPILER
 #endif
@@ -392,37 +397,6 @@ namespace FastExpressionCompiler.LightExpression
         {
             public object VarExprs; // ParameterExpression | IReadOnlyList<ParameterExpression>
             public object LocalVars; // LocalBuilder | LocalBuilder[]
-        }
-
-        internal struct LiveCountArray<T>
-        {
-            private const int EXPAND_BY = 3;
-
-            public int Count;
-            public T[] Items;
-
-            public LiveCountArray(T[] items)
-            {
-                Items = items;
-                Count = items.Length;
-            }
-
-            public ref T PushSlot()
-            {
-                if (++Count >= Items.Length)
-                    Items = Expand(Items);
-                return ref Items[Count - 1];
-            }
-
-            public void Pop() => --Count;
-
-            private static T[] Expand(T[] items)
-            {
-                var newItems = new T[items.Length + EXPAND_BY];
-                for (var i = 0; i < items.Length; i++)
-                    newItems[i] = items[i];
-                return newItems;
-            }
         }
 
         [Flags]
@@ -4378,6 +4352,39 @@ namespace FastExpressionCompiler.LightExpression
                 return list.Count == 0 ? default : list[0];
             using (var items = source.GetEnumerator())
                 return items.MoveNext() ? items.Current : default;
+        }
+    }
+
+    internal struct LiveCountArray<T>
+    {
+        public int Count;
+        public T[] Items;
+
+        public LiveCountArray(T[] items)
+        {
+            Items = items;
+            Count = items.Length;
+        }
+
+        public ref T PushSlot()
+        {
+            if (++Count >= Items.Length)
+                Items = Expand(Items);
+            return ref Items[Count - 1];
+        }
+
+        public void Pop() => --Count;
+
+        private static T[] Expand(T[] items)
+        {
+            if (items.Length == 0)
+                return new T[2];
+
+            var count = items.Length;
+            var newItems = new T[count << 1];
+            for (var i = 0; i < count; i++)
+                newItems[i] = items[i];
+            return newItems;
         }
     }
 }
