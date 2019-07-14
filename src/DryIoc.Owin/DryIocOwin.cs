@@ -63,7 +63,7 @@ namespace DryIoc.Owin
         /// Additionally may register external instance into open scope.</summary>
         /// <param name="app">App builder to use.</param>
         /// <param name="container">DryIoc container for opening scope.</param>
-        /// <param name="registerInScope">(optional) e.g. `r => r.UseInstance(someSettings)`</param>
+        /// <param name="registerInScope">(optional) e.g. `r => r.Use(someSettings)`</param>
         /// <param name="scopeContext">(optional) Scope context to use. By default sets the <see cref="AsyncExecutionFlowScopeContext"/>.</param>
         /// <returns>IMPORTANT: if passed <paramref name="container"/> did not have a scope context,
         /// then the method will return NEW container with scope context set. 
