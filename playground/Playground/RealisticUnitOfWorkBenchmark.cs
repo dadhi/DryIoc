@@ -12,6 +12,21 @@ using IContainer = DryIoc.IContainer;
 
 namespace PerformanceTests
 {
+    public static class Ext
+    {
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> f,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> f,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+    }
+
     public class RealisticUnitOfWorkBenchmark
     {
         public static IContainer PrepareDryIoc()
@@ -81,6 +96,101 @@ namespace PerformanceTests
                 Reuse.Scoped);
             container.RegisterDelegate(
                 r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()), 
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.Scoped);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
+            ResolveDummyPopulation(container);
+            return container;
+        }
+
+        public static IContainer PrepareDryIoc_RegisterDelegateWithInjectedDependencies()
+        {
+            var container = new Container();
+
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R (root) / Controller
+            container.Register<R>(Reuse.Scoped);
+
+            container.Register<Scoped1>(Reuse.Scoped);
+            container.Register<Scoped2>(Reuse.Scoped);
+
+            container.Register<Trans1>(Reuse.Transient);
+            container.Register<Trans2>(Reuse.Transient);
+
+            container.Register<Single1>(Reuse.Singleton);
+            container.Register<Single2>(Reuse.Singleton);
+
+            container.RegisterDelegate<Scoped1, Scoped3, Single1, SingleObj1, ScopedFac1>(
+                (scoped1, scoped3, single1, singleObj1) => new ScopedFac1(scoped1, scoped3, single1, singleObj1),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Scoped2, Scoped4, Single2, SingleObj2, ScopedFac2>(
+                (scoped2, scoped4, single2, singleObj2) => new ScopedFac2(scoped2, scoped4, single2, singleObj2),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj1());
+            container.RegisterInstance(new SingleObj2());
+
+            // level 2
+            container.Register<Scoped3>(Reuse.Scoped);
+            container.Register<Scoped4>(Reuse.Scoped);
+
+            container.Register<Scoped12>(Reuse.Scoped);
+            container.Register<Scoped22>(Reuse.Scoped);
+
+            container.Register<Single12>(Reuse.Singleton);
+            container.Register<Single22>(Reuse.Singleton);
+
+            container.Register<Trans12>(Reuse.Transient);
+            container.Register<Trans22>(Reuse.Transient);
+
+            container.RegisterDelegate<Scoped13, Single1, SingleObj13, ScopedFac12>(
+                (scoped13, single1, singleObj13) => new ScopedFac12(scoped13, single1, singleObj13),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Scoped23, Single2, SingleObj23, ScopedFac22>(
+                (scoped23, single2, singleObj23) => new ScopedFac22(scoped23, single2, singleObj23),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj12());
+            container.RegisterInstance(new SingleObj22());
+
+            // level 3
+            container.Register<Scoped13>(Reuse.Scoped);
+            container.Register<Scoped23>(Reuse.Scoped);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate<Single1, Scoped14, ScopedFac14, ScopedFac13>(
+                (single1, scoped14, scopedFac14) => new ScopedFac13(single1, scoped14, scopedFac14),
+                Reuse.Scoped);
+
+            container.RegisterDelegate<Single2, Scoped24, ScopedFac24, ScopedFac23>(
+                (single2, scoped24, scopedFac24) => new ScopedFac23(single2, scoped24, scopedFac24),
                 Reuse.Scoped);
 
             container.RegisterInstance(new SingleObj13());
@@ -822,16 +932,6 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
   [Host]     : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
   DefaultJob : .NET Core 2.2.0 (CoreCLR 4.6.27110.04, CoreFX 4.6.27110.04), 64bit RyuJIT
 
-                            Method |         Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |-------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
-                       BmarkDryIoc |     68.51 us |   0.2992 us |   0.2652 us |   0.68 |    0.02 |     16.6016 |      0.1221 |           - |            76.57 KB |
-                   BmarkDryIocMsDi |     83.14 us |   0.5770 us |   0.5397 us |   0.83 |    0.02 |     18.1885 |      0.1221 |           - |             84.2 KB |
- BmarkMicrosoftDependencyInjection |     99.98 us |   2.0301 us |   2.4166 us |   1.00 |    0.00 |     10.9863 |      0.1221 |           - |            46.02 KB |
-                      BmarkAutofac |    409.29 us |   1.4180 us |   1.3264 us |   4.08 |    0.11 |     67.3828 |      0.4883 |           - |           310.66 KB |
-                  BmarkAutofacMsDi |    415.40 us |   1.9196 us |   1.6029 us |   4.13 |    0.12 |     69.8242 |      0.9766 |           - |           322.92 KB |
-                        BmarkGrace | 11,377.40 us |  76.6630 us |  71.7107 us | 113.29 |    2.92 |    109.3750 |     46.8750 |           - |           517.05 KB |
-                    BmarkGraceMsDi | 13,103.36 us | 111.6352 us | 104.4236 us | 130.48 |    3.43 |    125.0000 |     62.5000 |     15.6250 |            615.5 KB |
-
             ## Test with 4 level graph + disposables + fixed scoped things for DryIoc:
 
                             Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -839,22 +939,22 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
  BmarkMicrosoftDependencyInjection |    134.0 us |   2.1675 us |   2.0275 us |   1.00 |    0.00 |     13.7939 |      0.1221 |           - |            58.65 KB |
                        BmarkDryIoc |    145.3 us |   0.8318 us |   0.7374 us |   1.08 |    0.02 |     30.2734 |           - |           - |           140.35 KB |
                    BmarkDryIocMsDi |    161.6 us |   0.9626 us |   0.9004 us |   1.21 |    0.02 |     32.2266 |           - |           - |           149.19 KB |
-                  BmarkAutofacMsDi |    665.2 us |   5.4804 us |   5.1264 us |   4.96 |    0.08 |    105.4688 |      3.9063 |           - |           487.64 KB |
-                      BmarkAutofac |    673.2 us |   5.5615 us |   5.2022 us |   5.02 |    0.08 |    101.5625 |     18.5547 |           - |           470.39 KB |
                         BmarkGrace | 18,480.8 us | 100.5977 us |  89.1773 us | 137.83 |    2.35 |    156.2500 |     62.5000 |           - |           755.18 KB |
                     BmarkGraceMsDi | 21,640.4 us | 119.7309 us | 106.1383 us | 161.39 |    2.81 |    187.5000 |     93.7500 |     31.2500 |           926.88 KB |
+                      BmarkAutofac |    673.2 us |   5.5615 us |   5.2022 us |   5.02 |    0.08 |    101.5625 |     18.5547 |           - |           470.39 KB |
+                  BmarkAutofacMsDi |    665.2 us |   5.4804 us |   5.1264 us |   4.96 |    0.08 |    105.4688 |      3.9063 |           - |           487.64 KB |
 
             ## After returning ScopedOrSingleton to use lambda 
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
-                       BmarkDryIoc |    160.1 us |   2.670 us |   2.498 us |   0.96 |    0.02 |     30.2734 |      0.4883 |           - |           140.03 KB |
  BmarkMicrosoftDependencyInjection |    166.9 us |   2.035 us |   1.804 us |   1.00 |    0.00 |     13.6719 |      0.2441 |           - |            58.66 KB |
+                       BmarkDryIoc |    160.1 us |   2.670 us |   2.498 us |   0.96 |    0.02 |     30.2734 |      0.4883 |           - |           140.03 KB |
                    BmarkDryIocMsDi |    180.2 us |   2.420 us |   2.263 us |   1.08 |    0.02 |     32.4707 |      0.2441 |           - |           150.03 KB |
-                  BmarkAutofacMsDi |    747.8 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
-                      BmarkAutofac |    790.0 us |   5.206 us |   4.615 us |   4.74 |    0.06 |    101.5625 |      6.8359 |           - |           470.32 KB |
                         BmarkGrace | 20,058.3 us | 290.376 us | 257.411 us | 120.22 |    1.59 |    156.2500 |     62.5000 |           - |           755.11 KB |
                     BmarkGraceMsDi | 23,546.7 us | 294.414 us | 275.395 us | 141.02 |    2.04 |    187.5000 |     93.7500 |     31.2500 |           926.86 KB |
+                      BmarkAutofac |    790.0 us |   5.206 us |   4.615 us |   4.74 |    0.06 |    101.5625 |      6.8359 |           - |           470.32 KB |
+                  BmarkAutofacMsDi |    747.8 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
 
             ## DryIoc v4.0.4 and Grace v7
 
@@ -870,16 +970,6 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## DryIoc v4.0.5
 
-                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    130.6 us |   5.148 us |   8.015 us |   1.00 |    0.00 |     17.5781 |      0.9766 |           - |            79.72 KB |
-                       BmarkDryIoc |    153.2 us |   1.196 us |   1.119 us |   1.17 |    0.03 |     26.8555 |           - |           - |            125.2 KB |
-                   BmarkDryIocMsDi |    161.1 us |   1.456 us |   1.290 us |   1.23 |    0.04 |     28.8086 |      0.4883 |           - |           133.72 KB |
-                        BmarkGrace | 18,794.2 us | 114.387 us | 106.998 us | 144.02 |    4.02 |    156.2500 |     62.5000 |           - |           739.76 KB |
-                    BmarkGraceMsDi | 22,490.8 us | 124.663 us | 110.510 us | 172.21 |    5.08 |    187.5000 |     93.7500 |           - |           909.11 KB |
-                      BmarkAutofac |    670.9 us |   3.976 us |   3.719 us |   5.14 |    0.15 |    102.5391 |      9.7656 |           - |           472.92 KB |
-                  BmarkAutofacMsDi |    664.5 us |   7.498 us |   6.646 us |   5.09 |    0.17 |    105.4688 |      5.8594 |           - |           490.05 KB |
-
                             Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
  BmarkMicrosoftDependencyInjection |    148.0 us |   1.5359 us |   1.4366 us |   1.00 |    0.00 |     18.4326 |      0.1221 |           - |            79.69 KB |
@@ -889,6 +979,26 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                     BmarkGraceMsDi | 22,149.9 us | 122.6704 us | 114.7460 us | 149.69 |    1.48 |    187.5000 |     93.7500 |           - |           909.15 KB |
                       BmarkAutofac |    696.3 us |   4.9448 us |   4.3834 us |   4.71 |    0.07 |    102.5391 |      2.9297 |           - |            472.8 KB |
                   BmarkAutofacMsDi |    688.8 us |   7.1206 us |   6.6606 us |   4.66 |    0.07 |    105.4688 |      0.9766 |           - |           489.97 KB |
+
+            ### FEC v2.1 and BDN 0.11.5
+
+|                            Method |     Mean |    Error |    StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|---------------------------------- |---------:|---------:|----------:|------:|--------:|-------:|------:|----------:|
+| BmarkMicrosoftDependencyInjection | 120.6 us | 1.223 us | 0.9550 us |  1.00 | 18.6768 | 0.1221 |     - |  80.63 KB |
+|                       BmarkDryIoc | 147.2 us | 1.034 us | 0.9673 us |  1.22 | 28.3203 | 0.2441 |     - | 131.55 KB |
+|                   BmarkDryIocMsDi | 166.6 us | 1.509 us | 1.4116 us |  1.38 | 30.7617 | 0.7324 |     - | 142.35 KB |
+
+            ### RegisterDelegate with injected dependencies
+
+|                                               Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
+|                    BmarkMicrosoftDependencyInjection |    121.0 us |   0.9459 us |   0.8848 us |   1.00 |    0.00 |  18.6768 |  0.1221 |     - |  80.63 KB |
+|                                          BmarkDryIoc |    145.0 us |   0.7806 us |   0.6518 us |   1.20 |    0.01 |  28.3203 |  0.2441 |     - | 131.55 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    114.1 us |   0.7860 us |   0.6968 us |   0.94 |    0.01 |  22.7051 |  0.1221 |     - | 104.65 KB |
+|                                      BmarkDryIocMsDi |    161.4 us |   2.0801 us |   1.9457 us |   1.33 |    0.02 |  30.7617 |  0.7324 |     - | 142.35 KB |
+|                                           BmarkGrace | 17,375.4 us | 329.5635 us | 308.2739 us | 143.57 |    2.96 | 156.2500 | 62.5000 |     - | 739.99 KB |
+|                                       BmarkGraceMsDi | 19,487.7 us | 112.4615 us | 105.1965 us | 161.02 |    1.56 | 187.5000 | 93.7500 |     - | 909.83 KB |
+
             */
 
             [Benchmark(Baseline = true)]
@@ -896,6 +1006,9 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
+
+            [Benchmark]
+            public object BmarkDryIoc_RegisterDelegateWithInjectedDependencies() => Measure(PrepareDryIoc_RegisterDelegateWithInjectedDependencies());
 
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
@@ -906,10 +1019,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
         }
 
@@ -1106,7 +1219,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             */
 
             private IServiceProvider _msDi;
-            private IContainer _dryioc;
+            private IContainer _dryIoc, _dryIoc2;
             private IServiceProvider _dryIocMsDi;
             private DependencyInjectionContainer _grace;
             private IServiceProvider _graceMsDi;
@@ -1116,20 +1229,24 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [GlobalSetup]
             public void WarmUp()
             {
-                _msDi = PrepareMsDi();
-                _dryioc = PrepareDryIoc();
-                _dryIocMsDi = PrepareDryIocMsDi();
-                _grace = PrepareGrace();
-                _graceMsDi = PrepareGraceMsDi();
-                _autofac = PrepareAutofac();
-                _autofacMsDi = PrepareAutofacMsDi();
+                Measure(_msDi = PrepareMsDi());
+                Measure(_dryIoc = PrepareDryIoc());
+                Measure(_dryIoc2 = PrepareDryIoc_RegisterDelegateWithInjectedDependencies());
+                Measure(_dryIocMsDi = PrepareDryIocMsDi());
+                Measure(_grace = PrepareGrace());
+                Measure(_graceMsDi = PrepareGraceMsDi());
+                Measure(_autofac = PrepareAutofac());
+                Measure(_autofacMsDi = PrepareAutofacMsDi());
             }
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(_msDi);
 
             [Benchmark]
-            public object BmarkDryIoc() => Measure(_dryioc);
+            public object BmarkDryIoc() => Measure(_dryIoc);
+
+            [Benchmark]
+            public object BmarkDryIoc_RegisterDelegateWithInjectedDependencies() => Measure(_dryIoc2);
 
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
