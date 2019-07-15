@@ -54,14 +54,10 @@ namespace LoadTest
             // a default validator for types that do not have their own validator
             container.Register(typeof(IValidator<>), typeof(Validator<>), Reuse.Singleton);
 
-            var ns = typeof(Framework.ITimeService).Namespace;
+            var ns = typeof(ITimeService).Namespace;
 
-            var types = typeof(Framework.ITimeService).GetAssembly().GetLoadedTypes().Where(i =>
-                {
-                    return i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
-                           (i.Name.EndsWith("Service") || i.Name.EndsWith("Authorization"));
-                }
-            );
+            var types = typeof(ITimeService).GetAssembly().GetLoadedTypes()
+                .Where(i => i.Namespace == ns && !i.IsInterface && !i.IsAbstract && (i.Name.EndsWith("Service") || i.Name.EndsWith("Authorization")));
 
             container.RegisterMany(types, Reuse.Singleton, serviceTypeCondition: s => s.IsInterface,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
@@ -83,23 +79,20 @@ namespace LoadTest
 
         static void RegShared(IContainer container)
         {
-            var ns = typeof(Shared.Country).Namespace;
+            var ns = typeof(Country).Namespace;
 
-            var types = typeof(Shared.IPsaContext).Assembly.GetLoadedTypes().Where(i =>
-                {
-                    return i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
+            var types = typeof(IPsaContext).Assembly.GetLoadedTypes()
+                .Where(i => i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
                            (i.Name.EndsWith("Repository") || i.Name.EndsWith("Validator") ||
                             i.Name.EndsWith("Authorization") || i.Name.EndsWith("Builder") ||
-                            i.Name.EndsWith("Service"));
-                }
-            );
+                            i.Name.EndsWith("Service")));
 
             container.RegisterMany(types, Reuse.Singleton, serviceTypeCondition: s => s.IsInterface,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             container.Register(typeof(ISharedAuthorization<>), typeof(SharedAuthorization<>), reuse: Reuse.Singleton,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-            container.Register<Framework.IDict>(made: Made.Of(() => Dict.Current()), reuse: Reuse.Singleton,
+            container.Register<IDict>(made: Made.Of(() => Dict.Current()), reuse: Reuse.Singleton,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             container.Register<IAppSettings, AppSettings>(reuse: Reuse.Singleton,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
@@ -109,10 +102,10 @@ namespace LoadTest
 
             // Overrides
             container.Register<IPsaContextStorage, PsaContextStorage>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            container.Register<Framework.IContextService, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            container.Register<Framework.IContextService<IPsaContext>, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.Register<IContextService, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.Register<IContextService<IPsaContext>, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             container.Register<IPsaContextService, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-            container.Register<Framework.IContextService<Shared.ISharedContext>, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            container.Register<IContextService<ISharedContext>, PsaContextService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             container.Register<IOrganizationContextScopeService, OrganizationContextScopeService>(Reuse.Singleton,
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
@@ -133,7 +126,7 @@ namespace LoadTest
             });
         }
 
-        static void RegUsers(IContainer container, bool singletonDecorators)
+        static void RegUsers(IRegistrator container, bool singletonDecorators)
         {
             container.Register<Users.IUniqueUserService, Users.UniqueUserService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw, reuse: Reuse.Singleton);
             container.Register<Users.IUniqueUserService, UniqueUserDependencyServiceDecorator>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
@@ -151,7 +144,7 @@ namespace LoadTest
             //container.Register<ITrustedOrganizationUserRepository, TrustedOrganizationUserRepository>(Reuse.Singleton);
         }
 
-        static void RegOrganizations(IContainer container)
+        static void RegOrganizations(IRegistrator container)
         {
             var ns = typeof(OrganizationBase.OrganizationEntity).Namespace;
 
@@ -184,7 +177,7 @@ namespace LoadTest
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
         }
 
-        static void RegConnLoad(IContainer container)
+        static void RegConnLoad(IRegistrator container)
         {
             container.Register<IPublicUserService, PublicUserService>(Reuse.Singleton,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
@@ -204,7 +197,7 @@ namespace LoadTest
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
         }
 
-        static void RegConnAdapterLoad(IContainer container)
+        static void RegConnAdapterLoad(IRegistrator container)
         {
             container.Register<IConnClient, ConnClient>(reuse: Reuse.Singleton,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
@@ -234,7 +227,7 @@ namespace LoadTest
                 RegisterRepositories(builder, singletonDecorators);
             }
 
-            private static void RegisterImplementations(IContainer container)
+            private static void RegisterImplementations(IRegistrator container)
             {
                 var ns = typeof(Users.IUniqueUserService).Namespace;
 
@@ -249,12 +242,12 @@ namespace LoadTest
                 );
             }
 
-            private static void RegisterRepositories(IContainer container, bool singletonDecorators)
+            private static void RegisterRepositories(IRegistrator container, bool singletonDecorators)
             {
-                var ns = typeof(Users.Repositories.EntityVersionRepository).Namespace;
+                var ns = typeof(EntityVersionRepository).Namespace;
 
                 container.RegisterMany(
-                    typeof(Users.Repositories.EntityVersionRepository).GetAssembly().GetLoadedTypes().Where(i =>
+                    typeof(EntityVersionRepository).GetAssembly().GetLoadedTypes().Where(i =>
                     {
                         return i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
                                (i.Name.EndsWith("Service") || i.Name.EndsWith("Repository")) &&
@@ -266,25 +259,25 @@ namespace LoadTest
                 );
 
                 container
-                    .Register<Users.Repositories.IUniqueUserToConnChangeNotifier,
-                        Users.Repositories.UniqueUserToConnChangeNotifier>(Reuse.Singleton);
+                    .Register<IUniqueUserToConnChangeNotifier,
+                        UniqueUserToConnChangeNotifier>(Reuse.Singleton);
 
-                container.Register<IUniqueUserRepository, Users.Repositories.UniqueUserRepository>(
+                container.Register<IUniqueUserRepository, UniqueUserRepository>(
                     Reuse.Singleton);
                 container
                     .Register<IUniqueUserRepository,
-                        Users.Repositories.UniqueUserConnUpdateHandlerRepository>(setup: Setup.Decorator,
+                        UniqueUserConnUpdateHandlerRepository>(setup: Setup.Decorator,
                         reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
-                container.Register<IUniqueUserRepository, Users.Repositories.UniqueUserUuidHandlerRepository>(
+                container.Register<IUniqueUserRepository, UniqueUserUuidHandlerRepository>(
                     setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
                 container
-                    .Register<IUniqueUserRepository, Organizations.UniqueUserToUserReplicator>(
+                    .Register<IUniqueUserRepository, UniqueUserToUserReplicator>(
                         setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
             }
         }
 
 
-        static void RegC(IContainer container)
+        static void RegC(IRegistrator container)
         {
             var ns = typeof(RM.AccountService).Namespace;
             var types = typeof(RM.AccountService).Assembly.GetLoadedTypes().Where(i =>
@@ -308,7 +301,7 @@ namespace LoadTest
                 RegisterRepositories(builder);
             }
 
-            static void RegisterApplicationServices(IContainer container)
+            static void RegisterApplicationServices(IRegistrator container)
             {
                 var ns = typeof(CUsers.ApplicationServices.IUserService).Namespace;
                 var types = typeof(CUsers.ApplicationServices.IUserService).Assembly.GetLoadedTypes().Where(
@@ -320,7 +313,7 @@ namespace LoadTest
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             }
 
-            static void RegisterDomain(IContainer container)
+            static void RegisterDomain(IRegistrator container)
             {
                 var ns = typeof(CUsers.Domain.IUserEventRepository).Namespace;
                 var types = typeof(CUsers.Domain.IUserEventRepository).Assembly.GetLoadedTypes().Where(
@@ -331,7 +324,7 @@ namespace LoadTest
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             }
 
-            static void RegisterRepositories(IContainer container)
+            static void RegisterRepositories(IRegistrator container)
             {
                 var ns = typeof(CUsers.Domain.UserEventRepository).Namespace;
                 var types = typeof(CUsers.Domain.UserEventRepository).Assembly.GetLoadedTypes().Where(
@@ -370,7 +363,7 @@ namespace LoadTest
 
             private static class ScheduledWorkIocModule
             {
-                public static void Load(IContainer container)
+                public static void Load(IRegistrator container)
                 {
                     var ns = typeof(ScheduledWork.ScheduledWorkService).Namespace;
 
@@ -393,7 +386,7 @@ namespace LoadTest
                     RegisterApplicationServices(container);
                 }
 
-                private static void RegisterApplicationServices(IContainer container)
+                private static void RegisterApplicationServices(IRegistrator container)
                 {
                     var theAssembly = typeof(Background.ScopedBackgroundTask).Assembly;
                     var ns = typeof(Background.ScopedBackgroundTask).Namespace;
@@ -410,13 +403,13 @@ namespace LoadTest
                 }
             }
 
-            private static void RegisterMail(IContainer container)
+            private static void RegisterMail(IRegistrator container)
             {
                 container.Register<IIncomingEmailHandler, AppIncomingEmailHandler>(Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             }
 
-            private static void RegIntegrations(IContainer container)
+            private static void RegIntegrations(IRegistrator container)
             {
                 var types = Assembly.GetExecutingAssembly().GetLoadedTypes()
                     .Where((i) => i.Namespace == "Integrations" && !i.IsInterface && !i.IsAbstract && i.Name.EndsWith("Service"));
@@ -431,7 +424,7 @@ namespace LoadTest
                 container.RegisterMany(providerTypes, Reuse.Scoped, serviceTypeCondition: s => s.IsInterface && s.Name != "ICalendarSyncProvider" && s.Name != "IIntegrationProvider", ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             }
 
-            private static void RegisterConnWebHooks(IContainer container)
+            private static void RegisterConnWebHooks(IRegistrator container)
             {
                 var ns = typeof(Conn.Service.ConnWebHooksController).Namespace;
                 container.RegisterMany(typeof(Conn.Service.ConnWebHooksController).Assembly.GetLoadedTypes()
@@ -449,13 +442,13 @@ namespace LoadTest
 
             private static void RegisterShopObjects(IContainer container, bool singletonDecorators)
             {
-                ShopIocModule.Load<Shop.DoNothingBilledPaymentPdfBuilder>(container, singletonDecorators);
+                ShopIocModule.Load<DoNothingBilledPaymentPdfBuilder>(container, singletonDecorators);
                 //container.Register<IShopUserService, Shared.PsaShopUserService>(reuse: Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             }
 
-            private static void RegisterRestObjects(IContainer container)
+            private static void RegisterRestObjects(IRegistrator container)
             {
-                var apiAssembly = typeof(Web.Rest.API.BearerAuthenticationController).Assembly;
+                var apiAssembly = typeof(BearerAuthenticationController).Assembly;
                 var ns = typeof(BearerAuthenticationController).Namespace;
 
                 var restAssemblyTypes = apiAssembly.GetLoadedTypes().Where(i =>
@@ -513,8 +506,8 @@ namespace LoadTest
 
             private static void RegisterDataObjects(IContainer container)
             {
-                var apiAssembly = typeof(Data.ActivityRepository).Assembly;
-                var ns = typeof(Data.ActivityRepository).Namespace;
+                var apiAssembly = typeof(ActivityRepository).Assembly;
+                var ns = typeof(ActivityRepository).Namespace;
                 var types = apiAssembly.GetLoadedTypes().Where(i =>
                     {
                         return i.Namespace == ns && !i.IsInterface && !i.IsAbstract && i.Name.EndsWith("Repository");
@@ -527,7 +520,7 @@ namespace LoadTest
                 // Check later
                 container.RegisterInstance<IAuditTrail<Case>>(CaseAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<CaseMember>>(CaseMemberAuditTrail.Definition);
-                container.RegisterInstance<IAuditTrail<Entities.Task>>(TaskAuditTrail.Definition);
+                container.RegisterInstance<IAuditTrail<Task>>(TaskAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<TaskMember>>(TaskMemberAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<Contact>>(ContactAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<BillingPlan>>(BillingPlanAuditTrail.Definition);
@@ -538,7 +531,7 @@ namespace LoadTest
                 container.RegisterInstance<IAuditTrail<Item>>(ItemAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<IReport>>(ExportAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<Activity>>(ActivityAuditTrail.Definition);
-                container.RegisterInstance<IAuditTrail<RM.CommunicatesWith>>(CommunicatesWithAuditTrail.Definition);
+                container.RegisterInstance<IAuditTrail<CommunicatesWith>>(CommunicatesWithAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<Employment>>(EmploymentAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<Right>>(RightAuditTrail.Definition);
                 container.RegisterInstance<IAuditTrail<Framework.User>>(UserAuditTrail.Definition);
@@ -644,7 +637,7 @@ namespace LoadTest
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
                 container.Register<IBilledPaymentPdfBuilder, BilledPaymentPdfBuilderImpl>(Reuse.Singleton);
-                container.Register<Shop.IAddonActivationRepository, Shop.AddonActivationAppApiGuidRuleDecorator>(
+                container.Register<IAddonActivationRepository, AddonActivationAppApiGuidRuleDecorator>(
                     setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
             }
         }
