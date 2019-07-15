@@ -7,7 +7,7 @@ namespace DryIoc.IssuesTests
     class Issue201_MultiThreadingIssueWhenRegisterInstanceUsedWithinOpenScope
     {
         [Test]
-        public void UseInstance_InThread_Replace_should_return_the_same_in_thread()
+        public void Use_instance_InThread_Replace_should_return_the_same_in_thread()
         {
             var container = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
             container.Register<U>();

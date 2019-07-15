@@ -84,7 +84,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 container.Populate(descriptors, registerDescriptor);
 
 #if NETSTANDARD1_0
-            container.UseInstance<IServiceProvider>(new DryIocServiceProvider(container));
+            container.Use<IServiceProvider>(new DryIocServiceProvider(container));
 #endif
 
             return container;

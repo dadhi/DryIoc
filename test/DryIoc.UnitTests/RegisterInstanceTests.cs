@@ -435,7 +435,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void UseInstance_wont_replace_existing_typed_registration_instead_will_append_to_it()
+        public void Use_instance_wont_replace_existing_typed_registration_instead_will_append_to_it()
         {
             var container = new Container();
             container.Register<ServiceB>();
@@ -458,7 +458,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void UseInstance_wont_replace_existing_typed_registration_instead_will_append_to_it_In_presence_or_keyed_registration()
+        public void Use_instance_wont_replace_existing_typed_registration_instead_will_append_to_it_In_presence_or_keyed_registration()
         {
             var container = new Container();
             container.Register<ServiceB>();

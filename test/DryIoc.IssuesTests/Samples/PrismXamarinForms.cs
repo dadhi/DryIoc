@@ -83,7 +83,7 @@ namespace DryIoc.IssuesTests.Samples
         }
 
         [Test]
-        public void Replace_singleton_dependency_with_UseInstance()
+        public void Replace_singleton_dependency_with_instance()
         {
             var c = new Container();
 

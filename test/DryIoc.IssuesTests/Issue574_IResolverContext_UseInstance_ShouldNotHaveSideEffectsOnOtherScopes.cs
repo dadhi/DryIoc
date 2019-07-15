@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue574_IResolverContext_UseInstance_ShouldNotHaveSideEffectsOnOtherScopes
+    public class Issue574_IResolverContext_Use_instance_ShouldNotHaveSideEffectsOnOtherScopes
     {
         [Test]
         public void Can_add_to_single_keyed_singleton_the_instance()
@@ -37,7 +37,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void No_cache_issues_between_normal_registration_and_UseInstance()
+        public void No_cache_issues_between_normal_registration_and_register_instance()
         {
             var container = new Container();
 
@@ -61,7 +61,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void No_cache_issues_between_more_than_2_normal_registration_and_UseInstance()
+        public void No_cache_issues_between_more_than_2_normal_registration_and_register_instance()
         {
             var container = new Container();
 
