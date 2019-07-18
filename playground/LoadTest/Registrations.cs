@@ -159,11 +159,11 @@ namespace LoadTest
             container.RegisterMany(types, Reuse.Singleton, serviceTypeCondition: s => s.IsInterface,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
-            ns = typeof(Organizations.Organization).Namespace;
+            var ns1 = typeof(Organizations.Organization).Namespace;
 
             types = typeof(Organizations.Organization).Assembly.GetLoadedTypes().Where(i =>
                 {
-                    return i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
+                    return i.Namespace == ns1 && !i.IsInterface && !i.IsAbstract &&
                            (i.Name.EndsWith("Repository") || i.Name.EndsWith("Service") || i.Name.EndsWith("Builder") ||
                             i.Name.EndsWith("Validator") || i.Name.EndsWith("Authorization")) 
                            && i.Name != "UserRepository"

@@ -24,8 +24,8 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
-            //Registrations.RegisterTypes(container, true);
+            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            Registrations.RegisterTypes(container, true);
 
 
             /*
@@ -51,17 +51,15 @@ namespace LoadTest
             //  --Load Test Result --
             //  00:01:27.69
 
-            var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
-            Registrations.RegisterTypes(container, true);
+            //var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            //Registrations.RegisterTypes(container, true);
 
             // Validate IoC registrations
             var results = container.Validate();
-
             if (results.Length > 0)
             {
                 throw new Exception(results.ToString());
             }
-
             Console.WriteLine("No IoC Validation errors detected");
 
             var httpControllerType = typeof(IHttpController);
