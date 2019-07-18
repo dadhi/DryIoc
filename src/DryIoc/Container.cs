@@ -263,7 +263,7 @@ namespace DryIoc
             // Delegate to full blown Resolve aware of service key, open scope, etc.
             var serviceKey = request.ServiceKey;
             if (serviceKey != null || CurrentScope?.Name != null)
-                return ((IResolver)this).Resolve(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
+                return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
 
             if (factory == null)
                 return null;
@@ -313,49 +313,81 @@ namespace DryIoc
         object IResolver.Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            preResolveParent = preResolveParent ?? Request.Empty;
+            // fallback to simple Resolve and its default cache if no keys are passed
             if (serviceKey == null && requiredServiceType == null && CurrentScope?.Name == null &&
-                preResolveParent.IsEmpty && args.IsNullOrEmpty())
-            {
+                (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty())
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
-            }
 
+            return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent ?? Request.Empty, args);
+        }
+
+        private object ResolveAndCacheKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
+            Type requiredServiceType, Request preResolveParent, object[] args)
+        {
             object key = null;
             object inEntryKey = null;
             KV<object, ImHashMap<object, object>> cacheEntry = null;
-            var noCache = args.IsNullOrEmpty() && preResolveParent.IsEmpty;
-            if (noCache)
+            var mayBeCached = args.IsNullOrEmpty() && preResolveParent.IsEmpty;
+            if (mayBeCached)
             {
                 key = serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey);
 
-                inEntryKey = CurrentScope?.Name == null ? requiredServiceType
-                    : requiredServiceType == null ? CurrentScope?.Name
-                    : (object)KV.Of(requiredServiceType, CurrentScope?.Name);
+                var scopeName = CurrentScope?.Name;
+                inEntryKey = scopeName == null ? requiredServiceType
+                    : requiredServiceType == null ? scopeName
+                    : (object)KV.Of(requiredServiceType, scopeName);
 
-                // Try get from cache first
+                // Try get from the cache first
                 var cache = _registry.Value.KeyedFactoryDelegateCache;
                 cacheEntry = cache.Value.GetValueOrDefault(key);
-                if (cacheEntry != null &&
-                    GetCachedOrCompileAndCacheFactoryDelegate(cache, key, cacheEntry, inEntryKey, out var cachedFactory))
-                    return cachedFactory(this);
+                if (cacheEntry != null)
+                {
+                    var cachedItem = inEntryKey == null ? cacheEntry.Key :
+                        cacheEntry.Value != null ? cacheEntry.Value.GetValueOrDefault(inEntryKey) :
+                        null;
+
+                    if (cachedItem is FactoryDelegate cachedDelegate)
+                        return cachedDelegate(this);
+
+                    if (cachedItem is Expression cachedExpression)
+                    {
+                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                        TryCacheKeyedFactoryDelegateOrExpression(cache, key, cacheEntry, inEntryKey, compiledDelegate);
+                        return compiledDelegate(this);
+                    }
+                }
             }
 
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
 
-            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, inputArgs: args);
+            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent,
+                inputArgs: args);
             var factory = ((IContainer)this).ResolveFactory(request);
 
             // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
-            if (serviceKey == null && request.ServiceKey != null && 
+            if (serviceKey == null && request.ServiceKey != null &&
                 factory.Caching != FactoryCaching.DoNotCache && args.IsNullOrEmpty())
             {
                 key = KV.Of(serviceType, request.ServiceKey);
                 var cache = _registry.Value.KeyedFactoryDelegateCache;
                 cacheEntry = cache.Value.GetValueOrDefault(key);
-                if (cacheEntry != null &&
-                    GetCachedOrCompileAndCacheFactoryDelegate(cache, key, cacheEntry, inEntryKey, out var cachedFactory))
-                    return cachedFactory(this);
+                if (cacheEntry != null)
+                {
+                    var cachedItem = inEntryKey == null ? cacheEntry.Key :
+                        cacheEntry.Value != null ? cacheEntry.Value.GetValueOrDefault(inEntryKey) :
+                        null;
+
+                    if (cachedItem is FactoryDelegate cachedDelegate)
+                        return cachedDelegate(this);
+
+                    if (cachedItem is Expression cachedExpression)
+                    {
+                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                        TryCacheKeyedFactoryDelegateOrExpression(cache, key, cacheEntry, inEntryKey, compiledDelegate);
+                        return compiledDelegate(this);
+                    }
+                }
             }
 
             if (factory == null)
@@ -371,16 +403,18 @@ namespace DryIoc
                 if (expr is ConstantExpression ce)
                 {
                     var value = ce.Value;
-                    if (factory.Caching != FactoryCaching.DoNotCache && noCache)
-                        TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, 
-                            (FactoryDelegate)value.ToFactoryDelegate);
+                    if (factory.Caching != FactoryCaching.DoNotCache && mayBeCached)
+                        TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry,
+                            inEntryKey,
+                            (FactoryDelegate) value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
-                if (factory.Caching != FactoryCaching.DoNotCache && noCache)
-                    TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, expr);
+                if (factory.Caching != FactoryCaching.DoNotCache && mayBeCached)
+                    TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry,
+                        inEntryKey, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -400,8 +434,9 @@ namespace DryIoc
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            if (factory.Caching != FactoryCaching.DoNotCache && noCache)
-                TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey, factoryDelegate);
+            if (factory.Caching != FactoryCaching.DoNotCache && mayBeCached)
+                TryCacheKeyedFactoryDelegateOrExpression(_registry.Value.KeyedFactoryDelegateCache, key, cacheEntry, inEntryKey,
+                    factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -419,35 +454,9 @@ namespace DryIoc
                 ? KV.Of(factory, cachedFactories)
                 : KV.Of(cacheEntry?.Key, cachedFactories.AddOrUpdate(inEntryKey, factory));
 
-            var cache = cacheRef.Value;
-            if (!cacheRef.TrySwapIfStillCurrent(cache, cache.AddOrUpdate(key, cacheEntry)))
+            var currentCache = cacheRef.Value;
+            if (!cacheRef.TrySwapIfStillCurrent(currentCache, currentCache.AddOrUpdate(key, cacheEntry)))
                 cacheRef.AddOrUpdate(key, cacheEntry);
-        }
-
-        private bool GetCachedOrCompileAndCacheFactoryDelegate(
-            Ref<ImHashMap<object, KV<object, ImHashMap<object, object>>>> cacheRef, object key, 
-            KV<object, ImHashMap<object, object>> cacheEntry, object inEntryKey, 
-            out FactoryDelegate factoryDelegate)
-        {
-            var cachedFactory = cacheEntry == null ? null :
-                inEntryKey == null ? cacheEntry.Key :
-                cacheEntry.Value != null ? cacheEntry.Value.GetValueOrDefault(inEntryKey) :
-                null;
-
-            if (cachedFactory != null)
-            {
-                factoryDelegate = cachedFactory as FactoryDelegate;
-                if (factoryDelegate == null)
-                {
-                    factoryDelegate = ((Expression)cachedFactory).CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
-                    TryCacheKeyedFactoryDelegateOrExpression(cacheRef, key, cacheEntry, inEntryKey, factoryDelegate);
-                }
-
-                return true;
-            }
-
-            factoryDelegate = null;
-            return false;
         }
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey,
@@ -2355,6 +2364,7 @@ namespace DryIoc
             }
         }
 
+        // todo: consider to reduce recursion the same way as in FEC `TryEmit`
         /// Interprets passed expression
         public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
         {
@@ -2365,6 +2375,13 @@ namespace DryIoc
                     {
                         var newExpr = (NewExpression)expr;
                         var newArgs = newExpr.Arguments.ToListOrSelf();
+
+                        // todo: handle simpler cases without additional calls
+                        //if (newArgs.Count < 2)
+                        //{
+                        //    ;
+                        //}
+
                         if (!TryInterpretMany(r, newArgs, useFec, out var args))
                             return false;
 
