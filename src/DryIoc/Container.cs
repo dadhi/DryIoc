@@ -330,7 +330,7 @@ namespace DryIoc
             {
                 key = GetKeyedDelegateCacheKey(serviceType, serviceKey, requiredServiceType, CurrentScope?.Name);
 
-                var cacheSlot = _registry.Value.KeyedFactoryDelegateCache.Value.GetValueOrDefault(key);
+                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(key);
                 if (cacheSlot != null)
                 {
                     if (cacheSlot.Value is FactoryDelegate cachedDelegate)
@@ -357,7 +357,7 @@ namespace DryIoc
                 mayBeCached && factory.Caching != FactoryCaching.DoNotCache)
             {
                 key = GetKeyedDelegateCacheKey(serviceType, request.ServiceKey, requiredServiceType, CurrentScope?.Name);
-                var cacheSlot = _registry.Value.KeyedFactoryDelegateCache.Value.GetValueOrDefault(key);
+                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(key);
                 if (cacheSlot != null)
                 {
                     if (cacheSlot.Value is FactoryDelegate cachedDelegate)
@@ -1714,22 +1714,25 @@ namespace DryIoc
                 public CacheSlot(object value) => Value = value;
             }
 
-            internal const int DEFAULT_CACHE_SLOT_COUNT = 16;
-            internal const int DEFAULT_CACHE_SLOT_COUNT_MASK = DEFAULT_CACHE_SLOT_COUNT - 1;
+            internal const int CACHE_SLOT_COUNT = 16;
+            internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
+
             public ImHashMap<Type, CacheSlot>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
             public CacheSlot GetCachedDefaultFactoryOrDefault(Type serviceType)
             {
-                if (DefaultFactoryCache == null)
+                // copy to local `cache` will prevent NRE if cache is set to null from outside
+                var cache = DefaultFactoryCache;
+                if (cache == null)
                     return null;
 
                 var hash = serviceType.GetHashCode();
-                var map = DefaultFactoryCache[hash & DEFAULT_CACHE_SLOT_COUNT_MASK];
+                var map = cache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
                     return null;
 
-                while (hash != map.Hash && map.Height != 0)
+                while (map.Height != 0 && hash != map.Hash)
                     map = hash < map.Hash ? map.Left : map.Right;
 
                 return ReferenceEquals(serviceType, map.Key) ? map.Value : map.GetConflictedValueOrDefault(serviceType, null);
@@ -1742,8 +1745,8 @@ namespace DryIoc
                     return;
 
                 if (DefaultFactoryCache == null)
-                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, CacheSlot>[DEFAULT_CACHE_SLOT_COUNT], null);
-                ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK];
+                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, CacheSlot>[CACHE_SLOT_COUNT], null);
+                ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
                     Interlocked.CompareExchange(ref map, ImHashMap<Type, CacheSlot>.Empty, null);
                 var current = map;
@@ -1752,19 +1755,27 @@ namespace DryIoc
                     Ref.Swap(ref map, serviceType, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
-            private ImHashMap<Type, CacheSlot>[] CloneDefaultFactoryCache()
+            // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
+            public ImHashMap<object, CacheSlot>[] KeyedFactoryCache;
+
+            [MethodImpl((MethodImplOptions)256)]
+            public CacheSlot GetCachedKeyedFactoryOrDefault(object key)
             {
-                if (DefaultFactoryCache == null)
+                // copy to local `cache` will prevent NRE if cache is set to null from outside
+                var cache = KeyedFactoryCache;
+                if (cache == null)
                     return null;
 
-                var clone = new ImHashMap<Type, CacheSlot>[DEFAULT_CACHE_SLOT_COUNT];
-                for (int i = 0; i < DEFAULT_CACHE_SLOT_COUNT; i++)
-                    clone[i] = DefaultFactoryCache[i];
-                return clone;
-            }
+                var hash = key.GetHashCode();
+                var map = cache[hash & CACHE_SLOT_COUNT_MASK];
+                if (map == null)
+                    return null;
 
-            // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
-            public readonly Ref<ImHashMap<object, CacheSlot>> KeyedFactoryDelegateCache;
+                while (map.Height != 0 && hash != map.Hash)
+                    map = hash < map.Hash ? map.Left : map.Right;
+
+                return key.Equals(map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, null);
+            }
 
             public void TryCacheKeyedFactory(object key, object factory)
             {
@@ -1772,10 +1783,17 @@ namespace DryIoc
                 if (Services.IsEmpty)
                     return;
 
-                var current = KeyedFactoryDelegateCache.Value;
+                if (KeyedFactoryCache == null)
+                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<object, CacheSlot>[CACHE_SLOT_COUNT], null);
+
+                ref var map = ref KeyedFactoryCache[key.GetHashCode() & CACHE_SLOT_COUNT_MASK];
+                if (map == null)
+                    Interlocked.CompareExchange(ref map, ImHashMap<object, CacheSlot>.Empty, null);
+
+                var current = map;
                 var cacheSlot = new CacheSlot(factory);
-                if (!KeyedFactoryDelegateCache.TrySwapIfStillCurrent(current, current.AddOrUpdate(key, cacheSlot)))
-                    KeyedFactoryDelegateCache.AddOrUpdate(key, cacheSlot);
+                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(key, cacheSlot), current) != current)
+                    Ref.Swap(ref map, key, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
@@ -1785,9 +1803,7 @@ namespace DryIoc
                 : this(ImHashMap<Type, object>.Empty,
                     ImHashMap<Type, Factory[]>.Empty,
                     wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
-                    null,
-                    Ref.Of(ImHashMap<object, CacheSlot>.Empty),
-                    IsChangePermitted.Permitted)
+                    null, null, IsChangePermitted.Permitted)
             { }
 
             private Registry(
@@ -1795,37 +1811,34 @@ namespace DryIoc
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
                 ImHashMap<Type, CacheSlot>[] defaultFactoryCache,
-                Ref<ImHashMap<object, CacheSlot>> keyedFactoryDelegateCache,
+                ImHashMap<object, CacheSlot>[] keyedFactoryCache,
                 IsChangePermitted isChangePermitted)
             {
                 Services = services;
                 Decorators = decorators;
                 Wrappers = wrappers;
                 DefaultFactoryCache = defaultFactoryCache;
-                KeyedFactoryDelegateCache = keyedFactoryDelegateCache;
+                KeyedFactoryCache = keyedFactoryCache;
                 _isChangePermitted = isChangePermitted;
             }
 
             public Registry WithoutCache() =>
-                new Registry(Services, Decorators, Wrappers, null, Ref.Of(ImHashMap<object, CacheSlot>.Empty), _isChangePermitted);
+                new Registry(Services, Decorators, Wrappers, null, null, _isChangePermitted);
 
             internal Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
-                    CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(),
+                    // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(),
                     _isChangePermitted);
 
             private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) =>
                 decorators == Decorators ? this :
-                new Registry(Services, decorators, Wrappers,
-                    CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(),
-                    _isChangePermitted);
+                new Registry(Services, decorators, Wrappers, DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
 
             private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) =>
                 wrappers == Wrappers ? this :
-                new Registry(Services, Decorators, wrappers,
-                    CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(),
-                    _isChangePermitted);
+                new Registry(Services, Decorators, wrappers, DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -2008,7 +2021,7 @@ namespace DryIoc
                 if (registry.Services != newServices)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
-                        CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
 
                     if (isUpdated)
                     {
@@ -2084,7 +2097,7 @@ namespace DryIoc
                 if (newServices != registry.Services)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
-                        CloneDefaultFactoryCache(), KeyedFactoryDelegateCache.NewRef(), _isChangePermitted);
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
 
                     if (isUpdated && ifAlreadyRegistered == IfAlreadyRegistered.Replace && 
                         updatedOldEntry is FactoriesEntry updatedOldFactories &&
@@ -2234,34 +2247,32 @@ namespace DryIoc
 
             internal void DropFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
             {
-                if (DefaultFactoryCache != null ||
-                    !KeyedFactoryDelegateCache.Value.IsEmpty)
+                if (DefaultFactoryCache != null || KeyedFactoryCache != null)
                 {
                     if (factory.FactoryGenerator == null)
-                        SetCachedFactoryValueToNull(serviceType, serviceKey);
+                    {
+                        var defaultFactoryCache = DefaultFactoryCache;
+                        if (defaultFactoryCache != null)
+                            Ref.Swap(ref defaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK],
+                                serviceType, (t, x) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
+
+                        // At the moment there is not possibility to clean-up a particular factory.
+                        // But considering that keyed services are much lees "likely" than the default ones - then  it is fine, right?
+                        KeyedFactoryCache = null;
+                    }
                     else
                     {
                         // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
                         // a safe alternative is dropping the whole cache
                         DefaultFactoryCache = null;
-                        KeyedFactoryDelegateCache.Swap(_ => ImHashMap<object, CacheSlot>.Empty);
+                        KeyedFactoryCache = null;
                     }
                 }
             }
 
-            private void SetCachedFactoryValueToNull(Type serviceType, object serviceKey)
-            {
-                if (DefaultFactoryCache != null)
-                    Ref.Swap(ref DefaultFactoryCache[serviceType.GetHashCode() & DEFAULT_CACHE_SLOT_COUNT_MASK],
-                        serviceType, (t, x) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
-
-                KeyedFactoryDelegateCache.Swap(x => x
-                    .Update(serviceKey == null ? (object)serviceType : KV.Of(serviceType, serviceKey), null));
-            }
-
             public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow) =>
                 new Registry(Services, Decorators, Wrappers,
-                    DefaultFactoryCache, KeyedFactoryDelegateCache,
+                    DefaultFactoryCache, KeyedFactoryCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
         }
 

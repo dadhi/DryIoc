@@ -102,6 +102,18 @@ namespace ImTools
             return source.ToList();
         }
 
+        /// Array copy
+        public static T[] Copy<T>(this T[] items)
+        {
+            if (items == null)
+                return null;
+
+            var clone = new T[items.Length];
+            for (var i = 0; i < clone.Length; i++)
+                clone[i] = items[i];
+            return clone;
+        }
+
         /// <summary>Returns new array consisting from all items from source array then all items from added array.
         /// If source is null or empty, then added array will be returned.
         /// If added is null or empty, then source will be returned.</summary>
