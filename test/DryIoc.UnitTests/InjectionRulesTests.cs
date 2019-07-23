@@ -266,7 +266,7 @@ namespace DryIoc.UnitTests
             container.Register<MyService>();
             container.Register<ConnectionStringProvider>(Reuse.Singleton);
             container.Register<IConnectionStringProvider, ConnectionNamingConnectionStringProvider>(
-                Made.Of(() => new ConnectionNamingConnectionStringProvider(default(ConnectionStringProvider), Arg.Of<string>("targetName"))));
+                Made.Of(() => new ConnectionNamingConnectionStringProvider(default, Arg.Of<string>("targetName"))));
 
             container.Register<string>(serviceKey: "targetName",
                 made: Made.Of(r => GetType().SingleMethod("GetTargetName").MakeGenericMethod(r.Parent.Parent.ImplementationType)));

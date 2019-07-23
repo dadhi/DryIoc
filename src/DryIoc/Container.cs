@@ -896,6 +896,14 @@ namespace DryIoc
             return clearedServices || clearedWrapper || clearedDecorator;
         }
 
+        [MethodImpl((MethodImplOptions)256)]
+        internal Expression GetCachedFactoryExpression(int factoryId, Request request, out Registry.ExpressionCacheSlot slot) => 
+            _registry.Value.GetCachedFactoryExpression(factoryId, request, out slot);
+
+        [MethodImpl((MethodImplOptions) 256)]
+        internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, Registry.ExpressionCacheSlot slot) =>
+            _registry.Value.CacheFactoryExpression(factoryId, request, expr, slot);
+
         Factory IContainer.ResolveFactory(Request request)
         {
             var factory = ((IContainer)this).GetServiceFactoryOrDefault(request);
@@ -1796,14 +1804,120 @@ namespace DryIoc
                     Ref.Swap(ref map, key, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
+            internal sealed class ExpressionCacheSlot
+            {
+                public Expression Transient;
+                public Expression Scoped;
+                public KeyValuePair<object, Expression>[] ScopedToName;
+            }
+
+            /// The int key is the `FactoryID`
+            public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
+
+            [MethodImpl((MethodImplOptions)256)]
+            public Expression GetCachedFactoryExpression(
+                int factoryId, Request request, out Registry.ExpressionCacheSlot slot)
+            {
+                slot = null;
+
+                // copy to local `cache` will prevent NRE if cache is set to null from outside
+                var cache = FactoryExpressionCache;
+                if (cache == null)
+                    return null;
+
+                var map = cache[factoryId & CACHE_SLOT_COUNT_MASK];
+                if (map == null)
+                    return null;
+
+                while (map.Height != 0 && factoryId != map.Key)
+                    map = factoryId < map.Key ? map.Left : map.Right;
+
+                slot = map.Value;
+                if (slot != null)
+                {
+                    var reuse = request.Reuse;
+                    if (reuse == Reuse.Transient)
+                        return slot.Transient;
+
+                    if (reuse is CurrentScopeReuse scoped)
+                    {
+                        if (scoped.Name == null)
+                            return slot.Scoped;
+
+                        var named = slot.ScopedToName;
+                        if (named != null)
+                            for (var i = 0; i < named.Length; i++)
+                                if (Equals(named[i].Key, scoped.Name))
+                                    return named[i].Value;
+                    }
+                }
+
+                return null;
+            }
+
+            [MethodImpl((MethodImplOptions) 256)]
+            internal void CacheFactoryExpression(int factoryId, Request request, Expression expr,
+                ExpressionCacheSlot slot = null)
+            {
+                if (slot == null)
+                {
+                    if (FactoryExpressionCache == null)
+                        Interlocked.CompareExchange(ref FactoryExpressionCache,
+                            new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], null);
+
+                    ref var map = ref FactoryExpressionCache[factoryId & CACHE_SLOT_COUNT_MASK];
+                    if (map == null)
+                        Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
+
+                    // double check that other thread created the slot in between
+                    slot = map.GetValueOrDefault(factoryId) ?? new ExpressionCacheSlot();
+
+                    var current = map;
+                    if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(factoryId, slot), current) != current)
+                        Ref.Swap(ref map, factoryId, slot, (type, e, x) => x.AddOrUpdate(type, e));
+                }
+
+                var reuse = request.Reuse;
+                if (reuse == Reuse.Transient)
+                {
+                    slot.Transient = expr;
+                }
+                else if (reuse is CurrentScopeReuse scoped)
+                {
+                    if (scoped.Name == null)
+                        slot.Scoped = expr;
+                    else
+                    {
+                        var named = slot.ScopedToName;
+                        if (named == null)
+                        {
+                            slot.ScopedToName = new[] {scoped.Name.Pair(expr)};
+                        }
+                        else
+                        {
+                            var i = named.Length - 1;
+                            for (; i >= 0; i--)
+                                if (Equals(named[i].Key, scoped.Name))
+                                    break;
+                            if (i == -1)
+                            {
+                                var newNamed = new KeyValuePair<object, Expression>[named.Length + 1];
+                                Array.Copy(named, 0, newNamed, 0, named.Length);
+                                newNamed[named.Length] = scoped.Name.Pair(expr);
+                                slot.ScopedToName = newNamed;
+                            }
+                        }
+                    }
+                }
+            }
+
             private enum IsChangePermitted { Permitted, Error, Ignored }
             private readonly IsChangePermitted _isChangePermitted;
 
             private Registry(ImHashMap<Type, Factory> wrapperFactories = null)
-                : this(ImHashMap<Type, object>.Empty,
-                    ImHashMap<Type, Factory[]>.Empty,
-                    wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
-                    null, null, IsChangePermitted.Permitted)
+                : this(ImHashMap<Type, object>.Empty, ImHashMap<Type, Factory[]>.Empty, wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
+                    null, null, null, // caches
+                    IsChangePermitted.Permitted)
             { }
 
             private Registry(
@@ -1812,6 +1926,7 @@ namespace DryIoc
                 ImHashMap<Type, Factory> wrappers,
                 ImHashMap<Type, CacheSlot>[] defaultFactoryCache,
                 ImHashMap<object, CacheSlot>[] keyedFactoryCache,
+                ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
                 Services = services;
@@ -1819,40 +1934,41 @@ namespace DryIoc
                 Wrappers = wrappers;
                 DefaultFactoryCache = defaultFactoryCache;
                 KeyedFactoryCache = keyedFactoryCache;
+                FactoryExpressionCache = factoryExpressionCache;
                 _isChangePermitted = isChangePermitted;
             }
 
             public Registry WithoutCache() =>
-                new Registry(Services, Decorators, Wrappers, null, null, _isChangePermitted);
+                new Registry(Services, Decorators, Wrappers, null, null, null, _isChangePermitted);
 
             internal Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(),
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
                     _isChangePermitted);
 
             private Registry WithDecorators(ImHashMap<Type, Factory[]> decorators) =>
                 decorators == Decorators ? this :
-                new Registry(Services, decorators, Wrappers, DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
+                new Registry(Services, decorators, Wrappers, 
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
 
             private Registry WithWrappers(ImHashMap<Type, Factory> wrappers) =>
                 wrappers == Wrappers ? this :
-                new Registry(Services, Decorators, wrappers, DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
+                new Registry(Services, Decorators, wrappers, 
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
                 foreach (var entry in Services.Enumerate())
                 {
-                    var serviceType = entry.Key;
-                    var factory = entry.Value as Factory;
-                    if (factory != null)
-                        yield return new ServiceRegistrationInfo(factory, serviceType, null);
+                    if (entry.Value is Factory factory)
+                        yield return new ServiceRegistrationInfo(factory, entry.Key, null);
                     else
                     {
                         var factories = ((FactoriesEntry)entry.Value).Factories;
                         foreach (var f in factories.Enumerate())
-                            yield return new ServiceRegistrationInfo(f.Value, serviceType, f.Key);
+                            yield return new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
                     }
                 }
             }
@@ -2021,7 +2137,7 @@ namespace DryIoc
                 if (registry.Services != newServices)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
 
                     if (isUpdated)
                     {
@@ -2097,7 +2213,8 @@ namespace DryIoc
                 if (newServices != registry.Services)
                 {
                     registry = new Registry(newServices, Decorators, Wrappers,
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), _isChangePermitted);
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), 
+                        _isChangePermitted);
 
                     if (isUpdated && ifAlreadyRegistered == IfAlreadyRegistered.Replace && 
                         updatedOldEntry is FactoriesEntry updatedOldFactories &&
@@ -2256,7 +2373,7 @@ namespace DryIoc
                             Ref.Swap(ref defaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK],
                                 serviceType, (t, x) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
 
-                        // At the moment there is not possibility to clean-up a particular factory.
+                        // todo: At the moment there is not possibility to clean-up a particular factory.
                         // But considering that keyed services are much lees "likely" than the default ones - then  it is fine, right?
                         KeyedFactoryCache = null;
                     }
@@ -2268,11 +2385,19 @@ namespace DryIoc
                         KeyedFactoryCache = null;
                     }
                 }
+
+                if (FactoryExpressionCache != null)
+                {
+                    var cache = FactoryExpressionCache;
+                    if (cache != null)
+                        Ref.Swap(ref cache[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
+                            factory.FactoryID, (fid, x) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, null));
+                }
             }
 
             public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow) =>
                 new Registry(Services, Decorators, Wrappers,
-                    DefaultFactoryCache, KeyedFactoryCache,
+                    DefaultFactoryCache, KeyedFactoryCache, FactoryExpressionCache,
                     ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
         }
 
@@ -4872,6 +4997,8 @@ namespace DryIoc
         }
     }
 
+
+
     /// <summary>Rules how to: <list type="bullet">
     /// <item>Select constructor for creating service with <see cref="FactoryMethod"/>.</item>
     /// <item>Specify how to resolve constructor parameters with <see cref="Parameters"/>.</item>
@@ -4885,12 +5012,29 @@ namespace DryIoc
         /// <summary>Return type of strongly-typed factory method expression.</summary>
         public Type FactoryMethodKnownResultType { get; private set; }
 
-        /// <summary>True is made has properties or parameters with custom value.
-        /// That's mean the whole made become context based which affects caching</summary>
-        public bool HasCustomDependencyValue { get; private set; } // todo: unused, review what was the need for it
+        [Flags]
+        private enum MadeDetails
+        {
+            NoConditionals = 0,
+            ImplTypeDependsOnRequest = 1 << 1,
+            ImplMemberDependsOnRequest = 1 << 3,
+            HasCustomDependencyValue = 1 << 4
+        }
+
+        private readonly MadeDetails _details;
+
+        /// Has any conditional flags
+        public bool IsConditional => _details != MadeDetails.NoConditionals; 
+
+        /// True is made has properties or parameters with custom value.
+        /// That's mean the whole made become context based which affects caching.
+        public bool HasCustomDependencyValue => (_details & MadeDetails.HasCustomDependencyValue) != 0;
 
         /// <summary>Indicates that the implementation type depends on request.</summary>
-        public readonly bool IsConditionalImplementation;
+        public bool IsConditionalImplementation => (_details & MadeDetails.ImplTypeDependsOnRequest) != 0;
+
+        /// Indicates that the member depends on request
+        public bool IsImplMemberDependsOnRequest => (_details & MadeDetails.ImplMemberDependsOnRequest) != 0;
 
         /// <summary>Specifies how constructor parameters should be resolved:
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
@@ -4946,9 +5090,10 @@ namespace DryIoc
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            bool isConditionalImlementation = false) =>
+            bool isConditionalImlementation = false, bool isImplMemberDependsOnRequest = false) =>
             factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation ? Default :
-            new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
+            new Made(factoryMethod, parameters, propertiesAndFields,
+                isConditionalImlementation: isConditionalImlementation, isImplMemberDependsOnRequest: isImplMemberDependsOnRequest);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
@@ -4977,19 +5122,21 @@ namespace DryIoc
         /// Where <paramref name="getMethodOrMember"/> is method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields);
+            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields,
+                isImplMemberDependsOnRequest: true);
 
         /// <summary>Creates factory specification with implementation type, conditionally depending on request.</summary>
         public static Made Of(Func<Request, Type> getImplType,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()), parameters, propertiesAndFields,
-            isConditionalImlementation: true);
+                isConditionalImlementation: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), parameters, propertiesAndFields);
+            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), parameters, propertiesAndFields,
+                isImplMemberDependsOnRequest: true);
 
         /// <summary>Defines how to select constructor from implementation type.
         /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
@@ -4997,7 +5144,7 @@ namespace DryIoc
         public static Made Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null) =>
             Of(r => DryIoc.FactoryMethod.Of(
-                getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
+                    getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
                 parameters, propertiesAndFields);
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
@@ -5123,14 +5270,22 @@ namespace DryIoc
 #region Implementation
 
         private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false)
+            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false, 
+            bool isImplMemberDependsOnRequest = false)
         {
             FactoryMethod = factoryMethod;
             Parameters = parameters;
             PropertiesAndFields = propertiesAndFields;
             FactoryMethodKnownResultType = factoryMethodKnownResultType;
-            HasCustomDependencyValue = hasCustomValue;
-            IsConditionalImplementation = isConditionalImlementation;
+
+            var details = default(MadeDetails);
+            if (hasCustomValue)
+                details |= MadeDetails.HasCustomDependencyValue;
+            if (isConditionalImlementation)
+                details |= MadeDetails.ImplTypeDependsOnRequest;
+            if (isImplMemberDependsOnRequest)
+                details |= MadeDetails.ImplMemberDependsOnRequest;
+            _details = details;
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
@@ -6792,8 +6947,6 @@ namespace DryIoc
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
 
-#region State carried with each request
-
         /// <summary>Available in runtime only, provides access to container initiated request.</summary>
         public readonly IContainer Container;
 
@@ -6834,11 +6987,6 @@ namespace DryIoc
 
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
         public readonly int DependencyDepth;
-
-        /// Holds the resolved expressions
-        internal ImMap<Expression> ExprCache;
-
-#endregion
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -7243,7 +7391,9 @@ namespace DryIoc
                 return s.Append("<empty request>");
 
             if (IsNestedResolutionCall)
-                s.Append("asResolutionCall ");
+                s.Append("Resolution call dependency ");
+            else if (IsResolutionRoot)
+                s.Append("Resolution root ");
 
             if (FactoryID != 0) // request is with resolved factory
             {
@@ -7260,7 +7410,7 @@ namespace DryIoc
 
             s.Append(_serviceInfo);
 
-            if (Factory != null && !(Factory is ReflectionFactory))
+            if (Factory != null && Factory is ReflectionFactory == false)
                 s.Append(' ').Append(Factory.GetType().Name).Append(' ');
 
             if (FactoryID != 0)
@@ -7298,15 +7448,6 @@ namespace DryIoc
                 s.AppendLine().Append("  from ").Append(Container);
 
             return s;
-        }
-
-        /// <summary>Built expressions stored in resolution root (call).</summary>
-        internal Request GetParentWithExprCache()
-        {
-            var req = this;
-            while (!req.IsEmpty && req.ExprCache == null)
-                req = req.DirectParent;
-            return req;
         }
 
         /// <summary>Prints whole request chain.</summary>
@@ -7384,11 +7525,6 @@ namespace DryIoc
              
             // runtime state
             Factory = factory;
-
-            // if for service that is resolution root or service starting from the func, create a cache there
-            if (factoryType == FactoryType.Service && 
-                (Flags & (RequestFlags.IsResolutionCall | RequestFlags.IsDirectlyWrappedInFunc)) != 0)
-                ExprCache = ImMap<Expression>.Empty;
         }
     }
 
@@ -7943,16 +8079,22 @@ namespace DryIoc
                     return Constant(singleton, request.ServiceType);
             }
 
-            Request reqParentWithExprCache = null;
-            if (Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service)
+            var mayCache = Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service &&
+                !request.IsSingletonOrDependencyOfSingleton && // it will be evaluated to constant anyway
+                !request.IsDirectlyWrappedInFunc() && 
+                !request.IsWrappedInFuncWithArgs() &&
+                !setup.UseParentReuse &&
+                !Made.IsConditional;
+
+            Container.Registry.ExpressionCacheSlot cacheSlot = null;
+            if (mayCache)
             {
-                reqParentWithExprCache = request.GetParentWithExprCache();
-                var cachedExpr = reqParentWithExprCache.ExprCache?.GetValueOrDefault(FactoryID);
+                var cachedExpr = ((Container)request.Container).GetCachedFactoryExpression(FactoryID, request, out cacheSlot);
                 if (cachedExpr != null)
                     return cachedExpr;
             }
 
-            // Then create new expression
+            // Then create a new expression
             var serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr != null)
             {
@@ -7967,8 +8109,8 @@ namespace DryIoc
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
 
-                if (reqParentWithExprCache?.ExprCache != null)
-                    reqParentWithExprCache.ExprCache = reqParentWithExprCache.ExprCache.AddOrUpdate(FactoryID, serviceExpr);
+                if (mayCache)
+                    ((Container)request.Container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheSlot);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -10790,12 +10932,12 @@ namespace DryIoc
         /// <returns>True if target service was found, false - otherwise.</returns>
         bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey);
 
-        /// <summary>Puts and instance into the current scope or singletons.</summary>
-        new void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey);
-
         /// Puts instance created via the passed factory on demand into the current or singleton scope
         new void Use(Type serviceType, FactoryDelegate factory);
+
+        /// [Obsolete("Replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")]
+        new void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
+            bool preventDisposal, bool weaklyReferenced, object serviceKey);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
