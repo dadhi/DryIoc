@@ -999,6 +999,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 |                                           BmarkGrace | 17,375.4 us | 329.5635 us | 308.2739 us | 143.57 |    2.96 | 156.2500 | 62.5000 |     - | 739.99 KB |
 |                                       BmarkGraceMsDi | 19,487.7 us | 112.4615 us | 105.1965 us | 161.02 |    1.56 | 187.5000 | 93.7500 |     - | 909.83 KB |
 
+            ### Per-container expression cache
+
+|                                               Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
+|                    BmarkMicrosoftDependencyInjection |    138.6 us |   2.9064 us |   6.7935 us |   1.00 |    0.00 |  18.6768 |  0.1221 |     - |  80.63 KB |
+|                                          BmarkDryIoc |    114.5 us |   0.6205 us |   0.5501 us |   0.86 |    0.05 |  22.2168 |  0.1221 |     - | 102.76 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    110.8 us |   0.8611 us |   0.8054 us |   0.83 |    0.05 |  21.3623 |  0.2441 |     - |  98.88 KB |
+|                                      BmarkDryIocMsDi |    126.0 us |   2.1756 us |   2.0351 us |   0.94 |    0.06 |  24.1699 |  0.1221 |     - | 111.45 KB |
+|                                           BmarkGrace | 18,877.0 us | 110.1994 us | 103.0806 us | 141.23 |    8.26 | 156.2500 | 62.5000 |     - | 739.94 KB |
+|                                       BmarkGraceMsDi | 21,916.3 us | 264.2463 us | 247.1762 us | 164.04 |   10.81 | 187.5000 | 93.7500 |     - | 909.85 KB |
             */
 
             [Benchmark(Baseline = true)]
