@@ -262,8 +262,9 @@ namespace DryIoc
 
             // Delegate to full blown Resolve aware of service key, open scope, etc.
             var serviceKey = request.ServiceKey;
-            if (serviceKey != null || CurrentScope?.Name != null)
-                return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, null, Request.Empty, null);
+            var scopeName = CurrentScope?.Name;
+            if (serviceKey != null || scopeName != null)
+                return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, scopeName, null, Request.Empty, null);
 
             if (factory == null)
                 return null;
@@ -314,24 +315,24 @@ namespace DryIoc
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
             // fallback to simple Resolve and its default cache if no keys are passed
-            if (serviceKey == null && requiredServiceType == null && CurrentScope?.Name == null &&
+            var scopeName = CurrentScope?.Name;
+            if (serviceKey == null && requiredServiceType == null && scopeName == null &&
                 (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty())
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
 
-            return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent ?? Request.Empty, args);
+            return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, 
+                scopeName, requiredServiceType, preResolveParent ?? Request.Empty, args);
         }
 
         private object ResolveAndCacheKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            Type requiredServiceType, Request preResolveParent, object[] args)
+            object scopeName, Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            object key = null;
-            var mayBeCached = requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty();
-            var scopeName = CurrentScope?.Name;
-            if (mayBeCached)
+            object cacheKey = null;
+            if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
-                key = GetKeyedDelegateCacheKey(serviceType, serviceKey, scopeName);
+                cacheKey = GetKeyedDelegateCacheKey(serviceType, serviceKey, scopeName);
 
-                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(key);
+                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(cacheKey);
                 if (cacheSlot != null)
                 {
                     if (cacheSlot.Value is FactoryDelegate cachedDelegate)
@@ -352,13 +353,17 @@ namespace DryIoc
             var request = Request.Create(this, 
                 serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, inputArgs: args);
             var factory = ((IContainer)this).ResolveFactory(request);
-             
-            // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
-            if (mayBeCached && serviceKey == null && request.ServiceKey != null &&
-                factory.Caching != FactoryCaching.DoNotCache)
+
+            // Prevents caching if factory says Don't
+            if (factory.Caching == FactoryCaching.DoNotCache)
+                cacheKey = null;
+
+            if (cacheKey != null &&
+                // Request service key may be changed when resolving the factory, so we need to look into cache again for the new key
+                serviceKey == null && request.ServiceKey != null)
             {
-                key = GetKeyedDelegateCacheKey(serviceType, request.ServiceKey, scopeName);
-                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(key);
+                cacheKey = GetKeyedDelegateCacheKey(serviceType, request.ServiceKey, scopeName);
+                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(cacheKey);
                 if (cacheSlot != null)
                 {
                     if (cacheSlot.Value is FactoryDelegate cachedDelegate)
@@ -386,15 +391,15 @@ namespace DryIoc
                 if (expr is ConstantExpression ce)
                 {
                     var value = ce.Value;
-                    if (mayBeCached && factory.Caching != FactoryCaching.DoNotCache)
-                        _registry.Value.TryCacheKeyedFactory(key, (FactoryDelegate)value.ToFactoryDelegate);
+                    if (cacheKey != null)
+                        _registry.Value.TryCacheKeyedFactory(cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
-                if (mayBeCached && factory.Caching != FactoryCaching.DoNotCache)
-                    _registry.Value.TryCacheKeyedFactory(key, expr);
+                if (cacheKey != null)
+                    _registry.Value.TryCacheKeyedFactory(cacheKey, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -414,8 +419,8 @@ namespace DryIoc
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            if (mayBeCached && factory.Caching != FactoryCaching.DoNotCache)
-                _registry.Value.TryCacheKeyedFactory(key, factoryDelegate);
+            if (cacheKey != null)
+                _registry.Value.TryCacheKeyedFactory(cacheKey, factoryDelegate);
 
             return factoryDelegate(this);
         }
