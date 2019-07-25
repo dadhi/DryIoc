@@ -330,7 +330,9 @@ namespace DryIoc
             object cacheKey = null;
             if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
-                cacheKey = GetKeyedDelegateCacheKey(serviceType, serviceKey, scopeName);
+                cacheKey = scopeName == null 
+                    ? KV.Of(serviceType, serviceKey) 
+                    : KV.Of(serviceType, serviceKey == null ? scopeName : KV.Of(scopeName, serviceKey));
 
                 var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(cacheKey);
                 if (cacheSlot != null)
@@ -351,18 +353,23 @@ namespace DryIoc
             ThrowIfContainerDisposed();
 
             var request = Request.Create(this, 
-                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, inputArgs: args);
+                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, default, args);
             var factory = ((IContainer)this).ResolveFactory(request);
+            if (factory == null)
+                return null;
 
             // Prevents caching if factory says Don't
             if (factory.Caching == FactoryCaching.DoNotCache)
                 cacheKey = null;
 
-            if (cacheKey != null &&
-                // Request service key may be changed when resolving the factory, so we need to look into cache again for the new key
-                serviceKey == null && request.ServiceKey != null)
+            // Request service key may be changed when resolving the factory,
+            // so we need to look into Default cache again for the new key
+            if (cacheKey != null && serviceKey == null && request.ServiceKey != null)
             {
-                cacheKey = GetKeyedDelegateCacheKey(serviceType, request.ServiceKey, scopeName);
+                cacheKey = scopeName == null
+                    ? (object)KV.Of(serviceType, request.ServiceKey)
+                    : KV.Of(serviceType, KV.Of(scopeName, request.ServiceKey));
+
                 var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(cacheKey);
                 if (cacheSlot != null)
                 {
@@ -377,9 +384,6 @@ namespace DryIoc
                     }
                 }
             }
-
-            if (factory == null)
-                return null;
 
             FactoryDelegate factoryDelegate;
             if (factory.UseInterpretation(request))
@@ -423,19 +427,6 @@ namespace DryIoc
                 _registry.Value.TryCacheKeyedFactory(cacheKey, factoryDelegate);
 
             return factoryDelegate(this);
-        }
-
-        private static object GetKeyedDelegateCacheKey(Type serviceType, object serviceKey, object scopeName)
-        {
-            if (scopeName != null)
-            {
-                if (serviceKey == null)
-                    return KV.Of(serviceType, scopeName);
-
-                return KV.Of(serviceType, KV.Of(scopeName, serviceKey));
-            }
-
-            return KV.Of(serviceType, serviceKey);
         }
 
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey,
@@ -8129,9 +8120,12 @@ namespace DryIoc
                         (r, e, u) => (object)new HiddenDisposable(
                         Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
                             ? instance : e.CompileToFactoryDelegate(u)(r))) :
-                        (r, e, u) => 
-                        Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                            ? instance : e.CompileToFactoryDelegate(u)(r);
+                        (r, e, u) =>
+                        {
+                            if (Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance))
+                                return instance;
+                            return e.CompileToFactoryDelegate(u)(r);
+                        };
 
                 var container = request.Container;
                 var singleton = container.SingletonScope.TryGetOrAddWithoutClosure(FactoryID, 
