@@ -325,10 +325,11 @@ namespace DryIoc
             Type requiredServiceType, Request preResolveParent, object[] args)
         {
             object key = null;
-            var mayBeCached = args.IsNullOrEmpty() && preResolveParent.IsEmpty;
+            var mayBeCached = requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty();
+            var scopeName = CurrentScope?.Name;
             if (mayBeCached)
             {
-                key = GetKeyedDelegateCacheKey(serviceType, serviceKey, requiredServiceType, CurrentScope?.Name);
+                key = GetKeyedDelegateCacheKey(serviceType, serviceKey, scopeName);
 
                 var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(key);
                 if (cacheSlot != null)
@@ -351,12 +352,12 @@ namespace DryIoc
             var request = Request.Create(this, 
                 serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, inputArgs: args);
             var factory = ((IContainer)this).ResolveFactory(request);
-
+             
             // Request service key may be changed when resolving the factory, so we need to look into cache again for new key
-            if (serviceKey == null && request.ServiceKey != null &&
-                mayBeCached && factory.Caching != FactoryCaching.DoNotCache)
+            if (mayBeCached && serviceKey == null && request.ServiceKey != null &&
+                factory.Caching != FactoryCaching.DoNotCache)
             {
-                key = GetKeyedDelegateCacheKey(serviceType, request.ServiceKey, requiredServiceType, CurrentScope?.Name);
+                key = GetKeyedDelegateCacheKey(serviceType, request.ServiceKey, scopeName);
                 var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(key);
                 if (cacheSlot != null)
                 {
@@ -419,31 +420,16 @@ namespace DryIoc
             return factoryDelegate(this);
         }
 
-        private static object GetKeyedDelegateCacheKey(Type serviceType, object serviceKey, Type requiredServiceType, object scopeName)
+        private static object GetKeyedDelegateCacheKey(Type serviceType, object serviceKey, object scopeName)
         {
             if (scopeName != null)
             {
-                if (serviceKey == null && requiredServiceType == null)
+                if (serviceKey == null)
                     return KV.Of(serviceType, scopeName);
 
-                if (requiredServiceType == null)
-                    return KV.Of(serviceType, KV.Of(scopeName, serviceKey));
-
-                if (serviceKey == null)
-                    return KV.Of(serviceType, KV.Of(requiredServiceType, scopeName));
-
-                return KV.Of(serviceType, KV.Of(requiredServiceType, KV.Of(scopeName, serviceKey)));
+                return KV.Of(serviceType, KV.Of(scopeName, serviceKey));
             }
 
-            if (requiredServiceType != null) // scopeName is always null
-            {
-                if (serviceKey == null)
-                    return KV.Of(serviceType, requiredServiceType);
-
-                return KV.Of(serviceType, KV.Of(requiredServiceType, serviceKey));
-            }
-
-            // scopeName, requiredServiceType are always null
             return KV.Of(serviceType, serviceKey);
         }
 
@@ -2807,14 +2793,14 @@ namespace DryIoc
             if (scope.TryGet(out result, id))
                 return true;
 
-            var createExpr = ((LambdaExpression)args[4]).Body;
-            var disposalIndex = (int)ConstValue(args[5]);
-
-            result = CurrentScopeReuse.GetNameScoped(resolverContext, scopeName, throwIfNoScope, id, 
-                () => TryInterpretAndUnwrapContainerException(resolverContext, createExpr, useFec, out var value) 
-                    ? value
-                    : createExpr.CompileToFactoryDelegate(useFec)(resolverContext), 
-                disposalIndex);
+            result = scope.TryGetOrAddWithoutClosure(id, resolverContext, ((LambdaExpression)args[4]).Body, useFec,
+                (rc, e, uf) =>
+                {
+                    if (TryInterpretAndUnwrapContainerException(rc, e, uf, out var value))
+                        return value;
+                    return e.CompileToFactoryDelegate(uf)(rc);
+                },
+                (int)ConstValue(args[5]));
 
             return true;
         }

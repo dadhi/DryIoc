@@ -24,8 +24,8 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
-            //Registrations.RegisterTypes(container, true);
+            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
@@ -40,9 +40,8 @@ namespace LoadTest
              */
             // WORKS:
             //Release mode - CPU: Core i7 8750H(12 threads), RAM: 16Gb
-            //    -- Starting Load test--
             //    -- Load Test Result--
-            //00:04:42.45
+            //  00:04:42.45
 
             //var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
             //Registrations.RegisterTypes(container, false);
@@ -50,12 +49,14 @@ namespace LoadTest
 
             // This setup config WORKS, but uses a lot of memory
             //Release mode - CPU: Core i7 8750H(12 threads), RAM: 16Gb
-            //  --Starting Load test --
             //  --Load Test Result --
             //  00:01:27.69
 
-            var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
-            Registrations.RegisterTypes(container, true);
+            // After centralized cache and fan-keyed resolution cache
+            //  00:02:54.82
+
+            //var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            //Registrations.RegisterTypes(container, true);
 
             // Validate IoC registrations
             var results = container.Validate();
