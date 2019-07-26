@@ -44,11 +44,7 @@ namespace LoadTest
 
         public static void StartTest(Type[] controllerTypes, IContainer container)
         {
-            Console.WriteLine("-- Starting Load test --");
-
-            var threadCount = 32;
-            var iterations = 100;
-            var i = 0;
+            Console.WriteLine("-- Run Stack overflow test --");
 
             var controllers = controllerTypes;
 
@@ -57,14 +53,7 @@ namespace LoadTest
                 scope.Resolve(controllers[148]);
             }
 
-            var stopWatch = new Stopwatch();
-            stopWatch.Start();
-
-            stopWatch.Stop();
-            // Get the elapsed time as a TimeSpan value.
-            var ts = stopWatch.Elapsed;
-            Console.WriteLine("-- Load Test Result --");
-            Console.WriteLine($"{ts.Hours:00}:{ts.Minutes:00}:{ts.Seconds:00}.{ts.Milliseconds / 10:00}");
+            Console.WriteLine("-- Finished --");
         }
     }
 }
