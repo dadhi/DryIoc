@@ -1067,7 +1067,9 @@ namespace FastExpressionCompiler.LightExpression
             public static readonly MethodInfo[] Methods = _methods.AsArray();
 
             public static Func<R> Curry<C, R>(Func<C, R> f, C c) => () => f(c);
+
             public static Func<T1, R> Curry<C, T1, R>(Func<C, T1, R> f, C c) => t1 => f(c, t1);
+
             public static Func<T1, T2, R> Curry<C, T1, T2, R>(Func<C, T1, T2, R> f, C c) => (t1, t2) => f(c, t1, t2);
 
             public static Func<T1, T2, T3, R> Curry<C, T1, T2, T3, R>(Func<C, T1, T2, T3, R> f, C c) =>
