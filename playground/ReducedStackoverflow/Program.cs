@@ -8,6 +8,7 @@ using System.Web.Http.Controllers;
 using DryIoc;
 using DryIoc.WebApi;
 using Logic;
+using Web.Rest.API;
 
 namespace LoadTest
 {
@@ -29,28 +30,11 @@ namespace LoadTest
 
             Registrations.RegisterTypes(container, true);
 
-            var httpControllerType = typeof(IHttpController);
-
-            // Get Controllers which would normally be used for routing web requests
-            var controllers = Assembly.GetExecutingAssembly().GetLoadedTypes()
-                .Where((t) =>
-                    !t.IsAbstract && !t.IsInterface && !t.Name.Contains("Base") &&
-                    httpControllerType.IsAssignableFrom(t))
-                .ToArray();
-
-
-            StartTest(controllers, container);
-        }
-
-        public static void StartTest(Type[] controllerTypes, IContainer container)
-        {
             Console.WriteLine("-- Run Stack overflow test --");
-
-            var controllers = controllerTypes;
 
             using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                scope.Resolve(controllers[148]);
+                scope.Resolve(typeof(EmailController));
             }
 
             Console.WriteLine("-- Finished --");

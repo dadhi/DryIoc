@@ -340,36 +340,13 @@ namespace Logic
         : IPdfCreationHandlerService
     {
         public PdfCreationHandlerService(
-            //IContextService<IPsaContext> arg0,
             IInvoiceFileService arg1,
             IPdfDocumentService arg2,
-            //IInvoiceDefinition arg3,
-            //IInvoiceBreakdownDefinition arg4,
             IPdfProposalDocumentService arg5,
-            //IProposalDefinition arg6,
-            //IInvoiceService arg7,
             IOfferService arg8,
-            //ITravelReimbursementService arg9,
-            //ITravelReimbursementDefinition arg10,
             IPdfTravelReimbursementDocumentService arg11
-            //ITravelReimbursementBreakdownDefinition arg12
-            //IUserRepository arg13
         )
         {
-            //field0 = arg0;
-            //field1 = arg1;
-            //field2 = arg2;
-            //field3 = arg3;
-            //field4 = arg4;
-            //field5 = arg5;
-            //field6 = arg6;
-            //field7 = arg7;
-            //field8 = arg8;
-            //field9 = arg9;
-            //field10 = arg10;
-            //field11 = arg11;
-            //field12 = arg12;
-            //field13 = arg13;
         }
 
         public readonly IContextService<IPsaContext> field0;

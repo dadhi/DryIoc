@@ -443,37 +443,10 @@ namespace LoadTest
             private static void RegisterShopObjects(IContainer container, bool singletonDecorators)
             {
                 ShopIocModule.Load<DoNothingBilledPaymentPdfBuilder>(container, singletonDecorators);
-                //container.Register<IShopUserService, Shared.PsaShopUserService>(reuse: Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             }
 
             private static void RegisterRestObjects(IRegistrator container)
             {
-                var apiAssembly = typeof(BearerAuthenticationController).Assembly;
-                var ns = typeof(BearerAuthenticationController).Namespace;
-
-                var restAssemblyTypes = apiAssembly.GetLoadedTypes().Where(i =>
-                {
-                    return i.Namespace == ns && !i.IsInterface && !i.IsAbstract && (i.Name.EndsWith("Service") ||
-                                                                                    (i.Name.EndsWith("Converter") &&
-                                                                                     i.Name !=
-                                                                                     "SharedDashboardModelConverter" &&
-                                                                                     i.Name !=
-                                                                                     "TemporaryProjectTravelsModelConverter" &&
-                                                                                     i.Name !=
-                                                                                     "ProjectWorkHourPriceModelConverter"
-                                                                                    )
-                           );
-                }
-                );
-                container.RegisterMany(restAssemblyTypes, Reuse.Scoped, serviceTypeCondition: s => s.IsInterface && s.Namespace == ns, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-                container.Register<IRestSettingsService, RestSettingsService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-                container.Register<IModelConverter<WorkPriceEx>, WorkHourPriceModelConverter>(Reuse.Scoped, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-                container.Register<IModelConverter<TemporaryProjectTravelExpenseModel>, TemporaryProjectTravelsModelConverter>(Reuse.Scoped, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
-                container.Register<PsaReportFactory, PsaReportFactory>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-                container.RegisterDelegate<ReportControllerFactory<IPsaContext>>(c => PsaReportFactory.Factory, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-                container.RegisterDelegate<IReportFactoryService<IPsaContext>>(c => PsaReportFactory.Factory, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-                container.RegisterDelegate<IPsaReportFactoryService>(c => PsaReportFactory.Factory, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-                container.Register<IWhiteListService, WhiteListService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             }
 
             private static void RegisterPdfObjects(IContainer container)
