@@ -341,28 +341,11 @@ namespace Logic
     {
         public PdfCreationHandlerService(
             IInvoiceFileService arg1,
-            IPdfDocumentService arg2,
             IPdfProposalDocumentService arg5,
-            IOfferService arg8,
-            IPdfTravelReimbursementDocumentService arg11
+            IOfferService arg8
         )
         {
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IPdfInvoiceDocumentService field1;
-        public readonly IPdfDocumentService field2;
-        public readonly IInvoiceDefinition field3;
-        public readonly IInvoiceBreakdownDefinition field4;
-        public readonly IPdfProposalDocumentService field5;
-        public readonly IProposalDefinition field6;
-        public readonly IInvoiceService field7;
-        public readonly IOfferService field8;
-        public readonly ITravelReimbursementService field9;
-        public readonly ITravelReimbursementDefinition field10;
-        public readonly IPdfTravelReimbursementDocumentService field11;
-        public readonly ITravelReimbursementBreakdownDefinition field12;
-        public readonly IUserRepository field13;
     }
 
 
@@ -376,52 +359,10 @@ namespace Logic
     {
         public PdfInvoiceDocumentService(
             IContextService<IPsaContext> arg0,
-            //IInvoiceService arg1,
-            //IInvoiceConfigService arg2
-            //IInvoiceRowService arg3,
-            //ICurrencyService arg4,
-            //IInvoiceStatusService arg5,
-            //IInvoiceTaxBreakdownService arg6,
-            //IFileService arg7,
-            //IFileDataService arg8,
             IInvoiceFileService arg9
-            //IInvoiceHtmlRepository arg10
-            //IInvoiceBreakdownService arg11
-            //IInvoiceBankAccountRepository arg12,
-            //IBankAccountRepository arg13,
-            //IBusinessUnitService arg14
         ) : base(arg0)
         {
-            //field1 = arg1;
-            //field2 = arg2;
-            //field3 = arg3;
-            //field4 = arg4;
-            //field5 = arg5;
-            //field6 = arg6;
-            //field7 = arg7;
-            //field8 = arg8;
-            //field9 = arg9;
-            //field10 = arg10;
-            //field11 = arg11;
-            //field12 = arg12;
-            //field13 = arg13;
-            //field14 = arg14;
         }
-
-        public readonly IInvoiceService field1;
-        public readonly IInvoiceConfigService field2;
-        public readonly IInvoiceRowService field3;
-        public readonly ICurrencyService field4;
-        public readonly IInvoiceStatusService field5;
-        public readonly IInvoiceTaxBreakdownService field6;
-        public readonly IFileService field7;
-        public readonly IFileDataService field8;
-        public readonly IInvoiceFileService field9;
-        public readonly IInvoiceHtmlRepository field10;
-        public readonly IInvoiceBreakdownService field11;
-        public readonly IInvoiceBankAccountRepository field12;
-        public readonly IBankAccountRepository field13;
-        public readonly IBusinessUnitService field14;
     }
 
 
@@ -435,58 +376,13 @@ namespace Logic
     {
         public PdfProposalDocumentService(
             IContextService<IPsaContext> arg0,
-            ICurrencyService arg1,
-            IFileService arg2,
-            IFileDataService arg3,
-            IBusinessUnitService arg4,
             IOfferService arg5,
             ICaseService arg6,
-            //IAccountService arg7,
-            IContactService arg8,
-            //ITaxService arg9,
-            IPricelistService arg10,
-            IFormatingCultureRepository arg11,
-            IProposalTaxBreakdownService arg12,
-            //IUserService arg13,
-            //IAddressRepository arg14,
-            //ICaseMemberService arg15,
-            IOfferFileService arg16
+            IProposalTaxBreakdownService arg12
         ) : base(arg0)
         {
-            //field1 = arg1;
-            //field2 = arg2;
-            //field3 = arg3;
-            //field4 = arg4;
-            //field5 = arg5;
-            //field6 = arg6;
-            //field7 = arg7;
-            //field8 = arg8;
-            //field9 = arg9;
-            //field10 = arg10;
-            //field11 = arg11;
-            //field12 = arg12;
-            //field13 = arg13;
-            //field14 = arg14;
-            //field15 = arg15;
-            //field16 = arg16;
-        }
 
-        public readonly ICurrencyService field1;
-        public readonly IFileService field2;
-        public readonly IFileDataService field3;
-        public readonly IBusinessUnitService field4;
-        public readonly IOfferService field5;
-        public readonly ICaseService field6;
-        public readonly IAccountService field7;
-        public readonly IContactService field8;
-        public readonly ITaxService field9;
-        public readonly IPricelistService field10;
-        public readonly IFormatingCultureRepository field11;
-        public readonly IProposalTaxBreakdownService field12;
-        public readonly IUserService field13;
-        public readonly IAddressRepository field14;
-        public readonly ICaseMemberService field15;
-        public readonly IOfferFileService field16;
+        }
     }
 
 
@@ -7057,34 +6953,11 @@ public class AccountOverviewReportHandler : AccountListReportHandler
         , IInvoiceFileService
     {
         public InvoiceFileService(
-            //IContextService<IPsaContext> arg0,
-            //IValidator<InvoiceFile> arg1,
-            //IAuthorization<IPsaContext, InvoiceFile> arg2,
-            //IInvoiceFileRepository arg3
             IFileService arg4
-            //IInvoiceService arg5
-            //IInvoiceCaseRepository arg6,
-            //ICaseFileService arg7
         ) : base()
         {
-            //field0 = arg0;
-            //field1 = arg1;
-            //field2 = arg2;
-            //field3 = arg3;
-            //field4 = arg4;
-            //field5 = arg5;
-            //field6 = arg6;
-            //field7 = arg7;
-        }
 
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IValidator<InvoiceFile> field1;
-        public readonly IAuthorization<IPsaContext, InvoiceFile> field2;
-        public readonly IInvoiceFileRepository field3;
-        public readonly IFileService field4;
-        public readonly IInvoiceService field5;
-        public readonly IInvoiceCaseRepository field6;
-        public readonly ICaseFileService field7;
+        }
     }
 
 
@@ -8506,28 +8379,10 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IContextService<IPsaContext> arg0,
             IOfferService arg1,
             ITaxService arg2,
-            ITaxTotalService arg3,
-            ICurrencyRoundingFactory arg4,
-            IAccountCountrySettingsService arg5,
             ICaseService arg6
         )
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
-            field5 = arg5;
-            field6 = arg6;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IOfferService field1;
-        public readonly ITaxService field2;
-        public readonly ITaxTotalService field3;
-        public readonly ICurrencyRoundingFactory field4;
-        public readonly IAccountCountrySettingsService field5;
-        public readonly ICaseService field6;
     }
 
 
@@ -8981,47 +8836,12 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             ITaskMemberService arg8,
             IUserRepository arg9,
             ITaxService arg10,
-            ICaseRepository arg11, IAuditTrail<Task> arg12, IAuditTrail<Case> arg13, IAuditTrail<CaseMember> arg14,
-            IAuditTrailEntryRepository arg15,
-            ITreeTaskService arg16
-        ) : base(arg0)
+            ICaseRepository arg11, IAuditTrail<Task> arg12, IAuditTrail<Case> arg13, IAuditTrail<CaseMember> arg14
+            //IAuditTrailEntryRepository arg15,
+            //ITreeTaskService arg16
+        ) : base()
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
-            field5 = arg5;
-            field6 = arg6;
-            field7 = arg7;
-            field8 = arg8;
-            field9 = arg9;
-            field10 = arg10;
-            field11 = arg11;
-            field12 = arg12;
-            field13 = arg13;
-            field14 = arg14;
-            field15 = arg15;
-            field16 = arg16;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly ITaskRepository field1;
-        public readonly IValidator<Task> field2;
-        public readonly IAuthorization<IPsaContext, Task> field3;
-        public readonly ICaseNoteService field4;
-        public readonly IResourceAllocationService field5;
-        public readonly IPricelistService field6;
-        public readonly ICaseMemberService field7;
-        public readonly ITaskMemberService field8;
-        public readonly IUserRepository field9;
-        public readonly ITaxService field10;
-        public readonly ICaseRepository field11;
-        public readonly IAuditTrail<Task> field12;
-        public readonly IAuditTrail<Case> field13;
-        public readonly IAuditTrail<CaseMember> field14;
-        public readonly IAuditTrailEntryRepository field15;
-        public readonly ITreeTaskService field16;
     }
 
 
@@ -9931,63 +9751,13 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IUserRepository arg4,
             IFileDownloadService arg5,
             IFileDataService arg6,
-            //IGoogleDriveSettings arg8,
             ICaseFileService arg9,
             IFileTagService arg10,
             ICaseNoteService arg11,
-            //ICaseRepository arg12,
-            //IOfferRepository arg13,
-            IOfferFileService arg14,
-            //IOrganizationAddonService arg15,
-            //ICustomerDatabaseRepository arg16,
-            //IItemFileRepository arg17,
-            //IPsaOrganizationService arg18,
-            //IBusinessUnitRepository arg19,
-            IInvoiceConfigRepository arg20
+            IOfferFileService arg14
         ) : base()
         {
-            //field0 = arg0;
-            //field1 = arg1;
-            //field2 = arg2;
-            //field3 = arg3;
-            //field4 = arg4;
-            //field5 = arg5;
-            //field6 = arg6;
-            //field8 = arg8;
-            //field9 = arg9;
-            //field10 = arg10;
-            //field11 = arg11;
-            //field12 = arg12;
-            //field13 = arg13;
-            //field14 = arg14;
-            //field15 = arg15;
-            //field16 = arg16;
-            //field17 = arg17;
-            //field18 = arg18;
-            //field19 = arg19;
-            //field20 = arg20;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IFileRepository field1;
-        public readonly IValidator<File> field2;
-        public readonly IAuthorization<IPsaContext, File> field3;
-        public readonly IUserRepository field4;
-        public readonly IFileDownloadService field5;
-        public readonly IFileDataService field6;
-        public readonly IGoogleDriveSettings field8;
-        public readonly ICaseFileService field9;
-        public readonly IFileTagService field10;
-        public readonly ICaseNoteService field11;
-        public readonly ICaseRepository field12;
-        public readonly IOfferRepository field13;
-        public readonly IOfferFileService field14;
-        public readonly IOrganizationAddonService field15;
-        public readonly ICustomerDatabaseRepository field16;
-        public readonly IItemFileRepository field17;
-        public readonly IPsaOrganizationService field18;
-        public readonly IBusinessUnitRepository field19;
-        public readonly IInvoiceConfigRepository field20;
     }
 
 
@@ -10099,46 +9869,11 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IContextService<IPsaContext> arg0,
             IOfferItemRepository arg1,
             IValidator<OfferItem> arg2,
-            IAuthorization<IPsaContext, OfferItem> arg3,
-            ICaseRepository arg4,
-            IPricelistRepository arg5,
             IPricelistVersionService arg6,
-            ICurrencyRepository arg7,
-            IOfferRepository arg8,
-            IProductRepository arg9,
-            IProductPriceRepository arg10,
-            IOfferSubtotalRepository arg11,
             IAuthorization<IPsaContext, Offer> arg12
-        ) : base(arg0, arg1, arg2, arg3)
+        ) : base()
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
-            field5 = arg5;
-            field6 = arg6;
-            field7 = arg7;
-            field8 = arg8;
-            field9 = arg9;
-            field10 = arg10;
-            field11 = arg11;
-            field12 = arg12;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IOfferItemRepository field1;
-        public readonly IValidator<OfferItem> field2;
-        public readonly IAuthorization<IPsaContext, OfferItem> field3;
-        public readonly ICaseRepository field4;
-        public readonly IPricelistRepository field5;
-        public readonly IPricelistVersionService field6;
-        public readonly ICurrencyRepository field7;
-        public readonly IOfferRepository field8;
-        public readonly IProductRepository field9;
-        public readonly IProductPriceRepository field10;
-        public readonly IOfferSubtotalRepository field11;
-        public readonly IAuthorization<IPsaContext, Offer> field12;
     }
 
 
@@ -10153,99 +9888,19 @@ public class AccountOverviewReportHandler : AccountListReportHandler
     {
         public OfferService(
             IContextService<IPsaContext> arg0,
-            IValidator<Offer> arg1,
-            IAuthorization<IPsaContext, Offer> arg2,
             IOfferRepository arg3,
             IProposalStatusService arg4,
             ITaskService arg5,
             ICaseService arg6,
             IPricelistService arg7,
-            ICurrencyService arg8,
-            IItemRepository arg9,
-            IWorkTypeService arg10,
-            IBusinessUnitService arg11,
             IInvoiceService arg12,
-            IOfferSubtotalRepository arg13,
-            IOfferItemRepository arg14,
-            IOfferTaskRepository arg15,
-            ITimeService arg16,
-            IProductService arg17,
             IProductPriceService arg18,
             IPricelistVersionService arg19,
-            IFormattingCultureService arg20,
-            IItemSalesAccountRepository arg21,
             IOfferItemService arg22,
-            IOfferTaskService arg23,
-            IOfferSubtotalService arg24,
-            ITaxService arg25,
-            IAccountRepository arg26,
-            IAddressRepository arg27,
-            ICompanyRepository arg28,
-            IOrganizationCompanyRepository arg29
+            ICompanyRepository arg28
         ) : base(arg0)
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
-            field5 = arg5;
-            field6 = arg6;
-            field7 = arg7;
-            field8 = arg8;
-            field9 = arg9;
-            field10 = arg10;
-            field11 = arg11;
-            field12 = arg12;
-            field13 = arg13;
-            field14 = arg14;
-            field15 = arg15;
-            field16 = arg16;
-            field17 = arg17;
-            field18 = arg18;
-            field19 = arg19;
-            field20 = arg20;
-            field21 = arg21;
-            field22 = arg22;
-            field23 = arg23;
-            field24 = arg24;
-            field25 = arg25;
-            field26 = arg26;
-            field27 = arg27;
-            field28 = arg28;
-            field29 = arg29;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IValidator<Offer> field1;
-        public readonly IAuthorization<IPsaContext, Offer> field2;
-        public readonly IOfferRepository field3;
-        public readonly IProposalStatusService field4;
-        public readonly ITaskService field5;
-        public readonly ICaseService field6;
-        public readonly IPricelistService field7;
-        public readonly ICurrencyService field8;
-        public readonly IItemRepository field9;
-        public readonly IWorkTypeService field10;
-        public readonly IBusinessUnitService field11;
-        public readonly IInvoiceService field12;
-        public readonly IOfferSubtotalRepository field13;
-        public readonly IOfferItemRepository field14;
-        public readonly IOfferTaskRepository field15;
-        public readonly ITimeService field16;
-        public readonly IProductService field17;
-        public readonly IProductPriceService field18;
-        public readonly IPricelistVersionService field19;
-        public readonly IFormattingCultureService field20;
-        public readonly IItemSalesAccountRepository field21;
-        public readonly IOfferItemService field22;
-        public readonly IOfferTaskService field23;
-        public readonly IOfferSubtotalService field24;
-        public readonly ITaxService field25;
-        public readonly IAccountRepository field26;
-        public readonly IAddressRepository field27;
-        public readonly ICompanyRepository field28;
-        public readonly IOrganizationCompanyRepository field29;
     }
 
 
@@ -10372,22 +10027,10 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IContextService<IPsaContext> arg0,
             IProposalStatusRepository arg1,
             IValidator<ProposalStatus> arg2,
-            IAuthorization<IPsaContext, ProposalStatus> arg3,
-            IOrganizationRepository arg4
+            IAuthorization<IPsaContext, ProposalStatus> arg3
         ) : base(arg0, arg1, arg2, arg3)
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IProposalStatusRepository field1;
-        public readonly IValidator<ProposalStatus> field2;
-        public readonly IAuthorization<IPsaContext, ProposalStatus> field3;
-        public readonly IOrganizationRepository field4;
     }
 
 

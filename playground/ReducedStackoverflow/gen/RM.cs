@@ -451,21 +451,10 @@ namespace RM
     {
         public CompanyRepository(
             IContextService<IPsaContext> arg0,
-            IConfiguration arg1,
-            DbProviderFactory arg2,
-            ICustomerDatabaseRepository arg3
+            IConfiguration arg1
         ) : base()
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IConfiguration field1;
-        public readonly DbProviderFactory field2;
-        public readonly ICustomerDatabaseRepository field3;
     }
 
 

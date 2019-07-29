@@ -32,9 +32,12 @@ namespace LoadTest
 
             Console.WriteLine("-- Run Stack overflow test --");
 
-            using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
+            for (int i = 0; i < 10; i++)
             {
-                scope.Resolve(typeof(EmailController));
+                using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
+                {
+                    scope.Resolve(typeof(EmailController));
+                }
             }
 
             Console.WriteLine("-- Finished --");
