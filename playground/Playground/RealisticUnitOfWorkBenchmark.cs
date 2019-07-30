@@ -1226,6 +1226,17 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                    BmarkDryIocMsDi | 4.135 us | 0.0322 us | 0.0301 us |  1.08 |    0.01 |      1.6251 |           - |           - |             7.52 KB |
                         BmarkGrace | 2.590 us | 0.0071 us | 0.0066 us |  0.68 |    0.01 |      0.5798 |           - |           - |             2.69 KB |
                     BmarkGraceMsDi | 3.336 us | 0.0560 us | 0.0523 us |  0.87 |    0.02 |      0.6332 |           - |           - |             2.93 KB |
+
+            ## FEC v3
+
+                                               Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+----------------------------------------------------- |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
+                    BmarkMicrosoftDependencyInjection | 3.841 us | 0.0203 us | 0.0169 us |  1.00 | 0.9460 |     - |     - |   4.37 KB |
+                                          BmarkDryIoc | 3.098 us | 0.0168 us | 0.0157 us |  0.81 | 1.1406 |     - |     - |   5.26 KB |
+ BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 2.757 us | 0.0417 us | 0.0390 us |  0.72 | 1.1787 |     - |     - |   5.45 KB |
+                                      BmarkDryIocMsDi | 3.526 us | 0.0490 us | 0.0459 us |  0.92 | 1.1482 |     - |     - |    5.3 KB |
+                                           BmarkGrace | 2.601 us | 0.0168 us | 0.0141 us |  0.68 | 0.5798 |     - |     - |   2.69 KB |
+                                       BmarkGraceMsDi | 3.378 us | 0.0114 us | 0.0106 us |  0.88 | 0.6332 |     - |     - |   2.93 KB |
             */
 
             private IServiceProvider _msDi;
