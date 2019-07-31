@@ -1,20 +1,24 @@
 using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
 using System.Web.Http;
-using System.Web.Http.Controllers;
 using DryIoc;
 using DryIoc.WebApi;
-using Logic;
+using NUnit.Framework;
 using Web.Rest.API;
 
 namespace LoadTest
 {
+    [TestFixture]
     class Program
     {
         static void Main(string[] args)
+        {
+            new Program().Test();
+
+            Console.WriteLine("-- Finished --");
+        }
+
+        [Test]
+        public void Test()
         {
             var config = new HttpConfiguration();
 
@@ -26,7 +30,8 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            var container =
+                new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
 
             Registrations.RegisterTypes(container, true);
 
@@ -39,8 +44,6 @@ namespace LoadTest
                     scope.Resolve(typeof(EmailController));
                 }
             }
-
-            Console.WriteLine("-- Finished --");
         }
     }
 }

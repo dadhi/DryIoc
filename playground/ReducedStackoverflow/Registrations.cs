@@ -17,7 +17,6 @@ using Shared;
 using Shop;
 using Users.Repositories;
 using Utilities;
-using Web.Rest.API;
 using CustomerDatabase = Databases.CustomerDatabase;
 using IUserService = Conn.IUserService;
 

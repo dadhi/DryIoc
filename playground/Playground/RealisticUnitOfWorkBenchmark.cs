@@ -1229,14 +1229,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## FEC v3
 
-                                               Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
------------------------------------------------------ |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
-                    BmarkMicrosoftDependencyInjection | 3.841 us | 0.0203 us | 0.0169 us |  1.00 | 0.9460 |     - |     - |   4.37 KB |
-                                          BmarkDryIoc | 3.098 us | 0.0168 us | 0.0157 us |  0.81 | 1.1406 |     - |     - |   5.26 KB |
- BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 2.757 us | 0.0417 us | 0.0390 us |  0.72 | 1.1787 |     - |     - |   5.45 KB |
-                                      BmarkDryIocMsDi | 3.526 us | 0.0490 us | 0.0459 us |  0.92 | 1.1482 |     - |     - |    5.3 KB |
-                                           BmarkGrace | 2.601 us | 0.0168 us | 0.0141 us |  0.68 | 0.5798 |     - |     - |   2.69 KB |
-                                       BmarkGraceMsDi | 3.378 us | 0.0114 us | 0.0106 us |  0.88 | 0.6332 |     - |     - |   2.93 KB |
+                                               Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+----------------------------------------------------- |---------:|----------:|----------:|---------:|------:|--------:|-------:|------:|------:|----------:|
+                    BmarkMicrosoftDependencyInjection | 3.887 us | 0.0890 us | 0.1916 us | 3.797 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+                                          BmarkDryIoc | 2.996 us | 0.0138 us | 0.0129 us | 2.992 us |  0.73 |    0.04 | 1.0643 |     - |     - |   4.91 KB |
+ BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 2.660 us | 0.0318 us | 0.0298 us | 2.656 us |  0.65 |    0.04 | 1.0643 |     - |     - |   4.91 KB |
+                                      BmarkDryIocMsDi | 3.306 us | 0.0652 us | 0.0801 us | 3.303 us |  0.82 |    0.04 | 1.0757 |     - |     - |   4.96 KB |
+                                           BmarkGrace | 2.630 us | 0.0064 us | 0.0053 us | 2.630 us |  0.63 |    0.03 | 0.5798 |     - |     - |   2.69 KB |
+                                       BmarkGraceMsDi | 3.264 us | 0.0073 us | 0.0061 us | 3.264 us |  0.78 |    0.04 | 0.6332 |     - |     - |   2.93 KB |
             */
 
             private IServiceProvider _msDi;

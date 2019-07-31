@@ -550,10 +550,8 @@ namespace FastExpressionCompiler.LightExpression
                 var nestedLambdas = NestedLambdas;
                 var constantsCount = constants.Count;
                 var nestedLambdasCount = nestedLambdas.Length;
-                if (constantsCount == 0 && nestedLambdasCount == 0)
-                    return new ArrayClosure(null);
 
-                var items = new object[constantsCount + nestedLambdasCount];
+                var items = new object[constantsCount + nestedLambdasCount + NonPassedParameters.Length];
 
                 if (constantsCount != 0)
                     for (var i = 0; i < constantsCount; i++)
@@ -562,6 +560,8 @@ namespace FastExpressionCompiler.LightExpression
                 if (nestedLambdasCount != 0)
                     for (var i = 0; i < nestedLambdasCount; i++)
                         items[constantsCount + i] = nestedLambdas[i].Lambda;
+
+                // Note that `nonPassedParams` will be populated by when nested lambda is emitted
 
                 return new ArrayClosure(items);
             }
@@ -641,17 +641,10 @@ namespace FastExpressionCompiler.LightExpression
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
-        // todo: Specialize the closure for nested and root lambda - the nested lambda should include NonPassedParameters
         public sealed class ArrayClosure
         {
-            public static FieldInfo ConstantsAndNestedLambdasField =
+            public static FieldInfo ItemsField =
                 typeof(ArrayClosure).GetTypeInfo().GetDeclaredField(nameof(Items));
-
-            public static FieldInfo NonPassedParamsField =
-                typeof(ArrayClosure).GetTypeInfo().GetDeclaredField(nameof(NonPassedParams));
-
-            public static ConstructorInfo Constructor =
-                typeof(ArrayClosure).GetTypeInfo().DeclaredConstructors.GetFirst();
 
             public static ArrayClosure Create(ConstantExpression[] constantExprs)
             {
@@ -662,8 +655,6 @@ namespace FastExpressionCompiler.LightExpression
             }
 
             public readonly object[] Items;
-            public object[] NonPassedParams;
-
             public ArrayClosure(object[] items) => Items = items;
         }
 
@@ -1721,8 +1712,8 @@ namespace FastExpressionCompiler.LightExpression
 
                 // Load non-passed argument from Closure - closure object is always a first argument
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Ldfld, ArrayClosure.NonPassedParamsField);
-                EmitLoadConstantInt(il, nonPassedParamIndex);
+                il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
+                EmitLoadConstantInt(il, closure.Constants.Count + closure.NestedLambdas.Length + nonPassedParamIndex);
                 il.Emit(OpCodes.Ldelem_Ref);
                 il.Emit(paramType.IsValueType() ? OpCodes.Unbox_Any : OpCodes.Castclass, paramType);
                 return true;
@@ -2082,7 +2073,7 @@ namespace FastExpressionCompiler.LightExpression
 
                     // Load constant from Closure - closure object is always a first argument
                     il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
+                    il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
                     EmitLoadConstantInt(il, constIndex);
                     il.Emit(OpCodes.Ldelem_Ref);
                     il.Emit(exprType.IsValueType() ? OpCodes.Unbox_Any : OpCodes.Castclass, exprType);
@@ -2621,7 +2612,6 @@ namespace FastExpressionCompiler.LightExpression
                         }
 
                         // check that it's a captured parameter by closure
-                        //var nonPassedParamIndex = closure.NonPassedParameters.GetFirstIndex(leftParamExpr);
                         var nonPassedParams = closure.NonPassedParameters;
                         var nonPassedParamIndex = nonPassedParams.Length - 1;
                         while (nonPassedParamIndex != -1 &&
@@ -2640,8 +2630,10 @@ namespace FastExpressionCompiler.LightExpression
                             var valueVar = il.DeclareLocal(expr.Type); // store left value in variable
 
                             il.Emit(OpCodes.Stloc, valueVar);
-                            il.Emit(OpCodes.Ldfld, ArrayClosure.NonPassedParamsField); // load array field
-                            EmitLoadConstantInt(il, nonPassedParamIndex); // load array item index
+
+                            // load array field and param item index
+                            il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
+                            EmitLoadConstantInt(il, closure.Constants.Count + closure.NestedLambdas.Length + nonPassedParamIndex);
                             il.Emit(OpCodes.Ldloc, valueVar);
                             if (expr.Type.IsValueType())
                                 il.Emit(OpCodes.Box, expr.Type);
@@ -2650,8 +2642,9 @@ namespace FastExpressionCompiler.LightExpression
                         }
                         else
                         {
-                            il.Emit(OpCodes.Ldfld, ArrayClosure.NonPassedParamsField); // load array field
-                            EmitLoadConstantInt(il, nonPassedParamIndex); // load array item index
+                            // load array field and param item index
+                            il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
+                            EmitLoadConstantInt(il, closure.Constants.Count + closure.NestedLambdas.Length + nonPassedParamIndex);
 
                             if (!TryEmit(right, paramExprs, il, ref closure, flags))
                                 return false;
@@ -2893,12 +2886,13 @@ namespace FastExpressionCompiler.LightExpression
 
                 var nestedLambdaInfo = closure.NestedLambdas[outerNestedLambdaIndex];
                 var nestedLambda = nestedLambdaInfo.Lambda;
+                var constantsCount = closure.Constants.Count;
 
                 // Load compiled lambda on stack counting the offset - nested lambdas are going after constants
                 var nestedLambdaType = nestedLambda.GetType();
                 il.Emit(OpCodes.Ldarg_0); // closure is always a first argument
-                il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
-                EmitLoadConstantInt(il, closure.Constants.Count + outerNestedLambdaIndex);
+                il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
+                EmitLoadConstantInt(il, constantsCount + outerNestedLambdaIndex);
                 il.Emit(OpCodes.Ldelem_Ref); // load the array item object on stack and cast it lambda
                 il.Emit(OpCodes.Castclass, nestedLambdaType);
 
@@ -2909,19 +2903,12 @@ namespace FastExpressionCompiler.LightExpression
                     return true;
 
                 // The code generated below should look like this:
-                // `((ArrayClosure)lambda.Target).NonPassedParameters = new object[pn] { param0, param1, ... }`
+                // `var x = (ArrayClosure)lambda.Target; x.Items[0] = param0; x.Items[1] = param1; ... `
 
-                il.Emit(OpCodes.Dup); // Get lambda copy to set params to it Target
-
-                var targetSetter = nestedLambdaType.FindPropertyGetMethod("Target");
-                if (targetSetter == null)
-                    return false;
-                il.Emit(OpCodes.Call, targetSetter);
+                il.Emit(OpCodes.Dup); // Get lambda copy to set params to its Target
+                il.Emit(OpCodes.Call, Tools.DelegateTargetGetterMethod);
                 il.Emit(OpCodes.Castclass, typeof(ArrayClosure));
-
-                // Initialize the array of parameters
-                EmitLoadConstantInt(il, nestedNonPassedParams.Length); // the length of array
-                il.Emit(OpCodes.Newarr, typeof(object));
+                il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
 
                 // Load used and closed parameter values on stack
                 var outerNonPassedParams = closure.NonPassedParameters;
@@ -2931,7 +2918,7 @@ namespace FastExpressionCompiler.LightExpression
 
                     // Duplicate nested array on stack to store the item, and load index to where to store
                     il.Emit(OpCodes.Dup);
-                    EmitLoadConstantInt(il, nestedParamIndex);
+                    EmitLoadConstantInt(il, nestedClosureInfo.Constants.Count + nestedClosureInfo.NestedLambdas.Length + nestedParamIndex);
 
                     var outerParamIndex = outerParamExprs.Count - 1;
                     while (outerParamIndex != -1 && !ReferenceEquals(outerParamExprs[outerParamIndex], nestedParam))
@@ -2970,10 +2957,10 @@ namespace FastExpressionCompiler.LightExpression
                             if (outerNonPassedParamIndex == -1)
                                 return false; // impossible
 
-                            // Load the parameter from `NonPassedParamsField` object array
+                            // Load the parameter from outer closure `Items` array
                             il.Emit(OpCodes.Ldarg_0); // closure is always a first argument
-                            il.Emit(OpCodes.Ldfld, ArrayClosure.NonPassedParamsField);
-                            EmitLoadConstantInt(il, outerNonPassedParamIndex);
+                            il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField);
+                            EmitLoadConstantInt(il, constantsCount + closure.NestedLambdas.Length + outerNonPassedParamIndex);
                             il.Emit(OpCodes.Ldelem_Ref);
                         }
                     }
@@ -2982,8 +2969,8 @@ namespace FastExpressionCompiler.LightExpression
                     il.Emit(OpCodes.Stelem_Ref);
                 }
 
-                // Create nested closure object composed of all constants, params, lambdas loaded on stack
-                il.Emit(OpCodes.Stfld, ArrayClosure.NonPassedParamsField);
+                // Pop-out the `il.Emit(OpCodes.Ldfld, ArrayClosure.ItemsField)` loaded earlier
+                il.Emit(OpCodes.Pop);
                 return true;
             }
 
@@ -3670,6 +3657,8 @@ namespace FastExpressionCompiler.LightExpression
 
             return type.GetTypeInfo().BaseType?.FindMethod(methodName);
         }
+
+        internal static MethodInfo DelegateTargetGetterMethod = typeof(Delegate).FindPropertyGetMethod("Target");
 
         internal static MethodInfo FindDelegateInvokeMethod(this Type type) => type.FindMethod("Invoke");
 
