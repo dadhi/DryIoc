@@ -907,6 +907,47 @@ namespace ImTools
         public T OrDefault(T defaultValue = default(T)) => HasValue ? Value : defaultValue;
     }
 
+    /// Ever growing stack
+    public struct GrowingStack<T>
+    {
+        /// The count
+        public int Count;
+
+        /// The items array
+        public T[] Items;
+
+        /// Constructs the thing 
+        public GrowingStack(int capacity)
+        {
+            Items = new T[capacity];
+            Count = 0;
+        }
+
+        /// Push the new slot and return the ref to it
+        public ref T PushSlot()
+        {
+            if (++Count >= Items.Length)
+                Items = Expand(Items);
+            return ref Items[Count - 1];
+        }
+
+        /// Pops the item - just moving the counter back
+        public void Pop() => --Count;
+
+        /// Expands the items starting with 2
+        private static T[] Expand(T[] items)
+        {
+            if (items.Length == 0)
+                return new T[2];
+
+            var count = items.Length;
+            var newItems = new T[count << 1];
+            for (var i = 0; i < count; i++)
+                newItems[i] = items[i];
+            return newItems;
+        }
+    }
+
     /// <summary>Immutable list - simplest linked list with Head and Rest.</summary>
     /// <typeparam name="T">Type of the item.</typeparam>
     public sealed class ImList<T>
