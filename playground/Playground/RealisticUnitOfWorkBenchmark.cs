@@ -1001,14 +1001,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### Per-container expression cache
 
-|                                               Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
-|                    BmarkMicrosoftDependencyInjection |    138.6 us |   2.9064 us |   6.7935 us |   1.00 |    0.00 |  18.6768 |  0.1221 |     - |  80.63 KB |
-|                                          BmarkDryIoc |    114.5 us |   0.6205 us |   0.5501 us |   0.86 |    0.05 |  22.2168 |  0.1221 |     - | 102.76 KB |
-| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    110.8 us |   0.8611 us |   0.8054 us |   0.83 |    0.05 |  21.3623 |  0.2441 |     - |  98.88 KB |
-|                                      BmarkDryIocMsDi |    126.0 us |   2.1756 us |   2.0351 us |   0.94 |    0.06 |  24.1699 |  0.1221 |     - | 111.45 KB |
-|                                           BmarkGrace | 18,877.0 us | 110.1994 us | 103.0806 us | 141.23 |    8.26 | 156.2500 | 62.5000 |     - | 739.94 KB |
-|                                       BmarkGraceMsDi | 21,916.3 us | 264.2463 us | 247.1762 us | 164.04 |   10.81 | 187.5000 | 93.7500 |     - | 909.85 KB |
+|                                               Method |        Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|----------------------------------------------------- |------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|------:|----------:|
+|                    BmarkMicrosoftDependencyInjection |    138.6 us |   2.510 us |   2.225 us |   1.00 |    0.00 |  18.5547 |  0.4883 |     - |  80.63 KB |
+|                                          BmarkDryIoc |    112.5 us |   1.098 us |   1.027 us |   0.81 |    0.01 |  22.2168 |  0.1221 |     - | 102.76 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    111.7 us |   1.258 us |   1.176 us |   0.81 |    0.02 |  21.3623 |  0.2441 |     - |  98.88 KB |
+|                                      BmarkDryIocMsDi |    123.0 us |   1.243 us |   1.101 us |   0.89 |    0.01 |  24.1699 |  0.2441 |     - | 111.47 KB |
+|                                           BmarkGrace | 18,405.3 us |  89.436 us |  83.658 us | 132.75 |    2.18 | 156.2500 | 62.5000 |     - | 739.95 KB |
+|                                       BmarkGraceMsDi | 22,026.4 us | 142.195 us | 133.009 us | 158.83 |    2.53 | 187.5000 | 93.7500 |     - | 909.85 KB |
             */
 
             [Benchmark(Baseline = true)]

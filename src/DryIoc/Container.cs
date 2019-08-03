@@ -2491,20 +2491,33 @@ namespace DryIoc
                         var newExpr = (NewExpression)expr;
                         var newArgs = newExpr.Arguments.ToListOrSelf();
 
-                        // todo: handle simpler cases without additional calls
-                        //if (newArgs.Count < 2)
-                        //{
-                        //    ;
-                        //}
+                        if (newArgs.Count == 0)
+                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                        else
+                        {
+                            var args = new object[newArgs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                            {
+                                var argExpr = newArgs[i];
+                                if (argExpr is ConstantExpression constExpr)
+                                    args[i] = constExpr.Value;
+                                else if (TryInterpret(r, argExpr, useFec, out var arg))
+                                    args[i] = arg;
+                                else return false;
+                            }
+                            result = newExpr.Constructor.Invoke(args);
+                        }
 
-                        if (!TryInterpretMany(r, newArgs, useFec, out var args))
-                            return false;
-
-                        result = newExpr.Constructor.Invoke(args);
                         return true;
                     }
                 case ExprType.Call:
                     {
+                        if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
+                        {
+                            result = r.Root ?? r;
+                            return true;
+                        }
+
                         var callExpr = (MethodCallExpression)expr;
                         var callMethod = callExpr.Method;
                         var methodDeclaringType = callMethod.DeclaringType;
@@ -2512,11 +2525,116 @@ namespace DryIoc
                         var callObject = callExpr.Object;
                         var callArgs = callExpr.Arguments.ToListOrSelf();
 
-                        if (methodDeclaringType == typeof(IResolver))
+                        if (methodDeclaringType == typeof(CurrentScopeReuse))
+                        {
+                            var resolver = r;
+                            if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
+                            {
+                                if (!TryInterpret(r, callArgs[0], useFec, out var resolverObj))
+                                    return false;
+                                resolver = (IResolverContext)resolverObj;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.GetScopedMethod)
+                            {
+                                result = InterpretGetScoped(resolver, callArgs, useFec);
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
+                            {
+                                result = InterpretGetScopedViaFactoryDelegate(resolver, callArgs, useFec);
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
+                            {
+                                result = InterpretGetNameScoped(resolver, callArgs, useFec);
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonMethod)
+                            {
+                                result = InterpretGetScopedOrSingleton(resolver, callArgs, useFec);
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
+                            {
+                                result = InterpretGetScopedOrSingletonViaFactoryDelegate(resolver, callArgs, useFec);
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.TrackScopedOrSingletonMethod)
+                            {
+                                if (!TryInterpret(resolver, callArgs[1], useFec, out var service))
+                                    return false;
+                                result = CurrentScopeReuse.TrackScopedOrSingleton(resolver, service);
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.TrackScopedMethod)
+                            {
+                                var scope = resolver.GetCurrentScope((bool)ConstValue(callArgs[1]));
+                                if (scope == null)
+                                    result = null; // result is null in this case
+                                else
+                                {
+                                    if (!TryInterpret(resolver, callArgs[2], useFec, out var service))
+                                        return false;
+                                    result = scope.TrackDisposable(service /* todo: what is with `disposalOrder`*/);
+                                }
+                                return true;
+                            }
+
+                            if (callMethod == CurrentScopeReuse.TrackNameScopedMethod)
+                            {
+                                var scope = resolver.GetNamedScope(ConstValue(callArgs[1]), (bool)ConstValue(callArgs[2]));
+                                if (scope == null)
+                                    result = null; // result is null in this case
+                                else
+                                {
+                                    if (!TryInterpret(resolver, callArgs[3], useFec, out var service))
+                                        return false;
+                                    result = scope.TrackDisposable(service);
+                                }
+                                return true;
+                            }
+                        }
+                        else if (methodDeclaringType == typeof(IScope))
+                        {
+                            if (callMethod == SingletonScope.GetOrAddMethod)
+                            {
+                                // check if scoped dependency is already in scope, then just return it
+                                var factoryId = (int)ConstValue(callArgs[0]);
+                                if (!r.SingletonScope.TryGet(out result, factoryId))
+                                {
+                                    result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r, 
+                                        ((LambdaExpression)callArgs[1]).Body, useFec,
+                                        (rc, e, uf) =>
+                                        {
+                                            if (TryInterpret(rc, e, uf, out var value))
+                                                return value;
+                                            return e.CompileToFactoryDelegate(uf)(rc);
+                                        },
+                                        (int)ConstValue(callArgs[2]));
+                                }
+
+                                return true;
+                            }
+
+                            if (callMethod == SingletonScope.TrackDisposableMethod)
+                            {
+                                if (!TryInterpret(r, callArgs[0], useFec, out var service))
+                                    return false;
+                                result = r.SingletonScope.TrackDisposable(service, (int)ConstValue(callArgs[1]));
+                                return true;
+                            }
+                        }
+                        else if (methodDeclaringType == typeof(IResolver))
                         {
                             if (!TryInterpret(r, callObject, useFec, out var resolverObj))
                                 return false;
-
                             var resolver = (IResolverContext)resolverObj;
 
                             if (callMethod == Resolver.ResolveFastMethod)
@@ -2551,81 +2669,40 @@ namespace DryIoc
                                 return true;
                             }
                         }
-                        else if (methodDeclaringType == typeof(IScope))
-                        {
-                            if (callMethod == SingletonScope.GetOrAddMethod)
-                            {
-                                // we know that `callObject` is always a `r.SingletonScope` - not need to interpret it
-                                var singletonScope = r.SingletonScope;
 
-                                // check if scoped dependency is already in scope, then just return it
-                                var factoryId = (int)ConstValue(callArgs[0]);
-                                if (singletonScope.TryGet(out result, factoryId))
-                                    return true;
-
-                                var createExpr = ((LambdaExpression)callArgs[1]).Body;
-                                result = singletonScope.TryGetOrAddWithoutClosure(factoryId, r, createExpr, useFec,
-                                    (rc, e, uf) =>
-                                    {
-                                        if (TryInterpretAndUnwrapContainerException(rc, e, uf, out var value))
-                                            return value;
-                                        return e.CompileToFactoryDelegate(uf)(rc);
-                                    },
-                                    (int)ConstValue(callArgs[2]));
-                                return true;
-                            }
-
-                            if (callMethod == SingletonScope.TrackDisposableMethod)
-                            {
-                                if (!TryInterpret(r, callArgs[0], useFec, out var service))
-                                    return false;
-
-                                result = r.SingletonScope.TrackDisposable(service, (int)ConstValue(callArgs[1]));
-                                return true;
-                            }
-                        }
-                        else if (methodDeclaringType == typeof(CurrentScopeReuse))
-                        {
-                            var resolver = r;
-                            if (callArgs[0] != FactoryDelegateCompiler.ResolverContextParamExpr &&
-                                TryInterpret(r, callArgs[0], useFec, out var resolverObj))
-                                resolver = (IResolverContext)resolverObj;
-
-                            if (callMethod == CurrentScopeReuse.GetScopedMethod)
-                                return InterpretGetScoped(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
-                                return InterpretGetScopedViaFactoryDelegate(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
-                                return InterpretGetNameScoped(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonMethod)
-                                return InterpretGetScopedOrSingleton(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
-                                return TryInterpretGetScopedOrSingletonViaFactoryDelegate(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.TrackScopedOrSingletonMethod)
-                                return TryInterpretTrackScopedOrSingleton(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.TrackScopedMethod)
-                                return TryInterpretTrackScoped(resolver, callArgs, useFec, out result);
-
-                            if (callMethod == CurrentScopeReuse.TrackNameScopedMethod)
-                                return TryInterpretTrackNameScoped(resolver, callArgs, useFec, out result);
-                        }
-
+                        // fallback to reflection invocation
                         object instance = null;
                         if (callObject != null && !TryInterpret(r, callObject, useFec, out instance))
                             return false;
 
-                        if (!TryInterpretMany(r, callArgs, useFec, out var args))
-                            return false;
+                        if (callArgs.Count == 0)
+                            result = callMethod.Invoke(instance, ArrayTools.Empty<object>());
+                        else
+                        {
+                            var args = new object[callArgs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                            {
+                                var argExpr = callArgs[i];
+                                if (argExpr is ConstantExpression constExpr)
+                                    args[i] = constExpr.Value;
+                                else if (TryInterpret(r, argExpr, useFec, out var arg))
+                                    args[i] = arg;
+                                else
+                                    return false;
+                            }
+                            result = callMethod.Invoke(instance, args);
+                        }
 
-                        result = callMethod.Invoke(instance, args);
                         return true;
                     }
+                case ExprType.Parameter:
+                {
+                    // todo: handles IResolverContext only
+                    if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
+                        return false;
+                    result = r;
+                    return true;
+                }
                 case ExprType.Constant:
                     {
                         result = ((ConstantExpression)expr).Value;
@@ -2638,17 +2715,10 @@ namespace DryIoc
                             return false;
 
                         // skip conversion for null and for directly assignable type
-                        result = instance == null || instance.GetType().IsAssignableTo(convertExpr.Type)
-                            ? instance
-                            : Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
-                        return true;
-                    }
-                case ExprType.Parameter:
-                    {
-                        // todo: handles IResolverContext only
-                        if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
-                            return false;
-                        result = r;
+                        if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
+                            result = instance;
+                        else
+                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
                         return true;
                     }
                 case ExprType.MemberAccess:
@@ -2701,8 +2771,17 @@ namespace DryIoc
                         var newArray = (NewArrayExpression)expr;
 
                         var itemExprs = newArray.Expressions.ToListOrSelf();
-                        if (!TryInterpretMany(r, itemExprs, useFec, out var items))
-                            return false;
+                        var items = new object[itemExprs.Count];
+                        for (var i = 0; i < items.Length; i++)
+                        {
+                            var argExpr = itemExprs[i];
+                            if (argExpr is ConstantExpression constExpr)
+                                items[i] = constExpr.Value;
+                            else if (TryInterpret(r, argExpr, useFec, out var arg))
+                                items[i] = arg;
+                            else
+                                return false;
+                        }
 
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                         return true;
@@ -2730,12 +2809,26 @@ namespace DryIoc
 
                         if (!TryInterpret(r, delegateExpr, useFec, out var delegateObj))
                             return false;
-
-                        if (!TryInterpretMany(r, invokeExpr.Arguments.ToListOrSelf(), useFec, out var args))
-                            return false;
-
                         var lambda = (Delegate)delegateObj;
-                        result = lambda.Method.Invoke(lambda.Target, args);
+
+                        var argExprs = invokeExpr.Arguments.ToListOrSelf();
+                        if (argExprs.Count == 0)
+                            result = lambda.Method.Invoke(lambda.Target, ArrayTools.Empty<object>());
+                        else
+                        {
+                            var args = new object[argExprs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                            {
+                                var argExpr = argExprs[i];
+                                if (argExpr is ConstantExpression constExpr)
+                                    args[i] = constExpr.Value;
+                                else if (TryInterpret(r, argExpr, useFec, out var arg))
+                                    args[i] = arg;
+                                else
+                                    return false;
+                            }
+                            result = lambda.Method.Invoke(lambda.Target, args);
+                        }
                         return true;
                     }
 #endif
@@ -2748,184 +2841,93 @@ namespace DryIoc
             return false;
         }
 
-        private static bool InterpretGetScoped(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        private static object InterpretGetScoped(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            result = null;
             var scope = r.CurrentScope;
             if (scope == null)
-            {
-                if ((bool)ConstValue(args[1]))
-                    Throw.For<IScope>(Error.NoCurrentScope, r);
-                return true;
-            }
+                return (bool) ConstValue(args[1]) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
-            // check if scoped dependency is already in scope, then just return it
-            var id = (int)ConstValue(args[2]);
-            if (scope.TryGet(out result, id))
-                return true;
+            var factoryId = (int)ConstValue(args[2]);
+            if (scope.TryGet(out var result, factoryId))
+                return result;
 
-            result = scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[3]).Body, useFec, 
+            return scope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression) args[3]).Body, useFec,
                 (rc, e, uf) =>
                 {
-                    if (TryInterpretAndUnwrapContainerException(rc, e, uf, out var value))
+                    if (TryInterpret(rc, e, uf, out var value))
                         return value;
                     return e.CompileToFactoryDelegate(uf)(rc);
                 },
                 (int)ConstValue(args[4]));
-
-            return true;
         }
 
-        private static bool InterpretGetScopedViaFactoryDelegate(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            result = null;
-            var scope = r.GetCurrentScope(throwIfNotFound: (bool)ConstValue(args[1]));
+            var scope = r.CurrentScope;
             if (scope == null)
-                return true;
+                return (bool)ConstValue(args[1]) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[2]);
-            if (scope.TryGet(out result, id))
-                return true; // this is fine, cause `throwIfNoScope == false` and result is null in this case
+            if (scope.TryGet(out var result, id))
+                return result;
 
-            var factoryDelegate = (FactoryDelegate)((ConstantExpression)args[3]).Value;
-            result = scope.GetOrAddViaFactoryDelegate(id, factoryDelegate, r, (int)ConstValue(args[4]));
-            return true;
+            return scope.GetOrAddViaFactoryDelegate(id, (FactoryDelegate)((ConstantExpression)args[3]).Value, 
+                r, (int)ConstValue(args[4]));
         }
 
-        private static bool InterpretGetNameScoped(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        private static object InterpretGetNameScoped(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            result = null;
-
-            var scopeName = ConstValue(args[1]);
-            var throwIfNoScope = (bool)ConstValue(args[2]);
-            var scope = r.GetNamedScope(scopeName, throwIfNoScope);
+            var scope = r.GetNamedScope(ConstValue(args[1]), (bool)ConstValue(args[2]));
             if (scope == null)
-                return true; // result is null in this case
+                return null; // result is null in this case
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[3]);
-            if (scope.TryGet(out result, id))
-                return true;
+            if (scope.TryGet(out var result, id))
+                return result;
 
-            result = scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[4]).Body, useFec,
+            return scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[4]).Body, useFec,
                 (rc, e, uf) =>
                 {
-                    if (TryInterpretAndUnwrapContainerException(rc, e, uf, out var value))
+                    if (TryInterpret(rc, e, uf, out var value))
                         return value;
                     return e.CompileToFactoryDelegate(uf)(rc);
                 },
                 (int)ConstValue(args[5]));
-
-            return true;
         }
 
-        private static bool InterpretGetScopedOrSingleton(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        private static object InterpretGetScopedOrSingleton(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            result = null;
             var scope = r.CurrentScope ?? r.SingletonScope;
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[1]);
-            if (scope.TryGet(out result, id))
-                return true;
+            if (scope.TryGet(out var result, id))
+                return result;
 
-            result = scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[2]).Body, useFec,
-                (rc, e, uf) => TryInterpretAndUnwrapContainerException(rc, e, uf, out var value)
-                    ? value
-                    : e.CompileToFactoryDelegate(uf)(rc),
+            return scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[2]).Body, useFec,
+                (rc, e, uf) =>
+                {
+                    if (TryInterpret(rc, e, uf, out var value))
+                        return value;
+                    return e.CompileToFactoryDelegate(uf)(rc);
+                },
                 disposalOrder: (int)ConstValue(args[3]));
-
-            return true;
         }
 
-        private static bool TryInterpretGetScopedOrSingletonViaFactoryDelegate(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            result = null;
             var scope = r.CurrentScope ?? r.SingletonScope;
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[1]);
-            if (scope.TryGet(out result, id))
-                return true;
+            if (scope.TryGet(out var result, id))
+                return result;
 
             // we know for sure that it will be a constant
             var factoryDelegate = (FactoryDelegate)((ConstantExpression)args[2]).Value;
-            result = scope.GetOrAddViaFactoryDelegate(id, factoryDelegate, r, (int)ConstValue(args[3]));
-            return true;
-        }
-
-        private static bool TryInterpretTrackScopedOrSingleton(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
-        {
-            result = null;
-            if (!TryInterpret(r, args[1], useFec, out var service))
-                return false;
-
-            result = CurrentScopeReuse.TrackScopedOrSingleton(r, service);
-            return true;
-        }
-
-        private static bool TryInterpretTrackScoped(IResolverContext r, IList<Expression> args, bool useFec, out object result)
-        {
-            result = null;
-            var scope = r.GetCurrentScope((bool)ConstValue(args[1]));
-            if (scope == null)
-                return true; // result is null in this case
-
-            // check if scoped dependency is already in scope, then just return it
-            if (!TryInterpret(r, args[2], useFec, out var service))
-                return false;
-
-            result = scope.TrackDisposable(service/* todo: what is with `disposalOrder`*/); 
-            return true;
-        }
-
-        private static bool TryInterpretTrackNameScoped(
-            IResolverContext r, IList<Expression> args, bool useFec, out object result)
-        {
-            result = null;
-            var scopeName = ConstValue(args[1]);
-            var throwIfNoScope = (bool)ConstValue(args[2]);
-            var scope = r.GetNamedScope(scopeName, throwIfNoScope);
-            if (scope == null)
-                return true; // result is null in this case
-
-            // check if scoped dependency is already in scope, then just return it
-            if (!TryInterpret(r, args[3], useFec, out var service))
-                return false;
-
-            result = scope.TrackDisposable(service);
-            return true;
-        }
-
-        private static bool TryInterpretMany(
-            IResolverContext r, IList<Expression> argExprs, bool useFec, out object[] args)
-        {
-            if (argExprs.Count == 0)
-            {
-                args = ArrayTools.Empty<object>();
-            }
-            else
-            {
-                args = new object[argExprs.Count];
-                for (var i = 0; i < args.Length; i++)
-                {
-                    var argExpr = argExprs[i];
-                    if (argExpr is ConstantExpression constExpr)
-                        args[i] = constExpr.Value;
-                    else if (TryInterpret(r, argExpr, useFec, out var arg))
-                        args[i] = arg;
-                    else return false;
-                }
-            }
-
-            return true;
+            return scope.GetOrAddViaFactoryDelegate(id, factoryDelegate, r, (int)ConstValue(args[3]));
         }
 
         [MethodImpl((MethodImplOptions)256)]
@@ -3654,8 +3656,7 @@ namespace DryIoc
             if (name == null)
                 return currentScope;
 
-            var scopeName = name as IScopeName;
-            if (scopeName != null)
+            if (name is IScopeName scopeName)
             {
                 for (var s = currentScope; s != null; s = s.Parent)
                     if (scopeName.Match(s.Name))
@@ -8065,7 +8066,7 @@ namespace DryIoc
             }
 
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
-            if (rules.EagerCachingSingletonForFasterAccess && 
+            if (rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse &&
                 !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
@@ -9912,10 +9913,8 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
-            var slots = _slots;
-            var index = id & SLOT_COUNT_MASK;
-            return slots[index].TryFind(id, out var value) ? value 
-                : TryGetOrAdd(ref slots[index], id, createValue, disposalOrder);
+            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            return items.TryFind(id, out var value) ? value : TryGetOrAdd(ref items, id, createValue, disposalOrder);
         }
 
         private object TryGetOrAdd(ref ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
@@ -9955,10 +9954,9 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            var slots = _slots;
-            var index = id & SLOT_COUNT_MASK;
-            return slots[index].TryFind(id, out var value) ? value
-                : TryGetOrAddViaFactoryDelegate(ref slots[index], id, createValue, r, disposalOrder);
+            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            return items.TryFind(id, out var value) ? value
+                : TryGetOrAddViaFactoryDelegate(ref items, id, createValue, r, disposalOrder);
         }
 
         private object TryGetOrAddViaFactoryDelegate(
