@@ -38,6 +38,18 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(x1);
             Assert.IsNotNull(x2);
         }
+
+        [Test]
+        public void OpenScopeAndResolve_with_UseInterpretation()
+        {
+            var container = new Container(rules => rules.WithUseInterpretation()).PrepareDryIoc();
+            var x1 = container.Measure();
+
+            var x2 = container.Measure();
+
+            Assert.IsNotNull(x1);
+            Assert.IsNotNull(x2);
+        }
     }
 
     public static class Realistic_unit_of_work_slash_web_controller_example

@@ -241,7 +241,14 @@ namespace DryIoc
 
                 if (cacheSlot.Value is Expression cachedExpression)
                 {
-                    var compiledFactory = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                    if (Rules.UseInterpretation)
+                    {
+                        if (Interpreter.TryInterpretAndUnwrapContainerException(this,
+                            cachedExpression, false, out var result))
+                            return result;
+                    }
+
+                    var compiledFactory = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
                     cacheSlot.Value = compiledFactory;
                     return compiledFactory(this);
                 }
@@ -295,7 +302,7 @@ namespace DryIoc
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(useFec);
+                factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
             }
             else
             {
@@ -342,7 +349,11 @@ namespace DryIoc
 
                     if (cacheSlot.Value is Expression cachedExpression)
                     {
-                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                        if (Rules.UseInterpretation && 
+                            Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, Rules.UseFastExpressionCompiler, out var result))
+                            return result;
+
+                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
                         cacheSlot.Value = compiledDelegate;
                         return compiledDelegate(this);
                     }
@@ -378,7 +389,11 @@ namespace DryIoc
 
                     if (cacheSlot.Value is Expression cachedExpression)
                     {
-                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler);
+                        if (Rules.UseInterpretation && 
+                            Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, Rules.UseFastExpressionCompiler, out var result))
+                            return result;
+
+                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
                         cacheSlot.Value = compiledDelegate;
                         return compiledDelegate(this);
                     }
@@ -411,7 +426,7 @@ namespace DryIoc
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(useFec);
+                factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
             }
             else
             {
@@ -1642,7 +1657,7 @@ namespace DryIoc
                 {
                     var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                     if (decoratedExpr != null)
-                        return decoratedExpr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
+                        return decoratedExpr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler, request.Rules.UseInterpretation);
                 }
 
                 return GetInstanceFromScopeChainOrSingletons;
@@ -2479,7 +2494,6 @@ namespace DryIoc
             }
         }
 
-        // todo: consider to reduce recursion the same way as in FEC `TryEmit`
         /// Interprets passed expression
         public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
         {
@@ -2503,7 +2517,8 @@ namespace DryIoc
                                     args[i] = constExpr.Value;
                                 else if (TryInterpret(r, argExpr, useFec, out var arg))
                                     args[i] = arg;
-                                else return false;
+                                else
+                                    return false;
                             }
                             result = newExpr.Constructor.Invoke(args);
                         }
@@ -2615,7 +2630,7 @@ namespace DryIoc
                                         {
                                             if (TryInterpret(rc, e, uf, out var value))
                                                 return value;
-                                            return e.CompileToFactoryDelegate(uf)(rc);
+                                            return e.CompileToFactoryDelegate(useFastExpressionCompiler: uf, preferInterpretation: ((IContainer)rc).Rules.UseInterpretation)(rc);
                                         },
                                         (int)ConstValue(callArgs[2]));
                                 }
@@ -2856,7 +2871,7 @@ namespace DryIoc
                 {
                     if (TryInterpret(rc, e, uf, out var value))
                         return value;
-                    return e.CompileToFactoryDelegate(uf)(rc);
+                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
                 },
                 (int)ConstValue(args[4]));
         }
@@ -2892,7 +2907,7 @@ namespace DryIoc
                 {
                     if (TryInterpret(rc, e, uf, out var value))
                         return value;
-                    return e.CompileToFactoryDelegate(uf)(rc);
+                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
                 },
                 (int)ConstValue(args[5]));
         }
@@ -2911,7 +2926,7 @@ namespace DryIoc
                 {
                     if (TryInterpret(rc, e, uf, out var value))
                         return value;
-                    return e.CompileToFactoryDelegate(uf)(rc);
+                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
                 },
                 disposalOrder: (int)ConstValue(args[3]));
         }
@@ -2986,7 +3001,10 @@ namespace DryIoc
                     return operandExpr;
             }
 
-            return expr.Type != typeof(void) && expr.Type.IsValueType() ? Convert(expr, typeof(object)) : expr;
+            if (expr.Type != typeof(void) && expr.Type.IsValueType())
+                return Convert(expr, typeof(object));
+
+            return expr;
         }
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
@@ -2997,9 +3015,51 @@ namespace DryIoc
 #endif
                 );
 
+        /// How to compile
+        public enum HowToCompile
+        {
+            /// Foo
+            UseSystemCompile = 0,
+            /// Bar
+            UseFastExpressionCompiler,
+            /// Zoo
+            PreferIntrerpetation
+        }
+
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        public static FactoryDelegate CompileToFactoryDelegate(this Expression expression,
+        public static FactoryDelegate CompileToFactoryDelegate(
+            this Expression expression, bool useFastExpressionCompiler, bool preferInterpretation)
+        {
+            expression = expression.NormalizeExpression();
+
+            if (expression is ConstantExpression constExpr)
+                return constExpr.Value.ToFactoryDelegate;
+
+            if (!preferInterpretation && useFastExpressionCompiler)
+            {
+                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
+                    expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                if (factoryDelegate != null)
+                    return factoryDelegate;
+            }
+
+            // fallback for platforms when FastExpressionCompiler is not supported,
+            // or just in case when some expression is not supported (did not found one yet)
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs, typeof(object)).ToLambdaExpression()
+#else
+            return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs)
+#endif
+                .Compile(
+#if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
+                    preferInterpretation
+#endif
+);
+        }
+
+        /// [Obsolete("Use the version with `preferInterpretation` parameter instead")]
+        public static FactoryDelegate CompileToFactoryDelegate(this Expression expression, 
             bool useFastExpressionCompiler = false)
         {
             expression = expression.NormalizeExpression();
@@ -4628,6 +4688,7 @@ namespace DryIoc
             _settings & ~Settings.EagerCachingSingletonForFasterAccess
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       & ~Settings.UseInterpretationForTheFirstResolution
+                      & ~Settings.UseInterpretation
                       | Settings.UsedForExpressionGeneration
                       | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
@@ -4705,7 +4766,19 @@ namespace DryIoc
 
         /// Fallbacks to system `Expression.Compile()`
         public Rules WithoutInterpretationForTheFirstResolution() =>
-            WithSettings(_settings & ~Settings.UseInterpretationForTheFirstResolution);
+            WithSettings(_settings & ~Settings.UseInterpretationForTheFirstResolution & ~Settings.UseInterpretation);
+
+        /// Subject
+        public bool UseInterpretation => 
+            (_settings & Settings.UseInterpretation) != 0;
+
+        /// Uses DryIoc own interpretation mechanism or fallbacks to `Compile(preferInterpretation: true)`
+        public Rules WithUseInterpretation() => 
+            WithSettings(_settings | Settings.UseInterpretation | Settings.UseInterpretationForTheFirstResolution);
+
+        /// Subject
+        public Rules WithoutUseInterpretation() => 
+            WithSettings(_settings & ~Settings.UseInterpretation);
 
         /// <summary>Outputs most notable non-default rules</summary>
         public override string ToString()
@@ -4806,7 +4879,8 @@ namespace DryIoc
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
             UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
-            UseInterpretationForTheFirstResolution = 1 << 18
+            UseInterpretationForTheFirstResolution = 1 << 18,
+            UseInterpretation = 1 << 19
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -8128,16 +8202,16 @@ namespace DryIoc
                     Setup.WeaklyReferenced ? (Func<IResolverContext, Expression, bool, object>)(
                         (r, e, u) => new WeakReference(
                         Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                            ? instance : e.CompileToFactoryDelegate(u)(r))) :
+                            ? instance : e.CompileToFactoryDelegate(u, ((IContainer)r).Rules.UseInterpretation)(r))) :
                     Setup.PreventDisposal ? (Func<IResolverContext, Expression, bool, object>)(
                         (r, e, u) => (object)new HiddenDisposable(
                         Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                            ? instance : e.CompileToFactoryDelegate(u)(r))) :
+                            ? instance : e.CompileToFactoryDelegate(u, ((IContainer)r).Rules.UseInterpretation)(r))) :
                         (r, e, u) =>
                         {
                             if (Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance))
                                 return instance;
-                            return e.CompileToFactoryDelegate(u)(r);
+                            return e.CompileToFactoryDelegate(u, ((IContainer)r).Rules.UseInterpretation)(r);
                         };
 
                 var container = request.Container;
@@ -8174,7 +8248,8 @@ namespace DryIoc
 
         /// Creates factory delegate from service expression and returns it.
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
-            GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler);
+            GetExpressionOrDefault(request)
+                ?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler, request.Rules.UseInterpretation);
 
         internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
