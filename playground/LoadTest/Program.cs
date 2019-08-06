@@ -24,7 +24,12 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            var container = new Container(rules => rules
+                // With Interpretation completes without error in 28 sec
+                //.WithUseInterpretation()
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(config);
+
             Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`

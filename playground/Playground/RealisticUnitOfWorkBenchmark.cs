@@ -1003,14 +1003,17 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### Per-container expression cache
 
-|                                               Method |        Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|----------------------------------------------------- |------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|------:|----------:|
-|                    BmarkMicrosoftDependencyInjection |    138.6 us |   2.510 us |   2.225 us |   1.00 |    0.00 |  18.5547 |  0.4883 |     - |  80.63 KB |
-|                                          BmarkDryIoc |    112.5 us |   1.098 us |   1.027 us |   0.81 |    0.01 |  22.2168 |  0.1221 |     - | 102.76 KB |
-| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    111.7 us |   1.258 us |   1.176 us |   0.81 |    0.02 |  21.3623 |  0.2441 |     - |  98.88 KB |
-|                                      BmarkDryIocMsDi |    123.0 us |   1.243 us |   1.101 us |   0.89 |    0.01 |  24.1699 |  0.2441 |     - | 111.47 KB |
-|                                           BmarkGrace | 18,405.3 us |  89.436 us |  83.658 us | 132.75 |    2.18 | 156.2500 | 62.5000 |     - | 739.95 KB |
-|                                       BmarkGraceMsDi | 22,026.4 us | 142.195 us | 133.009 us | 158.83 |    2.53 | 187.5000 | 93.7500 |     - | 909.85 KB |
+                                               Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
+                    BmarkMicrosoftDependencyInjection |    142.4 us |   2.8172 us |   3.0143 us |   1.00 |    0.00 |  18.5547 |  0.2441 |     - |  80.63 KB |
+                                          BmarkDryIoc |    115.1 us |   1.2749 us |   1.1926 us |   0.81 |    0.02 |  22.2168 |  0.1221 |     - | 102.76 KB |
+            BmarkDryIoc_WithoutFastExpressionCompiler |    118.8 us |   0.7867 us |   0.7358 us |   0.83 |    0.02 |  22.2168 |  0.1221 |     - | 102.85 KB |
+ BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    116.9 us |   2.2063 us |   2.3607 us |   0.82 |    0.03 |  21.3623 |  0.1221 |     - |  98.88 KB |
+                                      BmarkDryIocMsDi |    127.6 us |   1.0401 us |   0.9729 us |   0.89 |    0.02 |  24.1699 |  0.2441 |     - | 111.57 KB |
+                                           BmarkGrace | 18,639.2 us | 112.6611 us | 105.3833 us | 130.54 |    2.90 | 156.2500 | 62.5000 |     - | 740.69 KB |
+                                       BmarkGraceMsDi | 22,114.5 us | 120.6271 us | 112.8347 us | 154.88 |    3.48 | 187.5000 | 93.7500 |     - |  909.8 KB |
+                                         BmarkAutofac |    650.1 us |   8.9800 us |   8.3999 us |   4.55 |    0.13 |  99.6094 |       - |     - | 460.65 KB |
+                                     BmarkAutofacMsDi |    680.0 us |   5.2721 us |   4.9315 us |   4.76 |    0.12 | 102.5391 |  8.7891 |     - | 474.55 KB |
             */
 
             [Benchmark(Baseline = true)]
@@ -1018,6 +1021,9 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
+
+            [Benchmark]
+            public object BmarkDryIoc_WithoutFastExpressionCompiler() => Measure(PrepareDryIoc(false, withoutFastExpressionCompiler: true));
 
             [Benchmark]
             public object BmarkDryIoc_RegisterDelegateWithInjectedDependencies() => Measure(PrepareDryIoc_RegisterDelegateWithInjectedDependencies());
@@ -1031,10 +1037,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
         }
 

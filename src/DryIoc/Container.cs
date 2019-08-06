@@ -40,6 +40,9 @@ THE SOFTWARE.
 #if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NET35 && !NET40 && !NET403
 #define SUPPORTS_VARIANCE
 #endif
+#if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
+#define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
+#endif
 
 namespace DryIoc
 {
@@ -129,7 +132,7 @@ namespace DryIoc
 
             if (_ownCurrentScope != null) // scoped container
             {
-                SetCurrentScopeToScopeContext(_ownCurrentScope);
+                _scopeContext?.SetCurrent(current => current == _ownCurrentScope ? current.Parent : current);
                 _ownCurrentScope.Dispose();
             }
             else // whole Container with singletons.
@@ -146,10 +149,6 @@ namespace DryIoc
         {
             try { _disposeStackTrace = new StackTrace(); } catch {}
         }
-
-        // hiding nested lambda to reduce allocations
-        private void SetCurrentScopeToScopeContext(IScope scope) => 
-            _scopeContext?.SetCurrent(s => s == scope ? s.Parent : s);
 
         #region IRegistrator
 
@@ -213,9 +212,9 @@ namespace DryIoc
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
         }
 
-        #endregion
+#endregion
 
-        #region IResolver
+#region IResolver
 
 #if SUPPORTS_ISERVICE_PROVIDER
         /// Resolves service with <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
@@ -277,7 +276,7 @@ namespace DryIoc
                 return null;
 
             FactoryDelegate factoryDelegate;
-            if (factory.UseInterpretation(request))
+            if (factory is InstanceFactory == false)
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -552,9 +551,9 @@ namespace DryIoc
                 Throw.It(Error.ContainerIsDisposed, ToString());
         }
 
-        #endregion
+#endregion
 
-        #region IResolverContext
+#region IResolverContext
 
         /// <inheritdoc />
         public IResolverContext Parent => _parent;
@@ -832,9 +831,9 @@ namespace DryIoc
         public void Use(Type serviceType, FactoryDelegate factory) => 
             (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
 
-        #endregion
+#endregion
 
-        #region IContainer
+#region IContainer
 
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
@@ -1469,9 +1468,9 @@ namespace DryIoc
         private static readonly MethodInfo _kvOfMethod =
             typeof(KV).GetTypeInfo().GetDeclaredMethod(nameof(KV.Of));
 
-        #endregion
+#endregion
 
-        #region Factories Add/Get
+#region Factories Add/Get
 
         internal sealed class FactoriesEntry
         {
@@ -1622,9 +1621,9 @@ namespace DryIoc
             return factory;
         }
 
-        #endregion
+#endregion
 
-        #region Implementation
+#region Implementation
 
         private int _disposed;
         private StackTrace _disposeStackTrace;
@@ -1674,7 +1673,7 @@ namespace DryIoc
             public override Expression CreateExpressionOrDefault(Request request) =>
                 Resolver.CreateResolutionExpression(request);
 
-            #region Implementation
+#region Implementation
 
             private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
             {
@@ -1699,7 +1698,7 @@ namespace DryIoc
                    ?? value;
             }
 
-            #endregion
+#endregion
         }
 
         internal sealed class Registry
@@ -2417,7 +2416,7 @@ namespace DryIoc
             _parent = parent;
         }
 
-        #endregion
+#endregion
     }
 
     /// Special service key with info about open-generic service type
@@ -3052,7 +3051,7 @@ namespace DryIoc
             return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs)
 #endif
                 .Compile(
-#if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
+#if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
                     preferInterpretation
 #endif
 );
@@ -3749,16 +3748,15 @@ namespace DryIoc
         public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
             // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
-            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope, name) : SetCurrentContextScope(r, name);
+            var scope = r.ScopeContext == null 
+                ? new Scope(r.CurrentScope, name) 
+                : r.ScopeContext.SetCurrent(current => new Scope(current, name));
 
             if (trackInParent)
                 (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
 
             return r.WithCurrentScope(scope);
         }
-
-        private static IScope SetCurrentContextScope(IResolverContext r, object name) =>
-            r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
 
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
