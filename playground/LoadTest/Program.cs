@@ -81,7 +81,7 @@ namespace LoadTest
         public static void IterateInOrder(Type[] controllerTypes, IContainer container)
         {
             var threadCount = 32;
-            var iterations = 100;
+            var iterations = 10;
             var i = 0;
             var threads = new Thread[threadCount];
 
@@ -143,7 +143,7 @@ namespace LoadTest
 
         public static void ParaetrizedLoop(object param)
         {
-            LoadTestParams p = (LoadTestParams) param;
+            LoadTestParams p = (LoadTestParams)param;
             int controllerCount = p.controllerTypes.Length;
 
             for (var j = 0; j < p.iterations; j++)
