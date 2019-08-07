@@ -162,7 +162,7 @@ namespace LoadTest
 
         public static void StartRandomOrderTest(Type[] controllerTypes, IContainer container)
         {
-            var threadCount = 1;
+            var threadCount = controllerTypes.Length - 1;
             var iterations = 10;
             int i;
             var threads = new Thread[threadCount];
