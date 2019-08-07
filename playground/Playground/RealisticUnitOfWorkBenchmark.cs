@@ -982,26 +982,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac |    696.3 us |   4.9448 us |   4.3834 us |   4.71 |    0.07 |    102.5391 |      2.9297 |           - |            472.8 KB |
                   BmarkAutofacMsDi |    688.8 us |   7.1206 us |   6.6606 us |   4.66 |    0.07 |    105.4688 |      0.9766 |           - |           489.97 KB |
 
-            ### FEC v2.1 and BDN 0.11.5
-
-|                            Method |     Mean |    Error |    StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|---------------------------------- |---------:|---------:|----------:|------:|--------:|-------:|------:|----------:|
-| BmarkMicrosoftDependencyInjection | 120.6 us | 1.223 us | 0.9550 us |  1.00 | 18.6768 | 0.1221 |     - |  80.63 KB |
-|                       BmarkDryIoc | 147.2 us | 1.034 us | 0.9673 us |  1.22 | 28.3203 | 0.2441 |     - | 131.55 KB |
-|                   BmarkDryIocMsDi | 166.6 us | 1.509 us | 1.4116 us |  1.38 | 30.7617 | 0.7324 |     - | 142.35 KB |
-
-            ### RegisterDelegate with injected dependencies
-
-|                                               Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
-|                    BmarkMicrosoftDependencyInjection |    121.0 us |   0.9459 us |   0.8848 us |   1.00 |    0.00 |  18.6768 |  0.1221 |     - |  80.63 KB |
-|                                          BmarkDryIoc |    145.0 us |   0.7806 us |   0.6518 us |   1.20 |    0.01 |  28.3203 |  0.2441 |     - | 131.55 KB |
-| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |    114.1 us |   0.7860 us |   0.6968 us |   0.94 |    0.01 |  22.7051 |  0.1221 |     - | 104.65 KB |
-|                                      BmarkDryIocMsDi |    161.4 us |   2.0801 us |   1.9457 us |   1.33 |    0.02 |  30.7617 |  0.7324 |     - | 142.35 KB |
-|                                           BmarkGrace | 17,375.4 us | 329.5635 us | 308.2739 us | 143.57 |    2.96 | 156.2500 | 62.5000 |     - | 739.99 KB |
-|                                       BmarkGraceMsDi | 19,487.7 us | 112.4615 us | 105.1965 us | 161.02 |    1.56 | 187.5000 | 93.7500 |     - | 909.83 KB |
-
-            ### Per-container expression cache
+            ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
                                                Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
 ----------------------------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
@@ -1022,7 +1003,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkDryIoc_WithoutFastExpressionCompiler() => Measure(PrepareDryIoc(false, withoutFastExpressionCompiler: true));
 
             [Benchmark]
@@ -1031,16 +1012,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
         }
 
@@ -1215,27 +1196,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac | 38.488 us | 0.2379 us | 0.2225 us |  9.94 |    0.12 |      9.7656 |           - |           - |             45.2 KB |
                   BmarkAutofacMsDi | 47.389 us | 0.1995 us | 0.1866 us | 12.24 |    0.11 |     12.5732 |      0.1221 |           - |            58.09 KB |
 
-            ## After scaling the locks
-
-                            Method |     Mean |     Error |    StdDev | Ratio | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection | 3.674 us | 0.0145 us | 0.0121 us |  1.00 |      0.9460 |           - |           - |             4.37 KB |
-                       BmarkDryIoc | 4.399 us | 0.0168 us | 0.0140 us |  1.20 |      2.0828 |           - |           - |             9.62 KB |
-                   BmarkDryIocMsDi | 4.598 us | 0.0586 us | 0.0548 us |  1.25 |      2.0905 |           - |           - |             9.66 KB |
-                        BmarkGrace | 2.606 us | 0.0276 us | 0.0258 us |  0.71 |      0.5798 |           - |           - |             2.69 KB |
-                    BmarkGraceMsDi | 3.311 us | 0.0423 us | 0.0396 us |  0.90 |      0.6332 |           - |           - |             2.93 KB |
-
-            ## Hybrid array[tree] collection for scoped items
-
-                            Method |     Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |---------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection | 3.836 us | 0.0331 us | 0.0309 us |  1.00 |    0.00 |      0.9460 |           - |           - |             4.37 KB |
-                       BmarkDryIoc | 4.000 us | 0.0265 us | 0.0248 us |  1.04 |    0.01 |      1.6174 |           - |           - |             7.47 KB |
-                   BmarkDryIocMsDi | 4.135 us | 0.0322 us | 0.0301 us |  1.08 |    0.01 |      1.6251 |           - |           - |             7.52 KB |
-                        BmarkGrace | 2.590 us | 0.0071 us | 0.0066 us |  0.68 |    0.01 |      0.5798 |           - |           - |             2.69 KB |
-                    BmarkGraceMsDi | 3.336 us | 0.0560 us | 0.0523 us |  0.87 |    0.02 |      0.6332 |           - |           - |             2.93 KB |
-
-            ## FEC v3
+            ## FEC V3 and multiple improvements 
 
 |                                               Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
 |----------------------------------------------------- |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
