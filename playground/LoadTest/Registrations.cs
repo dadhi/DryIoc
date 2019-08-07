@@ -470,7 +470,12 @@ namespace LoadTest
                 container.Register<IModelConverter<WorkPriceEx>, WorkHourPriceModelConverter>(Reuse.Scoped, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<IModelConverter<TemporaryProjectTravelExpenseModel>, TemporaryProjectTravelsModelConverter>(Reuse.Scoped, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<PsaReportFactory, PsaReportFactory>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-                container.RegisterDelegate<ReportControllerFactory<IPsaContext>>(c => PsaReportFactory.Factory, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                container.RegisterDelegate<ReportControllerFactory<IPsaContext>>(
+                    c =>
+                    {
+                        return PsaReportFactory.Factory;
+                    }, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw
+                );
                 container.RegisterDelegate<IReportFactoryService<IPsaContext>>(c => PsaReportFactory.Factory, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.RegisterDelegate<IPsaReportFactoryService>(c => PsaReportFactory.Factory, Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IWhiteListService, WhiteListService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);

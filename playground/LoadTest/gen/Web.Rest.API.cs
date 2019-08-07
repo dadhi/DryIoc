@@ -14,6 +14,7 @@ using Conn.Adapter;
 using Conn.Service;
 using RM;
 using Data;
+using DryIoc;
 using Entities;
 using Financials;
 using Framework;
@@ -10956,7 +10957,7 @@ namespace Web.Rest.API
 
     public class PsaReportFactory : ReportControllerFactory<IPsaContext>, IPsaReportFactoryService
     {
-        public static readonly PsaReportFactory Factory = null;
+        public static readonly PsaReportFactory Factory = LoadTest.Program.RootContainer.Resolve<PsaReportFactory>(ifUnresolved: IfUnresolved.Throw);
 
         private readonly IGuidService _GuidService;
         private readonly IAccountService _AccountService;
