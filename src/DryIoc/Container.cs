@@ -123,31 +123,41 @@ namespace DryIoc
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
+            // if already disposed - just leave
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            // nice to have, but we can live without it if something goes wrong
+            // Nice to have disposal stack-trace, but we can live without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
-                NewStackTrace();
+                try { _disposeStackTrace = new StackTrace(); }
+                catch { }
 
-            if (_ownCurrentScope != null) // scoped container
+            if (_parent != null)
             {
-                _scopeContext?.SetCurrent(current => current == _ownCurrentScope ? current.Parent : current);
-                _ownCurrentScope.Dispose();
+                if (_ownCurrentScope != null)
+                {
+                    _ownCurrentScope.Dispose();
+                }
+                else if (_scopeContext != null)
+                {
+                    IScope currentScope = null;
+                    _scopeContext.SetCurrent(s =>
+                    {
+                        // save the current scope for the later,
+                        // do dispose it AFTER its parent is actually set to be a new ambient current scope.
+                        currentScope = s;
+                        return s?.Parent;
+                    });
+                    currentScope?.Dispose();
+                }
             }
-            else // whole Container with singletons.
+            else
             {
                 _registry.Swap(Registry.Empty);
                 Rules = Rules.Default;
                 _singletonScope.Dispose(); // will also dispose any tracked scopes
                 _scopeContext?.Dispose();
             }
-        }
-
-        // hiding nested lambda to reduce allocations
-        private void NewStackTrace()
-        {
-            try { _disposeStackTrace = new StackTrace(); } catch {}
         }
 
         #region IRegistrator
@@ -583,6 +593,7 @@ namespace DryIoc
             _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
         public IResolverContext WithCurrentScope(IScope scope)
         {
             ThrowIfContainerDisposed();
@@ -590,8 +601,7 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
-        /// Will become OBSOLETE in the next major version:
-        /// Please just use `RegisterInstance` or <see cref="Use"/> method instead.
+        /// [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
@@ -838,7 +848,7 @@ namespace DryIoc
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
-        /// <summary>Represents scope bound to container itself, and not an ambient (context) thing.</summary>
+        /// <summary>Represents scope bound to container itself, and not the ambient (context) thing.</summary>
         public IScope OwnCurrentScope => _ownCurrentScope;
 
         /// <summary>Indicates that container is disposed.</summary>
@@ -853,19 +863,14 @@ namespace DryIoc
             RegistrySharing registrySharing, IScope singletonScope, IScope curentScope)
         {
             ThrowIfContainerDisposed();
-            rules = rules ?? Rules.Default;
 
             var registry =
                 registrySharing == RegistrySharing.Share ? _registry :
                 registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
-            singletonScope = singletonScope ?? NewSingletonScope();
-            curentScope = curentScope ?? _ownCurrentScope;
-            parent = parent ?? _parent;
-
-            return new Container(rules, registry, singletonScope, scopeContext,
-                _ownCurrentScope, _disposed, _disposeStackTrace, _parent);
+            return new Container(rules ?? Rules.Default, registry, singletonScope ?? NewSingletonScope(), scopeContext,
+                curentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -3645,7 +3650,7 @@ namespace DryIoc
         /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
         IScope CurrentScope { get; }
 
-        /// <summary>Creates resolver context with specified current scope (or container which implements the context).</summary>
+        /// Creates the resolver context with specified current Container-OWN scope 
         IResolverContext WithCurrentScope(IScope scope);
 
         /// Put instance into the current scope or singletons.
@@ -3698,10 +3703,10 @@ namespace DryIoc
             Property(FactoryDelegateCompiler.ResolverContextParamExpr,
                 typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
 
-        /// <summary>Indicates that context is scoped, have an open scope</summary>
-        public static bool IsScoped(this IResolverContext r) => r.CurrentScope != null;
+        /// Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context
+        public static bool IsScoped(this IResolverContext r) => r.Parent != null;
 
-        /// <summary>Provides access to the current scope.</summary>
+        /// Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between 
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
             r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null);
 
@@ -3747,15 +3752,23 @@ namespace DryIoc
         /// ]]></code></example>
         public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
-            // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
-            var scope = r.ScopeContext == null 
-                ? new Scope(r.CurrentScope, name) 
-                : r.ScopeContext.SetCurrent(current => new Scope(current, name));
+            if (r.ScopeContext == null)
+            {
+                // todo: may use `r.OwnCurrentScope` when its moved to `IResolverContext` from `IContainer`
+                var parentScope = r.CurrentScope;
+                var newOwnScope = new Scope(parentScope, name);
+                if (trackInParent)
+                    (parentScope ?? r.SingletonScope).TrackDisposable(newOwnScope);
+                return r.WithCurrentScope(newOwnScope);
+            }
+
+            var newContextScope = name == null
+                ? r.ScopeContext.SetCurrent(parent => new Scope(parent))
+                : r.ScopeContext.SetCurrent(parent => new Scope(parent, name));
 
             if (trackInParent)
-                (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
-
-            return r.WithCurrentScope(scope);
+                (newContextScope.Parent ?? r.SingletonScope).TrackDisposable(newContextScope);
+            return r.WithCurrentScope(null);
         }
 
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
@@ -10260,10 +10273,10 @@ namespace DryIoc
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
         public override string ToString() =>
-            (IsDisposed ? "disposed" : "") + "{"
-            + (Name != null ? "Name=" + Name : "no name")
-            + (Parent != null ? ", Parent=" + Parent : "")
-            + "}";
+            "{" + (IsDisposed ? "IsDisposed=true, " : "")
+                + (Name != null ? "Name=" + Name : "Name=null")
+                + (Parent != null ? ", Parent=" + Parent : "")
+                + "}";
 
         private ImHashMap<Type, FactoryDelegate> _factories;
         private ImMap<IDisposable> _disposables;
