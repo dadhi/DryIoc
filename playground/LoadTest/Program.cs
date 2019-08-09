@@ -19,10 +19,9 @@ namespace LoadTest
         public static IContainer CreateContainer()
         {
             var config = new HttpConfiguration();
-            var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
             var container = new Container(rules => rules
                 // With UseInterpretation it completes without error in 28 sec
-                //.WithUseInterpretation()
+                .WithUseInterpretation()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
