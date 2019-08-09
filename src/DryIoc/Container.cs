@@ -40,6 +40,9 @@ THE SOFTWARE.
 #if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NET35 && !NET40 && !NET403
 #define SUPPORTS_VARIANCE
 #endif
+#if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
+#define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
+#endif
 
 namespace DryIoc
 {
@@ -120,19 +123,35 @@ namespace DryIoc
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
+            // if already disposed - just leave
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            // nice to have, but we can live without it if something goes wrong
+            // Nice to have disposal stack-trace, but we can live without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
-                NewStackTrace();
+                try { _disposeStackTrace = new StackTrace(); }
+                catch { }
 
-            if (_ownCurrentScope != null) // scoped container
+            if (_parent != null)
             {
-                SetCurrentScopeToScopeContext(_ownCurrentScope);
-                _ownCurrentScope.Dispose();
+                if (_ownCurrentScope != null)
+                {
+                    _ownCurrentScope.Dispose();
+                }
+                else if (_scopeContext != null)
+                {
+                    IScope currentScope = null;
+                    _scopeContext.SetCurrent(s =>
+                    {
+                        // save the current scope for the later,
+                        // do dispose it AFTER its parent is actually set to be a new ambient current scope.
+                        currentScope = s;
+                        return s?.Parent;
+                    });
+                    currentScope?.Dispose();
+                }
             }
-            else // whole Container with singletons.
+            else
             {
                 _registry.Swap(Registry.Empty);
                 Rules = Rules.Default;
@@ -140,16 +159,6 @@ namespace DryIoc
                 _scopeContext?.Dispose();
             }
         }
-
-        // hiding nested lambda to reduce allocations
-        private void NewStackTrace()
-        {
-            try { _disposeStackTrace = new StackTrace(); } catch {}
-        }
-
-        // hiding nested lambda to reduce allocations
-        private void SetCurrentScopeToScopeContext(IScope scope) => 
-            _scopeContext?.SetCurrent(s => s == scope ? s.Parent : s);
 
         #region IRegistrator
 
@@ -213,9 +222,9 @@ namespace DryIoc
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
         }
 
-        #endregion
+#endregion
 
-        #region IResolver
+#region IResolver
 
 #if SUPPORTS_ISERVICE_PROVIDER
         /// Resolves service with <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
@@ -277,7 +286,7 @@ namespace DryIoc
                 return null;
 
             FactoryDelegate factoryDelegate;
-            if (factory.UseInterpretation(request))
+            if (factory is InstanceFactory == false)
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -552,9 +561,9 @@ namespace DryIoc
                 Throw.It(Error.ContainerIsDisposed, ToString());
         }
 
-        #endregion
+#endregion
 
-        #region IResolverContext
+#region IResolverContext
 
         /// <inheritdoc />
         public IResolverContext Parent => _parent;
@@ -584,6 +593,7 @@ namespace DryIoc
             _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
         public IResolverContext WithCurrentScope(IScope scope)
         {
             ThrowIfContainerDisposed();
@@ -591,8 +601,7 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
-        /// Will become OBSOLETE in the next major version:
-        /// Please just use `RegisterInstance` or <see cref="Use"/> method instead.
+        /// [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
@@ -832,14 +841,14 @@ namespace DryIoc
         public void Use(Type serviceType, FactoryDelegate factory) => 
             (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
 
-        #endregion
+#endregion
 
-        #region IContainer
+#region IContainer
 
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         public Rules Rules { get; private set; }
 
-        /// <summary>Represents scope bound to container itself, and not an ambient (context) thing.</summary>
+        /// <summary>Represents scope bound to container itself, and not the ambient (context) thing.</summary>
         public IScope OwnCurrentScope => _ownCurrentScope;
 
         /// <summary>Indicates that container is disposed.</summary>
@@ -854,19 +863,14 @@ namespace DryIoc
             RegistrySharing registrySharing, IScope singletonScope, IScope curentScope)
         {
             ThrowIfContainerDisposed();
-            rules = rules ?? Rules.Default;
 
             var registry =
                 registrySharing == RegistrySharing.Share ? _registry :
                 registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
-            singletonScope = singletonScope ?? NewSingletonScope();
-            curentScope = curentScope ?? _ownCurrentScope;
-            parent = parent ?? _parent;
-
-            return new Container(rules, registry, singletonScope, scopeContext,
-                _ownCurrentScope, _disposed, _disposeStackTrace, _parent);
+            return new Container(rules ?? Rules.Default, registry, singletonScope ?? NewSingletonScope(), scopeContext,
+                curentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -1469,9 +1473,9 @@ namespace DryIoc
         private static readonly MethodInfo _kvOfMethod =
             typeof(KV).GetTypeInfo().GetDeclaredMethod(nameof(KV.Of));
 
-        #endregion
+#endregion
 
-        #region Factories Add/Get
+#region Factories Add/Get
 
         internal sealed class FactoriesEntry
         {
@@ -1622,9 +1626,9 @@ namespace DryIoc
             return factory;
         }
 
-        #endregion
+#endregion
 
-        #region Implementation
+#region Implementation
 
         private int _disposed;
         private StackTrace _disposeStackTrace;
@@ -1674,7 +1678,7 @@ namespace DryIoc
             public override Expression CreateExpressionOrDefault(Request request) =>
                 Resolver.CreateResolutionExpression(request);
 
-            #region Implementation
+#region Implementation
 
             private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
             {
@@ -1699,7 +1703,7 @@ namespace DryIoc
                    ?? value;
             }
 
-            #endregion
+#endregion
         }
 
         internal sealed class Registry
@@ -2417,7 +2421,7 @@ namespace DryIoc
             _parent = parent;
         }
 
-        #endregion
+#endregion
     }
 
     /// Special service key with info about open-generic service type
@@ -3052,7 +3056,7 @@ namespace DryIoc
             return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs)
 #endif
                 .Compile(
-#if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
+#if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
                     preferInterpretation
 #endif
 );
@@ -3646,7 +3650,7 @@ namespace DryIoc
         /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
         IScope CurrentScope { get; }
 
-        /// <summary>Creates resolver context with specified current scope (or container which implements the context).</summary>
+        /// Creates the resolver context with specified current Container-OWN scope 
         IResolverContext WithCurrentScope(IScope scope);
 
         /// Put instance into the current scope or singletons.
@@ -3699,10 +3703,10 @@ namespace DryIoc
             Property(FactoryDelegateCompiler.ResolverContextParamExpr,
                 typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
 
-        /// <summary>Indicates that context is scoped, have an open scope</summary>
-        public static bool IsScoped(this IResolverContext r) => r.CurrentScope != null;
+        /// Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context
+        public static bool IsScoped(this IResolverContext r) => r.Parent != null;
 
-        /// <summary>Provides access to the current scope.</summary>
+        /// Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between 
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
             r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null);
 
@@ -3748,17 +3752,24 @@ namespace DryIoc
         /// ]]></code></example>
         public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
         {
-            // todo: Should we use OwnCurrentScope, then should it be in ResolverContext?
-            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope, name) : SetCurrentContextScope(r, name);
+            if (r.ScopeContext == null)
+            {
+                // todo: may use `r.OwnCurrentScope` when its moved to `IResolverContext` from `IContainer`
+                var parentScope = r.CurrentScope;
+                var newOwnScope = new Scope(parentScope, name);
+                if (trackInParent)
+                    (parentScope ?? r.SingletonScope).TrackDisposable(newOwnScope);
+                return r.WithCurrentScope(newOwnScope);
+            }
+
+            var newContextScope = name == null
+                ? r.ScopeContext.SetCurrent(parent => new Scope(parent))
+                : r.ScopeContext.SetCurrent(parent => new Scope(parent, name));
 
             if (trackInParent)
-                (scope.Parent ?? r.SingletonScope).TrackDisposable(scope);
-
-            return r.WithCurrentScope(scope);
+                (newContextScope.Parent ?? r.SingletonScope).TrackDisposable(newContextScope);
+            return r.WithCurrentScope(null);
         }
-
-        private static IScope SetCurrentContextScope(IResolverContext r, object name) =>
-            r.ScopeContext.SetCurrent(scope => new Scope(scope, name));
 
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
@@ -10262,10 +10273,10 @@ namespace DryIoc
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
         public override string ToString() =>
-            (IsDisposed ? "disposed" : "") + "{"
-            + (Name != null ? "Name=" + Name : "no name")
-            + (Parent != null ? ", Parent=" + Parent : "")
-            + "}";
+            "{" + (IsDisposed ? "IsDisposed=true, " : "")
+                + (Name != null ? "Name=" + Name : "Name=null")
+                + (Parent != null ? ", Parent=" + Parent : "")
+                + "}";
 
         private ImHashMap<Type, FactoryDelegate> _factories;
         private ImMap<IDisposable> _disposables;

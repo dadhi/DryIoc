@@ -279,13 +279,22 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
                              Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ----------------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
                         BmarkDryIoc |   172.6 ns |  1.664 ns |  1.556 ns |  0.61 |    0.01 |      0.0896 |           - |           - |               424 B |
- BmarkMicrosoftSDependencyInjection |   285.0 ns |  1.564 ns |  1.463 ns |  1.00 |    0.00 |      0.0758 |           - |           - |               360 B |
                          BmarkGrace |   301.3 ns |  4.890 ns |  4.574 ns |  1.06 |    0.02 |      0.1216 |           - |           - |               576 B |
+ BmarkMicrosoftSDependencyInjection |   285.0 ns |  1.564 ns |  1.463 ns |  1.00 |    0.00 |      0.0758 |           - |           - |               360 B |
                    BmarkLightInject | 1,079.8 ns | 14.331 ns | 13.406 ns |  3.79 |    0.05 |      0.2422 |           - |           - |              1144 B |
                        BmarkAutofac | 2,017.9 ns |  9.589 ns |  8.501 ns |  7.08 |    0.05 |      0.6676 |           - |           - |              3152 B |
 
+# 06.08.2019
+
+                             Method |       Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+----------------------------------- |-----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+                        BmarkDryIoc |   247.9 ns |  1.768 ns |  1.654 ns |  0.79 |    0.01 | 0.1135 |     - |     - |     536 B |
+                         BmarkGrace |   234.3 ns |  1.369 ns |  1.280 ns |  0.75 |    0.00 | 0.0575 |     - |     - |     272 B |
+ BmarkMicrosoftSDependencyInjection |   313.2 ns |  1.092 ns |  1.022 ns |  1.00 |    0.00 | 0.0811 |     - |     - |     384 B |
+                   BmarkLightInject | 1,025.1 ns | 19.367 ns | 23.055 ns |  3.26 |    0.08 | 0.2403 |     - |     - |    1136 B |
+                       BmarkAutofac | 2,640.2 ns | 30.274 ns | 25.280 ns |  8.43 |    0.08 | 0.8965 |     - |     - |    4232 B |
         */
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]
         public class FirstTimeOpenScopeResolve
         {
             private readonly IContainer _autofac = PrepareAutofac();

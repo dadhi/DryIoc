@@ -135,7 +135,9 @@ namespace DryIoc.UnitTests
                 Assert.That(getLog(), Is.InstanceOf<Log>());
 
             var ex = Assert.Throws<ContainerException>(() => getLog());
-            Assert.That(ex.Error, Is.EqualTo(Error.NoCurrentScope));
+            Assert.AreEqual(
+                Error.NameOf(Error.NoCurrentScope), 
+                ex.ErrorName);
         }
 
         [Test]
