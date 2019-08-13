@@ -3434,7 +3434,7 @@ namespace DryIoc
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(
             this IContainer container, params ServiceInfo[] roots)
         {
-            var generatingContainer = container.With(rules => rules.ForValidate());
+            var validatingContainer = container.With(rules => rules.ForValidate());
 
             List<KeyValuePair<ServiceInfo, ContainerException>> errors = null;
             for (var i = 0; i < roots.Length; i++)
@@ -3442,8 +3442,8 @@ namespace DryIoc
                 var root = roots[i];
                 try
                 {
-                    var request = Request.Create(generatingContainer, root);
-                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    var request = Request.Create(validatingContainer, root);
+                    var expr = validatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
                 }
@@ -5047,8 +5047,9 @@ namespace DryIoc
                 .GetConstructorOrNull(includeNonPublic, Empty<Type>())
                 ?.To(ctor => Of(ctor));
 
-        /// <summary>Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
-        /// Works both for resolving service and Func{TArgs..., TService}</summary>
+        /// Better be named `ConstructorWithMostResolvableArguments`.
+        /// Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
+        /// Works both for resolving service and `Func{TArgs..., TService}`
         public static readonly FactoryMethodSelector ConstructorWithResolvableArguments =
             Constructor(mostResolvable: true);
 
@@ -7845,15 +7846,15 @@ namespace DryIoc
             if (decorateeType == null && decorateeServiceKey == null)
                 return condition;
 
-            Func<Request, bool> decorateeCond;
+            Func<Request, bool> decorateeCondition;
             if (decorateeServiceKey == null)
-                decorateeCond = r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
+                decorateeCondition = r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
             else if (decorateeType == null)
-                decorateeCond = r => decorateeServiceKey.Equals(r.ServiceKey);
+                decorateeCondition = r => decorateeServiceKey.Equals(r.ServiceKey);
             else
-                decorateeCond = r => decorateeServiceKey.Equals(r.ServiceKey) &&
+                decorateeCondition = r => decorateeServiceKey.Equals(r.ServiceKey) &&
                                      r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
-            return condition == null ? decorateeCond : r => decorateeCond(r) && condition(r);
+            return condition == null ? decorateeCondition : r => decorateeCondition(r) && condition(r);
         }
 
         /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>

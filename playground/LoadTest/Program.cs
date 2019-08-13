@@ -24,13 +24,13 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            var container = new Container(rules => rules
-                // With UseInterpretation it completes without error in 28 sec
-                //.WithUseInterpretation()
-                .With(FactoryMethod.ConstructorWithResolvableArguments))
-                .WithWebApi(config);
+            //var container = new Container(rules => rules
+            //    // With UseInterpretation it completes without error in 28 sec
+            //    //.WithUseInterpretation()
+            //    .With(FactoryMethod.ConstructorWithResolvableArguments))
+            //    .WithWebApi(config);
 
-            Registrations.RegisterTypes(container, true);
+            //Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
@@ -48,8 +48,13 @@ namespace LoadTest
             //    -- Load Test Result--
             //  00:04:42.45
 
-            //var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
-            //Registrations.RegisterTypes(container, false);
+            // 13.08.2019 - 00:03:45.58
+
+            var container = new Container(rules => rules
+                .WithoutFastExpressionCompiler()
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(config);
+            Registrations.RegisterTypes(container, false);
 
 
             // This setup config WORKS, but uses a lot of memory
@@ -60,7 +65,12 @@ namespace LoadTest
             // After centralized cache and fan-keyed resolution cache
             //  00:02:54.82
 
-            //var container = new Container(rules => rules.WithoutFastExpressionCompiler().With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            // 13.08.2019 - still holds!
+
+            //var container = new Container(rules => rules
+            //    .WithoutFastExpressionCompiler()
+            //    .With(FactoryMethod.ConstructorWithResolvableArguments))
+            //    .WithWebApi(config);
             //Registrations.RegisterTypes(container, true);
 
             // Validate IoC registrations
