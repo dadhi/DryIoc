@@ -3678,9 +3678,7 @@ namespace DryIoc
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.DirectParent.IsSingletonOrDependencyOfSingleton
-            && !request.OpensResolutionScope
-            && !request.IsDirectlyWrappedInFunc()
+            request.DirectParent.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope && !request.IsDirectlyWrappedInFunc()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -7031,6 +7029,10 @@ namespace DryIoc
         /// <summary>Available in runtime only, provides access to container initiated request.</summary>
         public readonly IContainer Container;
 
+        // todo: WIP
+        /// The root / default resolver parameter, the new resolver parameter may be set in Scope or SingletonScope value factory delegate
+        internal ParameterExpression ResolverContextParamExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
+
         /// <summary>Request immediate parent.</summary>
         public readonly Request DirectParent;
 
@@ -8153,8 +8155,7 @@ namespace DryIoc
 
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (rules.EagerCachingSingletonForFasterAccess &&
-                request.Reuse is SingletonReuse &&
-                !setup.PreventDisposal && !setup.WeaklyReferenced)
+                request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
                 if (request.SingletonScope.TryGet(out var singleton, FactoryID))
                     return Constant(singleton, request.ServiceType);
@@ -8175,7 +8176,14 @@ namespace DryIoc
                     return cachedExpr;
             }
 
-            // Then create a new expression
+            // Creates an object graph expression with all of the dependencies created
+            // todo: But we need somehow to say to dependencies downwards that ResolverContext parameter is a new one, e.g.:
+            //
+            // `CurrentScopeReuse.GetScopedWithResolverContext(r, id: 183, r1 =>
+            //      CurrentScopeReuse.GetScopedWithResolverContext(r1, ...)`
+            //
+            // Btw, we need a different name for `r1..` paremeter to avoid conflicts in generation scenarios.
+            //
             var serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr != null)
             {
@@ -8197,8 +8205,8 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
-        /// and producing the result expression.</summary>
+        /// Applies reuse to created expression, by wrapping passed expression into scoped access
+        /// and producing the result expression.
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
             // Optimization: eagerly creates a singleton during the construction of object graph
@@ -9549,7 +9557,7 @@ namespace DryIoc
             Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
     }
 
-    /// <summary>Should return value stored in scope.</summary>
+    /// Should return value stored in scope
     public delegate object CreateScopedValue();
 
     /// <summary>Lazy object storage that will create object with provided factory on first access,
@@ -9570,6 +9578,9 @@ namespace DryIoc
 
         /// Creates, stores, and returns created item
         object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
+
+        /// Creates, stores, and returns created item
+        object GetOrAddWithResolverContext(IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0);
 
         /// Create the value via `FactoryDelegate` if it is available
         object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0);
@@ -9599,8 +9610,8 @@ namespace DryIoc
         IScope Clone();
     }
 
-    /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
-    /// <c>lock</c> is used internally to ensure that object factory called only once.</summary>
+    /// Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
+    /// <c>lock</c> is used internally to ensure that object factory called only once.
     public sealed class SingletonScope : IScope
     {
         struct Slot
@@ -9659,7 +9670,7 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             var slots = _slots;
-            var index =  id & SLOT_COUNT_MASK;
+            var index =  id & SLOT_COUNT_SUFFIX_MASK;
             return slots[index].Items.TryFind(id, out var value) ? value
                 : TryGetOrAdd(ref slots[index], id, createValue, disposalOrder);
         }
@@ -9701,10 +9712,56 @@ namespace DryIoc
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAddWithResolverContext(IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder)
+        {
+            var slots = _slots;
+            var index =  id & SLOT_COUNT_SUFFIX_MASK;
+            return slots[index].Items.TryFind(id, out var value) ? value
+                : TryGetOrAdd(ref slots[index], r, id, createValue, disposalOrder);
+        }
+
+        internal static readonly MethodInfo GetOrAddWithResolverContextMethod =
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddWithResolverContext));
+
+        private object TryGetOrAdd(ref Slot slot, 
+            IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            lock (slot.Lock)
+            {
+                // re-check if items where changed in between (double check locking)
+                if (slot.Items.TryFind(id, out item))
+                    return item;
+
+                item = createValue(r);
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                var items = slot.Items;
+                if (Interlocked.CompareExchange(ref slot.Items, items.AddOrUpdate(id, item), items) != items)
+                    RefMap.AddOrUpdate(ref slot.Items, id, item);
+            }
+
+            if (item is IDisposable disposable && disposable != this)
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
+
+            return item;
+        }
+
+        /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             var slots = _slots;
-            var index = id & SLOT_COUNT_MASK;
+            var index = id & SLOT_COUNT_SUFFIX_MASK;
             return slots[index].Items.TryFind(id, out var value) ? value
                 : TryGetOrAddViaFactoryDelegate(ref slots[index], id, createValue, r, disposalOrder);
         }
@@ -9750,7 +9807,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var slot = ref _slots[id & SLOT_COUNT_MASK];
+            ref var slot = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
 
             object item;
             lock (slot.Lock)
@@ -9786,7 +9843,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var slot = ref _slots[id & SLOT_COUNT_MASK];
+            ref var slot = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
 
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
             var items = slot.Items;
@@ -9811,7 +9868,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var slot = ref _slots[id & SLOT_COUNT_MASK];
+            ref var slot = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
 
             object item;
             if (!slot.Items.TryFind(id, out item))
@@ -9853,7 +9910,7 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            return _slots[id & SLOT_COUNT_MASK].Items.TryFind(id, out item);
+            return _slots[id & SLOT_COUNT_SUFFIX_MASK].Items.TryFind(id, out item);
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
@@ -9950,7 +10007,7 @@ namespace DryIoc
         private int _disposed;
 
         private const int SLOT_COUNT = 16;
-        private const int SLOT_COUNT_MASK = SLOT_COUNT - 1;
+        private const int SLOT_COUNT_SUFFIX_MASK = SLOT_COUNT - 1;
         private Slot[] _slots;
 
 #endregion
@@ -10000,7 +10057,7 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
-            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
             return items.TryFind(id, out var value) ? value : TryGetOrAdd(ref items, id, createValue, disposalOrder);
         }
 
@@ -10039,9 +10096,52 @@ namespace DryIoc
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAddWithResolverContext(
+            IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0)
+        {
+            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
+            return items.TryFind(id, out var value) ? value : TryGetOrAdd(ref items, r, id, createValue, disposalOrder);
+        }
+
+        private object TryGetOrAdd(ref ImMap<object> items, 
+            IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            object item;
+            lock (_lock)
+            {
+                // re-check if items where changed in between (double check locking)
+                if (items.TryFind(id, out item))
+                    return item;
+
+                item = createValue(r);
+
+                // Swap is required because if _items changed inside createValue, then we need to retry
+                var it = items;
+                if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
+                    RefMap.AddOrUpdate(ref items, id, item);
+            }
+
+            var disposable = item as IDisposable;
+            if (disposable != null && disposable != this)
+            {
+                if (disposalOrder == 0)
+                    disposalOrder = NextDisposalIndex();
+                var ds = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+            }
+
+            return item;
+        }
+
+        /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
             return items.TryFind(id, out var value) ? value
                 : TryGetOrAddViaFactoryDelegate(ref items, id, createValue, r, disposalOrder);
         }
@@ -10087,7 +10187,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
 
             object item;
             lock (_lock)
@@ -10123,7 +10223,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
 
             // try to atomically replaced items with the one set item, if attempt failed then lock and replace
             var it = items;
@@ -10148,7 +10248,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var items = ref _slots[id & SLOT_COUNT_MASK];
+            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
 
             object item;
             if (items.TryFind(id, out item))
@@ -10188,7 +10288,7 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            return _slots[id & SLOT_COUNT_MASK].TryFind(id, out item);
+            return _slots[id & SLOT_COUNT_SUFFIX_MASK].TryFind(id, out item);
         }
 
         /// <summary>Can be used to manually add service for disposal</summary>
@@ -10286,7 +10386,7 @@ namespace DryIoc
 
         private readonly object _lock;
         private const int SLOT_COUNT = 16;
-        private const int SLOT_COUNT_MASK = SLOT_COUNT - 1;
+        private const int SLOT_COUNT_SUFFIX_MASK = SLOT_COUNT - 1;
         private ImMap<object>[] _slots;
     }
 
@@ -10435,7 +10535,7 @@ namespace DryIoc
             if (serviceFactoryExpr.Type.IsValueType())
                 serviceFactoryExpr = Convert(serviceFactoryExpr, typeof(object));
 
-            var resolverExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
+            var resolverExpr = request.ResolverContextParamExpr;
 
             if (serviceFactoryExpr is InvocationExpression ie && 
                 ie.Expression is ConstantExpression factoryDelegateExpr &&
@@ -10472,11 +10572,12 @@ namespace DryIoc
                 var idExpr = Constant(request.FactoryID);
                 var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
 
+                var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr, typeof(object));
-#else
-                var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr);
+                    , typeof(object)
 #endif
+                    );
+
                 if (ScopedOrSingleton)
                     return Call(GetScopedOrSingletonMethod, resolverExpr,
                         idExpr, factoryLambdaExpr, disposalOrderExpr);
@@ -10565,6 +10666,14 @@ namespace DryIoc
 
         internal static readonly MethodInfo GetNameScopedMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScoped));
+
+        /// Subject
+        public static object GetNameScopedWithResolverContext(IResolverContext r,
+            object scopeName, bool throwIfNoScope, int id, Func<IResolverContext, object> createValue, int disposalIndex) =>
+            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddWithResolverContext(r, id, createValue, disposalIndex);
+
+        internal static readonly MethodInfo GetNameScopedWithResolverContextMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScopedWithResolverContext));
 
         /// Subject
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
