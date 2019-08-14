@@ -2694,6 +2694,8 @@ namespace DryIoc
                         if (callObject != null && !TryInterpret(r, callObject, useFec, out instance))
                             return false;
 
+                        // todo: handle `Invoke` if possible, e.g. for RegisterDelegate
+
                         if (callArgs.Count == 0)
                             result = callMethod.Invoke(instance, ArrayTools.Empty<object>());
                         else
@@ -9579,10 +9581,7 @@ namespace DryIoc
         /// Creates, stores, and returns created item
         object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
 
-        /// Creates, stores, and returns created item
-        object GetOrAddWithResolverContext(IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0);
-
-        /// Create the value via `FactoryDelegate` if it is available
+        /// Create the value via `FactoryDelegate` passing the `IResolverContext`
         object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0);
 
         /// Creates, stores, and returns created item
@@ -9594,10 +9593,10 @@ namespace DryIoc
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
         object TrackDisposable(object item, int disposalOrder = 0);
 
-        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
+        ///[Obsolete("Removing because it is used only by obsolete `UseInstance` feature")]
         void SetOrAdd(int id, object item);
 
-        /// <summary>Gets and existing value at specified id, or adds a new value if no-one was added in between.</summary>
+        ///[Obsolete("Removing because it is not used")]
         object GetOrTryAdd(int id, object item, int disposalOrder);
 
         /// Sets (replaces) the factory for specified type.
@@ -9625,10 +9624,10 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, CreateEmptySlots(), ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
         { }
 
-        private Scope(IScope parent, object name, ImMap<object>[] slots,
+        private Scope(IScope parent, object name, ImMap<ItemRef>[] maps,
             ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
         {
             Parent = parent;
@@ -9636,147 +9635,126 @@ namespace DryIoc
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
-            _lock = new object();
-            _slots = slots;
+            _maps = maps;
         }
 
-        private static ImMap<object>[] _emptySlots = CreateEmptySlots();
+        private static ImMap<ItemRef>[] _emptySlots = CreateEmptyMaps();
 
-        private static ImMap<object>[] CreateEmptySlots()
+        private static ImMap<ItemRef>[] CreateEmptyMaps()
         {
-            var slots = new ImMap<object>[SLOT_COUNT];
-            for (int i = 0; i < SLOT_COUNT; i++)
-                slots[i] = ImMap<object>.Empty;
+            var slots = new ImMap<ItemRef>[MAP_COUNT];
+            for (int i = 0; i < MAP_COUNT; i++)
+                slots[i] = ImMap<ItemRef>.Empty;
             return slots;
+        }
+
+        /// <inheritdoc />
+        public IScope Clone()
+        {
+            var slotsCopy = new ImMap<ItemRef>[MAP_COUNT];
+            for (var i = 0; i < MAP_COUNT; i++)
+            {
+                // todo: we need a way to copy all Refs in the slot - do we?
+                slotsCopy[i] = _maps[i];
+            }
+
+            return new Scope(Parent, Name, slotsCopy, _factories, _disposables, _nextDisposalIndex);
         }
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
-            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
-            return items.TryFind(id, out var value) ? value : TryGetOrAdd(ref items, id, createValue, disposalOrder);
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
+            return map.TryFind(id, out var itemRef) && itemRef.Item != null ? itemRef.Item 
+                : TryGetOrAdd(ref map, id, createValue, disposalOrder);
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAdd));
 
-        private object TryGetOrAdd(ref ImMap<object> items, int id, CreateScopedValue createValue, int disposalOrder = 0)
+        private object TryGetOrAdd(ref ImMap<ItemRef> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            object item;
-            lock (_lock)
+            // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
+            // so we don't need to `TryFind` later
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+
+            map.TryFind(id, out var itemRef);
+
+            if (itemRef.Item != null)
+                return itemRef.Item;
+
+            // lock on the ref itself to set its `Item` field
+            lock (itemRef)
             {
-                // re-check if items where changed in between (double check locking)
-                if (items.TryFind(id, out item))
-                    return item;
+                // double-check if the item was changed in between (double check locking)
+                if (itemRef.Item != null)
+                    return itemRef.Item;
 
-                item = createValue();
-
-                // Swap is required because if _items changed inside createValue, then we need to retry
-                var it = items;
-                if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
-                    RefMap.AddOrUpdate(ref items, id, item);
+                // we can simple assing because we are under the lock 
+                itemRef.Item = createValue();
             }
 
-            var disposable = item as IDisposable;
-            if (disposable != null && disposable != this)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
-
-            return item;
-        }
-
-        /// <inheritdoc />
-        [MethodImpl((MethodImplOptions)256)]
-        public object GetOrAddWithResolverContext(
-            IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0)
-        {
-            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
-            return items.TryFind(id, out var value) ? value : TryGetOrAdd(ref items, r, id, createValue, disposalOrder);
-        }
-
-        private object TryGetOrAdd(ref ImMap<object> items, 
-            IResolverContext r, int id, Func<IResolverContext, object> createValue, int disposalOrder = 0)
-        {
-            if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
-
-            object item;
-            lock (_lock)
-            {
-                // re-check if items where changed in between (double check locking)
-                if (items.TryFind(id, out item))
-                    return item;
-
-                item = createValue(r);
-
-                // Swap is required because if _items changed inside createValue, then we need to retry
-                var it = items;
-                if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
-                    RefMap.AddOrUpdate(ref items, id, item);
-            }
-
-            var disposable = item as IDisposable;
-            if (disposable != null && disposable != this)
+            if (itemRef.Item is IDisposable disposable && disposable != this)
             {
                 if (disposalOrder == 0)
                     disposalOrder = NextDisposalIndex();
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
+                var d = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
                     RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
             }
 
-            return item;
+            return itemRef.Item;
         }
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
-            return items.TryFind(id, out var value) ? value
-                : TryGetOrAddViaFactoryDelegate(ref items, id, createValue, r, disposalOrder);
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
+            return map.TryFind(id, out var itemRef) && itemRef.Item != null ? itemRef.Item
+                : TryGetOrAddViaFactoryDelegate(ref map, id, createValue, r, disposalOrder);
         }
 
-        private object TryGetOrAddViaFactoryDelegate(
-            ref ImMap<object> items, int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
+
+        private object TryGetOrAddViaFactoryDelegate(ref ImMap<ItemRef> map, 
+            int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            object item;
-            lock (_lock)
+            // todo: add the AddOrUpdate version returning the existing Value if it exists the same way as for `ImHashMap` so we don't need `GetValueOrDefault` later
+            // todo: even better if we have a version without `Update` and wirthout need for lambda here
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+
+            var itemRef = map.GetValueOrDefault(id);
+            if (itemRef.Item != null)
+                return itemRef.Item;
+
+            // lock on the ref itself to set its `Item` field
+            lock (itemRef)
             {
-                // re-check if items where changed in between (double check locking)
-                if (items.TryFind(id, out item))
-                    return item;
+                // double-check if the item was changed in between (double check locking)
+                if (itemRef.Item != null)
+                    return itemRef.Item;
 
-                item = createValue(r);
-
-                // Swap is required because if _items changed inside createValue, then we need to retry
-                var it = items;
-                if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
-                    RefMap.AddOrUpdate(ref items, id, item);
+                // we can simple assign because we are under the lock 
+                itemRef.Item = createValue(r);
             }
 
-            if (item is IDisposable disposable && disposable != this)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
+            if (itemRef.Item is IDisposable disposable && disposable != this)
+                AddDisposable(disposable, disposalOrder);
 
-            return item;
+            return itemRef.Item;
         }
 
         /// <inheritdoc />
@@ -9787,99 +9765,112 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            object item;
-            lock (_lock)
+            // todo: add the AddOrUpdate version returning the existing Value if it exists the same way as for `ImHashMap` so we don't need `GetValueOrDefault` later
+            // todo: even better if we have a version without `Update` and wirthout need for lambda here
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+
+            var itemRef = map.GetValueOrDefault(id);
+            if (itemRef.Item != null)
+                return itemRef.Item;
+
+            // lock on the ref itself to set its `Item` field
+            lock (itemRef)
             {
-                // re-check if items where changed in between (double check locking)
-                if (items.TryFind(id, out item))
-                    return item;
+                // double-check if the item was changed in between (double check locking)
+                if (itemRef.Item != null)
+                    return itemRef.Item;
 
-                item = createValue(resolveContext, expr, useFec);
-
-                // Swap is required because if _items changed inside createValue, then we need to retry
-                var it = items;
-                if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
-                    RefMap.AddOrUpdate(ref items, id, item);
+                // we can simple assign because we are under the lock 
+                itemRef.Item = createValue(resolveContext, expr, useFec);
             }
 
-            if (item is IDisposable disposable && disposable != this)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                var d = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
+            if (itemRef.Item is IDisposable disposable && disposable != this)
+                AddDisposable(disposable, disposalOrder);
 
-            return item;
+            return itemRef.Item;
         }
 
-        /// <summary>Sets (replaces) value at specified id, or adds value if no existing id found.</summary>
-        /// <param name="id">To set value at. Should be >= 0.</param> <param name="item">Value to set.</param>
+        ///[Obsolete("Removing because it is used only by obsolete `UseInstance` feature")]
         public void SetOrAdd(int id, object item)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            // try to atomically replaced items with the one set item, if attempt failed then lock and replace
-            var it = items;
-            if (Interlocked.CompareExchange(ref items, it.AddOrUpdate(id, item), it) != it)
+            // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
+            // so we don't need to `TryFind` later
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+
+            var itemRef = map.GetValueOrDefault(id);
+            if (itemRef.Item != null)
+                return;
+
+            // lock on the ref itself to set its `Item` field
+            lock (itemRef)
             {
-                lock (_lock)
-                    items = items.AddOrUpdate(id, item);
+                // double-check if the item was changed in between (double check locking)
+                if (itemRef.Item != null)
+                    return;
+
+                // we can simple assign because we are under the lock 
+                itemRef.Item = item;
             }
 
-            if (item is IDisposable disposable && disposable != this)
-            {
-                int disposalOrder = NextDisposalIndex();
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
+            if (itemRef.Item is IDisposable disposable && disposable != this)
+                AddDisposable(disposable, NextDisposalIndex());
         }
 
-        /// Try to set the value if it is not already set
+        ///[Obsolete("Removing because it is not used")]
         public object GetOrTryAdd(int id, object newItem, int disposalOrder)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            ref var items = ref _slots[id & SLOT_COUNT_SUFFIX_MASK];
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            object item;
-            if (items.TryFind(id, out item))
-                return item;
+            if (map.TryFind(id, out var itemRef) && itemRef.Item != null)
+                return itemRef.Item;
 
-            lock (_lock)
+            // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
+            // so we don't need to `TryFind` later
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+
+            itemRef = map.GetValueOrDefault(id);
+
+            // lock on the ref itself to set its `Item` field
+            lock (itemRef)
             {
-                // if we did found the item (now), let's return it
-                if (items.TryFind(id, out item))
-                    return item;
-                items = items.AddOrUpdate(id, newItem);
+                // double-check if the item was changed in between (double check locking)
+                if (itemRef.Item != null)
+                    return itemRef.Item;
+
+                // we can simple assign because we are under the lock 
+                itemRef.Item = newItem;
             }
 
-            if (newItem is IDisposable disposable && disposable != this)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
+            if (itemRef.Item is IDisposable disposable && disposable != this)
+                AddDisposable(disposable, disposalOrder);
 
-            return newItem;
+            return itemRef.Item;
         }
 
-        /// <inheritdoc />
-        public IScope Clone()
+        [MethodImpl((MethodImplOptions)256)]
+        private void AddDisposable(IDisposable disposable, int disposalOrder)
         {
-            var slots = new ImMap<object>[SLOT_COUNT];
-            for (var i = 0; i < SLOT_COUNT; i++) slots[i] = _slots[i];
-            return new Scope(Parent, Name, slots, _factories, _disposables, _nextDisposalIndex);
+            if (disposalOrder == 0)
+                disposalOrder = NextDisposalIndex();
+            var d = _disposables;
+            if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
+                RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
         }
 
         /// <inheritdoc />
@@ -9888,20 +9879,15 @@ namespace DryIoc
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            return _slots[id & SLOT_COUNT_SUFFIX_MASK].TryFind(id, out item);
+            item = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id)?.Item;
+            return item != null;
         }
 
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
             if (item is IDisposable disposable && disposable != this)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = Interlocked.Decrement(ref _nextDisposalIndex);
-                var ds = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, ds.AddOrUpdate(disposalOrder, disposable), ds) != ds)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
+                AddDisposable(disposable, disposalOrder);
             return item;
         }
 
@@ -9916,9 +9902,9 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            var factories = _factories;
-            if (Interlocked.CompareExchange(ref _factories, _factories.AddOrUpdate(type, factory), factories) != factories)
-                Ref.Swap(ref _factories, f => f.AddOrUpdate(type, factory));
+            var f = _factories;
+            if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(type, factory), f) != f)
+                RefMap.AddOrUpdate(ref _factories, type, factory);
         }
 
         /// Try retrieve instance from the small registry.
@@ -9972,7 +9958,7 @@ namespace DryIoc
 
             _disposables = ImMap<IDisposable>.Empty;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
-            _slots = _emptySlots;
+            _maps = _emptySlots;
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
@@ -9987,10 +9973,15 @@ namespace DryIoc
         private int _nextDisposalIndex;
         private int _disposed;
 
-        private readonly object _lock;
-        private const int SLOT_COUNT = 16;
-        private const int SLOT_COUNT_SUFFIX_MASK = SLOT_COUNT - 1;
-        private ImMap<object>[] _slots;
+        // Stores the item object in a ref (class) box which does not change after created and may be used for locking
+        private sealed class ItemRef
+        {
+            public object Item;
+        }
+
+        private const int MAP_COUNT = 16;
+        private const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
+        private ImMap<ItemRef>[] _maps;
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -10271,12 +10262,12 @@ namespace DryIoc
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScoped));
 
         /// Subject
-        public static object GetNameScopedWithResolverContext(IResolverContext r,
-            object scopeName, bool throwIfNoScope, int id, Func<IResolverContext, object> createValue, int disposalIndex) =>
-            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddWithResolverContext(r, id, createValue, disposalIndex);
+        public static object GetNameScopedViaFactoryDelegate(IResolverContext r,
+            object scopeName, bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalIndex) =>
+            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
 
-        internal static readonly MethodInfo GetNameScopedWithResolverContextMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScopedWithResolverContext));
+        internal static readonly MethodInfo GetNameScopedViaFactoryDelegateMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScopedViaFactoryDelegate));
 
         /// Subject
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
