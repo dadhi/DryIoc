@@ -1200,12 +1200,13 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
 |                                               Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
 |----------------------------------------------------- |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
-|                    BmarkMicrosoftDependencyInjection |  4.084 us | 0.0682 us | 0.0638 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
-|                                          BmarkDryIoc |  3.249 us | 0.0564 us | 0.0528 us |  0.80 |    0.02 | 1.0643 |     - |     - |   4.91 KB |
-| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |  2.760 us | 0.0434 us | 0.0406 us |  0.68 |    0.01 | 1.0643 |     - |     - |   4.91 KB |
-|                        BmarkDryIoc_UseInterpretation | 15.235 us | 0.2302 us | 0.2153 us |  3.73 |    0.07 | 1.4954 |     - |     - |   6.96 KB |
-|            BmarkDryIoc_WithoutFastExpressionCompiler | 12.595 us | 0.2380 us | 0.2226 us |  3.08 |    0.07 | 1.4191 |     - |     - |   6.59 KB |
-|                                      BmarkDryIocMsDi |  3.317 us | 0.0310 us | 0.0259 us |  0.81 |    0.02 | 1.0757 |     - |     - |   4.96 KB |
+|                    BmarkMicrosoftDependencyInjection |  3.915 us | 0.0950 us | 0.1094 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|                                          BmarkDryIoc |  3.862 us | 0.0758 us | 0.0709 us |  0.99 |    0.02 | 1.6251 |     - |     - |   7.49 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |  3.622 us | 0.0185 us | 0.0164 us |  0.92 |    0.03 | 1.8272 |     - |     - |   8.43 KB |
+|                        BmarkDryIoc_UseInterpretation | 15.208 us | 0.2822 us | 0.2502 us |  3.88 |    0.11 | 1.6937 |     - |     - |   7.82 KB |
+|            BmarkDryIoc_WithoutFastExpressionCompiler | 13.040 us | 0.2574 us | 0.2408 us |  3.33 |    0.12 | 1.6022 |     - |     - |   7.45 KB |
+|                                      BmarkDryIocMsDi |  4.135 us | 0.0538 us | 0.0477 us |  1.05 |    0.04 | 1.6251 |     - |     - |   7.52 KB |
+
             */
 
             private IServiceProvider _msDi;
