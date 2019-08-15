@@ -7031,10 +7031,6 @@ namespace DryIoc
         /// <summary>Available in runtime only, provides access to container initiated request.</summary>
         public readonly IContainer Container;
 
-        // todo: WIP
-        /// The root / default resolver parameter, the new resolver parameter may be set in Scope or SingletonScope value factory delegate
-        internal ParameterExpression ResolverContextParamExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
-
         /// <summary>Request immediate parent.</summary>
         public readonly Request DirectParent;
 
@@ -10129,42 +10125,38 @@ namespace DryIoc
             if (serviceFactoryExpr.Type.IsValueType())
                 serviceFactoryExpr = Convert(serviceFactoryExpr, typeof(object));
 
-            var resolverExpr = request.ResolverContextParamExpr;
-
-            if (serviceFactoryExpr is InvocationExpression ie && 
-                ie.Expression is ConstantExpression factoryDelegateExpr &&
-                factoryDelegateExpr.Type == typeof(FactoryDelegate))
-            {
-                if (!request.TracksTransientDisposable)
-                {
-                    if (ScopedOrSingleton)
-                        return Call(GetScopedOrSingletonViaFactoryDelegateMethod, 
-                            resolverExpr, Constant(request.FactoryID), factoryDelegateExpr,
-                            Constant(request.Factory.Setup.DisposalOrder));
-                    else if (Name == null)
-                        return Call(GetScopedViaFactoryDelegateMethod,
-                            resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
-                            Constant(request.FactoryID), factoryDelegateExpr,
-                            Constant(request.Factory.Setup.DisposalOrder));
-                }
-            }
+            var resolverContextParamExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
 
             if (request.TracksTransientDisposable)
             {
                 if (ScopedOrSingleton)
-                    return Call(TrackScopedOrSingletonMethod, resolverExpr, serviceFactoryExpr);
+                    return Call(TrackScopedOrSingletonMethod, resolverContextParamExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(TrackScopedMethod, resolverExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                    return Call(TrackScopedMethod, resolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(TrackNameScopedMethod, resolverExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                return Call(TrackNameScopedMethod, resolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
             {
                 var idExpr = Constant(request.FactoryID);
                 var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
+
+                // optimization for registered delegate
+                if (serviceFactoryExpr is InvocationExpression ie &&
+                    ie.Expression is ConstantExpression factoryDelegateExpr &&
+                    factoryDelegateExpr.Type == typeof(FactoryDelegate))
+                {
+                    if (ScopedOrSingleton)
+                        return Call(GetScopedOrSingletonViaFactoryDelegateMethod,
+                            resolverContextParamExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                    else if (Name == null)
+                        return Call(GetScopedViaFactoryDelegateMethod,
+                            resolverContextParamExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
+                            idExpr, factoryDelegateExpr, disposalOrderExpr);
+                }
 
                 var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -10173,17 +10165,16 @@ namespace DryIoc
                     );
 
                 if (ScopedOrSingleton)
-                    return Call(GetScopedOrSingletonMethod, resolverExpr,
+                    return Call(GetScopedOrSingletonMethod, resolverContextParamExpr,
                         idExpr, factoryLambdaExpr, disposalOrderExpr);
 
                 if (Name == null)
-                    return Call(GetScopedMethod, resolverExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
-                        idExpr, factoryLambdaExpr, disposalOrderExpr);
+                    return Call(GetScopedMethod, resolverContextParamExpr, 
+                        Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryLambdaExpr, disposalOrderExpr);
 
-                return Call(GetNameScopedMethod, resolverExpr,
-                    request.Container.GetConstantExpression(Name, typeof(object)),
-                    Constant(request.IfUnresolved == IfUnresolved.Throw),
-                    idExpr, factoryLambdaExpr, disposalOrderExpr);
+                return Call(GetNameScopedMethod, resolverContextParamExpr,
+                    request.Container.GetConstantExpression(Name, typeof(object)), 
+                    Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryLambdaExpr, disposalOrderExpr);
             }
         }
 
