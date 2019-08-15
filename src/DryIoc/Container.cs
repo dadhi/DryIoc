@@ -2566,9 +2566,9 @@ namespace DryIoc
                                 return true;
                             }
 
-                            if (callMethod == CurrentScopeReuse.GetNameScopedMethod)
+                            if (callMethod == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
                             {
-                                result = InterpretGetNameScoped(resolver, callArgs, useFec);
+                                result = InterpretGetNameScopedViaFactoryDelegate(resolver, callArgs, useFec);
                                 return true;
                             }
 
@@ -2886,36 +2886,54 @@ namespace DryIoc
         {
             var scope = r.CurrentScope;
             if (scope == null)
-                return (bool)ConstValue(args[1]) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+                return (bool)((ConstantExpression)args[1]).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
             // check if scoped dependency is already in scope, then just return it
-            var id = (int)ConstValue(args[2]);
-            if (scope.TryGet(out var result, id))
+            var factoryId = (int)ConstValue(args[2]);
+            if (scope.TryGet(out var result, factoryId))
                 return result;
 
-            return scope.GetOrAddViaFactoryDelegate(id, (FactoryDelegate)((ConstantExpression)args[3]).Value, 
-                r, (int)ConstValue(args[4]));
-        }
+            var disposalOrder = (int)((ConstantExpression)args[4]).Value;
 
-        private static object InterpretGetNameScoped(IResolverContext r, IList<Expression> args, bool useFec)
-        {
-            var scope = r.GetNamedScope(ConstValue(args[1]), (bool)ConstValue(args[2]));
-            if (scope == null)
-                return null; // result is null in this case
+            var lambda = args[3];
+            if (lambda is ConstantExpression registeredDelegate)
+                return scope.GetOrAddViaFactoryDelegate(factoryId, (FactoryDelegate)registeredDelegate.Value, r, disposalOrder);
 
-            // check if scoped dependency is already in scope, then just return it
-            var id = (int)ConstValue(args[3]);
-            if (scope.TryGet(out var result, id))
-                return result;
-
-            return scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[4]).Body, useFec,
+            return scope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)lambda).Body, useFec,
                 (rc, e, uf) =>
                 {
                     if (TryInterpret(rc, e, uf, out var value))
                         return value;
                     return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
                 },
-                (int)ConstValue(args[5]));
+                disposalOrder);
+        }
+
+        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
+        {
+            var scope = r.GetNamedScope(((ConstantExpression)args[1]).Value, (bool)((ConstantExpression)args[2]).Value);
+            if (scope == null)
+                return null; // result is null in this case
+
+            // check if scoped dependency is already in scope, then just return it
+            var factoryId = (int)((ConstantExpression)args[3]).Value;
+            if (scope.TryGet(out var result, factoryId))
+                return result;
+
+            var disposalOrder = (int)((ConstantExpression)args[5]).Value;
+
+            var lambda = args[4];
+            if (lambda is ConstantExpression registeredDelegate)
+                return scope.GetOrAddViaFactoryDelegate(factoryId, (FactoryDelegate)registeredDelegate.Value, r, disposalOrder);
+
+            return scope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)lambda).Body, useFec,
+                (rc, e, uf) =>
+                {
+                    if (TryInterpret(rc, e, uf, out var value))
+                        return value;
+                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
+                },
+                disposalOrder);
         }
 
         private static object InterpretGetScopedOrSingleton(IResolverContext r, IList<Expression> args, bool useFec)
@@ -2946,9 +2964,21 @@ namespace DryIoc
             if (scope.TryGet(out var result, id))
                 return result;
 
-            // we know for sure that it will be a constant
-            var factoryDelegate = (FactoryDelegate)((ConstantExpression)args[2]).Value;
-            return scope.GetOrAddViaFactoryDelegate(id, factoryDelegate, r, (int)ConstValue(args[3]));
+            var lambda = args[2];
+            var disposalOrder = (int)((ConstantExpression)args[3]).Value;
+
+            if (lambda is ConstantExpression registeredDelegate)
+                return scope.GetOrAddViaFactoryDelegate(id, (FactoryDelegate)registeredDelegate.Value, r, disposalOrder);
+
+            var lambdaExpr = (LambdaExpression)lambda;
+            return scope.TryGetOrAddWithoutClosure(id, r, lambdaExpr.Body, useFec,
+                (rc, e, uf) =>
+                {
+                    if (TryInterpret(rc, e, uf, out var value))
+                        return value;
+                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
+                },
+                disposalOrder);
         }
 
         [MethodImpl((MethodImplOptions)256)]
@@ -2994,8 +3024,11 @@ namespace DryIoc
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr = Parameter(typeof(IResolverContext), "r");
 
-        private static readonly Type[] _factoryDelegateParamTypes = { typeof(IResolverContext) };
-        private static readonly ParameterExpression[] _factoryDelegateParamExprs = { ResolverContextParamExpr };
+        /// Optimization: singleton array with the type of IResolverContext parameter
+        public static readonly Type[] FactoryDelegateParamTypes = { typeof(IResolverContext) };
+
+        /// Optimization: singleton array with the parameter expression of IResolverContext
+        public static readonly ParameterExpression[] FactoryDelegateParamExprs = { ResolverContextParamExpr };
 
         /// Strips the unnecessary or adds the necessary cast to expression return result
         public static Expression NormalizeExpression(this Expression expr)
@@ -3015,7 +3048,7 @@ namespace DryIoc
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression) =>
-            Lambda<FactoryDelegate>(expression.NormalizeExpression(), _factoryDelegateParamExprs
+            Lambda<FactoryDelegate>(expression.NormalizeExpression(), FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                 , typeof(object)
 #endif
@@ -3045,7 +3078,7 @@ namespace DryIoc
             if (!preferInterpretation && useFastExpressionCompiler)
             {
                 var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
-                    expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                    expression, FactoryDelegateParamExprs, FactoryDelegateParamTypes, typeof(object));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -3053,9 +3086,9 @@ namespace DryIoc
             // fallback for platforms when FastExpressionCompiler is not supported,
             // or just in case when some expression is not supported (did not found one yet)
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-            return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs, typeof(object)).ToLambdaExpression()
+            return Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs, typeof(object)).ToLambdaExpression()
 #else
-            return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs)
+            return Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs)
 #endif
                 .Compile(
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
@@ -3077,7 +3110,7 @@ namespace DryIoc
             if (useFastExpressionCompiler)
             {
                 var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
-                    expression, _factoryDelegateParamExprs, _factoryDelegateParamTypes, typeof(object));
+                    expression, FactoryDelegateParamExprs, FactoryDelegateParamTypes, typeof(object));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -3085,9 +3118,9 @@ namespace DryIoc
             // fallback for platforms when FastExpressionCompiler is not supported,
             // or just in case when some expression is not supported (did not found one yet)
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-            return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs, typeof(object)).ToLambdaExpression().Compile();
+            return Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs, typeof(object)).ToLambdaExpression().Compile();
 #else
-            return Lambda<FactoryDelegate>(expression, _factoryDelegateParamExprs).Compile();
+            return Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs).Compile();
 #endif
         }
 
@@ -10144,37 +10177,37 @@ namespace DryIoc
                 var idExpr = Constant(request.FactoryID);
                 var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
 
-                // optimization for registered delegate
+                Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie &&
-                    ie.Expression is ConstantExpression factoryDelegateExpr &&
-                    factoryDelegateExpr.Type == typeof(FactoryDelegate))
+                    ie.Expression is ConstantExpression registeredDelegateExpr &&
+                    registeredDelegateExpr.Type == typeof(FactoryDelegate))
                 {
-                    if (ScopedOrSingleton)
-                        return Call(GetScopedOrSingletonViaFactoryDelegateMethod,
-                            resolverContextParamExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
-                    else if (Name == null)
-                        return Call(GetScopedViaFactoryDelegateMethod,
-                            resolverContextParamExpr, Constant(request.IfUnresolved == IfUnresolved.Throw),
-                            idExpr, factoryDelegateExpr, disposalOrderExpr);
+                    // optimization for the registered delegate
+                    factoryDelegateExpr = registeredDelegateExpr;
                 }
-
-                var factoryLambdaExpr = Lambda<CreateScopedValue>(serviceFactoryExpr
+                else
+                {
+                    factoryDelegateExpr = Lambda<FactoryDelegate>(serviceFactoryExpr,
+                        FactoryDelegateCompiler.FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    , typeof(object)
+                        , typeof(object)
 #endif
                     );
+                }
 
                 if (ScopedOrSingleton)
-                    return Call(GetScopedOrSingletonMethod, resolverContextParamExpr,
-                        idExpr, factoryLambdaExpr, disposalOrderExpr);
+                    return Call(GetScopedOrSingletonViaFactoryDelegateMethod, 
+                        resolverContextParamExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+
+                var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
 
                 if (Name == null)
-                    return Call(GetScopedMethod, resolverContextParamExpr, 
-                        Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryLambdaExpr, disposalOrderExpr);
+                    return Call(GetScopedViaFactoryDelegateMethod, resolverContextParamExpr, 
+                        Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryDelegateExpr, disposalOrderExpr);
 
-                return Call(GetNameScopedMethod, resolverContextParamExpr,
+                return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)), 
-                    Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryLambdaExpr, disposalOrderExpr);
+                    Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryDelegateExpr, disposalOrderExpr);
             }
         }
 
