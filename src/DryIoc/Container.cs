@@ -2554,12 +2554,6 @@ namespace DryIoc
                                 resolver = (IResolverContext)resolverObj;
                             }
 
-                            if (callMethod == CurrentScopeReuse.GetScopedMethod)
-                            {
-                                result = InterpretGetScoped(resolver, callArgs, useFec);
-                                return true;
-                            }
-
                             if (callMethod == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
                             {
                                 result = InterpretGetScopedViaFactoryDelegate(resolver, callArgs, useFec);
@@ -2569,12 +2563,6 @@ namespace DryIoc
                             if (callMethod == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
                             {
                                 result = InterpretGetNameScopedViaFactoryDelegate(resolver, callArgs, useFec);
-                                return true;
-                            }
-
-                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonMethod)
-                            {
-                                result = InterpretGetScopedOrSingleton(resolver, callArgs, useFec);
                                 return true;
                             }
 
@@ -2622,8 +2610,10 @@ namespace DryIoc
                         }
                         else if (methodDeclaringType == typeof(IScope))
                         {
-                            if (callMethod == Scope.GetOrAddMethod)
+                            if (callMethod == Scope.GetOrAddViaFactoryDelegateMethod)
                             {
+                                r = r.Root ?? r;
+
                                 // check if scoped dependency is already in scope, then just return it
                                 var factoryId = (int)ConstValue(callArgs[0]);
                                 if (!r.SingletonScope.TryGet(out result, factoryId))
@@ -2634,9 +2624,10 @@ namespace DryIoc
                                         {
                                             if (TryInterpret(rc, e, uf, out var value))
                                                 return value;
-                                            return e.CompileToFactoryDelegate(useFastExpressionCompiler: uf, preferInterpretation: ((IContainer)rc).Rules.UseInterpretation)(rc);
+                                            return e.CompileToFactoryDelegate(useFastExpressionCompiler: uf, 
+                                                preferInterpretation: ((IContainer)rc).Rules.UseInterpretation)(rc);
                                         },
-                                        (int)ConstValue(callArgs[2]));
+                                        (int)ConstValue(callArgs[3]));
                                 }
 
                                 return true;
@@ -2644,6 +2635,7 @@ namespace DryIoc
 
                             if (callMethod == Scope.TrackDisposableMethod)
                             {
+                                r = r.Root ?? r;
                                 if (!TryInterpret(r, callArgs[0], useFec, out var service))
                                     return false;
                                 result = r.SingletonScope.TrackDisposable(service, (int)ConstValue(callArgs[1]));
@@ -2652,9 +2644,13 @@ namespace DryIoc
                         }
                         else if (methodDeclaringType == typeof(IResolver))
                         {
-                            if (!TryInterpret(r, callObject, useFec, out var resolverObj))
-                                return false;
-                            var resolver = (IResolverContext)resolverObj;
+                            var resolver = r;
+                            if (!ReferenceEquals(callObject, FactoryDelegateCompiler.ResolverContextParamExpr))
+                            {
+                                if (!TryInterpret(r, callObject, useFec, out var resolverObj))
+                                    return false;
+                                resolver = (IResolverContext)resolverObj;
+                            }
 
                             if (callMethod == Resolver.ResolveFastMethod)
                             {
@@ -2862,26 +2858,6 @@ namespace DryIoc
             return false;
         }
 
-        private static object InterpretGetScoped(IResolverContext r, IList<Expression> args, bool useFec)
-        {
-            var scope = r.CurrentScope;
-            if (scope == null)
-                return (bool) ConstValue(args[1]) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
-
-            var factoryId = (int)ConstValue(args[2]);
-            if (scope.TryGet(out var result, factoryId))
-                return result;
-
-            return scope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression) args[3]).Body, useFec,
-                (rc, e, uf) =>
-                {
-                    if (TryInterpret(rc, e, uf, out var value))
-                        return value;
-                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
-                },
-                (int)ConstValue(args[4]));
-        }
-
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
         {
             var scope = r.CurrentScope;
@@ -2934,25 +2910,6 @@ namespace DryIoc
                     return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
                 },
                 disposalOrder);
-        }
-
-        private static object InterpretGetScopedOrSingleton(IResolverContext r, IList<Expression> args, bool useFec)
-        {
-            var scope = r.CurrentScope ?? r.SingletonScope;
-
-            // check if scoped dependency is already in scope, then just return it
-            var id = (int)ConstValue(args[1]);
-            if (scope.TryGet(out var result, id))
-                return result;
-
-            return scope.TryGetOrAddWithoutClosure(id, r, ((LambdaExpression)args[2]).Body, useFec,
-                (rc, e, uf) =>
-                {
-                    if (TryInterpret(rc, e, uf, out var value))
-                        return value;
-                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
-                },
-                disposalOrder: (int)ConstValue(args[3]));
         }
 
         private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
@@ -10112,12 +10069,15 @@ namespace DryIoc
                 return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
                     serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder));
 
-            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddMethod,
-                Constant(request.FactoryID), Lambda<CreateScopedValue>(serviceFactoryExpr
+            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
+                Constant(request.FactoryID), Lambda<FactoryDelegate>(serviceFactoryExpr,
+                    FactoryDelegateCompiler.FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                     , typeof(object)
 #endif
-                    ), Constant(request.Factory.Setup.DisposalOrder));
+                ),
+                FactoryDelegateCompiler.ResolverContextParamExpr,
+                Constant(request.Factory.Setup.DisposalOrder));
         }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
@@ -10243,9 +10203,6 @@ namespace DryIoc
             int id, CreateScopedValue createValue, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
 
-        internal static readonly MethodInfo GetScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingleton));
-
         /// Subject
         public static object GetScopedOrSingletonViaFactoryDelegate(IResolverContext r,
             int id, FactoryDelegate createValue, int disposalIndex) =>
@@ -10265,9 +10222,6 @@ namespace DryIoc
         public static object GetScoped(IResolverContext r,
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
-
-        internal static readonly MethodInfo GetScopedMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScoped));
 
         /// Subject
         public static object GetScopedViaFactoryDelegate(IResolverContext r,
