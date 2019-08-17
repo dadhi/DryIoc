@@ -24,13 +24,12 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            //var container = new Container(rules => rules
-            //    // With UseInterpretation it completes without error in 28 sec
-            //    //.WithUseInterpretation()
-            //    .With(FactoryMethod.ConstructorWithResolvableArguments))
-            //    .WithWebApi(config);
+            var container = new Container(rules => rules
+                .WithDependencyDepthToSplitObjectGraph(5)
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(config);
 
-            //Registrations.RegisterTypes(container, true);
+            Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
@@ -50,11 +49,11 @@ namespace LoadTest
 
             // 13.08.2019 - 00:03:45.58
 
-            var container = new Container(rules => rules
-                .WithoutFastExpressionCompiler()
-                .With(FactoryMethod.ConstructorWithResolvableArguments))
-                .WithWebApi(config);
-            Registrations.RegisterTypes(container, false);
+            //var container = new Container(rules => rules
+            //    .WithoutFastExpressionCompiler()
+            //    .With(FactoryMethod.ConstructorWithResolvableArguments))
+            //    .WithWebApi(config);
+            //Registrations.RegisterTypes(container, false);
 
 
             // This setup config WORKS, but uses a lot of memory
