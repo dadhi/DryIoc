@@ -869,7 +869,7 @@ namespace DryIoc
                 registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
                 : Ref.Of(_registry.Value.WithoutCache());
 
-            return new Container(rules ?? Rules.Default, registry, singletonScope ?? NewSingletonScope(), scopeContext,
+            return new Container(rules ?? Rules, registry, singletonScope ?? NewSingletonScope(), scopeContext,
                 curentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
         }
 
@@ -4307,7 +4307,7 @@ namespace DryIoc
                         made.FactoryMethod ?? _made.FactoryMethod,
                         made.Parameters ?? _made.Parameters,
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
-                DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -4318,7 +4318,7 @@ namespace DryIoc
         public Rules WithDefaultRegistrationServiceKey(object serviceKey) =>
             serviceKey == null ? this :
                 new Rules(_settings, FactorySelector, DefaultReuse,
-                    _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                    _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
                     DynamicRegistrationProviders, UnknownServiceResolvers, serviceKey);
 
@@ -4336,7 +4336,7 @@ namespace DryIoc
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
             new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
-                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -4376,7 +4376,7 @@ namespace DryIoc
         /// <summary>Appends dynamic registration rules.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -4385,7 +4385,7 @@ namespace DryIoc
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -4403,7 +4403,7 @@ namespace DryIoc
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules),
                 DefaultRegistrationServiceKey);
@@ -4413,7 +4413,7 @@ namespace DryIoc
         /// so it could be check for remove success or fail.</summary>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule),
                 DefaultRegistrationServiceKey);
@@ -4494,7 +4494,7 @@ namespace DryIoc
         /// Replaced with `WithConcreteTypeDynamicRegistrations`
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)),
                 DefaultRegistrationServiceKey);
@@ -4578,7 +4578,7 @@ namespace DryIoc
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -4600,7 +4600,7 @@ namespace DryIoc
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, itemToExpressionOrDefault,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -4716,7 +4716,7 @@ namespace DryIoc
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, rule, DefaultDependencyDepthToSplitObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
+                _made, rule, DependencyDepthToSplitObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
@@ -4781,7 +4781,7 @@ namespace DryIoc
         public Rules WithoutUseInterpretation() => 
             WithSettings(_settings & ~Settings.UseInterpretation);
 
-        /// <summary>Outputs most notable non-default rules</summary>
+        /// Outputs most notable non-default rules
         public override string ToString()
         {
             if (this == Default)
@@ -4797,6 +4797,9 @@ namespace DryIoc
                 if (removedSettings != 0)
                     s += (s != "" ? " and without {" : "Rules without {") + removedSettings + "}";
             }
+
+            if (DependencyDepthToSplitObjectGraph != DefaultDependencyDepthToSplitObjectGraph)
+                s += " with DepthToSplitObjectGraph=" + DependencyDepthToSplitObjectGraph;
 
             if (DefaultReuse != null && DefaultReuse != Reuse.Transient)
                 s += (s != "" ? NewLine : "Rules ") + " with DefaultReuse=" + DefaultReuse;
@@ -4854,7 +4857,7 @@ namespace DryIoc
 
         private Rules WithSettings(Settings newSettings) =>
             new Rules(newSettings,
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DefaultDependencyDepthToSplitObjectGraph,
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -7097,7 +7100,8 @@ namespace DryIoc
 
         /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.DependencyDepthToSplitObjectGraph"/> setting.</summary>
         public bool ShouldSplitObjectGraph() =>
-            FactoryType == FactoryType.Service && DependencyDepth > Rules.DependencyDepthToSplitObjectGraph;
+            FactoryType == FactoryType.Service &&
+            DependencyDepth > Rules.DependencyDepthToSplitObjectGraph;
 
         /// <summary>Current scope</summary>
         public IScope CurrentScope => Container.CurrentScope;
@@ -8165,13 +8169,6 @@ namespace DryIoc
             }
 
             // Creates an object graph expression with all of the dependencies created
-            // todo: But we need somehow to say to dependencies downwards that ResolverContext parameter is a new one, e.g.:
-            //
-            // `CurrentScopeReuse.GetScopedWithResolverContext(r, id: 183, r1 =>
-            //      CurrentScopeReuse.GetScopedWithResolverContext(r1, ...)`
-            //
-            // Btw, we need a different name for `r1..` paremeter to avoid conflicts in generation scenarios.
-            //
             var serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr != null)
             {
@@ -9656,9 +9653,6 @@ namespace DryIoc
                 : TryGetOrAdd(ref map, id, createValue, disposalOrder);
         }
 
-        internal static readonly MethodInfo GetOrAddMethod =
-            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAdd));
-
         private object TryGetOrAdd(ref ImMap<ItemRef> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
@@ -10198,7 +10192,7 @@ namespace DryIoc
         /// <summary>Flag indicating that it is a scope or singleton.</summary>
         public readonly bool ScopedOrSingleton;
 
-        /// Subject
+        /// [Obsolete("Replaced by `GetScopedOrSingletonViaFactoryDelegate`")]
         public static object GetScopedOrSingleton(IResolverContext r,
             int id, CreateScopedValue createValue, int disposalIndex) =>
             (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
@@ -10218,7 +10212,7 @@ namespace DryIoc
         internal static readonly MethodInfo TrackScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
 
-        /// Subject
+        /// [Obsolete("Replaced by `GetScopedViaFactoryDelegate`")]
         public static object GetScoped(IResolverContext r,
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
@@ -10231,13 +10225,10 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegate));
 
-        /// Subject
+        /// [Obsolete("Replaced by `GetNameScopedViaFactoryDelegate`")]
         public static object GetNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
-
-        internal static readonly MethodInfo GetNameScopedMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScoped));
 
         /// Subject
         public static object GetNameScopedViaFactoryDelegate(IResolverContext r,
