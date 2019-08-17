@@ -13,27 +13,29 @@ namespace DryIoc.IssuesTests.FastExpressionCompiler
         [Test]
         public void Outer_parameters_should_be_correctly_used_for_the_nested_lambda()
         {
-            var r = Parameter(typeof(IResolverContext), "r");
-            var s = Parameter(typeof(String), "_String0");
+            var rParam = Parameter(typeof(IResolverContext), "r");
+            var sParam = Parameter(typeof(String), "_String0");
 
-            var body = MemberInit(New(typeof(LogTableManagerConsumer2).GetTypeInfo().DeclaredConstructors.ToArray()[0],
-                    new Expression[0]),
+            var logTableManType = typeof(LogTableManagerConsumer2).GetTypeInfo();
+            var rCtxType = typeof(IResolverContext).GetTypeInfo();
+            var scopeType = typeof(IScope).GetTypeInfo();
+            var body = MemberInit(
+                New(logTableManType.DeclaredConstructors.First()),
                 Bind(
-                    typeof(LogTableManagerConsumer2).GetTypeInfo().DeclaredMembers.ToArray()[4],
-                    Lambda(typeof(Func<String, ILogTableManager>),
-                        Convert(Call(Property(r,
-                                typeof(IResolverContext).GetTypeInfo().DeclaredProperties.ToArray()[3]),
-                            typeof(IScope).GetTypeInfo().DeclaredMethods.ToArray()[0],
-                            Constant(174, typeof(Int32)),
-                            Lambda(typeof(CreateScopedValue),
-                                Call(null,
-                                    typeof(LogTableManager).GetTypeInfo().DeclaredMethods.ToArray()[2],
-                                    s),
-                                new ParameterExpression[0]),
-                            Constant(0, typeof(Int32))), typeof(ILogTableManager)),
-                        s)));
+                    logTableManType.GetDeclaredProperty(nameof(LogTableManagerConsumer2.GetLogTableManager)),
+                    Lambda<Func<String, ILogTableManager>>(
+                        Convert(Call(
+                            Property(rParam, rCtxType.GetDeclaredProperty(nameof(IResolverContext.SingletonScope))),
+                                scopeType.SingleMethod("get_" + nameof(IScope.Parent)),
+                            Constant(174, typeof(int)),
+                                Lambda<CreateScopedValue>(
+                                    Call(null, 
+                                        typeof(LogTableManager).GetTypeInfo().GetDeclaredMethod(nameof(LogTableManager.Create)), sParam)),
+                                        Constant(0, typeof(Int32))), 
+                            typeof(ILogTableManager)),
+                        sParam)));
 
-            var fExpr = Lambda<Func<IResolverContext, object>>(body, r);
+            var fExpr = Lambda<Func<IResolverContext, object>>(body, rParam);
 
             var f = fExpr.CompileFast(true);
 
@@ -42,7 +44,7 @@ namespace DryIoc.IssuesTests.FastExpressionCompiler
 
         public class LogTableManagerConsumer2
         {
-            private Func<string, ILogTableManager> GetLogTableManager { get; set; }
+            public Func<string, ILogTableManager> GetLogTableManager { get; set; }
 
             private ILogTableManager logTableManager;
 
