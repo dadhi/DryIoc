@@ -1192,17 +1192,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac | 38.488 us | 0.2379 us | 0.2225 us |  9.94 |    0.12 |      9.7656 |           - |           - |             45.2 KB |
                   BmarkAutofacMsDi | 47.389 us | 0.1995 us | 0.1866 us | 12.24 |    0.11 |     12.5732 |      0.1221 |           - |            58.09 KB |
 
-            ## FEC V3 and multiple improvements 
+            ## FEC V3 and multiple improvements
 
-|                                               Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|----------------------------------------------------- |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
-|                    BmarkMicrosoftDependencyInjection |  3.921 us | 0.0395 us | 0.0370 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
-|                                          BmarkDryIoc |  3.535 us | 0.0660 us | 0.0648 us |  0.90 |    0.02 | 1.2512 |     - |     - |   5.77 KB |
-| BmarkDryIoc_RegisterDelegateWithInjectedDependencies |  3.188 us | 0.0606 us | 0.0623 us |  0.81 |    0.02 | 1.2512 |     - |     - |   5.77 KB |
-|                        BmarkDryIoc_UseInterpretation | 16.055 us | 0.1854 us | 0.1735 us |  4.10 |    0.06 | 1.6785 |     - |     - |   7.82 KB |
-|            BmarkDryIoc_WithoutFastExpressionCompiler | 14.662 us | 0.1405 us | 0.1314 us |  3.74 |    0.05 | 1.5564 |     - |     - |   7.18 KB |
-|                                      BmarkDryIocMsDi |  3.554 us | 0.0225 us | 0.0199 us |  0.91 |    0.01 | 1.2550 |     - |     - |    5.8 KB |
-
+|                                               Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|----------------------------------------------------- |---------:|----------:|----------:|---------:|------:|--------:|-------:|------:|------:|----------:|
+|                    BmarkMicrosoftDependencyInjection | 3.810 us | 0.0116 us | 0.0103 us | 3.811 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|                                          BmarkDryIoc | 3.311 us | 0.0129 us | 0.0121 us | 3.312 us |  0.87 |    0.00 | 1.1559 |     - |     - |   5.33 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 2.877 us | 0.0574 us | 0.0614 us | 2.834 us |  0.75 |    0.02 | 1.1559 |     - |     - |   5.33 KB |
+|                                      BmarkDryIocMsDi | 3.464 us | 0.0146 us | 0.0129 us | 3.461 us |  0.91 |    0.00 | 1.1597 |     - |     - |   5.35 KB |
             */
 
             private IServiceProvider _msDi;
@@ -1237,10 +1234,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIoc_RegisterDelegateWithInjectedDependencies() => Measure(_dryIoc_RegDelInjectedDeps);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkDryIoc_UseInterpretation() => Measure(_dryIoc_UseInterpretation);
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkDryIoc_WithoutFastExpressionCompiler() => Measure(_dryIoc_WoutFec);
 
             [Benchmark]

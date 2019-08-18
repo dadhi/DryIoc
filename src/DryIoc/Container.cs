@@ -9649,8 +9649,7 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            return map.TryFind(id, out var itemRef) && itemRef.Item != null ? itemRef.Item 
-                : TryGetOrAdd(ref map, id, createValue, disposalOrder);
+            return map.GetValueOrDefault(id)?.Item ?? TryGetOrAdd(ref map, id, createValue, disposalOrder);
         }
 
         private object TryGetOrAdd(ref ImMap<ItemRef> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
@@ -9658,14 +9657,12 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
-            // so we don't need to `TryFind` later
+            var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
-            map.TryFind(id, out var itemRef);
-
+            itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
                 return itemRef.Item;
 
@@ -9697,8 +9694,7 @@ namespace DryIoc
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            return map.TryFind(id, out var itemRef) && itemRef.Item != null ? itemRef.Item
-                : TryGetOrAddViaFactoryDelegate(ref map, id, createValue, r, disposalOrder);
+            return map.GetValueOrDefault(id)?.Item ?? TryGetOrAddViaFactoryDelegate(ref map, id, createValue, r, disposalOrder);
         }
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
@@ -9710,13 +9706,12 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            // todo: add the AddOrUpdate version returning the existing Value if it exists the same way as for `ImHashMap` so we don't need `GetValueOrDefault` later
-            // todo: even better if we have a version without `Update` and wirthout need for lambda here
+            var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
-            var itemRef = map.GetValueOrDefault(id);
+            itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
                 return itemRef.Item;
 
@@ -9747,13 +9742,12 @@ namespace DryIoc
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            // todo: add the AddOrUpdate version returning the existing Value if it exists the same way as for `ImHashMap` so we don't need `GetValueOrDefault` later
-            // todo: even better if we have a version without `Update` and wirthout need for lambda here
+            var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
-            var itemRef = map.GetValueOrDefault(id);
+            itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
                 return itemRef.Item;
 
@@ -9843,7 +9837,6 @@ namespace DryIoc
             return itemRef.Item;
         }
 
-        [MethodImpl((MethodImplOptions)256)]
         private void AddDisposable(IDisposable disposable, int disposalOrder)
         {
             if (disposalOrder == 0)
@@ -9857,8 +9850,6 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public bool TryGet(out object item, int id)
         {
-            if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
             item = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id)?.Item;
             return item != null;
         }
