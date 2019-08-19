@@ -201,7 +201,7 @@ namespace FastExpressionCompiler.LightExpression
                 new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6) }, typeof(void))
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
-#endregion
+        #endregion
 
         /// <summary>Tries to compile lambda expression to <typeparamref name="TDelegate"/></summary>
         public static TDelegate TryCompile<TDelegate>(this LambdaExpression lambdaExpr) where TDelegate : class =>
@@ -230,8 +230,8 @@ namespace FastExpressionCompiler.LightExpression
                 return null;
             il.Emit(OpCodes.Ret);
 
-            var delegateType = typeof(TDelegate) != typeof(Delegate) 
-                ? typeof(TDelegate) 
+            var delegateType = typeof(TDelegate) != typeof(Delegate)
+                ? typeof(TDelegate)
                 : Tools.GetFuncOrActionType(Tools.GetParamTypes(lambdaExpr.Parameters), lambdaExpr.ReturnType);
             return (TDelegate)(object)method.CreateDelegate(delegateType, ArrayClosure.Create(closureConstantsExprs));
         }
@@ -290,7 +290,7 @@ namespace FastExpressionCompiler.LightExpression
                 closurePlusParamTypes = PrependClosureTypeToParamTypes(paramTypes);
             }
 
-            var method = new DynamicMethod(string.Empty, 
+            var method = new DynamicMethod(string.Empty,
                 returnType, closurePlusParamTypes, typeof(ExpressionCompiler), skipVisibility: true);
 
             var il = method.GetILGenerator();
@@ -353,20 +353,20 @@ namespace FastExpressionCompiler.LightExpression
         private enum ClosureStatus
         {
             ToBeCollected = 1,
-            UserProvided  = 1 << 1,
-            HasClosure    = 1 << 2
+            UserProvided = 1 << 1,
+            HasClosure = 1 << 2
         }
 
         // Track the info required to build a closure object + some context information not directly related to closure.
         private struct ClosureInfo
         {
-#region Emitting context to help track the state
+            #region Emitting context to help track the state
 
             public bool LastEmitIsAddress;
 
             // Helpers to know if a Return GotoExpression's Label should be emitted.
             // First set bit is ContainsReturnGoto, the rest is ReturnLabelIndex
-            private int[] _tryCatchFinallyInfos; 
+            private int[] _tryCatchFinallyInfos;
             public int CurrentTryCatchFinallyIndex;
 
             // Tracks the stack of blocks where are we in emit phase
@@ -375,9 +375,9 @@ namespace FastExpressionCompiler.LightExpression
             // Dictionary for the used Labels in IL
             private KeyValuePair<LabelTarget, Label?>[] _labels;
 
-#endregion
+            #endregion
 
-#region Closure related state
+            #region Closure related state
 
             public ClosureStatus Status;
 
@@ -390,7 +390,7 @@ namespace FastExpressionCompiler.LightExpression
 
             // All nested lambdas recursively nested in expression
             public NestedLambdaInfo[] NestedLambdas;
-#endregion
+            #endregion
 
             // Populates info directly with provided closure object and constants.
             public ClosureInfo(bool isUserProvided, ConstantExpression[] usedProvidedClosureConstantExpressions = null)
@@ -398,6 +398,8 @@ namespace FastExpressionCompiler.LightExpression
                 NonPassedParameters = Tools.Empty<ParameterExpression>();
                 NestedLambdas = Tools.Empty<NestedLambdaInfo>();
 
+                ItemsArrayVarRef = null;
+                ConstantVarsRef = null;
                 LastEmitIsAddress = false;
                 CurrentTryCatchFinallyIndex = -1;
                 _tryCatchFinallyInfos = null;
@@ -420,6 +422,9 @@ namespace FastExpressionCompiler.LightExpression
                     Constants = new LiveCountArray<ConstantExpression>(usedProvidedClosureConstantExpressions);
                 }
             }
+
+            public LocalBuilder ItemsArrayVarRef { get; set; }
+            public LocalBuilder[] ConstantVarsRef { get; set; }
 
             public void AddConstant(ConstantExpression expr)
             {
@@ -568,7 +573,9 @@ namespace FastExpressionCompiler.LightExpression
                         items[constantsCount + i] = nestedLambda.Lambda;
                     else
                         items[constantsCount + i] = new NestedLambdaWithConstantsAndNestedLambdas(
-                            nestedLambda.Lambda, nestedClosureInfo.GetArrayOfConstantsAndNestedLambdas());
+                            nestedLambda.Lambda,
+                            nestedClosureInfo.GetArrayOfConstantsAndNestedLambdas()
+                        );
                 }
 
                 // Note that `nonPassedParams` will be populated by when nested lambda is emitted
@@ -773,7 +780,7 @@ namespace FastExpressionCompiler.LightExpression
 
         /// Helps to identify constants as the one to be put in closure object 
         public static bool IsClosureBoundConstant(object value, TypeInfo type) =>
-            !type.IsPrimitive && !type.IsEnum && !(value is string) && !(value is Type) && !(value is decimal) 
+            !type.IsPrimitive && !type.IsEnum && !(value is string) && !(value is Type) && !(value is decimal)
             || value is Delegate;
 
         // @paramExprs is required for nested lambda compilation
@@ -998,7 +1005,7 @@ namespace FastExpressionCompiler.LightExpression
                     case ExpressionType.Switch:
                         var switchExpr = ((SwitchExpression)expr);
                         if (!TryCollectBoundConstants(ref closure, switchExpr.SwitchValue, paramExprs, isNestedLambda, ref rootClosure) ||
-                            switchExpr.DefaultBody != null && 
+                            switchExpr.DefaultBody != null &&
                             !TryCollectBoundConstants(ref closure, switchExpr.DefaultBody, paramExprs, isNestedLambda, ref rootClosure))
                             return false;
                         var switchCases = switchExpr.Cases;
@@ -1114,8 +1121,7 @@ namespace FastExpressionCompiler.LightExpression
             }
 
             var nestedReturnType = nestedLambdaExpr.ReturnType;
-            var method = new DynamicMethod(
-                string.Empty, nestedReturnType, closurePlusParamTypes, typeof(ExpressionCompiler), true);
+            var method = new DynamicMethod(string.Empty, nestedReturnType, closurePlusParamTypes, typeof(ExpressionCompiler), skipVisibility: true);
 
             var il = method.GetILGenerator();
             var parentFlags = nestedReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
@@ -1180,7 +1186,7 @@ namespace FastExpressionCompiler.LightExpression
                         return false;
                 }
 
-                if (catchBlock.Filter != null && 
+                if (catchBlock.Filter != null &&
                     !TryCollectBoundConstants(ref closure, catchBlock.Filter, paramExprs, isNestedLambda, ref rootClosure))
                     return false;
 
@@ -1191,7 +1197,7 @@ namespace FastExpressionCompiler.LightExpression
                     closure.PopBlock();
             }
 
-            if (tryExpr.Finally != null && 
+            if (tryExpr.Finally != null &&
                 !TryCollectBoundConstants(ref closure, tryExpr.Finally, paramExprs, isNestedLambda, ref rootClosure))
                 return false;
 
@@ -1199,7 +1205,7 @@ namespace FastExpressionCompiler.LightExpression
             return true;
         }
 
-#endregion
+        #endregion
 
         // The minimal context-aware flags set by parent
         [Flags]
@@ -1367,7 +1373,7 @@ namespace FastExpressionCompiler.LightExpression
                         case ExpressionType.PreDecrementAssign:
                             return TryEmitIncDecAssign((UnaryExpression)expr, paramExprs, il, ref closure, parent);
 
-                        case ExpressionType.AddAssign: 
+                        case ExpressionType.AddAssign:
                         case ExpressionType.AddAssignChecked:
                         case ExpressionType.SubtractAssign:
                         case ExpressionType.SubtractAssignChecked:
@@ -1467,7 +1473,7 @@ namespace FastExpressionCompiler.LightExpression
 
                         case ExpressionType.Default:
                             if (expr.Type != typeof(void) && (parent & ParentFlags.IgnoreResult) == 0)
-                               EmitDefault(expr.Type, il);
+                                EmitDefault(expr.Type, il);
                             return true;
 
                         case ExpressionType.Index:
@@ -1769,7 +1775,7 @@ namespace FastExpressionCompiler.LightExpression
                         paramIndex += 1; // shift parameter index by one, because the first one will be closure
 
                     closure.LastEmitIsAddress = !paramExpr.IsByRef && paramType.IsValueType() &&
-                        ((parent & ParentFlags.InstanceCall) == ParentFlags.InstanceCall || 
+                        ((parent & ParentFlags.InstanceCall) == ParentFlags.InstanceCall ||
                          (parent & ParentFlags.MemberAccess) != 0);
 
                     if (closure.LastEmitIsAddress)
@@ -2169,19 +2175,53 @@ namespace FastExpressionCompiler.LightExpression
                 if (expr != null && IsClosureBoundConstant(constantValue, constantType.GetTypeInfo()))
                 {
                     var closureConstants = closure.Constants;
+                    var constantCount = closureConstants.Count;
+                    var constIndex = constantCount - 1;
 
-                    var constIndex = closureConstants.Count - 1;
                     while (constIndex >= 0 && !ReferenceEquals(closureConstants.Items[constIndex], expr))
                         --constIndex;
                     if (constIndex == -1)
                         return false;
 
-                    // Load constant from Closure - closure object is always a first argument
-                    il.Emit(OpCodes.Ldarg_0);
-                    il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
-                    EmitLoadConstantInt(il, constIndex);
-                    il.Emit(OpCodes.Ldelem_Ref);
-                    il.Emit(exprType.IsValueType() ? OpCodes.Unbox_Any : OpCodes.Castclass, exprType);
+                    // If expression is small and there is no variables set then just read them by args and field
+                    if (constantCount <= 3 && closure.ConstantVarsRef == null)
+                    {
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
+                        EmitLoadConstantInt(il, constIndex);
+                        il.Emit(OpCodes.Ldelem_Ref);
+
+                        return true;
+                    }
+
+                    // When expressions are large its better to store constants into variables so they can be re-used later
+                    if (closure.ConstantVarsRef == null)
+                    {
+                        // Load constant from Closure - closure object is always a first argument
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
+                        closure.ItemsArrayVarRef = il.DeclareLocal(typeof(object[]));
+
+                        var itemsIndex = closure.ItemsArrayVarRef.LocalIndex;
+
+                        EmitStLocInt(il, itemsIndex);
+
+                        // Store to variable
+                        closure.ConstantVarsRef = new LocalBuilder[constantCount];
+
+                        for (var i = 0; i < constantCount; i++)
+                        {
+                            // Store variable for easy access later
+                            closure.ConstantVarsRef[i] = il.DeclareLocal(closureConstants.Items[i].Type);
+
+                            EmitLdLocInt(il, itemsIndex);
+                            EmitLoadConstantInt(il, itemsIndex);
+                            il.Emit(OpCodes.Ldelem_Ref);
+                            EmitStLocInt(il, closure.ConstantVarsRef[i].LocalIndex);
+                        }
+                    }
+
+                    EmitLdLocInt(il, closure.ConstantVarsRef[constIndex].LocalIndex);
                 }
                 else
                 {
@@ -2788,7 +2828,7 @@ namespace FastExpressionCompiler.LightExpression
 
                         var memberExpr = (MemberExpression)left;
                         var objExpr = memberExpr.Expression;
-                        if (objExpr != null && 
+                        if (objExpr != null &&
                             !TryEmit(objExpr, paramExprs, il, ref closure, flags | ParentFlags.MemberAccess | ParentFlags.InstanceAccess))
                             return false;
 
@@ -2994,7 +3034,7 @@ namespace FastExpressionCompiler.LightExpression
                 // it means that we somehow skipped the lambda expression while collecting closure info.
                 var outerNestedLambdas = closure.NestedLambdas;
                 var outerNestedLambdaIndex = outerNestedLambdas.Length - 1;
-                while (outerNestedLambdaIndex != -1 && 
+                while (outerNestedLambdaIndex != -1 &&
                        !ReferenceEquals(outerNestedLambdas[outerNestedLambdaIndex].LambdaExpression, lambdaExpr))
                     --outerNestedLambdaIndex;
                 if (outerNestedLambdaIndex == -1)
@@ -3003,20 +3043,29 @@ namespace FastExpressionCompiler.LightExpression
                 var nestedLambdaInfo = closure.NestedLambdas[outerNestedLambdaIndex];
                 var nestedLambda = nestedLambdaInfo.Lambda;
                 var constantsCount = closure.Constants.Count;
+                var constantAndLambdasCount = constantsCount + outerNestedLambdaIndex;
 
-                // Load compiled lambda on stack counting the offset - nested lambdas are going after constants
-                var nestedLambdaType = nestedLambda.GetType();
-                il.Emit(OpCodes.Ldarg_0); // closure is always a first argument
-                il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
-                EmitLoadConstantInt(il, constantsCount + outerNestedLambdaIndex);
-                il.Emit(OpCodes.Ldelem_Ref); // load the array item object on stack and cast it lambda
+                // If there is no closure.items in stack, read args and field
+                if (closure.ItemsArrayVarRef == null)
+                {
+                    il.Emit(OpCodes.Ldarg_0); // Read first agument, its always closure
+                    il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField); // Read items field
+                }
+                else
+                {
+                    // Load items from local variable
+                    EmitLdLocInt(il, closure.ItemsArrayVarRef.LocalIndex);
+                }
+
+                EmitLoadConstantInt(il, constantAndLambdasCount); // Get object from array index
+                il.Emit(OpCodes.Ldelem_Ref);
 
                 // If lambda does not use any outer parameters to be set in closure, then we're done
                 ref var nestedClosureInfo = ref nestedLambdaInfo.ClosureInfo;
                 var nestedNonPassedParams = nestedClosureInfo.NonPassedParameters;
                 if (nestedNonPassedParams.Length == 0)
                 {
-                    il.Emit(OpCodes.Castclass, nestedLambdaType);
+                    //il.Emit(OpCodes.Castclass, nestedLambdaType);
                     return true;
                 }
 
@@ -3492,7 +3541,7 @@ namespace FastExpressionCompiler.LightExpression
                             for (var i = 0; i < methods.Length; i++)
                             {
                                 var m = methods[i];
-                                if (m.IsStatic && m.Name == "Concat" && 
+                                if (m.IsStatic && m.Name == "Concat" &&
                                     m.GetParameters().Length == 2 && m.GetParameters()[0].ParameterType == paraType)
                                 {
                                     method = m;
@@ -3771,6 +3820,56 @@ namespace FastExpressionCompiler.LightExpression
                         break;
                 }
             }
+
+            private static void EmitLdLocInt(ILGenerator il, int i)
+            {
+                switch (i)
+                {
+                    case 0:
+                        il.Emit(OpCodes.Ldloc_0);
+                        break;
+                    case 1:
+                        il.Emit(OpCodes.Ldloc_1);
+                        break;
+                    case 2:
+                        il.Emit(OpCodes.Ldloc_2);
+                        break;
+                    case 3:
+                        il.Emit(OpCodes.Ldloc_3);
+                        break;
+                    case int n when n > -129 && n < 128:
+                        il.Emit(OpCodes.Ldloc_S, (sbyte)i);
+                        break;
+                    default:
+                        il.Emit(OpCodes.Ldloc, (short)i);
+                        break;
+                }
+            }
+
+            private static void EmitStLocInt(ILGenerator il, int i)
+            {
+                switch (i)
+                {
+                    case 0:
+                        il.Emit(OpCodes.Stloc_0);
+                        break;
+                    case 1:
+                        il.Emit(OpCodes.Stloc_1);
+                        break;
+                    case 2:
+                        il.Emit(OpCodes.Stloc_2);
+                        break;
+                    case 3:
+                        il.Emit(OpCodes.Stloc_3);
+                        break;
+                    case int n when n > -129 && n < 128:
+                        il.Emit(OpCodes.Stloc_S, (sbyte)i);
+                        break;
+                    default:
+                        il.Emit(OpCodes.Stloc, (short)i);
+                        break;
+                }
+            }
         }
     }
 
@@ -3875,8 +3974,8 @@ namespace FastExpressionCompiler.LightExpression
                 {
                     var n = m.Name;
                     // n == "op_Implicit" || n == "op_Explicit"
-                    if (n.Length == 11 && 
-                        n[2] == '_' && n[5] == 'p' && n[6] == 'l' && n[7] == 'i' && n[8] == 'c' && n[9] == 'i' && n[10] == 't' && 
+                    if (n.Length == 11 &&
+                        n[2] == '_' && n[5] == 'p' && n[6] == 'l' && n[7] == 'i' && n[8] == 'c' && n[9] == 'i' && n[10] == 't' &&
                         m.GetParameters()[0].ParameterType == sourceType)
                         return m;
                 }
