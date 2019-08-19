@@ -9678,13 +9678,7 @@ namespace DryIoc
             }
 
             if (itemRef.Item is IDisposable disposable && disposable != this)
-            {
-                if (disposalOrder == 0)
-                    disposalOrder = NextDisposalIndex();
-                var d = _disposables;
-                if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
-                    RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
-            }
+                AddDisposable(disposable, disposalOrder);
 
             return itemRef.Item;
         }
@@ -9843,7 +9837,7 @@ namespace DryIoc
                 disposalOrder = NextDisposalIndex();
             var d = _disposables;
             if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
-                RefMap.AddOrUpdate(ref _disposables, disposalOrder, disposable);
+                Ref.Swap(ref _disposables, disposalOrder, disposable, (dispOrder, disp, x) => x.AddOrUpdate(dispOrder, disp));
         }
 
         /// <inheritdoc />
@@ -9875,7 +9869,7 @@ namespace DryIoc
 
             var f = _factories;
             if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(type, factory), f) != f)
-                RefMap.AddOrUpdate(ref _factories, type, factory);
+                Ref.Swap(ref _factories, type, factory, (t, fac, x) => x.AddOrUpdate(t, fac));
         }
 
         /// Try retrieve instance from the small registry.
@@ -11125,22 +11119,6 @@ namespace DryIoc
         }
     }
 
-    /// Hiding the lambda in the method call, so it is not needed it won't be allocated
-    internal static class RefMap
-    {
-        public static void AddOrUpdate<V>(this Ref<ImMap<V>> map, int key, V value) =>
-            map.Swap(x => x.AddOrUpdate(key, value));
-
-        public static void AddOrUpdate<V>(ref ImMap<V> map, int key, V value) =>
-            Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
-
-        public static void AddOrUpdate<K, V>(this Ref<ImHashMap<K, V>> map, K key, V value) =>
-            map.Swap(key, value, (k, v, m) => m.AddOrUpdate(k, v));
-
-        public static void AddOrUpdate<K, V>(ref ImHashMap<K, V> map, K key, V value) =>
-            Ref.Swap(ref map, x => x.AddOrUpdate(key, value));
-    }
-
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>
     public static class ReflectionTools
     {
@@ -11340,7 +11318,7 @@ namespace DryIoc
                 m.IsPublic && m.IsStatic && m.ReturnType == targetType && 
                 m.GetParameters().SingleOrDefaultIfMany()?.ParameterType == sourceType &&
                 (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
-                .SingleOrDefaultIfMany();
+            .SingleOrDefaultIfMany();
 
         /// <summary>Returns true if type is assignable to <paramref name="other"/> type.</summary>
         public static bool IsAssignableTo(this Type type, Type other) =>
