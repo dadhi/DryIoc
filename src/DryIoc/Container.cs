@@ -6319,7 +6319,9 @@ namespace DryIoc
                 PopulateDependencyResolutionCallExpressions(request);
 
             var container = request.Container;
-            var serviceTypeExpr = Constant(request.ServiceType, typeof(Type));
+            var serviceType = request.ServiceType;
+
+            var serviceTypeExpr = Constant(serviceType, typeof(Type));
             var ifUnresolvedExpr = Constant(request.IfUnresolved, typeof(IfUnresolved));
             var requiredServiceTypeExpr = Constant(request.RequiredServiceType, typeof(Type));
             var serviceKeyExpr = container.GetConstantExpression(request.ServiceKey, typeof(object));
@@ -6341,25 +6343,23 @@ namespace DryIoc
                     FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
-            // Only parent is converted to be passed to Resolve.
-            // The current request is formed by rest of Resolve parameters.
-            var parent = request.DirectParent;
-
             var parentFlags = default(RequestFlags);
             if (opensResolutionScope)
                 parentFlags |= RequestFlags.OpensResolutionScope;
             if ((request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                 parentFlags |= RequestFlags.StopRecursiveDependencyCheck;
 
-            var preResolveParentExpr = container.GetRequestExpression(parent, parentFlags);
+            // Only parent is converted to be passed to Resolve.
+            // The current request is formed by rest of Resolve parameters.
+            var preResolveParentExpr = container.GetRequestExpression(request.DirectParent, parentFlags);
 
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
 
-            if (request.ServiceType == typeof(void))
+            if (serviceType == typeof(object))
                 return resolveCallExpr;
 
-            return Convert(resolveCallExpr, request.ServiceType);
+            return Convert(resolveCallExpr, serviceType);
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request)
@@ -6385,8 +6385,8 @@ namespace DryIoc
             if (factoryExpr == null)
                 return;
 
-            request.Container.Rules.DependencyResolutionCallExprs.Swap(x =>
-                x.AddOrUpdate(request, factoryExpr
+            request.Container.Rules.DependencyResolutionCallExprs.Swap(request, factoryExpr, 
+                (req, facExpr, x) => x.AddOrUpdate(req, facExpr
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                         .ToExpression()
 #endif
@@ -7098,7 +7098,7 @@ namespace DryIoc
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton => (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
-        /// <summary>Returns true if object graph should be split due <see cref="DryIoc.Rules.DependencyDepthToSplitObjectGraph"/> setting.</summary>
+        /// [Obsolete("Unused - hides more than abstracts")]
         public bool ShouldSplitObjectGraph() =>
             FactoryType == FactoryType.Service &&
             DependencyDepth > Rules.DependencyDepthToSplitObjectGraph;
@@ -8124,33 +8124,37 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            var rules = request.Rules;
             var setup = Setup;
+            var container = request.Container;
+
+            // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
+            if (container.Rules.EagerCachingSingletonForFasterAccess &&
+                request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
+            {
+                if (container.SingletonScope.TryGet(out var singleton, FactoryID))
+                    return Constant(singleton, request.ServiceType);
+            }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && // preventing recursion
                 (setup.OpenResolutionScope ||
-                !request.IsResolutionCall && // preventing recursion
-                (setup.AsResolutionCall || 
-                 (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration) ||
-                 setup.UseParentReuse || request.ShouldSplitObjectGraph()) &&
-                request.GetActualServiceType() != typeof(void)))
+                 !request.IsResolutionCall && // preventing recursion
+                 (setup.AsResolutionCall ||
+                  (setup.AsResolutionCallForExpressionGeneration && container.Rules.UsedForExpressionGeneration) ||
+                  setup.UseParentReuse ||
+                  request.FactoryType == FactoryType.Service &&
+                  request.DependencyDepth > container.Rules.DependencyDepthToSplitObjectGraph) &&
+                 request.GetActualServiceType() != typeof(void)))
+            {
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
+            }
 
             // First look for decorators if it is not already a decorator
             if (FactoryType != FactoryType.Decorator)
             {
-                var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request);
+                var decoratorExpr = container.GetDecoratorExpressionOrDefault(request);
                 if (decoratorExpr != null)
                     return decoratorExpr;
-            }
-
-            // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
-            if (rules.EagerCachingSingletonForFasterAccess &&
-                request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
-            {
-                if (request.SingletonScope.TryGet(out var singleton, FactoryID))
-                    return Constant(singleton, request.ServiceType);
             }
 
             var mayCache = Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service &&
@@ -8163,7 +8167,7 @@ namespace DryIoc
             Container.Registry.ExpressionCacheSlot cacheSlot = null;
             if (mayCache)
             {
-                var cachedExpr = ((Container)request.Container).GetCachedFactoryExpression(FactoryID, request, out cacheSlot);
+                var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, request, out cacheSlot);
                 if (cachedExpr != null)
                     return cachedExpr;
             }
@@ -8179,12 +8183,12 @@ namespace DryIoc
 
                     serviceExpr = ApplyReuse(serviceExpr, request);
 
-                    if (serviceExpr.Type != originalServiceExprType) // todo: do I need to convert?
+                    if (serviceExpr.Type != originalServiceExprType)
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
 
                 if (mayCache)
-                    ((Container)request.Container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheSlot);
+                    ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheSlot);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -8197,9 +8201,6 @@ namespace DryIoc
             // Optimization: eagerly creates a singleton during the construction of object graph
             if (request.Reuse is SingletonReuse && 
                 request.Rules.EagerCachingSingletonForFasterAccess &&
-                // except: For decorators and wrappers, when tracking transient disposable and
-                // for lazy creation in Func
-                FactoryType == FactoryType.Service &&
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
@@ -9938,6 +9939,7 @@ namespace DryIoc
         private int _nextDisposalIndex;
         private int _disposed;
 
+        // todo: We can use the object tumbstone to express empty Ref in order to support valid `null` as Item value, e.g. `Empty = new object()`
         // Stores the item object in a ref (class) box which does not change after created and may be used for locking
         private sealed class ItemRef
         {

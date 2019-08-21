@@ -23,9 +23,10 @@ namespace LoadTest
              * if it does not fail you can increase threadCount and iterations  integers to increase pressure
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
+             *
              */
             var container = new Container(rules => rules
-                .WithDependencyDepthToSplitObjectGraph(5)
+                .WithDependencyDepthToSplitObjectGraph(8) // depth 5 - completes in 00:02:22.07; depth 8 - is still a stack overflow
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 

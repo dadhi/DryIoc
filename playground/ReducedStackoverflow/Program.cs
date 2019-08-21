@@ -31,7 +31,6 @@ namespace LoadTest
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
             var container = new Container(rules => rules
-                .WithDependencyDepthToSplitObjectGraph(8)
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
