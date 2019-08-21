@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.0.5</version>
+        <version>4.1.0-preview-01</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,16 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.1.0
+
+### Briefly:
+
+- Bug fixes
+- Better memory and performance for the real-world applications - big object graphs and the Unit-of-work scenarios
+- FEC V3.0 optimized for nested lambda invocation (scoped services in DryIoc) and consuming less memory
+- Rules.WithUseInterpretation to work iOS
+
+
 ## v4.0.5 Release notes
 
 - fixed: #133 Validate method call hangs
