@@ -21,7 +21,7 @@ namespace LoadTest
             var config = new HttpConfiguration();
             var container = new Container(rules => rules
                 // With UseInterpretation it completes without error in 28 sec
-                .WithUseInterpretation()
+                .WithoutFastExpressionCompiler()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
@@ -42,23 +42,23 @@ namespace LoadTest
 
             var container = CreateContainer();
 
-            //var stopWatch = new Stopwatch();
-            //stopWatch.Start();
-            //Console.WriteLine("Validate started");
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
+            Console.WriteLine("Validate started");
 
-            //// Validate IoC registrations
-            //var results = container.Validate();
-            //if (results.Length > 0)
-            //{
-            //    throw new Exception(results.ToString());
-            //}
-            //stopWatch.Stop();
-            //var ts = stopWatch.Elapsed;
+            // Validate IoC registrations
+            var results = container.Validate();
+            if (results.Length > 0)
+            {
+                throw new Exception(results.ToString());
+            }
+            stopWatch.Stop();
+            var ts = stopWatch.Elapsed;
 
-            //Console.WriteLine("");
-            //Console.WriteLine("Validation finished");
-            //Console.WriteLine($"{ts.Hours:00}:{ts.Minutes:00}:{ts.Seconds:00}.{ts.Milliseconds / 10:00}");
-            //Console.WriteLine("");
+            Console.WriteLine("");
+            Console.WriteLine("Validation finished");
+            Console.WriteLine($"{ts.Hours:00}:{ts.Minutes:00}:{ts.Seconds:00}.{ts.Milliseconds / 10:00}");
+            Console.WriteLine("");
 
             var httpControllerType = typeof(IHttpController);
 
@@ -70,18 +70,39 @@ namespace LoadTest
                 .ToArray();
 
             // Make sure all controllers can be resolved
-            //ResolveAllControllersOnce(container, controllers);
+            ResolveAllControllersOnce(container, controllers);
 
-            //CreateContainer();
+            Console.WriteLine("");
+            Console.WriteLine("----------------------------------");
+            Console.WriteLine(" Starting compiled + cached tests ");
+            Console.WriteLine("----------------------------------");
+            Console.WriteLine("");
 
-            //ForceGarbageCollector();
-
-            //IterateInOrder(controllers, container);
-
-            //CreateContainer();
-
+            container = CreateContainer();
             ForceGarbageCollector();
+            ResolveAllControllersOnce(container, controllers); // Intepret
+            ResolveAllControllersOnce(container, controllers); // Compile, cache
+            IterateInOrder(controllers, container);
+            container = CreateContainer();
+            ForceGarbageCollector();
+            ResolveAllControllersOnce(container, controllers); // Intepret
+            ResolveAllControllersOnce(container, controllers); // Compile, cache
+            StartRandomOrderTest(controllers, container);
 
+
+
+            Console.WriteLine("");
+            Console.WriteLine("---------------------------------------");
+            Console.WriteLine("      Starting cold run tests          ");
+            Console.WriteLine("      This can take a long time...     ");
+            Console.WriteLine("---------------------------------------");
+            Console.WriteLine("");
+
+            container = CreateContainer();
+            ForceGarbageCollector();
+            IterateInOrder(controllers, container);
+            container = CreateContainer();
+            ForceGarbageCollector();
             StartRandomOrderTest(controllers, container);
         }
 
@@ -207,7 +228,7 @@ namespace LoadTest
 
             // Poll thread status
             var aTimer = new System.Timers.Timer();
-            aTimer.Interval = 10000;
+            aTimer.Interval = 15000;
 
             // Hook up the Elapsed event for the timer. 
             aTimer.Elapsed += CheckThreadStatus;
@@ -271,7 +292,10 @@ namespace LoadTest
 
             foreach (var keyValuePair in ThreadStatuses)
             {
-                Console.WriteLine(keyValuePair.Value + " threads are" + keyValuePair.Key);
+                if (keyValuePair.Value > 0)
+                {
+                    Console.WriteLine(keyValuePair.Value + " threads are " + keyValuePair.Key);
+                }
             }
 
             Console.WriteLine("");
@@ -286,10 +310,6 @@ namespace LoadTest
                     scope.Resolve(controller);
                 }
             }
-
-            Console.WriteLine("");
-            Console.WriteLine("All Controllers in test resolved");
-            Console.WriteLine("");
         }
 
         static void ForceGarbageCollector()
