@@ -239,7 +239,7 @@ namespace LoadTest
             {
                 _threads[i].Join();
             }
-
+            aTimer.Stop();
             stopWatch.Stop();
             // Get the elapsed time as a TimeSpan value.
             var ts = stopWatch.Elapsed;
