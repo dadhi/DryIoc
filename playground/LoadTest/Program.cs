@@ -25,8 +25,9 @@ namespace LoadTest
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              *
              */
-            var container = new Container(rules => rules
-                .WithDependencyDepthToSplitObjectGraph(8) // depth 5 - completes in 00:02:22.07; depth 8 - is still a stack overflow
+            var container = new Container(rules => rules 
+                // depth:5 - completes in 00:02:22.07, for singletonDecorators: false - 00:02:15.27; depth 8 - is still a stack overflow
+                .WithDependencyDepthToSplitObjectGraph(5)
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
