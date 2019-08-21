@@ -1391,9 +1391,18 @@ namespace ImTools
     /// ImMap methods
     public static class ImMap
     {
+        /// Get value for found key or default `V` otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImMap<V> map, int key)
+        {
+            while (map.Height != 0 && map.Key != key)
+                map = key < map.Key ? map.Left : map.Right;
+            return map.Value;
+        }
+
         /// Get value for found key or default value otherwise.
         [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImMap<V> map, int key, V defaultValue = default(V))
+        public static V GetValueOrDefault<V>(this ImMap<V> map, int key, V defaultValue)
         {
             while (map.Height != 0 && map.Key != key)
                 map = key < map.Key ? map.Left : map.Right;

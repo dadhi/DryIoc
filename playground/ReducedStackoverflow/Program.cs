@@ -30,8 +30,9 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              */
-            var container =
-                new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
+            var container = new Container(rules => rules
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(config);
 
             Registrations.RegisterTypes(container, true);
 
