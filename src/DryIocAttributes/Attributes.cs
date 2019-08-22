@@ -29,6 +29,28 @@ using System.ComponentModel.Composition;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
+
+#if NET40 || NET45
+using System.Runtime.CompilerServices;
+[assembly: TypeForwardedTo(typeof(ExportAttribute))]
+[assembly: TypeForwardedTo(typeof(InheritedExportAttribute))]
+[assembly: TypeForwardedTo(typeof(PartNotDiscoverableAttribute))]
+[assembly: TypeForwardedTo(typeof(CreationPolicy))]
+[assembly: TypeForwardedTo(typeof(PartCreationPolicyAttribute))]
+[assembly: TypeForwardedTo(typeof(ImportingConstructorAttribute))]
+[assembly: TypeForwardedTo(typeof(ImportAttribute))]
+[assembly: TypeForwardedTo(typeof(ImportManyAttribute))]
+[assembly: TypeForwardedTo(typeof(MetadataAttributeAttribute))]
+[assembly: TypeForwardedTo(typeof(ExportMetadataAttribute))]
+[assembly: TypeForwardedTo(typeof(IPartImportsSatisfiedNotification))]
+#endif
+
+#if NET45
+[assembly: TypeForwardedTo(typeof(ExportFactory<>))]
+[assembly: TypeForwardedTo(typeof(ExportFactory<,>))]
+[assembly: TypeForwardedTo(typeof(ExportLifetimeContext<>))]
+#endif
+
 namespace DryIocAttributes
 {
     /// <summary>List of supported DryIoc reuse types.</summary>
