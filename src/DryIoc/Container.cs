@@ -8204,25 +8204,37 @@ namespace DryIoc
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                var createSingleton = 
-                    Setup.WeaklyReferenced ? (Func<IResolverContext, Expression, bool, object>)(
+                Func<IResolverContext, Expression, bool, object> createSingleton;
+                if (Setup.WeaklyReferenced)
+                {
+                    createSingleton = (Func<IResolverContext, Expression, bool, object>) (
                         (r, e, u) => new WeakReference(
-                        Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                            ? instance : e.CompileToFactoryDelegate(u, ((IContainer)r).Rules.UseInterpretation)(r))) :
-                    Setup.PreventDisposal ? (Func<IResolverContext, Expression, bool, object>)(
-                        (r, e, u) => (object)new HiddenDisposable(
-                        Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                            ? instance : e.CompileToFactoryDelegate(u, ((IContainer)r).Rules.UseInterpretation)(r))) :
-                        (r, e, u) =>
-                        {
-                            if (Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance))
-                                return instance;
-                            return e.CompileToFactoryDelegate(u, ((IContainer)r).Rules.UseInterpretation)(r);
-                        };
+                            Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
+                                ? instance
+                                : e.CompileToFactoryDelegate(u, ((IContainer) r).Rules.UseInterpretation)(r)));
+                }
+                else if (Setup.PreventDisposal)
+                {
+                    createSingleton = (Func<IResolverContext, Expression, bool, object>) (
+                        (r, e, u) => (object) new HiddenDisposable(
+                            Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
+                                ? instance
+                                : e.CompileToFactoryDelegate(u, ((IContainer) r).Rules.UseInterpretation)(r)));
+                }
+                else
+                {
+                    createSingleton = (r, e, u) =>
+                    {
+                        if (Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance))
+                            return instance;
+                        return e.CompileToFactoryDelegate(u, ((IContainer) r).Rules.UseInterpretation)(r);
+                    };
+                }
 
                 var container = request.Container;
                 var singleton = container.SingletonScope.TryGetOrAddWithoutClosure(FactoryID, 
-                    container, serviceExpr, container.Rules.UseFastExpressionCompiler, createSingleton, Setup.DisposalOrder);
+                    container, serviceExpr, container.Rules.UseFastExpressionCompiler, createSingleton, 
+                    Setup.DisposalOrder);
 
                 serviceExpr = Constant(singleton);
             }
@@ -8230,21 +8242,29 @@ namespace DryIoc
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
                 if (Setup.WeaklyReferenced)
+                {
                     serviceExpr = New(typeof(WeakReference).Constructor(typeof(object)), serviceExpr);
+                }
                 else if (Setup.PreventDisposal)
+                {
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
+                }
 
                 serviceExpr = request.Reuse.Apply(request, serviceExpr);
             }
 
             // Unwrap WeakReference or HiddenDisposable
             if (Setup.WeaklyReferenced)
+            {
                 serviceExpr = Call(
                     typeof(ThrowInGeneratedCode).GetTypeInfo().GetDeclaredMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
                     Property(Convert(serviceExpr, typeof(WeakReference)),
                         typeof(WeakReference).Property(nameof(WeakReference.Target))));
+            }
             else if (Setup.PreventDisposal)
+            {
                 serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
+            }
 
             return serviceExpr;
         }
