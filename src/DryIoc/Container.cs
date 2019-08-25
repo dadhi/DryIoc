@@ -3011,17 +3011,6 @@ namespace DryIoc
 #endif
                 );
 
-        /// How to compile
-        public enum HowToCompile
-        {
-            /// Foo
-            UseSystemCompile = 0,
-            /// Bar
-            UseFastExpressionCompiler,
-            /// Zoo
-            PreferIntrerpetation
-        }
-
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
         public static FactoryDelegate CompileToFactoryDelegate(
@@ -3051,7 +3040,7 @@ namespace DryIoc
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
                     preferInterpretation
 #endif
-);
+                );
         }
 
         /// [Obsolete("Use the version with `preferInterpretation` parameter instead")]

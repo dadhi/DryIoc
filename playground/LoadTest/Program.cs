@@ -24,14 +24,17 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              *
+             * With the new FEC using variables for closure constants
+             * - singletonDecorators: true  - 00:01:02.79
+             * - singletonDecorators: false - 00:02:56.42
              */
-            var container = new Container(rules => rules 
+            var container = new Container(rules => rules
                 // depth:5 - completes in 00:02:22.07, for singletonDecorators: false - 00:02:15.27; depth 8 - is still a stack overflow
-                .WithDependencyDepthToSplitObjectGraph(5)
+                //.WithDependencyDepthToSplitObjectGraph(5)
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
-            Registrations.RegisterTypes(container, true);
+            //Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
@@ -46,9 +49,6 @@ namespace LoadTest
              */
             // WORKS:
             //Release mode - CPU: Core i7 8750H(12 threads), RAM: 16Gb
-            //    -- Load Test Result--
-            //  00:04:42.45
-
             // 13.08.2019 - 00:03:45.58
 
             //var container = new Container(rules => rules
@@ -56,7 +56,6 @@ namespace LoadTest
             //    .With(FactoryMethod.ConstructorWithResolvableArguments))
             //    .WithWebApi(config);
             //Registrations.RegisterTypes(container, false);
-
 
             // This setup config WORKS, but uses a lot of memory
             //Release mode - CPU: Core i7 8750H(12 threads), RAM: 16Gb

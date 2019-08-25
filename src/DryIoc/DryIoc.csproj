@@ -4,7 +4,7 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.1.0-preview-01</VersionPrefix>
+        <VersionPrefix>4.1.0-preview-02</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -24,6 +24,7 @@
 - Better memory and performance for the real-world applications - big object graphs and the Unit-of-work scenarios
 - FEC V3.0 optimized for nested lambda invocation (scoped services in DryIoc) and consuming less memory
 - Rules.WithUseInterpretation to work iOS
+- Streamlined ambient ScopeContext scope disposal, ensuring more predictable AsyncExecutionFlowScopeContext, ThreadScopeContext behavior
 
 
 ## v4.0.5 Release notes
