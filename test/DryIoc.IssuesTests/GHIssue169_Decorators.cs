@@ -4,7 +4,6 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    [Ignore("fix me")]
     [TestFixture]
     public class GHIssue169_Decorators
     {
@@ -24,7 +23,6 @@ namespace DryIoc.IssuesTests
             // This is same test but Decorator is singleton
             c.Register<IRepository, RepoDecorator>(Reuse.Singleton, setup: Setup.Decorator,
                 ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-
 
             using (var scope = c.OpenScope(Reuse.WebRequestScopeName))
             {

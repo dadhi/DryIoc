@@ -8124,10 +8124,17 @@ namespace DryIoc
         {
             request = request.WithResolvedFactory(this);
 
-            var setup = Setup;
+            // First look for decorators if it is not already a decorator
             var container = request.Container;
+            if (FactoryType != FactoryType.Decorator)
+            {
+                var decoratorExpr = container.GetDecoratorExpressionOrDefault(request);
+                if (decoratorExpr != null)
+                    return decoratorExpr;
+            }
 
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
+            var setup = Setup;
             if (container.Rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
@@ -8147,14 +8154,6 @@ namespace DryIoc
                  request.GetActualServiceType() != typeof(void)))
             {
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
-            }
-
-            // First look for decorators if it is not already a decorator
-            if (FactoryType != FactoryType.Decorator)
-            {
-                var decoratorExpr = container.GetDecoratorExpressionOrDefault(request);
-                if (decoratorExpr != null)
-                    return decoratorExpr;
             }
 
             var mayCache = Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service &&
