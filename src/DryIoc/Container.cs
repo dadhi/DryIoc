@@ -8740,22 +8740,6 @@ namespace DryIoc
 
                 if (paramInfo.Details == DryIoc.ServiceDetails.Default)
                 {
-                    if (paramServiceType == typeof(IResolverContext) || paramServiceType == typeof(IResolver)
-                        // todo: replace framework targets with feature toggle
-#if SUPPORTS_ISERVICE_PROVIDER
-                        || paramServiceType == typeof(IServiceProvider)
-#endif
-                    )
-                    {
-                        paramExprs[i] = ResolverContext.GetRootOrSelfExpr(paramRequest);
-                        continue;
-                    }
-                    else if (paramServiceType == typeof(IRegistrator) || paramServiceType == typeof(IContainer))
-                    {
-                        paramExprs[i] = Convert(ResolverContext.GetRootOrSelfExpr(paramRequest), paramServiceType);
-                        continue;
-                    }
-
                     if (request.Container.TryGetUsedInstance(paramServiceType, out var instance))
                     {
                         // Generate the fast resolve call for used instances
