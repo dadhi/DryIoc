@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.0.6 Release notes / 2019-08-29
+
+- fixed: #171 Wrong IContainer resolved
+
 ## v4.0.5 Release notes / 2019-06-08
 
 - fixed: #133 Validate method call hangs
