@@ -2276,7 +2276,8 @@ namespace DryIoc
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
             New(_ctor, Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
 
-        private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey).SingleConstructor();
+        private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey)
+            .GetTypeInfo().DeclaredConstructors.GetFirst(x => x.GetParameters().Length == 2);
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 
@@ -3739,7 +3740,9 @@ namespace DryIoc
             if (itemType != typeof(object))
                 resolveManyExpr = Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr);
 
-            return New(typeof(LazyEnumerable<>).MakeGenericType(itemType).SingleConstructor(), resolveManyExpr);
+            return New(typeof(LazyEnumerable<>).MakeGenericType(itemType)
+                    .GetTypeInfo().DeclaredConstructors.GetFirst(x => x.GetParameters().Length == 1), 
+                    resolveManyExpr);
         }
 
         private static readonly MethodInfo _enumerableCastMethod =
@@ -3854,7 +3857,8 @@ namespace DryIoc
                 return null;
 
             var keyExpr = request.Container.GetConstantExpression(serviceKey, serviceKeyType);
-            return New(keyValueType.SingleConstructor(), keyExpr, serviceExpr);
+            return New(keyValueType.GetTypeInfo().DeclaredConstructors.GetFirst(x => x.GetParameters().Length == 2), 
+                keyExpr, serviceExpr);
         }
 
         /// <summary>Discovers and combines service with its setup metadata.
