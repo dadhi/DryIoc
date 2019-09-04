@@ -15,7 +15,7 @@
 <![CDATA[
 ## v4.0.7 Release notes
 
-- fixed: #173 Wrong IContainer resolved
+- fixed: #173 Validate-Method throws System.TypeInitializationException : The type initializer for 'DryIoc.OpenGenericTypeKey' threw an exception.
 
 ## v4.0.6 Release notes
 

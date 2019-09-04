@@ -2277,7 +2277,7 @@ namespace DryIoc
             New(_ctor, Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
 
         private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey)
-            .GetTypeInfo().DeclaredConstructors.GetFirst(x => x.GetParameters().Length == 2);
+            .GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 2);
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 
@@ -3741,7 +3741,7 @@ namespace DryIoc
                 resolveManyExpr = Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr);
 
             return New(typeof(LazyEnumerable<>).MakeGenericType(itemType)
-                    .GetTypeInfo().DeclaredConstructors.GetFirst(x => x.GetParameters().Length == 1), 
+                    .GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 1), 
                     resolveManyExpr);
         }
 
@@ -3857,7 +3857,7 @@ namespace DryIoc
                 return null;
 
             var keyExpr = request.Container.GetConstantExpression(serviceKey, serviceKeyType);
-            return New(keyValueType.GetTypeInfo().DeclaredConstructors.GetFirst(x => x.GetParameters().Length == 2), 
+            return New(keyValueType.GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 2), 
                 keyExpr, serviceExpr);
         }
 
