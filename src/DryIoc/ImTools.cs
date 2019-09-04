@@ -926,7 +926,7 @@ namespace ImTools
         /// Push the new slot and return the ref to it
         public ref T PushSlot()
         {
-            if (++Count >= Items.Length)
+            if (++Count > Items.Length)
                 Items = Expand(Items);
             return ref Items[Count - 1];
         }
@@ -941,9 +941,8 @@ namespace ImTools
                 return new T[2];
 
             var count = items.Length;
-            var newItems = new T[count << 1];
-            for (var i = 0; i < count; i++)
-                newItems[i] = items[i];
+            var newItems = new T[count << 1]; // count x 2
+            Array.Copy(items, 0, newItems, 0, count);
             return newItems;
         }
     }
