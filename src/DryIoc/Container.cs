@@ -3454,7 +3454,7 @@ namespace DryIoc
 
             // When not for generation, using run-time request object to Minimize generated object graph.
             if (!container.Rules.UsedForExpressionGeneration)
-                return Constant(r);
+                return Constant(r.PreventChanges());
 
             // recursively ask for parent expression until it is empty
             var parentExpr = container.GetRequestExpression(request.DirectParent);
@@ -6963,17 +6963,17 @@ namespace DryIoc
 
     internal sealed class RequestStack
     {
-        public Request[] Requests;
+        public Request[] Items;
 
-        public RequestStack() => Requests = new Request[4];
+        public RequestStack(int capacity = 4) => Items = new Request[capacity];
 
         public ref Request GetOrPushRef(int index)
         {
-            if (index < Requests.Length)
-                return ref Requests[index];
+            if (index < Items.Length)
+                return ref Items[index];
 
-            Requests = Expand(Requests);
-            return ref Requests[index];
+            Items = Expand(Items);
+            return ref Items[index];
         }
 
         private static Request[] Expand(Request[] items)
@@ -6992,18 +6992,18 @@ namespace DryIoc
             = RequestFlags.IsSingletonOrDependencyOfSingleton
             | RequestFlags.IsWrappedInFunc;
 
-        private const RequestFlags DefaultFlags = default(RequestFlags);
+        private const RequestFlags DefaultFlags = default;
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(null, null, null, DefaultFlags, ServiceInfo.Empty, null);
+            new Request(null, null, 0, null, -1, DefaultFlags, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, null, DefaultFlags | RequestFlags.OpensResolutionScope, ServiceInfo.Empty, null);
+            new Request(null, null, 0, null, -1, DefaultFlags | RequestFlags.OpensResolutionScope, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
@@ -7018,25 +7018,29 @@ namespace DryIoc
 
             flags |= RequestFlags.IsResolutionCall;
 
-            RequestStack stack;
             // inherit some flags and service details from parent (if any)
             preResolveParent = preResolveParent ?? Empty;
             if (!preResolveParent.IsEmpty)
             {
-                stack = preResolveParent.RequestStack;
-
                 serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(
                     preResolveParent._serviceInfo, container, preResolveParent.FactoryType);
 
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
-            else
-            {
-                stack = new RequestStack();
-            }
 
             var inputArgExprs = inputArgs?.Map(a => Constant(a));
-            return new Request(container, preResolveParent, stack, flags, serviceInfo, inputArgExprs);
+
+            // if `preResolveParent` is not emtpty we may use its stack
+            var stack = preResolveParent.RequestStack ?? new RequestStack();
+            var indexInStack = preResolveParent.IndexInStack + 1; // for the Emty preResolveParent it should be `-1 + 1 == 0` 
+            ref var req = ref stack.GetOrPushRef(indexInStack);
+
+            // we re-starting the dependency depth count from `1`
+            if (req == null)
+                req = new Request(container, preResolveParent, 1, stack, indexInStack, flags, serviceInfo, inputArgExprs);
+            else
+                req.SetServiceInfo(container, preResolveParent, 1, stack, indexInStack, flags, serviceInfo, inputArgExprs);
+            return req;
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
@@ -7046,14 +7050,15 @@ namespace DryIoc
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
 
+        // todo: Make a property in v4.0
         /// <summary>Available in runtime only, provides access to container initiated request.</summary>
-        public readonly IContainer Container;
+        public IContainer Container;
 
         /// <summary>Request immediate parent.</summary>
-        public readonly Request DirectParent;
+        public Request DirectParent;
 
-        internal readonly RequestStack RequestStack;
-
+        internal RequestStack RequestStack;
+        internal int IndexInStack;
 
         // mutable because of RequestFlags.AddedToResolutionExpressions
         /// <summary>Persisted request conditions</summary>
@@ -7063,7 +7068,7 @@ namespace DryIoc
         private IServiceInfo _serviceInfo;
 
         /// <summary>Input arguments provided with `Resolve`</summary>
-        internal readonly Expression[] InputArgExprs;
+        internal Expression[] InputArgExprs;
 
         /// <summary>Runtime known resolve factory, otherwise is <c>null</c></summary>
         internal Factory Factory;
@@ -7078,7 +7083,7 @@ namespace DryIoc
         public FactoryType FactoryType { get; private set; }
 
         /// <summary>Service implementation type if known.</summary>
-        public Type ImplementationType => _factoryImplType ?? (_factoryImplType = Factory?.ImplementationType);
+        public Type ImplementationType => _factoryImplType ?? Factory?.ImplementationType;
         private Type _factoryImplType;
 
         /// <summary>Service reuse.</summary>
@@ -7088,7 +7093,7 @@ namespace DryIoc
         public int DecoratedFactoryID { get; private set; }
 
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
-        public readonly int DependencyDepth;
+        public int DependencyDepth;
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -7160,10 +7165,8 @@ namespace DryIoc
         public Type ServiceType => _serviceInfo.ServiceType;
 
         /// <summary>Compatible required or service type.</summary>
-        public Type GetActualServiceType() =>
-            _actualServiceType ?? (_actualServiceType = _serviceInfo.GetActualServiceType());
-
-        private Type _actualServiceType; // saving result once
+        public Type GetActualServiceType() => _actualServiceType;
+        private Type _actualServiceType;
 
         /// <summary>Optional service key to identify service of the same type.</summary>
         public object ServiceKey => _serviceInfo.Details.ServiceKey;
@@ -7197,7 +7200,14 @@ namespace DryIoc
             var flags = Flags & InheritedFlags | additionalFlags;
             var serviceInfo = info.ThrowIfNull().InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
 
-            return new Request(Container, this, RequestStack, flags, serviceInfo, InputArgExprs);
+            var stack = RequestStack ?? new RequestStack();
+            var indexInStack = IndexInStack + 1;
+            ref var req = ref stack.GetOrPushRef(indexInStack);
+            if (req == null)
+                req = new Request(Container, this, DependencyDepth + 1, RequestStack, indexInStack, flags, serviceInfo, InputArgExprs);
+            else
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, indexInStack, flags, serviceInfo, InputArgExprs);
+            return req;
         }
 
         /// <summary>Composes service description into <see cref="IServiceInfo"/> and Pushes the new request.</summary>
@@ -7210,8 +7220,8 @@ namespace DryIoc
 
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
-            new Request(Container, this, RequestStack, DefaultFlags, ServiceInfo.Of(serviceType),
-                InputArgExprs, /*factory:*/null, factoryID, FactoryType.Service, implementationType, reuse, 0);
+            Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+                factoryID, FactoryType.Service, implementationType, reuse, DefaultFlags, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith4Args = Lazy.Of(() =>
             typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
@@ -7219,9 +7229,8 @@ namespace DryIoc
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
-            new Request(Container, this, RequestStack, flags,
-                ServiceInfo.Of(serviceType, requiredServiceType, IfUnresolved.Throw, serviceKey),
-                InputArgExprs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, 0);
+            Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
+                factoryID, factoryType, implementationType, reuse, flags, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith8Args = Lazy.Of(() =>
             typeof(Request).Method(nameof(Push), typeof(Type), typeof(Type), typeof(object),
@@ -7231,9 +7240,8 @@ namespace DryIoc
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
             int decoratedFactoryID) =>
-            new Request(Container, this, RequestStack, flags,
-                ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
-                InputArgExprs, /*factory:*/null, factoryID, factoryType, implementationType, reuse, decoratedFactoryID);
+            Push(serviceType, requiredServiceType, serviceKey, null, null, ifUnresolved,
+                factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith10Args = Lazy.Of(() =>
             typeof(Request).Method(nameof(Push),
@@ -7243,11 +7251,15 @@ namespace DryIoc
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
-            int decoratedFactoryID) =>
-            new Request(Container, this, RequestStack, flags,
+            int decoratedFactoryID)
+        {
+            return new Request(Container, this, DependencyDepth + 1, null, -1, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
-                InputArgExprs, /*factory:*/null, factoryID, factoryType, implementationType, reuse,
+                InputArgExprs, implementationType, 
+                null, // factory cannot be supplied in generated code
+                factoryID, factoryType, reuse,
                 decoratedFactoryID);
+        }
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = Lazy.Of(() =>
             typeof(Request).Method(nameof(Push),
@@ -7262,20 +7274,23 @@ namespace DryIoc
         {
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
-                : new Request(Container, DirectParent, RequestStack, Flags, newServiceInfo, InputArgExprs,
-                    Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
+                : new Request(Container, 
+                    DirectParent, DependencyDepth, RequestStack, IndexInStack, Flags, newServiceInfo, InputArgExprs,
+                    _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
         /// Produces the new request with the changed `ifUnresolved` or returns original request otherwise
         public Request WithIfUnresolved(IfUnresolved ifUnresolved) =>
             IfUnresolved == ifUnresolved ? this
-                : new Request(Container, DirectParent, RequestStack, Flags, _serviceInfo.WithIfUnresolved(ifUnresolved),
-                    InputArgExprs, Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
+                : new Request(Container, 
+                    DirectParent, DependencyDepth, RequestStack, IndexInStack, Flags, _serviceInfo.WithIfUnresolved(ifUnresolved),
+                    InputArgExprs, _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
-            new Request(Container, DirectParent, RequestStack, newFlags, _serviceInfo, InputArgExprs,
-                Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
+            new Request(Container,
+                DirectParent, DependencyDepth, RequestStack, IndexInStack, newFlags, _serviceInfo, InputArgExprs,
+                _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -7292,8 +7307,9 @@ namespace DryIoc
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
-            new Request(Container, DirectParent, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
-                Factory, FactoryID, FactoryType, _factoryImplType, Reuse, DecoratedFactoryID);
+            new Request(Container, 
+                DirectParent, DependencyDepth, RequestStack, IndexInStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
+                _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
         /// <param name="factory">Factory to which request is resolved.</param>
@@ -7352,13 +7368,15 @@ namespace DryIoc
             }
 
             if (copyRequest)
-                return new Request(Container, DirectParent, RequestStack, flags, _serviceInfo, InputArgExprs,
-                    factory, factory.FactoryID, factory.FactoryType,
-                    null, // factoryImplType: null, so that implementation type can be lazily retrieved from `factory`
-                    reuse, decoratedFactoryID);
+            {
+                PreventChanges();
+                return new Request(Container,
+                    DirectParent, DependencyDepth, null, -1, flags, _serviceInfo, InputArgExprs,
+                    null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+            }
 
             Flags = flags;
-            SetResolvedFactory(factory, factory.FactoryID, factory.FactoryType, null, reuse, decoratedFactoryID);
+            SetResolvedFactory(null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
             return this;
         }
 
@@ -7590,45 +7608,85 @@ namespace DryIoc
         public override int GetHashCode() => _hashCode;
 
         // Initial request without factory info yet
-        private Request(IContainer container, Request parent, RequestStack stack,
+        private Request(IContainer container, 
+            Request parent, int dependencyDepth, RequestStack stack, int indexInStack,
             RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
+            DependencyDepth = dependencyDepth;
             RequestStack = stack;
+            IndexInStack = indexInStack;
 
             _serviceInfo = serviceInfo;
+            _actualServiceType = serviceInfo.GetActualServiceType();
+
+            Flags = flags;
+
+            // runtime state
+            InputArgExprs = inputArgExprs;
+            Container     = container;
+        }
+
+        // Request with resolved factory state
+        private Request(IContainer container, 
+            Request parent, int dependencyDepth, RequestStack stack, int indexInStack,
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
+            Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
+            : this(container, parent, dependencyDepth, stack, indexInStack, flags, serviceInfo, inputArgExprs)
+        {
+            SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
+        }
+
+        /// Severe the connection with the request pool up to the parent so that noone can change the Request state
+        internal Request PreventChanges()
+        {
+            for (var r = this; !r.IsEmpty; r = r.DirectParent)
+            {
+                if (r.RequestStack != null)
+                {
+                    r.RequestStack.Items[r.IndexInStack] = null;
+                    r.RequestStack = null;
+                    r.IndexInStack = -1;
+                }
+            }
+
+            return this;
+        }
+
+        private void SetServiceInfo(IContainer container, 
+            Request parent, int dependencyDepth, RequestStack stack, int indexInStack,
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+        {
+            DirectParent = parent;
+            DependencyDepth = dependencyDepth;
+
+            RequestStack = stack;
+            IndexInStack = indexInStack;
+
+            _serviceInfo = serviceInfo;
+            _actualServiceType = serviceInfo.GetActualServiceType();
+
             Flags = flags;
 
             // runtime state
             InputArgExprs = inputArgExprs;
             Container = container;
 
-            if (parent != null)
-                DependencyDepth = parent.DependencyDepth + 1;
+            // reset factory info
+            SetResolvedFactory(null, null, 0, FactoryType.Service, null, 0);
         }
 
-        // Request with resolved factory state
-        private Request(IContainer container, Request parent, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
-            Factory factory, int factoryID, FactoryType factoryType, Type factoryImplType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, stack, flags, serviceInfo, inputArgExprs)
-        {
-            SetResolvedFactory(factory , factoryID, factoryType, factoryImplType, reuse, decoratedFactoryID);
-        }
-
-        private void SetResolvedFactory(Factory factory, int factoryID, FactoryType factoryType,
-            Type factoryImplType, IReuse reuse, int decoratedFactoryID)
+        private void SetResolvedFactory(Type factoryImplType, 
+            Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
         {
             FactoryID = factoryID;
             FactoryType = factoryType;
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
-
             _hashCode = Hasher.Combine(DirectParent?._hashCode ?? 0, FactoryID);
-            _factoryImplType = factoryImplType;
-             
-            // runtime state
-            Factory = factory;
+
+            _factoryImplType = factoryImplType; // should be set from the runtime known `Factory` object
+            Factory = factory; // runtime state
         }
     }
 
