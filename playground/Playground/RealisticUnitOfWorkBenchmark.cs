@@ -990,6 +990,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                                           BmarkDryIoc | 111.3 us | 0.9117 us | 0.8528 us |  0.79 |    0.01 | 21.7285 | 0.2441 |     - | 100.34 KB |
  BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 107.5 us | 1.8341 us | 1.7157 us |  0.77 |    0.02 | 20.1416 | 0.1221 |     - |  92.93 KB |
                                       BmarkDryIocMsDi | 127.6 us | 1.5477 us | 1.4477 us |  0.91 |    0.02 | 23.4375 |      - |     - | 108.39 KB |
+
+|                                               Method |     Mean |     Error |    StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|----------------------------------------------------- |---------:|----------:|----------:|------:|--------:|-------:|------:|----------:|
+|                    BmarkMicrosoftDependencyInjection | 142.8 us | 1.5226 us | 1.2715 us |  1.00 | 18.5547 | 0.2441 |     - |  80.63 KB |
+|                                          BmarkDryIoc | 112.7 us | 0.1224 us | 0.1145 us |  0.79 | 20.2637 | 0.2441 |     - |  93.71 KB |
+| BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 110.2 us | 1.7887 us | 1.6731 us |  0.77 | 19.2871 |      - |     - |  88.92 KB |
+|                                      BmarkDryIocMsDi | 125.7 us | 1.7946 us | 1.6787 us |  0.88 | 21.9727 | 0.4883 |     - | 101.76 KB |
+
              */
 
             [Benchmark(Baseline = true)]

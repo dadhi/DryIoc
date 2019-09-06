@@ -286,11 +286,16 @@ namespace DryIoc
                 return null;
 
             FactoryDelegate factoryDelegate;
+
+            // todo: in v5.0 there should be no check nor the InstanceFactory
             if (factory is InstanceFactory == false)
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
                     return null;
+
+                // Complete with request - its resources can be used elsewhere
+                request.RequestStack?.Free();
 
                 if (expr is ConstantExpression constExpr)
                 {
@@ -6963,9 +6968,29 @@ namespace DryIoc
 
     internal sealed class RequestStack
     {
+        private static StackPool<RequestStack> _requestStackPool = new StackPool<RequestStack>();
+
+        public static RequestStack Alloc() => _requestStackPool.Rent() ?? new RequestStack(4);
+        public void Free()
+        {
+            for (int i = 0; i < Items.Length; i++)
+            {
+                var item = Items[i];
+                if (item != null)
+                {
+                    // prevent memory leaks by resetting the runtime state
+                    item.Container = null;
+                    item.Factory = null;
+                    item.InputArgExprs = null;
+                }
+            }
+
+            _requestStackPool.Return(this);
+        }
+
         public Request[] Items;
 
-        public RequestStack(int capacity = 4) => Items = new Request[capacity];
+        private RequestStack(int capacity) => Items = new Request[capacity];
 
         public ref Request GetOrPushRef(int index)
         {
@@ -7031,7 +7056,7 @@ namespace DryIoc
             var inputArgExprs = inputArgs?.Map(a => Constant(a));
 
             // if `preResolveParent` is not emtpty we may use its stack
-            var stack = preResolveParent.RequestStack ?? new RequestStack();
+            var stack = preResolveParent.RequestStack ?? RequestStack.Alloc();
             var indexInStack = preResolveParent.IndexInStack + 1; // for the Emty preResolveParent it should be `-1 + 1 == 0` 
             ref var req = ref stack.GetOrPushRef(indexInStack);
 
@@ -7200,7 +7225,7 @@ namespace DryIoc
             var flags = Flags & InheritedFlags | additionalFlags;
             var serviceInfo = info.ThrowIfNull().InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
 
-            var stack = RequestStack ?? new RequestStack();
+            var stack = RequestStack ?? RequestStack.Alloc();
             var indexInStack = IndexInStack + 1;
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
