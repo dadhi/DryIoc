@@ -3459,7 +3459,7 @@ namespace DryIoc
 
             // When not for generation, using run-time request object to Minimize generated object graph.
             if (!container.Rules.UsedForExpressionGeneration)
-                return Constant(r.PreventChanges());
+                return Constant(r.IsolateRequestChain());
 
             // recursively ask for parent expression until it is empty
             var parentExpr = container.GetRequestExpression(request.DirectParent);
@@ -6970,7 +6970,15 @@ namespace DryIoc
     {
         private static StackPool<RequestStack> _requestStackPool = new StackPool<RequestStack>();
 
-        public static RequestStack Alloc() => _requestStackPool.Rent() ?? new RequestStack(4);
+        public static RequestStack Alloc()
+        {
+            // todo: enable later
+            //var rent = _requestStackPool.Rent();
+            //if (rent != null)
+            //    return rent;
+            return new RequestStack(4);
+        }
+
         public void Free()
         {
             for (int i = 0; i < Items.Length; i++)
@@ -6985,7 +6993,8 @@ namespace DryIoc
                 }
             }
 
-            _requestStackPool.Return(this);
+            // todo: enable later
+            //_requestStackPool.Return(this);
         }
 
         public Request[] Items;
@@ -6997,14 +7006,20 @@ namespace DryIoc
             if (index < Items.Length)
                 return ref Items[index];
 
-            Items = Expand(Items);
+            Items = Expand(Items, index);
             return ref Items[index];
         }
 
-        private static Request[] Expand(Request[] items)
+        private static Request[] Expand(Request[] items, int index)
         {
             var count = items.Length;
-            var newItems = new Request[count << 1]; // count x 2
+            var newCount = count << 1;
+
+            // ensure that the index is always in range
+            while (index >= newCount)
+                newCount <<= 1;
+
+            var newItems = new Request[newCount]; // count x 2
             Array.Copy(items, 0, newItems, 0, count);
             return newItems;
         }
@@ -7028,7 +7043,7 @@ namespace DryIoc
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, 0, null, -1, DefaultFlags | RequestFlags.OpensResolutionScope, ServiceInfo.Empty, null);
+            new Request(null, null, 0, null, -1, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
@@ -7055,16 +7070,14 @@ namespace DryIoc
 
             var inputArgExprs = inputArgs?.Map(a => Constant(a));
 
-            // if `preResolveParent` is not emtpty we may use its stack
-            var stack = preResolveParent.RequestStack ?? RequestStack.Alloc();
-            var indexInStack = preResolveParent.IndexInStack + 1; // for the Emty preResolveParent it should be `-1 + 1 == 0` 
-            ref var req = ref stack.GetOrPushRef(indexInStack);
+            var stack = RequestStack.Alloc();
+            ref var req = ref stack.GetOrPushRef(0);
 
             // we re-starting the dependency depth count from `1`
             if (req == null)
-                req = new Request(container, preResolveParent, 1, stack, indexInStack, flags, serviceInfo, inputArgExprs);
+                req =  new Request(container, preResolveParent, 1, stack, 0, flags, serviceInfo, inputArgExprs);
             else
-                req.SetServiceInfo(container, preResolveParent, 1, stack, indexInStack, flags, serviceInfo, inputArgExprs);
+                req.SetServiceInfo(container, preResolveParent, 1, stack, 0, flags, serviceInfo, inputArgExprs);
             return req;
         }
 
@@ -7225,11 +7238,32 @@ namespace DryIoc
             var flags = Flags & InheritedFlags | additionalFlags;
             var serviceInfo = info.ThrowIfNull().InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
 
-            var stack = RequestStack ?? RequestStack.Alloc();
+            var stack = RequestStack;
+            if (stack == null)
+            {
+                stack = RequestStack.Alloc();
+
+                // traverse all the requests up and including the resolution root and the new stack to them
+                Request parent = null;
+                do
+                {
+
+                    parent = parent?.DirectParent ?? this;
+                    if (parent.IndexInStack != -1)
+                    {
+                        if (parent.RequestStack != null)
+                        {
+
+                        }
+                    }
+                }
+                while ((parent.Flags & RequestFlags.IsResolutionCall) == 0 && !parent.DirectParent.IsEmpty) ;
+            }
+
             var indexInStack = IndexInStack + 1;
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req = new Request(Container, this, DependencyDepth + 1, RequestStack, indexInStack, flags, serviceInfo, InputArgExprs);
+                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, indexInStack, flags, serviceInfo, InputArgExprs);
             else
                 req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, indexInStack, flags, serviceInfo, InputArgExprs);
             return req;
@@ -7394,7 +7428,7 @@ namespace DryIoc
 
             if (copyRequest)
             {
-                PreventChanges();
+                IsolateRequestChain();
                 return new Request(Container,
                     DirectParent, DependencyDepth, null, -1, flags, _serviceInfo, InputArgExprs,
                     null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
@@ -7568,8 +7602,9 @@ namespace DryIoc
             if (!InputArgExprs.IsNullOrEmpty())
                 s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
 
+            // todo: exclude IsResolutionCall cause it is printed by above
             if (Flags != default(RequestFlags))
-                s.Append(" ").Append(Flags);
+                s.Append(" (").Append(Flags).Append(')');
 
             return s;
         }
@@ -7663,18 +7698,31 @@ namespace DryIoc
         }
 
         /// Severe the connection with the request pool up to the parent so that noone can change the Request state
-        internal Request PreventChanges()
+        internal Request IsolateRequestChain()
         {
-            for (var r = this; !r.IsEmpty; r = r.DirectParent)
-            {
-                if (r.RequestStack != null)
-                {
-                    r.RequestStack.Items[r.IndexInStack] = null;
-                    r.RequestStack = null;
-                    r.IndexInStack = -1;
-                }
-            }
+            var stack = RequestStack;
+            if (stack == null)
+                return this;
 
+            Request r = null; 
+            do
+            {
+                r = r == null ? this : r.DirectParent;
+
+                if (r.RequestStack != stack)
+                {
+                    // assert that the stack will be the same
+                }
+
+                // severe the requests links with the stack
+                stack.Items[r.IndexInStack] = null;
+                r.RequestStack = null;
+                r.IndexInStack = -1;
+
+            } while ((r.Flags & RequestFlags.IsResolutionCall) == 0 && !r.DirectParent.IsEmpty);
+
+            // todo: something still fails here
+            //stack?.Free();
             return this;
         }
 
