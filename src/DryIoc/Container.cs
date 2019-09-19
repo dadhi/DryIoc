@@ -6994,7 +6994,6 @@ namespace DryIoc
                     // prevent memory leaks by resetting the runtime state
                     item.Container = null;
                     item.Factory = null;
-                    item.InputArgExprs = null;
                 }
             }
 
@@ -7713,10 +7712,7 @@ namespace DryIoc
             {
                 r = r == null ? this : r.DirectParent;
 
-                if (r.RequestStack != stack)
-                {
-                    // assert that the stack will be the same
-                }
+                Debug.Assert(r.RequestStack != stack);
 
                 // severe the requests links with the stack
                 stack.Items[r.IndexInStack] = null;
@@ -7725,7 +7721,7 @@ namespace DryIoc
             } while ((r.Flags & RequestFlags.IsResolutionCall) == 0);
 
             // todo: something still fails here
-            //stack?.Free();
+            stack?.Free();
             return this;
         }
 
