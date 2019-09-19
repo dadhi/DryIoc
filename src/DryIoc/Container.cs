@@ -294,9 +294,6 @@ namespace DryIoc
                 if (expr == null)
                     return null;
 
-                // Complete with request - its resources can be used elsewhere
-                request.RequestStack?.Free();
-
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
@@ -6968,45 +6965,16 @@ namespace DryIoc
 
     internal sealed class RequestStack
     {
-        private static StackPool<RequestStack> _requestStackPool = new StackPool<RequestStack>();
-
-        public static RequestStack Alloc(int index = 0)
+        public static RequestStack Get(int index = 0)
         {
             var capacity = 4;
             while (index >= capacity)
                 capacity <<= 1;
-
-            // todo: enable later
-            //var rent = _requestStackPool.Rent();
-            //if (rent != null)
-            //    return rent;
-
             return new RequestStack(capacity);
         }
 
-        public void Free()
-        {
-            for (int i = 0; i < Items.Length; i++)
-            {
-                var item = Items[i];
-                if (item != null)
-                {
-                    // prevent memory leaks by resetting the runtime state
-                    item.Container = null;
-                    item.Factory = null;
-                }
-            }
-
-            // todo: enable later
-            //_requestStackPool.Return(this);
-        }
-
         public Request[] Items;
-
-        private RequestStack(int capacity)
-        {
-            Items = new Request[capacity];
-        }
+        private RequestStack(int capacity) => Items = new Request[capacity];
 
         public ref Request GetOrPushRef(int index)
         {
@@ -7077,7 +7045,7 @@ namespace DryIoc
 
             var inputArgExprs = inputArgs?.Map(a => Constant(a));
 
-            var stack = RequestStack.Alloc();
+            var stack = RequestStack.Get();
             ref var req = ref stack.GetOrPushRef(0);
 
             // we re-starting the dependency depth count from `1`
@@ -7249,7 +7217,7 @@ namespace DryIoc
             var indexInStack = IndexInStack + 1;
             if (stack == null)
             {
-                stack = RequestStack.Alloc(indexInStack);
+                stack = RequestStack.Get(indexInStack);
 
                 // traverse all the requests up including the resolution root and set the new stack to them
                 Request parent = null;
@@ -7712,16 +7680,12 @@ namespace DryIoc
             {
                 r = r == null ? this : r.DirectParent;
 
-                Debug.Assert(r.RequestStack != stack);
-
                 // severe the requests links with the stack
                 stack.Items[r.IndexInStack] = null;
                 r.RequestStack = null;
 
             } while ((r.Flags & RequestFlags.IsResolutionCall) == 0);
 
-            // todo: something still fails here
-            stack?.Free();
             return this;
         }
 
