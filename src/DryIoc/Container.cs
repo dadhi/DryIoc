@@ -7223,14 +7223,10 @@ namespace DryIoc
                 Request parent = null;
                 do
                 {
-                    parent = parent?.DirectParent ?? this;
-
-                    Debug.Assert(parent.IndexInStack != -1);
-                    Debug.Assert(parent.RequestStack == null);
-
+                    parent = parent == null ? this : parent.DirectParent;
                     parent.RequestStack = stack;
                 }
-                while ((parent.Flags & RequestFlags.IsResolutionCall) == 0);
+                while ((parent.Flags & RequestFlags.IsResolutionCall) == 0 && !parent.DirectParent.IsEmpty);
             }
 
             ref var req = ref stack.GetOrPushRef(indexInStack);
@@ -7671,20 +7667,18 @@ namespace DryIoc
         /// Severe the connection with the request pool up to the parent so that noone can change the Request state
         internal Request IsolateRequestChain()
         {
-            var stack = RequestStack;
-            if (stack == null)
-                return this;
-
-            Request r = null; 
+            Request r = null;
             do
             {
                 r = r == null ? this : r.DirectParent;
+                if (r.RequestStack != null)
+                {
+                    // severe the requests links with the stack
+                    r.RequestStack.Items[r.IndexInStack] = null;
+                    r.RequestStack = null;
+                }
 
-                // severe the requests links with the stack
-                stack.Items[r.IndexInStack] = null;
-                r.RequestStack = null;
-
-            } while ((r.Flags & RequestFlags.IsResolutionCall) == 0);
+            } while ((r.Flags & RequestFlags.IsResolutionCall) == 0 && !r.DirectParent.IsEmpty);
 
             return this;
         }
