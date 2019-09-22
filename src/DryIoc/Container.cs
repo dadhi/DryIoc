@@ -3026,11 +3026,12 @@ namespace DryIoc
 
             if (!preferInterpretation && useFastExpressionCompiler)
             {
-                var factoryDelegate = Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
+                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.CompileFast(
+                    Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                     , typeof(object)
 #endif
-                ).CompileFast(true);
+                ));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -3061,11 +3062,12 @@ namespace DryIoc
 
             if (useFastExpressionCompiler)
             {
-                var factoryDelegate = Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
+                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.CompileFast(
+                    Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                     , typeof(object)
 #endif
-                ).CompileFast(true);
+                ));
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }

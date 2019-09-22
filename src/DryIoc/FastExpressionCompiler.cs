@@ -41,8 +41,7 @@ namespace FastExpressionCompiler.LightExpression
     /// <summary>Polyfill for absence of FastExpressionCompiler: https://github.com/dadhi/FastExpressionCompiler </summary>
     public static class ExpressionCompiler
     {
-        /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
-        public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr, bool ifFastFailedReturnNull = false)
+        internal static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr, bool ifFastFailedReturnNull = false)
             where TDelegate : class => null;
 
         internal static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
