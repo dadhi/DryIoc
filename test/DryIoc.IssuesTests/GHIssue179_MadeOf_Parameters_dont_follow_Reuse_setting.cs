@@ -13,28 +13,24 @@ namespace DryIoc.IssuesTests
             container.Register<A>();
             container.Register<B>();
 
-            container.Register(Made.Of(
-                () => LogManager.GetLogger(Arg.Index<Type>(0)),
+            container.Register<ILog>(made: Made.Of(
+                () => new Log(Arg.Index<Type>(0)),
                 request => request.Parent.ImplementationType));
 
             var b = container.Resolve<B>();
 
-            Assert.AreNotSame(b.Log, b.A.Log);
+            Assert.AreNotSame(b.Log.ContextType, b.A.Log.ContextType);
         }
 
         public interface ILog
         {
+            Type ContextType { get; }
         }
 
         public class Log : ILog
         {
-            public readonly Type ContextType;
+            public Type ContextType { get; }
             public Log(Type contextType) => ContextType = contextType;
-        }
-
-        public class LogManager
-        {
-            public static ILog GetLogger(Type type) => new Log(type);
         }
 
         public class B
@@ -42,7 +38,7 @@ namespace DryIoc.IssuesTests
             public ILog Log { get; }
             public A A { get; }
 
-            public B(ILog log, A a)
+            public B(A a, ILog log)
             {
                 Log = log;
                 A = a;
