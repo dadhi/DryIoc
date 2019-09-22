@@ -1343,8 +1343,17 @@ namespace FastExpressionCompiler.LightExpression
 
                         case ExpressionType.Constant:
                             var constantExpression = (ConstantExpression)expr;
-                            return (parent & ParentFlags.IgnoreResult) != 0 ||
-                                   TryEmitConstant(constantExpression, constantExpression.Type, constantExpression.Value, il, ref closure);
+                            if ((parent & ParentFlags.IgnoreResult) != 0)
+                                return true;
+                            if (constantExpression.Value == null)
+                            {
+                                if (!expr.Type.IsValueType())
+                                    il.Emit(OpCodes.Ldnull);
+                                else
+                                    EmitLoadLocalVariable(il, InitValueTypeVariable(il, expr.Type));
+                                return true;
+                            }
+                            return TryEmitConstant(constantExpression, constantExpression.Type, constantExpression.Value, il, ref closure);
 
                         case ExpressionType.Call:
                             return TryEmitMethodCall((MethodCallExpression)expr, paramExprs, il, ref closure, parent);
@@ -2269,21 +2278,6 @@ namespace FastExpressionCompiler.LightExpression
 
             private static bool TryEmitConstant(ConstantExpression expr, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure)
             {
-                if (constantValue == null)
-                {
-                    if (!exprType.IsValueType())
-                        il.Emit(OpCodes.Ldnull);
-                    else
-                    {
-                        var valueTypeVarIndex = il.GetNextLocalVarIndex(exprType);
-                        EmitLoadLocalVariableAddress(il, valueTypeVarIndex);
-                        il.Emit(OpCodes.Initobj, exprType);
-                        EmitLoadLocalVariable(il, valueTypeVarIndex);
-                    }
-
-                    return true;
-                }
-
                 var constValueType = constantValue.GetType();
                 if (expr != null && IsClosureBoundConstant(constantValue, constValueType.GetTypeInfo()))
                 {
@@ -3168,7 +3162,19 @@ namespace FastExpressionCompiler.LightExpression
                         il.Emit(closure.LastEmitIsAddress ? OpCodes.Ldflda : OpCodes.Ldfld, field);
                     }
                     else if (field.IsLiteral)
-                        TryEmitConstant(null, field.FieldType, field.GetValue(null), il, ref closure);
+                    {
+                        var fieldValue = field.GetValue(null);
+                        if (fieldValue == null)
+                        {
+                            if (!field.FieldType.IsValueType())
+                                il.Emit(OpCodes.Ldnull);
+                            else
+                                EmitLoadLocalVariable(il, InitValueTypeVariable(il, field.FieldType));
+                            return true;
+                        }
+
+                        TryEmitConstant(null, field.FieldType, fieldValue, il, ref closure);
+                    }
                     else
                         il.Emit(OpCodes.Ldsfld, field);
 
