@@ -2984,7 +2984,7 @@ namespace DryIoc
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr = Parameter(typeof(IResolverContext), "r");
 
-        /// Optimization: singleton array with the type of IResolverContext parameter
+        /// [Obsolete("Not used anymore")]
         public static readonly Type[] FactoryDelegateParamTypes = { typeof(IResolverContext) };
 
         /// Optimization: singleton array with the parameter expression of IResolverContext
@@ -3026,8 +3026,11 @@ namespace DryIoc
 
             if (!preferInterpretation && useFastExpressionCompiler)
             {
-                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
-                    expression, FactoryDelegateParamExprs, FactoryDelegateParamTypes, typeof(object));
+                var factoryDelegate = Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                    , typeof(object)
+#endif
+                ).CompileFast(true);
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -3058,8 +3061,11 @@ namespace DryIoc
 
             if (useFastExpressionCompiler)
             {
-                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompile<FactoryDelegate>(
-                    expression, FactoryDelegateParamExprs, FactoryDelegateParamTypes, typeof(object));
+                var factoryDelegate = Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                    , typeof(object)
+#endif
+                ).CompileFast(true);
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -8254,7 +8260,7 @@ namespace DryIoc
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
                 if (container.SingletonScope.TryGet(out var singleton, FactoryID))
-                    return Constant(singleton, request.ServiceType);
+                    return Constant(singleton);
             }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
