@@ -34,7 +34,7 @@ namespace LoadTest
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
-            Registrations.RegisterTypes(container, false);
+            Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);

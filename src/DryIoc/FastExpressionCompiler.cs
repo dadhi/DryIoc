@@ -41,8 +41,9 @@ namespace FastExpressionCompiler.LightExpression
     /// <summary>Polyfill for absence of FastExpressionCompiler: https://github.com/dadhi/FastExpressionCompiler </summary>
     public static class ExpressionCompiler
     {
-        internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr,
-            ParameterExpression[] paramExprs, Type[] closurePlusParamTypes, Type returnType) => null;
+        /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
+        public static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr, bool ifFastFailedReturnNull = false)
+            where TDelegate : class => null;
 
         internal static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
     }
@@ -64,7 +65,7 @@ namespace FastExpressionCompiler.LightExpression
     // ReSharper disable once PartialTypeWithSinglePart
     public static partial class ExpressionCompiler
     {
-        #region Expression.CompileFast overloads for Delegate, Func, and Action
+#region Expression.CompileFast overloads for Delegate, Func, and Action
 
         /// <summary>Compiles lambda expression to TDelegate type. Use ifFastFailedReturnNull parameter to Not fallback to Expression.Compile, useful for testing.</summary>
         public static TDelegate CompileFast<TDelegate>(this LambdaExpression lambdaExpr,
@@ -277,7 +278,7 @@ namespace FastExpressionCompiler.LightExpression
             return @delegate;
         }
 
-        #region Obsolete
+#region Obsolete
 
         /// Obsolete
         [Obsolete("Not used - candidate for removal")]
@@ -294,7 +295,7 @@ namespace FastExpressionCompiler.LightExpression
                 delegateType != typeof(Delegate) ? delegateType : Tools.GetFuncOrActionType(paramTypes, returnType), 
                 bodyExpr, paramExprs, GetClosureTypeToParamTypes(paramExprs), returnType);
 
-        #endregion
+#endregion
 
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType,
             Expression bodyExpr, IReadOnlyList<ParameterExpression> paramExprs, Type[] closurePlusParamTypes, Type returnType)
@@ -446,19 +447,14 @@ namespace FastExpressionCompiler.LightExpression
             {
                 Status |= ClosureStatus.HasClosure;
 
-                // todo: Can be further optimized?
-                var i = Constants.Count - 1;
                 var constItems = Constants.Items;
-                while (i != -1 && !ReferenceEquals(constItems[i], expr)) --i;
-                if (i == -1)
-                {
-                    ref var slot = ref Constants.PushSlot();
-                    slot = expr;
-                }
+                var constIndex = Constants.Count - 1;
+                while (constIndex != -1 && !ReferenceEquals(constItems[constIndex].Value, expr.Value))
+                    --constIndex;
+                if (constIndex == -1)
+                    Constants.PushSlot(expr);
                 else
-                {
                     ++ConstantsAndNestedLambdasMultipleUsageCount;
-                }
             }
 
             public void AddNonPassedParam(ParameterExpression expr)
@@ -574,27 +570,28 @@ namespace FastExpressionCompiler.LightExpression
 
             public object[] GetArrayOfConstantsAndNestedLambdas()
             {
-                var constants = Constants;
+                var constItems = Constants.Items;
+                var constCount = Constants.Count;
+
                 var nestedLambdas = NestedLambdas;
-                var constantsCount = constants.Count;
                 var nestedLambdasCount = nestedLambdas.Length;
 
-                if (constantsCount + nestedLambdasCount == 0)
+                if (constCount + nestedLambdasCount == 0)
                     return null;
 
-                var items = new object[constantsCount + nestedLambdasCount];
+                var items = new object[constCount + nestedLambdasCount];
 
-                for (var i = 0; i < constantsCount; i++)
-                    items[i] = constants.Items[i].Value;
+                for (var i = 0; i < constCount; ++i)
+                    items[i] = constItems[i].Value;
 
                 for (var i = 0; i < nestedLambdasCount; i++)
                 {
                     var nestedLambda = nestedLambdas[i];
                     ref var nestedClosureInfo = ref nestedLambda.ClosureInfo;
                     if (nestedClosureInfo.NonPassedParameters.Length == 0)
-                        items[constantsCount + i] = nestedLambda.Lambda;
+                        items[constCount + i] = nestedLambda.Lambda;
                     else
-                        items[constantsCount + i] = new NestedLambdaWithConstantsAndNestedLambdas(
+                        items[constCount + i] = new NestedLambdaWithConstantsAndNestedLambdas(
                             nestedLambda.Lambda, nestedClosureInfo.GetArrayOfConstantsAndNestedLambdas());
                 }
 
@@ -804,7 +801,7 @@ namespace FastExpressionCompiler.LightExpression
                 (t1, t2, t3, t4, t5, t6) => f(c, t1, t2, t3, t4, t5, t6);
         }
 
-        #region Collect Bound Constants
+#region Collect Bound Constants
 
         /// Helps to identify constants as the one to be put into the Closure
         public static bool IsClosureBoundConstant(object value, TypeInfo type) =>
@@ -1353,7 +1350,7 @@ namespace FastExpressionCompiler.LightExpression
                                     EmitLoadLocalVariable(il, InitValueTypeVariable(il, expr.Type));
                                 return true;
                             }
-                            return TryEmitConstant(constantExpression, constantExpression.Type, constantExpression.Value, il, ref closure);
+                            return TryEmitNotNullConstant(constantExpression, constantExpression.Type, constantExpression.Value, il, ref closure);
 
                         case ExpressionType.Call:
                             return TryEmitMethodCall((MethodCallExpression)expr, paramExprs, il, ref closure, parent);
@@ -2276,16 +2273,16 @@ namespace FastExpressionCompiler.LightExpression
                 return true;
             }
 
-            private static bool TryEmitConstant(ConstantExpression expr, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure)
+            private static bool TryEmitNotNullConstant(
+                ConstantExpression expr, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure)
             {
                 var constValueType = constantValue.GetType();
                 if (expr != null && IsClosureBoundConstant(constantValue, constValueType.GetTypeInfo()))
                 {
-                    ref var constants = ref closure.Constants;
-                    var constItems = constants.Items;
-                    var constCount = constants.Count;
+                    var constItems = closure.Constants.Items;
+                    var constCount = closure.Constants.Count;
                     var constIndex = constCount - 1;
-                    while (constIndex != -1 && !ReferenceEquals(constItems[constIndex], expr))
+                    while (constIndex != -1 && !ReferenceEquals(constItems[constIndex].Value, expr.Value))
                         --constIndex;
                     if (constIndex == -1)
                         return false;
@@ -2428,9 +2425,9 @@ namespace FastExpressionCompiler.LightExpression
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
 
-                    ref var constants = ref closure.Constants;
-                    var constItems = constants.Items;
-                    var constCount = constants.Count;
+                    var constItems = closure.Constants.Items;
+                    var constCount = closure.Constants.Count;
+
                     for (var i = 0; i < constCount; i++)
                     {
                         il.Emit(OpCodes.Dup); // duplicate `ArrayClosure.ConstantsAndNestedLambdasField` on a stack
@@ -2564,13 +2561,12 @@ namespace FastExpressionCompiler.LightExpression
                 }
 
                 il.Emit(OpCodes.Newarr, elemType);
-                EmitStoreLocalVariable(il, arrVarIndex);
 
                 var isElemOfValueType = elemType.IsValueType();
 
                 for (int i = 0, n = elems.Count; i < n; i++)
                 {
-                    EmitLoadLocalVariable(il, arrVarIndex);
+                    il.Emit(OpCodes.Dup);
                     EmitLoadArrayIndex(il, i);
 
                     // loading element address for later copying of value into it.
@@ -2586,7 +2582,6 @@ namespace FastExpressionCompiler.LightExpression
                         il.Emit(OpCodes.Stelem_Ref);
                 }
 
-                EmitLoadLocalVariable(il, arrVarIndex);
                 return true;
             }
 
@@ -3173,7 +3168,7 @@ namespace FastExpressionCompiler.LightExpression
                             return true;
                         }
 
-                        TryEmitConstant(null, field.FieldType, fieldValue, il, ref closure);
+                        TryEmitNotNullConstant(null, field.FieldType, fieldValue, il, ref closure);
                     }
                     else
                         il.Emit(OpCodes.Ldsfld, field);
@@ -4437,12 +4432,19 @@ namespace FastExpressionCompiler.LightExpression
             return ref Items[Count - 1];
         }
 
+        public void PushSlot(T item)
+        {
+            if (++Count > Items.Length)
+                Items = Expand(Items);
+            Items[Count - 1] = item;
+        }
+
         public void Pop() => --Count;
 
         private static T[] Expand(T[] items)
         {
             if (items.Length == 0)
-                return new T[2];
+                return new T[4];
 
             var count = items.Length;
             var newItems = new T[count << 1]; // count x 2
