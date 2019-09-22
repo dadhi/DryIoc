@@ -2543,8 +2543,6 @@ namespace FastExpressionCompiler.LightExpression
                 if (elemType == null)
                     return false;
 
-                var arrVarIndex = il.GetNextLocalVarIndex(arrayType);
-
                 var rank = arrayType.GetArrayRank();
                 if (rank == 1) // one dimensional
                 {
