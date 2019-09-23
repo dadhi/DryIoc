@@ -8276,6 +8276,7 @@ namespace DryIoc
             }
 
             var mayCache = Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service &&
+                !request.IsResolutionRoot &&
                 !request.IsSingletonOrDependencyOfSingleton && // it will be evaluated to constant anyway
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
