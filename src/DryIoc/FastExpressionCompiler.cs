@@ -1345,10 +1345,7 @@ namespace FastExpressionCompiler.LightExpression
                                 return true;
                             if (constantExpression.Value == null)
                             {
-                                if (!expr.Type.IsValueType())
-                                    il.Emit(OpCodes.Ldnull);
-                                else
-                                    EmitLoadLocalVariable(il, InitValueTypeVariable(il, expr.Type));
+                                il.Emit(OpCodes.Ldnull);
                                 return true;
                             }
                             return TryEmitNotNullConstant(constantExpression, constantExpression.Type, constantExpression.Value, il, ref closure);
@@ -3158,19 +3155,15 @@ namespace FastExpressionCompiler.LightExpression
                     else if (field.IsLiteral)
                     {
                         var fieldValue = field.GetValue(null);
-                        if (fieldValue == null)
-                        {
-                            if (!field.FieldType.IsValueType())
-                                il.Emit(OpCodes.Ldnull);
-                            else
-                                EmitLoadLocalVariable(il, InitValueTypeVariable(il, field.FieldType));
-                            return true;
-                        }
+                        if (fieldValue != null)
+                            return TryEmitNotNullConstant(null, field.FieldType, fieldValue, il, ref closure);
 
-                        TryEmitNotNullConstant(null, field.FieldType, fieldValue, il, ref closure);
+                        il.Emit(OpCodes.Ldnull);
                     }
                     else
+                    {
                         il.Emit(OpCodes.Ldsfld, field);
+                    }
 
                     return true;
                 }
