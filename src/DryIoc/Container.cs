@@ -3026,12 +3026,10 @@ namespace DryIoc
 
             if (!preferInterpretation && useFastExpressionCompiler)
             {
-                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.CompileFast(
-                    Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    , typeof(object)
-#endif
-                ));
+                var factoryDelegate = (FactoryDelegate)(FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+                    typeof(FactoryDelegate), expression, FactoryDelegateParamExprs, 
+                    new[] { typeof(FastExpressionCompiler.LightExpression.ExpressionCompiler.ArrayClosure), typeof(IResolverContext) }, typeof(object)));
+
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
@@ -3062,12 +3060,10 @@ namespace DryIoc
 
             if (useFastExpressionCompiler)
             {
-                var factoryDelegate = FastExpressionCompiler.LightExpression.ExpressionCompiler.CompileFast(
-                    Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    , typeof(object)
-#endif
-                ));
+                var factoryDelegate = (FactoryDelegate)(FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+                    typeof(FactoryDelegate), expression, FactoryDelegateParamExprs,
+                    new[] { typeof(FastExpressionCompiler.LightExpression.ExpressionCompiler.ArrayClosure), typeof(IResolverContext) }, typeof(object)));
+
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }

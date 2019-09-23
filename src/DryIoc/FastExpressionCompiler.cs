@@ -41,10 +41,12 @@ namespace FastExpressionCompiler.LightExpression
     /// <summary>Polyfill for absence of FastExpressionCompiler: https://github.com/dadhi/FastExpressionCompiler </summary>
     public static class ExpressionCompiler
     {
-        internal static TDelegate CompileFast<TDelegate>(this Expression<TDelegate> lambdaExpr, bool ifFastFailedReturnNull = false)
-            where TDelegate : class => null;
+        internal static object TryCompileBoundToFirstClosureParam(Type delegateType,
+            Expression bodyExpr, ParameterExpression[] paramExprs, Type[] closurePlusParamTypes, Type returnType) => null;
 
         internal static Func<T1, R> CompileFast<T1, R>(this Expression<Func<T1, R>> lambdaExpr) => lambdaExpr.Compile();
+
+        internal class ArrayClosure {}
     }
 }
 #else
