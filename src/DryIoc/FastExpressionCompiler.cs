@@ -1279,7 +1279,7 @@ namespace FastExpressionCompiler.LightExpression
         /// to normal and slow Expression.Compile.</summary>
         private static class EmittingVisitor
         {
-#if NETSTANDARD1_3 || NETSTANDARD1_4 || NETSTANDARD1_5 || NETSTANDARD1_6
+#if NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3 || NETSTANDARD1_4 || NETSTANDARD1_5 || NETSTANDARD1_6
             private static readonly MethodInfo _getTypeFromHandleMethod =
                 typeof(Type).GetTypeInfo().GetDeclaredMethod("GetTypeFromHandle");
 
@@ -1898,7 +1898,7 @@ namespace FastExpressionCompiler.LightExpression
                 // Load non-passed argument from Closure - closure object is always a first argument
                 il.Emit(OpCodes.Ldarg_0);
                 il.Emit(OpCodes.Ldfld, ArrayClosureWithNonPassedParams.NonPassedParamsField);
-                EmitLoadArrayIndex(il, nonPassedParamIndex);
+                EmitLoadConstantInt(il, nonPassedParamIndex);
                 il.Emit(OpCodes.Ldelem_Ref);
 
                 // source type is object, NonPassedParams is object array
@@ -2294,7 +2294,7 @@ namespace FastExpressionCompiler.LightExpression
                         il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
 
-                        EmitLoadArrayIndex(il, constIndex);
+                        EmitLoadConstantInt(il, constIndex);
                         il.Emit(OpCodes.Ldelem_Ref);
                         if (exprType.IsValueType())
                             il.Emit(OpCodes.Unbox_Any, exprType);
@@ -2304,7 +2304,7 @@ namespace FastExpressionCompiler.LightExpression
                         // Load constants array from variable
                         EmitLoadLocalVariable(il, 0);
 
-                        EmitLoadArrayIndex(il, constIndex);
+                        EmitLoadConstantInt(il, constIndex);
                         il.Emit(OpCodes.Ldelem_Ref);
                         if (exprType.IsValueType())
                             il.Emit(OpCodes.Unbox_Any, exprType);
@@ -2432,7 +2432,7 @@ namespace FastExpressionCompiler.LightExpression
                     for (var i = 0; i < constCount; i++)
                     {
                         il.Emit(OpCodes.Dup); // duplicate `ArrayClosure.ConstantsAndNestedLambdasField` on a stack
-                        EmitLoadArrayIndex(il, i);
+                        EmitLoadConstantInt(il, i);
                         il.Emit(OpCodes.Ldelem_Ref);
 
                         var varType = constItems[i].Type;
@@ -2446,7 +2446,7 @@ namespace FastExpressionCompiler.LightExpression
                     for (var i = 0; i < nestedLambdas.Length; i++)
                     {
                         il.Emit(OpCodes.Dup); // duplicate `ArrayClosure.ConstantsAndNestedLambdasField` on a stack
-                        EmitLoadArrayIndex(il, constCount + i);
+                        EmitLoadConstantInt(il, constCount + i);
                         il.Emit(OpCodes.Ldelem_Ref);
 
                         var varType = nestedLambdas[i].Lambda.GetType();
@@ -2566,7 +2566,7 @@ namespace FastExpressionCompiler.LightExpression
                 for (int i = 0, n = elems.Count; i < n; i++)
                 {
                     il.Emit(OpCodes.Dup);
-                    EmitLoadArrayIndex(il, i);
+                    EmitLoadConstantInt(il, i);
 
                     // loading element address for later copying of value into it.
                     if (isElemOfValueType)
@@ -2922,7 +2922,7 @@ namespace FastExpressionCompiler.LightExpression
 
                             // load array field and param item index
                             il.Emit(OpCodes.Ldfld, ArrayClosureWithNonPassedParams.NonPassedParamsField);
-                            EmitLoadArrayIndex(il, nonPassedParamIndex);
+                            EmitLoadConstantInt(il, nonPassedParamIndex);
                             EmitLoadLocalVariable(il, valueVarIndex);
                             if (expr.Type.IsValueType())
                                 il.Emit(OpCodes.Box, expr.Type);
@@ -3203,14 +3203,14 @@ namespace FastExpressionCompiler.LightExpression
                     // Load constant from Closure - closure object is always a first argument
                     il.Emit(OpCodes.Ldarg_0);
                     il.Emit(OpCodes.Ldfld, ArrayClosure.ConstantsAndNestedLambdasField);
-                    EmitLoadArrayIndex(il, nestedLambdaInClosureIndex);
+                    EmitLoadConstantInt(il, nestedLambdaInClosureIndex);
                     il.Emit(OpCodes.Ldelem_Ref); // load the array item object
                 }
                 else if (closure.ConstantsAndNestedLambdasMultipleUsageCount == -1)
                 {
                     // Load constants array variable 
                     EmitLoadLocalVariable(il, 0);
-                    EmitLoadArrayIndex(il, nestedLambdaInClosureIndex);
+                    EmitLoadConstantInt(il, nestedLambdaInClosureIndex);
                     il.Emit(OpCodes.Ldelem_Ref); // load the array item object
                 }
                 else
@@ -3252,7 +3252,7 @@ namespace FastExpressionCompiler.LightExpression
                 }
 
                 // - create `NonPassedParameters` array
-                EmitLoadArrayIndex(il, nestedNonPassedParams.Length); // size of array
+                EmitLoadConstantInt(il, nestedNonPassedParams.Length); // size of array
                 il.Emit(OpCodes.Newarr, typeof(object));
 
                 // - populate the `NonPassedParameters` array
@@ -3263,7 +3263,7 @@ namespace FastExpressionCompiler.LightExpression
 
                     // Duplicate nested array on stack to store the item, and load index to where to store
                     il.Emit(OpCodes.Dup);
-                    EmitLoadArrayIndex(il, nestedParamIndex);
+                    EmitLoadConstantInt(il, nestedParamIndex);
 
                     var outerParamIndex = outerParamExprs.Count - 1;
                     while (outerParamIndex != -1 && !ReferenceEquals(outerParamExprs[outerParamIndex], nestedParam))
@@ -3304,7 +3304,7 @@ namespace FastExpressionCompiler.LightExpression
                             // Load the parameter from outer closure `Items` array
                             il.Emit(OpCodes.Ldarg_0); // closure is always a first argument
                             il.Emit(OpCodes.Ldfld, ArrayClosureWithNonPassedParams.NonPassedParamsField);
-                            EmitLoadArrayIndex(il, outerNonPassedParamIndex);
+                            EmitLoadConstantInt(il, outerNonPassedParamIndex);
                             il.Emit(OpCodes.Ldelem_Ref);
                         }
                     }
@@ -3991,48 +3991,7 @@ namespace FastExpressionCompiler.LightExpression
                         il.Emit(OpCodes.Ldc_I4_8);
                         break;
                     case int n when n > -129 && n < 128:
-                        il.Emit(OpCodes.Ldc_I4_S, (sbyte)i);
-                        break;
-                    default:
-                        il.Emit(OpCodes.Ldc_I4, i);
-                        break;
-                }
-            }
-
-            /// Same as <see cref="EmitLoadConstantInt"/> but without `-1` case - call me ridiculous, but I guess it could be further optimized
-            private static void EmitLoadArrayIndex(ILGenerator il, int i)
-            {
-                switch (i)
-                {
-                    case 0:
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        break;
-                    case 1:
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        break;
-                    case 2:
-                        il.Emit(OpCodes.Ldc_I4_2);
-                        break;
-                    case 3:
-                        il.Emit(OpCodes.Ldc_I4_3);
-                        break;
-                    case 4:
-                        il.Emit(OpCodes.Ldc_I4_4);
-                        break;
-                    case 5:
-                        il.Emit(OpCodes.Ldc_I4_5);
-                        break;
-                    case 6:
-                        il.Emit(OpCodes.Ldc_I4_6);
-                        break;
-                    case 7:
-                        il.Emit(OpCodes.Ldc_I4_7);
-                        break;
-                    case 8:
-                        il.Emit(OpCodes.Ldc_I4_8);
-                        break;
-                    case int n when n < 256:
-                        il.Emit(OpCodes.Ldc_I4_S, (byte)n);
+                        il.Emit(OpCodes.Ldc_I4_S, (sbyte)n);
                         break;
                     default:
                         il.Emit(OpCodes.Ldc_I4, i);
