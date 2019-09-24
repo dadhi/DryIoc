@@ -9826,7 +9826,7 @@ namespace DryIoc
 
             var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
+            if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
                 Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
@@ -9848,6 +9848,49 @@ namespace DryIoc
                 AddDisposable(disposable, disposalOrder);
 
             return itemRef.Item;
+        }
+
+        internal object GetOrAddViaFactoryDelegate_2(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        {
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id);
+            if (itemRef == null || itemRef.Item == null)
+            {
+                itemRef = AddItemRef(id);
+                if (itemRef.Item == null)
+                {
+                    lock (itemRef)
+                    {
+                        if (itemRef.Item == null)
+                        {
+                            itemRef.Item = TryAddDisposable(disposalOrder, createValue(r));
+                        }
+                    }
+                }
+            }
+
+            return itemRef.Item;
+        }
+
+        private ItemRef AddItemRef(int id)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
+
+            var itemRef = new ItemRef();
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+
+            return map.GetValueOrDefault(id);
+        }
+
+        private object TryAddDisposable(int disposalOrder, object item)
+        {
+            if (item is IDisposable disposableItem && disposableItem != this)
+                AddDisposable(disposableItem, disposalOrder);
+            return item;
         }
 
         /// <inheritdoc />
