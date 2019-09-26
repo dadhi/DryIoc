@@ -2863,29 +2863,47 @@ namespace DryIoc
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            var scope = r.CurrentScope;
+            var scope = (Scope)r.CurrentScope;
             if (scope == null)
                 return (bool)((ConstantExpression)args[1]).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
-            // check if scoped dependency is already in scope, then just return it
-            var factoryId = (int)ConstValue(args[2]);
-            if (scope.TryGet(out var result, factoryId))
-                return result;
+            var id = (int)ConstValue(args[2]);
+
+            var mapIndex = id & Scope.MAP_COUNT_SUFFIX_MASK;
+            ref var map = ref scope._maps[mapIndex];
+            var item = map.GetValueOrDefault(id)?.Item;
+            if (item != null)
+                return item;
 
             var disposalOrder = (int)((ConstantExpression)args[4]).Value;
 
             var lambda = args[3];
-            if (lambda is ConstantExpression registeredDelegate)
-                return scope.GetOrAddViaFactoryDelegate(factoryId, (FactoryDelegate)registeredDelegate.Value, r, disposalOrder);
+            if (lambda is ConstantExpression factoryDelegate)
+                return scope.TryGetOrAddViaFactoryDelegate(ref map, id, (FactoryDelegate)factoryDelegate.Value, r, disposalOrder);
 
-            return scope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)lambda).Body, useFec,
-                (rc, e, uf) =>
-                {
-                    if (TryInterpret(rc, e, uf, out var value))
-                        return value;
-                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
-                },
-                disposalOrder);
+            var itemRef = new Scope.ItemRef();
+            var currMap = map;
+            if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), currMap) != currMap)
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+
+            itemRef = map.GetValueOrDefault(id);
+            if (itemRef.Item != null)
+                return itemRef.Item;
+
+            lock (itemRef)
+            {
+                if (itemRef.Item != null)
+                    return itemRef.Item;
+
+                if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out var result))
+                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
+                itemRef.Item = result;
+            }
+
+            if (itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, scope))
+                scope.AddDisposable(disposable, disposalOrder);
+
+            return itemRef.Item;
         }
 
         private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
@@ -9818,7 +9836,7 @@ namespace DryIoc
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
 
-        private object TryGetOrAddViaFactoryDelegate(ref ImMap<ItemRef> map, 
+        internal object TryGetOrAddViaFactoryDelegate(ref ImMap<ItemRef> map, 
             int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             if (_disposed == 1)
@@ -9844,53 +9862,10 @@ namespace DryIoc
                 itemRef.Item = createValue(r);
             }
 
-            if (itemRef.Item is IDisposable disposable && disposable != this)
+            if (itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, this))
                 AddDisposable(disposable, disposalOrder);
 
             return itemRef.Item;
-        }
-
-        internal object GetOrAddViaFactoryDelegate_2(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
-        {
-            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id);
-            if (itemRef == null || itemRef.Item == null)
-            {
-                itemRef = AddItemRef(id);
-                if (itemRef.Item == null)
-                {
-                    lock (itemRef)
-                    {
-                        if (itemRef.Item == null)
-                        {
-                            itemRef.Item = TryAddDisposable(disposalOrder, createValue(r));
-                        }
-                    }
-                }
-            }
-
-            return itemRef.Item;
-        }
-
-        private ItemRef AddItemRef(int id)
-        {
-            if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
-
-            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-
-            var itemRef = new ItemRef();
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
-
-            return map.GetValueOrDefault(id);
-        }
-
-        private object TryAddDisposable(int disposalOrder, object item)
-        {
-            if (item is IDisposable disposableItem && disposableItem != this)
-                AddDisposable(disposableItem, disposalOrder);
-            return item;
         }
 
         /// <inheritdoc />
@@ -9998,7 +9973,7 @@ namespace DryIoc
             return itemRef.Item;
         }
 
-        private void AddDisposable(IDisposable disposable, int disposalOrder)
+        internal void AddDisposable(IDisposable disposable, int disposalOrder)
         {
             if (disposalOrder == 0)
                 disposalOrder = NextDisposalIndex();
@@ -10107,14 +10082,14 @@ namespace DryIoc
 
         // todo: We can use the object tumbstone to express empty Ref in order to support valid `null` as Item value, e.g. `Empty = new object()`
         // Stores the item object in a ref (class) box which does not change after created and may be used for locking
-        private sealed class ItemRef
+        internal sealed class ItemRef
         {
             public object Item;
         }
 
-        private const int MAP_COUNT = 16;
-        private const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
-        private ImMap<ItemRef>[] _maps;
+        internal const int MAP_COUNT = 16;
+        internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
+        internal ImMap<ItemRef>[] _maps;
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
