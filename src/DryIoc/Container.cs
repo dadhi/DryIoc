@@ -2881,6 +2881,7 @@ namespace DryIoc
             if (lambda is ConstantExpression factoryDelegate)
                 return scope.TryGetOrAddViaFactoryDelegate(ref map, id, (FactoryDelegate)factoryDelegate.Value, r, disposalOrder);
 
+            // add only, keep old item if it already exists
             var itemRef = new Scope.ItemRef();
             var currMap = map;
             if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), currMap) != currMap)

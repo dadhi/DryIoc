@@ -8,7 +8,7 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
-        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
+        <PackageIcon>logo128.png</PackageIcon>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
     </PropertyGroup>
@@ -43,6 +43,7 @@
     <ItemGroup>
         <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" Visible="false" />
         <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
+        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo128.png" Visible="false" />
     </ItemGroup>
 
     <!--Probing for portable targets, it could be either MS Visual Studio or 'dotnet\sdk' locations-->
