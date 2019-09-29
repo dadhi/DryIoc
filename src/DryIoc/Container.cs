@@ -8342,51 +8342,54 @@ namespace DryIoc
                 !request.TracksTransientDisposable &&
                 !request.IsWrappedInFunc())
             {
-                Func<IResolverContext, Expression, bool, object> createSingleton;
-                if (Setup.WeaklyReferenced)
-                {
-                    createSingleton = (Func<IResolverContext, Expression, bool, object>) (
-                        (r, e, u) => new WeakReference(
-                            Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                                ? instance
-                                : e.CompileToFactoryDelegate(u, ((IContainer) r).Rules.UseInterpretation)(r)));
-                }
-                else if (Setup.PreventDisposal)
-                {
-                    createSingleton = (Func<IResolverContext, Expression, bool, object>) (
-                        (r, e, u) => (object) new HiddenDisposable(
-                            Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance)
-                                ? instance
-                                : e.CompileToFactoryDelegate(u, ((IContainer) r).Rules.UseInterpretation)(r)));
-                }
-                else
-                {
-                    createSingleton = (r, e, u) =>
-                    {
-                        if (Interpreter.TryInterpretAndUnwrapContainerException(r, e, u, out var instance))
-                            return instance;
-                        return e.CompileToFactoryDelegate(u, ((IContainer) r).Rules.UseInterpretation)(r);
-                    };
-                }
-
                 var container = request.Container;
-                var singleton = container.SingletonScope.TryGetOrAddWithoutClosure(FactoryID, 
-                    container, serviceExpr, container.Rules.UseFastExpressionCompiler, createSingleton, 
-                    Setup.DisposalOrder);
+                var scope = (Scope)container.SingletonScope;
+                if (scope.IsDisposed)
+                    Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
-                serviceExpr = Constant(singleton);
+                var factoryId = FactoryID;
+                ref var map = ref scope._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK];
+
+                var itemRef = new Scope.ItemRef();
+                var m = map;
+                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(factoryId, itemRef, (oldRef, _) => oldRef), m) != m)
+                    Ref.Swap(ref map, factoryId, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+
+                itemRef = map.GetValueOrDefault(factoryId);
+                if (itemRef.Item == null)
+                {
+                    var isNewItem = false;
+                    lock (itemRef)
+                    {
+                        if (itemRef.Item == null)
+                        {
+                            var useFec = container.Rules.UseFastExpressionCompiler;
+                            if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out var result))
+                                result = serviceExpr.CompileToFactoryDelegate(useFec, container.Rules.UseInterpretation)(container);
+
+                            if (Setup.WeaklyReferenced)
+                                result = new WeakReference(result);
+                            else if (Setup.PreventDisposal) // todo: we don't need it here because because we just don't need to AddDisposable
+                                result = new HiddenDisposable(result);
+
+                            itemRef.Item = result;
+                            isNewItem = true;
+                        }
+                    }
+
+                    if (isNewItem && itemRef.Item is IDisposable disposable && disposable != this)
+                        scope.AddDisposable(disposable, Setup.DisposalOrder);
+                }
+
+                serviceExpr = Constant(itemRef.Item);
             }
             else
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
                 if (Setup.WeaklyReferenced)
-                {
                     serviceExpr = New(typeof(WeakReference).Constructor(typeof(object)), serviceExpr);
-                }
-                else if (Setup.PreventDisposal)
-                {
+                else if (Setup.PreventDisposal) 
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
-                }
 
                 serviceExpr = request.Reuse.Apply(request, serviceExpr);
             }
@@ -9888,14 +9891,10 @@ namespace DryIoc
             if (itemRef.Item != null)
                 return itemRef.Item;
 
-            // lock on the ref itself to set its `Item` field
             lock (itemRef)
             {
-                // double-check if the item was changed in between (double check locking)
                 if (itemRef.Item != null)
                     return itemRef.Item;
-
-                // we can simple assign because we are under the lock 
                 itemRef.Item = createValue(resolveContext, expr, useFec);
             }
 
