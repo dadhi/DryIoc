@@ -1104,7 +1104,7 @@ namespace FastExpressionCompiler.LightExpression
 
                 var isInOuterLambda = false;
                 if (paramExprs.Count != 0)
-                    for (var p = 0; !isInNestedLambda && p < paramExprs.Count; ++p)
+                    for (var p = 0; !isInOuterLambda && p < paramExprs.Count; ++p)
                         isInOuterLambda = ReferenceEquals(paramExprs[p], nestedNonPassedParam);
 
                 if (!isInNestedLambda && !isInOuterLambda)
