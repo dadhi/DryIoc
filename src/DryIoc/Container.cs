@@ -3779,8 +3779,9 @@ namespace DryIoc
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
             instance = null;
-            return  r.CurrentScope?.TryGetUsedInstance(r, serviceType, out instance) == true ||
-                   r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
+            if (r.CurrentScope?.TryGetUsedInstance(r, serviceType, out instance) == true) 
+                return true;
+            return r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
         }
 
         /// A bit if sugar to track disposable in singleton or current scope
@@ -10114,6 +10115,8 @@ namespace DryIoc
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
     }
 
+#if NET35 || NET40 || NET403 || PCL || PCL328 || PCL259
+
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
     /// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
     public sealed class ThreadScopeContext : IScopeContext
@@ -10147,6 +10150,43 @@ namespace DryIoc
         /// Collection of scoped by their managed thread id
         private ImMap<IScope> _scopes = ImMap<IScope>.Empty;
     }
+
+#else
+    /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
+    /// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
+    public sealed class ThreadScopeContext : IScopeContext
+    {
+        /// <summary>Provides static name for context. It is OK because its constant.</summary>
+        public static readonly string ScopeContextName = "ThreadScopeContext";
+
+        private ThreadLocal<IScope> _scope = new ThreadLocal<IScope>(true);
+
+        /// <summary>Returns current scope in calling Thread or null, if no scope tracked.</summary>
+        public IScope GetCurrentOrDefault() => 
+            _scope.Value;
+
+        /// <summary>Change current scope for the calling Thread.</summary>
+        public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope) => 
+            _scope.Value = setCurrentScope(GetCurrentOrDefault());
+
+        /// <summary>Disposes the scopes and empties internal scope storage.</summary>
+        public void Dispose()
+        {
+            var scopes = _scope.Values;
+            foreach (var scope in scopes)
+            {
+                var s = scope;
+                while (s != null)
+                {
+                    var x = s;
+                    s = s.Parent;
+                    x.Dispose();
+                }
+            }
+        }
+    }
+
+#endif
 
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
     ///  and more powerful as can be based on other storage beside reuse.</summary>

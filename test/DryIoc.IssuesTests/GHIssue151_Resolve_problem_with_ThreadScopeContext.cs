@@ -54,10 +54,12 @@ namespace DryIocTest
                 if (!b.IsSameThread())
                     Assert.Fail("It is not the same thread");
             }
+
+            container.Dispose();
         }
 
-        [Test][Ignore("todo: fix me")]
-        public void Test()
+        [Test]
+        public void Simple_Test()
         {
             var container = new Container(scopeContext: new ThreadScopeContext());
             container.Register<B>();
@@ -75,7 +77,7 @@ namespace DryIocTest
             foreach (var thread in threads)
                 thread.Join();
             
-            Assert.AreEqual(5, count.Value);
+            Assert.AreEqual(5 * 2, count.Value);
         }
 
         private void Work(IContainer container, Count count)
