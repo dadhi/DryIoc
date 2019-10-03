@@ -10130,8 +10130,8 @@ namespace DryIoc
         {
             var threadId = Portable.GetCurrentManagedThreadID();
             IScope newScope = null;
-            Ref.Swap(ref _scopes, scopes =>
-                scopes.AddOrUpdate(threadId, newScope = setCurrentScope(scopes.GetValueOrDefault(threadId) as IScope)));
+            Ref.Swap(ref _scopes, s => s.AddOrUpdate(threadId, 
+                newScope = setCurrentScope(s.GetValueOrDefault(threadId) as IScope)));
             return newScope;
         }
 
@@ -10144,6 +10144,7 @@ namespace DryIoc
             _scopes = ImMap<IScope>.Empty;
         }
 
+        /// Collection of scoped by their managed thread id
         private ImMap<IScope> _scopes = ImMap<IScope>.Empty;
     }
 
