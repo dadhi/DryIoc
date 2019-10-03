@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(LocalBuild)' == 'true'">net40;net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.1.0-preview-02</VersionPrefix>
+        <VersionPrefix>4.1.0-preview-03</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -21,11 +21,14 @@
 
 ### Briefly:
 
-- Bug fixes
 - Better memory and performance for the real-world applications - big object graphs and the Unit-of-work scenarios
 - FEC V3.0 optimized for nested lambda invocation (scoped services in DryIoc) and consuming less memory
 - Rules.WithUseInterpretation to work iOS
 - Streamlined ambient ScopeContext scope disposal, ensuring more predictable AsyncExecutionFlowScopeContext, ThreadScopeContext behavior
+
+### Bug fixes:
+
+- 151 Resolve problem with ThreadScopeContext in version 4.0.*
 
 
 ## v4.0.5 Release notes
