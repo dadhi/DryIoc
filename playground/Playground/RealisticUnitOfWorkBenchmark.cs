@@ -12,21 +12,6 @@ using IContainer = DryIoc.IContainer;
 
 namespace PerformanceTests
 {
-    public static class Ext
-    {
-        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
-            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> f,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
-                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
-
-        public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
-            this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> f,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
-                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
-    }
-
     public class RealisticUnitOfWorkBenchmark
     {
         public static IContainer PrepareDryIoc(bool useInterpretation = false, bool withoutFastExpressionCompiler = false)

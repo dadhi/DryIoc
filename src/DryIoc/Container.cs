@@ -5876,6 +5876,20 @@ namespace DryIoc
             registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
+        /// Registers delegate with explicit arguments resolved by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(factory.GetType().GetTypeInfo().GetDeclaredMethod("Invoke"), factory)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments resolved by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(made: Made.Of(FactoryMethod.Of(factory.GetType().GetTypeInfo().GetDeclaredMethod("Invoke"), factory)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
         /// Minimizes the number of allocations when converting from Func to named delegate
         public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
 

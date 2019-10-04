@@ -146,18 +146,6 @@ namespace DryIoc.IssuesTests
             return container;
         }
 
-        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
-            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> f,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
-                reuse: reuse, setup:setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
-
-        public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
-            this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> f,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register<TService>(made: Made.Of(FactoryMethod.Of(f.GetType().GetMethod("Invoke"), f)),
-                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
-
         public static IContainer PrepareDryIoc_RegisterDelegateWithInjectedDependencies(this IContainer container)
         {
             // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
