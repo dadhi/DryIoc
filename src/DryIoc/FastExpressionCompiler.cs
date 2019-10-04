@@ -3334,7 +3334,7 @@ namespace FastExpressionCompiler.LightExpression
                         argExprs[i].Type.IsByRef ? i : -1))
                         return false;
 
-                var delegateInvokeMethod = lambda.Type.FindDelegateInvokeMethod();
+                var delegateInvokeMethod = lambda.Type.GetTypeInfo().GetDeclaredMethod("Invoke");
                 il.Emit(OpCodes.Call, delegateInvokeMethod);
 
                 if ((parent & ParentFlags.IgnoreResult) != 0 && delegateInvokeMethod.ReturnType != typeof(void))

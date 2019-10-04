@@ -5078,7 +5078,7 @@ namespace DryIoc
             FactoryServiceInfo = factoryServiceInfo;
         }
 
-        private FactoryMethod(MemberInfo constructorOrMethodOrMember, Expression factoryExpression)
+        internal FactoryMethod(MemberInfo constructorOrMethodOrMember, Expression factoryExpression)
         {
             ConstructorOrMethodOrMember = constructorOrMethodOrMember;
             FactoryExpression = factoryExpression;
@@ -5090,8 +5090,6 @@ namespace DryIoc
             ResolvedParameterExpressions = resolvedParameterExpressions;
         }
     }
-
-
 
     /// <summary>Rules how to: <list type="bullet">
     /// <item>Select constructor for creating service with <see cref="FactoryMethod"/>.</item>
@@ -5363,7 +5361,8 @@ namespace DryIoc
 
 #region Implementation
 
-        private Made(FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
+        internal Made(
+            FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false, 
             bool isImplMemberDependsOnRequest = false)
         {
@@ -5380,6 +5379,12 @@ namespace DryIoc
             if (isImplMemberDependsOnRequest)
                 details |= MadeDetails.ImplMemberDependsOnRequest;
             _details = details;
+        }
+
+        internal Made(FactoryMethod factoryMethod, Type factoryReturnType)
+        {
+            FactoryMethod = factoryMethod.ToFunc<Request, FactoryMethod>;
+            FactoryMethodKnownResultType = factoryReturnType;
         }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
@@ -5876,18 +5881,71 @@ namespace DryIoc
             registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
-        /// Registers delegate with explicit arguments resolved by container avoiding the ServiceLocator anti-pattern
+        private const string InvokeMethodName = "Invoke";
+        private static MethodInfo InvokeMethod(this Type type) => type.GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
+
+        /// Registers delegate to be injected by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TService>(
+            this IRegistrator r, Func<TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TService>(
+            this IRegistrator r, Func<TDep1, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TDep2, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register<TService>(made: Made.Of(FactoryMethod.Of(factory.GetType().GetTypeInfo().GetDeclaredMethod("Invoke"), factory)),
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
                 reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
 
-        /// Registers delegate with explicit arguments resolved by container avoiding the ServiceLocator anti-pattern
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register<TService>(made: Made.Of(FactoryMethod.Of(factory.GetType().GetTypeInfo().GetDeclaredMethod("Invoke"), factory)),
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
+                reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
+
+        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, TService>(
+            this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, TService> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register<TService>(
+                made: new Made(new FactoryMethod(factory.ThrowIfNull().GetType().InvokeMethod(), Constant(factory)), typeof(TService)),
                 reuse: reuse, setup: setup, ifAlreadyRegistered: ifAlreadyRegistered, serviceKey: serviceKey);
 
         /// Minimizes the number of allocations when converting from Func to named delegate
@@ -11683,7 +11741,6 @@ namespace DryIoc
             return null;
         }
 
-        // note: Prefer `GetDeclaredMethod(name)` for supported platforms
         /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
         public static MethodInfo SingleMethod(this Type type, string name, bool includeNonPublic = false) =>
             type.GetSingleMethodOrNull(name, includeNonPublic).ThrowIfNull(
