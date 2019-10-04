@@ -11600,7 +11600,7 @@ namespace DryIoc
         public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
         {
             var argsLength = args.Length;
-            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            var ctors = Constructors(type, includeNonPublic, includeStatic: false).ToArrayOrSelf();
             for (var c = 0; c < ctors.Length; c++)
             {
                 var ctor = ctors[c];
@@ -11638,7 +11638,7 @@ namespace DryIoc
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
             ConstructorInfo ctor = null;
-            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            var ctors = Constructors(type, includeNonPublic, includeStatic: false).ToArrayOrSelf();
             for (var i = 0; i < ctors.Length; i++)
             {
                 var x = ctors[i];
