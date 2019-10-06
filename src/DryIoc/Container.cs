@@ -2871,9 +2871,9 @@ namespace DryIoc
 
             var mapIndex = id & Scope.MAP_COUNT_SUFFIX_MASK;
             ref var map = ref scope._maps[mapIndex];
-            var item = map.GetValueOrDefault(id)?.Item;
-            if (item != null)
-                return item;
+            var itemRef = map.GetValueOrDefault(id);
+            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                return itemRef.Item;
 
             var disposalOrder = (int)((ConstantExpression)args[4]).Value;
 
@@ -2882,18 +2882,18 @@ namespace DryIoc
                 return scope.TryGetOrAddViaFactoryDelegate(ref map, id, (FactoryDelegate)factoryDelegate.Value, r, disposalOrder);
 
             // add only, keep old item if it already exists
-            var itemRef = new Scope.ItemRef();
+            itemRef = new ItemRef();
             var currMap = map;
             if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), currMap) != currMap)
                 Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
-            if (itemRef.Item != null)
+            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
             lock (itemRef)
             {
-                if (itemRef.Item != null)
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
 
                 if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out var result))
@@ -8414,18 +8414,18 @@ namespace DryIoc
                 var factoryId = FactoryID;
                 ref var map = ref scope._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK];
 
-                var itemRef = new Scope.ItemRef();
+                var itemRef = new ItemRef();
                 var m = map;
                 if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(factoryId, itemRef, (oldRef, _) => oldRef), m) != m)
                     Ref.Swap(ref map, factoryId, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
                 itemRef = map.GetValueOrDefault(factoryId);
-                if (itemRef.Item == null)
+                if (ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 {
                     var isNewItem = false;
                     lock (itemRef)
                     {
-                        if (itemRef.Item == null)
+                        if (ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                         {
                             var useFec = container.Rules.UseFastExpressionCompiler;
                             if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out var result))
@@ -9859,7 +9859,11 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            return map.GetValueOrDefault(id)?.Item ?? TryGetOrAdd(ref map, id, createValue, disposalOrder);
+            var itemRef = map.GetValueOrDefault(id);
+            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                return itemRef.Item;
+
+            return TryGetOrAdd(ref map, id, createValue, disposalOrder);
         }
 
         private object TryGetOrAdd(ref ImMap<ItemRef> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
@@ -9873,14 +9877,14 @@ namespace DryIoc
                 Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
-            if (itemRef.Item != null)
+            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)
             {
                 // double-check if the item was changed in between (double check locking)
-                if (itemRef.Item != null)
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
 
                 // we can simple assing because we are under the lock 
@@ -9898,7 +9902,11 @@ namespace DryIoc
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            return map.GetValueOrDefault(id)?.Item ?? TryGetOrAddViaFactoryDelegate(ref map, id, createValue, r, disposalOrder);
+            var itemRef = map.GetValueOrDefault(id);
+            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                return itemRef.Item;
+
+            return TryGetOrAddViaFactoryDelegate(ref map, id, createValue, r, disposalOrder);
         }
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
@@ -9916,14 +9924,14 @@ namespace DryIoc
                 Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
-            if (itemRef.Item != null)
+            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)
             {
                 // double-check if the item was changed in between (double check locking)
-                if (itemRef.Item != null)
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
 
                 // we can simple assign because we are under the lock 
@@ -9952,12 +9960,12 @@ namespace DryIoc
                 Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
-            if (itemRef.Item != null)
+            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
             lock (itemRef)
             {
-                if (itemRef.Item != null)
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
                 itemRef.Item = createValue(resolveContext, expr, useFec);
             }
@@ -9983,14 +9991,14 @@ namespace DryIoc
                 Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
 
             var itemRef = map.GetValueOrDefault(id);
-            if (itemRef.Item != null)
+            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return;
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)
             {
                 // double-check if the item was changed in between (double check locking)
-                if (itemRef.Item != null)
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return;
 
                 // we can simple assign because we are under the lock 
@@ -10009,7 +10017,7 @@ namespace DryIoc
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            if (map.TryFind(id, out var itemRef) && itemRef.Item != null)
+            if (map.TryFind(id, out var itemRef) && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
             // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
@@ -10024,7 +10032,7 @@ namespace DryIoc
             lock (itemRef)
             {
                 // double-check if the item was changed in between (double check locking)
-                if (itemRef.Item != null)
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
 
                 // we can simple assign because we are under the lock 
@@ -10050,8 +10058,15 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public bool TryGet(out object item, int id)
         {
-            item = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id)?.Item;
-            return item != null;
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id); 
+            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            {
+                item = itemRef.Item;
+                return true;
+            }
+
+            item = null;
+            return false;
         }
 
         /// <summary>Can be used to manually add service for disposal</summary>
@@ -10144,16 +10159,17 @@ namespace DryIoc
         private int _nextDisposalIndex;
         private int _disposed;
 
-        // todo: We can use the object tumbstone to express empty Ref in order to support valid `null` as Item value, e.g. `Empty = new object()`
-        // Stores the item object in a ref (class) box which does not change after created and may be used for locking
-        internal sealed class ItemRef
-        {
-            public object Item;
-        }
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
         internal ImMap<ItemRef>[] _maps;
+    }
+
+    // Stores the item object in a ref (class) box which does not change after created and may be used for locking
+    internal sealed class ItemRef
+    {
+        public static readonly object NoItem = new object();
+        public object Item = NoItem;
     }
 
     /// <summary>Delegate to get new scope from old/existing current scope.</summary>
