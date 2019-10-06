@@ -667,17 +667,15 @@ namespace ImTools
         public T Swap(Func<T, T> getNewValue) => Ref.Swap(ref _value, getNewValue);
 
         /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
+        public T Swap<A>(A a, Func<A, T, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
 
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
-
-        /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public T Swap<A, B, C>(A a, B b, C c, Func<T, A, B, C, T> getNewValue) => Ref.Swap(ref _value, a, b, c, getNewValue);
+        public T Swap<A, B>(A a, B b, Func<A, B, T, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
 
         /// <summary>Just sets new value ignoring any intermingled changes.</summary>
         /// <param name="newValue"></param> <returns>old value</returns>
-        public T Swap(T newValue) => Interlocked.Exchange(ref _value, newValue);
+        public T Swap(T newValue) =>
+            Interlocked.Exchange(ref _value, newValue);
 
         /// <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
         /// <param name="currentValue"></param> <param name="newValue"></param>
@@ -729,13 +727,13 @@ namespace ImTools
         }
 
         /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue) where T : class
+        public static T Swap<A, T>(ref T value, A a, Func<A, T, T> getNewValue) where T : class
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(oldValue, a);
+                var newValue = getNewValue(a, oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -744,13 +742,13 @@ namespace ImTools
         }
 
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue) where T : class
+        public static T Swap<A, B, T>(ref T value, A a, B b, Func<A, B, T, T> getNewValue) where T : class
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b);
+                var newValue = getNewValue(a, b, oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -760,13 +758,13 @@ namespace ImTools
 
         /// Option without allocation for capturing `a`, `b`, `c` in closure of `getNewValue`
         [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A, B, C>(ref T value, A a, B b, C c, Func<T, A, B, C, T> getNewValue) where T : class
+        public static T Swap<A, B, C, T>(ref T value, A a, B b, C c, Func<A, B, C, T, T> getNewValue) where T : class
         {
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b, c);
+                var newValue = getNewValue(a, b, c, oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > RETRY_COUNT_UNTIL_THROW)
@@ -2139,7 +2137,7 @@ namespace ImTools
         }
 
         private static void RefAddOrUpdateSlot(ref ImMapSlot<V> slot, int key, V value) =>
-            Ref.Swap(ref slot, key, value, (s, k, v) =>
+            Ref.Swap(ref slot, key, value, (k, v, s) =>
                 s.KeyPlusHeight == 0 ? ImMapSlot<V>.Leaf(k, v)
                 : k != s.KeyPart ? s.AddOrUpdate(k, v)
                 : new ImMapSlot<V>(s.KeyPlusHeight, v, s.Left, s.Right));
@@ -2160,7 +2158,7 @@ namespace ImTools
         }
 
         private static void RefAddOrUpdateSlot(ref ImMapSlot<V> slot, int key, V value, Update<V> updateValue) =>
-            Ref.Swap(ref slot, key, value, updateValue, (s, k, v, u) => s.AddOrUpdate(k, v, false, u));
+            Ref.Swap(ref slot, key, value, updateValue, (k, v, u, s) => s.AddOrUpdate(k, v, false, u));
 
         /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
         /// <param name="key"></param> <param name="value"></param>
@@ -2176,7 +2174,7 @@ namespace ImTools
         }
 
         private static void RefUpdateSlot(ref ImMapSlot<V> slot, int key, V value) =>
-            Ref.Swap(ref slot, key, value, (s, k, v) => s.AddOrUpdate(k, v, true, null));
+            Ref.Swap(ref slot, key, value, (k, v, s) => s.AddOrUpdate(k, v, true, null));
 
         /// Get value for found key or the default value otherwise.
         [MethodImpl((MethodImplOptions)256)]

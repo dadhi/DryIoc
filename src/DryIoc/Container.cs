@@ -1763,7 +1763,7 @@ namespace DryIoc
                 var current = map;
                 var cacheSlot = new CacheSlot(factory);
                 if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(serviceType, cacheSlot), current) != current)
-                    Ref.Swap(ref map, serviceType, cacheSlot, (x, type, slot) => x.AddOrUpdate(type, slot));
+                    Ref.Swap(ref map, serviceType, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
             // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
@@ -1804,7 +1804,7 @@ namespace DryIoc
                 var current = map;
                 var cacheSlot = new CacheSlot(factory);
                 if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(key, cacheSlot), current) != current)
-                    Ref.Swap(ref map, key, cacheSlot, (x, type, slot) => x.AddOrUpdate(type, slot));
+                    Ref.Swap(ref map, key, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
             internal sealed class ExpressionCacheSlot
@@ -1877,7 +1877,7 @@ namespace DryIoc
 
                     var current = map;
                     if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(factoryId, slot), current) != current)
-                        Ref.Swap(ref map, factoryId, slot, (x, type, e) => x.AddOrUpdate(type, e));
+                        Ref.Swap(ref map, factoryId, slot, (type, e, x) => x.AddOrUpdate(type, e));
                 }
 
                 var reuse = request.Reuse;
@@ -2374,7 +2374,7 @@ namespace DryIoc
                         var defaultFactoryCache = DefaultFactoryCache;
                         if (defaultFactoryCache != null)
                             Ref.Swap(ref defaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK],
-                                serviceType, (x, t) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
+                                serviceType, (t, x) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
 
                         // todo: At the moment there is not possibility to clean-up a particular factory.
                         // But considering that keyed services are much lees "likely" than the default ones - then  it is fine, right?
@@ -2394,7 +2394,7 @@ namespace DryIoc
                     var cache = FactoryExpressionCache;
                     if (cache != null)
                         Ref.Swap(ref cache[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (x, fid) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, null));
+                            factory.FactoryID, (fid, x) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, null));
                 }
             }
 
@@ -2885,7 +2885,7 @@ namespace DryIoc
             var itemRef = new Scope.ItemRef();
             var currMap = map;
             if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), currMap) != currMap)
-                Ref.Swap(ref map, id, itemRef, (x, i, ir) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
@@ -6469,7 +6469,7 @@ namespace DryIoc
                 return;
 
             request.Container.Rules.DependencyResolutionCallExprs.Swap(request, factoryExpr, 
-                (x, req, facExpr) => x.AddOrUpdate(req, facExpr
+                (req, facExpr, x) => x.AddOrUpdate(req, facExpr
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                         .ToExpression()
 #endif
@@ -8417,7 +8417,7 @@ namespace DryIoc
                 var itemRef = new Scope.ItemRef();
                 var m = map;
                 if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(factoryId, itemRef, (oldRef, _) => oldRef), m) != m)
-                    Ref.Swap(ref map, factoryId, itemRef, (x, i, ir) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+                    Ref.Swap(ref map, factoryId, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
                 itemRef = map.GetValueOrDefault(factoryId);
                 if (itemRef.Item == null)
@@ -9177,7 +9177,7 @@ namespace DryIoc
 
                 // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (facs, genFacKey, fac) => facs.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
+                    (genFacKey, fac, facs) => facs.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
 
                 return closedGenericFactory;
             }
@@ -9870,7 +9870,7 @@ namespace DryIoc
             var itemRef = new ItemRef();
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (x, i, ir) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
@@ -9913,7 +9913,7 @@ namespace DryIoc
             var itemRef = new ItemRef();
             var m = map;
             if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (x, i, ir) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
@@ -9949,7 +9949,7 @@ namespace DryIoc
             var itemRef = new ItemRef();
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (x, i, ir) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
 
             itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != null)
@@ -10043,7 +10043,7 @@ namespace DryIoc
                 disposalOrder = NextDisposalIndex();
             var d = _disposables;
             if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
-                Ref.Swap(ref _disposables, disposalOrder, disposable, (x, dispOrder, disp) => x.AddOrUpdate(dispOrder, disp));
+                Ref.Swap(ref _disposables, disposalOrder, disposable, (dispOrder, disp, x) => x.AddOrUpdate(dispOrder, disp));
         }
 
         /// <inheritdoc />
@@ -10075,7 +10075,7 @@ namespace DryIoc
 
             var f = _factories;
             if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(type, factory), f) != f)
-                Ref.Swap(ref _factories, type, factory, (x, t, fac) => x.AddOrUpdate(t, fac));
+                Ref.Swap(ref _factories, type, factory, (t, fac, x) => x.AddOrUpdate(t, fac));
         }
 
         /// Try retrieve instance from the small registry.
