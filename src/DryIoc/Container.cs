@@ -9802,8 +9802,8 @@ namespace DryIoc
         IScope Clone();
     }
 
-    /// <summary>Scope implementation to hold and dispose stored <see cref="IDisposable"/> items.
-    /// <c>lock</c> is used internally to ensure that object factory called only once.</summary>
+    /// Scope is container to hold the shared per scope items and dispose <see cref="IDisposable"/> items.
+    /// Scope uses Locking to ensure that the object factory called only once.
     public sealed class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
