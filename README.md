@@ -43,7 +43,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * [Performance overview](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
 * Realistic performance of unit-of-work with the modest size object graph ([#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634), [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255)):
 
-### Creating container, registering services, then `OpenScope` and resolve the root service
+### Creating the container, registering the services, then opening a scope and resolving the scoped service (e.g. controller) for the first time
 
 ```md
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -57,7 +57,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
                     BmarkGraceMsDi | 23,546.7 us | 294.414 us | 275.395 us | 141.02 |    2.04 |    187.5000 |     93.7500 |     31.2500 |           926.86 KB |
 ```
 
-### `OpenScope` and resolve the root service
+### Openning a scope and resolving the scoped service (e.g. controller) after the first time
 
 ```md
                             Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
